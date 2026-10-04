@@ -10,6 +10,9 @@ use DateTimeImmutable;
 
 final readonly class SongMetadataUpdated extends AbstractDomainEvent
 {
+    /**
+     * @param string[] $updatedFields
+     */
     public function __construct(
         private readonly Uuid $songId,
         private readonly string $source,
@@ -19,6 +22,9 @@ final readonly class SongMetadataUpdated extends AbstractDomainEvent
         parent::__construct($occurredAt);
     }
 
+    /**
+     * @param array<string, mixed> $payload
+     */
     public static function fromPayload(array $payload): static
     {
         return new self(
@@ -29,6 +35,9 @@ final readonly class SongMetadataUpdated extends AbstractDomainEvent
         );
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toPayload(): array
     {
         return [
@@ -54,6 +63,9 @@ final readonly class SongMetadataUpdated extends AbstractDomainEvent
         return $this->source;
     }
 
+    /**
+     * @return string[]
+     */
     public function getUpdatedFields(): array
     {
         return $this->updatedFields;

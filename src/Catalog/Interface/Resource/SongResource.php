@@ -38,6 +38,7 @@ final class SongResource extends AbstractResource
     /**
      * @param array<string, string> $artistNames  songUuid => artistName
      * @param array<string, string> $albumTitles  albumUuid => albumTitle
+     * @return array<string, mixed>
      */
     public static function fromWithMeta(Song $song, array $artistNames = [], array $albumTitles = []): array
     {
@@ -67,6 +68,7 @@ final class SongResource extends AbstractResource
      * @param iterable<Song> $songs
      * @param array<string, string> $artistNames  songUuid => artistName
      * @param array<string, string> $albumTitles  albumUuid => albumTitle
+     * @return list<array<string, mixed>>
      */
     public static function collectionWithMeta(iterable $songs, array $artistNames, array $albumTitles): array
     {

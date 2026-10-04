@@ -156,6 +156,10 @@ final class AdminAlbumController
         }
     }
 
+    /**
+     * @param \App\Catalog\Domain\Model\Song[] $songs
+     * @return array{count: int, names: list<string>}
+     */
     private function getPlaylistDataForSongs(array $songs): array
     {
         $allPlaylistNames = [];

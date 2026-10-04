@@ -33,6 +33,9 @@ final readonly class MetadataSynced extends AbstractDomainEvent
         return $this->entityType;
     }
 
+    /**
+     * @param array<string, mixed> $payload
+     */
     public static function fromPayload(array $payload): static
     {
         return new self(
@@ -42,6 +45,9 @@ final readonly class MetadataSynced extends AbstractDomainEvent
         );
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toPayload(): array
     {
         return [

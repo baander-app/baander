@@ -32,8 +32,8 @@ class SongEntity
     #[ORM\JoinColumn(name: 'album_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private AlbumEntity $album;
 
-    #[ORM\OneToMany(mappedBy: 'song', targetEntity: GenreSongEntity::class)]
     /** @var Collection<int, GenreSongEntity> */
+    #[ORM\OneToMany(mappedBy: 'song', targetEntity: GenreSongEntity::class)]
     private Collection $genres;
 
     #[ORM\Column(type: 'text')]
@@ -117,6 +117,7 @@ class SongEntity
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $spotifyId = null;
 
+    /** @var string[] */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '{}'])]
     private array $lockedFields = [];
 
@@ -473,11 +474,17 @@ class SongEntity
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /**
+     * @return string[]
+     */
     public function getLockedFields(): array
     {
         return $this->lockedFields;
     }
 
+    /**
+     * @param string[] $lockedFields
+     */
     public function setLockedFields(array $lockedFields): void
     {
         $this->lockedFields = $lockedFields;

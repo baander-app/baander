@@ -99,6 +99,8 @@ final class AlbumDuplicateDetector
      * 2. Title similarity ≥ 85%
      * 3. Artist overlap ≥ 50%
      * 4. Year match (both null OR equal)
+     * @param array{album: \App\Catalog\Domain\Model\Album, normalizedTitle: string, artists: array<array-key, string>, year: int|null} $a
+     * @param array{album: \App\Catalog\Domain\Model\Album, normalizedTitle: string, artists: array<array-key, string>, year: int|null} $b
      */
     private function isDuplicate(array $a, array $b): bool
     {
@@ -141,15 +143,13 @@ final class AlbumDuplicateDetector
         $distance = levenshtein($a, $b);
         $maxLength = max(strlen($a), strlen($b));
 
-        if ($maxLength === 0) {
-            return 1.0;
-        }
-
         return 1.0 - ($distance / $maxLength);
     }
 
     /**
      * Calculates Jaccard index for artist overlap.
+     * @param string[] $artistsA
+     * @param string[] $artistsB
      */
     private function calculateArtistOverlap(array $artistsA, array $artistsB): float
     {
@@ -174,6 +174,9 @@ final class AlbumDuplicateDetector
      * Calculates confidence score for a duplicate group.
      *
      * Confidence is based on the average similarity scores within the group.
+     * @param array{album: \App\Catalog\Domain\Model\Album, normalizedTitle: string, artists: array<array-key, string>, year: int|null} $anchor
+     * @param string[] $groupIds
+     * @param array<string, array{album: \App\Catalog\Domain\Model\Album, normalizedTitle: string, artists: array<array-key, string>, year: int|null}> $albumData
      */
     private function calculateConfidence(array $anchor, array $groupIds, array $albumData): float
     {

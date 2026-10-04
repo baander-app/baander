@@ -23,6 +23,9 @@ interface MovieRepositoryInterface extends Searchable
 
     public function findByPublicId(PublicId $publicId): ?Movie;
 
+    /**
+     * @return \App\Catalog\Domain\Model\Movie[]
+     */
     public function findByLibrary(Uuid $libraryId): array;
 
     public function findByTitleAndLibrary(string $title, Uuid $libraryId): ?Movie;

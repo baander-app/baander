@@ -73,6 +73,7 @@ class ArtistEntity
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $spotifyId = null;
 
+    /** @var string[] */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '{}'])]
     private array $lockedFields = [];
 
@@ -153,9 +154,9 @@ class ArtistEntity
         return $this->lifeSpanBegin;
     }
 
-    public function setLifeSpanBegin(?\DateTimeImmutable $lifeSpanBegin): void
+    public function setLifeSpanBegin(?\DateTimeInterface $lifeSpanBegin): void
     {
-        $this->lifeSpanBegin = $lifeSpanBegin;
+        $this->lifeSpanBegin = $lifeSpanBegin !== null ? \DateTimeImmutable::createFromInterface($lifeSpanBegin) : null;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
@@ -164,9 +165,9 @@ class ArtistEntity
         return $this->lifeSpanEnd;
     }
 
-    public function setLifeSpanEnd(?\DateTimeImmutable $lifeSpanEnd): void
+    public function setLifeSpanEnd(?\DateTimeInterface $lifeSpanEnd): void
     {
-        $this->lifeSpanEnd = $lifeSpanEnd;
+        $this->lifeSpanEnd = $lifeSpanEnd !== null ? \DateTimeImmutable::createFromInterface($lifeSpanEnd) : null;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
@@ -236,11 +237,17 @@ class ArtistEntity
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /**
+     * @return string[]
+     */
     public function getLockedFields(): array
     {
         return $this->lockedFields;
     }
 
+    /**
+     * @param string[] $lockedFields
+     */
     public function setLockedFields(array $lockedFields): void
     {
         $this->lockedFields = $lockedFields;

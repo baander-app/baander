@@ -29,6 +29,9 @@ final class MovieService implements MoviePortInterface
         return $this->movieRepository->findByUuid($uuid);
     }
 
+    /**
+     * @return \App\Catalog\Domain\Model\Movie[]
+     */
     public function findByLibrary(Uuid $libraryId): array
     {
         return $this->movieRepository->findByLibrary($libraryId);

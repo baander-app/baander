@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Controller;
 
-use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Catalog\Interface\Request\UpdateMovieRequest;
@@ -32,7 +31,6 @@ final class MovieController
     public function __construct(
         private readonly MoviePortInterface $movieService,
         private readonly VideoRepositoryInterface $videoRepository,
-        private readonly GenrePortInterface $genreService,
     ) {
     }
 

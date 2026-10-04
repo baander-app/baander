@@ -16,6 +16,9 @@ interface MoviePortInterface
 
     public function findByUuid(Uuid $uuid): ?Movie;
 
+    /**
+     * @return \App\Catalog\Domain\Model\Movie[]
+     */
     public function findByLibrary(Uuid $libraryId): array;
 
     public function findByTitleAndLibrary(string $title, Uuid $libraryId): ?Movie;

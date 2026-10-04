@@ -75,9 +75,11 @@ class AlbumEntity
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $annotation = null;
 
+    /** @var string[] */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '{}'])]
     private array $lockedFields = [];
 
+    /** @var array<int, array{id: string, title: string, mergedAt: string}> */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '[]'])]
     private array $mergedFrom = [];
 
@@ -265,11 +267,17 @@ class AlbumEntity
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /**
+     * @return string[]
+     */
     public function getLockedFields(): array
     {
         return $this->lockedFields;
     }
 
+    /**
+     * @param string[] $lockedFields
+     */
     public function setLockedFields(array $lockedFields): void
     {
         $this->lockedFields = $lockedFields;
@@ -284,6 +292,9 @@ class AlbumEntity
         return $this->mergedFrom;
     }
 
+    /**
+     * @param array<int, array{id: string, title: string, mergedAt: string}> $mergedFrom
+     */
     public function setMergedFrom(array $mergedFrom): void
     {
         $this->mergedFrom = $mergedFrom;

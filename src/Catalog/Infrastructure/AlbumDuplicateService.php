@@ -48,7 +48,7 @@ final class AlbumDuplicateService implements AlbumDuplicatePortInterface
     }
 
     /**
-     * @param array<string, array> $artistNamesMap
+     * @param array<string, array<int, array{name: string, role: string|null}>> $artistNamesMap
      */
     private function enrichGroup(DuplicateGroup $group, array $artistNamesMap): DuplicateGroup
     {

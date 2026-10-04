@@ -70,6 +70,9 @@ final class MovieRepository implements MovieRepositoryInterface
         return $entity !== null ? $this->toDomain($entity) : null;
     }
 
+    /**
+     * @return \App\Catalog\Domain\Model\Movie[]
+     */
     public function findByLibrary(Uuid $libraryId): array
     {
         $entities = $this->entityManager

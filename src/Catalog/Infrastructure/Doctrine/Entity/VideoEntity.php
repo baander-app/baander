@@ -43,6 +43,7 @@ class VideoEntity
     #[ORM\Column(type: 'integer', nullable: true)]
     private ?int $framerate = null;
 
+    /** @var array<string, mixed> */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '{}'])]
     private array $probe = [];
 
@@ -153,11 +154,17 @@ class VideoEntity
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function getProbe(): array
     {
         return $this->probe;
     }
 
+    /**
+     * @param array<string, mixed> $probe
+     */
     public function setProbe(array $probe): void
     {
         $this->probe = $probe;

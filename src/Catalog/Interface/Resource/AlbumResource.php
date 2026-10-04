@@ -44,6 +44,7 @@ final class AlbumResource extends AbstractResource
 
     /**
      * @param array<int, array{name: string, role: string|null}> $artists
+     * @return array<string, mixed>
      */
     public static function fromWithCoverAndArtists(Album $album, ?Image $coverImage, array $artists, string $baseUrl = ''): array
     {
@@ -63,6 +64,9 @@ final class AlbumResource extends AbstractResource
         return $data;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public static function fromWithCover(Album $album, ?Image $coverImage, string $baseUrl = ''): array
     {
         return self::fromWithCoverAndArtists($album, $coverImage, [], $baseUrl);

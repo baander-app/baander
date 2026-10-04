@@ -13,7 +13,7 @@ final readonly class DuplicateGroup
 {
     /**
      * @param Uuid[] $albumIds
-     * @param array<int, array> $albums
+     * @param array<int, array<string, mixed>> $albums
      */
     public function __construct(
         public array $albumIds,
@@ -44,7 +44,7 @@ final readonly class DuplicateGroup
     }
 
     /**
-     * @return array<int, array>
+     * @return array<int, array<string, mixed>>
      */
     public function getAlbums(): array
     {

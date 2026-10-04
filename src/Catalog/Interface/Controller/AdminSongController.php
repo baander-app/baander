@@ -83,10 +83,7 @@ final class AdminSongController
             return $this->notFound();
         }
 
-        $album = null;
-        if ($song->getAlbumId() !== null) {
-            $album = $this->albumPort->findByUuid($song->getAlbumId());
-        }
+        $album = $this->albumPort->findByUuid($song->getAlbumId());
 
         $playlists = $this->playlistRepo->findPlaylistNamesContainingSong($song->getId());
         $playlistNames = array_map(fn($p) => $p['name'], $playlists);

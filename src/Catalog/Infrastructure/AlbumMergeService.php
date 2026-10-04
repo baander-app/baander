@@ -10,7 +10,6 @@ use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Domain\Model\Album;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use Doctrine\ORM\EntityManagerInterface;
 use InvalidArgumentException;
 
 final class AlbumMergeService implements AlbumMergePortInterface
@@ -18,7 +17,6 @@ final class AlbumMergeService implements AlbumMergePortInterface
     public function __construct(
         private readonly AlbumPortInterface $albumPort,
         private readonly SongPortInterface $songPort,
-        private readonly EntityManagerInterface $entityManager,
     ) {
     }
 

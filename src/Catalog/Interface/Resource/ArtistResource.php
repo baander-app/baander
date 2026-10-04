@@ -40,6 +40,9 @@ final class ArtistResource extends AbstractResource
         ];
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public static function fromWithCover(Artist $artist, ?Image $coverImage, string $baseUrl = ''): array
     {
         $data = self::from($artist);
