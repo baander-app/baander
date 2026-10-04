@@ -22,7 +22,7 @@ export function useVisualizerLoop(options: UseVisualizerLoopOptions): void {
   const { rendererRef, canvasRef, smoothingAlpha = 0.35, compact = false, albumPublicId } = options
 
   const rafRef = useRef<number>(0)
-  const lastTimeRef = useRef(performance.now())
+  const lastTimeRef = useRef(0)
   const runningRef = useRef(false)
   const ctx2dRef = useRef<CanvasRenderingContext2D | null>(null)
 
@@ -36,6 +36,11 @@ export function useVisualizerLoop(options: UseVisualizerLoopOptions): void {
       if (!runningRef.current) return
       rafRef.current = requestAnimationFrame(draw)
 
+      // Advance on every frame so unavailable inputs do not accumulate elapsed time.
+      const now = performance.now()
+      const deltaTime = now - lastTimeRef.current
+      lastTimeRef.current = now
+
       const renderer = rendererRef.current
       const canvas = canvasRef.current
       if (!canvas || !renderer) return
@@ -48,11 +53,6 @@ export function useVisualizerLoop(options: UseVisualizerLoopOptions): void {
 
       // Get palette
       const palette = albumPublicId ? getPalette(albumPublicId) : null
-
-      // Compute delta time
-      const now = performance.now()
-      const deltaTime = now - lastTimeRef.current
-      lastTimeRef.current = now
 
       // Cache 2D context — getContext returns same instance after first call
       if (!ctx2dRef.current && !renderer.isWebGL) {
