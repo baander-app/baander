@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Lyrics\Infrastructure\Doctrine\Repository;
 
-use App\Catalog\Application\Port\SongPortInterface;
 use App\Lyrics\Application\Port\LyricsAdminPortInterface;
 use App\Lyrics\Application\Command\BulkFetchLyricsCommand;
 use App\Shared\Infrastructure\Doctrine\Entity\JobMonitorEntity;
@@ -16,7 +15,6 @@ final class LyricsAdminRepository implements LyricsAdminPortInterface
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
-        private readonly SongPortInterface $songPort,
         private readonly MessageBusInterface $bus,
         private readonly LoggerInterface $logger,
     ) {

@@ -121,7 +121,7 @@ final class FetchLyricsHandler
         return $lyrics;
     }
 
-    private function createLyricsFromResult(LrclibResult $result, $songId): Lyrics
+    private function createLyricsFromResult(LrclibResult $result, \App\Shared\Domain\Model\Uuid $songId): Lyrics
     {
         return Lyrics::create(
             songId: $songId,

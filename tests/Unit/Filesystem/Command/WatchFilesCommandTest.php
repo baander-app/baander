@@ -25,7 +25,6 @@ final class WatchFilesCommandTest extends TestCase
     {
         $this->command = new WatchFilesCommand(
             new FileWatcher(new NullLogger()),
-            new NullLogger(),
         );
     }
 

@@ -8,6 +8,7 @@ use App\Shared\Domain\Model\Uuid;
 
 final readonly class CreatePlaylistCommand
 {
+    /** @param array<array-key, mixed> $smartRules */
     public function __construct(
         private string $name,
         private Uuid $userId,
@@ -49,6 +50,7 @@ final readonly class CreatePlaylistCommand
         return $this->isSmart;
     }
 
+    /** @return array<array-key, mixed> */
     public function getSmartRules(): array
     {
         return $this->smartRules;

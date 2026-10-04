@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Activity\Interface\Controller;
 
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Activity\Application\Port\ActivityPortInterface;
 use App\Activity\Domain\Model\MediaActivity;
 use App\Activity\Infrastructure\ActivityEnrichmentService;
@@ -53,7 +54,7 @@ final class UserRecentController
     public function recent(Request $request): JsonResponse
     {
         $user = $this->security->getUser();
-        if ($user === null) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return $this->unauthorized();
         }
 

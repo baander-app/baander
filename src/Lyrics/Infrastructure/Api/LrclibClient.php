@@ -123,7 +123,8 @@ final class LrclibClient implements LrclibClientInterface
      * Returns null on 404 (no lyrics found), logs errors on other failures,
      * and never throws external exceptions to callers.
      *
-     * @return array<string, mixed>|null Decoded JSON response, or null on failure/404
+     * @return array<array-key, mixed>|null Decoded JSON response, or null on failure/404
+     * @param array<string, mixed> $params
      */
     private function request(string $method, string $endpoint, array $params = []): ?array
     {
@@ -156,7 +157,7 @@ final class LrclibClient implements LrclibClientInterface
 
             $data = $response->toArray();
 
-            return is_array($data) ? $data : null;
+            return $data;
         } catch (ClientException $e) {
             $response = $e->getResponse();
 

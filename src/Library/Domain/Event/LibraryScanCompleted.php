@@ -37,6 +37,9 @@ final readonly class LibraryScanCompleted extends AbstractDomainEvent
         );
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toPayload(): array
     {
         return [

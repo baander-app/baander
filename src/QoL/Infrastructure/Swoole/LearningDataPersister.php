@@ -75,6 +75,9 @@ final class LearningDataPersister
         return sprintf('%s/governor_state.json', $this->stateDir);
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
     public function load(): ?array
     {
         $filePath = $this->stateFilePath();

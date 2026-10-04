@@ -87,7 +87,7 @@ final class CpuGpuSampler implements Bootable
         }
 
         $lines = explode("\n", $stat);
-        $cpuLine = $lines[0] ?? '';
+        $cpuLine = $lines[0];
         $parts = preg_split('/\s+/', $cpuLine);
 
         if ($parts === false || count($parts) < 5) {
@@ -180,7 +180,7 @@ final class CpuGpuSampler implements Bootable
         }
 
         $lines = explode("\n", trim($output));
-        $first = trim($lines[0] ?? '');
+        $first = trim($lines[0]);
 
         if (is_numeric($first)) {
             return (float)$first;

@@ -197,6 +197,7 @@ final class LearningModel
 
     /**
      * Serialize model state for persistence.
+     * @return array{samples: array<array-key, array<string, int|float|string|bool>>, coefficients: list<float>|null}
      */
     public function getState(): array
     {
@@ -208,6 +209,7 @@ final class LearningModel
 
     /**
      * Restore model state from persistence.
+     * @param array<string, mixed> $state
      */
     public function restoreState(array $state): void
     {

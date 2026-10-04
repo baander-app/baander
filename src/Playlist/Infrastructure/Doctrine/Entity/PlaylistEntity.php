@@ -42,6 +42,7 @@ class PlaylistEntity
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
     private bool $isSmart = false;
 
+    /** @var array<array-key, mixed> */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '{}'])]
     private array $smartRules = [];
 
@@ -135,11 +136,17 @@ class PlaylistEntity
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /**
+     * @return array<array-key, mixed>
+     */
     public function getSmartRules(): array
     {
         return $this->smartRules;
     }
 
+    /**
+     * @param array<array-key, mixed> $smartRules
+     */
     public function setSmartRules(array $smartRules): void
     {
         $this->smartRules = $smartRules;

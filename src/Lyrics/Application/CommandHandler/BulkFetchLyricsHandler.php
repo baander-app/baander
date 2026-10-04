@@ -8,7 +8,7 @@ use App\Catalog\Application\Port\SongPortInterface;
 use App\Lyrics\Application\Command\BulkFetchLyricsCommand;
 use App\Lyrics\Application\Command\FetchLyricsCommand;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
-use App\Shared\Domain\Model\Cursor;
+use App\Shared\Application\Port\CursorDecoderInterface;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Infrastructure\Swoole\Async;
 use Psr\Log\LoggerInterface;
@@ -32,6 +32,7 @@ final class BulkFetchLyricsHandler
         private readonly LyricsRepositoryInterface $lyricsRepository,
         private readonly MessageBusInterface $bus,
         private readonly LoggerInterface $logger,
+        private readonly CursorDecoderInterface $cursorDecoder,
     ) {
     }
 
@@ -81,9 +82,13 @@ final class BulkFetchLyricsHandler
                 }
             }
 
-            $cursor = $page->getNextCursor();
-            if ($cursor === null) {
+            $nextCursor = $page->getNextCursor();
+            if ($nextCursor === null) {
                 break;
+            }
+            $cursor = $this->cursorDecoder->decode($nextCursor);
+            if ($cursor === null) {
+                throw new \UnexpectedValueException('Song pagination returned an invalid continuation cursor.');
             }
         }
 

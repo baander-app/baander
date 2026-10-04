@@ -189,6 +189,22 @@ final class LibraryControllerSecurityTest extends TestCase
         $this->assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode());
     }
 
+    public function testAuthorizedDeleteReturnsDocumentedEmptyData(): void
+    {
+        $library = $this->createLibrary();
+        $libraries = $this->createMock(LibraryPortInterface::class);
+        $libraries->method('findByUuid')->willReturn($library);
+        $libraries->expects($this->once())->method('delete')->with($library);
+        $security = $this->createStub(Security::class);
+        $security->method('getUser')->willReturn(new SecurityUser(Uuid::v7()->toString(), 'admin@baander.app', 'hash', ['ROLE_ADMIN']));
+        $controller = new LibraryController($libraries, $this->statsQuery, $this->pathValidator, $this->commandBus, $security);
+
+        $response = $controller->destroy($library->getId()->toString());
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('{"data":null}', $response->getContent());
+    }
+
     public function testScanRequiresOwnershipOrAdmin(): void
     {
         $this->commandBus = $this->createMock(MessageBusInterface::class);

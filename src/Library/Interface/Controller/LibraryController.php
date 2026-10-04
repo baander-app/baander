@@ -282,7 +282,7 @@ final class LibraryController
 
         $this->libraryService->delete($library);
 
-        return $this->successResponse(null);
+        return $this->json(['data' => null]);
     }
 
     #[OA\Post(

@@ -46,15 +46,6 @@ final class MimeDetector implements \App\Filesystem\Application\Port\MimeDetecto
         'application/pdf' => ["%PDF"],
     ];
 
-    /** Container format sub-type detection offsets. */
-    private const array CONTAINER_TYPES = [
-        'RIFF' => [
-            ['offset' => 8, 'length' => 4, 'value' => 'WAVE', 'mime' => 'audio/wav'],
-            ['offset' => 8, 'length' => 4, 'value' => 'AVI ', 'mime' => 'video/avi'],
-            ['offset' => 8, 'length' => 4, 'value' => 'WEBP', 'mime' => 'image/webp'],
-        ],
-    ];
-
     /**
      * Detect the MIME type of a file by reading its magic bytes.
      */

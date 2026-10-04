@@ -245,6 +245,7 @@ final class StreamGovernor
 
     /**
      * Serialize full governor state for persistence.
+     * @return array<string, mixed>
      */
     public function exportState(): array
     {
@@ -266,6 +267,7 @@ final class StreamGovernor
 
     /**
      * Restore governor state from persistence.
+     * @param array<string, mixed> $state
      */
     public function importState(array $state): void
     {

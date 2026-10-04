@@ -32,7 +32,8 @@ final class FileWatcher
     /** @var array<int, string> Reverse map from watch descriptor to directory path */
     private array $wdToPath = [];
 
-    private $inotifyFd = null;
+    /** @var resource|null */
+    private mixed $inotifyFd = null;
 
     /** @var callable[] */
     private array $listeners = [];
@@ -56,10 +57,11 @@ final class FileWatcher
         }
 
         if ($this->inotifyFd === null) {
-            $this->inotifyFd = inotify_init();
-            if ($this->inotifyFd === false) {
+            $descriptor = inotify_init();
+            if (!is_resource($descriptor)) {
                 throw new \RuntimeException('Failed to initialize inotify.');
             }
+            $this->inotifyFd = $descriptor;
         }
 
         if (isset($this->watches[$realPath])) {
@@ -131,6 +133,9 @@ final class FileWatcher
         $this->logger->info('File watcher stopped');
     }
 
+    /**
+     * @param array{wd: int, mask: int, cookie: int, name: string} $inotifyEvent
+     */
     private function dispatchEvent(array $inotifyEvent): void
     {
         $eventType = 0;

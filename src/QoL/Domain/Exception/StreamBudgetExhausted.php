@@ -27,6 +27,7 @@ final class StreamBudgetExhausted extends RuntimeException
 
     /**
      * Structured error data for the 503 response body.
+     * @return array{error: string, active_streams: int, budget_used: float, requested_tier: string, message: string}
      */
     public function toResponseData(): array
     {

@@ -6,7 +6,6 @@ namespace App\Filesystem\Command;
 
 use App\Filesystem\Watcher\FileWatcher;
 use App\Filesystem\Watcher\FileWatchEvent;
-use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -21,7 +20,6 @@ final class WatchFilesCommand extends Command
 {
     public function __construct(
         private readonly FileWatcher $fileWatcher,
-        private readonly LoggerInterface $logger,
     ) {
         parent::__construct();
     }

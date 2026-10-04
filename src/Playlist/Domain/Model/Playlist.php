@@ -14,6 +14,9 @@ final class Playlist
     /** @var PlaylistSong[] */
     private array $songs = [];
 
+    /**
+     * @param array<array-key, mixed> $smartRules
+     */
     private function __construct(
         private readonly Uuid $id,
         private readonly PublicId $publicId,
@@ -31,6 +34,7 @@ final class Playlist
 
     /**
      * Create a new Playlist aggregate root.
+     * @param array<array-key, mixed> $smartRules
      */
     public static function create(
         string $name,
@@ -66,6 +70,7 @@ final class Playlist
      * This is intended for use by the repository layer only.
      *
      * @param PlaylistSong[] $songs
+     * @param array<array-key, mixed> $smartRules
      */
     public static function reconstitute(
         Uuid $id,
@@ -190,6 +195,7 @@ final class Playlist
 
     /**
      * Update smart playlist rules.
+     * @param array<array-key, mixed> $rules
      */
     public function updateSmartRules(array $rules): void
     {

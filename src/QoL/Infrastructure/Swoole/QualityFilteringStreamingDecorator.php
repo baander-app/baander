@@ -178,6 +178,9 @@ final readonly class QualityFilteringStreamingDecorator implements TranscodeStre
         return $result ?? $manifest;
     }
 
+    /**
+     * @return list<array{name: string, height: int, width: int, bitrate: int, codec: string}>
+     */
     public function getQualityLadderForVideo(Uuid $videoId): array
     {
         return $this->inner->getQualityLadderForVideo($videoId);

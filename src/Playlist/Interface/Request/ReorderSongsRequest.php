@@ -17,6 +17,9 @@ use Symfony\Component\Validator\Constraints\Count;
 )]
 final readonly class ReorderSongsRequest
 {
+    /**
+     * @param array<array-key, mixed> $songIds
+     */
     public function __construct(
         #[NotBlank(message: 'Song IDs are required.')]
         #[Count(min: 1, minMessage: 'The "song_ids" field must not be empty.')]

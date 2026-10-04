@@ -10,6 +10,9 @@ use DateTimeImmutable;
 
 final readonly class SmartPlaylistSynced extends AbstractDomainEvent
 {
+    /**
+     * @param array<array-key, mixed> $rulesApplied
+     */
     public function __construct(
         private readonly Uuid $playlistId,
         private readonly int $songCount,
@@ -20,6 +23,9 @@ final readonly class SmartPlaylistSynced extends AbstractDomainEvent
         parent::__construct($occurredAt);
     }
 
+    /**
+     * @param array<string, mixed> $payload
+     */
     public static function fromPayload(array $payload): static
     {
         return new self(
@@ -31,6 +37,9 @@ final readonly class SmartPlaylistSynced extends AbstractDomainEvent
         );
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function toPayload(): array
     {
         return [
@@ -57,6 +66,9 @@ final readonly class SmartPlaylistSynced extends AbstractDomainEvent
         return $this->songCount;
     }
 
+    /**
+     * @return array<array-key, mixed>
+     */
     public function getRulesApplied(): array
     {
         return $this->rulesApplied;

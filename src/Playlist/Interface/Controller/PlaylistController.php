@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Playlist\Interface\Controller;
 
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Playlist\Application\Command\AddSongCommand;
 use App\Playlist\Application\Command\CreatePlaylistCommand;
 use App\Playlist\Application\Command\RemoveSongCommand;
@@ -63,7 +64,7 @@ final class PlaylistController
     public function index(Request $request): JsonResponse
     {
         $user = $this->security->getUser();
-        if ($user === null) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return $this->unauthorized();
         }
 
@@ -107,7 +108,7 @@ final class PlaylistController
     public function store(#[MapRequestPayload] CreatePlaylistRequest $payload): JsonResponse
     {
         $user = $this->security->getUser();
-        if ($user === null) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return $this->unauthorized();
         }
 
@@ -188,7 +189,7 @@ final class PlaylistController
 
             $albumIds = array_map(
                 static fn(\App\Catalog\Domain\Model\Song $s) => $s->getAlbumId(),
-                array_values(array_filter($songMap)),
+                array_values($songMap),
             );
             $albumTitles = $this->songService->getAlbumTitlesByIds($albumIds);
 
@@ -511,7 +512,7 @@ final class PlaylistController
     private function requireOwnership(Playlist $playlist): ?JsonResponse
     {
         $user = $this->security->getUser();
-        if ($user === null) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return $this->unauthorized();
         }
 

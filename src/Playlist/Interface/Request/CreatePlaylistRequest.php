@@ -22,6 +22,9 @@ use Symfony\Component\Validator\Constraints\Length;
 )]
 final readonly class CreatePlaylistRequest
 {
+    /**
+     * @param array<array-key, mixed> $smartRules
+     */
     public function __construct(
         #[NotBlank(message: 'Name is required.')]
         #[Length(max: 255)]
