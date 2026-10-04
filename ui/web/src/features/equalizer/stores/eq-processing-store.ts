@@ -77,6 +77,7 @@ export const reapplyProcessingState = () => {
 
   processor.setCompression(state.compressionEnabled)
   processor.setMasterGain(state.masterGain)
+  processor.setNormalization(state.normalizationEnabled, state.targetLufs)
 }
 
 export const useEqProcessingStore = create<EqProcessingState>()(
@@ -141,13 +142,12 @@ export const useEqProcessingStore = create<EqProcessingState>()(
 
       setNormalizationEnabled: (enabled) => {
         set({ normalizationEnabled: enabled })
-        if (!enabled) {
-          audioService.getProcessor()?.applyVolumeNormalization(0, 0)
-        }
+        audioService.getProcessor()?.setNormalization(enabled, useEqProcessingStore.getState().targetLufs)
       },
 
       setTargetLufs: (target) => {
         set({ targetLufs: target })
+        audioService.getProcessor()?.setNormalization(useEqProcessingStore.getState().normalizationEnabled, target)
       },
 
       setStereoEnabled: (enabled) => {

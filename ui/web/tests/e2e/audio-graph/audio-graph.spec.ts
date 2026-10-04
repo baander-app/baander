@@ -67,10 +67,7 @@ test('compressor before EQ renders the requested order', async ({ render }) => {
   expect(difference(expected.left, reverse.left)).toBeGreaterThan(0.01)
 })
 
-test('rebuilding preserves the active normalization gain', async ({ render }) => {
-  const result = await render({ chain: ['masterGain'], normalization: true, rebuilds: [['stereo', 'masterGain'], ['masterGain']] })
-  expect(result.leftGain).toBeCloseTo(10 ** (-6 / 20), 3)
-})
+
 
 test('repeated rebuilds remove obsolete stereo and crossfeed paths', async ({ render }) => {
   const result = await render({ chain: ['stereo', 'crossfeed'], width: 2, crossfeed: 0.5,

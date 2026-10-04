@@ -191,6 +191,7 @@ test('programme reset clears publication interval and accepts only newer valid g
   assert.equal(f.processor.intervalTruePeak, -Infinity)
   assert.deepEqual(structuredClone(f.processor.outputMessage), {
     type: 'analysis', programmeGeneration: 4, lufs: -60, leftChannel: 0, rightChannel: 0,
+    loudnessReady: false,
     rms: 0, isPlaying: false, truePeak: -60, crestL: 0, crestR: 0,
     phase: { samples: new Float32Array(128), correlation: null },
   })
@@ -358,4 +359,23 @@ test('programme reset removes phase ring samples and accumulated correlation bef
   const silent = f.messages.filter(m => m.type === 'analysis').at(-1)
   assert.equal(silent.phase.correlation, null)
   assert.deepEqual(silent.phase.samples, new Float32Array(128))
+})
+
+test('normalization readiness identifies native loudness and excludes silence and fallback estimates', async () => {
+  const f = await fixture()
+  const input = new Float32Array(128).fill(0.25)
+  for (let block = 0; block < 16; block++) feed(f, input)
+  assert.equal(f.messages.filter(m => m.type === 'analysis').at(-1).loudnessReady, true)
+  for (let block = 0; block < 16; block++) feed(f, new Float32Array(128))
+  assert.equal(f.messages.filter(m => m.type === 'analysis').at(-1).loudnessReady, false)
+  resetProgramme(f, 1)
+  assert.equal(f.processor.outputMessage.loudnessReady, false)
+  const fallback = await fixture(48000, 'missing')
+  for (let block = 0; block < 16; block++) feed(fallback, input)
+  const report = fallback.messages.filter(m => m.type === 'analysis').at(-1)
+  assert.ok(report.rms > 0)
+  assert.equal(report.loudnessReady, false)
+  const trapped = await fixture(48000, 'getter')
+  for (let block = 0; block < 16; block++) feed(trapped, input)
+  assert.equal(trapped.messages.filter(m => m.type === 'analysis').at(-1).loudnessReady, false)
 })

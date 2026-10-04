@@ -6,7 +6,6 @@ export interface RenderOptions {
   width?: number
   mode?: 'normal' | 'mid' | 'side'
   crossfeed?: number
-  normalization?: boolean
   eqBoost?: boolean
   reference?: boolean
   signal?: 'left' | 'right' | 'mono' | 'antiphase'
@@ -69,7 +68,6 @@ async function render(options: RenderOptions) {
     if (options.width !== undefined) processor.setStereoWidth(options.width, options.mode)
     if (options.crossfeed !== undefined) processor.setCrossfeed(options.crossfeed)
     if (options.eqBoost) processor.updateEQBands([{ gain: 18 }])
-    if (options.normalization) processor.applyVolumeNormalization(-20, -14)
     for (const chain of [options.chain, ...(options.rebuilds ?? [])]) {
       processor.rebuildChain(chain)
       await new Promise(resolve => setTimeout(resolve, 60))
@@ -351,4 +349,65 @@ async function stereoAnalysis(options: StereoAnalysisOptions): Promise<StereoAna
   }
 }
 
-Object.assign(window, { audioGraphFixture: { render, lifecycle, passiveAnalysis, stereoAnalysis } })
+async function normalization() {
+  const processor = new AudioProcessor()
+  const graph = processor as unknown as { audioContext: AudioContext; sourceGainA: GainNode; rebuildGain: GainNode }
+  const context = graph.audioContext
+  const source = context.createOscillator()
+  const level = context.createGain()
+  const output = context.createAnalyser()
+  output.fftSize = 2048
+  source.frequency.value = context.sampleRate / 64
+  level.gain.value = 0.2
+  source.connect(level)
+  const samples = new Float32Array(2048)
+  const waitFor = async (condition: () => boolean) => {
+    const deadline = performance.now() + 5000
+    while (!condition()) {
+      if (performance.now() > deadline) throw new Error('Native normalization did not settle')
+      await new Promise(resolve => setTimeout(resolve, 10))
+    }
+  }
+  const settled = async () => {
+    const start = context.currentTime
+    await waitFor(() => context.currentTime - start > 0.8)
+    output.getFloatTimeDomainData(samples)
+    return { rms: Math.sqrt(samples.reduce((sum, value) => sum + value * value, 0) / samples.length), gainDb: processor.getNormalizationGainDb() }
+  }
+  try {
+    await context.resume()
+    await processor.connectDualAudioElements(new Audio(), new Audio())
+    level.connect(graph.sourceGainA)
+    graph.rebuildGain.connect(output)
+    processor.setCompression(false)
+    processor.setPlayingState(true)
+    source.start()
+    const baseline = await settled()
+    processor.setNormalization(true, -23)
+    await waitFor(() => processor.getNormalizationGainDb() < -1)
+    const normalized = await settled()
+    processor.setVolume(0.25)
+    const quiet = await settled()
+    processor.setMuted(true)
+    const muted = await settled()
+    processor.setMuted(false)
+    const unmuted = await settled()
+    processor.rebuildChain(['masterGain', 'eq'])
+    const rebuilt = await settled()
+    processor.setNormalization(false, -23)
+    const disabled = await settled()
+    processor.setNormalization(true, -23)
+    await waitFor(() => processor.getNormalizationGainDb() < -1)
+    processor.resetProgramme()
+    const resetGain = processor.getNormalizationGainDb()
+    return { baseline, normalized, quiet, muted, unmuted, rebuilt, disabled, resetGain }
+  } finally {
+    source.stop()
+    source.disconnect()
+    level.disconnect()
+    output.disconnect()
+    processor.destroy()
+  }
+}
+
+Object.assign(window, { audioGraphFixture: { render, lifecycle, passiveAnalysis, stereoAnalysis, normalization } })

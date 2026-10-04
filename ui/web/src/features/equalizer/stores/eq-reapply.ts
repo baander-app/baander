@@ -47,10 +47,7 @@ export function reapplyAllEqState() {
   // Loudness contour
   processor.setLoudnessContour(processingState.loudnessContourEnabled)
 
-  // Normalization off on reapply (LUFS worklet will re-measure)
-  if (!processingState.normalizationEnabled) {
-    processor.applyVolumeNormalization(0, 0)
-  }
+  processor.setNormalization(processingState.normalizationEnabled, processingState.targetLufs)
 
   processor.rebuildChain(processingState.chainOrder)
 }

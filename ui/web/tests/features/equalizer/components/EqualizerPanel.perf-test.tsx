@@ -8,14 +8,12 @@ const {
   mockUpdateEQBands,
   mockSetCompression,
   mockSetMasterGain,
-  mockApplyVolumeNormalization,
 } = vi.hoisted(() => ({
   mockSetVolume: vi.fn(),
   mockToggleMute: vi.fn(),
   mockUpdateEQBands: vi.fn(),
   mockSetCompression: vi.fn(),
   mockSetMasterGain: vi.fn(),
-  mockApplyVolumeNormalization: vi.fn(),
 }))
 
 const mockProcessor = {
@@ -31,7 +29,7 @@ const mockProcessor = {
   updateEQBands: mockUpdateEQBands,
   setCompression: mockSetCompression,
   setMasterGain: mockSetMasterGain,
-  applyVolumeNormalization: mockApplyVolumeNormalization,
+  getNormalizationGainDb: () => 0,
 }
 
 vi.mock('@/features/player/services/audio-service', () => ({

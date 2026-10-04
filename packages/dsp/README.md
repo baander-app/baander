@@ -89,3 +89,13 @@ channel has zero energy. The SVG plots sum against difference (a goniometer),
 not a phase angle derived from peak frequency. Paused, expired, reset, or
 unavailable worklet data removes the trace. Separate analyser snapshots do not
 claim paired phase data. Processing uses fixed sample buffers.
+
+Playback normalization follows fresh native loudness reports independently of the
+Equalizer screen. It measures the input mix before EQ, master gain, and listening
+volume, and applies a separate smoothed correction limited to −20 through +6.02 dB.
+It is continuous momentary adjustment, not a track-level ReplayGain scan or an
+output limiter. Native readiness, non-silent input, and loudness above −60 LUFS
+are required; fallback estimates do not drive correction. Disable, programme
+reset, pause, expired reports, and teardown return correction to unity. Listening
+volume and mute remain independent downstream controls. The displayed correction
+is the commanded dB adjustment; the audio gain approaches it with smoothing.

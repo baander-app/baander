@@ -11,7 +11,10 @@ loader, and creates its nodes in Chromium's native
 `OfflineAudioContext`. A generated buffer enters the source gain and analyser
 without depending on media decoding. Tests inspect the final 200 ms of a
 one-second render so parameter smoothing settles naturally. They preserve all
-processor gain automation, including normalization and rebuild fades.
+processor gain automation and rebuild fades. Normalization is exercised separately
+in a live AudioContext against the shipped loudness WASM, without Equalizer
+mounted. It checks independent listening volume/mute, rebuilding, disabling, and
+programme reset against measured output.
 
 The fixture uses disposable HTTPS certificates and a loopback server at
 `audio.baander.app`. Chromium maps that hostname to `127.0.0.1`; these tests never

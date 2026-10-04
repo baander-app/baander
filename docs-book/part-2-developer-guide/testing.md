@@ -624,3 +624,9 @@ yarn test:coverage     # With coverage
 ```
 
 See the [Frontend Development](frontend-development.md) page for more details.
+
+The native audio graph suite also runs normalization against the shipped loudness
+WASM without mounting Equalizer. It checks output attenuation, independent volume
+and mute, chain rebuilds, disable, and programme reset. Unit coverage checks
+settings restoration, native-readiness rejection, expiry, and passive playback
+volume ownership.

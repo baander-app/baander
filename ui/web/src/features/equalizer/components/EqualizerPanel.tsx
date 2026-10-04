@@ -122,7 +122,6 @@ export function EqualizerPanel({ className }: { className?: string }) {
 
   const masterGain = useEqProcessingStore((s) => s.masterGain)
   const normalizationEnabled = useEqProcessingStore((s) => s.normalizationEnabled)
-  const targetLufs = useEqProcessingStore((s) => s.targetLufs)
 
   return (
     <Root className={className}>
@@ -133,7 +132,6 @@ export function EqualizerPanel({ className }: { className?: string }) {
           bands={bands}
           masterGain={masterGain}
           normalizationEnabled={normalizationEnabled}
-          targetLufs={targetLufs}
         />
 
         {/* Presets */}

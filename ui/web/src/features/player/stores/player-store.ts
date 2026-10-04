@@ -1,12 +1,26 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { activityService } from '../services/activity-service'
+import { audioService } from '../services/audio-service'
 import { createLogger } from '@/shared/lib/logger'
 import { updateTime, registerTimeBridge } from './player-time-tracker'
 import type { SongEntry } from '@/features/catalog/types'
 
 const logger = createLogger('PlayerStore')
 let playbackSelectionGeneration = 0
+
+/** Keep programme input independent of listening volume once the graph owns output. */
+export function syncPlaybackVolume(elements: HTMLAudioElement[], volume: number, muted: boolean) {
+  const processor = audioService.getProcessor()
+  // Configure output first so transferring ownership never exposes unity output.
+  processor?.setVolume(volume / 100)
+  processor?.setMuted(muted)
+  const graphOwnsVolume = processor?.isActive && !processor.passive
+  for (const element of elements) {
+    element.volume = graphOwnsVolume ? 1 : volume / 100
+    element.muted = graphOwnsVolume ? false : muted
+  }
+}
 
 export interface Track {
   publicId: string
@@ -290,8 +304,7 @@ export const usePlayerStore = create<PlayerState>()(
         if (nextIndex === null || !track || track.publicId !== expectedNextId) return false
 
         playbackSelectionGeneration++
-        element.volume = volume / 100
-        element.muted = muted
+        syncPlaybackVolume([element], volume, muted)
         set({
           audioElement: element,
           currentIndex: nextIndex,
@@ -414,29 +427,23 @@ export const usePlayerStore = create<PlayerState>()(
         const clamped = Math.max(0, Math.min(100, Math.round(volume)))
         set({ volume: clamped })
         const { audioElement, muted } = get()
-        if (audioElement && !muted) audioElement.volume = clamped / 100
+        syncPlaybackVolume(audioElement ? [audioElement] : [], clamped, muted)
       },
 
       setMuted: (muted) => {
         set({ muted })
-        const { audioElement } = get()
-        if (audioElement) audioElement.muted = muted
+        const { audioElement, volume } = get()
+        syncPlaybackVolume(audioElement ? [audioElement] : [], volume, muted)
       },
 
       toggleMute: () => {
-        const { muted, audioElement } = get()
-        const next = !muted
-        set({ muted: next })
-        if (audioElement) audioElement.muted = next
+        get().setMuted(!get().muted)
       },
 
       // Audio element
       setAudioElement: (el) => {
         const { volume, muted } = get()
-        if (el) {
-          el.volume = volume / 100
-          el.muted = muted
-        }
+        syncPlaybackVolume(el ? [el] : [], volume, muted)
         set({ audioElement: el })
       },
     }),

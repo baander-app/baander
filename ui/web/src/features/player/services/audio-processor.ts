@@ -21,6 +21,7 @@ export interface PhaseAnalysis {
 }
 
 interface MeterFrame {
+  loudnessReady: boolean
   phase: PhaseAnalysis | null
   leftChannel: number
   rightChannel: number
@@ -78,6 +79,12 @@ export class AudioProcessor {
   private leftMeterAnalyzer!: AnalyserNode
   private rightMeterAnalyzer!: AnalyserNode
   private gainNode!: GainNode
+  private normalizationGain!: GainNode
+  private normalizationEnabled = false
+  private normalizationTargetLufs = -14
+  private normalizationGainDb = 0
+  private volume = 1
+  private muted = false
   private rebuildGain!: GainNode
   private analysisSink!: GainNode
   private rebuildTimer: ReturnType<typeof setTimeout> | null = null
@@ -272,6 +279,8 @@ export class AudioProcessor {
     this.analyzerNode.channelInterpretation = 'speakers'
 
     this.gainNode = this.audioContext.createGain()
+    this.normalizationGain = this.audioContext.createGain()
+    this.normalizationGain.connect(this.gainNode)
     this.rebuildGain = this.audioContext.createGain()
     this.analysisSink = this.audioContext.createGain()
     this.analysisSink.gain.value = 0
@@ -411,13 +420,14 @@ export class AudioProcessor {
       currentNode.connect(stage.input)
       currentNode = stage.output
     }
-    this.chainEntry ??= this.gainNode
-    currentNode.connect(this.gainNode)
+    this.chainEntry ??= this.normalizationGain
+    currentNode.connect(this.normalizationGain)
   }
 
   // --- Analysis ---
 
   private clearAnalysis() {
+    this.commandNormalizationGain(0)
     this.frequencyData.fill(0)
     this.timeDomainData.fill(128)
     this.peakFrequency = 0
@@ -436,6 +446,7 @@ export class AudioProcessor {
 
   private performUnifiedAnalysis() {
     if (this.destroyed || this.passiveMode || !this.isConnected) return
+    this.updateNormalization()
     if (!this.isPlaying) {
       this.clearAnalysis()
       return
@@ -491,10 +502,12 @@ export class AudioProcessor {
             && typeof msg.rms === 'number' && Number.isFinite(msg.rms) && msg.rms >= 0
             && typeof msg.lufs === 'number' && Number.isFinite(msg.lufs)) {
             this.latestMeterFrame = {
+              loudnessReady: msg.loudnessReady === true,
               leftChannel: msg.leftChannel, rightChannel: msg.rightChannel, rms: msg.rms,
               lufs: msg.lufs, receivedAt: this.audioContext.currentTime,
               phase: this.validatePhase(msg.phase),
             }
+            this.updateNormalization()
           }
         }
       }
@@ -539,6 +552,7 @@ export class AudioProcessor {
 
   private teardownWorklet() {
     this.latestMeterFrame = null
+    this.commandNormalizationGain(0)
     // Invalidate continuations before disconnecting nodes or aborting requests.
     this.workletGeneration++
     this.workletAbort.abort()
@@ -562,6 +576,7 @@ export class AudioProcessor {
     if (this.destroyed) return
     this.programmeGeneration++
     this.latestMeterFrame = null
+    this.commandNormalizationGain(0)
     this.audioWorkletNode?.port.postMessage({
       type: 'reset-programme', programmeGeneration: this.programmeGeneration,
     })
@@ -753,14 +768,27 @@ export class AudioProcessor {
   }
 
   setVolume(volume: number) {
-    if (this.passiveMode) return
-    const v = Math.max(0, Math.min(1, volume))
-    this.gainNode.gain.setTargetAtTime(v, this.audioContext.currentTime, 0.05)
+    if (!Number.isFinite(volume)) return
+    this.volume = Math.max(0, Math.min(1, volume))
+    if (this.passiveMode || this.destroyed) return
+    this.applyOutputGain()
   }
 
   setMuted(muted: boolean) {
-    if (this.passiveMode) return
-    this.gainNode.gain.setTargetAtTime(muted ? 0 : 1, this.audioContext.currentTime, 0.05)
+    this.muted = muted
+    if (this.passiveMode || this.destroyed) return
+    this.applyOutputGain()
+  }
+
+  private applyOutputGain(): void {
+    const gain = this.gainNode.gain
+    const now = this.audioContext.currentTime
+    if (!this.isConnected || this.muted) {
+      gain.cancelScheduledValues(now)
+      gain.setValueAtTime(this.muted ? 0 : this.volume, now)
+    } else {
+      gain.setTargetAtTime(this.volume, now, 0.05)
+    }
   }
 
   setMasterGain(gainDb: number) {
@@ -829,14 +857,35 @@ export class AudioProcessor {
     }
   }
 
-  applyVolumeNormalization(targetLufs: number, currentLufs: number): number {
-    const gainDb = Math.max(-20, Math.min(20, targetLufs - currentLufs))
-    if (!this.passiveMode) {
-      const normGainLinear = Math.pow(10, gainDb / 20)
-      const safeGain = Math.min(2.0, normGainLinear)
-      this.gainNode.gain.setTargetAtTime(safeGain, this.audioContext.currentTime, this.SMOOTHING_TIME)
+  setNormalization(enabled: boolean, targetLufs: number): void {
+    if (!Number.isFinite(targetLufs)) return
+    this.normalizationEnabled = enabled
+    this.normalizationTargetLufs = targetLufs
+    this.updateNormalization()
+  }
+
+  getNormalizationGainDb(): number {
+    return this.normalizationGainDb
+  }
+
+  private updateNormalization(): void {
+    const frame = this.latestMeterFrame
+    const age = frame ? this.audioContext.currentTime - frame.receivedAt : Infinity
+    if (!this.normalizationEnabled || this.destroyed || this.passiveMode || !this.isConnected || !this.isPlaying
+      || !frame?.loudnessReady || age < 0 || age > this.METER_FRAME_MAX_AGE
+      || frame.rms <= 1e-6 || frame.lufs <= -60) {
+      this.commandNormalizationGain(0)
+      return
     }
-    return gainDb
+    this.commandNormalizationGain(Math.max(-20, Math.min(20 * Math.log10(2), this.normalizationTargetLufs - frame.lufs)))
+  }
+
+  private commandNormalizationGain(gainDb: number): void {
+    if (gainDb === this.normalizationGainDb) return
+    this.normalizationGainDb = gainDb
+    if (this.audioContext.state !== 'closed') {
+      this.normalizationGain.gain.setTargetAtTime(Math.pow(10, gainDb / 20), this.audioContext.currentTime, this.SMOOTHING_TIME)
+    }
   }
 
   getAnalysisData(): AnalysisData {

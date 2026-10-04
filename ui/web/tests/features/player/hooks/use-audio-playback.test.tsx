@@ -37,7 +37,8 @@ vi.mock('@/features/player/services/audio-service', () => ({
   },
 }))
 
-vi.mock('@/features/player/stores/player-store', () => {
+vi.mock('@/features/player/stores/player-store', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/features/player/stores/player-store')>()
   const mockState = {
     volume: 75,
     muted: false,
@@ -50,6 +51,7 @@ vi.mock('@/features/player/stores/player-store', () => {
     playNext: mockPlayNext,
   }
   return {
+    ...actual,
     usePlayerStore: Object.assign(
       (selector: (state: Record<string, unknown>) => unknown) => selector(mockState),
       { getState: () => mockState, subscribe: vi.fn(() => () => {}) },

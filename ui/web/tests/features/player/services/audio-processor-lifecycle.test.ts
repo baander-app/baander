@@ -612,3 +612,129 @@ describe('paired phase report ownership', () => {
     expect(processor.getAnalysisData().phase?.samples).toHaveLength(128)
   })
 })
+
+describe('AudioProcessor normalization ownership', () => {
+  const report = (overrides = {}) => ({
+    type: 'analysis', programmeGeneration: 0, loudnessReady: true,
+    leftChannel: 20, rightChannel: 20, rms: 0.2, lufs: -20, ...overrides,
+  })
+  const gains = () => processor as unknown as { gainNode: MockNode; normalizationGain: MockNode; rebuildGain: MockNode }
+  const start = async () => {
+    await connect()
+    await settle()
+    processor.setPlayingState(true)
+    processor.setNormalization(true, -14)
+  }
+
+  it('updates from native meter reports without a UI poll and keeps user volume and mute independent', async () => {
+    await start()
+    processor.setVolume(0.4)
+    processor.setMuted(true)
+    worklet('magic-soup-processor').emit(report())
+    expect(processor.getNormalizationGainDb()).toBe(6)
+    expect(gains().normalizationGain.gain.setTargetAtTime).toHaveBeenLastCalledWith(10 ** (6 / 20), 10, 0.1)
+    expect(gains().gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(0, 10)
+    processor.setVolume(0.25)
+    expect(gains().gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(0, 10)
+    processor.setMuted(false)
+    expect(gains().gainNode.gain.setTargetAtTime).toHaveBeenLastCalledWith(0.25, 10, 0.05)
+    expect(processor.getNormalizationGainDb()).toBe(6)
+    expect(gains().normalizationGain.outputs.has(gains().gainNode)).toBe(true)
+    expect(gains().gainNode.outputs.has(gains().rebuildGain)).toBe(true)
+  })
+
+  it('configures initial output immediately and preserves silence through connection until unmute', async () => {
+    processor.setVolume(0.4)
+    expect(gains().gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(0.4, 10)
+    processor.setMuted(true)
+    expect(gains().gainNode.gain.cancelScheduledValues).toHaveBeenLastCalledWith(10)
+    expect(gains().gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(0, 10)
+    expect(gains().gainNode.gain.setTargetAtTime).not.toHaveBeenCalled()
+    await connect()
+    await settle()
+    expect(gains().gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(0, 10)
+    processor.setVolume(0.3)
+    expect(gains().gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(0, 10)
+    processor.setMuted(false)
+    expect(gains().gainNode.gain.setTargetAtTime).toHaveBeenLastCalledWith(0.3, 10, 0.05)
+    processor.setVolume(0.7)
+    expect(gains().gainNode.gain.setTargetAtTime).toHaveBeenLastCalledWith(0.7, 10, 0.05)
+    processor.setMuted(true)
+    expect(gains().gainNode.gain.cancelScheduledValues).toHaveBeenLastCalledWith(10)
+    expect(gains().gainNode.gain.setValueAtTime).toHaveBeenLastCalledWith(0, 10)
+  })
+
+  it('reports the actual bounded correction and responds to target changes and disabling', async () => {
+    await start()
+    worklet('magic-soup-processor').emit(report({ lufs: -40 }))
+    expect(processor.getNormalizationGainDb()).toBe(20 * Math.log10(2))
+    expect(gains().normalizationGain.gain.setTargetAtTime).toHaveBeenLastCalledWith(2, 10, 0.1)
+    processor.setNormalization(true, -43)
+    expect(processor.getNormalizationGainDb()).toBe(-3)
+    worklet('magic-soup-processor').emit(report({ lufs: -5 }))
+    expect(processor.getNormalizationGainDb()).toBe(-20)
+    processor.setNormalization(false, -14)
+    expect(processor.getNormalizationGainDb()).toBe(0)
+    expect(gains().normalizationGain.gain.setTargetAtTime).toHaveBeenLastCalledWith(1, 10, 0.1)
+    worklet('magic-soup-processor').emit(report())
+    expect(processor.getNormalizationGainDb()).toBe(0)
+  })
+
+  it('does not normalize approximate fallback, silence, unavailable LUFS, malformed or wrong-generation reports', async () => {
+    await start()
+    for (const overrides of [
+      { loudnessReady: false }, { loudnessReady: undefined }, { rms: 0 }, { lufs: -60 },
+      { lufs: -70 }, { lufs: NaN }, { lufs: Infinity }, { rms: Infinity }, { programmeGeneration: 1 },
+    ]) {
+      worklet('magic-soup-processor').emit(report(overrides))
+      expect(processor.getNormalizationGainDb()).toBe(0)
+    }
+    graph.leftMeterAnalyzer.getFloatTimeDomainData.mockImplementation(data => data.fill(0.2))
+    graph.rightMeterAnalyzer.getFloatTimeDomainData.mockImplementation(data => data.fill(0.2))
+    graph.audioContext.currentTime += 1
+    processor.getAnalysisData()
+    expect(processor.getNormalizationGainDb()).toBe(0)
+    worklet('magic-soup-processor').emit(report())
+    expect(processor.getNormalizationGainDb()).toBe(6)
+    worklet('magic-soup-processor').emit(report({ rms: 0 }))
+    expect(processor.getNormalizationGainDb()).toBe(0)
+  })
+
+  it('neutralizes expired native correction on the owned interval even when spectrum worklet is ready', async () => {
+    await start()
+    worklet('wasm-spectrum').emit({ type: 'ready' })
+    expect(graph.wasmSpectrumReady).toBe(true)
+    worklet('magic-soup-processor').emit(report())
+    expect(processor.getNormalizationGainDb()).toBe(6)
+    graph.audioContext.currentTime += 0.26
+    vi.advanceTimersByTime(40)
+    expect(processor.getNormalizationGainDb()).toBe(0)
+    processor.destroy()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('clears correction at programme reset and rejects the previous programme', async () => {
+    await start()
+    worklet('magic-soup-processor').emit(report())
+    expect(processor.getNormalizationGainDb()).toBe(6)
+    processor.resetProgramme()
+    expect(processor.getNormalizationGainDb()).toBe(0)
+    worklet('magic-soup-processor').emit(report())
+    expect(processor.getNormalizationGainDb()).toBe(0)
+    worklet('magic-soup-processor').emit(report({ programmeGeneration: 1 }))
+    expect(processor.getNormalizationGainDb()).toBe(6)
+  })
+
+  for (const action of ['pause', 'disconnect', 'passive', 'destroy'] as const) {
+    it(`neutralizes correction on ${action}`, async () => {
+      await start()
+      worklet('magic-soup-processor').emit(report())
+      expect(processor.getNormalizationGainDb()).toBe(6)
+      if (action === 'pause') processor.setPlayingState(false)
+      else if (action === 'passive') await processor.initializePassiveMode()
+      else processor[action]()
+      expect(processor.getNormalizationGainDb()).toBe(0)
+      expect(vi.getTimerCount()).toBe(0)
+    })
+  }
+})

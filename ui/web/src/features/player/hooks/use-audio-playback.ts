@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { audioService } from '@/features/player/services/audio-service'
-import { usePlayerStore, resolveNextIndex, buildStreamUrl } from '@/features/player/stores/player-store'
+import { usePlayerStore, resolveNextIndex, buildStreamUrl, syncPlaybackVolume } from '@/features/player/stores/player-store'
 import { updateTime } from '@/features/player/stores/player-time-tracker'
 import { createLogger } from '@/shared/lib/logger'
 
@@ -30,7 +30,14 @@ export function useAudioPlayback() {
 
     let connection: Promise<void> | undefined
     const connect = () => {
-      connection ??= Promise.resolve(audioService.connectDualAudioElements(audioA, audioB))
+      if (!connection) {
+        syncVolume()
+        connection = Promise.resolve(audioService.connectDualAudioElements(audioA, audioB)).finally(() => {
+          if (lifetime.active) syncVolume()
+        })
+        // The core graph is wired synchronously; EQ reapplication finishes later.
+        syncVolume()
+      }
       return connection
     }
     const onLoadStart = () => {
@@ -59,10 +66,7 @@ export function useAudioPlayback() {
     const inactive = () => active() === audioA ? audioB : audioA
     const syncVolume = () => {
       const { volume, muted } = usePlayerStore.getState()
-      for (const audio of [audioA, audioB]) {
-        audio.volume = volume / 100
-        audio.muted = muted
-      }
+      syncPlaybackVolume([audioA, audioB], volume, muted)
     }
     syncVolume()
 
@@ -94,7 +98,7 @@ export function useAudioPlayback() {
         await connect()
         if (token !== generation || !valid(next)) return
         const processor = audioService.getProcessor()
-        if (!processor || processor.passive) {
+        if (!processor || !processor.isActive || processor.passive) {
           invalidate()
           if (next.owner.ended) usePlayerStore.getState().playNext()
           return

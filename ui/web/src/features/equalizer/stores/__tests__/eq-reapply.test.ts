@@ -13,7 +13,7 @@ const audio = vi.hoisted(() => ({
   processor: {
     updateEQBands: vi.fn(), setCompression: vi.fn(), setCompressorParams: vi.fn(),
     setMasterGain: vi.fn(), setStereoWidth: vi.fn(), setCrossfeed: vi.fn(),
-    setLoudnessContour: vi.fn(), applyVolumeNormalization: vi.fn(), rebuildChain: vi.fn(),
+    setLoudnessContour: vi.fn(), setNormalization: vi.fn(), rebuildChain: vi.fn(),
   },
 }))
 vi.mock('@/features/player/services/audio-service', () => ({
@@ -45,6 +45,12 @@ describe('processor state reapplication', () => {
     expect(audio.processor.setStereoWidth).toHaveBeenCalledWith(expected, state.stereoEnabled ? state.stereoMode : 'normal')
   })
 
+  it.each([true, false])('restores normalization enabled=%s without the equalizer screen', (enabled) => {
+    useEqProcessingStore.setState({ normalizationEnabled: enabled, targetLufs: -23 })
+    reapplyAllEqState()
+    expect(audio.processor.setNormalization).toHaveBeenCalledWith(enabled, -23)
+  })
+
   it('rebuilds the saved processing order after applying compressor state', () => {
     const chainOrder = ['stereo', 'crossfeed', 'eq', 'compressor', 'loudness', 'masterGain'] as const
     useEqProcessingStore.setState({ chainOrder: [...chainOrder], compressionEnabled: true })
@@ -73,6 +79,7 @@ describe('processor state reapplication', () => {
       const success = operation === 'fetch' ? await result.current.fetchFromServer() : await result.current.rollback(2)
       expect(success).toBe(true)
     })
+    expect(audio.processor.setNormalization).toHaveBeenCalledWith(payload.normalizationEnabled, payload.targetLufs)
     expect(audio.processor.updateEQBands).toHaveBeenCalledWith(payload.bands)
     expect(audio.processor.setStereoWidth).toHaveBeenCalledWith(2, 'side')
     expect(audio.processor.setCompressorParams).toHaveBeenCalledWith({ threshold: -32, ratio: 6, knee: 12, attack: 7, release: 180 })

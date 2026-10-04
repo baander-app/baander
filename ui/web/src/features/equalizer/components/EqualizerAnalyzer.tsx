@@ -17,6 +17,7 @@ interface DisplayData {
   peakFrequency: number
   rms: number
   frequencyBars: number[]
+  normalizationGainDb: number
   phase: PhaseAnalysis | null
   trackId: string | null
 }
@@ -25,7 +26,6 @@ interface EqualizerAnalyzerProps {
   bands: BandConfig[]
   masterGain: number
   normalizationEnabled: boolean
-  targetLufs: number
 }
 
 // --- Spectrum Visualizer ---
@@ -295,7 +295,7 @@ const ReadoutValue = styled.span`
   color: var(--color-foreground)
 `
 
-export function EqualizerAnalyzer({ bands, masterGain, normalizationEnabled, targetLufs }: EqualizerAnalyzerProps) {
+export function EqualizerAnalyzer({ bands, masterGain, normalizationEnabled }: EqualizerAnalyzerProps) {
   const intervalRef = useRef<number | null>(null)
   const smoothedBarsRef = useRef(new Float32Array(64))
 
@@ -313,12 +313,13 @@ export function EqualizerAnalyzer({ bands, masterGain, normalizationEnabled, tar
     rms: 0,
     frequencyBars: new Array(64).fill(0),
     phase: null,
+    normalizationGainDb: 0,
     trackId: null,
   })
 
   useEffect(() => usePlayerStore.subscribe((state, previous) => {
     if (!state.isPlaying || state.currentTrack?.publicId !== previous.currentTrack?.publicId) {
-      setDisplayData((data) => data.phase ? { ...data, phase: null } : data)
+      setDisplayData((data) => data.phase || data.normalizationGainDb !== 0 ? { ...data, phase: null, normalizationGainDb: 0 } : data)
     }
   }), [])
 
@@ -336,7 +337,7 @@ export function EqualizerAnalyzer({ bands, masterGain, normalizationEnabled, tar
       try {
         const processor = audioService.getProcessor()
         if (!processor) {
-          setDisplayData((previous) => ({ ...previous, phase: null }))
+          setDisplayData((previous) => ({ ...previous, phase: null, normalizationGainDb: 0 }))
           return
         }
 
@@ -371,12 +372,10 @@ export function EqualizerAnalyzer({ bands, masterGain, normalizationEnabled, tar
           rms: data.rms,
           frequencyBars: bars,
           phase: data.phase,
+          normalizationGainDb: processor.getNormalizationGainDb(),
           trackId,
         })
 
-        if (normalizationEnabled && data.lufs !== 0 && !isNaN(data.lufs)) {
-          processor.applyVolumeNormalization(targetLufs, data.lufs)
-        }
       } catch (error) {
         console.error('[Equalizer] analysis update error:', error)
       }
@@ -388,9 +387,9 @@ export function EqualizerAnalyzer({ bands, masterGain, normalizationEnabled, tar
         intervalRef.current = null
       }
     }
-  }, [isPlaying, normalizationEnabled, targetLufs, trackId])
+  }, [isPlaying, trackId])
 
-  const currentGain = normalizationEnabled ? targetLufs - displayData.lufs : 0
+  const currentGain = normalizationEnabled && isPlaying && displayData.trackId === trackId ? displayData.normalizationGainDb : 0
   const totalGain = (masterGain + currentGain).toFixed(1)
   const formattedPeakFreq = displayData.peakFrequency > 1000
     ? `${(displayData.peakFrequency / 1000).toFixed(1)}K`

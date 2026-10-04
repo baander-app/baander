@@ -12,6 +12,7 @@ export interface MediaSnapshot {
   time: number
   active: number
   source: string | undefined
+  outputGain: number | undefined
   elements: { id: string | null; paused: boolean; ended: boolean; time: number; volume: number; muted: boolean; loads: number }[]
   events: { element: number; type: string; time: number; ended: boolean; at: number }[]
 }
@@ -52,10 +53,11 @@ const fixture = {
   },
   snapshot(): MediaSnapshot {
     const state = usePlayerStore.getState()
+    const graph = audioService.getProcessor() as unknown as { gainNode: GainNode } | null
     return {
       track: state.currentTrack?.publicId, index: state.currentIndex, playing: state.isPlaying,
       duration: state.duration, time: state.currentTime, active: elements.indexOf(state.audioElement!),
-      source: audioService.getProcessor()?.getActiveSource(), events: [...events],
+      source: audioService.getProcessor()?.getActiveSource(), outputGain: graph?.gainNode.gain.value, events: [...events],
       elements: elements.map((element, index) => ({ id: element.src ? new URL(element.src).searchParams.get('id') : null,
         paused: element.paused, ended: element.ended, time: element.currentTime, volume: element.volume, muted: element.muted, loads: loads[index] })),
     }

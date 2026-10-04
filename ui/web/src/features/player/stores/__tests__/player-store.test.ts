@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { audioService } from '../../services/audio-service'
 import { activityService } from '../../services/activity-service'
 import {
   usePlayerStore,
@@ -7,6 +8,10 @@ import {
   type Track,
   type PlayerState,
 } from '../player-store'
+
+vi.mock('../../services/audio-service', () => ({
+  audioService: { getProcessor: vi.fn(() => null) },
+}))
 
 // --- Helpers ---------------------------------------------------------------
 
@@ -67,6 +72,7 @@ function seedQueue(current = 0, n = 3): Track[] {
 
 describe('player-store', () => {
   beforeEach(() => {
+    vi.mocked(audioService.getProcessor).mockReturnValue(null)
     resetStore()
   })
 
@@ -138,6 +144,41 @@ describe('player-store', () => {
     expect(audio.muted).toBe(true)
     usePlayerStore.getState().setMuted(false)
     expect(audio.volume).toBe(0.4)
+    expect(audio.muted).toBe(false)
+  })
+
+  it('keeps active graph input at unity across attachment, mute, volume and adoption', () => {
+    const processor = { isActive: true, passive: false, setVolume: vi.fn(), setMuted: vi.fn() }
+    vi.mocked(audioService.getProcessor).mockReturnValue(processor as unknown as NonNullable<ReturnType<typeof audioService.getProcessor>>)
+    seedQueue()
+    usePlayerStore.setState({ volume: 40, muted: true })
+    const audio = makeAudioStub()
+    usePlayerStore.getState().setAudioElement(audio)
+    usePlayerStore.getState().setVolume(20)
+    usePlayerStore.getState().toggleMute()
+    expect(audio.volume).toBe(1)
+    expect(audio.muted).toBe(false)
+    expect(processor.setVolume).toHaveBeenLastCalledWith(0.2)
+    expect(processor.setMuted).toHaveBeenLastCalledWith(false)
+    const incoming = makeAudioStub()
+    const recordPlay = vi.spyOn(activityService, 'recordPlay').mockResolvedValue()
+    expect(usePlayerStore.getState().adoptPreloadedNext(incoming, 't0', 't1')).toBe(true)
+    expect(incoming.volume).toBe(1)
+    expect(incoming.muted).toBe(false)
+    recordPlay.mockRestore()
+  })
+
+  it('updates volume while muted with a passive processor', () => {
+    const processor = { isActive: true, passive: true, setVolume: vi.fn(), setMuted: vi.fn() }
+    vi.mocked(audioService.getProcessor).mockReturnValue(processor as unknown as NonNullable<ReturnType<typeof audioService.getProcessor>>)
+    const audio = makeAudioStub()
+    usePlayerStore.getState().setAudioElement(audio)
+    usePlayerStore.getState().setMuted(true)
+    usePlayerStore.getState().setVolume(20)
+    expect(audio.volume).toBe(0.2)
+    expect(audio.muted).toBe(true)
+    usePlayerStore.getState().setMuted(false)
+    expect(audio.volume).toBe(0.2)
     expect(audio.muted).toBe(false)
   })
 

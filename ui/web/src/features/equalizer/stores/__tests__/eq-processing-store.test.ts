@@ -13,7 +13,7 @@ const mockProcessor = {
   setCompression: vi.fn(),
   setMasterGain: vi.fn(),
   setCompressorParams: vi.fn(),
-  applyVolumeNormalization: vi.fn(),
+  setNormalization: vi.fn(),
   setStereoWidth: vi.fn(),
   setCrossfeed: vi.fn(),
   setLoudnessContour: vi.fn(),
@@ -197,10 +197,11 @@ describe('useEqProcessingStore — enable toggles', () => {
   it('setNormalizationEnabled clears normalization on the processor when disabling', () => {
     useEqProcessingStore.getState().setNormalizationEnabled(true)
     expect(useEqProcessingStore.getState().normalizationEnabled).toBe(true)
+    expect(mockProcessor.setNormalization).toHaveBeenLastCalledWith(true, -14)
 
     useEqProcessingStore.getState().setNormalizationEnabled(false)
     expect(useEqProcessingStore.getState().normalizationEnabled).toBe(false)
-    expect(mockProcessor.applyVolumeNormalization).toHaveBeenLastCalledWith(0, 0)
+    expect(mockProcessor.setNormalization).toHaveBeenLastCalledWith(false, -14)
   })
 
   it('setMasterGain updates state and forwards to the processor', () => {
@@ -212,6 +213,10 @@ describe('useEqProcessingStore — enable toggles', () => {
   it('setTargetLufs updates state', () => {
     useEqProcessingStore.getState().setTargetLufs(-23)
     expect(useEqProcessingStore.getState().targetLufs).toBe(-23)
+    expect(mockProcessor.setNormalization).toHaveBeenLastCalledWith(false, -23)
+    useEqProcessingStore.getState().setNormalizationEnabled(true)
+    useEqProcessingStore.getState().setTargetLufs(-18)
+    expect(mockProcessor.setNormalization).toHaveBeenLastCalledWith(true, -18)
   })
 
   it('setStereoMode translates mid->0 and side->2 when stereo is enabled', () => {

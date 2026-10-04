@@ -23,6 +23,7 @@ class MagicSoupProcessor extends AudioWorkletProcessor {
     this.programmeGeneration = 0;
     this.outputMessage = {
       type: 'analysis', programmeGeneration: 0, lufs: -60, leftChannel: 0, rightChannel: 0,
+      loudnessReady: false,
       rms: 0, isPlaying: false, truePeak: -60, crestL: 0, crestR: 0,
       phase: { samples: new Float32Array(128), correlation: null },
     };
@@ -55,6 +56,7 @@ class MagicSoupProcessor extends AudioWorkletProcessor {
     this.isPlaying = false;
     this.outputMessage.programmeGeneration = generation;
     this.outputMessage.lufs = -60;
+    this.outputMessage.loudnessReady = false;
     this.outputMessage.truePeak = -60;
     this.outputMessage.leftChannel = 0;
     this.outputMessage.rightChannel = 0;
@@ -169,10 +171,13 @@ class MagicSoupProcessor extends AudioWorkletProcessor {
     this.performWASMAnalysis(input);
     if (++this.frameCounter % this.analysisFrameInterval === 0) {
       this.performFallbackAnalysis(input);
+      this.outputMessage.loudnessReady = false;
       if (this.loudnessReady) {
         try {
           this.outputMessage.lufs = this.loudnessAPI.lufsM();
           this.outputMessage.truePeak = this.intervalTruePeak;
+          this.outputMessage.loudnessReady = Number.isFinite(this.outputMessage.lufs)
+            && this.outputMessage.lufs > -60 && this.outputMessage.rms > 1e-6;
         } catch (error) { this.disableMeter('loudness', error); }
       }
       if (this.dynamicsReady) {

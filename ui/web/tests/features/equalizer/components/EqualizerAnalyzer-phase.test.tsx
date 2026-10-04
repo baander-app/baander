@@ -2,9 +2,9 @@ import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PhaseAnalysis } from '@/features/player/services/audio-processor'
 
-const { getAnalysisData } = vi.hoisted(() => ({ getAnalysisData: vi.fn() }))
+const { getAnalysisData, getNormalizationGainDb } = vi.hoisted(() => ({ getAnalysisData: vi.fn(), getNormalizationGainDb: vi.fn(() => 0) }))
 vi.mock('@/features/player/services/audio-service', () => ({
-  audioService: { getProcessor: () => ({ getAnalysisData }) },
+  audioService: { getProcessor: () => ({ getAnalysisData, getNormalizationGainDb }) },
 }))
 vi.mock('@/features/visualizer/components/VisualizerHost', () => ({ VisualizerHost: () => null }))
 vi.mock('@/features/visualizer/register-visualizer-renderers', () => ({
@@ -32,7 +32,7 @@ function signal(right: (angle: number) => number, correlation: number | null): P
 
 function mount(phase: PhaseAnalysis | null) {
   getAnalysisData.mockReturnValue(report(phase))
-  render(<EqualizerAnalyzer bands={flatBands()} masterGain={0} normalizationEnabled={false} targetLufs={-14} />)
+  render(<EqualizerAnalyzer bands={flatBands()} masterGain={0} normalizationEnabled={false} />)
   act(() => { vi.advanceTimersByTime(40) })
 }
 
@@ -100,6 +100,16 @@ describe('EqualizerAnalyzer stereo phase', () => {
     getAnalysisData.mockReturnValue(report(null))
     act(() => { vi.advanceTimersByTime(40) })
     expect(screen.getByText('Phase unavailable')).toBeInTheDocument()
+  })
+
+  it('displays the processor correction rather than recalculating normalization in the UI', () => {
+    getAnalysisData.mockReturnValue(report(null))
+    getNormalizationGainDb.mockReturnValue(20 * Math.log10(2))
+    render(<EqualizerAnalyzer bands={flatBands()} masterGain={-3} normalizationEnabled />)
+    act(() => { vi.advanceTimersByTime(40) })
+    expect(screen.getByText('3.0 dB')).toBeInTheDocument()
+    act(() => { usePlayerStore.setState({ isPlaying: false }) })
+    expect(screen.queryByText('3.0 dB')).not.toBeInTheDocument()
   })
 
   it('marks correlation unavailable for silent captures', () => {

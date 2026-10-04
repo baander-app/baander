@@ -12,6 +12,10 @@ const processorMock = vi.hoisted(() => {
   let active: 'A' | 'B' = 'A'
   return {
     instance: {
+      isActive: false,
+      passive: false,
+      setVolume: vi.fn(),
+      setMuted: vi.fn(),
       getActiveSource: vi.fn(() => active),
       instantSwap: vi.fn(() => { active = active === 'A' ? 'B' : 'A' }),
       crossfadeToInactive: vi.fn((duration: number) => {
@@ -39,6 +43,10 @@ vi.mock('@/features/player/services/audio-service', () => ({
     getProcessor: vi.fn(() => processorMock.instance),
     destroy: vi.fn(),
   },
+}))
+
+vi.mock('@/features/player/services/activity-service', () => ({
+  activityService: { recordPlay: vi.fn(() => Promise.resolve()) },
 }))
 
 // EQ reapply is dynamically imported inside the hook; stub it to a no-op.
@@ -146,6 +154,12 @@ function timeUpdate(el: MockAudioElement, currentTime: number, duration: number)
 describe('useAudioPlayback', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    processorMock.instance.isActive = false
+    processorMock.instance.passive = false
+    vi.mocked(audioService.getProcessor).mockReturnValue(processorMock.instance as unknown as NonNullable<ReturnType<typeof audioService.getProcessor>>)
+    vi.mocked(audioService.connectDualAudioElements).mockImplementation(async () => {
+      processorMock.instance.isActive = true
+    })
     vi.mocked(audioService.resumeContextIfNeeded).mockResolvedValue(undefined)
     // vi.clearAllMocks wipes mock implementations; restore the swap state machine.
     // getActiveSource returns the current `active`, instantSwap/crossfade flip it
@@ -512,7 +526,8 @@ describe('useAudioPlayback', () => {
       await act(async () => { timeUpdate(a, 97, 100) })
       expect(a.pause).not.toHaveBeenCalled()
       expect(usePlayerStore.getState().audioElement).toBe(b)
-      expect(b.volume).toBe(0.75)
+      expect(b.volume).toBe(1)
+      expect(processorMock.instance.setVolume).toHaveBeenLastCalledWith(0.75)
       act(() => { vi.advanceTimersByTime(3000) })
       expect(a.pause).toHaveBeenCalled()
       vi.useRealTimers()
@@ -685,8 +700,9 @@ describe('useAudioPlayback', () => {
       expect(b.pause).toHaveBeenCalled()
     })
 
-    it('keeps both elements volume and mute synchronized after handoff', async () => {
+    it('keeps listening volume downstream of both elements after handoff', async () => {
       seedQueue(0, 2)
+      usePlayerStore.setState({ volume: 25, muted: true })
       renderHook(() => useAudioPlayback())
       const [a, b] = capturedAudioElements
       await act(async () => {
@@ -694,13 +710,112 @@ describe('useAudioPlayback', () => {
         b.dispatchEvent(new Event('canplaythrough'))
         a.dispatchEvent(new Event('ended'))
       })
+      expect([a.volume, b.volume]).toEqual([1, 1])
+      expect([a.muted, b.muted]).toEqual([false, false])
+      expect(processorMock.instance.setVolume).toHaveBeenLastCalledWith(0.25)
+      expect(processorMock.instance.setMuted).toHaveBeenLastCalledWith(true)
       act(() => {
         usePlayerStore.getState().setMuted(true)
         usePlayerStore.getState().setVolume(40)
         usePlayerStore.getState().setMuted(false)
       })
-      expect([a.volume, b.volume]).toEqual([0.4, 0.4])
+      expect([a.volume, b.volume]).toEqual([1, 1])
       expect([a.muted, b.muted]).toEqual([false, false])
+      expect(processorMock.instance.setVolume).toHaveBeenLastCalledWith(0.4)
+      expect(processorMock.instance.setMuted).toHaveBeenLastCalledWith(false)
+      act(() => { usePlayerStore.getState().toggleMute() })
+      expect([a.muted, b.muted]).toEqual([false, false])
+      expect(processorMock.instance.setMuted).toHaveBeenLastCalledWith(true)
+    })
+  })
+
+  it('falls back to normal selection when graph connection never becomes active', async () => {
+    seedQueue(0, 2)
+    vi.mocked(audioService.connectDualAudioElements).mockResolvedValue(undefined)
+    renderHook(() => useAudioPlayback())
+    const [a, b] = capturedAudioElements
+    await act(async () => {
+      timeUpdate(a, 95, 100)
+      b.dispatchEvent(new Event('canplaythrough'))
+      a.ended = true
+      a.dispatchEvent(new Event('ended'))
+    })
+    expect(usePlayerStore.getState().currentTrack?.publicId).toBe('t1')
+    expect(usePlayerStore.getState().audioElement).toBe(a)
+    expect(a.src).toContain('t1')
+    expect(b.play).not.toHaveBeenCalled()
+    expect(processorMock.instance.instantSwap).not.toHaveBeenCalled()
+    expect(processorMock.instance.crossfadeToInactive).not.toHaveBeenCalled()
+  })
+
+  describe('volume ownership', () => {
+    it.each(['unconnected', 'absent', 'passive'])('keeps both elements at listening volume with %s processor', (mode) => {
+      if (mode === 'absent') vi.mocked(audioService.getProcessor).mockReturnValue(null)
+      if (mode === 'passive') {
+        processorMock.instance.isActive = true
+        processorMock.instance.passive = true
+      }
+      renderHook(() => useAudioPlayback())
+      const [a, b] = capturedAudioElements
+      act(() => {
+        usePlayerStore.getState().setMuted(true)
+        usePlayerStore.getState().setVolume(35)
+      })
+      expect([a.volume, b.volume]).toEqual([0.35, 0.35])
+      expect([a.muted, b.muted]).toEqual([true, true])
+      act(() => { usePlayerStore.getState().toggleMute() })
+      expect([a.volume, b.volume]).toEqual([0.35, 0.35])
+      expect([a.muted, b.muted]).toEqual([false, false])
+    })
+
+    it('configures output before synchronous graph wiring and restores element controls after passive fallback', async () => {
+      usePlayerStore.setState({ volume: 35, muted: true })
+      let finishConnection!: () => void
+      vi.mocked(audioService.connectDualAudioElements).mockImplementation(() => {
+        expect(processorMock.instance.setVolume).toHaveBeenLastCalledWith(0.35)
+        expect(processorMock.instance.setMuted).toHaveBeenLastCalledWith(true)
+        processorMock.instance.isActive = true
+        return new Promise<void>((resolve) => { finishConnection = resolve })
+      })
+      renderHook(() => useAudioPlayback())
+      const [a, b] = capturedAudioElements
+      act(() => {
+        a.src = 'https://baander.app/audio.mp3'
+        a.dispatchEvent(new Event('loadstart'))
+      })
+      // Pending EQ import must not leave attenuation ahead of the meter.
+      expect([a.volume, b.volume]).toEqual([1, 1])
+      expect([a.muted, b.muted]).toEqual([false, false])
+      act(() => { usePlayerStore.getState().setVolume(20) })
+      expect(processorMock.instance.setVolume).toHaveBeenLastCalledWith(0.2)
+      await act(async () => {
+        processorMock.instance.passive = true
+        finishConnection()
+      })
+      expect([a.volume, b.volume]).toEqual([0.2, 0.2])
+      expect([a.muted, b.muted]).toEqual([true, true])
+    })
+
+    it('preserves listening volume during deferred connection, then transfers both inputs to unity', async () => {
+      usePlayerStore.setState({ volume: 35, muted: true })
+      let finishConnection!: () => void
+      vi.mocked(audioService.connectDualAudioElements).mockImplementation(() => new Promise<void>((resolve) => {
+        finishConnection = () => { processorMock.instance.isActive = true; resolve() }
+      }))
+      renderHook(() => useAudioPlayback())
+      const [a, b] = capturedAudioElements
+      act(() => {
+        a.src = 'https://baander.app/audio.mp3'
+        a.dispatchEvent(new Event('loadstart'))
+        usePlayerStore.getState().setVolume(20)
+      })
+      expect([a.volume, b.volume]).toEqual([0.2, 0.2])
+      expect([a.muted, b.muted]).toEqual([true, true])
+      await act(async () => { finishConnection() })
+      expect([a.volume, b.volume]).toEqual([1, 1])
+      expect([a.muted, b.muted]).toEqual([false, false])
+      expect(processorMock.instance.setVolume).toHaveBeenLastCalledWith(0.2)
+      expect(processorMock.instance.setMuted).toHaveBeenLastCalledWith(true)
     })
   })
 
