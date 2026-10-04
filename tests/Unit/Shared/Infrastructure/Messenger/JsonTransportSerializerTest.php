@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Messenger;
 
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use App\Shared\Infrastructure\Messenger\JobIdStamp;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use App\Shared\Infrastructure\Messenger\Stamp\CorrelationIdStamp;
@@ -26,7 +26,7 @@ final class JsonTransportSerializerTest extends TestCase
 {
     public function testRetryAndFailureMetadataSurviveWithoutSerializingObjects(): void
     {
-        $serializer = new JsonTransportSerializer(new JsonMessageCodec());
+        $serializer = new JsonTransportSerializer(MessageCodecFactory::create());
         $command = new ExtractAlbumCoverCommand(Uuid::v4());
         $stamps = [
             new BusNameStamp('messenger.bus.default'),
@@ -51,14 +51,14 @@ final class JsonTransportSerializerTest extends TestCase
 
     public function testUnknownSendableStampIsRejectedRatherThanSilentlyLost(): void
     {
-        $serializer = new JsonTransportSerializer(new JsonMessageCodec());
+        $serializer = new JsonTransportSerializer(MessageCodecFactory::create());
         $this->expectException(\InvalidArgumentException::class);
         $serializer->encode(new Envelope(new ExtractAlbumCoverCommand(Uuid::v4()), [new class implements StampInterface {}]));
     }
 
     public function testUntrustedMetadataCannotInstantiateClasses(): void
     {
-        $codec = new JsonMessageCodec();
+        $codec = MessageCodecFactory::create();
         $wire = $codec->encode(new ExtractAlbumCoverCommand(Uuid::v4()), ['stamps' => [['type' => 'stdClass', 'data' => []]]]);
         $this->expectException(MessageDecodingFailedException::class);
         (new JsonTransportSerializer($codec))->decode(['body' => $wire]);
@@ -67,12 +67,12 @@ final class JsonTransportSerializerTest extends TestCase
     public function testLegacyPhpEnvelopeIsRejected(): void
     {
         $this->expectException(MessageDecodingFailedException::class);
-        (new JsonTransportSerializer(new JsonMessageCodec()))->decode(['body' => serialize(new Envelope(new \stdClass()))]);
+        (new JsonTransportSerializer(MessageCodecFactory::create()))->decode(['body' => serialize(new Envelope(new \stdClass()))]);
     }
 
     public function testNegativeRetryCountIsRejected(): void
     {
-        $codec = new JsonMessageCodec();
+        $codec = MessageCodecFactory::create();
         $wire = $codec->encode(new ExtractAlbumCoverCommand(Uuid::v4()), ['stamps' => [['type' => 'retry', 'data' => ['count' => -1, 'at' => '2026-10-01T10:00:00.000+00:00']]]]);
         $this->expectException(MessageDecodingFailedException::class);
         (new JsonTransportSerializer($codec))->decode(['body' => $wire]);

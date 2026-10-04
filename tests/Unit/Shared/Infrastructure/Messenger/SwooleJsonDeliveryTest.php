@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Messenger;
 
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Shared\Domain\Model\JobStatus;
 use App\Shared\Domain\Model\PublicId;
@@ -21,7 +22,6 @@ use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use Psr\Log\NullLogger;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
-use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
@@ -51,7 +51,7 @@ final class SwooleJsonDeliveryTest extends TestCase
             new SendMessageMiddleware(new SendersLocator([ExtractAlbumCoverCommand::class => ['swoole_task']], $container)),
             new HandleMessageMiddleware(new HandlersLocator([ExtractAlbumCoverCommand::class => [static function (ExtractAlbumCoverCommand $message) use (&$handled): void { $handled[] = $message; }]])),
         ]);
-        $serializer = new JsonTransportSerializer(new JsonMessageCodec());
+        $serializer = new JsonTransportSerializer(MessageCodecFactory::create());
         $task = new \Swoole\Server\Task();
         $task->data = $serializer->encode(new Envelope($command));
         $server = new \Swoole\Server('127.0.0.1', 0);
@@ -114,14 +114,14 @@ final class SwooleJsonDeliveryTest extends TestCase
                 }],
             ])),
         ]);
-        $serializer = new JsonTransportSerializer(new JsonMessageCodec());
+        $serializer = new JsonTransportSerializer(MessageCodecFactory::create());
         $task = new \Swoole\Server\Task();
         $task->data = $serializer->encode($envelope);
         $server = new \Swoole\Server('127.0.0.1', 0);
         $decorator = new SwooleTaskJobMonitorDecorator(
             new SwooleServerTaskTransportHandler($bus, $serializer),
             new JobMonitorService($em, new CursorPaginator(), new JsonEncoder()),
-            new JobMessageSerializer(new JsonMessageCodec()),
+            new JobMessageSerializer(MessageCodecFactory::create()),
             new NullLogger(),
             $serializer,
         );
@@ -146,7 +146,7 @@ final class SwooleJsonDeliveryTest extends TestCase
             self::assertNotSame($jobId->toString(), $monitorId);
         }
 
-        self::assertSame((new JsonMessageCodec())->encode($command), $updates[0]['data']['data']);
+        self::assertSame((MessageCodecFactory::create())->encode($command), $updates[0]['data']['data']);
         self::assertFalse($updates[0]['data']['data_truncated']);
         self::assertSame(JobStatus::Running->value, $updates[1]['data']['status']);
         self::assertSame(($fails ? JobStatus::Failed : JobStatus::Finished)->value, $updates[2]['data']['status']);

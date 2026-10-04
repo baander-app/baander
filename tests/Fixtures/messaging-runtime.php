@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
+
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
+require_once __DIR__ . '/Messaging/MessageCodecFactory.php';
 (new Symfony\Component\Dotenv\Dotenv())->bootEnv(dirname(__DIR__, 2) . '/.env');
 
 $mode = $argv[1] ?? '';
@@ -49,7 +52,7 @@ if ($mode === 'prepare') {
 } elseif ($mode === 'send') {
     $transport = new Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport(
         Symfony\Component\Messenger\Bridge\Redis\Transport\Connection::fromDsn(getenv('MESSENGER_TRANSPORT_DSN'), ['group' => 'baander']),
-        new App\Shared\Infrastructure\Messenger\JsonTransportSerializer(new App\Shared\Infrastructure\Messaging\JsonMessageCodec()),
+        new App\Shared\Infrastructure\Messenger\JsonTransportSerializer(MessageCodecFactory::create()),
     );
     $transport->send(new Symfony\Component\Messenger\Envelope(new App\Shared\Domain\Event\Outbox\RelayOutboxCommand()));
 } elseif ($mode === 'handled') {

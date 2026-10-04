@@ -735,7 +735,7 @@ deptrac:
     # Standard pattern for each context:
     #   Domain       → Shared Domain
     #   Application  → own Domain, Shared Domain, Shared Application
-    #   Infrastructure → own Domain, own Application, Shared Domain, Shared Infrastructure
+    #   Infrastructure → own Domain, own Application, Shared Domain/Application/Infrastructure
     #   Interface    → own Application, Shared Domain, Shared Application, Shared Interface
     # =============================================
 
@@ -759,6 +759,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Activity Infrastructure':
+      - 'Shared Application'
       - 'Activity Domain'
       - 'Activity Application'
       - 'Shared Domain'
@@ -787,6 +788,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Auth Infrastructure':
+      - 'Shared Application'
       - 'Auth Identity Contract'
       - 'Auth Domain'
       - 'Auth Application'
@@ -814,6 +816,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Catalog Infrastructure':
+      - 'Shared Application'
       - 'Catalog Domain'
       - 'Catalog Application'
       - 'Shared Domain'
@@ -851,6 +854,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Library Infrastructure':
+      - 'Shared Application'
       - 'Library Domain'
       - 'Library Application'
       - 'Shared Domain'
@@ -873,6 +877,7 @@ deptrac:
     'Lyrics Domain':
       - 'Shared Domain'
     'Lyrics Infrastructure':
+      - 'Shared Application'
       - 'Lyrics Application'
       - 'Lyrics Domain'
       - 'Shared Domain'
@@ -886,6 +891,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Media Infrastructure':
+      - 'Shared Application'
       - 'Media Domain'
       - 'Media Application'
       - 'Shared Domain'
@@ -911,6 +917,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Metadata Infrastructure':
+      - 'Shared Application'
       - 'Metadata Domain'
       - 'Metadata Application'
       - 'Shared Domain'
@@ -929,6 +936,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Notification Infrastructure':
+      - 'Shared Application'
       - 'Notification Domain'
       - 'Notification Application'
       - 'Shared Domain'
@@ -954,6 +962,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Party Infrastructure':
+      - 'Shared Application'
       - 'Party Domain'
       - 'Party Application'
       - 'Shared Domain'
@@ -980,6 +989,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Playlist Infrastructure':
+      - 'Shared Application'
       - 'Playlist Domain'
       - 'Playlist Application'
       - 'Shared Domain'
@@ -1006,6 +1016,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Recommendation Infrastructure':
+      - 'Shared Application'
       - 'Recommendation Domain'
       - 'Recommendation Application'
       - 'Shared Domain'
@@ -1032,6 +1043,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Transcode Infrastructure':
+      - 'Shared Application'
       - 'Transcode Domain'
       - 'Transcode Application'
       - 'Shared Domain'
@@ -1058,6 +1070,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'UserPreference Infrastructure':
+      - 'Shared Application'
       - 'UserPreference Domain'
       - 'UserPreference Application'
       - 'Shared Domain'
@@ -1082,6 +1095,7 @@ deptrac:
       - 'Discovery Domain'
       - 'Shared Domain'
     'Discovery Infrastructure':
+      - 'Shared Application'
       - 'Discovery Application'
       - 'Discovery Domain'
       - 'Shared Domain'
@@ -1106,6 +1120,7 @@ deptrac:
       - 'Favorites Domain'
       - 'Shared Domain'
     'Favorites Infrastructure':
+      - 'Shared Application'
       - 'Favorites Application'
       - 'Favorites Domain'
       - 'Shared Domain'

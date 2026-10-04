@@ -46,6 +46,16 @@ principals, and user-ID propagation. The related 103 tests (369 assertions) pass
 scoped PHPStan is clean. This removes 21 active dependencies on the concrete security
 user, leaving 355 active Deptrac violations with zero configuration errors.
 
+Shared message encoding now owns only the bounded, versioned JSON envelope;
+eight feature codecs own their payload mappings through a shared application
+contract. The format remains independent of Symfony serialization. Removed the
+unused framework serializer factory and its obsolete allowlist implementation.
+The active codec/transport units pass 123 tests (644 assertions); real Redis delivery,
+retry, outbox replay, and container wiring pass 23 tests (369 assertions). Golden
+wire fixtures, strict payload fields, numeric types, and size limits remain covered.
+Scoped PHPStan and container lint pass. The earlier combined backend gate passed
+4,560 tests (19,165 assertions); rerun it after the ongoing library-scope changes.
+
 ## Delivery horizons
 
 The destination is a reliable private self-hosted backend/web application, a small

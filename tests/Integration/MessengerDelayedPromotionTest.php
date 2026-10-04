@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Messenger\Bridge\Redis\Transport\Connection;
@@ -39,7 +39,7 @@ final class MessengerDelayedPromotionTest extends TestCase
         $this->dsn = $dsn;
         $this->stream = 'delayed_promotion_' . bin2hex(random_bytes(12));
         $this->queue = $this->stream . '__queue';
-        $this->serializer = new JsonTransportSerializer(new JsonMessageCodec());
+        $this->serializer = new JsonTransportSerializer(MessageCodecFactory::create());
         $parts = parse_url($dsn);
         self::assertIsArray($parts);
         $this->redis = new \Redis();

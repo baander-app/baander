@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Kernel;
 use App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand;
 use App\Scheduler\Application\CommandHandler\ExecuteScheduledJobHandler;
@@ -21,7 +22,6 @@ use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceExecutionStore;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceStore;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
@@ -359,7 +359,7 @@ final class SchedulerOccurrenceGuardTest extends TestCase
         self::assertNotSame('', $dsn);
         $connection = RedisConnection::fromDsn($dsn, ['stream' => 'scheduler_guard_' . bin2hex(random_bytes(12)), 'group' => 'test', 'consumer' => 'test']);
         $this->redisConnections[] = $connection;
-        $transport = new RedisTransport($connection, new JsonTransportSerializer(new JsonMessageCodec()));
+        $transport = new RedisTransport($connection, new JsonTransportSerializer(MessageCodecFactory::create()));
         $transport->setup();
         return $transport;
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Interface\Controller;
 
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Shared\Domain\Model\Uuid;
@@ -11,7 +12,6 @@ use App\Shared\Infrastructure\Doctrine\Entity\JobMonitorEntity;
 use App\Shared\Infrastructure\Messenger\JobIdStamp;
 use App\Shared\Infrastructure\Messenger\JobMessageSerializer;
 use App\Shared\Infrastructure\Messenger\JobMonitorService;
-use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use App\Shared\Infrastructure\Pagination\CursorCodec;
 use App\Shared\Infrastructure\Pagination\CursorPaginator;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
@@ -95,7 +95,7 @@ final class JobMonitorRetryTest extends TestCase
     {
         $job = new JobMonitorEntity('original-job', queue: $queue);
         $job->markFailed();
-        $job->setData((new JobMessageSerializer(new JsonMessageCodec()))->serialize(
+        $job->setData((new JobMessageSerializer(MessageCodecFactory::create()))->serialize(
             new Envelope(new ExtractAlbumCoverCommand(Uuid::generate())),
         ));
 
@@ -115,7 +115,7 @@ final class JobMonitorRetryTest extends TestCase
             new JobMonitorService($entityManager, new CursorPaginator(), $encoder),
             new CursorCodec($encoder),
             $bus,
-            new JobMessageSerializer(new JsonMessageCodec()),
+            new JobMessageSerializer(MessageCodecFactory::create()),
             $this->createStub(RedisClientFactory::class),
         );
     }

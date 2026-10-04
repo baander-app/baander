@@ -59,7 +59,6 @@ services:
             - '../src/Transcode/Infrastructure/Swoole/TranscodeLoopOwnership.php'
             - '../src/**/Entity/'
             - '../src/**/ValueObject/'
-            - '../src/Shared/Infrastructure/Messenger/AllowedClassNormalizer.php'
 
     App\Notification\Infrastructure\Webhook\WebhookDestinationPolicy:
         arguments:
@@ -76,6 +75,8 @@ services:
         alias: App\Notification\Infrastructure\Webhook\WebhookSecretCodec
 
     _instanceof:
+        App\Shared\Application\Messaging\MessagePayloadCodecInterface:
+            tags: ['baander.message_payload_codec']
         App\Scheduler\Domain\Model\SchedulableCommandInterface:
             tags: ['scheduler.messenger_command']
         App\Scheduler\Domain\Model\SchedulableConsoleCommandInterface:
@@ -734,6 +735,10 @@ services:
             - { name: 'kernel.event_listener', event: 'Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent', method: 'onMessageReceived' }
             - { name: 'kernel.event_listener', event: 'Symfony\Component\Messenger\Event\WorkerMessageHandledEvent', method: 'onMessageHandled' }
             - { name: 'kernel.event_listener', event: 'Symfony\Component\Messenger\Event\WorkerMessageFailedEvent', method: 'onMessageFailed' }
+
+    App\Shared\Infrastructure\Messaging\JsonMessageCodec:
+        arguments:
+            $payloadCodecs: !tagged_iterator baander.message_payload_codec
 
     App\Shared\Infrastructure\Messenger\JobMessageSerializer:
         arguments:

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
@@ -18,7 +19,6 @@ use App\Metadata\Application\CommandHandler\ExtractAlbumCoverHandler;
 use App\Metadata\Domain\Model\CoverArt;
 use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -183,7 +183,7 @@ final class CoverExtractionRetryTest extends TestCase
             'consumer' => 'test',
         ]);
         $this->connections[] = $connection;
-        $transport = new RedisTransport($connection, new JsonTransportSerializer(new JsonMessageCodec()));
+        $transport = new RedisTransport($connection, new JsonTransportSerializer(MessageCodecFactory::create()));
         $transport->setup();
         return $transport;
     }

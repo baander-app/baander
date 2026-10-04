@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Event;
 
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Notification\Application\DTO\SendEmailCommand;
 use App\Notification\Application\DTO\SendPushCommand;
 use App\Notification\Application\DTO\SendWebhookCommand;
@@ -13,7 +14,6 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Event\NotificationDeliveryBus;
 use App\Shared\Infrastructure\Event\NotificationDeliveryRepository;
 use App\Shared\Infrastructure\Event\RelayNotificationDeliveriesHandler;
-use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Result;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -31,7 +31,7 @@ final class NotificationDeliveryTest extends TestCase
     public function testBusPersistsVersionedIntent(string $channel): void
     {
         $message = self::message($channel);
-        $codec = new JsonMessageCodec();
+        $codec = MessageCodecFactory::create();
         $connection = $this->createMock(Connection::class);
         $connection->expects($this->once())->method('executeStatement')
             ->with($this->callback(static fn (string $sql): bool => str_contains($sql, 'ON CONFLICT (channel, notification_id) DO NOTHING')),
@@ -55,7 +55,7 @@ final class NotificationDeliveryTest extends TestCase
     {
         $connection = $this->createMock(Connection::class);
         $connection->expects($this->never())->method('executeStatement');
-        $bus = new NotificationDeliveryBus(new NotificationDeliveryRepository($connection), new JsonMessageCodec());
+        $bus = new NotificationDeliveryBus(new NotificationDeliveryRepository($connection), MessageCodecFactory::create());
         $message = match ($case) {
             'unsupported' => new \stdClass(),
             'envelope stamps' => new Envelope(self::message('push'), [new DelayStamp(100)]),
@@ -108,7 +108,7 @@ final class NotificationDeliveryTest extends TestCase
     #[DataProvider('retryCases')]
     public function testFailedDeliveryRetainsRetryOrDeadLetterAndContinuesBatch(string $failure, int $attempts): void
     {
-        $codec = new JsonMessageCodec();
+        $codec = MessageCodecFactory::create();
         $message = self::message('push');
         $payload = match ($failure) {
             'malformed' => '{',
@@ -170,7 +170,7 @@ final class NotificationDeliveryTest extends TestCase
     public function testDurableHandoffPrecedesFencedAcknowledgement(bool $acknowledged): void
     {
         $message = self::message('webhook');
-        $codec = new JsonMessageCodec();
+        $codec = MessageCodecFactory::create();
         $result = $this->createMock(Result::class);
         $result->expects($this->once())->method('fetchAllAssociative')->willReturn([
             ['id' => 7, 'channel' => 'webhook', 'notification_id' => 'notification-1',
@@ -226,7 +226,7 @@ final class NotificationDeliveryTest extends TestCase
         $connection->expects($this->once())->method('executeStatement')->willReturn(0);
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($this->never())->method('dispatch');
-        $handler = new RelayNotificationDeliveriesHandler(new NotificationDeliveryRepository($connection), $bus, new JsonMessageCodec(), new NullLogger());
+        $handler = new RelayNotificationDeliveriesHandler(new NotificationDeliveryRepository($connection), $bus, MessageCodecFactory::create(), new NullLogger());
         self::assertSame(0, $handler());
     }
 

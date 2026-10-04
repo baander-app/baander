@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Kernel;
 use App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand;
 use App\Scheduler\Infrastructure\Process\SchedulerWorkerRunner;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
 use App\Shared\Infrastructure\Worker\WorkerChildProcess;
@@ -70,7 +70,7 @@ final class SchedulerWorkerRunnerTest extends TestCase
         self::assertNotNull($lease);
         $stream = 'scheduler_loop_' . bin2hex(random_bytes(8));
         $this->redis = RedisConnection::fromDsn($redis, ['stream' => $stream, 'group' => 'test', 'consumer' => 'test']);
-        $this->transport = new RedisTransport($this->redis, new JsonTransportSerializer(new JsonMessageCodec()));
+        $this->transport = new RedisTransport($this->redis, new JsonTransportSerializer(MessageCodecFactory::create()));
         $this->transport->setup();
         $this->environment = [...getenv(), 'DATABASE_URL' => $url, 'PGOPTIONS' => '-c search_path=' . $this->schema,
             'PGAPPNAME' => $this->schema, 'BAANDER_TEST_SCHEDULER_STREAM' => $stream,

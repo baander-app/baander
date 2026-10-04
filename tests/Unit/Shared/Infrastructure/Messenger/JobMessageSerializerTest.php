@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Messenger;
 
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Messenger\JobMessageSerializer;
-use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Messenger\Envelope;
 
@@ -17,7 +17,7 @@ final class JobMessageSerializerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->serializer = new JobMessageSerializer(new JsonMessageCodec());
+        $this->serializer = new JobMessageSerializer(MessageCodecFactory::create());
     }
 
     public function testSerializesValidCommandToJson(): void
@@ -41,7 +41,7 @@ final class JobMessageSerializerTest extends TestCase
 
     public function testReturnsNullWhenPayloadExceedsThreshold(): void
     {
-        $serializer = new JobMessageSerializer(new JsonMessageCodec(), maxPayloadSize: 1);
+        $serializer = new JobMessageSerializer(MessageCodecFactory::create(), maxPayloadSize: 1);
 
         $command = new ExtractAlbumCoverCommand(Uuid::generate());
         $envelope = new Envelope($command);
@@ -71,7 +71,7 @@ final class JobMessageSerializerTest extends TestCase
     public function testDeserializeValidPayload(): void
     {
         $albumId = Uuid::generate();
-        $data = (new JsonMessageCodec())->encode(new ExtractAlbumCoverCommand($albumId));
+        $data = (MessageCodecFactory::create())->encode(new ExtractAlbumCoverCommand($albumId));
 
         $result = $this->serializer->deserialize($data);
 

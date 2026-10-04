@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
@@ -23,7 +24,6 @@ use App\Radio\Application\Port\RadioStationPortInterface;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Scheduler\Application\Command\ExecuteScheduledJobCommand;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use App\Shared\Infrastructure\Messenger\HttpServerTaskDispatcher;
 use App\Shared\Infrastructure\Messenger\SwooleTaskDispatcherInterface;
@@ -85,7 +85,7 @@ final class MessengerJsonDeliveryTest extends TestCase
         $async = $this->transport();
         $failed = $this->transport();
         $server = new HttpServer($this->createStub(HttpServerConfiguration::class));
-        $serializer = new SigningSerializer(new JsonTransportSerializer(new JsonMessageCodec()), 'integration-test-key', [ExtractAlbumCoverCommand::class]);
+        $serializer = new SigningSerializer(new JsonTransportSerializer(MessageCodecFactory::create()), 'integration-test-key', [ExtractAlbumCoverCommand::class]);
         $dispatcher = $this->createStub(SwooleTaskDispatcherInterface::class);
         if ($throw === null) {
             $dispatcher = new HttpServerTaskDispatcher($server, $serializer);
@@ -329,7 +329,7 @@ final class MessengerJsonDeliveryTest extends TestCase
         }
         $connection = Connection::fromDsn($dsn, ['stream' => 'test_' . bin2hex(random_bytes(12)), 'group' => 'test', 'consumer' => 'test']);
         $this->connections[] = $connection;
-        $transport = new RedisTransport($connection, new SigningSerializer(new JsonTransportSerializer(new JsonMessageCodec()), 'integration-test-key', $signedClasses));
+        $transport = new RedisTransport($connection, new SigningSerializer(new JsonTransportSerializer(MessageCodecFactory::create()), 'integration-test-key', $signedClasses));
         $transport->setup();
         return $transport;
     }

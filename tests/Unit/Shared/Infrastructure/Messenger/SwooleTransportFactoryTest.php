@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Messenger;
 
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use PHPUnit\Framework\TestCase;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Messenger\SwooleServerTaskTransportFactory;
@@ -24,7 +24,7 @@ final class SwooleTransportFactoryTest extends TestCase
         $sender = $this->createMock(SenderInterface::class);
         $sender->expects($this->once())->method('send')->with($envelope)->willReturn($envelope);
         $factory->setSender($sender);
-        $transport = $factory->createTransport('swoole://task', [], new JsonTransportSerializer(new JsonMessageCodec()));
+        $transport = $factory->createTransport('swoole://task', [], new JsonTransportSerializer(MessageCodecFactory::create()));
         self::assertSame($envelope, $transport->send($envelope));
     }
 }

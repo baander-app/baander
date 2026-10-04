@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Messenger;
 
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Shared\Domain\Model\JobStatus;
 use App\Shared\Domain\Model\PublicId;
@@ -13,7 +14,6 @@ use App\Shared\Infrastructure\Messenger\JobIdStamp;
 use App\Shared\Infrastructure\Messenger\JobMessageSerializer;
 use App\Shared\Infrastructure\Messenger\JobMonitorService;
 use App\Shared\Infrastructure\Messenger\WorkerJobMonitorSubscriber;
-use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use App\Shared\Infrastructure\Pagination\CursorPaginator;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -62,7 +62,7 @@ final class WorkerJobMonitorSubscriberTest extends TestCase
         $em->method('getConnection')->willReturn($connection);
         $this->subscriber = new WorkerJobMonitorSubscriber(
             new JobMonitorService($em, new CursorPaginator(), new JsonEncoder()),
-            new JobMessageSerializer(new JsonMessageCodec()),
+            new JobMessageSerializer(MessageCodecFactory::create()),
         );
     }
 
@@ -142,7 +142,7 @@ final class WorkerJobMonitorSubscriberTest extends TestCase
 
         self::assertSame('actual-async-receiver', $seen->last(ReceivedStamp::class)?->getTransportName());
         self::assertSame(JobStatus::Running->value, $this->updates[0]['data']['status']);
-        self::assertSame((new JsonMessageCodec())->encode($command), $this->updates[1]['data']['data']);
+        self::assertSame((MessageCodecFactory::create())->encode($command), $this->updates[1]['data']['data']);
         self::assertFalse($this->updates[1]['data']['data_truncated']);
         self::assertSame(($fails ? JobStatus::Failed : JobStatus::Finished)->value, $this->updates[2]['data']['status']);
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Kernel;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
@@ -18,7 +19,6 @@ use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Metadata\Application\CommandHandler\ExtractAlbumCoverHandler;
 use App\Metadata\Domain\Model\CoverArt;
 use App\Metadata\Domain\Model\ExtractedMetadata;
-use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use App\Shared\Infrastructure\Messenger\WorkerServicePoolResetSubscriber;
 use Doctrine\ORM\EntityManagerInterface;
@@ -211,7 +211,7 @@ final class CoverExtractionPersistenceTest extends TestCase
             'consumer' => 'test',
         ]);
         $this->connections[] = $connection;
-        $transport = new RedisTransport($connection, new JsonTransportSerializer(new JsonMessageCodec()));
+        $transport = new RedisTransport($connection, new JsonTransportSerializer(MessageCodecFactory::create()));
         $transport->setup();
         return $transport;
     }

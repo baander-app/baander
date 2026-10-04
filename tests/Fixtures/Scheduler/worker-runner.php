@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 // Isolated integration child only. No production entrypoint or implicit scheduler boot.
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Scheduler\Application\Service\SchedulerOccurrenceRelay;
 use App\Scheduler\Application\Service\SchedulerRecoveryPoller;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceDispatchStore;
@@ -11,13 +12,13 @@ use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerRecoveryScheduleStore
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerWorkerAuthority;
 use App\Scheduler\Infrastructure\Messenger\MessengerSchedulerOccurrencePublisher;
 use App\Scheduler\Infrastructure\Process\SchedulerWorkerRunner;
-use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use Psr\Log\NullLogger;
 use Symfony\Component\Messenger\Bridge\Redis\Transport\Connection;
 use Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport;
 
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
+require_once __DIR__ . '/../Messaging/MessageCodecFactory.php';
 try {
     $database = getenv('DATABASE_URL');
     $redis = getenv('MESSENGER_TEST_REDIS_DSN');
@@ -53,7 +54,7 @@ try {
             usleep((int) ceil($seconds * 1e6));
         };
     }
-    $transport = new RedisTransport(Connection::fromDsn($redis, ['stream' => $stream, 'group' => 'test', 'consumer' => 'test']), new JsonTransportSerializer(new JsonMessageCodec()));
+    $transport = new RedisTransport(Connection::fromDsn($redis, ['stream' => $stream, 'group' => 'test', 'consumer' => 'test']), new JsonTransportSerializer(MessageCodecFactory::create()));
     $runner = new SchedulerWorkerRunner(
         new SchedulerRecoveryPoller(DoctrineSchedulerRecoveryScheduleStore::fromDsn($database), DoctrineSchedulerOccurrenceMaterializer::fromDsn($database)),
         new SchedulerOccurrenceRelay(DoctrineSchedulerOccurrenceDispatchStore::fromDsn($database), new MessengerSchedulerOccurrencePublisher($transport)),

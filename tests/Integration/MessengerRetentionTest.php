@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Messenger\Bridge\Redis\Transport\Connection;
@@ -168,7 +168,7 @@ final class MessengerRetentionTest extends TestCase
         $options = array_replace($options, ['stream' => $this->stream, 'group' => $this->group, 'consumer' => $consumer, 'timeout' => 2.0, 'read_timeout' => 2.0], $overrides);
         $connection = Connection::fromDsn($this->dsn, $options);
         $this->connections[] = $connection;
-        $transport = new RedisTransport($connection, new JsonTransportSerializer(new JsonMessageCodec()));
+        $transport = new RedisTransport($connection, new JsonTransportSerializer(MessageCodecFactory::create()));
         $transport->setup();
         return $transport;
     }

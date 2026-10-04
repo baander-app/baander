@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
 
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
+require_once __DIR__ . '/../Messaging/MessageCodecFactory.php';
 
 $arguments = $_SERVER['argv'] ?? [];
 if (!is_array($arguments)) {
@@ -65,7 +67,7 @@ if ($mode === 'verify-scheduler' || $mode === 'replay-scheduler') {
         // consumer's retained deduplication guard with an actual duplicate delivery.
         $transport = new Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport(
             Symfony\Component\Messenger\Bridge\Redis\Transport\Connection::fromDsn('redis://default:test-only@redis:6379/scheduler_occurrences/baander'),
-            new App\Shared\Infrastructure\Messenger\JsonTransportSerializer(new App\Shared\Infrastructure\Messaging\JsonMessageCodec()),
+            new App\Shared\Infrastructure\Messenger\JsonTransportSerializer(MessageCodecFactory::create()),
         );
         $transport->send(new Symfony\Component\Messenger\Envelope(new App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand(App\Shared\Domain\Model\Uuid::fromString($occurrence['id']))));
         echo "Replayed duplicate scheduler envelope after confirmed execution.\n";

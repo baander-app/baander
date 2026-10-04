@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Notification\Application\DTO\SendEmailCommand;
 use App\Notification\Application\Handler\SendEmailHandler;
 use App\Notification\Domain\Repository\NotificationPreferenceRepositoryInterface;
 use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -155,7 +155,7 @@ final class NotificationRetryDeliveryTest extends TestCase
             'consumer' => 'test',
         ]);
         $this->connections[] = $connection;
-        $transport = new RedisTransport($connection, new JsonTransportSerializer(new JsonMessageCodec()));
+        $transport = new RedisTransport($connection, new JsonTransportSerializer(MessageCodecFactory::create()));
         $transport->setup();
         return $transport;
     }

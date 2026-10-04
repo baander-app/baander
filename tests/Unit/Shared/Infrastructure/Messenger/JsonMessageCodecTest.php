@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Messenger;
 
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Library\Application\Command\ScanLibraryCommand;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Domain\Model\DiscoveredFile;
@@ -23,12 +24,28 @@ use App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand;
 use App\Shared\Domain\Event\Outbox\RelayOutboxCommand;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
+use App\Shared\Infrastructure\Messaging\OutboxMessagePayloadCodec;
 use App\Transcode\Application\Command\UpdateTranscodePositionCommand;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class JsonMessageCodecTest extends TestCase
 {
+    public function testDuplicateWireRegistrationsFailBeforeReceivingMessages(): void
+    {
+        $this->expectException(\LogicException::class);
+        new JsonMessageCodec([new OutboxMessagePayloadCodec(), new OutboxMessagePayloadCodec()]);
+    }
+
+    public function testMissingFeatureCodecCannotDecodeOrInstantiateItsMessages(): void
+    {
+        $codec = new JsonMessageCodec([new OutboxMessagePayloadCodec()]);
+        $wire = MessageCodecFactory::create()->encode(new ExtractAlbumCoverCommand(Uuid::generate()));
+
+        $this->expectException(\InvalidArgumentException::class);
+        $codec->decode($wire);
+    }
+
     /** @return iterable<array{object}> */
     public static function messages(): iterable
     {
@@ -53,7 +70,7 @@ final class JsonMessageCodecTest extends TestCase
     #[DataProvider('messages')]
     public function testEveryRoutedMessageRoundTripsWithoutClassMetadata(object $message): void
     {
-        $codec = new JsonMessageCodec();
+        $codec = MessageCodecFactory::create();
         $encoded = $codec->encode($message, ['correlation_id' => 'correlation']);
         self::assertStringNotContainsString('Symfony', $encoded);
         self::assertStringNotContainsString('App\\', $encoded);
@@ -65,7 +82,7 @@ final class JsonMessageCodecTest extends TestCase
 
     public function testWireFormatHasAStableGoldenExample(): void
     {
-        $codec = new JsonMessageCodec();
+        $codec = MessageCodecFactory::create();
         $json = '{"format":"baander.message","version":1,"type":"metadata.extract_album_cover","payload":{"album_id":"00000000-0000-4000-8000-000000000001"},"metadata":{}}';
         self::assertSame($json, $codec->encode(new ExtractAlbumCoverCommand(Uuid::fromString('00000000-0000-4000-8000-000000000001'))));
         self::assertInstanceOf(ExtractAlbumCoverCommand::class, $codec->decode($json)->message);
@@ -74,7 +91,7 @@ final class JsonMessageCodecTest extends TestCase
     public function testOccurrenceWireCarriesOnlyItsIdentity(): void
     {
         $id = Uuid::v7();
-        $codec = new JsonMessageCodec();
+        $codec = MessageCodecFactory::create();
         $wire = json_decode($codec->encode(new ExecuteScheduledOccurrenceCommand($id)), true, flags: JSON_THROW_ON_ERROR);
         self::assertSame('scheduler.execute_occurrence', $wire['type']);
         self::assertSame(['occurrence_id' => $id->toString()], $wire['payload']);
@@ -85,7 +102,7 @@ final class JsonMessageCodecTest extends TestCase
 
     public function testOccurrenceWireRejectsInvalidIdentity(): void
     {
-        $codec = new JsonMessageCodec();
+        $codec = MessageCodecFactory::create();
         $wire = json_decode($codec->encode(new ExecuteScheduledOccurrenceCommand(Uuid::v7())), true, flags: JSON_THROW_ON_ERROR);
         $wire['payload']['occurrence_id'] = 'not-a-uuid';
         $this->expectException(\InvalidArgumentException::class);
@@ -108,7 +125,7 @@ final class JsonMessageCodecTest extends TestCase
                 'named' => ['z' => 1.0, 'a' => 2.0],
             ],
         ];
-        $codec = new JsonMessageCodec();
+        $codec = MessageCodecFactory::create();
         $encoded = $codec->encode(new ExecuteScheduledJobCommand('job-id', 'command', 'command-name', $parameters));
         $decoded = $codec->decode($encoded)->message;
 
@@ -125,7 +142,7 @@ final class JsonMessageCodecTest extends TestCase
     public function testMetadataPreservesFloatTokensAndNestedOrder(): void
     {
         $metadata = ['integral' => 1.0, 'negative_zero' => -0.0, 'nested' => ['z' => 1.0e18, 'a' => [1.25, 0.0]]];
-        $codec = new JsonMessageCodec();
+        $codec = MessageCodecFactory::create();
         $encoded = $codec->encode(new RelayOutboxCommand(1), $metadata);
         $decoded = $codec->decode($encoded);
 
@@ -154,18 +171,18 @@ final class JsonMessageCodecTest extends TestCase
     public function testMalformedOrUnsupportedContractsAreRejected(string $json): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        (new JsonMessageCodec())->decode($json);
+        (MessageCodecFactory::create())->decode($json);
     }
 
     public function testUnknownObjectsCannotBeEncoded(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        (new JsonMessageCodec())->encode(new \stdClass());
+        (MessageCodecFactory::create())->encode(new \stdClass());
     }
 
     public function testWholeDocumentSizeIsBounded(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        (new JsonMessageCodec(50))->encode(new RelayOutboxCommand(1));
+        (MessageCodecFactory::create(50))->encode(new RelayOutboxCommand(1));
     }
 }

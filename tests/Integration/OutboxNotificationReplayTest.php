@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Auth\Domain\Event\UserRegistered;
 use App\Notification\Application\DTO\CreateNotificationCommand;
 use App\Notification\Application\DTO\SendEmailCommand;
@@ -20,7 +21,6 @@ use App\Shared\Infrastructure\Event\NotificationBridgeSubscriber;
 use App\Shared\Infrastructure\Event\NotificationDeliveryBus;
 use App\Shared\Infrastructure\Event\NotificationDeliveryRepository;
 use App\Shared\Infrastructure\Event\OutboxEventDispatcher;
-use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Exception\DriverException;
@@ -93,7 +93,7 @@ final class OutboxNotificationReplayTest extends TestCase
         $this->replayer($this->second, $this->notificationListeners($this->second))->dispatch($event, 1);
         $this->assertCounts($this->first, 2, 3, 1);
         foreach ($this->first->fetchAllAssociative('SELECT payload FROM domain_event_outbox_delivery') as $row) {
-            $message = (new JsonMessageCodec())->decode($row['payload'])->message;
+            $message = (MessageCodecFactory::create())->decode($row['payload'])->message;
             self::assertContains($message::class, [SendEmailCommand::class, SendPushCommand::class, SendWebhookCommand::class]);
         }
     }
@@ -224,7 +224,7 @@ final class OutboxNotificationReplayTest extends TestCase
 
     private function notificationListeners(Connection $connection): EventDispatcher
     {
-        $deliveryBus = new NotificationDeliveryBus(new NotificationDeliveryRepository($connection), new JsonMessageCodec());
+        $deliveryBus = new NotificationDeliveryBus(new NotificationDeliveryRepository($connection), MessageCodecFactory::create());
         $createNotification = static function (CreateNotificationCommand $command) use ($connection, $deliveryBus): void {
             $notificationId = 'aaaaaaaaaaaaaaaaaaaaa';
             $connection->insert('replay_notifications', ['id' => $notificationId, 'kind' => $command->eventName]);
@@ -284,6 +284,6 @@ final class OutboxNotificationReplayTest extends TestCase
 
     private function event(): UserRegistered
     {
-        return new UserRegistered(Uuid::v4(), PublicId::fromString('bbbbbbbbbbbbbbbbbbbbb'), Email::fromString('replay@example.com'), 'Replay user');
+        return new UserRegistered(Uuid::v4(), PublicId::fromString('bbbbbbbbbbbbbbbbbbbbb'), Email::fromString('replay@baander.app'), 'Replay user');
     }
 }
