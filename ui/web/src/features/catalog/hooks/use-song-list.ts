@@ -1,7 +1,8 @@
-import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
+import { useCallback, useMemo } from 'react'
+import { useInfiniteQuery } from '@tanstack/react-query'
 import {
-  useGetSongIndex,
   getSongIndex,
+  getGetSongIndexQueryKey,
   type GetSongIndexParams,
 } from '@/shared/api-client/gen/endpoints'
 import type { ListSongData } from '../components/ListRow'
@@ -28,8 +29,12 @@ function parseSong(raw: Record<string, unknown>, index: number): ListSongData {
 }
 
 function parseResponseData(data: unknown): Record<string, unknown>[] {
-  const resp = data as Record<string, unknown> | undefined
-  return Array.isArray(resp?.data) ? (resp!.data as Record<string, unknown>[]) : []
+  if (typeof data !== 'object' || data === null || !('data' in data) || !Array.isArray(data.data)) {
+    return []
+  }
+  return data.data.filter((song): song is Record<string, unknown> =>
+    typeof song === 'object' && song !== null && !Array.isArray(song),
+  )
 }
 
 export interface UseSongListOptions {
@@ -43,85 +48,53 @@ export interface UseSongListResult {
   isLoading: boolean
   isFetchingMore: boolean
   hasNextPage: boolean
+  isError: boolean
+  isFetchMoreError: boolean
+  retry: () => void
   fetchMore: () => void
 }
 
 export function useSongList({ sort, pageSize = 100 }: UseSongListOptions): UseSongListResult {
-  const [accumulated, setAccumulated] = useState<ListSongData[]>([])
-  const [total, setTotal] = useState(0)
-  const [isFetchingMore, setIsFetchingMore] = useState(false)
-  const nextCursorRef = useRef<string | null>(null)
-  const hasNextPageRef = useRef(false)
+  const params: GetSongIndexParams = {
+    limit: pageSize,
+    ...(sort.field && sort.direction ? { sort: sort.field, order: sort.direction } : {}),
+  }
+  const query = useInfiniteQuery({
+    queryKey: [...getGetSongIndexQueryKey(params), 'infinite'],
+    initialPageParam: undefined,
+    queryFn: async ({ pageParam, signal }: { pageParam: string | undefined; signal: AbortSignal }) => {
+      const response: unknown = await getSongIndex(
+        { ...params, ...(pageParam ? { cursor: pageParam } : {}) },
+        { signal },
+      )
+      return { songs: parseResponseData(response), meta: extractCursorMeta(response) }
+    },
+    getNextPageParam: (lastPage) =>
+      lastPage.meta.has_next_page ? lastPage.meta.next_cursor ?? undefined : undefined,
+  })
 
-  const params: GetSongIndexParams = useMemo(
-    () => ({
-      limit: pageSize,
-      ...(sort.field && sort.direction ? { sort: sort.field, order: sort.direction } : {}),
-    }),
-    [sort, pageSize],
+  const songs = useMemo(
+    () => query.data?.pages.flatMap((page) => page.songs).map((song, index) => parseSong(song, index + 1)) ?? [],
+    [query.data],
   )
-
-  const { data: firstPageData, isLoading } = useGetSongIndex(params)
-
-  // Clear accumulated songs the moment sort/page changes, so songs from the previous sort
-  // can never mix with the incoming page if fetchMore fires during the refetch window.
-  // The firstPageData effect below repopulates once the new page arrives.
-  useEffect(() => {
-    setAccumulated([])
-    setTotal(0)
-    nextCursorRef.current = null
-    hasNextPageRef.current = false
-  }, [params])
-
-  // When first page loads or sort changes, reset accumulated songs
-  useEffect(() => {
-    if (!firstPageData) return
-    const raw = parseResponseData(firstPageData)
-
-    const songs = raw.map((s, i) => parseSong(s, i + 1))
-    setAccumulated(songs)
-
-    const meta = extractCursorMeta(firstPageData)
-    setTotal(meta.total)
-    nextCursorRef.current = meta.next_cursor
-    hasNextPageRef.current = meta.has_next_page
-  }, [firstPageData])
-
-  const fetchMore = useCallback(async () => {
-    if (!hasNextPageRef.current || isFetchingMore || !nextCursorRef.current) return
-
-    setIsFetchingMore(true)
-    try {
-      const nextParams: GetSongIndexParams = {
-        ...params,
-        cursor: nextCursorRef.current,
-      }
-      const response = await getSongIndex(nextParams)
-      const meta = extractCursorMeta(response)
-      const rawData = parseResponseData(response)
-
-      setAccumulated((prev) => {
-        const offset = prev.length
-        const newSongs = rawData.map((s, i) => parseSong(s, offset + i + 1))
-        return [...prev, ...newSongs]
-      })
-
-      setTotal(meta.total)
-      nextCursorRef.current = meta.next_cursor
-      hasNextPageRef.current = meta.has_next_page
-    } finally {
-      setIsFetchingMore(false)
-    }
-  }, [params, isFetchingMore])
-
-  const hasNextPage = hasNextPageRef.current
+  const { fetchNextPage, refetch, hasNextPage, isFetching } = query
+  const fetchMore = useCallback(() => {
+    if (!hasNextPage || isFetching) return
+    void fetchNextPage({ cancelRefetch: false }).catch(() => undefined)
+  }, [fetchNextPage, hasNextPage, isFetching])
+  const retry = useCallback(() => {
+    void refetch({ cancelRefetch: false }).catch(() => undefined)
+  }, [refetch])
 
   return {
-    songs: accumulated,
-    total,
-    isLoading,
-    isFetchingMore,
+    songs,
+    total: query.data?.pages.at(-1)?.meta.total ?? 0,
+    isLoading: query.isLoading,
+    isFetchingMore: query.isFetchingNextPage,
     hasNextPage,
+    isError: query.isError,
+    isFetchMoreError: query.isFetchNextPageError,
     fetchMore,
+    retry,
   }
 }

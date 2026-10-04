@@ -2,6 +2,7 @@ import { useRef, useCallback, useState, useEffect } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import styled, { keyframes } from 'styled-components'
 import { Loader2 } from 'lucide-react'
+import { Button } from '@/shared/components/ui/button'
 import { ListHeader, type SortState } from '../components/ListHeader'
 import { ListRow } from '../components/ListRow'
 import { useSongList } from '../hooks/use-song-list'
@@ -79,13 +80,21 @@ const EmptyText = styled.p`
   color: var(--color-muted-foreground);
 `
 
+const ErrorMessage = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1rem;
+`
+
 const ROW_HEIGHT = 32
 
 export function ListView() {
   const parentRef = useRef<HTMLDivElement>(null)
   const [sort, setSort] = useState<SortState>({ field: null, direction: null })
 
-  const { songs, isLoading, isFetchingMore, hasNextPage, fetchMore } = useSongList({ sort })
+  const { songs, isLoading, isFetchingMore, hasNextPage, fetchMore, isError, isFetchMoreError, retry } = useSongList({ sort })
 
   const virtualizer = useVirtualizer({
     count: songs.length,
@@ -100,10 +109,10 @@ export function ListView() {
   useEffect(() => {
     const lastRow = rows[rows.length - 1]
     if (!lastRow) return
-    if (lastRow.index >= songs.length - 10 && hasNextPage && !isFetchingMore) {
+    if (lastRow.index >= songs.length - 10 && hasNextPage && !isFetchingMore && !isError) {
       fetchMore()
     }
-  }, [rows, songs.length, hasNextPage, isFetchingMore, fetchMore])
+  }, [rows, songs.length, hasNextPage, isFetchingMore, isError, fetchMore])
 
   const handleSortChange = useCallback((newSort: SortState) => {
     setSort(newSort)
@@ -132,7 +141,12 @@ export function ListView() {
       <PageContainer>
         <ListHeader sort={sort} onSortChange={handleSortChange} />
         <EmptyContainer>
-          <EmptyText>No songs</EmptyText>
+          {isError ? (
+            <ErrorMessage role="alert">
+              <EmptyText>Could not load songs.</EmptyText>
+              <Button variant="ghost" onClick={retry}>Retry</Button>
+            </ErrorMessage>
+          ) : <EmptyText>No songs</EmptyText>}
         </EmptyContainer>
       </PageContainer>
     )
@@ -169,6 +183,12 @@ export function ListView() {
           <FetchingIndicator>
             <Loader2 size={14} />
           </FetchingIndicator>
+        )}
+        {isError && (
+          <ErrorMessage role="alert">
+            <EmptyText>{isFetchMoreError ? 'Could not load more songs.' : 'Could not refresh songs.'}</EmptyText>
+            <Button variant="ghost" disabled={isFetchingMore} onClick={isFetchMoreError ? fetchMore : retry}>Retry</Button>
+          </ErrorMessage>
         )}
       </ScrollArea>
     </PageContainer>

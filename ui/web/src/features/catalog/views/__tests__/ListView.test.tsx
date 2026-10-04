@@ -1,13 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ListView } from '../ListView'
+import type { GetSongIndexParams } from '@/shared/api-client/gen/endpoints'
 import { useListColumnStore } from '../../stores/list-column-store'
 
-// Mock the API hook
-const mockUseGetSongIndex = vi.fn()
+// Mock the transport while retaining the real query lifecycle
+const mockGetSongIndex = vi.fn()
 vi.mock('@/shared/api-client/gen/endpoints', () => ({
-  useGetSongIndex: (...args: any[]) => mockUseGetSongIndex(...args),
+  getSongIndex: (...args: unknown[]) => mockGetSongIndex(...args),
+  getGetSongIndexQueryKey: (params: GetSongIndexParams) => ['/api/songs/', params],
 }))
 
 function createQueryWrapper() {
@@ -35,47 +37,46 @@ const mockSongs = {
 
 describe('ListView', () => {
   beforeEach(() => {
+    vi.resetAllMocks()
     useListColumnStore.setState({
       visibleColumns: ['#', 'title', 'artist', 'album', 'year', 'duration'],
       columnOrder: ['#', 'title', 'artist', 'album', 'year', 'genre', 'duration', 'bitrate', 'format', 'createdAt'],
     })
-    mockUseGetSongIndex.mockReturnValue({ data: mockSongs, isLoading: false })
+    mockGetSongIndex.mockResolvedValue(mockSongs)
   })
 
-  it('renders song rows (via virtualizer)', () => {
+  it('renders song rows (via virtualizer)', async () => {
     // In jsdom, the virtualizer container has 0 height so no rows render.
     // We verify the data reaches the component by checking the total size.
     render(<ListView />, { wrapper: createQueryWrapper() })
 
     // The virtualizer should have calculated total height: 2 songs × 32px = 64px
-    const container = document.querySelector('[style*="height: 64px"]')
-    expect(container).toBeInTheDocument()
+    await waitFor(() => expect(document.querySelector('[style*="height: 64px"]')).toBeInTheDocument())
   })
 
   it('passes sort params to API when sorting', async () => {
-    mockUseGetSongIndex.mockReturnValue({ data: mockSongs, isLoading: false })
+    mockGetSongIndex.mockResolvedValue(mockSongs)
 
     render(<ListView />, { wrapper: createQueryWrapper() })
 
     // Initial call should not have sort
-    const initialCall = mockUseGetSongIndex.mock.calls[0][0]
+    const initialCall = mockGetSongIndex.mock.calls[0][0]
     expect(initialCall.sort).toBeUndefined()
 
     // Simulate sort change by clicking a header
     const titleHeader = screen.getByText('Title')
-    titleHeader.click()
+    fireEvent.click(titleHeader)
 
-    // After click, a new render will re-call the hook with sort params.
-    // Since the hook is mocked, we check that the last call has sort params.
+    // A sort change starts a fresh query with the corresponding transport params.
     await waitFor(() => {
-      const lastCall = mockUseGetSongIndex.mock.calls[mockUseGetSongIndex.mock.calls.length - 1][0]
+      const lastCall = mockGetSongIndex.mock.calls[mockGetSongIndex.mock.calls.length - 1][0]
       expect(lastCall.sort).toBe('title')
       expect(lastCall.order).toBe('asc')
     })
   })
 
   it('shows loading skeleton while loading', () => {
-    mockUseGetSongIndex.mockReturnValue({ data: null, isLoading: true })
+    mockGetSongIndex.mockReturnValue(new Promise(() => {}))
 
     render(<ListView />, { wrapper: createQueryWrapper() })
 
@@ -85,18 +86,15 @@ describe('ListView', () => {
     expect(screen.queryByText('Song A')).not.toBeInTheDocument()
   })
 
-  it('shows empty state when no songs', () => {
-    mockUseGetSongIndex.mockReturnValue({
-      data: { data: [], meta: { ...mockSongs.meta, total: 0 } },
-      isLoading: false,
-    })
+  it('shows empty state when no songs', async () => {
+    mockGetSongIndex.mockResolvedValue({ data: [], meta: { ...mockSongs.meta, total: 0 } })
 
     render(<ListView />, { wrapper: createQueryWrapper() })
 
-    expect(screen.getByText('No songs')).toBeInTheDocument()
+    expect(await screen.findByText('No songs')).toBeInTheDocument()
   })
 
-  it('virtualizer sets correct total height for large lists', () => {
+  it('virtualizer sets correct total height for large lists', async () => {
     const manySongs = Array.from({ length: 200 }, (_, i) => ({
       publicId: `s${i}`,
       title: `Song ${i}`,
@@ -106,15 +104,11 @@ describe('ListView', () => {
       length: 180,
     }))
 
-    mockUseGetSongIndex.mockReturnValue({
-      data: { data: manySongs, meta: { ...mockSongs.meta, total: 200 } },
-      isLoading: false,
-    })
+    mockGetSongIndex.mockResolvedValue({ data: manySongs, meta: { ...mockSongs.meta, total: 200 } })
 
     render(<ListView />, { wrapper: createQueryWrapper() })
 
     // Total height: 200 songs × 32px = 6400px
-    const container = document.querySelector('[style*="height: 6400px"]')
-    expect(container).toBeInTheDocument()
+    await waitFor(() => expect(document.querySelector('[style*="height: 6400px"]')).toBeInTheDocument())
   })
 })
