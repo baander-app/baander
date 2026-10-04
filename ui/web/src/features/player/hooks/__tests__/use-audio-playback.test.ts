@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act, cleanup } from '@testing-library/react'
 import { reapplyAllEqState } from '@/features/equalizer/stores/eq-reapply'
 import { audioService } from '@/features/player/services/audio-service'
+import { activityService } from '@/features/player/services/activity-service'
 
 // --- Mocks must be hoisted before the hook imports them ---------------------
 
@@ -453,20 +454,40 @@ describe('useAudioPlayback', () => {
   })
 
   describe('ended event', () => {
-    it('restarts the current track when repeat === "one"', () => {
+    it('stops repeat-one when its current native playback rejects', async () => {
+      seedQueue(0, 2)
+      usePlayerStore.setState({ repeat: 'one', isPlaying: true })
+      renderHook(() => useAudioPlayback())
+      const [a] = capturedAudioElements
+      a.src = '/api/stream/track?id=t0'
+      vi.mocked(a.play).mockRejectedValueOnce(new Error('Repeat failed'))
+      await act(async () => { a.dispatchEvent(new Event('ended')) })
+      expect(usePlayerStore.getState().isPlaying).toBe(false)
+      expect(activityService.recordPlay).not.toHaveBeenCalled()
+    })
+
+    it('restarts and records the current track when repeat === "one" without reloading', async () => {
       const q = seedQueue(0, 2)
       usePlayerStore.setState({ repeat: 'one', currentTrack: q[0] })
       const { result } = renderHook(() => useAudioPlayback())
       const [a] = capturedAudioElements
-      ;a.currentTime = 42
-
-      act(() => {
+      a.currentTime = 42
+      a.src = '/api/stream/track?id=t0'
+      vi.mocked(a.play).mockImplementation(() => {
+        a.paused = false
+        a.ended = false
+        return Promise.resolve()
+      })
+      await act(async () => {
         a.dispatchEvent(new Event('ended'))
       })
 
       expect(a.currentTime).toBe(0)
       expect(a.play).toHaveBeenCalled()
       expect(processorMock.instance.resetProgramme).toHaveBeenCalledOnce()
+      expect(activityService.recordPlay).toHaveBeenCalledExactlyOnceWith({ songId: 't0', albumId: undefined })
+      expect(a.src).toBe('/api/stream/track?id=t0')
+      expect(a.load).not.toHaveBeenCalled()
       // playNext must NOT be called: index unchanged.
       expect(usePlayerStore.getState().currentIndex).toBe(0)
       void result

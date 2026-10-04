@@ -72,3 +72,10 @@ Next/previous failure tests return HTTP 404 for the selected WAV and assert that
 native `play()` rejection clears the playing state. Store tests resolve or reject
 superseded play promises to check selection ownership and activity reporting,
 including navigation away and back to the same track.
+
+Repeat-one coverage observes calls at the activity-service boundary across native
+ended/replay cycles, checks that the source loads once, and checks that pause and
+resume add no play event. Activity-service unit tests verify one API submission
+per caller-owned playback attempt, including consecutive plays of the same song
+and independent request failures. Delivery remains best effort; an uncertain
+network failure is not automatically retried.

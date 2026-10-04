@@ -181,3 +181,24 @@ for (const action of ['next', 'previous'] as const) {
     await expect.poll(async () => (await snapshot(page)).playing).toBe(false)
   })
 }
+
+test('native repeat-one records each successful iteration without reloading the media source', async ({ page, origin }) => {
+  await page.goto(origin)
+  await page.waitForFunction(() => document.documentElement.dataset.ready === 'true')
+  await page.evaluate(() => { window.playbackFixture.repeatOne(); window.playbackFixture.start(false) })
+  await expect.poll(() => page.evaluate(() => window.playbackFixture.activity())).toEqual(['first'])
+  for (let iteration = 2; iteration <= 3; iteration++) {
+    await page.evaluate(() => window.playbackFixture.seek(3.85))
+    await expect.poll(() => page.evaluate(() => window.playbackFixture.activity())).toEqual(Array(iteration).fill('first'))
+    const repeated = await snapshot(page)
+    expect(repeated.track).toBe('first')
+    expect(repeated.playing).toBe(true)
+    expect(repeated.elements[0].loads).toBe(1)
+    expect(repeated.active).toBe(0)
+  }
+  await page.evaluate(() => window.playbackFixture.pause())
+  await expect.poll(async () => (await snapshot(page)).elements[0].paused).toBe(true)
+  await page.evaluate(() => window.playbackFixture.resume())
+  await expect.poll(async () => (await snapshot(page)).elements[0].paused).toBe(false)
+  expect(await page.evaluate(() => window.playbackFixture.activity())).toEqual(['first', 'first', 'first'])
+})

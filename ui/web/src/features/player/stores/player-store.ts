@@ -75,6 +75,7 @@ export interface PlayerState {
   clearQueue: () => void
 
   // Actions — playback
+  replayCurrentTrack: () => void
   setIsPlaying: (playing: boolean) => void
   setDuration: (duration: number) => void
   seekTo: (time: number) => void
@@ -150,12 +151,18 @@ function requestSelectedTrackPlayback(
   track: Track,
   get: () => PlayerState,
   set: (state: Partial<PlayerState>) => void,
+  sourceMode: 'replace' | 'preserve' = 'replace',
 ) {
   const generation = ++playbackSelectionGeneration
   const el = get().audioElement
   set({ isPlaying: true })
   if (!el) return
-  el.src = buildStreamUrl(track.publicId)
+  if (sourceMode === 'replace') {
+    el.src = buildStreamUrl(track.publicId)
+  } else {
+    el.currentTime = 0
+    updateTime(0)
+  }
   const src = el.src
   const ownsSelection = () => generation === playbackSelectionGeneration
     && get().audioElement === el && el.src === src && get().currentTrack === track
@@ -362,7 +369,6 @@ export const usePlayerStore = create<PlayerState>()(
           audioElement.pause()
           audioElement.src = ''
         }
-        activityService.reset()
         set({
           queue: [],
           currentIndex: -1,
@@ -375,6 +381,11 @@ export const usePlayerStore = create<PlayerState>()(
       },
 
       // Playback actions
+      replayCurrentTrack: () => {
+        const { currentTrack, audioElement } = get()
+        if (!currentTrack || !audioElement?.src) return
+        requestSelectedTrackPlayback(currentTrack, get, set, 'preserve')
+      },
       setIsPlaying: (playing) => {
         if (!playing && get().isPlaying) playbackSelectionGeneration++
         set({ isPlaying: playing })

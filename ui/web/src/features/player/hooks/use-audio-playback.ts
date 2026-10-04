@@ -231,8 +231,7 @@ export function useAudioPlayback() {
         const state = usePlayerStore.getState()
         if (state.repeat === 'one' && state.currentTrack) {
           audioService.getProcessor()?.resetProgramme()
-          audio.currentTime = 0
-          void audio.play().catch((err) => { if (owned()) logger.warn('Repeat-one resume failed:', err) })
+          state.replayCurrentTrack()
         } else if (candidate?.ready && valid(candidate)) {
           void handoff(false)
         } else {

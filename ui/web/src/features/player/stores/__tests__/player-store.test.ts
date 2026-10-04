@@ -296,6 +296,97 @@ describe('player-store', () => {
   // =========================================================================
   // playNext
   // =========================================================================
+  describe('replayCurrentTrack', () => {
+    beforeEach(() => { vi.spyOn(activityService, 'recordPlay').mockResolvedValue() })
+    afterEach(() => { vi.mocked(activityService.recordPlay).mockRestore() })
+
+    function prepareReplay() {
+      const queue = seedQueue(1, 3)
+      const audio = makeAudioStub()
+      audio.src = '/api/stream/track?id=t1'
+      audio.currentTime = 42
+      usePlayerStore.getState().setAudioElement(audio)
+      return { queue, audio }
+    }
+
+    it('records each successful repeat while preserving the loaded source and queue', async () => {
+      const { queue, audio } = prepareReplay()
+      const sourceSetter = vi.fn()
+      Object.defineProperty(audio, 'src', { get: () => '/api/stream/track?id=t1', set: sourceSetter })
+      for (let count = 1; count <= 3; count++) {
+        usePlayerStore.getState().replayCurrentTrack()
+        await Promise.resolve()
+        expect(activityService.recordPlay).toHaveBeenCalledTimes(count)
+      }
+      expect(audio.currentTime).toBe(0)
+      expect(usePlayerStore.getState().currentTime).toBe(0)
+      expect(sourceSetter).not.toHaveBeenCalled()
+      expect(usePlayerStore.getState().queue).toBe(queue)
+      expect(usePlayerStore.getState().currentTrack).toBe(queue[1])
+      expect(usePlayerStore.getState().currentIndex).toBe(1)
+      expect(audio.play).toHaveBeenCalledTimes(3)
+    })
+
+    it('stops a currently owned repeat that rejects', async () => {
+      const { audio } = prepareReplay()
+      vi.mocked(audio.play).mockRejectedValueOnce(new Error('Repeat unavailable'))
+      usePlayerStore.getState().replayCurrentTrack()
+      await Promise.resolve()
+      expect(usePlayerStore.getState().isPlaying).toBe(false)
+      expect(activityService.recordPlay).not.toHaveBeenCalled()
+    })
+
+    it.each(['resolve', 'reject'] as const)('ignores obsolete repeat %s after manual selection or replay ABA', async (outcome) => {
+      for (const replay of [false, true]) {
+        vi.mocked(activityService.recordPlay).mockClear()
+        const { audio, queue } = prepareReplay()
+        let settle!: () => void
+        vi.mocked(audio.play).mockReturnValueOnce(new Promise<void>((resolve, reject) => {
+          settle = () => outcome === 'resolve' ? resolve() : reject(new Error('Obsolete repeat failed'))
+        }))
+        usePlayerStore.getState().replayCurrentTrack()
+        if (replay) usePlayerStore.getState().replayCurrentTrack()
+        else usePlayerStore.getState().playTrack(queue[2])
+        settle()
+        await Promise.resolve()
+        expect(usePlayerStore.getState().isPlaying).toBe(true)
+        expect(activityService.recordPlay).toHaveBeenCalledExactlyOnceWith({ songId: replay ? 't1' : 't2', albumId: undefined })
+      }
+    })
+
+    it.each(['resolve', 'reject'] as const)('ignores pending repeat %s after element replacement or pause/resume', async (outcome) => {
+      for (const interruption of ['element', 'pause'] as const) {
+        vi.mocked(activityService.recordPlay).mockClear()
+        const { audio } = prepareReplay()
+        let settle!: () => void
+        vi.mocked(audio.play).mockReturnValueOnce(new Promise<void>((resolve, reject) => {
+          settle = () => outcome === 'resolve' ? resolve() : reject(new Error('Interrupted repeat failed'))
+        }))
+        usePlayerStore.getState().replayCurrentTrack()
+        if (interruption === 'element') usePlayerStore.getState().setAudioElement(makeAudioStub())
+        else {
+          usePlayerStore.getState().setIsPlaying(false)
+          usePlayerStore.getState().setIsPlaying(true)
+        }
+        settle()
+        await Promise.resolve()
+        expect(usePlayerStore.getState().isPlaying).toBe(true)
+        expect(activityService.recordPlay).not.toHaveBeenCalled()
+      }
+    })
+
+    it.each(['track', 'element', 'source'] as const)('ignores repeat without selected %s', (missing) => {
+      const { audio } = prepareReplay()
+      if (missing === 'track') usePlayerStore.setState({ currentTrack: null })
+      if (missing === 'element') usePlayerStore.getState().setAudioElement(null)
+      if (missing === 'source') audio.src = ''
+      usePlayerStore.getState().replayCurrentTrack()
+      expect(audio.play).not.toHaveBeenCalled()
+      expect(audio.currentTime).toBe(42)
+      expect(activityService.recordPlay).not.toHaveBeenCalled()
+    })
+  })
+
   describe.each(['playNext', 'playPrevious'] as const)('%s async ownership', (action) => {
     beforeEach(() => { vi.spyOn(activityService, 'recordPlay').mockResolvedValue() })
     afterEach(() => { vi.mocked(activityService.recordPlay).mockRestore() })

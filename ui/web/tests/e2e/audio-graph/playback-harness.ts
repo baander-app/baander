@@ -41,7 +41,7 @@ export const test = base.extend<Record<never, never>, { origin: string }>({
           plugin.onResolve({ filter: /^(?:react(?:-dom)?|zustand|scheduler)(?:\/.*)?$/ }, args => ({ path: require.resolve(args.path) }))
           plugin.onResolve({ filter: /(?:activity-service|eq-reapply|wasm-loader)$/ }, args => ({ path: args.path, namespace: 'fixture' }))
           plugin.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path.endsWith('activity-service')
-            ? 'export const activityService={recordPlay(){},reset(){}}'
+            ? 'export const activityService={recordPlay(payload){(globalThis.playbackActivity??=[]).push(payload.songId)}}'
             : args.path.endsWith('eq-reapply') ? 'export function reapplyAllEqState(){}'
             : `const api=new Proxy({}, {get:()=>()=>{}}); export const getLoudness=async()=>api,getDynamics=async()=>api,getSpectralFeatures=async()=>api; export const getWasmUrl=()=>'/analysis.wasm',getAudioWorkletUrl=file=>'/'+file;` }))
         } }],
