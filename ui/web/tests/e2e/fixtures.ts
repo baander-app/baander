@@ -53,9 +53,9 @@ export const spaNavigate = (page: Page) => async (path: string) => {
 }
 
 export const test = base.extend<{ asAdmin: Page }>({
-  asAdmin: async ({ page }, use) => {
+  asAdmin: async ({ page }, providePage) => {
     await authenticate(page)
-    await use(page)
+    await providePage(page)
   },
 })
 

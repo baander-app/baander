@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import styled, { css } from 'styled-components'
 import {
   Dialog,
@@ -131,22 +131,18 @@ interface CreateLibraryDialogProps {
   isPending: boolean
 }
 
-export function CreateLibraryDialog({ open, onClose, onSubmit, isPending }: CreateLibraryDialogProps) {
+export function CreateLibraryDialog(props: CreateLibraryDialogProps) {
+  if (!props.open) return null
+
+  return <CreateLibraryForm {...props} />
+}
+
+function CreateLibraryForm({ open, onClose, onSubmit, isPending }: CreateLibraryDialogProps) {
   const [name, setName] = useState('')
   const [path, setPath] = useState('')
   const [type, setType] = useState('music')
   const [slug, setSlug] = useState('')
-  const { result: pathResult, isValidating, validate, reset: resetValidation } = usePathValidation()
-
-  useEffect(() => {
-    if (!open) {
-      setName('')
-      setPath('')
-      setType('music')
-      setSlug('')
-      resetValidation()
-    }
-  }, [open, resetValidation])
+  const { result: pathResult, isValidating, validate } = usePathValidation()
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -249,18 +245,19 @@ interface EditLibraryDialogProps {
   isPending: boolean
 }
 
-export function EditLibraryDialog({ library, onClose, onSubmit, isPending }: EditLibraryDialogProps) {
+export function EditLibraryDialog(props: EditLibraryDialogProps) {
+  if (!props.library) return null
+
+  return <EditLibraryForm key={props.library.id} {...props} library={props.library} />
+}
+
+type EditLibraryFormProps = Omit<EditLibraryDialogProps, 'library'> & {
+  library: Library
+}
+
+function EditLibraryForm({ library, onClose, onSubmit, isPending }: EditLibraryFormProps) {
   const [name, setName] = useState(library?.name ?? '')
   const [sortOrder, setSortOrder] = useState(library?.sortOrder ?? 0)
-
-  useEffect(() => {
-    if (library) {
-      setName(library.name)
-      setSortOrder(library.sortOrder)
-    }
-  }, [library])
-
-  if (!library) return null
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
@@ -359,16 +356,18 @@ interface ScanLibraryDialogProps {
   isPending: boolean
 }
 
-export function ScanLibraryDialog({ library, onClose, onConfirm, isPending }: ScanLibraryDialogProps) {
+export function ScanLibraryDialog(props: ScanLibraryDialogProps) {
+  if (!props.library) return null
+
+  return <ScanLibraryForm key={props.library.id} {...props} library={props.library} />
+}
+
+type ScanLibraryFormProps = Omit<ScanLibraryDialogProps, 'library'> & {
+  library: Library
+}
+
+function ScanLibraryForm({ library, onClose, onConfirm, isPending }: ScanLibraryFormProps) {
   const [rescan, setRescan] = useState(false)
-
-  useEffect(() => {
-    if (!library) {
-      setRescan(false)
-    }
-  }, [library])
-
-  if (!library) return null
 
   const handleConfirm = () => {
     onConfirm(rescan)

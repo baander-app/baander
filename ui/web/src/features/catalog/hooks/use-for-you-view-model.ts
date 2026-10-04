@@ -18,18 +18,18 @@ export function useForYouViewModel(limit = 12) {
   )
 
   const songs = useMemo(() => {
-    const response = data as Record<string, unknown> | undefined
-    const items = Array.isArray(response?.data) ? (response.data as any[]) : []
-    return items
-      .filter((item) => item.song?.public_id)
-      .map((item): ForYouSong => ({
-        publicId: item.song.public_id,
-        title: item.song.title ?? 'Unknown',
-        albumInternalId: item.song.album_id ?? '',
-        duration: item.song.length ?? null,
+    return (data?.data ?? []).flatMap((item): ForYouSong[] => {
+      const song = item.song
+      if (typeof song?.public_id !== 'string' || !song.public_id) return []
+      return [{
+        publicId: song.public_id,
+        title: typeof song.title === 'string' ? song.title : 'Unknown',
+        albumInternalId: typeof song.album_id === 'string' ? song.album_id : '',
+        duration: typeof song.length === 'number' ? song.length : null,
         explanation: item.explanation ?? 'Recommended for you',
         totalScore: item.total_score ?? 0,
-      }))
+      }]
+    })
   }, [data])
 
   return { songs, isLoading, error }

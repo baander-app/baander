@@ -57,9 +57,9 @@ const tabsListLine = css`
   background: transparent;
 `
 
-const StyledTabsList = styled(TabsPrimitive.List).attrs<DataAttributes>((p) => ({
+const StyledTabsList = styled(TabsPrimitive.List).attrs<DataAttributes & { $variant?: "default" | "line" }>((p) => ({
   'data-slot': 'tabs-list',
-  'data-variant': (p as any).$variant ?? 'default',
+  'data-variant': p.$variant ?? 'default',
 }))<{ $variant?: "default" | "line" }>`
   ${tabsListBase}
   ${tabsListGroupContext}
@@ -216,7 +216,4 @@ const TabsContent = React.forwardRef<
   <StyledTabsContent ref={ref} {...props} />
 ))
 
-// Deprecated: variant styling is now handled by styled-components
-const tabsListVariants = (_opts?: { variant?: 'default' | 'line'; className?: string }) => ''
-
-export { Tabs, TabsList, TabsTrigger, TabsContent, tabsListVariants }
+export { Tabs, TabsList, TabsTrigger, TabsContent }

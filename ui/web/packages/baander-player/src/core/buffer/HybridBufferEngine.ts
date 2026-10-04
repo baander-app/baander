@@ -71,13 +71,6 @@ export interface BufferEngineConfig {
   webCodecsCanvasHeight?: number;
 }
 
-const DEFAULT_BUFFER_CONFIG: BufferEngineConfig = {
-  maxBufferLength: 30,
-  maxBufferSize: 50,
-  bufferAhead: 10,
-  behindBuffer: 5,
-  sufficientBufferThreshold: 2,
-};
 
 // ---------------------------------------------------------------------------
 // fMP4 Box Parser

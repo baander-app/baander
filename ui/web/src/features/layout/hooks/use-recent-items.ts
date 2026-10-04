@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import type { RecentItem } from '@/features/layout/components/SidebarRecentItems'
 import { createLogger } from '@/shared/lib/logger'
@@ -15,37 +15,64 @@ export interface UseRecentItemsResult {
   isLoading: boolean
 }
 
+interface RecentItemsState extends UseRecentItemsResult {
+  request: string
+}
+
 export function useRecentItems(options: UseRecentItemsOptions = {}): UseRecentItemsResult {
   const { limit = 5, mediaType } = options
-  const [items, setItems] = useState<RecentItem[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const seqRef = useRef(0)
+  const request = JSON.stringify([limit, mediaType ?? null])
+  const [state, setState] = useState<RecentItemsState>(() => ({
+    request,
+    items: [],
+    isLoading: true,
+  }))
+
+  if (state.request !== request) {
+    setState({
+      request,
+      items: [],
+      isLoading: true,
+    })
+  }
 
   useEffect(() => {
-    const seq = ++seqRef.current
+    const controller = new AbortController()
     const params = new URLSearchParams()
     params.set('limit', String(limit))
-    if (mediaType) params.set('mediaType', mediaType)
+    if (mediaType) {
+      params.set('mediaType', mediaType)
+    }
 
-    setIsLoading(true)
-    AXIOS_INSTANCE.get(`/api/user/recent?${params}`)
+    AXIOS_INSTANCE.get(`/api/user/recent?${params}`, { signal: controller.signal })
       .then((res) => {
-        if (seq !== seqRef.current) return // stale
-        const mapped: RecentItem[] = ((res.data?.data ?? []) as RecentActivityItem[]).map(mapToRecentItem)
-        setItems(mapped)
-      })
-      .catch((err) => {
-        if (seq !== seqRef.current) return
-        logger.warn('Failed to load recent items:', err)
-        setItems([])
-      })
-      .finally(() => {
-        if (seq !== seqRef.current) return
-        setIsLoading(false)
-      })
-  }, [limit, mediaType])
+        if (controller.signal.aborted) return
 
-  return { items, isLoading }
+        const items = ((res.data?.data ?? []) as RecentActivityItem[]).map(mapToRecentItem)
+        setState({
+          request,
+          items,
+          isLoading: false,
+        })
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) return
+
+        logger.warn('Failed to load recent items:', error)
+        setState({
+          request,
+          items: [],
+          isLoading: false,
+        })
+      })
+    return () => {
+      controller.abort()
+    }
+  }, [limit, mediaType, request])
+
+  return state.request === request
+    ? { items: state.items, isLoading: state.isLoading }
+    : { items: [], isLoading: true }
 }
 
 /** Raw shape of a `/api/user/recent` response item (music + movies).

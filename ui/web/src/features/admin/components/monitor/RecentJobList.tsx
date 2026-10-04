@@ -1,7 +1,7 @@
 import styled from 'styled-components'
 import { RotateCcw } from 'lucide-react'
 import { Button } from '@/shared/components/ui/button'
-import { getStatusIcon } from './ActiveJobCard'
+import { getStatusIcon } from './job-status-icon'
 import { interactiveTransition } from '@/shared/theme'
 
 interface RecentJob {

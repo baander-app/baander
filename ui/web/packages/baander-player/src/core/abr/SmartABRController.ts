@@ -231,7 +231,8 @@ export class SmartABRController {
    * @param bufferHealth - Current forward buffer in seconds
    * @param currentTime - Current playback position for context
    */
-  evaluate(bufferHealth: number, _currentTime?: number): string | null {
+  evaluate(bufferHealth: number, currentTime?: number): string | null;
+  evaluate(bufferHealth: number): string | null {
     this.state.bufferHealth = bufferHealth;
 
     if (this.renditions.length === 0) return null;

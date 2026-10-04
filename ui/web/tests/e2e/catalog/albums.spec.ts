@@ -1,5 +1,5 @@
 import { test, expect, spaNavigate } from '../fixtures'
-import { main, albumCards, untilLoaded, albumRows } from '../selectors'
+import { main, albumCards, untilLoaded } from '../selectors'
 
 test.describe('Albums page', () => {
   test('renders heading and album content', async ({ asAdmin: page }) => {

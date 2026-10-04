@@ -361,7 +361,7 @@ export class AdaptiveTransportLayer {
 
       // Try WebTransport first if available
       if (this.webTransport && this.stats.activeProtocol === 'webtransport') {
-        const wtResult = await this.fetchViaWebTransport(fullUrl, headers);
+        const wtResult = await this.fetchViaWebTransport(fullUrl);
         if (wtResult) return wtResult;
       }
 
@@ -471,7 +471,6 @@ export class AdaptiveTransportLayer {
    */
   private async fetchViaWebTransport(
     url: string,
-    _headers: Record<string, string>,
   ): Promise<FetchOutcome | null> {
     if (!this.webTransport) return null;
 

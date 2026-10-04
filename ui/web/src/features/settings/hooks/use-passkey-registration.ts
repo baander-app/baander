@@ -84,7 +84,7 @@ export function usePasskeyRegistration() {
         err instanceof Error ? err.message : 'Failed to register passkey';
       setState({ loading: false, error: message, success: false });
     }
-  }, []);
+  }, [queryClient]);
 
   return {
     register,

@@ -9,6 +9,7 @@ const testTheme = resolveTheme('dark', 'violet')
 // --- Mocks ---
 
 const mockRefetch = vi.fn()
+const mockQuery = vi.fn()
 
 function makeAlbumData(count: number, currentPage = 1, lastPage = 2) {
   return {
@@ -36,13 +37,17 @@ type MockConfig = {
 let mockConfig: MockConfig = {}
 
 vi.mock('@/shared/api-client/gen/endpoints', () => ({
-  useGetAlbumIndex: () => ({
-    data: mockConfig.data ?? makeAlbumData(6),
-    isLoading: mockConfig.isLoading ?? false,
-    isError: mockConfig.isError ?? false,
-    error: null,
-    refetch: mockRefetch,
-  }),
+  useGetAlbumIndex: (params: unknown) => {
+    mockQuery(params)
+
+    return {
+      data: mockConfig.data ?? makeAlbumData(6),
+      isLoading: mockConfig.isLoading ?? false,
+      isError: mockConfig.isError ?? false,
+      error: null,
+      refetch: mockRefetch,
+    }
+  },
 }))
 
 vi.mock('@/features/catalog/stores/selection-store', () => ({
@@ -146,4 +151,37 @@ describe('GridView', () => {
     render(<SCTypedThemeProvider theme={testTheme}><GridView /></SCTypedThemeProvider>)
     expect(screen.getByRole('grid', { name: 'Albums grid' })).toBeInTheDocument()
   })
+
+  it('resets the request page before issuing a changed-filter query and preserves identical filters', async () => {
+    const user = userEvent.setup()
+    const { rerender } = render(
+      <SCTypedThemeProvider theme={testTheme}>
+        <GridView params={{ q: 'first' }} />
+      </SCTypedThemeProvider>,
+    )
+
+    await user.click(screen.getByText('Load more'))
+
+    expect(mockQuery).toHaveBeenLastCalledWith(
+      expect.objectContaining({ page: 2, q: 'first' }),
+    )
+
+    rerender(
+      <SCTypedThemeProvider theme={testTheme}>
+        <GridView params={{ q: 'first' }} />
+      </SCTypedThemeProvider>,
+    )
+
+    expect(mockQuery).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }))
+
+    mockQuery.mockClear()
+    rerender(
+      <SCTypedThemeProvider theme={testTheme}>
+        <GridView params={{ q: 'second' }} />
+      </SCTypedThemeProvider>,
+    )
+
+    expect(mockQuery.mock.calls.every(([params]) => params.page === 1)).toBe(true)
+  })
+
 })

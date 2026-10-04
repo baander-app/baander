@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { SegmentPriorityQueue } from '../../src/core/transport/AdaptiveTransportLayer';
-import type { FetchOutcome } from '../../src/types';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -21,7 +20,7 @@ function makeRequest(url: string, priority: number): {
     url,
     priority,
     retryCount: 0,
-    resolve: (_outcome: FetchOutcome) => {},
+    resolve: () => {},
   };
   return { req, item };
 }

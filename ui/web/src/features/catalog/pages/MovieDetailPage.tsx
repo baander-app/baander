@@ -4,6 +4,7 @@ import styled from 'styled-components'
 import { useGetMovieShow } from '@/shared/api-client/gen/endpoints'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import { Button } from '@/shared/components/ui/button'
+import { asMovieFromData } from '../utils/api-adapters'
 import { MovieHeader } from '../components/MovieHeader'
 import { MovieMetadata } from '../components/MovieMetadata'
 import { MoviePlayerOverlay } from '../components/MoviePlayerOverlay'
@@ -50,7 +51,9 @@ export function MovieDetailPage() {
     )
   }
 
-  if (isLoading || !data?.data) {
+  const movie = asMovieFromData(data)
+
+  if (isLoading || !data?.data || !movie) {
     return (
       <LoadingContainer>
         <Skeleton style={{ height: '16rem', width: '100%', borderRadius: '0.5rem' }} />
@@ -61,13 +64,12 @@ export function MovieDetailPage() {
     )
   }
 
-  const movie = data.data as any
-
-  if (isPlaying && movie.videos?.length > 0) {
+  const video = movie.videos?.[0]
+  if (isPlaying && video) {
     return (
       <MoviePlayerOverlay
         title={movie.title}
-        videoId={movie.videos[0].publicId ?? movie.videos[0].uuid}
+        videoId={video.publicId ?? video.uuid}
         onClose={() => setIsPlaying(false)}
       />
     )

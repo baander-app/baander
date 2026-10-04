@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useStarredStations, useStations } from '../hooks/use-radio-stations'
 import styled from 'styled-components'
-import { getStations, getStarredStations, unstarStation, type RadioStation, type StarredStation } from '@/features/radio/api/radio-api'
+import { unstarStation, type StarredStation } from '@/features/radio/api/radio-api'
 import { StationCard } from './StationCard'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 
@@ -24,42 +25,26 @@ const EmptyMessage = styled.p`
 `
 
 export function StarredStations() {
-  const [_starredIds, setStarred] = useState<StarredStation[]>([])
-  const [stations, setStations] = useState<RadioStation[]>([])
-  const [loading, setLoading] = useState(true)
-
-  const loadData = useCallback(async () => {
-    try {
-      const starredData = await getStarredStations()
-      setStarred(starredData)
-
-      if (starredData.length > 0) {
-        const allStations = await getStations()
-        const starredIds = new Set(starredData.map((s) => s.stationId))
-        setStations(allStations.filter((s) => starredIds.has(s.id)))
-      } else {
-        setStations([])
-      }
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
-
-  const handleUnstar = async (stationId: string) => {
-    try {
-      await unstarStation(stationId)
-      setStarred((prev) => prev.filter((s) => s.stationId !== stationId))
-      setStations((prev) => prev.filter((s) => s.id !== stationId))
-    } catch {
-      // ignore
-    }
-  }
+  const queryClient = useQueryClient()
+  const starredQuery = useStarredStations()
+  const starred = starredQuery.data ?? []
+  const stationsQuery = useStations('', '', starred.length > 0)
+  const starredIds = new Set(starred.map((item) => item.stationId))
+  const stations = (stationsQuery.data ?? []).filter(
+    (station) => starredIds.has(station.id),
+  )
+  const loading = starredQuery.isPending || (
+    starred.length > 0 && stationsQuery.isFetching && stationsQuery.isPlaceholderData
+  )
+  const unstar = useMutation({
+    mutationFn: unstarStation,
+    onSuccess: (_result, stationId) => {
+      queryClient.setQueryData<StarredStation[]>(
+        ['radio', 'starred'],
+        (previous = []) => previous.filter((item) => item.stationId !== stationId),
+      )
+    },
+  })
 
   if (loading) {
     return (
@@ -87,7 +72,7 @@ export function StarredStations() {
           station={station}
           isStarred={true}
           onStar={() => {}}
-          onUnstar={handleUnstar}
+          onUnstar={(stationId) => unstar.mutate(stationId)}
         />
       ))}
     </Container>

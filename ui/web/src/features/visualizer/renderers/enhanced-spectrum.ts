@@ -98,7 +98,7 @@ export class EnhancedSpectrumRenderer implements VisualizerRenderer {
     }
   }
 
-  resize(_width: number, _height: number): void {
+  resize(): void {
     // No-op — width/height come from RenderContext each frame
   }
 

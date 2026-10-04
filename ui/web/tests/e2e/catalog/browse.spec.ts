@@ -28,7 +28,6 @@ test.describe('Songs page', () => {
     await untilLoaded(main(page)).catch(() => {})
 
     // Browser items are buttons inside columns
-    const genreButtons = main(page).locator('button').filter({ hasText: /.+/ }).filter({ has: page.locator('text=Genre') })
     const firstGenreButton = main(page).locator('[class*="border-r"] button').first()
     if (await firstGenreButton.isVisible().catch(() => false)) {
       await firstGenreButton.click()

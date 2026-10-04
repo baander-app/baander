@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useSubscriptions } from '../hooks/use-radio-stations'
 import styled, { css } from 'styled-components'
 import { Globe, Check } from 'lucide-react'
-import { getAvailableCountries, getSubscriptions, subscribeCountry, unsubscribeCountry, type CountryInfo, type CountrySubscription } from '@/features/radio/api/radio-api'
+import { getAvailableCountries, subscribeCountry, unsubscribeCountry, type CountrySubscription } from '@/features/radio/api/radio-api'
 import { Input } from '@/shared/components/ui/input'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import { toast } from 'sonner'
@@ -90,53 +92,51 @@ const EmptyMessage = styled.p`
 `
 
 export function CountryPicker() {
-  const [countries, setCountries] = useState<CountryInfo[]>([])
-  const [subscriptions, setSubscriptions] = useState<CountrySubscription[]>([])
-  const [loading, setLoading] = useState(true)
-  const [subscribing, setSubscribing] = useState<string | null>(null)
+  const queryClient = useQueryClient()
+  const countriesQuery = useQuery({
+    queryKey: ['radio', 'countries'],
+    queryFn: getAvailableCountries,
+    retry: false,
+  })
+  const subscriptionsQuery = useSubscriptions()
+  const countries = countriesQuery.data ?? []
+  const subscriptions = subscriptionsQuery.data ?? []
+  const loading = countriesQuery.isPending || subscriptionsQuery.isPending
   const [filter, setFilter] = useState('')
+  const subscribedCodes = new Set(
+    subscriptions.filter(Boolean).map((s) => s.countryCode.toUpperCase()),
+  )
 
-  const loadData = useCallback(async () => {
-    try {
-      const [countriesData, subsData] = await Promise.all([
-        getAvailableCountries(),
-        getSubscriptions(),
-      ])
-      setCountries(countriesData)
-      setSubscriptions(subsData)
-    } catch {
-      // Error handling — show empty state
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    loadData()
-  }, [loadData])
-
-  const subscribedCodes = new Set(subscriptions.filter(Boolean).map((s) => s.countryCode.toUpperCase()))
-
-  const handleToggle = async (code: string) => {
-    setSubscribing(code)
-    try {
-      if (subscribedCodes.has(code.toUpperCase())) {
-        const sub = subscriptions.find((s) => s.countryCode.toUpperCase() === code.toUpperCase())
-        if (sub) {
-          await unsubscribeCountry(sub.sourceId, code)
-          setSubscriptions((prev) => prev.filter((s) => s.countryCode.toUpperCase() !== code.toUpperCase()))
+  const toggle = useMutation({
+    mutationFn: async (code: string) => {
+      const sub = subscriptions.find(
+        (item) => item.countryCode.toUpperCase() === code.toUpperCase(),
+      )
+      if (sub) {
+        await unsubscribeCountry(sub.sourceId, code)
+        return {
+          code,
+          subscription: null,
         }
-      } else {
-        const newSub = await subscribeCountry(null, code)
-        setSubscriptions((prev) => [...prev, newSub])
       }
-    } catch (error) {
-      toast.error('Failed to update subscription')
-      console.error('Country toggle failed:', error)
-    } finally {
-      setSubscribing(null)
-    }
-  }
+      return {
+        code,
+        subscription: await subscribeCountry(null, code),
+      }
+    },
+    onSuccess: ({ code, subscription }) => {
+      queryClient.setQueryData<CountrySubscription[]>(
+        ['radio', 'subscriptions'],
+        (previous = []) => {
+          const remaining = previous.filter(
+            (item) => item.countryCode.toUpperCase() !== code.toUpperCase(),
+          )
+          return subscription ? [...remaining, subscription] : remaining
+        },
+      )
+    },
+    onError: () => toast.error('Failed to update subscription'),
+  })
 
   const filtered = filter
     ? countries.filter((c) =>
@@ -173,12 +173,12 @@ export function CountryPicker() {
       <CountryGrid>
         {sorted.map((country) => {
           const isSubscribed = subscribedCodes.has(country.code.toUpperCase())
-          const isToggling = subscribing === country.code
+          const isToggling = toggle.isPending
 
           return (
             <CountryButton
               key={country.code}
-              onClick={() => handleToggle(country.code)}
+              onClick={() => toggle.mutate(country.code)}
               disabled={isToggling}
               $subscribed={isSubscribed}
             >

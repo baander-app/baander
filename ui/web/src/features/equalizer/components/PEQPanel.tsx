@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useEqBandsStore, EQ_BANDS, DEFAULT_Q } from '../stores/eq-bands-store'
+import { useEqBandsStore, EQ_BANDS } from '../stores/eq-bands-store'
 import styled, { css } from 'styled-components'
 
 const MAX_PEQ_POINTS = 15
@@ -12,6 +12,11 @@ interface PEQPoint {
   q: number
 }
 
+interface PEQDraft {
+  index: number
+  point: PEQPoint
+}
+
 function logFreqToX(freq: number, width: number): number {
   return ((Math.log10(freq) - Math.log10(FREQ_MIN)) / (Math.log10(FREQ_MAX) - Math.log10(FREQ_MIN))) * width
 }
@@ -22,7 +27,7 @@ function xToLogFreq(x: number, width: number): number {
 }
 
 function gainToY(gain: number, height: number): number {
-  return height / 2 - (gain / 24) * height / 2 // ±12 dB range (using 24 for margin)
+  return height / 2 - (gain / 12) * height / 2
 }
 
 function yToGain(y: number, height: number): number {
@@ -126,74 +131,61 @@ const PEQWrapper = styled.div`
 
 export function PEQGraph() {
   const canvasRef = useRef<HTMLDivElement>(null)
-  const [points, setPoints] = useState<PEQPoint[]>(() =>
-    EQ_BANDS.map((b) => ({
-      frequency: b.frequency,
-      gain: 0,
-      q: DEFAULT_Q,
-    }))
-  )
-  const [dragIndex, setDragIndex] = useState<number | null>(null)
-  const [selectedPoint, setSelectedPoint] = useState<number | null>(null)
-  const setBand = useEqBandsStore((s) => s.setBand)
-
-  const updatePoint = useCallback((index: number, freq: number, gain: number) => {
-    setPoints((prev) => {
-      const next = [...prev]
-      next[index] = { ...next[index], frequency: freq, gain }
-      return next
-    })
-  }, [])
-
-  const syncingRef = useRef(false)
-
-  // Sync points → store when not dragging
-  useEffect(() => {
-    if (dragIndex !== null) return
-    syncingRef.current = true
-    points.forEach((p, i) => {
-      setBand(i, p.gain, p.q)
-    })
-    // Reset flag after React finishes the batch
-    queueMicrotask(() => { syncingRef.current = false })
-  }, [points, dragIndex, setBand])
-
-  // Sync store → points on external changes only
   const bands = useEqBandsStore((s) => s.bands)
+  const setBand = useEqBandsStore((s) => s.setBand)
+  const [frequencies, setFrequencies] = useState<number[]>(() =>
+    EQ_BANDS.map(band => band.frequency)
+  )
+  const [draft, setDraft] = useState<PEQDraft | null>(null)
+  const [selectedPoint, setSelectedPoint] = useState<number | null>(null)
+  const [width, setWidth] = useState(600)
+  const points = bands.map((band, index) =>
+    draft?.index === index ? draft.point : { ...band, frequency: frequencies[index] }
+  )
+
   useEffect(() => {
-    if (dragIndex !== null || syncingRef.current) return
-    setPoints((prev) =>
-      prev.map((p, i) =>
-        i < bands.length
-          ? { ...p, gain: bands[i].gain, q: bands[i].q }
-          : p
-      )
-    )
-  }, [bands, dragIndex])
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const observer = new ResizeObserver(entries => {
+      const measured = entries[0]?.contentRect.width
+      if (measured > 0) setWidth(measured)
+    })
+
+    observer.observe(canvas)
+    return () => observer.disconnect()
+  }, [])
 
   const handlePointerDown = useCallback((e: React.PointerEvent, index: number) => {
     e.preventDefault()
     e.stopPropagation()
-    setDragIndex(index)
+    setDraft({ index, point: points[index] })
     setSelectedPoint(index)
     ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
-  }, [])
+  }, [points])
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (dragIndex === null || !canvasRef.current) return
+    if (draft === null || !canvasRef.current) return
     const rect = canvasRef.current.getBoundingClientRect()
     const x = e.clientX - rect.left
     const y = e.clientY - rect.top
     const freq = Math.max(FREQ_MIN, Math.min(FREQ_MAX, xToLogFreq(x, rect.width)))
     const gain = yToGain(y, rect.height)
-    updatePoint(dragIndex, freq, gain)
-  }, [dragIndex, updatePoint])
+    setDraft(current => current && ({
+      ...current,
+      point: { ...current.point, frequency: freq, gain },
+    }))
+  }, [draft])
 
   const handlePointerUp = useCallback(() => {
-    setDragIndex(null)
-  }, [])
+    if (!draft) return
+    setBand(draft.index, draft.point.gain, draft.point.q)
+    setFrequencies(current => current.map((frequency, index) =>
+      index === draft.index ? draft.point.frequency : frequency
+    ))
+    setDraft(null)
+  }, [draft, setBand])
 
-  const width = canvasRef.current?.clientWidth ?? 600
   const height = 200
   const curvePath = computeResponseCurve(points, width)
 

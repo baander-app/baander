@@ -1,3 +1,4 @@
+import type { PropsWithChildren } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ListHeader, type SortState } from '../ListHeader'
@@ -5,7 +6,7 @@ import { useListColumnStore } from '../../stores/list-column-store'
 
 // Mock @dnd-kit to avoid complex drag setup in jsdom
 vi.mock('@dnd-kit/sortable', () => ({
-  SortableContext: ({ children }: any) => children,
+  SortableContext: ({ children }: PropsWithChildren) => children,
   useSortable: () => ({
     attributes: {},
     listeners: {},
@@ -15,7 +16,7 @@ vi.mock('@dnd-kit/sortable', () => ({
     isDragging: false,
   }),
   horizontalListSortingStrategy: () => {},
-  arrayMove: (arr: any[], from: number, to: number) => {
+  arrayMove: <T,>(arr: T[], from: number, to: number) => {
     const result = [...arr]
     const [removed] = result.splice(from, 1)
     result.splice(to, 0, removed)
@@ -25,7 +26,7 @@ vi.mock('@dnd-kit/sortable', () => ({
 }))
 
 vi.mock('@dnd-kit/core', () => ({
-  DndContext: ({ children }: any) => children,
+  DndContext: ({ children }: PropsWithChildren) => children,
   closestCenter: () => {},
   PointerSensor: class {},
   KeyboardSensor: class {},

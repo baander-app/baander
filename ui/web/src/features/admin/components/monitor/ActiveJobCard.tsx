@@ -1,31 +1,8 @@
-import styled, { keyframes } from 'styled-components'
-import { XCircle, Clock, CheckCircle, AlertCircle, Loader2 } from 'lucide-react'
+import styled from 'styled-components'
+import { XCircle } from 'lucide-react'
+import { getStatusIcon } from './job-status-icon'
 import { Button } from '@/shared/components/ui/button'
 import { ProgressBar } from '@/shared/components/progress-bar'
-
-const spin = keyframes`
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-`
-
-const SpinningLoader = styled(Loader2)`
-  animation: ${spin} 1s linear infinite;
-`
-
-const STATUS_ICONS = {
-  pending: Clock,
-  in_progress: Loader2,
-  completed: CheckCircle,
-  failed: AlertCircle,
-  cancelled: XCircle,
-} as const
-
-export function getStatusIcon(status: string) {
-  const Icon = STATUS_ICONS[status as keyof typeof STATUS_ICONS] || Clock
-  const isSpinning = status === 'in_progress'
-  if (isSpinning) return <SpinningLoader size={14} />
-  return <Icon size={14} />
-}
 
 interface ActiveJob {
   public_id: string

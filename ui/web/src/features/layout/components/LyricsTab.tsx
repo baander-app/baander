@@ -1,3 +1,4 @@
+import type { GetLyricsSongLyrics200 } from '@/shared/api-client/gen/endpoints'
 import styled, { css } from 'styled-components'
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { motion } from 'motion/react'
@@ -406,8 +407,8 @@ function PlainLyricsView({
 
 // -- Helpers --
 
-function extractLyrics(data: unknown): CachedLyrics | null {
-  const d = (data as any)?.data
+function extractLyrics(data: GetLyricsSongLyrics200 | undefined): CachedLyrics | null {
+  const d = data?.data
   if (!d || (typeof d === 'object' && Object.keys(d).length === 0)) return null
-  return d as CachedLyrics
+  return d
 }

@@ -253,7 +253,8 @@ export interface DashParseResult {
   mpdDuration: number;
 }
 
-export function parseDashMpd(text: string, videoId: string): DashParseResult {
+export function parseDashMpd(text: string, videoId: string): DashParseResult;
+export function parseDashMpd(text: string): DashParseResult {
   const parser = new DOMParser();
   const doc = parser.parseFromString(text, 'application/xml');
   const mpd = doc.querySelector('MPD');

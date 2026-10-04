@@ -45,13 +45,6 @@ export interface AIConfig {
   modelUrl: string;
 }
 
-const DEFAULT_AI_CONFIG: AIConfig = {
-  sampleIntervalSec: 2,
-  minConfidence: 0.6,
-  maxHighlights: 50,
-  useWebNN: true,
-  modelUrl: '/models/scene_classifier/',
-};
 
 // ---------------------------------------------------------------------------
 // AIOrchestrator

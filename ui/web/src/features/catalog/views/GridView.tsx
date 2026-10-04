@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import styled from 'styled-components'
 import type { GetAlbumIndexParams } from '@/shared/api-client/gen/endpoints'
 import { useGetAlbumIndex } from '@/shared/api-client/gen/endpoints'
@@ -47,9 +47,12 @@ const SKELETON_COUNT = 12
 const PER_PAGE = 24
 
 export function GridView({ params }: GridViewProps) {
-  const [page, setPage] = useState(1)
-
-  useEffect(() => { setPage(1) }, [params])
+  const filters = JSON.stringify(params ?? {})
+  const [pagination, setPagination] = useState({ filters, page: 1 })
+  const page = pagination.filters === filters ? pagination.page : 1
+  if (pagination.filters !== filters) {
+    setPagination({ filters, page: 1 })
+  }
 
   const { data, isLoading, isError, refetch } = useGetAlbumIndex({
     ...params,
@@ -103,7 +106,14 @@ export function GridView({ params }: GridViewProps) {
 
       {hasNextPage && (
         <LoadMoreRow>
-          <Button variant="ghost" size="sm" onClick={() => setPage((p) => p + 1)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setPagination((current) => ({
+              filters,
+              page: current.page + 1,
+            }))}
+          >
             Load more
           </Button>
         </LoadMoreRow>

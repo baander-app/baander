@@ -1,5 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
-import { parseHlsMaster, parseHlsMediaPlaylist, parseDashMpd } from './parse-helpers';
+import { describe, it, expect } from 'vitest';
 import { MASTER_MULTI_RENDITION, MASTER_EMPTY, MEDIA_WITH_SEGMENTS } from '../fixtures';
 
 // We'll extract the parsing functions for direct testing
@@ -43,9 +42,7 @@ describe('parseHlsMaster', () => {
   });
 
   it('should handle an empty master playlist', () => {
-    const masterPlaylist = MASTER_EMPTY;
-    // Parsing should return empty array
-    expect(true).toBe(true); // Placeholder
+    expect(MASTER_EMPTY.split('\n').filter(line => line.startsWith('#EXT-X-STREAM-INF:'))).toHaveLength(0);
   });
 });
 
@@ -83,8 +80,3 @@ describe('parseHlsMediaPlaylist', () => {
     expect(segments[0]!.uri).toBe('seg_0.m4s');
   });
 });
-
-// Helper exports for testing (would be extracted from UnifiedManifestEngine)
-export function parseHlsMaster(_text: string): unknown[] { return []; }
-export function parseHlsMediaPlaylist(_text: string, _baseUrl: string): unknown { return {}; }
-export function parseDashMpd(_text: string, _videoId: string): unknown[] { return []; }

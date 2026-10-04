@@ -91,7 +91,7 @@ describe('SmartABRController — Extended', () => {
   // ---- Switch-up hysteresis ----
 
   it('should not switch up within minSwitchInterval (hysteresis)', () => {
-    const { controller, changes } = createController();
+    const { controller } = createController();
 
     // Initialize to 360p
     controller.selectInitialRendition();

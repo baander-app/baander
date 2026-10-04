@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ThemeProvider as SCTypedThemeProvider } from 'styled-components'
 import { resolveTheme } from '@/shared/theme/resolve-theme'
 
@@ -27,7 +26,7 @@ import { AddToPlaylistDialog } from '@/features/playlist/components/AddToPlaylis
 
 function mockMutation(overrides = {}) {
   return {
-    mutateAsync: vi.fn().mockResolvedValue({ data: { publicId: 'pl_new' } }),
+    mutateAsync: vi.fn().mockResolvedValue({ publicId: 'pl_new', uuid: 'playlist-uuid', userId: 'user-uuid', name: 'New Mix', isPublic: false, isCollaborative: false, isSmart: false, songCount: 0, createdAt: '2026-10-04T12:00:00Z' }),
     isPending: false,
     ...overrides,
   }
@@ -127,4 +126,28 @@ describe('AddToPlaylistDialog', () => {
     expect(screen.getByPlaceholderText('New playlist name')).toBeInTheDocument()
     expect(screen.getByText('Create')).toBeInTheDocument()
   })
+
+  it('adds the song to the created playlist using the plain resource response', async () => {
+    mockUseGetPlaylistIndex.mockReturnValue({ data: { data: [] }, isLoading: false })
+    const create = mockMutation()
+    const add = mockMutation()
+    const onOpenChange = vi.fn()
+    mockUsePostPlaylistStore.mockReturnValue(create)
+    mockUsePostPlaylistAddSong.mockReturnValue(add)
+    render(
+      <SCTypedThemeProvider theme={testTheme}>
+        <AddToPlaylistDialog open onOpenChange={onOpenChange} songId="song_1" />
+      </SCTypedThemeProvider>,
+    )
+    fireEvent.change(screen.getByPlaceholderText('New playlist name'), { target: { value: '  New Mix  ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+    await waitFor(() => expect(add.mutateAsync).toHaveBeenCalledWith({
+      publicId: 'pl_new', data: { songId: 'song_1' },
+    }))
+    expect(create.mutateAsync).toHaveBeenCalledWith({ data: {
+      name: 'New Mix', isPublic: false, isCollaborative: false, isSmart: false, smartRules: [],
+    } })
+    expect(onOpenChange).toHaveBeenCalledWith(false)
+  })
+
 })

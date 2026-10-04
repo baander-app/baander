@@ -1,3 +1,4 @@
+import type { PropsWithChildren } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ActivityItem } from '../ActivityItem'
@@ -5,7 +6,7 @@ import type { ActivityEntry } from '../../types/activity'
 
 // Mock SongContextMenu to just render children (avoids router/player dependency chain)
 vi.mock('../menus/SongContextMenu', () => ({
-  SongContextMenu: ({ children }: any) => children,
+  SongContextMenu: ({ children }: PropsWithChildren) => children,
 }))
 
 // Mock selection store

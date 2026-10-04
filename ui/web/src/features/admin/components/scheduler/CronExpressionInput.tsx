@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import styled, { css } from 'styled-components'
 import { Input } from '@/shared/components/ui/input'
 import { interactiveTransition } from '@/shared/theme'
@@ -194,24 +194,18 @@ interface CronExpressionInputProps {
 
 export function CronExpressionInput({ value, onChange }: CronExpressionInputProps) {
   const [mode, setMode] = useState<'preset' | 'custom'>('preset')
-  const [fields, setFields] = useState<string[]>(() => parseExpression(value))
+  const fields = parseExpression(value)
 
   const matchedPreset = PRESETS.find((p) => p.expression === value)
 
-  useEffect(() => {
-    setFields(parseExpression(value))
-  }, [value])
-
   const handlePresetSelect = (preset: Preset) => {
     onChange(preset.expression)
-    setFields(parseExpression(preset.expression))
     setMode('preset')
   }
 
   const handleFieldChange = (index: number, raw: string) => {
     const next = [...fields]
     next[index] = raw || '*'
-    setFields(next)
     onChange(next.join(' '))
   }
 

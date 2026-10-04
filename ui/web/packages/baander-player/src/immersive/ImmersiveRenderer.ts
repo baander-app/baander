@@ -42,20 +42,13 @@ export interface ImmersiveConfig {
   stereo: boolean;
 }
 
-const DEFAULT_IMMERSIVE_CONFIG: ImmersiveConfig = {
-  projection: 'equirectangular',
-  sphereRadius: 50,
-  sphereSegments: 64,
-  defaultFov: 75,
-  stereo: false,
-};
 
 // ---------------------------------------------------------------------------
 // Three.js Type Stubs (for when Three.js is not imported)
 // ---------------------------------------------------------------------------
 
 type ThreeScene = import('three').Scene;
-type ThreeCamera = import('three').Camera;
+type ThreeCamera = import('three').PerspectiveCamera;
 type ThreeWebGLRenderer = import('three').WebGLRenderer;
 type ThreeMesh = import('three').Mesh;
 type ThreeTexture = import('three').Texture;
@@ -97,7 +90,7 @@ export class ImmersiveRenderer {
   private renderer: ThreeWebGLRenderer | null = null;
   private sphere: ThreeMesh | null = null;
   private videoTexture: ThreeTexture | null = null;
-  private xrSession: any = null;
+  private xrSession: XRSession | null = null;
   private animationFrameId: number | null = null;
 
   private spatialState: SpatialState = {
@@ -178,17 +171,17 @@ export class ImmersiveRenderer {
 
   /** Enter WebXR session. */
   async enterXR(mode: 'vr' | 'ar'): Promise<void> {
-    if (!this.renderer || !(navigator as any).xr) {
+    if (!this.renderer || !navigator.xr) {
       throw new Error('WebXR not available');
     }
 
     const sessionMode = mode === 'vr' ? 'immersive-vr' : 'immersive-ar';
-    const supported = await (navigator as any).xr?.isSessionSupported(sessionMode);
+    const supported = await navigator.xr?.isSessionSupported(sessionMode);
     if (!supported) {
       throw new Error(`WebXR ${mode.toUpperCase()} not supported on this device`);
     }
 
-    this.xrSession = await (navigator as any).xr.requestSession(sessionMode, {
+    this.xrSession = await navigator.xr.requestSession(sessionMode, {
       optionalFeatures: ['local-floor', 'bounded-floor'],
     });
 
@@ -204,9 +197,9 @@ export class ImmersiveRenderer {
       this.events.onSpatialStateChange(this.spatialState);
     });
 
-    if ((this.renderer as any).xr) {
-      (this.renderer as any).xr.enabled = true;
-      (this.renderer as any).xr.setSession(this.xrSession);
+    if (this.renderer.xr) {
+      this.renderer.xr.enabled = true;
+      this.renderer.xr.setSession(this.xrSession);
     }
   }
 
@@ -239,8 +232,8 @@ export class ImmersiveRenderer {
 
     // Update camera aspect ratio
     if ('aspect' in this.camera) {
-      (this.camera as any).aspect = width / height;
-      (this.camera as any).updateProjectionMatrix?.();
+      this.camera.aspect = width / height;
+      this.camera.updateProjectionMatrix();
     }
   }
 
@@ -312,7 +305,7 @@ export class ImmersiveRenderer {
       this.scene.remove(this.sphere);
     }
 
-    let geometry: InstanceType<typeof THREE.BufferGeometry>;
+    let geometry: import('three').BufferGeometry;
 
     switch (this.spatialState.projection) {
       case 'equirectangular':
@@ -355,7 +348,7 @@ export class ImmersiveRenderer {
       side: THREE.FrontSide,
     });
 
-    this.sphere = new THREE.Mesh(geometry as any, material);
+    this.sphere = new THREE.Mesh(geometry, material);
     this.scene.add(this.sphere);
   }
 
@@ -372,9 +365,9 @@ export class ImmersiveRenderer {
     // Update camera FOV when it changes (e.g. via scroll-to-zoom)
     if ('fov' in this.camera) {
       const fovDegrees = this.spatialState.fov * (180 / Math.PI);
-      if (Math.abs((this.camera as any).fov - fovDegrees) > 0.01) {
-        (this.camera as any).fov = fovDegrees;
-        (this.camera as any).updateProjectionMatrix();
+      if (Math.abs(this.camera.fov - fovDegrees) > 0.01) {
+        this.camera.fov = fovDegrees;
+        this.camera.updateProjectionMatrix();
       }
     }
 

@@ -4,7 +4,6 @@ import type { SchedulerConfig, SchedulerEvents } from '../../src/core/scheduler/
 import type {
   Manifest,
   Rendition,
-  SegmentInfo,
   FetchOutcome,
   BufferStats,
 } from '../../src/types';
@@ -162,8 +161,8 @@ function createScheduler(
   };
 
   const scheduler = new SegmentScheduler(
-    transport as any,
-    buffer as any,
+    transport,
+    buffer,
     abr,
     config,
     events,
@@ -231,8 +230,7 @@ describe('SegmentScheduler', () => {
   // ---- switchRendition ----
 
   it('should fetch init segment when switching renditions', async () => {
-    const { scheduler, transport, events } = createScheduler();
-    const trackingEvents = events as any;
+    const { scheduler, transport } = createScheduler();
     scheduler.setManifest(createTestManifest());
 
     await scheduler.start(0);
@@ -512,7 +510,7 @@ describe('SegmentScheduler', () => {
     const abr = new SmartABRController({ onRenditionChange: () => {} });
     abr.setRenditions(createTestRenditions());
 
-    const { scheduler, transport } = createScheduler({ abr, events: trackingEvents });
+    const { scheduler } = createScheduler({ abr, events: trackingEvents });
     scheduler.setManifest(createTestManifest());
 
     // Start — picks initial rendition (360p with default bandwidth)

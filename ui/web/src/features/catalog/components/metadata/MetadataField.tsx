@@ -91,7 +91,6 @@ export function MetadataField({
   isDirty,
   isSaving,
   onChange,
-  onToggleLock: _onToggleLock,
 }: MetadataFieldProps) {
   const displayValue = value ?? ''
   const isEditable = !field.readOnly && !isLocked

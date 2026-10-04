@@ -175,14 +175,6 @@ const SmartToggleRow = styled.div`
   gap: 0.5rem;
 `
 
-interface PlaylistItemData {
-  publicId: string
-  name: string
-  description?: string
-  isSmart?: boolean
-  songCount?: number
-}
-
 export function PlaylistsPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState('')
@@ -193,8 +185,7 @@ export function PlaylistsPage() {
   const createPlaylist = usePostPlaylistStore()
   const deletePlaylist = useDeletePlaylistDestroy()
 
-  const response = data as any
-  const items = response?.data as PlaylistItemData[] | undefined
+  const items = data?.data
 
   const handleCreate = async () => {
     if (!newName.trim()) return
@@ -313,7 +304,7 @@ export function PlaylistsPage() {
             </EmptyState>
           ) : (
             <PlaylistList>
-              {items.map((item: PlaylistItemData) => (
+              {items.map((item) => (
                 <PlaylistItem key={item.publicId}>
                   <PlaylistLink to={`/music/playlists/${item.publicId}`}>
                     <PlaylistName>{item.name}</PlaylistName>

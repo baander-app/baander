@@ -4,6 +4,8 @@ import { focusVisibleRing } from '@/shared/theme'
 import { filterActionLog } from '@/shared/lib/mediator/devtools'
 import type { ActionLogEntry } from '@/shared/lib/mediator/types'
 
+const EMPTY_LOG: ActionLogEntry[] = []
+
 interface ActionTimelineProps {
   log?: ActionLogEntry[]
 }
@@ -94,7 +96,7 @@ export function ActionTimeline({ log: externalLog }: ActionTimelineProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
 
   // Use external log if provided, otherwise show nothing
-  const log = externalLog ?? []
+  const log = externalLog ?? EMPTY_LOG
 
   // Auto-scroll to bottom when log changes
   useEffect(() => {

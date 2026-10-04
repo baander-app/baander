@@ -36,10 +36,6 @@ export interface SchedulerConfig {
   prefetchCount: number;
 }
 
-const DEFAULT_SCHEDULER_CONFIG: SchedulerConfig = {
-  lookAhead: 5,
-  prefetchCount: 3,
-};
 
 export interface SchedulerEvents {
   onSegmentFetched: (index: number, bytes: number, ttfb: number) => void;
@@ -80,8 +76,8 @@ export class SegmentScheduler {
   private readonly fetchedSubtitleSegments = new Set<number>();
 
   constructor(
-    private readonly transport: AdaptiveTransportLayer,
-    private readonly buffer: HybridBufferEngine,
+    private readonly transport: Pick<AdaptiveTransportLayer, 'fetchInitSegment' | 'fetchSegment'>,
+    private readonly buffer: Pick<HybridBufferEngine, 'init' | 'appendInit' | 'appendSegment' | 'appendAudioInit' | 'appendAudioSegment'>,
     private readonly abr: SmartABRController,
     private readonly config: SchedulerConfig,
     private readonly events: SchedulerEvents,

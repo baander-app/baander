@@ -24,6 +24,11 @@ utilities or import the removed `@/shared/lib/utils` helper. Preserve the
 interaction, accessibility, motion, and token requirements in `ui/DESIGN.md`.
 Use `lucide-react` and `@lucide/lab` for icons.
 
+Keep formatting consistent with `.editorconfig` and adjacent TypeScript: two-space
+indentation, readable multiline callbacks and object literals, and separate logical
+steps. Avoid compressed test setup and several statements on one line. Prefer named
+types for repeated nested shapes. Do not introduce Prettier for this project.
+
 ## Components, effects, and stores
 
 Type component props and state without `any`. Interfaces, type aliases, and

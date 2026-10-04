@@ -71,12 +71,6 @@ const CreateRow = styled.div`
   padding-top: 0.75rem;
 `
 
-interface PlaylistItem {
-  publicId: string
-  name: string
-  isSmart?: boolean
-}
-
 interface AddToPlaylistDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -93,7 +87,7 @@ export function AddToPlaylistDialog({ open, onOpenChange, songId }: AddToPlaylis
   const addSong = usePostPlaylistAddSong()
   const createPlaylist = usePostPlaylistStore()
 
-  const playlists = ((data as any)?.data ?? []) as PlaylistItem[]
+  const playlists = data?.data ?? []
   const filtered = search
     ? playlists.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
     : playlists
@@ -122,7 +116,7 @@ export function AddToPlaylistDialog({ open, onOpenChange, songId }: AddToPlaylis
           smartRules: [],
         },
       })
-      const newPlaylistId = (result as any)?.data?.publicId
+      const newPlaylistId = result.publicId
       if (newPlaylistId) {
         await addSong.mutateAsync({ publicId: newPlaylistId, data: { songId } })
         toast.success(`Created "${newName.trim()}" and added song`)

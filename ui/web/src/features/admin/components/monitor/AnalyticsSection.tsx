@@ -146,7 +146,7 @@ function getInitialRange() {
 }
 
 export function AnalyticsSection() {
-  const initial = useMemo(getInitialRange, [])
+  const [initial] = useState(getInitialRange)
   const [from, setFrom] = useState(initial.from)
   const [to, setTo] = useState(initial.to)
 

@@ -1,4 +1,4 @@
-import { test, expect, spaNavigate } from '../fixtures'
+import { test, expect } from '../fixtures'
 import { sidebar, main, contextPanel, untilLoaded } from '../selectors'
 
 test.describe('Sidebar', () => {

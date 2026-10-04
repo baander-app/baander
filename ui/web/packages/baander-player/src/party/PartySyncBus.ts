@@ -35,12 +35,6 @@ export interface PartySyncConfig {
   getPosition: () => number;
 }
 
-const DEFAULT_PARTY_CONFIG: PartySyncConfig = {
-  syncToleranceMs: 500,
-  broadcastIntervalMs: 1000,
-  wsEndpoint: '/api/party/ws',
-  getPosition: () => 0,
-};
 
 // ---------------------------------------------------------------------------
 // PartySyncBus

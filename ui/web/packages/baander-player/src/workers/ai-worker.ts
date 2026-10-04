@@ -33,26 +33,7 @@
 
 /// <reference lib="webworker" />
 
-declare module '@tensorflow/tfjs' {
-  export const tensor: any;
-  export const loadGraphModel: any;
-  export const loadLayersModel: any;
-  export const setBackend: any;
-  export const ready: any;
-  export const dispose: any;
-  export const disposeVariables: any;
-}
-declare module '@tensorflow/tfjs-core' {
-  export const tensor: any;
-  export const loadGraphModel: any;
-  export const loadLayersModel: any;
-  export const setBackend: any;
-  export const ready: any;
-  export const dispose: any;
-  export const disposeVariables: any;
-}
-declare module '@tensorflow/tfjs-backend-webgl' {}
-declare module '@tensorflow/tfjs-backend-cpu' {}
+import { selectPredictionTensor } from './tensor-output';
 
 // ---------------------------------------------------------------------------
 // Types (mirrored from ../types.ts to avoid import issues in workers)
@@ -148,17 +129,15 @@ const IMAGENET_TO_CONTENT_HINT: ReadonlyMap<string, ContentHint> = new Map([
 /** Thresholds for highlight detection. */
 const HIGHLIGHT_WINDOW_SIZE = 3;
 const HIGHLIGHT_MIN_CONFIDENCE = 0.75;
-const HIGHLIGHT_TIME_SPAN_SEC = 4;
 
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
 
 let config: AIWorkerConfig | null = null;
-let model: any = null; // tf.GraphModel | tf.LayersModel — typed as any to avoid TF import at top-level
-let tf: any = null;    // @tensorflow/tfjs module reference
+let model: InferenceModel | null = null;
+let tf: TensorFlowRuntime | null = null;
 let labelMap: Map<number, string> | null = null; // Custom label map (index → label)
-let initialized = false;
 
 // Highlight tracking — rolling window of recent classifications
 interface ClassificationRecord {
@@ -180,7 +159,7 @@ let lastHighlightEndTime = -Infinity;
  * Attempt to load @tensorflow/tfjs in the worker context.
  * Returns null if TF.js is not available.
  */
-async function loadTfjs(): Promise<any> {
+async function loadTfjs(): Promise<TensorFlowRuntime | null> {
   // Try standard import — works if tfjs is bundled or available via importmap
   try {
     const tfModule = await import('@tensorflow/tfjs');
@@ -212,16 +191,18 @@ async function loadTfjs(): Promise<any> {
  * Load the classification model.
  * Supports TF.js GraphModel (SavedModel / tfhub format) and LayersModel (Keras).
  */
-async function loadModel(modelUrl: string, tfInstance: any): Promise<any> {
+async function loadModel(modelUrl: string, tfInstance: TensorFlowRuntime): Promise<InferenceModel> {
   // Ensure model URL ends with / for TF.js convention
   const url = modelUrl.endsWith('/') ? modelUrl : `${modelUrl}/`;
 
   try {
     // Try GraphModel first (most common for converted models)
+    if (!tfInstance.loadGraphModel) throw new Error('GraphModel loader unavailable');
     return await tfInstance.loadGraphModel(url);
   } catch {
     // Fallback to LayersModel (Keras JSON format)
     try {
+      if (!tfInstance.loadLayersModel) throw new Error('LayersModel loader unavailable');
       return await tfInstance.loadLayersModel(`${url}model.json`);
     } catch {
       throw new Error(
@@ -280,7 +261,7 @@ async function loadLabelMap(modelUrl: string): Promise<Map<number, string> | nul
  * Convert an ImageBitmap to a TF.js tensor suitable for model input.
  * Resizes to 224×224 and normalizes pixel values to [0, 1].
  */
-function bitmapToTensor(bitmap: ImageBitmap, tfInstance: any): any {
+function bitmapToTensor(bitmap: ImageBitmap, tfInstance: TensorFlowRuntime): InferenceTensor {
   // Create an OffscreenCanvas to read pixel data from the ImageBitmap
   const canvas = new OffscreenCanvas(224, 224);
   const ctx = canvas.getContext('2d')!;
@@ -311,18 +292,12 @@ function bitmapToTensor(bitmap: ImageBitmap, tfInstance: any): any {
  * Run model prediction on the input tensor.
  * Returns the output tensor (probabilities or logits).
  */
-function predict(inputTensor: any): any {
+function predict(inputTensor: InferenceTensor): InferenceTensor {
   if (!model) throw new Error('Model not loaded');
 
-  // Execute model
-  const output = model.predict(inputTensor);
-
-  // Some models return an array of outputs
-  if (Array.isArray(output)) {
-    return output[0];
-  }
-
-  return output;
+  const runtime = tf;
+  if (!runtime) throw new Error('TensorFlow runtime not loaded');
+  return selectPredictionTensor(model.predict(inputTensor), tensor => runtime.dispose(tensor));
 }
 
 /**
@@ -330,12 +305,12 @@ function predict(inputTensor: any): any {
  * Extracts top-K predictions, maps to content hints.
  */
 function postProcess(
-  outputTensor: any,
+  outputTensor: InferenceTensor,
   timestamp: number,
-  tfInstance: any,
+  tfInstance: TensorFlowRuntime,
 ): SceneClassification {
   // Get the probability array from the output tensor
-  const probs = outputTensor.dataSync() as Float32Array;
+  const probs = outputTensor.dataSync();
   const numClasses = probs.length;
 
   // Build indexed entries for sorting
@@ -352,7 +327,6 @@ function postProcess(
   const topLabels: string[] = [];
   let topContentHint: ContentHint = 'unknown';
   let topConfidence = 0;
-  let topLabel = '';
 
   for (let k = 0; k < Math.min(topK, entries.length); k++) {
     const entry = entries[k]!;
@@ -363,7 +337,6 @@ function postProcess(
 
     if (k === 0) {
       topConfidence = entry.prob;
-      topLabel = label;
       topContentHint = resolveContentHint(label);
     }
   }
@@ -639,12 +612,10 @@ self.onmessage = async (event: MessageEvent) => {
           // Step 3: Load custom label map if available
           labelMap = await loadLabelMap(config.modelUrl);
 
-          initialized = true;
 
           self.postMessage({ type: 'ready' });
         } else {
           // TF.js not available — operate in heuristic-only mode
-          initialized = true;
           self.postMessage({ type: 'ready' });
         }
       } catch (err) {
@@ -653,8 +624,7 @@ self.onmessage = async (event: MessageEvent) => {
           payload: `AI worker init failed: ${err instanceof Error ? err.message : String(err)}`,
         });
 
-        // Still mark as initialized so heuristic fallback works
-        initialized = true;
+        // Classification can still use the heuristic fallback.
       }
 
       break;

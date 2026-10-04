@@ -164,7 +164,7 @@ export function MoviesBrowsePage() {
   function toggleView() {
     setViewMode((prev) => {
       const next = prev === 'grid' ? 'list' : 'grid'
-      try { localStorage.setItem('movies-view', next) } catch {}
+      try { localStorage.setItem('movies-view', next) } catch { /* Storage can be unavailable; keep the view in memory. */ }
       return next
     })
   }

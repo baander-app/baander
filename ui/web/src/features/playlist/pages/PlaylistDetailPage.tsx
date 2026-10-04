@@ -134,6 +134,8 @@ interface PlaylistSongResponse {
   length?: number
 }
 
+const EMPTY_SONGS: PlaylistSongResponse[] = []
+
 function formatTrackDuration(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`
 }
@@ -147,7 +149,7 @@ export function PlaylistDetailPage() {
   const playTrack = usePlayerStore((s) => s.playTrack)
 
   const playlist = (data as { data?: Record<string, unknown> })?.data ?? data as Record<string, unknown> | undefined
-  const songs = (playlist?.songs ?? []) as PlaylistSongResponse[]
+  const songs = (playlist?.songs as PlaylistSongResponse[] | undefined) ?? EMPTY_SONGS
 
   const tracks: Track[] = useMemo(() =>
     songs

@@ -88,8 +88,8 @@ export function useContextActions() {
     [],
   )
 
-  const toggleLove = useCallback(
-    (_songId: string) => {
+  const toggleLove = useCallback<(songId: string) => void>(
+    () => {
       // No-op placeholder — backend endpoint exists, will be wired later
     },
     [],

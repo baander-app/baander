@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook, waitFor, act } from '@testing-library/react'
+import { renderHook, waitFor } from '@testing-library/react'
 import { useSidebarConfig } from '@/features/layout/hooks/use-sidebar-config'
 import { useSidebarStore } from '@/features/layout/stores/sidebar-store'
 import { useMediaModeStore } from '@/features/layout/stores/media-mode-store'

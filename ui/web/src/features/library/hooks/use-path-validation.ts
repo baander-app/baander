@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 
 export function usePathValidation() {
   const [result, setResult] = useState<{
@@ -8,8 +8,19 @@ export function usePathValidation() {
   } | null>(null)
   const [isValidating, setIsValidating] = useState(false)
 
+  const owner = useRef(0)
+  useEffect(
+    () => () => {
+      owner.current++
+    },
+    [],
+  )
+
   const validate = useCallback(async (path: string) => {
+    const attempt = ++owner.current
+
     if (!path || path.trim() === '') {
+      setIsValidating(false)
       setResult(null)
       return
     }
@@ -17,20 +28,36 @@ export function usePathValidation() {
     setIsValidating(true)
     try {
       const { validatePath } = await import('../api/library-api')
+      if (attempt !== owner.current) return
+
       const res = await validatePath(path)
+      if (attempt !== owner.current) return
+
       setResult({
         valid: res.valid,
         error: res.error,
         resolvedPath: res.resolvedPath,
       })
     } catch {
-      setResult({ valid: false, error: 'Validation request failed', resolvedPath: null })
+      if (attempt !== owner.current) return
+
+      setResult({
+        valid: false,
+        error: 'Validation request failed',
+        resolvedPath: null,
+      })
     } finally {
-      setIsValidating(false)
+      if (attempt === owner.current) {
+        setIsValidating(false)
+      }
     }
   }, [])
 
-  const reset = useCallback(() => setResult(null), [])
+  const reset = useCallback(() => {
+    owner.current++
+    setResult(null)
+    setIsValidating(false)
+  }, [])
 
   return { result, isValidating, validate, reset }
 }

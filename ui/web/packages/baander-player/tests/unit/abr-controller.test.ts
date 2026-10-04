@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { SmartABRController } from '../../src/core/abr/SmartABRController';
-import type { Rendition, QualityTierInfo } from '../../src/types';
+import type { Rendition } from '../../src/types';
 
 function createTestRenditions(): Rendition[] {
   return [
@@ -82,7 +82,6 @@ describe('SmartABRController', () => {
     // Start at 1080p
     controller.selectInitialRendition();
     // Simulate being on 1080p
-    const state = controller.getState();
     // Force initial state
     controller.evaluate(15);
 

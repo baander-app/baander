@@ -1,3 +1,4 @@
+import type { GetLyricsSongLyrics200 } from '@/shared/api-client/gen/endpoints'
 import styled, { css } from 'styled-components'
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
@@ -326,7 +327,7 @@ function FullscreenContent({ onClose }: { onClose: () => void }) {
     query: { enabled: !!albumPublicId },
   })
 
-  const blurhash = (albumData as any)?.data?.coverImage?.blurhash ?? null
+  const blurhash = albumData?.data?.coverImage?.blurhash ?? null
 
   const lyrics = extractLyrics(lyricsData)
   const hasSynced = !!lyrics?.syncedLyrics
@@ -338,7 +339,7 @@ function FullscreenContent({ onClose }: { onClose: () => void }) {
     if (store.getPalette(albumPublicId)) return // already cached
     if (store.extracting.has(albumPublicId)) return // in progress
 
-    const coverUrl = (albumData as any)?.data?.coverImage?.url
+    const coverUrl = albumData?.data?.coverImage?.url
     if (!coverUrl) return
 
     store.startExtraction(albumPublicId)
@@ -557,8 +558,8 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`
 }
 
-function extractLyrics(data: unknown): CachedLyrics | null {
-  const d = (data as any)?.data
+function extractLyrics(data: GetLyricsSongLyrics200 | undefined): CachedLyrics | null {
+  const d = data?.data
   if (!d || (typeof d === 'object' && Object.keys(d).length === 0)) return null
-  return d as CachedLyrics
+  return d
 }

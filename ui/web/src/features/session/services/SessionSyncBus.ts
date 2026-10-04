@@ -47,7 +47,7 @@ export class SessionSyncBus {
     this.sessionArgs = { sessionId }
     this.cancelReconnect()
 
-    const url = this.buildWsUrl(sessionId)
+    const url = this.buildWsUrl()
     this.ws = new WebSocket(url)
 
     this.ws.onopen = () => {
@@ -115,7 +115,7 @@ export class SessionSyncBus {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN
   }
 
-  private buildWsUrl(_sessionId: string): string {
+  private buildWsUrl(): string {
     const base = this.config.wsEndpoint
     const sep = base.includes('?') ? '&' : '?'
     const auth = this.config.authToken ? `${sep}token=${encodeURIComponent(this.config.authToken)}` : ''

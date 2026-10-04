@@ -2,7 +2,7 @@ import styled from 'styled-components'
 import { useState, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { LayoutGrid, List, ChevronLeft, ChevronRight } from 'lucide-react'
-import type { PaginatedResponse, GetAlbumIndexOrder } from '@/shared/api-client/gen/endpoints'
+import type { PaginatedResponse, GetAlbumIndexOrder, AlbumResource, GetAlbumShow200DataCoverImage } from '@/shared/api-client/gen/endpoints'
 import { useGetAlbumIndex, useGetGenreIndex } from '@/shared/api-client/gen/endpoints'
 import { AlbumGridItem } from '../components/AlbumGridItem'
 import { AlbumListItem } from '../components/AlbumListItem'
@@ -189,7 +189,7 @@ export function AlbumsPage() {
   }, [])
 
   const response = data as unknown as PaginatedResponse | undefined
-  const items = response?.data as any[] | undefined
+  const items = response?.data as (AlbumResource & { artistName?: string; coverImage?: GetAlbumShow200DataCoverImage })[] | undefined
 
   const handleGenreToggle = useCallback((value: string) => {
     setPage(1)

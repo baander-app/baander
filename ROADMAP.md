@@ -80,7 +80,7 @@ After centralizing the image lifecycle, the rerun reports 130 errors and 14 warn
 - [x] Verify shared store helpers preserve symbol-key updates and action tracing
   after reset, and oversized property names cannot bypass trace export bounds.
 - [x] Rerun combined tests, typechecks, changed-file lint, and debugger browser flow.
-- [ ] Bring full-project web lint to zero errors before the application release.
+- [x] Bring full-project web lint to zero errors before the application release.
 
 Verification: 1,602 web tests across 138 files, 46 native audio browser tests,
 11 browser authentication tests, the HTTPS debugger browser flow, TypeScript,
@@ -88,6 +88,25 @@ changed-file ESLint, and the production build pass. New regressions
 failed before their fixes. Disabled debugger instrumentation remains unchanged;
 retained exports are bounded, but arbitrary JavaScript object enumeration is not
 a bounded-time operation.
+
+## Web quality gates restored
+
+Full-project web lint now passes with zero errors. Seven warnings remain: four
+React Compiler notices for TanStack virtualizers and three notices in generated
+coverage assets. No lint rules, discovery paths, or baselines were weakened.
+
+Corrections include typed API contracts and player inference outputs, isolated
+component exports for hot reload, request/form lifetime ownership, and a PEQ graph
+that preserves presets and responds to resizing. Playlist creation uses the actual
+resource response. Named inference outputs are supported and unused tensors disposed.
+The embedded player now has blocking typecheck and test steps in frontend CI.
+New code follows the project's manual formatting style; Prettier is not introduced.
+
+Validation: 1,618 web tests, 159 embedded-player tests, three performance tests,
+58 browser checks, web and player typechecks, and the production build pass.
+The player install was verified with the pinned Yarn version and immutable lockfile.
+The broader backend,
+security, native-media, and registry release gates remain separate milestones.
 
 ## Recent verified checkpoints
 

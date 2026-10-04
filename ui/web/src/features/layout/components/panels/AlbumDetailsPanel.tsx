@@ -13,6 +13,7 @@ import { AlbumContextMenu } from '@/features/catalog/components/menus/AlbumConte
 /** Album song as returned by GET /api/albums/{id}. Extends the generated SongResource
  *  with an optional `duration` alias some payloads use alongside the canonical `length`. */
 type AlbumSong = SongResource & { duration?: number | null }
+const EMPTY_SONGS: AlbumSong[] = []
 
 const CoverSkeleton = styled(Skeleton)`
   margin-inline: auto;
@@ -244,7 +245,7 @@ export function AlbumDetailsPanel({ publicId }: AlbumDetailsPanelProps) {
   const coverUrl = album?.coverImage?.url ?? null
   const { src: coverSrc } = useImageBlob(coverUrl)
 
-  const songs: AlbumSong[] = (album?.songs as AlbumSong[] | undefined) ?? []
+  const songs: AlbumSong[] = (album?.songs as AlbumSong[] | undefined) ?? EMPTY_SONGS
   const totalDuration = songs.reduce(
     (acc: number, s) => acc + (typeof s.length === 'number' ? s.length : (typeof s.duration === 'number' ? s.duration : 0)),
     0,

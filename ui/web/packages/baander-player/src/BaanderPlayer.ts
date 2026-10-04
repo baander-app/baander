@@ -71,8 +71,6 @@ export interface PlayerEvents {
 // ---------------------------------------------------------------------------
 
 /** Reusable no-op callback. Use when an event must be satisfied but has no consumer. */
-// eslint-disable-next-line @typescript-eslint/no-empty-function
-const noop = () => {};
 
 // ---------------------------------------------------------------------------
 // BaanderPlayer
@@ -437,7 +435,7 @@ export class BaanderPlayer {
     await this.offlineStore.downloadVideo(
       this.manifest.videoId,
       this.manifest,
-      async (url: string, options?: { signal?: AbortSignal }) => {
+      async (url: string) => {
         const result = await this.transport.fetchSegment(url);
         if (!result.ok) throw new Error(`Failed to fetch: ${url}`);
         return result.data;
