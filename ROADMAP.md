@@ -122,12 +122,14 @@ actual 21-character NanoID instead of UUID. Regression checks reject the former
 schemas, and the specification/client are regenerated together. Other contexts'
 public-ID schemas and mixed UUID/public-ID relationship fields still need audit.
 
-A PostgreSQL query-plan probe with 5,000 denied image/album/artist rows found
-43–46 ms image authorization queries dominated by JIT compilation; the same
-disposable session with JIT disabled took 0.095–0.110 ms for allowed images and
-0.463 ms for denial. The reverse artist-cover predicate scanned 5,001 artists.
-Query-shape/index remediation and representative benchmarks remain a bounded
-performance follow-up; no global JIT setting or schema change was made.
+Image authorization now starts artist checks from visible album/song relationships,
+avoiding the full artist scan in the earlier 5,000-row denied-catalog probe. A
+reproducible fixture captures the repository's actual SQL with migration indexes
+and analyzed tables; all six direct/reverse cover, playlist and denial cases avoid
+active artist sequential scans. No global JIT setting or schema change was made.
+Locked-dependency authorization/persistence tests pass 23 tests (600 assertions),
+and scoped PHPStan reports zero errors. The fixture is a selective-library plan
+regression, not a representative production capacity benchmark.
 
 ## Delivery horizons
 

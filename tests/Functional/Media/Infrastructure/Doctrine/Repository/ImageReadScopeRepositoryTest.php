@@ -8,6 +8,8 @@ use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistAlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\ArtistSongEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Media\Domain\Repository\ImageRepositoryInterface;
 use App\Media\Infrastructure\Doctrine\Entity\ImageEntity;
@@ -92,9 +94,58 @@ final class ImageReadScopeRepositoryTest extends TestCase
             $this->assertNotNull($view, $name);
             $this->assertSame($this->images[$name]->getId()->toString(), $view->getId()->toString());
             $this->assertSame('/images/' . $name . '.webp', $view->getPath());
+            $this->assertTrue($this->repository->saveVisibleBlurhash($view->getId(), 'cover-hash', $this->scope));
+            $this->assertSame(
+                'cover-hash',
+                $this->repository->findVisibleByPublicId($this->images[$name]->getPublicId(), $this->scope)?->getBlurhash(),
+            );
         }
         $this->assertNull($this->images['album-reverse']->getAlbum());
         $this->assertNull($this->images['artist-reverse']->getArtist());
+    }
+
+    public function testSongOnlyArtistCoversRemainVisibleUntilTheirRelationshipIsRemoved(): void
+    {
+        $artist = new ArtistEntity(new PublicId(), 'Song-only Artist');
+        $song = new SongEntity(
+            new PublicId(),
+            $this->entityManager->getReference(AlbumEntity::class, $this->allowedAlbum->getId()),
+            'Visible Song', '/media/allowed/song.flac', 32, 'audio/flac',
+        );
+        $direct = new ImageEntity('/images/song-direct.webp', 'webp', 'image/webp', new PublicId(), 32, 2, 2, 'artist');
+        $reverse = new ImageEntity('/images/song-reverse.webp', 'webp', 'image/webp', new PublicId(), 32, 2, 2, 'artist');
+        $direct->setArtist($artist);
+        $artist->setCoverImage($reverse);
+        foreach ([$artist, $song, $direct, $reverse,
+            new ArtistSongEntity($artist, $song, 'primary'),
+            new ArtistSongEntity($artist, $song, 'featured'),
+        ] as $entity) {
+            $this->entityManager->persist($entity);
+        }
+        $this->entityManager->flush();
+        $this->entityManager->clear();
+        foreach ([$direct, $reverse] as $image) {
+            $view = $this->repository->findVisibleByPublicId($image->getPublicId(), $this->scope);
+            $this->assertNotNull($view);
+            $this->assertTrue($this->repository->saveVisibleBlurhash($image->getId(), 'song-cover', $this->scope));
+        }
+        $this->assertSame(
+            $artist->getId()->toString(),
+            $this->repository->findVisibleByPublicId($direct->getPublicId(), $this->scope)?->getArtistId()?->toString(),
+        );
+        $this->assertNull($this->repository->findVisibleByPublicId($reverse->getPublicId(), $this->scope)?->getArtistId());
+        $this->entityManager->getConnection()->executeStatement(
+            'DELETE FROM artist_song WHERE artist_id = :artist',
+            ['artist' => $artist->getId()->toString()],
+        );
+        foreach ([$direct, $reverse] as $image) {
+            $this->assertNull($this->repository->findVisibleByPublicId($image->getPublicId(), $this->scope));
+            $this->assertFalse($this->repository->saveVisibleBlurhash($image->getId(), 'removed-cover', $this->scope));
+            $this->assertSame(
+                'song-cover',
+                $this->repository->findVisibleByPublicId($image->getPublicId(), $this->adminScope)?->getBlurhash(),
+            );
+        }
     }
 
     public function testUnrelatedPublicPlaylistAndOrphanImagesRemainDenied(): void

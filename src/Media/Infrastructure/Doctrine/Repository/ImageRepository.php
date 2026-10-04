@@ -47,7 +47,7 @@ final class ImageRepository implements ImageRepositoryInterface
                 $qb->addSelect('0 AS albumVisible', '0 AS artistVisible');
             } else {
                 $album = $this->albumVisibility('owner_album', 'owner_album.id = IDENTITY(i.album)');
-                $artist = $this->artistVisibility('owner_artist', 'owner_artist.id = IDENTITY(i.artist)');
+                $artist = $this->artistVisibility('owner_artist');
                 $qb->addSelect(
                     'CASE WHEN ' . $album . ' THEN 1 ELSE 0 END AS albumVisible',
                     'CASE WHEN ' . $artist . ' THEN 1 ELSE 0 END AS artistVisible',
@@ -130,10 +130,7 @@ final class ImageRepository implements ImageRepositoryInterface
                 'visible_album',
                 'visible_album.id = IDENTITY(i.album) OR visible_album.coverImage = i.id',
             );
-            $predicates[] = $this->artistVisibility(
-                'visible_artist',
-                'visible_artist.id = IDENTITY(i.artist) OR visible_artist.coverImage = i.id',
-            );
+            $predicates[] = $this->artistVisibility('visible_artist', includeCover: true);
             $qb->setParameter('image_libraries', $scope->getLibraries()->getLibraryIds(), ArrayParameterType::STRING);
         }
         $qb->andWhere('(' . implode(' OR ', $predicates) . ')');
@@ -150,27 +147,36 @@ final class ImageRepository implements ImageRepositoryInterface
             DQL;
     }
 
-    private function artistVisibility(string $alias, string $association): string
+    private function artistVisibility(string $alias, bool $includeCover = false): string
     {
+        // Start with visible relationships so PostgreSQL can use library and
+        // association indexes instead of checking nested membership per artist.
+        $albumArtist = $alias . '_album_artist';
+        $songArtist = $alias . '_song_artist';
+        $albumAssociation = "$albumArtist.id = IDENTITY(i.artist)";
+        $songAssociation = "$songArtist.id = IDENTITY(i.artist)";
+        if ($includeCover) {
+            $albumAssociation .= " OR $albumArtist.coverImage = i.id";
+            $songAssociation .= " OR $songArtist.coverImage = i.id";
+        }
+
         return <<<DQL
-            EXISTS (
-                SELECT $alias.id
-                FROM App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity $alias
-                WHERE ($association) AND (
-                    EXISTS (
-                        SELECT {$alias}_aa.id
-                        FROM App\Catalog\Infrastructure\Doctrine\Entity\ArtistAlbumEntity {$alias}_aa
-                        JOIN {$alias}_aa.album {$alias}_album
-                        WHERE {$alias}_aa.artist = $alias.id
-                            AND IDENTITY({$alias}_album.library) IN (:image_libraries)
-                    ) OR EXISTS (
-                        SELECT {$alias}_as.id
-                        FROM App\Catalog\Infrastructure\Doctrine\Entity\ArtistSongEntity {$alias}_as
-                        JOIN {$alias}_as.song {$alias}_song
-                        JOIN {$alias}_song.album {$alias}_song_album
-                        WHERE {$alias}_as.artist = $alias.id
-                            AND IDENTITY({$alias}_song_album.library) IN (:image_libraries)
-                    )
+            (
+                EXISTS (
+                    SELECT {$alias}_aa.id
+                    FROM App\Catalog\Infrastructure\Doctrine\Entity\ArtistAlbumEntity {$alias}_aa
+                    JOIN {$alias}_aa.album {$alias}_album
+                    JOIN {$alias}_aa.artist $albumArtist
+                    WHERE IDENTITY({$alias}_album.library) IN (:image_libraries)
+                        AND ($albumAssociation)
+                ) OR EXISTS (
+                    SELECT {$alias}_as.id
+                    FROM App\Catalog\Infrastructure\Doctrine\Entity\ArtistSongEntity {$alias}_as
+                    JOIN {$alias}_as.song {$alias}_song
+                    JOIN {$alias}_song.album {$alias}_song_album
+                    JOIN {$alias}_as.artist $songArtist
+                    WHERE IDENTITY({$alias}_song_album.library) IN (:image_libraries)
+                        AND ($songAssociation)
                 )
             )
             DQL;
