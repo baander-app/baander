@@ -10,6 +10,24 @@ type PlayerPreferenceState = Pick<PlayerState,
   'shuffle' | 'repeat' | 'volume' | 'muted' | 'crossfadeEnabled' | 'crossfadeDuration'
 >
 
+function isNumberInRange(value: unknown, minimum: number, maximum: number): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= minimum && value <= maximum
+}
+
+function readPlayerPreferences(payload: Record<string, unknown>): PlayerPreferenceState {
+  const { shuffle, repeat, volume, muted, crossfadeEnabled, crossfadeDuration } = payload
+  if (
+    typeof shuffle !== 'boolean' || typeof muted !== 'boolean' || typeof crossfadeEnabled !== 'boolean'
+    || (repeat !== 'off' && repeat !== 'all' && repeat !== 'one')
+    || !isNumberInRange(volume, 0, 1) || !isNumberInRange(crossfadeDuration, 0, 12)
+  ) {
+    throw new Error('Invalid player preference payload')
+  }
+  return {
+    shuffle, repeat, volume: Math.round(volume * VOLUME_SCALE), muted, crossfadeEnabled, crossfadeDuration,
+  }
+}
+
 export function usePlayerPreferences(isActive?: () => boolean) {
 
   const sync = usePreferenceSync<PlayerPreferenceState>({
@@ -26,14 +44,7 @@ export function usePlayerPreferences(isActive?: () => boolean) {
       replayGainMode: 'track',
       replayGainPreAmp: 0.0,
     }),
-    fromPayload: (payload) => ({
-      shuffle: payload.shuffle as boolean,
-      repeat: payload.repeat as 'off' | 'all' | 'one',
-      volume: Math.round((payload.volume as number) * VOLUME_SCALE),
-      muted: payload.muted as boolean,
-      crossfadeEnabled: payload.crossfadeEnabled as boolean,
-      crossfadeDuration: payload.crossfadeDuration as number,
-    }),
+    fromPayload: readPlayerPreferences,
     onRemoteUpdate: useCallback((data) => {
       mediator.dispatch(SETTINGS_ACTIONS.APPLY_PLAYER, {
         shuffle: data.shuffle,

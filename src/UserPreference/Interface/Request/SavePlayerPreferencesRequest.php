@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Interface\Request;
 
+use Nelmio\ApiDocBundle\Attribute\Ignore;
 use OpenApi\Attributes as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -13,6 +14,8 @@ use Symfony\Component\Validator\Constraints as Assert;
     properties: [
         new OA\Property(
             property: 'payload',
+            type: 'object',
+            required: ['shuffle', 'repeat', 'volume', 'muted', 'crossfadeEnabled', 'crossfadeDuration', 'replayGainEnabled', 'replayGainMode', 'replayGainPreAmp'],
             properties: [
                 new OA\Property(property: 'shuffle', type: 'boolean', example: false),
                 new OA\Property(property: 'repeat', type: 'string', example: 'off', enum: ['off', 'all', 'one']),
@@ -24,31 +27,35 @@ use Symfony\Component\Validator\Constraints as Assert;
                 new OA\Property(property: 'replayGainMode', type: 'string', example: 'track', enum: ['track', 'album']),
                 new OA\Property(property: 'replayGainPreAmp', type: 'number', example: 0.0, minimum: -15, maximum: 15),
             ],
+            additionalProperties: false,
         ),
         new OA\Property(property: 'version', type: 'integer', minimum: 0, example: 0),
     ],
 )]
 final readonly class SavePlayerPreferencesRequest
 {
+    /** @param array<string, mixed> $payload */
     public function __construct(
+        #[Ignore]
         #[Assert\NotNull(message: 'Payload is required.')]
         #[Assert\Type(type: 'array')]
         #[Assert\Collection(
             fields: [
                 'shuffle' => [new Assert\NotNull(), new Assert\Type('bool')],
                 'repeat' => [new Assert\NotNull(), new Assert\Type('string'), new Assert\Choice(choices: ['off', 'all', 'one'])],
-                'volume' => [new Assert\NotNull(), new Assert\Type('numeric'), new Assert\Range(min: 0, max: 1)],
+                'volume' => [new Assert\NotNull(), new Assert\Type(['int', 'float']), new Assert\Range(min: 0, max: 1)],
                 'muted' => [new Assert\NotNull(), new Assert\Type('bool')],
                 'crossfadeEnabled' => [new Assert\NotNull(), new Assert\Type('bool')],
-                'crossfadeDuration' => [new Assert\NotNull(), new Assert\Type('numeric'), new Assert\Range(min: 0, max: 12)],
+                'crossfadeDuration' => [new Assert\NotNull(), new Assert\Type(['int', 'float']), new Assert\Range(min: 0, max: 12)],
                 'replayGainEnabled' => [new Assert\NotNull(), new Assert\Type('bool')],
                 'replayGainMode' => [new Assert\NotNull(), new Assert\Type('string'), new Assert\Choice(choices: ['track', 'album'])],
-                'replayGainPreAmp' => [new Assert\NotNull(), new Assert\Type('numeric'), new Assert\Range(min: -15, max: 15)],
+                'replayGainPreAmp' => [new Assert\NotNull(), new Assert\Type(['int', 'float']), new Assert\Range(min: -15, max: 15)],
             ],
             allowMissingFields: false,
         )]
         public array $payload = [],
 
+        #[Ignore]
         #[Assert\NotNull(message: 'Version is required.')]
         #[Assert\GreaterThanOrEqual(value: 0, message: 'Version must be at least 0.')]
         public int $version = 0,

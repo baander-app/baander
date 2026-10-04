@@ -1925,6 +1925,53 @@ export interface SaveLayoutPreferencesRequest {
   version: number;
 }
 
+export type SavePlayerPreferencesRequestPayloadRepeat = typeof SavePlayerPreferencesRequestPayloadRepeat[keyof typeof SavePlayerPreferencesRequestPayloadRepeat];
+
+
+export const SavePlayerPreferencesRequestPayloadRepeat = {
+  off: 'off',
+  all: 'all',
+  one: 'one',
+} as const;
+
+export type SavePlayerPreferencesRequestPayloadReplayGainMode = typeof SavePlayerPreferencesRequestPayloadReplayGainMode[keyof typeof SavePlayerPreferencesRequestPayloadReplayGainMode];
+
+
+export const SavePlayerPreferencesRequestPayloadReplayGainMode = {
+  track: 'track',
+  album: 'album',
+} as const;
+
+export type SavePlayerPreferencesRequestPayload = {
+  shuffle: boolean;
+  repeat: SavePlayerPreferencesRequestPayloadRepeat;
+  /**
+     * @minimum 0
+     * @maximum 1
+     */
+  volume: number;
+  muted: boolean;
+  crossfadeEnabled: boolean;
+  /**
+     * @minimum 0
+     * @maximum 12
+     */
+  crossfadeDuration: number;
+  replayGainEnabled: boolean;
+  replayGainMode: SavePlayerPreferencesRequestPayloadReplayGainMode;
+  /**
+     * @minimum -15
+     * @maximum 15
+     */
+  replayGainPreAmp: number;
+};
+
+export interface SavePlayerPreferencesRequest {
+  payload: SavePlayerPreferencesRequestPayload;
+  /** @minimum 0 */
+  version: number;
+}
+
 export type AcceptLanguageParameter = typeof AcceptLanguageParameter[keyof typeof AcceptLanguageParameter];
 
 
@@ -5666,56 +5713,6 @@ export type GetPlayerPreferencesIndex200Payload = {
 export type GetPlayerPreferencesIndex200 = {
   payload?: GetPlayerPreferencesIndex200Payload;
   version?: number;
-};
-
-export type PutPlayerPreferencesUpdateBodyPayloadRepeat = typeof PutPlayerPreferencesUpdateBodyPayloadRepeat[keyof typeof PutPlayerPreferencesUpdateBodyPayloadRepeat];
-
-
-export const PutPlayerPreferencesUpdateBodyPayloadRepeat = {
-  off: 'off',
-  all: 'all',
-  one: 'one',
-} as const;
-
-export type PutPlayerPreferencesUpdateBodyPayloadReplayGainMode = typeof PutPlayerPreferencesUpdateBodyPayloadReplayGainMode[keyof typeof PutPlayerPreferencesUpdateBodyPayloadReplayGainMode];
-
-
-export const PutPlayerPreferencesUpdateBodyPayloadReplayGainMode = {
-  track: 'track',
-  album: 'album',
-} as const;
-
-export type PutPlayerPreferencesUpdateBodyPayload = {
-  shuffle?: boolean;
-  repeat?: PutPlayerPreferencesUpdateBodyPayloadRepeat;
-  /**
-     * @minimum 0
-     * @maximum 1
-     */
-  volume?: number;
-  muted?: boolean;
-  crossfadeEnabled?: boolean;
-  /**
-     * @minimum 0
-     * @maximum 12
-     */
-  crossfadeDuration?: number;
-  replayGainEnabled?: boolean;
-  replayGainMode?: PutPlayerPreferencesUpdateBodyPayloadReplayGainMode;
-  /**
-     * @minimum -15
-     * @maximum 15
-     */
-  replayGainPreAmp?: number;
-};
-
-export type PutPlayerPreferencesUpdateBody = {
-  payload: PutPlayerPreferencesUpdateBodyPayload;
-  /**
-     * Expected current version; 0 creates preferences.
-     * @minimum 0
-     */
-  version: number;
 };
 
 export type PutPlayerPreferencesUpdate200Payload = {
@@ -29839,14 +29836,14 @@ export const getPutPlayerPreferencesUpdateUrl = () => {
 /**
  * @summary Save player preferences
  */
-export const putPlayerPreferencesUpdate = async (putPlayerPreferencesUpdateBody: PutPlayerPreferencesUpdateBody, options?: RequestInit): Promise<PutPlayerPreferencesUpdate200> => {
+export const putPlayerPreferencesUpdate = async (savePlayerPreferencesRequest: SavePlayerPreferencesRequest, options?: RequestInit): Promise<PutPlayerPreferencesUpdate200> => {
 
   return customInstance<PutPlayerPreferencesUpdate200>(getPutPlayerPreferencesUpdateUrl(),
   {
     ...options,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(putPlayerPreferencesUpdateBody)
+    body: JSON.stringify(savePlayerPreferencesRequest)
   }
 );}
 
@@ -29854,8 +29851,8 @@ export const putPlayerPreferencesUpdate = async (putPlayerPreferencesUpdateBody:
 
 
 export const getPutPlayerPreferencesUpdateMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putPlayerPreferencesUpdate>>, TError,{data: BodyType<PutPlayerPreferencesUpdateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof putPlayerPreferencesUpdate>>, TError,{data: BodyType<PutPlayerPreferencesUpdateBody>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putPlayerPreferencesUpdate>>, TError,{data: BodyType<SavePlayerPreferencesRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof putPlayerPreferencesUpdate>>, TError,{data: BodyType<SavePlayerPreferencesRequest>}, TContext> => {
 
 const mutationKey = ['putPlayerPreferencesUpdate'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -29867,7 +29864,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putPlayerPreferencesUpdate>>, {data: BodyType<PutPlayerPreferencesUpdateBody>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putPlayerPreferencesUpdate>>, {data: BodyType<SavePlayerPreferencesRequest>}> = (props) => {
           const {data} = props ?? {};
 
           return  putPlayerPreferencesUpdate(data,requestOptions)
@@ -29881,18 +29878,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PutPlayerPreferencesUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof putPlayerPreferencesUpdate>>>
-    export type PutPlayerPreferencesUpdateMutationBody = BodyType<PutPlayerPreferencesUpdateBody>
+    export type PutPlayerPreferencesUpdateMutationBody = BodyType<SavePlayerPreferencesRequest>
     export type PutPlayerPreferencesUpdateMutationError = ErrorType<ApiError>
 
     /**
  * @summary Save player preferences
  */
 export const usePutPlayerPreferencesUpdate = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putPlayerPreferencesUpdate>>, TError,{data: BodyType<PutPlayerPreferencesUpdateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putPlayerPreferencesUpdate>>, TError,{data: BodyType<SavePlayerPreferencesRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof putPlayerPreferencesUpdate>>,
         TError,
-        {data: BodyType<PutPlayerPreferencesUpdateBody>},
+        {data: BodyType<SavePlayerPreferencesRequest>},
         TContext
       > => {
       return useMutation(getPutPlayerPreferencesUpdateMutationOptions(options), queryClient);

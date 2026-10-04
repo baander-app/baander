@@ -63,6 +63,28 @@ final class OpenApiSpecTest extends KernelTestCase
         }
     }
 
+    public function test_player_save_schema_requires_typed_bounded_fields(): void
+    {
+        $spec = $this->getSpec();
+        $body = $spec['paths']['/api/user/player-preferences/']['put']['requestBody']['content']['application/json']['schema'];
+        self::assertSame('#/components/schemas/SavePlayerPreferencesRequest', $body['$ref']);
+        $schema = $spec['components']['schemas']['SavePlayerPreferencesRequest'];
+        self::assertEqualsCanonicalizing(['payload', 'version'], $schema['required']);
+        $payload = $schema['properties']['payload'];
+        self::assertSame('object', $payload['type']);
+        self::assertFalse($payload['additionalProperties']);
+        self::assertArrayNotHasKey('default', $payload);
+        self::assertEqualsCanonicalizing([
+            'shuffle', 'repeat', 'volume', 'muted', 'crossfadeEnabled', 'crossfadeDuration',
+            'replayGainEnabled', 'replayGainMode', 'replayGainPreAmp',
+        ], $payload['required']);
+        foreach (['volume' => [0, 1], 'crossfadeDuration' => [0, 12], 'replayGainPreAmp' => [-15, 15]] as $field => [$min, $max]) {
+            self::assertSame('number', $payload['properties'][$field]['type']);
+            self::assertSame($min, $payload['properties'][$field]['minimum']);
+            self::assertSame($max, $payload['properties'][$field]['maximum']);
+        }
+    }
+
     public function test_raw_path_stream_is_absent_from_contract(): void
     {
         $spec = $this->getSpec();

@@ -6,6 +6,8 @@ namespace App\Tests\Functional\Controller;
 
 use App\Auth\Domain\Model\User;
 use App\Tests\Functional\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Functional tests for player-preferences management.
@@ -139,6 +141,91 @@ final class PlayerPreferencesControllerTest extends TestCase
         $this->assertJsonResponse($response, 422);
     }
 
+    /** @return iterable<string, array{string, mixed}> */
+    public static function invalidNumbers(): iterable
+    {
+        foreach (['volume' => [0, 1], 'crossfadeDuration' => [0, 12], 'replayGainPreAmp' => [-15, 15]] as $field => [$min, $max]) {
+            foreach ([
+                'numeric string' => '0.5',
+                'integer string' => '0',
+                'true' => true,
+                'false' => false,
+                'null' => null,
+                'array' => [0.5],
+                'object' => (object) ['value' => 0.5],
+                'below minimum' => $min - 0.1,
+                'above maximum' => $max + 0.1,
+            ] as $case => $value) {
+                yield $field . ' ' . $case => [$field, $value];
+            }
+        }
+    }
+
+    #[DataProvider('invalidNumbers')]
+    public function testSaveRejectsInvalidNumberWithoutChangingPayloadVersionOrHistory(string $field, mixed $value): void
+    {
+        $user = $this->createTestUser();
+        $payload = $this->validPayload();
+        $this->assertJsonResponse($this->savePreferences($user, $payload, 0), 200);
+        $savedBefore = $this->assertJsonResponse(
+            $this->authenticatedRequest('GET', '/api/user/player-preferences/', $user),
+            200,
+            'data',
+        );
+        $historyBefore = $this->assertJsonResponse(
+            $this->authenticatedRequest('GET', '/api/user/player-preferences/history', $user),
+            200,
+            'data',
+        );
+        $invalidPayload = $payload;
+        $invalidPayload[$field] = $value;
+
+        $this->assertJsonResponse($this->savePreferences($user, $invalidPayload, 1), 422);
+
+        $saved = $this->assertJsonResponse(
+            $this->authenticatedRequest('GET', '/api/user/player-preferences/', $user),
+            200,
+            'data',
+        );
+        $this->assertSame($savedBefore['data'], $saved['data']);
+        $this->assertSame(1, $saved['data']['version']);
+        $historyAfter = $this->assertJsonResponse(
+            $this->authenticatedRequest('GET', '/api/user/player-preferences/history', $user),
+            200,
+            'data',
+        );
+        $this->assertSame($historyBefore['data']['history'], $historyAfter['data']['history']);
+    }
+
+    /** @return iterable<string, array{string, int|float}> */
+    public static function validNumbers(): iterable
+    {
+        foreach (['volume' => [0, 1], 'crossfadeDuration' => [0, 12], 'replayGainPreAmp' => [-15, 15]] as $field => [$min, $max]) {
+            foreach ([
+                'minimum integer' => $min,
+                'maximum integer' => $max,
+                'minimum float' => (float) $min,
+                'maximum float' => (float) $max,
+                'fractional number' => 0.5,
+            ] as $case => $value) {
+                yield $field . ' ' . $case => [$field, $value];
+            }
+        }
+    }
+
+    #[DataProvider('validNumbers')]
+    public function testSaveAcceptsNumbersAndInclusiveBoundaries(string $field, int|float $value): void
+    {
+        $user = $this->createTestUser();
+        $payload = $this->validPayload();
+        $payload[$field] = $value;
+
+        $data = $this->assertJsonResponse($this->savePreferences($user, $payload, 0), 200, 'data');
+
+        $this->assertEquals($payload, $data['data']['payload']);
+        $this->assertSame(1, $data['data']['version']);
+    }
+
     // ---------------------------------------------------------------
     // GET /history
     // ---------------------------------------------------------------
@@ -224,11 +311,16 @@ final class PlayerPreferencesControllerTest extends TestCase
         ];
     }
 
-    private function savePreferences(User $user, array $payload, int $version)
+    private function savePreferences(User $user, array $payload, int $version): Response
     {
-        return $this->authenticatedRequest('PUT', '/api/user/player-preferences/', $user, [
+        $this->client->request('PUT', '/api/user/player-preferences/', [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_X_Test_User_Id' => $user->getId()->toString(),
+        ], json_encode([
             'payload' => $payload,
             'version' => $version,
-        ]);
+        ], JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION));
+
+        return $this->client->getResponse();
     }
 }

@@ -82,23 +82,7 @@ final class PlayerPreferencesController
             required: true,
             content: new OA\MediaType(
                 mediaType: 'application/json',
-                schema: new OA\Schema(
-                    required: ['payload', 'version'],
-                    properties: [
-                        new OA\Property(property: 'payload', properties: [
-                            new OA\Property(property: 'shuffle', type: 'boolean'),
-                            new OA\Property(property: 'repeat', type: 'string', enum: ['off', 'all', 'one']),
-                            new OA\Property(property: 'volume', type: 'number', minimum: 0, maximum: 1),
-                            new OA\Property(property: 'muted', type: 'boolean'),
-                            new OA\Property(property: 'crossfadeEnabled', type: 'boolean'),
-                            new OA\Property(property: 'crossfadeDuration', type: 'number', minimum: 0, maximum: 12),
-                            new OA\Property(property: 'replayGainEnabled', type: 'boolean'),
-                            new OA\Property(property: 'replayGainMode', type: 'string', enum: ['track', 'album']),
-                            new OA\Property(property: 'replayGainPreAmp', type: 'number', minimum: -15, maximum: 15),
-                        ]),
-                        new OA\Property(property: 'version', type: 'integer', minimum: 0, description: 'Expected current version; 0 creates preferences.'),
-                    ],
-                ),
+                schema: new OA\Schema(ref: new Model(type: SavePlayerPreferencesRequest::class)),
             ),
         ),
         responses: [

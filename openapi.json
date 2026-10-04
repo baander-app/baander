@@ -17979,65 +17979,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "required": [
-                                    "payload",
-                                    "version"
-                                ],
-                                "properties": {
-                                    "payload": {
-                                        "properties": {
-                                            "shuffle": {
-                                                "type": "boolean"
-                                            },
-                                            "repeat": {
-                                                "type": "string",
-                                                "enum": [
-                                                    "off",
-                                                    "all",
-                                                    "one"
-                                                ]
-                                            },
-                                            "volume": {
-                                                "type": "number",
-                                                "maximum": 1,
-                                                "minimum": 0
-                                            },
-                                            "muted": {
-                                                "type": "boolean"
-                                            },
-                                            "crossfadeEnabled": {
-                                                "type": "boolean"
-                                            },
-                                            "crossfadeDuration": {
-                                                "type": "number",
-                                                "maximum": 12,
-                                                "minimum": 0
-                                            },
-                                            "replayGainEnabled": {
-                                                "type": "boolean"
-                                            },
-                                            "replayGainMode": {
-                                                "type": "string",
-                                                "enum": [
-                                                    "track",
-                                                    "album"
-                                                ]
-                                            },
-                                            "replayGainPreAmp": {
-                                                "type": "number",
-                                                "maximum": 15,
-                                                "minimum": -15
-                                            }
-                                        },
-                                        "type": "object"
-                                    },
-                                    "version": {
-                                        "description": "Expected current version; 0 creates preferences.",
-                                        "type": "integer",
-                                        "minimum": 0
-                                    }
-                                },
-                                "type": "object"
+                                "$ref": "#/components/schemas/SavePlayerPreferencesRequest"
                             }
                         }
                     }
@@ -22202,6 +22144,88 @@
                                     "details",
                                     "info"
                                 ]
+                            }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                    },
+                    "version": {
+                        "type": "integer",
+                        "example": 0,
+                        "minimum": 0
+                    }
+                },
+                "type": "object"
+            },
+            "SavePlayerPreferencesRequest": {
+                "required": [
+                    "payload",
+                    "version"
+                ],
+                "properties": {
+                    "payload": {
+                        "required": [
+                            "shuffle",
+                            "repeat",
+                            "volume",
+                            "muted",
+                            "crossfadeEnabled",
+                            "crossfadeDuration",
+                            "replayGainEnabled",
+                            "replayGainMode",
+                            "replayGainPreAmp"
+                        ],
+                        "properties": {
+                            "shuffle": {
+                                "type": "boolean",
+                                "example": false
+                            },
+                            "repeat": {
+                                "type": "string",
+                                "example": "off",
+                                "enum": [
+                                    "off",
+                                    "all",
+                                    "one"
+                                ]
+                            },
+                            "volume": {
+                                "type": "number",
+                                "example": 0.8,
+                                "maximum": 1,
+                                "minimum": 0
+                            },
+                            "muted": {
+                                "type": "boolean",
+                                "example": false
+                            },
+                            "crossfadeEnabled": {
+                                "type": "boolean",
+                                "example": false
+                            },
+                            "crossfadeDuration": {
+                                "type": "number",
+                                "example": 5,
+                                "maximum": 12,
+                                "minimum": 0
+                            },
+                            "replayGainEnabled": {
+                                "type": "boolean",
+                                "example": false
+                            },
+                            "replayGainMode": {
+                                "type": "string",
+                                "example": "track",
+                                "enum": [
+                                    "track",
+                                    "album"
+                                ]
+                            },
+                            "replayGainPreAmp": {
+                                "type": "number",
+                                "example": 0,
+                                "maximum": 15,
+                                "minimum": -15
                             }
                         },
                         "type": "object",
