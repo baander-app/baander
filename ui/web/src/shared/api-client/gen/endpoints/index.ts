@@ -28682,7 +28682,7 @@ export const putAudioPreferencesUpdate = async (putAudioPreferencesUpdateBody: P
 
 
 
-export const getPutAudioPreferencesUpdateMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+export const getPutAudioPreferencesUpdateMutationOptions = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAudioPreferencesUpdate>>, TError,{data: BodyType<PutAudioPreferencesUpdateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof putAudioPreferencesUpdate>>, TError,{data: BodyType<PutAudioPreferencesUpdateBody>}, TContext> => {
 
@@ -28711,12 +28711,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PutAudioPreferencesUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof putAudioPreferencesUpdate>>>
     export type PutAudioPreferencesUpdateMutationBody = BodyType<PutAudioPreferencesUpdateBody>
-    export type PutAudioPreferencesUpdateMutationError = ErrorType<ApiError | ValidationError>
+    export type PutAudioPreferencesUpdateMutationError = ErrorType<ApiError>
 
     /**
  * @summary Save audio preferences
  */
-export const usePutAudioPreferencesUpdate = <TError = ErrorType<ApiError | ValidationError>,
+export const usePutAudioPreferencesUpdate = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAudioPreferencesUpdate>>, TError,{data: BodyType<PutAudioPreferencesUpdateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof putAudioPreferencesUpdate>>,
@@ -28854,7 +28854,7 @@ export const postAudioPreferencesRollback = async (postAudioPreferencesRollbackB
 
 
 
-export const getPostAudioPreferencesRollbackMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+export const getPostAudioPreferencesRollbackMutationOptions = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAudioPreferencesRollback>>, TError,{data: BodyType<PostAudioPreferencesRollbackBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postAudioPreferencesRollback>>, TError,{data: BodyType<PostAudioPreferencesRollbackBody>}, TContext> => {
 
@@ -28883,12 +28883,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostAudioPreferencesRollbackMutationResult = NonNullable<Awaited<ReturnType<typeof postAudioPreferencesRollback>>>
     export type PostAudioPreferencesRollbackMutationBody = BodyType<PostAudioPreferencesRollbackBody>
-    export type PostAudioPreferencesRollbackMutationError = ErrorType<ApiError | ValidationError>
+    export type PostAudioPreferencesRollbackMutationError = ErrorType<ApiError>
 
     /**
  * @summary Rollback audio preferences to a previous version
  */
-export const usePostAudioPreferencesRollback = <TError = ErrorType<ApiError | ValidationError>,
+export const usePostAudioPreferencesRollback = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAudioPreferencesRollback>>, TError,{data: BodyType<PostAudioPreferencesRollbackBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postAudioPreferencesRollback>>,
@@ -29509,7 +29509,7 @@ export const putLayoutPreferencesUpdate = async (saveLayoutPreferencesRequest: S
 
 
 
-export const getPutLayoutPreferencesUpdateMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+export const getPutLayoutPreferencesUpdateMutationOptions = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putLayoutPreferencesUpdate>>, TError,{data: BodyType<SaveLayoutPreferencesRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof putLayoutPreferencesUpdate>>, TError,{data: BodyType<SaveLayoutPreferencesRequest>}, TContext> => {
 
@@ -29538,12 +29538,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PutLayoutPreferencesUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof putLayoutPreferencesUpdate>>>
     export type PutLayoutPreferencesUpdateMutationBody = BodyType<SaveLayoutPreferencesRequest>
-    export type PutLayoutPreferencesUpdateMutationError = ErrorType<ApiError | ValidationError>
+    export type PutLayoutPreferencesUpdateMutationError = ErrorType<ApiError>
 
     /**
  * @summary Save layout preferences
  */
-export const usePutLayoutPreferencesUpdate = <TError = ErrorType<ApiError | ValidationError>,
+export const usePutLayoutPreferencesUpdate = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putLayoutPreferencesUpdate>>, TError,{data: BodyType<SaveLayoutPreferencesRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof putLayoutPreferencesUpdate>>,
@@ -29681,7 +29681,7 @@ export const postLayoutPreferencesRollback = async (postLayoutPreferencesRollbac
 
 
 
-export const getPostLayoutPreferencesRollbackMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+export const getPostLayoutPreferencesRollbackMutationOptions = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postLayoutPreferencesRollback>>, TError,{data: BodyType<PostLayoutPreferencesRollbackBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postLayoutPreferencesRollback>>, TError,{data: BodyType<PostLayoutPreferencesRollbackBody>}, TContext> => {
 
@@ -29710,12 +29710,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostLayoutPreferencesRollbackMutationResult = NonNullable<Awaited<ReturnType<typeof postLayoutPreferencesRollback>>>
     export type PostLayoutPreferencesRollbackMutationBody = BodyType<PostLayoutPreferencesRollbackBody>
-    export type PostLayoutPreferencesRollbackMutationError = ErrorType<ApiError | ValidationError>
+    export type PostLayoutPreferencesRollbackMutationError = ErrorType<ApiError>
 
     /**
  * @summary Rollback layout preferences to a previous version
  */
-export const usePostLayoutPreferencesRollback = <TError = ErrorType<ApiError | ValidationError>,
+export const usePostLayoutPreferencesRollback = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postLayoutPreferencesRollback>>, TError,{data: BodyType<PostLayoutPreferencesRollbackBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postLayoutPreferencesRollback>>,
@@ -29853,7 +29853,7 @@ export const putPlayerPreferencesUpdate = async (putPlayerPreferencesUpdateBody:
 
 
 
-export const getPutPlayerPreferencesUpdateMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+export const getPutPlayerPreferencesUpdateMutationOptions = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putPlayerPreferencesUpdate>>, TError,{data: BodyType<PutPlayerPreferencesUpdateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof putPlayerPreferencesUpdate>>, TError,{data: BodyType<PutPlayerPreferencesUpdateBody>}, TContext> => {
 
@@ -29882,12 +29882,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PutPlayerPreferencesUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof putPlayerPreferencesUpdate>>>
     export type PutPlayerPreferencesUpdateMutationBody = BodyType<PutPlayerPreferencesUpdateBody>
-    export type PutPlayerPreferencesUpdateMutationError = ErrorType<ApiError | ValidationError>
+    export type PutPlayerPreferencesUpdateMutationError = ErrorType<ApiError>
 
     /**
  * @summary Save player preferences
  */
-export const usePutPlayerPreferencesUpdate = <TError = ErrorType<ApiError | ValidationError>,
+export const usePutPlayerPreferencesUpdate = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putPlayerPreferencesUpdate>>, TError,{data: BodyType<PutPlayerPreferencesUpdateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof putPlayerPreferencesUpdate>>,
@@ -30025,7 +30025,7 @@ export const postPlayerPreferencesRollback = async (postPlayerPreferencesRollbac
 
 
 
-export const getPostPlayerPreferencesRollbackMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+export const getPostPlayerPreferencesRollbackMutationOptions = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlayerPreferencesRollback>>, TError,{data: BodyType<PostPlayerPreferencesRollbackBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postPlayerPreferencesRollback>>, TError,{data: BodyType<PostPlayerPreferencesRollbackBody>}, TContext> => {
 
@@ -30054,12 +30054,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostPlayerPreferencesRollbackMutationResult = NonNullable<Awaited<ReturnType<typeof postPlayerPreferencesRollback>>>
     export type PostPlayerPreferencesRollbackMutationBody = BodyType<PostPlayerPreferencesRollbackBody>
-    export type PostPlayerPreferencesRollbackMutationError = ErrorType<ApiError | ValidationError>
+    export type PostPlayerPreferencesRollbackMutationError = ErrorType<ApiError>
 
     /**
  * @summary Rollback player preferences to a previous version
  */
-export const usePostPlayerPreferencesRollback = <TError = ErrorType<ApiError | ValidationError>,
+export const usePostPlayerPreferencesRollback = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPlayerPreferencesRollback>>, TError,{data: BodyType<PostPlayerPreferencesRollbackBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postPlayerPreferencesRollback>>,

@@ -9,6 +9,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\UserPreference\Application\Exception\PreferenceVersionConflict;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\UserPreference\Application\Port\PlayerPreferencesPortInterface;
+use App\UserPreference\Interface\Request\PreferenceRequestBody;
 use App\UserPreference\Interface\Request\RollbackRequest;
 use App\UserPreference\Interface\Request\SavePlayerPreferencesRequest;
 use OpenApi\Attributes as OA;
@@ -19,7 +20,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\AsController;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 #[AsController]
@@ -32,7 +32,7 @@ final class PlayerPreferencesController
     public function __construct(
         private readonly PlayerPreferencesPortInterface $playerPreferencesPort,
         private readonly ValidatorInterface $validator,
-        private readonly JsonEncoder $jsonEncoder,
+        private readonly PreferenceRequestBody $requestBody,
         private readonly Security $security,
     ) {
     }
@@ -118,7 +118,8 @@ final class PlayerPreferencesController
             ])),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '409', description: 'Version conflict', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid input', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '400', description: 'Malformed or empty JSON body', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'Invalid request body or preference fields', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/', name: 'update', methods: ['PUT'])]
@@ -127,10 +128,10 @@ final class PlayerPreferencesController
     {
         $userId = $this->getUserId();
 
-        $data = $this->jsonEncoder->decode((string) $request->getContent(), 'json');
+        $data = $this->requestBody->save((string) $request->getContent());
         $dto = new SavePlayerPreferencesRequest(
-            payload: $data['payload'] ?? [],
-            version: $data['version'] ?? 0,
+            payload: $data['payload'],
+            version: $data['version'],
         );
 
         $errors = $this->validator->validate($dto);
@@ -207,7 +208,8 @@ final class PlayerPreferencesController
             ])),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '409', description: 'Concurrent version conflict', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid input', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '400', description: 'Malformed or empty JSON body', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'Invalid request body or preference fields', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/rollback', name: 'rollback', methods: ['POST'])]
@@ -216,8 +218,7 @@ final class PlayerPreferencesController
     {
         $userId = $this->getUserId();
 
-        $data = $this->jsonEncoder->decode((string) $request->getContent(), 'json');
-        $dto = new RollbackRequest($data['version'] ?? 0);
+        $dto = new RollbackRequest($this->requestBody->rollback((string) $request->getContent()));
 
         $errors = $this->validator->validate($dto);
         if (count($errors) > 0) {

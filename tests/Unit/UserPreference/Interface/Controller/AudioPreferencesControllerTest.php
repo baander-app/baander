@@ -11,7 +11,7 @@ use App\UserPreference\Interface\Controller\AudioPreferencesController;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
+use App\UserPreference\Interface\Request\PreferenceRequestBody;
 use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationList;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
@@ -20,7 +20,6 @@ final class AudioPreferencesControllerTest extends TestCase
 {
     private AudioPreferencesPortInterface $port;
     private ValidatorInterface $validator;
-    private JsonEncoder $jsonEncoder;
     private Security $security;
     private AudioPreferencesController $controller;
 
@@ -28,7 +27,6 @@ final class AudioPreferencesControllerTest extends TestCase
     {
         $this->port = $this->createStub(AudioPreferencesPortInterface::class);
         $this->validator = $this->createStub(ValidatorInterface::class);
-        $this->jsonEncoder = $this->createStub(JsonEncoder::class);
         $this->security = $this->createStub(Security::class);
 
         $this->controller = $this->createAudioPreferencesControllerFixture();
@@ -39,7 +37,7 @@ final class AudioPreferencesControllerTest extends TestCase
         $fixture = new AudioPreferencesController(
             $this->port,
             $this->validator,
-            $this->jsonEncoder,
+            new PreferenceRequestBody(),
             $this->security,
         );
 
@@ -93,7 +91,6 @@ final class AudioPreferencesControllerTest extends TestCase
 
         $request = $this->createJsonRequest('PUT', json_encode($inputData));
 
-        $this->jsonEncoder->method('decode')->willReturn($inputData);
         $this->validator->method('validate')->willReturn(new ConstraintViolationList());
 
         $this->port->expects($this->once())
@@ -116,7 +113,6 @@ final class AudioPreferencesControllerTest extends TestCase
 
         $request = $this->createJsonRequest('PUT', json_encode($inputData));
 
-        $this->jsonEncoder->method('decode')->willReturn($inputData);
         $this->validator->method('validate')->willReturn(new ConstraintViolationList());
 
         $this->port->method('saveForUser')->willThrowException(new \App\UserPreference\Application\Exception\PreferenceVersionConflict(5));
@@ -160,7 +156,6 @@ final class AudioPreferencesControllerTest extends TestCase
 
         $request = $this->createJsonRequest('POST', json_encode(['version' => 2]));
 
-        $this->jsonEncoder->method('decode')->willReturn(['version' => 2]);
         $this->validator->method('validate')->willReturn(new ConstraintViolationList());
 
         $this->port->expects($this->once())
@@ -184,9 +179,8 @@ final class AudioPreferencesControllerTest extends TestCase
         $this->port = $this->createMock(AudioPreferencesPortInterface::class);
         $this->controller = $this->createAudioPreferencesControllerFixture();
 
-        $request = $this->createJsonRequest('PUT', json_encode(['payload' => [], 'version' => 0]));
+        $request = $this->createJsonRequest('PUT', json_encode(['payload' => ['enabled' => 'invalid'], 'version' => 0]));
 
-        $this->jsonEncoder->method('decode')->willReturn(['payload' => [], 'version' => 0]);
 
         $violations = new ConstraintViolationList([
             new ConstraintViolation(

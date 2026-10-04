@@ -47,6 +47,22 @@ final class OpenApiSpecTest extends KernelTestCase
         self::assertSame(0, $schema['properties']['version']['minimum']);
     }
 
+    public function test_preference_write_errors_use_the_shared_api_envelope(): void
+    {
+        $spec = $this->getSpec();
+        foreach (['audio', 'player', 'layout'] as $preference) {
+            foreach (['put' => '', 'post' => 'rollback'] as $method => $suffix) {
+                $operation = $spec['paths']['/api/user/' . $preference . '-preferences/' . $suffix][$method];
+                foreach (['400', '422'] as $status) {
+                    self::assertSame(
+                        '#/components/schemas/ApiError',
+                        $operation['responses'][$status]['content']['application/json']['schema']['$ref'],
+                    );
+                }
+            }
+        }
+    }
+
     public function test_raw_path_stream_is_absent_from_contract(): void
     {
         $spec = $this->getSpec();
