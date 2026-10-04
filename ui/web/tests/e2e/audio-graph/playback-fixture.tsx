@@ -8,12 +8,13 @@ export interface MediaSnapshot {
   track: string | undefined
   index: number
   playing: boolean
+  processorPlaying: boolean | undefined
   duration: number
   time: number
   active: number
   source: string | undefined
   outputGain: number | undefined
-  elements: { id: string | null; paused: boolean; ended: boolean; time: number; volume: number; muted: boolean; loads: number }[]
+  elements: { id: string | null; paused: boolean; ended: boolean; time: number; volume: number; muted: boolean; loads: number; error: number | null }[]
   events: { element: number; type: string; time: number; ended: boolean; at: number }[]
 }
 
@@ -25,7 +26,7 @@ window.Audio = function (...args: ConstructorParameters<typeof Audio>) {
   const element = new OriginalAudio(...args)
   const index = elements.push(element) - 1
   loads[index] = 0
-  for (const type of ['loadstart', 'playing', 'pause', 'ended', 'timeupdate']) {
+  for (const type of ['loadstart', 'playing', 'pause', 'ended', 'timeupdate', 'error']) {
     element.addEventListener(type, () => {
       if (type === 'loadstart') loads[index]++
       events.push({ element: index, type, time: element.currentTime, ended: element.ended, at: performance.now() })
@@ -57,10 +58,12 @@ const fixture = {
     const graph = audioService.getProcessor() as unknown as { gainNode: GainNode } | null
     return {
       track: state.currentTrack?.publicId, index: state.currentIndex, playing: state.isPlaying,
+      processorPlaying: audioService.getProcessor()?.getSystemInfo().playing,
       duration: state.duration, time: state.currentTime, active: elements.indexOf(state.audioElement!),
       source: audioService.getProcessor()?.getActiveSource(), outputGain: graph?.gainNode.gain.value, events: [...events],
       elements: elements.map((element, index) => ({ id: element.src ? new URL(element.src).searchParams.get('id') : null,
-        paused: element.paused, ended: element.ended, time: element.currentTime, volume: element.volume, muted: element.muted, loads: loads[index] })),
+        paused: element.paused, ended: element.ended, time: element.currentTime, volume: element.volume, muted: element.muted,
+        loads: loads[index], error: element.error?.code ?? null })),
     }
   },
   seek(time: number) { usePlayerStore.getState().seekTo(time) },
@@ -75,6 +78,14 @@ const fixture = {
   next() { usePlayerStore.getState().playNext() },
   previous() { usePlayerStore.getState().playPrevious() },
   select(index: number) { usePlayerStore.getState().playTrack(tracks[index], tracks) },
+  reloadOwnedSourceToFailure() {
+    const element = usePlayerStore.getState().audioElement
+    if (!element) throw new Error('No owned native media element')
+    // The disposable fixture returns HTTP 404 for this unknown track. Reloading
+    // triggers a real Chromium MediaError without creating another play promise.
+    element.src = '/api/stream/track?id=unavailable'
+    element.load()
+  },
   holdNextResume() {
     const originalResume = audioService.resumeContextIfNeeded.bind(audioService)
     audioService.resumeContextIfNeeded = () => {

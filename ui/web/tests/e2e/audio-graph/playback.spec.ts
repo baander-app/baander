@@ -260,3 +260,32 @@ test('pending context resume cannot stop newer native playback after first → t
   }).toEqual({ playing: true, paused: false, advanced: true })
   expect(await page.evaluate(() => window.playbackFixture.activity())).toEqual(['first', 'third', 'first'])
 })
+
+test('owned native MediaError after a successful play stops playback and allows a new selection', async ({ page, origin }) => {
+  await start(page, origin)
+  await expect.poll(() => page.evaluate(() => window.playbackFixture.activity())).toEqual(['first'])
+  await expect.poll(async () => (await snapshot(page)).processorPlaying).toBe(true)
+  // This forced source reload certifies native error ownership after play() has
+  // resolved. It does not certify an actual midstream transport interruption.
+  await page.evaluate(() => window.playbackFixture.reloadOwnedSourceToFailure())
+  await expect.poll(async () => (await snapshot(page)).elements[0].error).toBe(4)
+  const failed = await snapshot(page)
+  expect(failed.events.some(event => event.element === 0 && event.type === 'error')).toBe(true)
+  expect(failed.track).toBe('first')
+  await expect.poll(async () => {
+    const state = await snapshot(page)
+    return { playing: state.playing, processorPlaying: state.processorPlaying }
+  }).toEqual({ playing: false, processorPlaying: false })
+  expect(await page.evaluate(() => window.playbackFixture.activity())).toEqual(['first'])
+  await page.evaluate(() => window.playbackFixture.select(2))
+  await track(page, 'third')
+  const recovered = await snapshot(page)
+  expect(recovered.elements[recovered.active].error).toBeNull()
+  expectActive(recovered, 'third', 0)
+  const nativeTime = recovered.elements[recovered.active].time
+  await expect.poll(async () => {
+    const state = await snapshot(page)
+    return state.elements[state.active].time > nativeTime + 0.1
+  }).toBe(true)
+  await expect.poll(() => page.evaluate(() => window.playbackFixture.activity())).toEqual(['first', 'third'])
+})

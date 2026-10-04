@@ -29,6 +29,9 @@ handoffs, crossfade overlap, promoted-element controls, and interrupted fades.
 One resume regression delays a context-resume rejection across track reselection
 and verifies that the newer native playback continues advancing. Hook unit tests
 also cover deferred success, native play rejection, and same-track replay.
+The active-media error regression reloads an already playing element to a local
+404 response, checks the real Chromium `MediaError`, and verifies stop and
+reselection recovery. It does not simulate a midstream transport interruption.
 These verify element ownership and timing, not sample-accurate gaplessness or
 authenticated streaming. Rebuild timing and worklet graph attachment
 also have unit regressions in `audio-processor-rebuild.test.ts`. Deferred module

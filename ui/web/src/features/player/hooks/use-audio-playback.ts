@@ -216,6 +216,14 @@ export function useAudioPlayback() {
         usePlayerStore.getState().setIsPlaying(false)
         audioService.setPlayingState(false)
       }
+      const onError = () => {
+        if (!owned() || !audio.error) return
+        logger.warn('Active audio playback failed:', audio.error)
+        invalidate()
+        audio.pause()
+        usePlayerStore.getState().setIsPlaying(false)
+        audioService.setPlayingState(false)
+      }
       const onTimeUpdate = () => {
         if (!owned()) return
         updateTime(audio.currentTime)
@@ -245,7 +253,7 @@ export function useAudioPlayback() {
         invalidate()
         if (audio.src) audioService.getProcessor()?.resetProgramme()
       }
-      const listeners = { seeking: onSeeking, loadstart: onSourceChange, play: onPlay, pause: onPause, timeupdate: onTimeUpdate, durationchange: onDurationChange, ended: onEnded }
+      const listeners = { seeking: onSeeking, loadstart: onSourceChange, play: onPlay, pause: onPause, timeupdate: onTimeUpdate, durationchange: onDurationChange, ended: onEnded, error: onError }
       for (const [name, listener] of Object.entries(listeners)) audio.addEventListener(name, listener)
       return () => { for (const [name, listener] of Object.entries(listeners)) audio.removeEventListener(name, listener) }
     })

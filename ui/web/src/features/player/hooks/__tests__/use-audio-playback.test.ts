@@ -71,6 +71,7 @@ function createStubAudioElement(): MockAudioElement {
     muted: false,
     paused: true,
     ended: false,
+    error: null,
     seeking: false,
     crossOrigin: '',
     play: vi.fn(() => Promise.resolve()),
@@ -161,6 +162,14 @@ function endMedia(audio: MockAudioElement) {
   audio.paused = true
   audio.ended = true
   audio.dispatchEvent(new Event('ended'))
+}
+
+function errorMedia(audio: MockAudioElement) {
+  audio.error = {
+    code: 3, message: 'Media decode failed',
+    MEDIA_ERR_ABORTED: 1, MEDIA_ERR_NETWORK: 2, MEDIA_ERR_DECODE: 3, MEDIA_ERR_SRC_NOT_SUPPORTED: 4,
+  }
+  audio.dispatchEvent(new Event('error'))
 }
 
 // --- Suite ------------------------------------------------------------------
@@ -958,6 +967,111 @@ describe('useAudioPlayback', () => {
   })
 
   // --- store → DOM sync ----------------------------------------------------
+
+  describe('owned media errors', () => {
+    it('stops a later active MediaError after playback succeeded and permits manual selection', async () => {
+      const queue = seedQueue(0, 2)
+      renderHook(() => useAudioPlayback())
+      const [a, b] = capturedAudioElements
+      a.src = '/api/stream/track?id=t0'
+      await act(async () => {
+        await a.play()
+        playMedia(a)
+      })
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+      act(() => { errorMedia(a) })
+      expect(usePlayerStore.getState().isPlaying).toBe(false)
+      expect(audioService.setPlayingState).toHaveBeenLastCalledWith(false)
+      expect(a.pause).toHaveBeenCalled()
+      expect(b.pause).toHaveBeenCalled()
+      expect(usePlayerStore.getState().currentTrack).toBe(queue[0])
+      vi.mocked(a.play).mockImplementation(() => {
+        a.error = null
+        a.paused = false
+        return Promise.resolve()
+      })
+      await act(async () => { usePlayerStore.getState().playTrack(queue[1]) })
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+      expect(usePlayerStore.getState().currentTrack).toBe(queue[1])
+    })
+
+    it('stops promoted media and the outgoing fade and cancels its deadline', async () => {
+      vi.useFakeTimers()
+      seedQueue(0, 2)
+      usePlayerStore.setState({ isPlaying: true, crossfadeEnabled: true, crossfadeDuration: 4 })
+      renderHook(() => useAudioPlayback())
+      const [a, b] = capturedAudioElements
+      a.paused = false
+      await act(async () => {
+        timeUpdate(a, 97, 100)
+        b.dispatchEvent(new Event('canplaythrough'))
+      })
+      expect(usePlayerStore.getState().audioElement).toBe(b)
+      expect(processorMock.instance.crossfadeToInactive).toHaveBeenCalledOnce()
+      const cancellations = processorMock.instance.cancelCrossfade.mock.calls.length
+      act(() => { errorMedia(b) })
+      expect(usePlayerStore.getState().isPlaying).toBe(false)
+      expect(audioService.setPlayingState).toHaveBeenLastCalledWith(false)
+      expect(a.pause).toHaveBeenCalled()
+      expect(b.pause).toHaveBeenCalled()
+      expect(processorMock.instance.cancelCrossfade.mock.calls.length).toBeGreaterThan(cancellations)
+      const pauses = vi.mocked(a.pause).mock.calls.length
+      act(() => { vi.advanceTimersByTime(5000) })
+      expect(a.pause).toHaveBeenCalledTimes(pauses)
+    })
+
+    it('invalidates pending incoming play when the active source errors', async () => {
+      seedQueue(0, 2)
+      usePlayerStore.setState({ isPlaying: true, crossfadeEnabled: true, crossfadeDuration: 4 })
+      let finishPlay!: () => void
+      renderHook(() => useAudioPlayback())
+      const [a, b] = capturedAudioElements
+      vi.mocked(b.play).mockReturnValueOnce(new Promise<void>((resolve) => { finishPlay = resolve }))
+      await act(async () => {
+        timeUpdate(a, 97, 100)
+        b.dispatchEvent(new Event('canplaythrough'))
+      })
+      expect(b.play).toHaveBeenCalledOnce()
+      act(() => { errorMedia(a) })
+      await act(async () => { finishPlay() })
+      expect(usePlayerStore.getState().audioElement).toBe(a)
+      expect(usePlayerStore.getState().currentIndex).toBe(0)
+      expect(usePlayerStore.getState().isPlaying).toBe(false)
+      expect(processorMock.instance.crossfadeToInactive).not.toHaveBeenCalled()
+      expect(processorMock.instance.instantSwap).not.toHaveBeenCalled()
+      expect(a.pause).toHaveBeenCalled()
+      expect(b.pause).toHaveBeenCalled()
+    })
+
+    it.each(['stale', 'inactive'] as const)('ignores an %s error notification', (source) => {
+      seedQueue(0, 2)
+      usePlayerStore.setState({ isPlaying: true })
+      renderHook(() => useAudioPlayback())
+      const [a, b] = capturedAudioElements
+      a.paused = false
+      const pauses = vi.mocked(a.pause).mock.calls.length
+      act(() => {
+        if (source === 'inactive') errorMedia(b)
+        else a.dispatchEvent(new Event('error'))
+      })
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+      expect(a.pause).toHaveBeenCalledTimes(pauses)
+      expect(audioService.setPlayingState).not.toHaveBeenCalledWith(false)
+    })
+
+    it('ignores owned-source error notifications delivered after teardown', () => {
+      seedQueue(0, 2)
+      usePlayerStore.setState({ isPlaying: true })
+      const { unmount } = renderHook(() => useAudioPlayback())
+      const [a] = capturedAudioElements
+      unmount()
+      const pauses = vi.mocked(a.pause).mock.calls.length
+      act(() => { errorMedia(a) })
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+      expect(a.pause).toHaveBeenCalledTimes(pauses)
+      expect(audioService.setPlayingState).not.toHaveBeenCalledWith(false)
+    })
+  })
 
   describe('isPlaying sync', () => {
     it.each([['resolve', 'selection'], ['reject', 'selection'], ['resolve', 'replay'], ['reject', 'replay']] as const)('ignores deferred context %s after newer same-track %s', async (outcome, transition) => {
