@@ -69,7 +69,7 @@ describe('AudioService', () => {
   it('connects audio element directly when already initialized', async () => {
     audioService.initialize()
 
-    const mockElement = { src: 'http://example.com/audio.mp3' } as HTMLAudioElement
+    const mockElement = { src: 'https://baander.app/audio.mp3' } as HTMLAudioElement
     await audioService.connectAudioElement(mockElement)
 
     expect(audioService.getProcessor()!.connectAudioElement).toHaveBeenCalledWith(mockElement)
@@ -147,14 +147,27 @@ describe('AudioService', () => {
       if (currentProcessor) expect(currentProcessor.initializePassiveMode).not.toHaveBeenCalled()
     })
 
-    it('uses passive mode for an owned InvalidStateError', async () => {
+    it.each([new DOMException('Source already owned', 'InvalidStateError'), new Error('Connection failed')])('rejects an owned connection error without pretending passive playback works: %s', async (error) => {
       audioService.initialize()
       const processor = audioService.getProcessor()!
-      vi.mocked(processor[method]).mockRejectedValueOnce(new DOMException('Source already owned', 'InvalidStateError'))
+      vi.mocked(processor[method]).mockRejectedValueOnce(error)
 
-      await connect()
+      await expect(connect()).rejects.toBe(error)
 
-      expect(processor.initializePassiveMode).toHaveBeenCalledTimes(1)
+      expect(processor.initializePassiveMode).not.toHaveBeenCalled()
+      expect(reapplyAllEqState).not.toHaveBeenCalled()
+    })
+
+    it('keeps a successful connection when preference application fails', async () => {
+      audioService.initialize()
+      const error = new Error('Preferences failed')
+      vi.mocked(reapplyAllEqState).mockImplementationOnce(() => { throw error })
+      const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+      try {
+        await expect(connect()).resolves.toBeUndefined()
+        expect(log).toHaveBeenCalled()
+        expect(audioService.getProcessor()!.initializePassiveMode).not.toHaveBeenCalled()
+      } finally { log.mockRestore() }
     })
 
     it('ignores a connection replaced while EQ import is pending', async () => {

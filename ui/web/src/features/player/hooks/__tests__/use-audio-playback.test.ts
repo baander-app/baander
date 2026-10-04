@@ -748,6 +748,75 @@ describe('useAudioPlayback', () => {
     expect(processorMock.instance.crossfadeToInactive).not.toHaveBeenCalled()
   })
 
+  describe('connection recovery', () => {
+    it.each(['loadstart', 'play'])('stops a failed unconnected graph and retries only on a later %s', async (event) => {
+      seedQueue(0, 2)
+      usePlayerStore.setState({ isPlaying: true, volume: 30, muted: true })
+      vi.mocked(audioService.connectDualAudioElements).mockRejectedValueOnce(new DOMException('Source capture failed', 'InvalidStateError'))
+      renderHook(() => useAudioPlayback())
+      const [a, b] = capturedAudioElements
+      await act(async () => {
+        a.src = 'https://baander.app/audio.mp3'
+        a.dispatchEvent(new Event('loadstart'))
+      })
+      expect(usePlayerStore.getState().isPlaying).toBe(false)
+      expect(a.pause).toHaveBeenCalled()
+      expect(b.pause).toHaveBeenCalled()
+      expect(audioService.setPlayingState).toHaveBeenLastCalledWith(false)
+      expect(audioService.connectDualAudioElements).toHaveBeenCalledTimes(1)
+      expect([a.volume, b.volume]).toEqual([.3, .3])
+      expect([a.muted, b.muted]).toEqual([true, true])
+      await act(async () => {
+        usePlayerStore.getState().setVolume(20)
+        a.dispatchEvent(new Event(event))
+      })
+      expect(audioService.connectDualAudioElements).toHaveBeenCalledTimes(2)
+      expect([a.volume, b.volume]).toEqual([1, 1])
+      expect([a.muted, b.muted]).toEqual([false, false])
+      expect(processorMock.instance.setVolume).toHaveBeenLastCalledWith(.2)
+      expect(processorMock.instance.setMuted).toHaveBeenLastCalledWith(true)
+    })
+
+    it('preserves a working graph when a connection attempt rejects', async () => {
+      seedQueue(0, 2)
+      usePlayerStore.setState({ isPlaying: true })
+      vi.mocked(audioService.connectDualAudioElements).mockImplementation(async () => {
+        processorMock.instance.isActive = true
+        throw new Error('Preference reapplication failed')
+      })
+      renderHook(() => useAudioPlayback())
+      const [a] = capturedAudioElements
+      const pauses = vi.mocked(a.pause).mock.calls.length
+      await act(async () => {
+        a.src = 'https://baander.app/audio.mp3'
+        a.dispatchEvent(new Event('loadstart'))
+      })
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+      expect(a.pause).toHaveBeenCalledTimes(pauses)
+      expect(a.volume).toBe(1)
+    })
+
+    it('ignores a failed connection from an unmounted playback lifetime', async () => {
+      let rejectConnection!: (error: Error) => void
+      vi.mocked(audioService.connectDualAudioElements).mockImplementationOnce(() => new Promise<void>((_, reject) => { rejectConnection = reject }))
+      const first = renderHook(() => useAudioPlayback())
+      const [a] = capturedAudioElements
+      act(() => {
+        a.src = 'https://baander.app/audio.mp3'
+        a.dispatchEvent(new Event('loadstart'))
+        first.unmount()
+      })
+      renderHook(() => useAudioPlayback())
+      const replacement = capturedAudioElements[2]
+      act(() => { usePlayerStore.setState({ isPlaying: true }) })
+      const pauses = vi.mocked(replacement.pause).mock.calls.length
+      await act(async () => { rejectConnection(new Error('Stale source capture failure')) })
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+      expect(replacement.pause).toHaveBeenCalledTimes(pauses)
+      expect(audioService.connectDualAudioElements).toHaveBeenCalledTimes(1)
+    })
+  })
+
   describe('volume ownership', () => {
     it.each(['unconnected', 'absent', 'passive'])('keeps both elements at listening volume with %s processor', (mode) => {
       if (mode === 'absent') vi.mocked(audioService.getProcessor).mockReturnValue(null)

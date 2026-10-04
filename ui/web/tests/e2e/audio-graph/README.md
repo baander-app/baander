@@ -58,3 +58,12 @@ Passive-mode coverage checks that unavailable audio capture produces neutral
 buffers and no polling, rather than simulated measurements. This exercises the
 real processor in Chromium; analysis modules remain fixture substitutes except
 in the separate production WASM loader test.
+
+Connection recovery uses a genuine native source-ownership conflict. It checks
+partial capture, replacement of either media element, and reuse of previously
+captured pairs. Processor tests also inject allocation and wiring failures to
+verify that a working graph survives a failed replacement. Connection failures
+are rejected rather than relabeled as passive playback: Web Audio capture cannot
+be undone by disconnecting a node. Playback stops when no usable graph remains;
+a later load or play event can retry. An element captured by another context
+requires replacement or recovery by its owner.

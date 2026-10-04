@@ -32,9 +32,23 @@ export function useAudioPlayback() {
     const connect = () => {
       if (!connection) {
         syncVolume()
-        connection = Promise.resolve(audioService.connectDualAudioElements(audioA, audioB)).finally(() => {
+        const attempt = Promise.resolve(audioService.connectDualAudioElements(audioA, audioB)).catch((err) => {
+          if (lifetime.active && connection === attempt) {
+            connection = undefined
+            syncVolume()
+            if (!audioService.getProcessor()?.isActive) {
+              invalidate()
+              audioA.pause()
+              audioB.pause()
+              usePlayerStore.getState().setIsPlaying(false)
+              audioService.setPlayingState(false)
+            }
+          }
+          throw err
+        }).finally(() => {
           if (lifetime.active) syncVolume()
         })
+        connection = attempt
         // The core graph is wired synchronously; EQ reapplication finishes later.
         syncVolume()
       }
@@ -193,6 +207,9 @@ export function useAudioPlayback() {
         if (!owned()) return
         usePlayerStore.getState().setIsPlaying(true)
         audioService.setPlayingState(true)
+        if (audio.src) void connect().catch((err) => {
+          if (owned()) logger.warn('Dual audio connection failed:', err)
+        })
       }
       const onPause = () => {
         if (!owned() || audio.ended || !audio.paused) return

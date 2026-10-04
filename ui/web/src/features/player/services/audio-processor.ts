@@ -70,6 +70,7 @@ export class AudioProcessor {
   // Audio graph nodes — dual source for gapless/crossfade
   private sourceNodeA: MediaElementAudioSourceNode | null = null
   private sourceNodeB: MediaElementAudioSourceNode | null = null
+  private readonly mediaSources = new WeakMap<HTMLMediaElement, MediaElementAudioSourceNode>()
   private sourceGainA!: GainNode
   private sourceGainB!: GainNode
   private activeSource: 'A' | 'B' = 'A'
@@ -610,13 +611,22 @@ export class AudioProcessor {
    */
   async connectDualAudioElements(elementA: HTMLAudioElement, elementB: HTMLAudioElement) {
     if (this.destroyed) return
+    if (elementA === elementB) throw new TypeError('Dual audio sources must use distinct media elements')
 
     // Guard: skip if already connected to the same pair
     if (
       this.isConnected &&
+      !this.passiveMode &&
       this.audioElement === elementA &&
-      this.sourceNodeA && this.sourceNodeB
+      this.sourceNodeA === this.mediaSources.get(elementA) &&
+      this.sourceNodeB === this.mediaSources.get(elementB)
     ) return
+
+    // Allocation is one-shot per element. Retain a successful first allocation if
+    // the second fails, while leaving the current graph and analysis untouched.
+    const nextA = this.getMediaSource(elementA)
+    const nextB = this.getMediaSource(elementB)
+    this.connectSourcePair(nextA, nextB)
 
     this.teardownWorklet()
     if (this.analysisInterval) {
@@ -624,23 +634,8 @@ export class AudioProcessor {
       this.analysisInterval = null
     }
 
-    // Disconnect old gain nodes from analyzerNode (source nodes persist)
-    try { this.sourceGainA.disconnect() } catch { /* ignore */ }
-    try { this.sourceGainB.disconnect() } catch { /* ignore */ }
-
-    // Create source nodes only once per element
-    if (!this.sourceNodeA) {
-      this.sourceNodeA = this.audioContext.createMediaElementSource(elementA)
-    }
-    if (!this.sourceNodeB) {
-      this.sourceNodeB = this.audioContext.createMediaElementSource(elementB)
-    }
-
-    // Wire: source → sourceGain → analyzerNode (summing junction)
-    this.sourceNodeA.connect(this.sourceGainA)
-    this.sourceNodeB.connect(this.sourceGainB)
-    this.sourceGainA.connect(this.analyzerNode)
-    this.sourceGainB.connect(this.analyzerNode)
+    this.sourceNodeA = nextA
+    this.sourceNodeB = nextB
 
     this.activeSource = 'A'
     this.cancelCrossfade()
@@ -651,6 +646,49 @@ export class AudioProcessor {
 
     if (this.isPlaying) this.setupFallbackAnalysis()
     this.initAdvancedProcessing().catch((err) => { logger.warn('Advanced processing init failed:', err) })
+  }
+
+  private getMediaSource(element: HTMLMediaElement): MediaElementAudioSourceNode {
+    const existing = this.mediaSources.get(element)
+    if (existing) return existing
+    const source = this.audioContext.createMediaElementSource(element)
+    this.mediaSources.set(element, source)
+    return source
+  }
+
+  private connectSourcePair(nextA: MediaElementAudioSourceNode, nextB: MediaElementAudioSourceNode): void {
+    const previousA = this.sourceNodeA, previousB = this.sourceNodeB
+    const wasActive = this.isConnected && !this.passiveMode
+    // Remove source edges too: otherwise reusing a cached source in the other
+    // slot would send it through both crossfade gains.
+    try { previousA?.disconnect(this.sourceGainA) } catch { /* edge may already be absent */ }
+    try { previousB?.disconnect(this.sourceGainB) } catch { /* edge may already be absent */ }
+    this.sourceGainA.disconnect()
+    this.sourceGainB.disconnect()
+    try {
+      nextA.connect(this.sourceGainA)
+      nextB.connect(this.sourceGainB)
+      this.sourceGainA.connect(this.analyzerNode)
+      this.sourceGainB.connect(this.analyzerNode)
+    } catch (error) {
+      try { nextA.disconnect(this.sourceGainA) } catch { /* partial connection */ }
+      try { nextB.disconnect(this.sourceGainB) } catch { /* partial connection */ }
+      this.sourceGainA.disconnect()
+      this.sourceGainB.disconnect()
+      if (wasActive) {
+        try {
+          previousA?.connect(this.sourceGainA)
+          previousB?.connect(this.sourceGainB)
+          this.sourceGainA.connect(this.analyzerNode)
+          this.sourceGainB.connect(this.analyzerNode)
+        } catch {
+          // A failed restoration cannot remain advertised as connected. Cache
+          // entries survive disconnect so a later retry reuses one-shot nodes.
+          this.disconnect()
+        }
+      }
+      throw error
+    }
   }
 
   /**

@@ -410,4 +410,37 @@ async function normalization() {
   }
 }
 
-Object.assign(window, { audioGraphFixture: { render, lifecycle, passiveAnalysis, stereoAnalysis, normalization } })
+async function connectionRecovery() {
+  const processor = new AudioProcessor()
+  const graph = processor as unknown as {
+    audioContext: AudioContext; sourceNodeA: MediaElementAudioSourceNode; sourceNodeB: MediaElementAudioSourceNode
+  }
+  const context = graph.audioContext
+  const a = new Audio(), foreign = new Audio(), b = new Audio(), replacementB = new Audio(), replacementA = new Audio()
+  // A genuine native capture makes a second capture of this element fail.
+  const foreignSource = context.createMediaElementSource(foreign)
+  let rejected = false
+  try {
+    try { await processor.connectDualAudioElements(a, foreign) } catch (error) {
+      rejected = error instanceof DOMException && error.name === 'InvalidStateError'
+    }
+    const activeAfterFailure = processor.isActive
+    await processor.connectDualAudioElements(a, b)
+    const recovered = processor.isActive && graph.sourceNodeA.mediaElement === a && graph.sourceNodeB.mediaElement === b
+    const ownedA = graph.sourceNodeA
+    await processor.connectDualAudioElements(a, replacementB)
+    const replacedB = graph.sourceNodeA === ownedA && graph.sourceNodeB.mediaElement === replacementB
+    processor.disconnect()
+    await processor.connectDualAudioElements(replacementA, b)
+    const replacedA = graph.sourceNodeA.mediaElement === replacementA && graph.sourceNodeB.mediaElement === b
+    // Returning to a captured pair must reuse its native one-shot source nodes.
+    await processor.connectDualAudioElements(a, b)
+    const reused = graph.sourceNodeA === ownedA && graph.sourceNodeB.mediaElement === b
+    return { rejected, activeAfterFailure, recovered, replacedB, replacedA, reused }
+  } finally {
+    foreignSource.disconnect()
+    processor.destroy()
+  }
+}
+
+Object.assign(window, { audioGraphFixture: { render, lifecycle, passiveAnalysis, stereoAnalysis, normalization, connectionRecovery } })

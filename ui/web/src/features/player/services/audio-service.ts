@@ -29,18 +29,19 @@ class AudioService {
 
     try {
       await processor.connectAudioElement(audioElement)
+    } catch (error) {
       if (!isCurrent()) return
+      // Native source creation is one-shot; passive mode cannot undo capture.
+      throw error
+    }
+    if (!isCurrent()) return
 
+    try {
       const { reapplyAllEqState } = await import('@/features/equalizer/stores/eq-reapply')
       if (!isCurrent()) return
       reapplyAllEqState()
     } catch (error) {
-      if (!isCurrent()) return
-      if (error instanceof DOMException && error.name === 'InvalidStateError') {
-        await processor.initializePassiveMode()
-      } else {
-        console.error('[AudioService] Failed to connect audio processor:', error)
-      }
+      if (isCurrent()) console.error('[AudioService] Failed to apply audio preferences:', error)
     }
   }
 
@@ -55,17 +56,19 @@ class AudioService {
 
     try {
       await processor.connectDualAudioElements(elementA, elementB)
+    } catch (error) {
       if (!isCurrent()) return
+      // Native source creation is one-shot; passive mode cannot undo capture.
+      throw error
+    }
+    if (!isCurrent()) return
+
+    try {
       const { reapplyAllEqState } = await import('@/features/equalizer/stores/eq-reapply')
       if (!isCurrent()) return
       reapplyAllEqState()
     } catch (error) {
-      if (!isCurrent()) return
-      if (error instanceof DOMException && error.name === 'InvalidStateError') {
-        await processor.initializePassiveMode()
-      } else {
-        console.error('[AudioService] Failed to connect dual audio elements:', error)
-      }
+      if (isCurrent()) console.error('[AudioService] Failed to apply audio preferences:', error)
     }
   }
 
