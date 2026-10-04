@@ -244,10 +244,10 @@ paratest: ## Runs tests in parallel via paratest
 	@make exec cmd="./vendor/bin/paratest -c phpunit.xml.dist --processes auto --tmp-dir var $(PARATEST_OPTIONS)"
 
 phpstan: ## Runs PHPStan static analysis
-	@make exec-bash cmd="XDEBUG_MODE=off php ./vendor/bin/phpstan analyse --memory-limit=512M $(PHPSTAN_OPTIONS)"
+	@make exec-bash cmd="XDEBUG_MODE=off php ./vendor/bin/phpstan analyse --memory-limit=1G $(PHPSTAN_OPTIONS)"
 
 phpstan-baseline: ## Generates PHPStan baseline for existing errors
-	@make exec-bash cmd="XDEBUG_MODE=off php ./vendor/bin/phpstan analyse --memory-limit=512M --generate-baseline phpstan-baseline.neon"
+	@make exec-bash cmd="XDEBUG_MODE=off php ./vendor/bin/phpstan analyse --memory-limit=1G --generate-baseline phpstan-baseline.neon"
 
 composer-normalize: ## Normalizes composer.json file content
 	@make exec cmd="composer normalize"
@@ -273,7 +273,7 @@ ci: ## Run full CI pipeline (lint, static analysis, architecture, tests)
 	@echo "\033[34m[ci] composer normalize --dry-run\033[39m"
 	@make exec cmd="composer normalize --dry-run"
 	@echo "\033[34m[ci] phpstan\033[39m"
-	@make exec-bash cmd="XDEBUG_MODE=off php ./vendor/bin/phpstan analyse --memory-limit=512M --no-progress"
+	@make exec-bash cmd="XDEBUG_MODE=off php ./vendor/bin/phpstan analyse --memory-limit=1G --no-progress"
 	@echo "\033[34m[ci] deptrac\033[39m"
 	@make exec cmd="vendor/bin/deptrac analyse --no-cache --no-progress"
 	@echo "\033[34m[ci] phpunit\033[39m"

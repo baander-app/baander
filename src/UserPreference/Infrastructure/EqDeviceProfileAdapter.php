@@ -10,6 +10,9 @@ use App\UserPreference\Application\Port\EqDeviceProfilePortInterface;
 use App\UserPreference\Domain\Model\EqDeviceProfile;
 use App\UserPreference\Domain\Repository\EqDeviceProfileRepositoryInterface;
 
+/**
+ * @phpstan-import-type ProfileData from EqDeviceProfilePortInterface
+ */
 final class EqDeviceProfileAdapter implements EqDeviceProfilePortInterface
 {
     public function __construct(
@@ -17,6 +20,9 @@ final class EqDeviceProfileAdapter implements EqDeviceProfilePortInterface
     ) {
     }
 
+    /**
+     * @return array<int, ProfileData>
+     */
     public function listProfiles(Uuid $userId): array
     {
         $models = $this->repository->findByUserId($userId);
@@ -24,6 +30,9 @@ final class EqDeviceProfileAdapter implements EqDeviceProfilePortInterface
         return array_map(fn (EqDeviceProfile $m) => $this->toArray($m), $models);
     }
 
+    /**
+     * @return ProfileData
+     */
     public function getProfile(Uuid $userId, Uuid $profileId): array
     {
         $model = $this->requireOwnedProfile($userId, $profileId);
@@ -31,6 +40,10 @@ final class EqDeviceProfileAdapter implements EqDeviceProfilePortInterface
         return $this->toArray($model);
     }
 
+    /**
+     * @param array<array-key, mixed> $payload
+     * @return ProfileData
+     */
     public function createProfile(Uuid $userId, string $name, string $icon, ?string $deviceId, array $payload, bool $isDefault = false): array
     {
         $maxOrder = 0;
@@ -55,6 +68,10 @@ final class EqDeviceProfileAdapter implements EqDeviceProfilePortInterface
         return $this->toArray($model);
     }
 
+    /**
+     * @param array<array-key, mixed>|null $payload
+     * @return ProfileData
+     */
     public function updateProfile(Uuid $userId, Uuid $profileId, ?string $name, ?string $icon, ?string $deviceId, ?array $payload, ?int $sortOrder): array
     {
         $model = $this->requireOwnedProfile($userId, $profileId);
@@ -100,6 +117,9 @@ final class EqDeviceProfileAdapter implements EqDeviceProfilePortInterface
         return $profile;
     }
 
+    /**
+     * @return ProfileData|null
+     */
     public function findProfileByDeviceId(Uuid $userId, string $deviceId): ?array
     {
         $model = $this->repository->findByDeviceId($userId, $deviceId);
@@ -108,7 +128,7 @@ final class EqDeviceProfileAdapter implements EqDeviceProfilePortInterface
     }
 
     /**
-     * @return array{id: string, name: string, icon: string, deviceId: string|null, payload: array, isDefault: bool, sortOrder: int, version: int, createdAt: string, updatedAt: string}
+     * @return ProfileData
      */
     private function toArray(EqDeviceProfile $m): array
     {

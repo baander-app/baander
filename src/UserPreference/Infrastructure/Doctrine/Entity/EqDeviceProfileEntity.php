@@ -31,6 +31,7 @@ class EqDeviceProfileEntity
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $deviceId = null;
 
+    /** @var array<array-key, mixed> */
     #[ORM\Column(type: 'jsonb', options: ['default' => '{}'])]
     private array $payload = [];
 
@@ -109,11 +110,13 @@ class EqDeviceProfileEntity
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /** @return array<array-key, mixed> */
     public function getPayload(): array
     {
         return $this->payload;
     }
 
+    /** @param array<array-key, mixed> $payload */
     public function setPayload(array $payload): void
     {
         $this->payload = $payload;

@@ -1,7 +1,6 @@
 includes:
   - vendor/phpstan/phpstan-symfony/extension.neon
   - vendor/phpstan/phpstan-doctrine/extension.neon
-  - phpstan-baseline.neon
   - vendor/baander/phpstan-rules/extension.neon
 
 parameters:
