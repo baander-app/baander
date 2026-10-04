@@ -37,6 +37,15 @@ namespace App\Library\Application\Port;
 interface LibraryReadScopeProviderInterface {}
 namespace App\Library\Application;
 final class InternalApplicationService {}
+namespace App\Auth\Application\Port;
+interface AuthenticatedUserIdentityInterface {}
+namespace App\Media\Infrastructure;
+final class BoundaryReadScopeProvider {
+    public function current(
+        \App\Library\Application\Port\LibraryReadScopeProviderInterface $scope,
+        \App\Auth\Application\Port\AuthenticatedUserIdentityInterface $identity,
+    ): void {}
+}
 SOURCE);
             $config = Yaml::parseFile($root . '/deptrac.yaml');
             unset($config['imports']);

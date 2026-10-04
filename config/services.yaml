@@ -514,6 +514,9 @@ services:
     App\Media\Application\Port\ImagePortInterface:
         alias: App\Media\Infrastructure\ImageService
 
+    App\Media\Application\Port\MediaReadScopeProviderInterface:
+        alias: App\Media\Infrastructure\MediaReadScopeProvider
+
     App\Media\Application\Port\ImageConversionPortInterface:
         alias: App\Media\Infrastructure\Converter\GdImageConverter
 

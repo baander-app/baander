@@ -6,6 +6,7 @@ namespace App\Media\Interface\Controller;
 
 use App\Media\Application\Port\ImageConversionPortInterface;
 use App\Media\Application\Port\ImagePortInterface;
+use App\Media\Application\Port\MediaReadScopeProviderInterface;
 use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Infrastructure\Converter\BlurHashGenerator;
 use App\Media\Interface\Resource\ImageResource;
@@ -35,6 +36,7 @@ final class ImageController
         private readonly BlurHashGenerator $blurHashGenerator,
         private readonly LoggerInterface $logger,
         private readonly CoWrapper $coWrapper,
+        private readonly MediaReadScopeProviderInterface $scopes,
     ) {
     }
 
@@ -42,10 +44,11 @@ final class ImageController
         path: '/api/images/{publicId}',
         summary: 'Get image metadata by public ID',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Image public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string'), example: 'aB3dE5fG7hJ9kL1mN3p'),
+            new OA\Parameter(name: 'publicId', description: 'Image public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string'), example: 'aB3dE5fG7hJ9kL1mN3pQr'),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Image metadata',
+                headers: [new OA\Header(header: 'Cache-Control', description: 'Private response; storage and caching prohibited', schema: new OA\Schema(type: 'string', example: 'private, no-store'))],
                 content: new OA\JsonContent(
                     properties: [new OA\Property(property: 'data', ref: new Model(type: ImageResource::class))],
                     type: 'object',
@@ -63,20 +66,23 @@ final class ImageController
             return $this->notFound($this->trans('errors.image_not_found', domain: 'media'));
         }
 
-        $image = $this->imageService->findByPublicId($pid);
+        $image = $this->imageService->findVisibleByPublicId($pid, $this->scopes->current());
 
         if ($image === null) {
             return $this->notFound($this->trans('errors.image_not_found', domain: 'media'));
         }
 
-        return $this->successResponse(ImageResource::from($image));
+        $response = $this->successResponse(ImageResource::from($image));
+        $response->headers->set('Cache-Control', 'private, no-store');
+
+        return $response;
     }
 
     #[OA\Get(
         path: '/api/images/{publicId}/file',
         summary: 'Serve the image file binary data',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Image public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string'), example: 'aB3dE5fG7hJ9kL1mN3p'),
+            new OA\Parameter(name: 'publicId', description: 'Image public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string'), example: 'aB3dE5fG7hJ9kL1mN3pQr'),
             new OA\Parameter(name: 'preset', description: 'Image size preset', in: 'query', required: false, schema: new OA\Schema(type: 'string', enum: ['thumb', 'small', 'medium', 'large'])),
         ],
         responses: [
@@ -84,7 +90,7 @@ final class ImageController
                 headers: [
                     new OA\Header(header: 'Content-Type', description: 'MIME type of the image (e.g. image/jpeg, image/webp)', schema: new OA\Schema(type: 'string')),
                     new OA\Header(header: 'Content-Length', description: 'File size in bytes', schema: new OA\Schema(type: 'integer')),
-                    new OA\Header(header: 'Cache-Control', description: 'Caching directive (30 day max-age, public)', schema: new OA\Schema(type: 'string')),
+                    new OA\Header(header: 'Cache-Control', description: 'Private response; storage and caching prohibited', schema: new OA\Schema(type: 'string', example: 'private, no-store')),
                 ],
             ),
             new OA\Response(response: '404', description: 'Image or image file not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
@@ -99,7 +105,7 @@ final class ImageController
             return $this->notFound($this->trans('errors.image_not_found', domain: 'media'));
         }
 
-        $image = $this->imageService->findByPublicId($pid);
+        $image = $this->imageService->findVisibleByPublicId($pid, $this->scopes->current());
 
         if ($image === null) {
             return $this->notFound($this->trans('errors.image_not_found', domain: 'media'));
@@ -162,10 +168,7 @@ final class ImageController
         $mimeType = mime_content_type($fullPath);
         $response->headers->set('Content-Type', $mimeType !== false ? $mimeType : 'application/octet-stream');
         $response->headers->set('Content-Length', (string) filesize($fullPath));
-        $response->setCache([
-            'max_age' => 86400 * 30,
-            'public' => true,
-        ]);
+        $response->headers->set('Cache-Control', 'private, no-store');
 
         return $response;
     }
@@ -174,10 +177,11 @@ final class ImageController
         path: '/api/images/{publicId}/blurhash',
         summary: 'Get the blurhash representation of an image',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Image public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string'), example: 'aB3dE5fG7hJ9kL1mN3p'),
+            new OA\Parameter(name: 'publicId', description: 'Image public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string'), example: 'aB3dE5fG7hJ9kL1mN3pQr'),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Blurhash string with dimensions',
+                headers: [new OA\Header(header: 'Cache-Control', description: 'Private response; storage and caching prohibited', schema: new OA\Schema(type: 'string', example: 'private, no-store'))],
                 content: new OA\JsonContent(
                     properties: [new OA\Property(property: 'data', properties: [
                         new OA\Property(property: 'blurhash', description: 'Blurhash string, or null if not computed', type: 'string', example: 'LKO2:N%2Tw=w]~RBVZRi};RPxuwH', nullable: true),
@@ -199,7 +203,8 @@ final class ImageController
             return $this->notFound($this->trans('errors.image_not_found', domain: 'media'));
         }
 
-        $image = $this->imageService->findByPublicId($pid);
+        $scope = $this->scopes->current();
+        $image = $this->imageService->findVisibleByPublicId($pid, $scope);
 
         if ($image === null) {
             return $this->notFound($this->trans('errors.image_not_found', domain: 'media'));
@@ -214,8 +219,9 @@ final class ImageController
                 $hash = $this->blurHashGenerator->generate($fullPath);
 
                 if ($hash !== null) {
-                    $image->setBlurhash($hash);
-                    $this->imageService->save($image);
+                    if (!$this->imageService->saveVisibleBlurhash($image->getId(), $hash, $scope)) {
+                        return $this->notFound($this->trans('errors.image_not_found', domain: 'media'));
+                    }
 
                     $this->logger->info('Generated and stored blurhash for image', [
                         'image_id' => $image->getId()->toString(),
@@ -229,10 +235,13 @@ final class ImageController
             }
         }
 
-        return $this->successResponse([
+        $response = $this->successResponse([
             'blurhash' => $hash,
             'width' => $image->getWidth(),
             'height' => $image->getHeight(),
         ]);
+        $response->headers->set('Cache-Control', 'private, no-store');
+
+        return $response;
     }
 }

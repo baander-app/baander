@@ -7706,12 +7706,21 @@
                         "schema": {
                             "type": "string"
                         },
-                        "example": "aB3dE5fG7hJ9kL1mN3p"
+                        "example": "aB3dE5fG7hJ9kL1mN3pQr"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "Image metadata",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Private response; storage and caching prohibited",
+                                "schema": {
+                                    "type": "string",
+                                    "example": "private, no-store"
+                                }
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -7754,7 +7763,7 @@
                         "schema": {
                             "type": "string"
                         },
-                        "example": "aB3dE5fG7hJ9kL1mN3p"
+                        "example": "aB3dE5fG7hJ9kL1mN3pQr"
                     },
                     {
                         "name": "preset",
@@ -7789,9 +7798,10 @@
                                 }
                             },
                             "Cache-Control": {
-                                "description": "Caching directive (30 day max-age, public)",
+                                "description": "Private response; storage and caching prohibited",
                                 "schema": {
-                                    "type": "string"
+                                    "type": "string",
+                                    "example": "private, no-store"
                                 }
                             }
                         }
@@ -7825,12 +7835,21 @@
                         "schema": {
                             "type": "string"
                         },
-                        "example": "aB3dE5fG7hJ9kL1mN3p"
+                        "example": "aB3dE5fG7hJ9kL1mN3pQr"
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "Blurhash string with dimensions",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Private response; storage and caching prohibited",
+                                "schema": {
+                                    "type": "string",
+                                    "example": "private, no-store"
+                                }
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -21493,7 +21512,6 @@
                 "required": [
                     "id",
                     "publicId",
-                    "path",
                     "extension",
                     "mimeType",
                     "size",
@@ -21512,11 +21530,9 @@
                     "publicId": {
                         "description": "Public identifier",
                         "type": "string",
-                        "format": "uuid"
-                    },
-                    "path": {
-                        "description": "File path",
-                        "type": "string"
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "extension": {
                         "description": "File extension",

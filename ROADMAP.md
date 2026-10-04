@@ -61,9 +61,17 @@ metadata. Both native PGroonga queries and Doctrine queries apply access predica
 before pagination. Multiple artist roles no longer duplicate album counts/pages.
 The combined production OAuth, catalog, library, artist mutation and signed-delivery
 matrix passes 91 tests (876 assertions). Scoped PostgreSQL search tests pass eight
-cases (77 assertions). Direct image delivery remains an access gap:
-image metadata/file/blurhash endpoints still lack resource ownership
-checks, so scoped album cover redirects alone do not complete media authorization.
+cases (77 assertions).
+
+Image metadata, files, presets and blurhashes now require an authenticated media
+scope before reading storage or generating derived files. Library grants cover
+direct and reverse album/artist covers; playlist images require owner/admin access.
+Immutable projections hide inaccessible owner IDs and storage paths without
+changing stored associations. Responses prohibit shared caching. The combined
+Media/Catalog/Genre/library-access gate passes 95 tests (1,155 assertions), including
+same-token revocation and denied derived work. Hydrated library membership
+revocation now binds typed UUIDs in a transaction; independent PostgreSQL observers
+verify commit, regrant and rollback after a flush failure.
 
 Genre reads now cover accessible song, album and movie associations through an
 immutable read projection. Inaccessible parent identifiers are omitted and their
@@ -81,7 +89,21 @@ also fails explicitly when its directory or exclusive lock cannot be established
 The combined unit/static-rule gate passes 4,558 tests (19,176 assertions), and the
 full configured PHPStan scan reports zero errors. Deptrac reports 298 active
 violations, 676 skipped occurrences and zero configuration errors; no baseline
-expansion was used. The full functional suite is being requalified separately.
+expansion was used.
+
+A clean Composer installation exposed 82 version differences in the existing vendor
+directory. Qualification now also uses an isolated installation matching every locked
+version, with all platform requirements satisfied. It found one unused promoted
+token-history property, removed without a suppression. The locked full PHPStan scan
+passes with zero errors and Unit/StaticAnalysisRules pass 4,558 tests (19,178 assertions).
+The locked Deptrac result remains 298 active violations, 676 skipped occurrences and
+zero errors. Functional runners generate disposable OAuth keys and exclude local
+private keys. The locked functional suite plus Media firewall and library transaction
+regressions pass 1,030 tests (8,450 assertions), including fresh migrations and a
+second no-op migration run. Locked OpenAPI output matches the regenerated client
+contract; web typechecking passes. CI image Composer installation now enforces the
+Swoole requirement and generates test keys with mode 0600. Optimized installation
+still reports 52 PSR-4 class/path warnings, a separate autoload cleanup task.
 
 ## Delivery horizons
 

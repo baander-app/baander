@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Media\Interface\Resource;
 
 use App\Media\Domain\Model\Image;
+use App\Media\Domain\ReadModel\ImageReadView;
 use App\Shared\Interface\Resource\AbstractResource;
 use OpenApi\Attributes as OA;
 
@@ -12,8 +13,7 @@ use OpenApi\Attributes as OA;
     schema: 'ImageResource',
     properties: [
         new OA\Property(property: 'id', type: 'string', format: 'uuid', description: 'Image UUID'),
-        new OA\Property(property: 'publicId', type: 'string', format: 'uuid', description: 'Public identifier'),
-        new OA\Property(property: 'path', type: 'string', description: 'File path'),
+        new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, description: 'Public identifier'),
         new OA\Property(property: 'extension', type: 'string', description: 'File extension'),
         new OA\Property(property: 'mimeType', type: 'string', description: 'MIME type'),
         new OA\Property(property: 'blurhash', type: 'string', nullable: true, description: 'BlurHash representation'),
@@ -32,12 +32,11 @@ final class ImageResource extends AbstractResource
 {
     public static function from(mixed $source): array
     {
-        assert($source instanceof Image);
+        assert($source instanceof Image || $source instanceof ImageReadView);
 
         return [
             'id' => $source->getId()->toString(),
             'publicId' => $source->getPublicId()->toString(),
-            'path' => $source->getPath(),
             'extension' => $source->getExtension(),
             'mimeType' => $source->getMimeType(),
             'blurhash' => $source->getBlurhash(),

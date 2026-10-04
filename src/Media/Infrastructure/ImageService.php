@@ -6,15 +6,27 @@ namespace App\Media\Infrastructure;
 
 use App\Media\Application\Port\ImagePortInterface;
 use App\Media\Domain\Model\Image;
+use App\Media\Domain\ReadModel\ImageReadView;
 use App\Media\Domain\Repository\ImageRepositoryInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\MediaReadScope;
 
 final class ImageService implements ImagePortInterface
 {
     public function __construct(
         private readonly ImageRepositoryInterface $imageRepository,
     ) {
+    }
+
+    public function findVisibleByPublicId(PublicId $publicId, MediaReadScope $scope): ?ImageReadView
+    {
+        return $this->imageRepository->findVisibleByPublicId($publicId, $scope);
+    }
+
+    public function saveVisibleBlurhash(Uuid $imageId, string $blurhash, MediaReadScope $scope): bool
+    {
+        return $this->imageRepository->saveVisibleBlurhash($imageId, $blurhash, $scope);
     }
 
     public function findByPublicId(PublicId $publicId): ?Image

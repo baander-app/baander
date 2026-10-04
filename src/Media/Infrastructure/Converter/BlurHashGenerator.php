@@ -33,7 +33,6 @@ final class BlurHashGenerator
             }
 
             $hash = BlurHash::encode($image, $componentsX, $componentsY);
-            imagedestroy($image);
 
             return $hash;
         } catch (\Throwable $e) {

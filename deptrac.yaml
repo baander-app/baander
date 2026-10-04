@@ -908,6 +908,8 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Media Infrastructure':
+      - 'Auth Identity Contract'
+      - 'Library Read Scope Contract'
       - 'Shared Application'
       - 'Media Domain'
       - 'Media Application'

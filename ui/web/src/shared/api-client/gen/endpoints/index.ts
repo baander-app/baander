@@ -1543,10 +1543,13 @@ export interface LrclibSearchResource {
 export interface ImageResource {
   /** Image UUID */
   id: string;
-  /** Public identifier */
+  /**
+     * Public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId: string;
-  /** File path */
-  path: string;
   /** File extension */
   extension: string;
   /** MIME type */

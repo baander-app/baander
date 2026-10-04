@@ -45,7 +45,7 @@ final class ImageResourceTest extends TestCase
 
         $this->assertSame($id->toString(), $result['id']);
         $this->assertSame($publicId->toString(), $result['publicId']);
-        $this->assertSame('images/album-cover.jpg', $result['path']);
+        $this->assertArrayNotHasKey('path', $result);
         $this->assertSame('jpg', $result['extension']);
         $this->assertSame('image/jpeg', $result['mimeType']);
         $this->assertSame('LEHV6nWB2yk8pyo0adR*.7kCMdnj', $result['blurhash']);
@@ -168,7 +168,9 @@ final class ImageResourceTest extends TestCase
         $result = ImageResource::collection([$image1, $image2]);
 
         $this->assertCount(2, $result);
-        $this->assertSame('images/one.jpg', $result[0]['path']);
-        $this->assertSame('images/two.png', $result[1]['path']);
+        $this->assertSame($image1->getPublicId()->toString(), $result[0]['publicId']);
+        $this->assertSame($image2->getPublicId()->toString(), $result[1]['publicId']);
+        $this->assertArrayNotHasKey('path', $result[0]);
+        $this->assertArrayNotHasKey('path', $result[1]);
     }
 }

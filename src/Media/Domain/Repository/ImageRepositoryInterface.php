@@ -5,11 +5,23 @@ declare(strict_types=1);
 namespace App\Media\Domain\Repository;
 
 use App\Media\Domain\Model\Image;
+use App\Media\Domain\ReadModel\ImageReadView;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\MediaReadScope;
 
 interface ImageRepositoryInterface
 {
+    public function findVisibleByPublicId(PublicId $publicId, MediaReadScope $scope): ?ImageReadView;
+
+    /**
+     * Atomically authorize and write the hash without changing image ownership.
+     * The target ImageEntity must not be managed by the current EntityManager.
+     *
+     * @throws \LogicException when the target is managed; callers must explicitly flush and clear it first.
+     */
+    public function saveVisibleBlurhash(Uuid $imageId, string $blurhash, MediaReadScope $scope): bool;
+
     public function save(Image $image): void;
 
     public function findByUuid(Uuid $uuid): ?Image;
