@@ -29,7 +29,6 @@ deptrac:
       - App\Activity\Domain\Model\MediaActivity
       - App\Activity\Infrastructure\ActivityEnrichmentService
     App\Activity\Interface\Resource\ActivityResource:
-      - App\Activity\Domain\Model\MediaActivity
       - App\Catalog\Domain\Model\Album
       - App\Catalog\Domain\Model\Song
       - App\Media\Domain\Model\Image
@@ -83,14 +82,6 @@ deptrac:
       - App\Auth\Domain\Repository\UserRepositoryInterface
       - App\Auth\Infrastructure\Security\OAuth\DpopNonceManager
       - App\Auth\Infrastructure\Security\OAuth\DpopProofValidator
-    App\Auth\Interface\Resource\AdminUserResource:
-      - App\Auth\Domain\Model\User
-    App\Auth\Interface\Resource\ClientResource:
-      - App\Auth\Domain\Model\OAuth\Client
-    App\Auth\Interface\Resource\LoginBlockResource:
-      - App\Auth\Domain\Model\LoginBlock
-    App\Auth\Interface\Resource\UserResource:
-      - App\Auth\Domain\Model\User
     App\Catalog\Application\CommandHandler\BatchExtractCoversHandler:
       - App\Metadata\Application\Command\ExtractAlbumCoverCommand
     App\Catalog\Application\CommandHandler\FilesDiscoveredHandler:
@@ -156,21 +147,9 @@ deptrac:
     App\Catalog\Interface\Request\UploadCoverRequest:
       - App\Filesystem\Application\Port\MimeDetectorPortInterface
     App\Catalog\Interface\Resource\AlbumResource:
-      - App\Catalog\Domain\Model\Album
       - App\Media\Domain\Model\Image
     App\Catalog\Interface\Resource\ArtistResource:
-      - App\Catalog\Domain\Model\Artist
       - App\Media\Domain\Model\Image
-    App\Catalog\Interface\Resource\DuplicateGroupResource:
-      - App\Catalog\Domain\ValueObject\DuplicateGroup
-    App\Catalog\Interface\Resource\GenreResource:
-      - App\Catalog\Domain\Model\Genre
-    App\Catalog\Interface\Resource\MovieResource:
-      - App\Catalog\Domain\Model\Movie
-    App\Catalog\Interface\Resource\SongResource:
-      - App\Catalog\Domain\Model\Song
-    App\Catalog\Interface\Resource\VideoResource:
-      - App\Catalog\Domain\Model\Video
     App\Filesystem\Command\WatchFilesCommand:
       - App\Filesystem\Watcher\FileWatchEvent
       - App\Filesystem\Watcher\FileWatcher
@@ -197,8 +176,6 @@ deptrac:
       - App\Library\Domain\ValueObject\LibraryPath
       - App\Library\Domain\ValueObject\LibrarySlug
       - App\Library\Domain\ValueObject\LibraryType
-    App\Library\Interface\Resource\LibraryResource:
-      - App\Library\Domain\Model\Library
     App\Lyrics\Infrastructure\Service\LyricsService:
       - App\Catalog\Application\Port\AlbumPortInterface
       - App\Catalog\Application\Port\SongPortInterface
@@ -215,8 +192,6 @@ deptrac:
       - App\Filesystem\Application\Port\LocalFilesystemPortInterface
     App\Media\Interface\Controller\ImageController:
       - App\Media\Infrastructure\Converter\BlurHashGenerator
-    App\Media\Interface\Resource\ImageResource:
-      - App\Media\Domain\Model\Image
     App\Metadata\Application\AlbumMetadataEnricher:
       - App\Catalog\Application\Port\AlbumPortInterface
       - App\Catalog\Application\Port\GenrePortInterface
@@ -315,20 +290,12 @@ deptrac:
       - App\Notification\Infrastructure\Push\PushSubscriptionRepositoryInterface
     App\Notification\Interface\Controller\WebhookController:
       - App\Notification\Infrastructure\Doctrine\Entity\WebhookEntity
-    App\Notification\Interface\Resource\NotificationPreferenceResource:
-      - App\Notification\Domain\Model\NotificationPreference
-    App\Notification\Interface\Resource\NotificationResource:
-      - App\Notification\Domain\Model\Notification
     App\Party\Application\CommandHandler\PausePlaybackHandler:
       - App\Transcode\Domain\Event\PlaybackPositionChanged
     App\Party\Application\CommandHandler\SeekPlaybackHandler:
       - App\Transcode\Domain\Event\PlaybackPositionChanged
     App\Party\Application\CommandHandler\StartPlaybackHandler:
       - App\Transcode\Domain\Event\PlaybackPositionChanged
-    App\Party\Interface\Resource\PartyMemberResource:
-      - App\Party\Domain\Model\PartyMember
-    App\Party\Interface\Resource\PartySessionResource:
-      - App\Party\Domain\Model\SyncedPartySession
     App\Playlist\Infrastructure\Doctrine\Entity\PlaylistCollaboratorEntity:
       - App\Auth\Infrastructure\Doctrine\Entity\UserEntity
     App\Playlist\Infrastructure\Doctrine\Entity\PlaylistEntity:
@@ -343,8 +310,6 @@ deptrac:
       - App\Catalog\Interface\Resource\SongResource
       - App\Playlist\Domain\Model\Playlist
       - App\Playlist\Domain\Model\PlaylistSong
-    App\Playlist\Interface\Resource\PlaylistResource:
-      - App\Playlist\Domain\Model\Playlist
     App\Recommendation\Application\CommandHandler\GenerateRecommendationsHandler:
       - App\Activity\Application\Port\ActivityPortInterface
       - App\Catalog\Domain\Model\Song
@@ -368,8 +333,6 @@ deptrac:
       - App\Recommendation\Domain\ValueObject\RecommendationJobStatus
     App\Recommendation\Interface\Controller\RecommendationController:
       - App\Recommendation\Domain\ValueObject\RecommendationType
-    App\Recommendation\Interface\Resource\RecommendationResource:
-      - App\Recommendation\Domain\Model\Recommendation
     App\Shared\Infrastructure\EventListener\ExceptionSubscriber:
       - App\Shared\Interface\DTO\ApiError
     App\Shared\Infrastructure\EventListener\ValidationExceptionSubscriber:
@@ -423,12 +386,6 @@ deptrac:
       - App\Transcode\Domain\ValueObject\AudioProfile
       - App\Transcode\Domain\ValueObject\QualityTier
       - App\Transcode\Domain\ValueObject\SessionPriority
-    App\Transcode\Interface\Resource\TranscodeJobResource:
-      - App\Transcode\Domain\Model\TranscodeJob
-    App\Transcode\Interface\Resource\TranscodeMetricsResource:
-      - App\Transcode\Domain\Model\TranscodeJob
-    App\Transcode\Interface\Resource\TranscodeSessionResource:
-      - App\Transcode\Domain\Model\TranscodeSession
     App\UserPreference\Interface\Controller\AccentColorController:
       - App\Auth\Infrastructure\Security\SecurityUser
     App\UserPreference\Interface\Controller\AudioPreferencesController:

@@ -28,9 +28,10 @@ explicit references from `AGENTS.md`; directory placement does not auto-load the
 ## Evidence and enforcement
 
 `deptrac.yaml` defines internal dependency rules and imports a baseline of existing
-violations. A baseline is recorded debt, not approval. The rules currently reject
-some cross-context ports and resource-to-model mappings prescribed above; report
-that policy mismatch rather than broadening dependencies during an unrelated task.
+violations. A baseline is recorded debt, not approval. Dedicated resource layers
+allow mapping their own domain models while controller layers remain restricted.
+Some cross-context ports still have policy mismatches; report them rather than
+broadening dependencies during an unrelated task.
 Radio, Scheduler, QoL, and Session are not covered by its context collectors.
 External framework dependencies also require review beyond its internal layers.
 

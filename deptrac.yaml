@@ -29,22 +29,22 @@ deptrac:
     graphviz:
       groups:
         Shared: ['Shared Domain', 'Shared Application', 'Shared Infrastructure', 'Shared Interface']
-        Activity: ['Activity Domain', 'Activity Application', 'Activity Infrastructure', 'Activity Interface']
-        Auth: ['Auth Domain', 'Auth Identity Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Interface']
-        Catalog: ['Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Interface']
+        Activity: ['Activity Domain', 'Activity Application', 'Activity Infrastructure', 'Activity Resources', 'Activity Interface']
+        Auth: ['Auth Domain', 'Auth Identity Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
+        Catalog: ['Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Resources', 'Catalog Interface']
         Filesystem: ['Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
-        Library: ['Library Domain', 'Library Application', 'Library Infrastructure', 'Library Interface']
+        Library: ['Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
         Lyrics: ['Lyrics Domain', 'Lyrics Infrastructure']
-        Media: ['Media Domain', 'Media Application', 'Media Infrastructure', 'Media Interface']
+        Media: ['Media Domain', 'Media Application', 'Media Infrastructure', 'Media Resources', 'Media Interface']
         Metadata: ['Metadata Domain', 'Metadata Application', 'Metadata Infrastructure', 'Metadata Interface']
-        Notification: ['Notification Domain', 'Notification Application', 'Notification Infrastructure', 'Notification Interface']
-        Party: ['Party Domain', 'Party Application', 'Party Infrastructure', 'Party Interface']
-        Playlist: ['Playlist Domain', 'Playlist Application', 'Playlist Infrastructure', 'Playlist Interface']
-        Recommendation: ['Recommendation Domain', 'Recommendation Application', 'Recommendation Infrastructure', 'Recommendation Interface']
-        Transcode: ['Transcode Domain', 'Transcode Application', 'Transcode Infrastructure', 'Transcode Interface']
-        UserPreference: ['UserPreference Domain', 'UserPreference Application', 'UserPreference Infrastructure', 'UserPreference Interface']
-        Discovery: ['Discovery Domain', 'Discovery Application', 'Discovery Infrastructure', 'Discovery Interface']
-        Favorites: ['Favorites Domain', 'Favorites Application', 'Favorites Infrastructure', 'Favorites Interface']
+        Notification: ['Notification Domain', 'Notification Application', 'Notification Infrastructure', 'Notification Resources', 'Notification Interface']
+        Party: ['Party Domain', 'Party Application', 'Party Infrastructure', 'Party Resources', 'Party Interface']
+        Playlist: ['Playlist Domain', 'Playlist Application', 'Playlist Infrastructure', 'Playlist Resources', 'Playlist Interface']
+        Recommendation: ['Recommendation Domain', 'Recommendation Application', 'Recommendation Infrastructure', 'Recommendation Resources', 'Recommendation Interface']
+        Transcode: ['Transcode Domain', 'Transcode Application', 'Transcode Infrastructure', 'Transcode Resources', 'Transcode Interface']
+        UserPreference: ['UserPreference Domain', 'UserPreference Application', 'UserPreference Infrastructure', 'UserPreference Resources', 'UserPreference Interface']
+        Discovery: ['Discovery Domain', 'Discovery Application', 'Discovery Infrastructure', 'Discovery Resources', 'Discovery Interface']
+        Favorites: ['Favorites Domain', 'Favorites Application', 'Favorites Infrastructure', 'Favorites Resources', 'Favorites Interface']
         Command: ['Command Utility']
 
   layers:
@@ -89,10 +89,20 @@ deptrac:
         - type: classLike
           value: '^App\\Activity\\Infrastructure\\'
 
-    - name: 'Activity Interface'
+    - name: 'Activity Resources'
       collectors:
         - type: classLike
-          value: '^App\\Activity\\Interface\\'
+          value: '^App\\Activity\\Interface\\Resource\\'
+
+    - name: 'Activity Interface'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Activity\\Interface\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Activity\\Interface\\Resource\\'
 
     # =============================================
     # Auth
@@ -123,10 +133,20 @@ deptrac:
         - type: classLike
           value: '^App\\Auth\\Infrastructure\\'
 
-    - name: 'Auth Interface'
+    - name: 'Auth Resources'
       collectors:
         - type: classLike
-          value: '^App\\Auth\\Interface\\'
+          value: '^App\\Auth\\Interface\\Resource\\'
+
+    - name: 'Auth Interface'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Auth\\Interface\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Auth\\Interface\\Resource\\'
 
     # =============================================
     # Catalog
@@ -146,10 +166,20 @@ deptrac:
         - type: classLike
           value: '^App\\Catalog\\Infrastructure\\'
 
-    - name: 'Catalog Interface'
+    - name: 'Catalog Resources'
       collectors:
         - type: classLike
-          value: '^App\\Catalog\\Interface\\'
+          value: '^App\\Catalog\\Interface\\Resource\\'
+
+    - name: 'Catalog Interface'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Catalog\\Interface\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Catalog\\Interface\\Resource\\'
 
     # =============================================
     # Filesystem (utility context, non-standard layers)
@@ -192,10 +222,20 @@ deptrac:
         - type: classLike
           value: '^App\\Library\\Infrastructure\\'
 
-    - name: 'Library Interface'
+    - name: 'Library Resources'
       collectors:
         - type: classLike
-          value: '^App\\Library\\Interface\\'
+          value: '^App\\Library\\Interface\\Resource\\'
+
+    - name: 'Library Interface'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Library\\Interface\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Library\\Interface\\Resource\\'
 
     # =============================================
     # Lyrics (Domain + Infrastructure only)
@@ -228,10 +268,20 @@ deptrac:
         - type: classLike
           value: '^App\\Media\\Infrastructure\\'
 
-    - name: 'Media Interface'
+    - name: 'Media Resources'
       collectors:
         - type: classLike
-          value: '^App\\Media\\Interface\\'
+          value: '^App\\Media\\Interface\\Resource\\'
+
+    - name: 'Media Interface'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Media\\Interface\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Media\\Interface\\Resource\\'
 
     # =============================================
     # Metadata
@@ -274,10 +324,20 @@ deptrac:
         - type: classLike
           value: '^App\\Notification\\Infrastructure\\'
 
-    - name: 'Notification Interface'
+    - name: 'Notification Resources'
       collectors:
         - type: classLike
-          value: '^App\\Notification\\Interface\\'
+          value: '^App\\Notification\\Interface\\Resource\\'
+
+    - name: 'Notification Interface'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Notification\\Interface\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Notification\\Interface\\Resource\\'
 
     # =============================================
     # Party
@@ -297,10 +357,20 @@ deptrac:
         - type: classLike
           value: '^App\\Party\\Infrastructure\\'
 
-    - name: 'Party Interface'
+    - name: 'Party Resources'
       collectors:
         - type: classLike
-          value: '^App\\Party\\Interface\\'
+          value: '^App\\Party\\Interface\\Resource\\'
+
+    - name: 'Party Interface'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Party\\Interface\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Party\\Interface\\Resource\\'
 
     # =============================================
     # Playlist
@@ -320,10 +390,20 @@ deptrac:
         - type: classLike
           value: '^App\\Playlist\\Infrastructure\\'
 
-    - name: 'Playlist Interface'
+    - name: 'Playlist Resources'
       collectors:
         - type: classLike
-          value: '^App\\Playlist\\Interface\\'
+          value: '^App\\Playlist\\Interface\\Resource\\'
+
+    - name: 'Playlist Interface'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Playlist\\Interface\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Playlist\\Interface\\Resource\\'
 
     # =============================================
     # Recommendation
@@ -343,10 +423,20 @@ deptrac:
         - type: classLike
           value: '^App\\Recommendation\\Infrastructure\\'
 
-    - name: 'Recommendation Interface'
+    - name: 'Recommendation Resources'
       collectors:
         - type: classLike
-          value: '^App\\Recommendation\\Interface\\'
+          value: '^App\\Recommendation\\Interface\\Resource\\'
+
+    - name: 'Recommendation Interface'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Recommendation\\Interface\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Recommendation\\Interface\\Resource\\'
 
     # =============================================
     # Transcode
@@ -366,10 +456,20 @@ deptrac:
         - type: classLike
           value: '^App\\Transcode\\Infrastructure\\'
 
-    - name: 'Transcode Interface'
+    - name: 'Transcode Resources'
       collectors:
         - type: classLike
-          value: '^App\\Transcode\\Interface\\'
+          value: '^App\\Transcode\\Interface\\Resource\\'
+
+    - name: 'Transcode Interface'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Transcode\\Interface\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Transcode\\Interface\\Resource\\'
 
     # =============================================
     # UserPreference
@@ -389,10 +489,20 @@ deptrac:
         - type: classLike
           value: '^App\\UserPreference\\Infrastructure\\'
 
-    - name: 'UserPreference Interface'
+    - name: 'UserPreference Resources'
       collectors:
         - type: classLike
-          value: '^App\\UserPreference\\Interface\\'
+          value: '^App\\UserPreference\\Interface\\Resource\\'
+
+    - name: 'UserPreference Interface'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\UserPreference\\Interface\\'
+          must_not:
+            - type: classLike
+              value: '^App\\UserPreference\\Interface\\Resource\\'
 
     # =============================================
     # Command (flat utility context)
@@ -420,10 +530,20 @@ deptrac:
         - type: classLike
           value: '^App\\Discovery\\Infrastructure\\'
 
-    - name: 'Discovery Interface'
+    - name: 'Discovery Resources'
       collectors:
         - type: classLike
-          value: '^App\\Discovery\\Interface\\'
+          value: '^App\\Discovery\\Interface\\Resource\\'
+
+    - name: 'Discovery Interface'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Discovery\\Interface\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Discovery\\Interface\\Resource\\'
 
     # =============================================
     # Favorites bounded context
@@ -443,10 +563,20 @@ deptrac:
         - type: classLike
           value: '^App\\Favorites\\Infrastructure\\'
 
-    - name: 'Favorites Interface'
+    - name: 'Favorites Resources'
       collectors:
         - type: classLike
-          value: '^App\\Favorites\\Interface\\'
+          value: '^App\\Favorites\\Interface\\Resource\\'
+
+    - name: 'Favorites Interface'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Favorites\\Interface\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Favorites\\Interface\\Resource\\'
 
   ruleset:
     # =============================================
@@ -484,7 +614,14 @@ deptrac:
       - 'Activity Application'
       - 'Shared Domain'
       - 'Shared Infrastructure'
+    'Activity Resources':
+      - 'Activity Application'
+      - 'Shared Application'
+      - 'Activity Domain'
+      - 'Shared Domain'
+      - 'Shared Interface'
     'Activity Interface':
+      - 'Activity Resources'
       - 'Auth Identity Contract'
       - 'Activity Application'
       - 'Shared Domain'
@@ -506,7 +643,14 @@ deptrac:
       - 'Auth Application'
       - 'Shared Domain'
       - 'Shared Infrastructure'
+    'Auth Resources':
+      - 'Auth Application'
+      - 'Shared Application'
+      - 'Auth Domain'
+      - 'Shared Domain'
+      - 'Shared Interface'
     'Auth Interface':
+      - 'Auth Resources'
       - 'Auth Identity Contract'
       - 'Auth Application'
       - 'Shared Domain'
@@ -525,7 +669,14 @@ deptrac:
       - 'Catalog Application'
       - 'Shared Domain'
       - 'Shared Infrastructure'
+    'Catalog Resources':
+      - 'Catalog Application'
+      - 'Shared Application'
+      - 'Catalog Domain'
+      - 'Shared Domain'
+      - 'Shared Interface'
     'Catalog Interface':
+      - 'Catalog Resources'
       - 'Catalog Application'
       - 'Shared Domain'
       - 'Shared Application'
@@ -555,7 +706,14 @@ deptrac:
       - 'Library Application'
       - 'Shared Domain'
       - 'Shared Infrastructure'
+    'Library Resources':
+      - 'Library Application'
+      - 'Shared Application'
+      - 'Library Domain'
+      - 'Shared Domain'
+      - 'Shared Interface'
     'Library Interface':
+      - 'Library Resources'
       - 'Auth Identity Contract'
       - 'Library Application'
       - 'Shared Domain'
@@ -582,7 +740,14 @@ deptrac:
       - 'Media Application'
       - 'Shared Domain'
       - 'Shared Infrastructure'
+    'Media Resources':
+      - 'Media Application'
+      - 'Shared Application'
+      - 'Media Domain'
+      - 'Shared Domain'
+      - 'Shared Interface'
     'Media Interface':
+      - 'Media Resources'
       - 'Media Application'
       - 'Shared Domain'
       - 'Shared Application'
@@ -618,7 +783,14 @@ deptrac:
       - 'Notification Application'
       - 'Shared Domain'
       - 'Shared Infrastructure'
+    'Notification Resources':
+      - 'Notification Application'
+      - 'Shared Application'
+      - 'Notification Domain'
+      - 'Shared Domain'
+      - 'Shared Interface'
     'Notification Interface':
+      - 'Notification Resources'
       - 'Notification Application'
       - 'Shared Domain'
       - 'Shared Application'
@@ -636,7 +808,14 @@ deptrac:
       - 'Party Application'
       - 'Shared Domain'
       - 'Shared Infrastructure'
+    'Party Resources':
+      - 'Party Application'
+      - 'Shared Application'
+      - 'Party Domain'
+      - 'Shared Domain'
+      - 'Shared Interface'
     'Party Interface':
+      - 'Party Resources'
       - 'Auth Identity Contract'
       - 'Party Application'
       - 'Shared Domain'
@@ -655,7 +834,14 @@ deptrac:
       - 'Playlist Application'
       - 'Shared Domain'
       - 'Shared Infrastructure'
+    'Playlist Resources':
+      - 'Playlist Application'
+      - 'Shared Application'
+      - 'Playlist Domain'
+      - 'Shared Domain'
+      - 'Shared Interface'
     'Playlist Interface':
+      - 'Playlist Resources'
       - 'Auth Identity Contract'
       - 'Playlist Application'
       - 'Shared Domain'
@@ -674,7 +860,14 @@ deptrac:
       - 'Recommendation Application'
       - 'Shared Domain'
       - 'Shared Infrastructure'
+    'Recommendation Resources':
+      - 'Recommendation Application'
+      - 'Shared Application'
+      - 'Recommendation Domain'
+      - 'Shared Domain'
+      - 'Shared Interface'
     'Recommendation Interface':
+      - 'Recommendation Resources'
       - 'Auth Identity Contract'
       - 'Recommendation Application'
       - 'Shared Domain'
@@ -693,7 +886,14 @@ deptrac:
       - 'Transcode Application'
       - 'Shared Domain'
       - 'Shared Infrastructure'
+    'Transcode Resources':
+      - 'Transcode Application'
+      - 'Shared Application'
+      - 'Transcode Domain'
+      - 'Shared Domain'
+      - 'Shared Interface'
     'Transcode Interface':
+      - 'Transcode Resources'
       - 'Auth Identity Contract'
       - 'Transcode Application'
       - 'Shared Domain'
@@ -712,7 +912,14 @@ deptrac:
       - 'UserPreference Application'
       - 'Shared Domain'
       - 'Shared Infrastructure'
+    'UserPreference Resources':
+      - 'UserPreference Application'
+      - 'Shared Application'
+      - 'UserPreference Domain'
+      - 'Shared Domain'
+      - 'Shared Interface'
     'UserPreference Interface':
+      - 'UserPreference Resources'
       - 'UserPreference Application'
       - 'Shared Domain'
       - 'Shared Application'
@@ -729,7 +936,14 @@ deptrac:
       - 'Discovery Domain'
       - 'Shared Domain'
       - 'Shared Infrastructure'
+    'Discovery Resources':
+      - 'Discovery Application'
+      - 'Shared Application'
+      - 'Discovery Domain'
+      - 'Shared Domain'
+      - 'Shared Interface'
     'Discovery Interface':
+      - 'Discovery Resources'
       - 'Discovery Application'
       - 'Discovery Domain'
       - 'Shared Domain'
@@ -746,7 +960,14 @@ deptrac:
       - 'Favorites Domain'
       - 'Shared Domain'
       - 'Shared Infrastructure'
+    'Favorites Resources':
+      - 'Favorites Application'
+      - 'Shared Application'
+      - 'Favorites Domain'
+      - 'Shared Domain'
+      - 'Shared Interface'
     'Favorites Interface':
+      - 'Favorites Resources'
       - 'Auth Identity Contract'
       - 'Favorites Application'
       - 'Favorites Domain'

@@ -4,6 +4,28 @@ Updated: 2026-10-04. This is the working delivery record for the remediation,
 registry, and web-state plans. Update it when scope changes or a stage is verified.
 Completed code is not proof of production or performance qualification.
 
+## Latest verified backend batches
+
+Signed delivery now shares full-query signature validation across manifests and
+segments. The production-firewall matrix passes 25 cases (313 assertions), with
+182 related unit tests (797 assertions). It covers seven delivery routes, five
+actor types, expiry/tampering, revoked credentials, and cross-library signing.
+Valid signed URLs remain bearer capabilities until expiry.
+
+Webhook delivery uses encrypted original secrets only. Hash-only signing and its
+persisted selector are removed. Disposable PostgreSQL tests verify fresh installation,
+preserved encrypted secrets, transactional refusal of unrecoverable local rows,
+and rotation against receiver-side HMAC verification. Webhook/handler units pass
+79 tests; functional/schema checks pass 21 tests, with independent-connection
+migration checks. No production deployment or local database reset was performed.
+
+Deptrac resource layers now enforce the documented resource-to-model exception
+without allowing controllers to depend on domain models. A real Deptrac fixture
+tests both sides. Removed 23 obsolete resource baseline pairs and the removed
+webhook signer dependency. The scan reports 238 active violations, 676 skipped
+occurrences, and zero configuration errors. Uncovered contexts remain work.
+The full configured PHPStan scan remains at zero errors after these batches.
+
 ## Delivery horizons
 
 The destination is a reliable private self-hosted backend/web application, a small
