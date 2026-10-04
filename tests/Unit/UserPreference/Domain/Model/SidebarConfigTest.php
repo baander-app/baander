@@ -61,7 +61,6 @@ final class SidebarConfigTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Each sidebar item must be a SidebarItem instance.');
 
-        /** @phpstan-ignore-next-line intentionally passing invalid type */
         SidebarConfig::create($this->userId, 'music', ['not-an-item']);
     }
 
@@ -116,7 +115,6 @@ final class SidebarConfigTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Each sidebar item must be a SidebarItem instance.');
 
-        /** @phpstan-ignore-next-line intentionally passing invalid type */
         $config->updateItems(['nope']);
     }
 

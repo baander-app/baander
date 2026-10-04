@@ -14,6 +14,7 @@ final class AudioPreferences
     ) {
     }
 
+    /** @param array<array-key, mixed> $payload */
     public static function create(Uuid $userId, array $payload = [], int $version = 1): self
     {
         $now = new DateTimeImmutable();
@@ -35,6 +36,7 @@ final class AudioPreferences
 
     /**
      * Replace the payload and advance the version.
+     * @param array<array-key, mixed> $payload
      */
     public function updatePayload(array $payload, int $version): void
     {
@@ -53,6 +55,7 @@ final class AudioPreferences
         return $this->state->userId;
     }
 
+    /** @return array<array-key, mixed> */
     public function getPayload(): array
     {
         return $this->state->payload;

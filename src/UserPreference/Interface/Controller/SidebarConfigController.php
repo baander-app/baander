@@ -214,6 +214,7 @@ final class SidebarConfigController
     /**
      * Build the MediaSidebarSchema-compatible response shape.
      * Flattened items are regrouped into sections using the item ID prefix convention.
+     * @return array{mediaType: string, sections: list<array{id: string, label: string, type: string, items: list<array<string, mixed>>}>, updatedAt: string}
      */
     private function buildSectionsResponse(object $config, string $mediaType): array
     {
@@ -232,6 +233,8 @@ final class SidebarConfigController
     /**
      * Group flat items into sections based on ID prefix.
      * Items like "music-home", "music-browse" → section "music-quick-jump".
+     * @param array<array-key, array<string, mixed>> $items
+     * @return list<array{id: string, label: string, type: string, items: list<array<string, mixed>>}>
      */
     private function groupItemsIntoSections(array $items, string $mediaType): array
     {
@@ -279,6 +282,10 @@ final class SidebarConfigController
         };
     }
 
+    /**
+     * @param list<array<string, mixed>> $items
+     * @return array{id: string, label: string, type: string, items: list<array<string, mixed>>}
+     */
     private function makeSection(string $sectionId, array $items): array
     {
         $label = $this->sectionLabel($sectionId);

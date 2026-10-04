@@ -8,6 +8,7 @@ use App\UserPreference\Domain\ValueObject\SidebarItemType;
 
 final readonly class SidebarItem
 {
+    /** @param array<array-key, mixed> $config */
     public function __construct(
         public string $id,
         public SidebarItemType $type,

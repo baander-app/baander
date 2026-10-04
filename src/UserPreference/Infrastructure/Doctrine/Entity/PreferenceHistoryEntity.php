@@ -28,6 +28,7 @@ class PreferenceHistoryEntity
     #[ORM\Column(type: 'integer')]
     private int $version;
 
+    /** @var array<array-key, mixed> */
     #[ORM\Column(type: 'jsonb')]
     private array $payload = [];
 
@@ -80,11 +81,13 @@ class PreferenceHistoryEntity
         $this->version = $version;
     }
 
+    /** @return array<array-key, mixed> */
     public function getPayload(): array
     {
         return $this->payload;
     }
 
+    /** @param array<array-key, mixed> $payload */
     public function setPayload(array $payload): void
     {
         $this->payload = $payload;

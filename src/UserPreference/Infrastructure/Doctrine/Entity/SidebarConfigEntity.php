@@ -25,6 +25,7 @@ class SidebarConfigEntity
     #[ORM\Column(type: 'text', options: ['default' => 'music'])]
     private string $mediaType = 'music';
 
+    /** @var array<int, array<string, mixed>> */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '[]'])]
     private array $items = [];
 
@@ -71,11 +72,13 @@ class SidebarConfigEntity
         $this->mediaType = $mediaType;
     }
 
+    /** @return array<int, array<string, mixed>> */
     public function getItems(): array
     {
         return $this->items;
     }
 
+    /** @param array<int, array<string, mixed>> $items */
     public function setItems(array $items): void
     {
         $this->items = $items;

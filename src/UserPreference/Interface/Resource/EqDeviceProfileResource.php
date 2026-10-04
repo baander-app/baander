@@ -25,7 +25,7 @@ use OpenApi\Attributes as OA;
 final class EqDeviceProfileResource
 {
     /**
-     * @return array{id: string, name: string, icon: string, deviceId: string|null, payload: array, isDefault: bool, sortOrder: int, version: int, createdAt: string, updatedAt: string}
+     * @return array{id: string, name: string, icon: string, deviceId: string|null, payload: array<array-key, mixed>, isDefault: bool, sortOrder: int, version: int, createdAt: string, updatedAt: string}
      */
     public static function from(EqDeviceProfile $model): array
     {

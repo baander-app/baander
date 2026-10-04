@@ -14,6 +14,7 @@ final class EqDeviceProfile
     ) {
     }
 
+    /** @param array<array-key, mixed> $payload */
     public static function create(
         Uuid $userId,
         string $name,
@@ -49,6 +50,7 @@ final class EqDeviceProfile
      * Partial update. Passing null for a field leaves it unchanged.
      * Changing the payload bumps the version.
      */
+    /** @param array<array-key, mixed>|null $payload */
     public function updateDetails(
         ?string $name = null,
         ?string $icon = null,
@@ -101,6 +103,7 @@ final class EqDeviceProfile
         return $this->state->deviceId;
     }
 
+    /** @return array<array-key, mixed> */
     public function getPayload(): array
     {
         return $this->state->payload;

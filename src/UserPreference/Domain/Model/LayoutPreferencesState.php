@@ -9,6 +9,7 @@ use DateTimeImmutable;
 
 final class LayoutPreferencesState
 {
+    /** @param array<array-key, mixed> $payload */
     public function __construct(
         public Uuid $id,
         public Uuid $userId,

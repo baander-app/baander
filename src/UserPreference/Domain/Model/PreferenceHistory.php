@@ -14,6 +14,7 @@ final class PreferenceHistory
     ) {
     }
 
+    /** @param array<array-key, mixed> $payload */
     public static function create(
         Uuid $userId,
         string $preferenceType,
@@ -55,6 +56,7 @@ final class PreferenceHistory
         return $this->state->version;
     }
 
+    /** @return array<array-key, mixed> */
     public function getPayload(): array
     {
         return $this->state->payload;

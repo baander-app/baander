@@ -13,7 +13,7 @@ use Symfony\Component\Validator\Constraints as Assert;
         new OA\Property(
             property: 'sections',
             type: 'array',
-            items: new OA\Schema(
+            items: new OA\Items(
                 properties: [
                     new OA\Property(property: 'id', type: 'string', example: 'music-quick-jump'),
                     new OA\Property(property: 'label', type: 'string', example: 'Quick Jump'),
@@ -21,7 +21,7 @@ use Symfony\Component\Validator\Constraints as Assert;
                     new OA\Property(
                         property: 'items',
                         type: 'array',
-                        items: new OA\Schema(
+                        items: new OA\Items(
                             properties: [
                                 new OA\Property(property: 'id', type: 'string', example: 'music-home'),
                                 new OA\Property(property: 'type', type: 'string', example: 'page_link', enum: ['page_link', 'smart_filter', 'panel_action']),
@@ -38,6 +38,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 )]
 final readonly class UpdateSidebarSectionsRequest
 {
+    /** @param array<array-key, mixed> $sections */
     public function __construct(
         #[Assert\NotBlank(message: 'Sections are required.')]
         #[Assert\Type(type: 'array')]

@@ -19,6 +19,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 )]
 final readonly class UpdateEqDeviceProfileRequest
 {
+    /** @param array<array-key, mixed>|null $payload */
     public function __construct(
         #[Assert\Length(max: 255, maxMessage: 'Name must be at most 255 characters.')]
         public ?string $name = null,

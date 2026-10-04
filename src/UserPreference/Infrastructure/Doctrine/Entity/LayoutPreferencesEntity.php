@@ -22,6 +22,7 @@ class LayoutPreferencesEntity
     #[ORM\JoinColumn(name: 'user_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private UserEntity $user;
 
+    /** @var array<array-key, mixed> */
     #[ORM\Column(type: 'jsonb')]
     private array $payload = [];
 
@@ -61,11 +62,13 @@ class LayoutPreferencesEntity
         $this->user = $user;
     }
 
+    /** @return array<array-key, mixed> */
     public function getPayload(): array
     {
         return $this->payload;
     }
 
+    /** @param array<array-key, mixed> $payload */
     public function setPayload(array $payload): void
     {
         $this->payload = $payload;

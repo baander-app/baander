@@ -10,9 +10,6 @@ use InvalidArgumentException;
 
 final class SidebarConfig
 {
-    /** @var string[] */
-    private const ALLOWED_TYPES = ['page_link', 'smart_filter', 'panel_action'];
-
     private function __construct(
         private SidebarConfigState $state,
     ) {
@@ -21,7 +18,7 @@ final class SidebarConfig
     /**
      * Create a new sidebar config for a user and media type.
      *
-     * @param SidebarItem[] $items
+     * @param array<array-key, mixed> $items
      */
     public static function create(Uuid $userId, string $mediaType, array $items = []): self
     {
@@ -47,7 +44,7 @@ final class SidebarConfig
     /**
      * Replace all sidebar items.
      *
-     * @param SidebarItem[] $items
+     * @param array<array-key, mixed> $items
      */
     public function updateItems(array $items): void
     {
@@ -86,7 +83,8 @@ final class SidebarConfig
     }
 
     /**
-     * @param SidebarItem[] $items
+     * @param array<array-key, mixed> $items
+     * @phpstan-assert SidebarItem[] $items
      */
     private static function validateItems(array $items): void
     {
@@ -97,12 +95,6 @@ final class SidebarConfig
 
             if (trim($item->label) === '') {
                 throw new InvalidArgumentException('Sidebar item label cannot be empty.');
-            }
-
-            if (!in_array($item->type->value, self::ALLOWED_TYPES, true)) {
-                throw new InvalidArgumentException(
-                    sprintf('Invalid sidebar item type "%s".', $item->type->value),
-                );
             }
         }
     }

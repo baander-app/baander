@@ -16,7 +16,7 @@ final class SidebarConfigAdapter implements SidebarConfigPortInterface
      * Per-media-type default sections matching frontend schemas exactly.
      * Stored as flat items per section — the controller restructures to sections on read.
      *
-     * @var array<string, array<int, array{id: string, type: string, label: string, icon: string, config: array<string, mixed>}>
+     * @var array<string, array<int, array{id: string, type: string, label: string, icon: string, config: array<string, mixed>}>>
      */
     private const DEFAULT_ITEMS = [
         'music' => [
@@ -81,8 +81,6 @@ final class SidebarConfigAdapter implements SidebarConfigPortInterface
             ['id' => 'ebooks-recommended', 'type' => 'page_link', 'label' => 'Recommended', 'icon' => 'sparkles', 'config' => ['route' => '/ebooks/recommended']],
         ],
     ];
-
-    private const VALID_MEDIA_TYPES = ['music', 'movies', 'tv', 'podcasts', 'concerts', 'ebooks'];
 
     public function __construct(
         private readonly SidebarConfigRepositoryInterface $repository,
