@@ -495,7 +495,7 @@ export class AudioProcessor {
           if (event.data === null || typeof event.data !== 'object') return
           const msg = event.data as { type: string; programmeGeneration?: number } & Partial<MeterFrame>
           if (msg.type === 'request-dsp-init') {
-            void this.sendDSPToWorklet(node, generation)
+            this.sendDSPToWorklet(node, generation)
           } else if (msg.type === 'analysis' && msg.programmeGeneration === this.programmeGeneration
             && this.isConnected && this.isPlaying
             && typeof msg.leftChannel === 'number' && Number.isFinite(msg.leftChannel) && msg.leftChannel >= 0 && msg.leftChannel <= 100

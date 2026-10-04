@@ -56,6 +56,9 @@ coordinate a single writer and review those updates with the implementation.
 
 ## Coding guidance
 
+Do not prefix function or method calls with `void`. Keep asynchronous error
+handling explicit.
+
 For backend changes, read [architecture rules](.agents/rules/architecture-rules.md)
 and the relevant `ddd-*.md` reference in `.agents/rules/`. For web changes, read
 [frontend rules](.agents/rules/frontend.md) and `ui/DESIGN.md`. Use the

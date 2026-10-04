@@ -79,3 +79,10 @@ resume add no play event. Activity-service unit tests verify one API submission
 per caller-owned playback attempt, including consecutive plays of the same song
 and independent request failures. Delivery remains best effort; an uncertain
 network failure is not automatically retried.
+
+Stale-notification tests dispatch obsolete `play` and `ended` notifications after
+pausing or selecting a new source. Chromium supplies the actual current media
+state; handlers must ignore notifications that disagree with it. The existing
+native-ended, gapless, crossfade, and repeat tests retain coverage for genuine
+events. Unit fixtures explicitly model paused/ended state for genuine events and
+leave stale notifications inconsistent to exercise the guards.

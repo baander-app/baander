@@ -55,7 +55,7 @@ export function useAudioPlayback() {
       return connection
     }
     const onLoadStart = () => {
-      if (lifetime.active && audioA.src) void connect().catch((err) => {
+      if (lifetime.active && audioA.src) connect().catch((err) => {
         if (lifetime.active) logger.warn('Dual audio connection failed:', err)
       })
     }
@@ -164,7 +164,7 @@ export function useAudioPlayback() {
       const state = usePlayerStore.getState()
       const audio = active()
       if (audio && state.isPlaying && state.crossfadeEnabled && state.crossfadeDuration > 0
-        && audio.duration - audio.currentTime <= state.crossfadeDuration) void handoff(true)
+        && audio.duration - audio.currentTime <= state.crossfadeDuration) handoff(true)
     }
     const schedulePreload = (audio: HTMLAudioElement) => {
       if (candidate || transitionPending || fadeTimer !== undefined || !Number.isFinite(audio.duration) || audio.duration <= 0) return
@@ -204,10 +204,10 @@ export function useAudioPlayback() {
     const removers = [audioA, audioB].map((audio) => {
       const owned = () => lifetime.active && active() === audio
       const onPlay = () => {
-        if (!owned()) return
+        if (!owned() || audio.paused || audio.ended) return
         usePlayerStore.getState().setIsPlaying(true)
         audioService.setPlayingState(true)
-        if (audio.src) void connect().catch((err) => {
+        if (audio.src) connect().catch((err) => {
           if (owned()) logger.warn('Dual audio connection failed:', err)
         })
       }
@@ -227,13 +227,13 @@ export function useAudioPlayback() {
         if (owned() && Number.isFinite(audio.duration) && audio.duration > 0) usePlayerStore.getState().setDuration(audio.duration)
       }
       const onEnded = () => {
-        if (!owned() || transitionPending) return
+        if (!owned() || !audio.ended || transitionPending) return
         const state = usePlayerStore.getState()
         if (state.repeat === 'one' && state.currentTrack) {
           audioService.getProcessor()?.resetProgramme()
           state.replayCurrentTrack()
         } else if (candidate?.ready && valid(candidate)) {
-          void handoff(false)
+          handoff(false)
         } else {
           invalidate()
           state.playNext()
@@ -284,7 +284,7 @@ export function useAudioPlayback() {
       && usePlayerStore.getState().audioElement === audio && audio.src === src
       && usePlayerStore.getState().currentTrack === track
     if (isPlaying && audio.paused) {
-      void audioService.resumeContextIfNeeded().then(async () => {
+      audioService.resumeContextIfNeeded().then(async () => {
         if (isActive() && usePlayerStore.getState().isPlaying) await audio.play()
       }).catch((err) => {
         if (!isActive()) return
@@ -312,7 +312,7 @@ export function useAudioPlayback() {
     }
 
     const onFirstInteraction = () => {
-      void resumeAndReapply().catch((err) => {
+      resumeAndReapply().catch((err) => {
         if (!cancelled) logger.warn('Audio context resume failed:', err)
       })
       document.removeEventListener('click', onFirstInteraction)

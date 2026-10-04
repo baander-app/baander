@@ -202,3 +202,34 @@ test('native repeat-one records each successful iteration without reloading the 
   await expect.poll(async () => (await snapshot(page)).elements[0].paused).toBe(false)
   expect(await page.evaluate(() => window.playbackFixture.activity())).toEqual(['first', 'first', 'first'])
 })
+
+test('queued play notification cannot resume currently paused native media', async ({ page, origin }) => {
+  await start(page, origin)
+  await expect.poll(() => page.evaluate(() => window.playbackFixture.activity())).toEqual(['first'])
+  await page.evaluate(() => window.playbackFixture.pause())
+  await expect.poll(async () => (await snapshot(page)).elements[0].paused).toBe(true)
+  // Deliver an obsolete notification while the native element exposes current state.
+  await page.evaluate(() => window.playbackFixture.notify('play'))
+  expect((await snapshot(page)).playing).toBe(false)
+  expect((await snapshot(page)).elements[0].paused).toBe(true)
+})
+
+for (const repeat of [false, true]) {
+  test(`queued ended notification cannot ${repeat ? 'repeat' : 'stop'} a newer native source`, async ({ page, origin }) => {
+    await start(page, origin)
+    await page.evaluate(() => window.playbackFixture.manual())
+    await track(page, 'third')
+    await expect.poll(() => page.evaluate(() => window.playbackFixture.activity())).toContain('third')
+    await page.evaluate(repeat => {
+      if (repeat) window.playbackFixture.repeatOne()
+      window.playbackFixture.seek(1.5)
+    }, repeat)
+    const before = await page.evaluate(() => window.playbackFixture.activity())
+    await page.evaluate(() => window.playbackFixture.notify('ended'))
+    const state = await snapshot(page)
+    expect(state.track).toBe('third')
+    expect(state.playing).toBe(true)
+    expect(state.elements[state.active].time).toBeGreaterThanOrEqual(1.4)
+    expect(await page.evaluate(() => window.playbackFixture.activity())).toEqual(before)
+  })
+}

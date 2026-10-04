@@ -70,6 +70,7 @@ const fixture = {
   manual() { usePlayerStore.getState().playTrack(tracks[2]) },
   activity(): string[] { return [...((window as unknown as { playbackActivity?: string[] }).playbackActivity ?? [])] },
   repeatOne() { usePlayerStore.getState().setRepeat('one') },
+  notify(type: 'play' | 'ended') { usePlayerStore.getState().audioElement?.dispatchEvent(new Event(type)) },
   next() { usePlayerStore.getState().playNext() },
   previous() { usePlayerStore.getState().playPrevious() },
   domPause(index: number) { elements[index].pause() },

@@ -166,10 +166,10 @@ function requestSelectedTrackPlayback(
   const src = el.src
   const ownsSelection = () => generation === playbackSelectionGeneration
     && get().audioElement === el && el.src === src && get().currentTrack === track
-  void el.play().then(() => {
+  el.play().then(() => {
     if (!ownsSelection() || !get().isPlaying || el.paused || el.ended) return
     // ActivityService handles its own request errors; those are not playback errors.
-    void activityService.recordPlay({ songId: track.publicId, albumId: track.albumPublicId })
+    activityService.recordPlay({ songId: track.publicId, albumId: track.albumPublicId })
   }, (err) => {
     if (!ownsSelection()) return
     logger.warn('Autoplay blocked or failed:', err)
@@ -314,7 +314,7 @@ export const usePlayerStore = create<PlayerState>()(
           duration: Number.isFinite(element.duration) ? element.duration : 0,
         })
         updateTime(element.currentTime)
-        void activityService.recordPlay({ songId: track.publicId, albumId: track.albumPublicId })
+        activityService.recordPlay({ songId: track.publicId, albumId: track.albumPublicId })
         return true
       },
 

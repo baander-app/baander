@@ -17,7 +17,7 @@ function compileModule(name: DspModuleType): Promise<WebAssembly.Module> {
   })()
   compiledModules.set(name, compilation)
   // A failed older request must not evict a replacement installed after reset.
-  void compilation.catch(() => {
+  compilation.catch(() => {
     if (compiledModules.get(name) === compilation) compiledModules.delete(name)
   })
   return compilation
