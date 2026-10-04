@@ -6,6 +6,8 @@ namespace App\Activity\Interface\Controller;
 
 use App\Activity\Application\Port\ActivityAnalyticsPortInterface;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\Exception\InvalidQueryParameter;
+use App\Shared\Interface\Request\QueryParameters;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -47,6 +49,7 @@ final class ActivityAdminController
                     ],
                 ),
             ),
+            new OA\Response(response: '400', description: 'Invalid query parameters', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
@@ -64,7 +67,7 @@ final class ActivityAdminController
         parameters: [
             new OA\Parameter(name: 'from', description: 'Start date (Y-m-d)', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
             new OA\Parameter(name: 'to', description: 'End date (Y-m-d)', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
-            new OA\Parameter(name: 'limit', description: 'Max results', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 10)),
+            new OA\Parameter(name: 'limit', description: 'Max results', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 10, maximum: 100, minimum: 1)),
         ],
         responses: [
             new OA\Response(
@@ -83,6 +86,7 @@ final class ActivityAdminController
                     ],
                 ),
             ),
+            new OA\Response(response: '400', description: 'Invalid query parameters', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
@@ -90,7 +94,7 @@ final class ActivityAdminController
     public function topTracks(Request $request): JsonResponse
     {
         [$from, $to] = $this->parseDateRange($request);
-        $limit = min(100, max(1, (int) $request->query->get('limit', 10)));
+        $limit = QueryParameters::integer($request->query, 'limit', 10, 1, 100);
 
         return $this->successResponse($this->analytics->getTopTracks($from, $to, $limit));
     }
@@ -101,7 +105,7 @@ final class ActivityAdminController
         parameters: [
             new OA\Parameter(name: 'from', description: 'Start date (Y-m-d)', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
             new OA\Parameter(name: 'to', description: 'End date (Y-m-d)', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
-            new OA\Parameter(name: 'limit', description: 'Max results', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 10)),
+            new OA\Parameter(name: 'limit', description: 'Max results', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 10, maximum: 100, minimum: 1)),
         ],
         responses: [
             new OA\Response(
@@ -118,6 +122,7 @@ final class ActivityAdminController
                     ],
                 ),
             ),
+            new OA\Response(response: '400', description: 'Invalid query parameters', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
@@ -125,7 +130,7 @@ final class ActivityAdminController
     public function topArtists(Request $request): JsonResponse
     {
         [$from, $to] = $this->parseDateRange($request);
-        $limit = min(100, max(1, (int) $request->query->get('limit', 10)));
+        $limit = QueryParameters::integer($request->query, 'limit', 10, 1, 100);
 
         return $this->successResponse($this->analytics->getTopArtists($from, $to, $limit));
     }
@@ -151,6 +156,7 @@ final class ActivityAdminController
                     ],
                 ),
             ),
+            new OA\Response(response: '400', description: 'Invalid query parameters', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
@@ -167,16 +173,12 @@ final class ActivityAdminController
      */
     private function parseDateRange(Request $request): array
     {
-        $fromString = $request->query->get('from');
-        $toString = $request->query->get('to');
+        $from = QueryParameters::optionalDate($request->query, 'from') ?? new \DateTimeImmutable('-30 days');
+        $to = (QueryParameters::optionalDate($request->query, 'to') ?? new \DateTimeImmutable('today'))->setTime(23, 59, 59);
 
-        $from = $fromString !== null
-            ? new \DateTimeImmutable($fromString)
-            : new \DateTimeImmutable('-30 days');
-
-        $to = $toString !== null
-            ? new \DateTimeImmutable($toString . ' 23:59:59')
-            : new \DateTimeImmutable('today 23:59:59');
+        if ($from > $to) {
+            throw new InvalidQueryParameter('to', 'End date must not precede start date.');
+        }
 
         return [$from, $to];
     }

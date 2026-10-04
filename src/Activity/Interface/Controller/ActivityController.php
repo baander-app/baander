@@ -20,6 +20,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
+use App\Shared\Interface\Request\QueryParameters;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -64,6 +65,7 @@ final class ActivityController
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: ActivityResource::class)))], type: 'object',
             )),
+            new OA\Response(response: '400', description: 'Invalid query parameter', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
@@ -75,16 +77,13 @@ final class ActivityController
             return $this->unauthorized();
         }
 
-        $limit = min(100, max(1, (int) $request->query->get('limit', 50)));
-        $offset = max(0, (int) $request->query->get('offset', 0));
+        $pagination = QueryParameters::pagination($request->query);
 
         $activities = $this->activityService->findByUser(
             Uuid::fromString($user->getId()),
-            $limit,
+            $pagination->limit,
+            $pagination->offset,
         );
-
-        // Manual offset slicing (findByUser returns sorted DESC from DB)
-        $activities = array_slice($activities, $offset, $limit);
 
         $baseUrl = $request->getSchemeAndHttpHost();
         $enriched = $this->enrichmentService->enrich($activities, $baseUrl);

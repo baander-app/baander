@@ -10,6 +10,26 @@ use Symfony\Component\HttpFoundation\InputBag;
 
 final class QueryParameters
 {
+    /** @param InputBag<covariant string|int|float|bool|null> $query */
+    public static function optionalDate(InputBag $query, string $name): ?\DateTimeImmutable
+    {
+        if (!$query->has($name)) {
+            return null;
+        }
+
+        $value = $query->all()[$name];
+        if (is_string($value)
+            && preg_match('/\A[0-9]{4}-[0-9]{2}-[0-9]{2}\z/', $value) === 1
+            && checkdate((int) substr($value, 5, 2), (int) substr($value, 8, 2), (int) substr($value, 0, 4))) {
+            $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+            if ($date !== false && $date->format('Y-m-d') === $value) {
+                return $date;
+            }
+        }
+
+        throw new InvalidQueryParameter($name, sprintf('%s must be a valid date in Y-m-d format.', $name));
+    }
+
     /**
      * @param InputBag<covariant string|int|float|bool|null> $query
      */

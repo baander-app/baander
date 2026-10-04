@@ -17,11 +17,11 @@ interface MediaActivityRepositoryInterface
     public function findByPublicId(PublicId $publicId): ?MediaActivity;
 
     /**
-     * Find activities for a user, ordered by last played descending.
+     * Find activities for a user, ordered by last played then UUID descending.
      *
      * @return MediaActivity[]
      */
-    public function findByUser(Uuid $userId, int $limit = 50): array;
+    public function findByUser(Uuid $userId, int $limit = 50, int $offset = 0): array;
 
     /**
      * Find a user's activity for a specific song.

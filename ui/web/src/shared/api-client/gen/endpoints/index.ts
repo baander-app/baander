@@ -1890,6 +1890,8 @@ from?: string;
 to?: string;
 /**
  * Max results
+ * @minimum 1
+ * @maximum 100
  */
 limit?: number;
 };
@@ -1918,6 +1920,8 @@ from?: string;
 to?: string;
 /**
  * Max results
+ * @minimum 1
+ * @maximum 100
  */
 limit?: number;
 };
@@ -5785,6 +5789,11 @@ export type getAdminActivitySummaryResponse200 = {
   status: 200
 }
 
+export type getAdminActivitySummaryResponse400 = {
+  data: ApiError
+  status: 400
+}
+
 export type getAdminActivitySummaryResponse403 = {
   data: ApiError
   status: 403
@@ -5793,7 +5802,7 @@ export type getAdminActivitySummaryResponse403 = {
 export type getAdminActivitySummaryResponseSuccess = (getAdminActivitySummaryResponse200) & {
   headers: Headers;
 };
-export type getAdminActivitySummaryResponseError = (getAdminActivitySummaryResponse403) & {
+export type getAdminActivitySummaryResponseError = (getAdminActivitySummaryResponse400 | getAdminActivitySummaryResponse403) & {
   headers: Headers;
 };
 
@@ -5912,6 +5921,11 @@ export type getAdminActivityTopTracksResponse200 = {
   status: 200
 }
 
+export type getAdminActivityTopTracksResponse400 = {
+  data: ApiError
+  status: 400
+}
+
 export type getAdminActivityTopTracksResponse403 = {
   data: ApiError
   status: 403
@@ -5920,7 +5934,7 @@ export type getAdminActivityTopTracksResponse403 = {
 export type getAdminActivityTopTracksResponseSuccess = (getAdminActivityTopTracksResponse200) & {
   headers: Headers;
 };
-export type getAdminActivityTopTracksResponseError = (getAdminActivityTopTracksResponse403) & {
+export type getAdminActivityTopTracksResponseError = (getAdminActivityTopTracksResponse400 | getAdminActivityTopTracksResponse403) & {
   headers: Headers;
 };
 
@@ -6039,6 +6053,11 @@ export type getAdminActivityTopArtistsResponse200 = {
   status: 200
 }
 
+export type getAdminActivityTopArtistsResponse400 = {
+  data: ApiError
+  status: 400
+}
+
 export type getAdminActivityTopArtistsResponse403 = {
   data: ApiError
   status: 403
@@ -6047,7 +6066,7 @@ export type getAdminActivityTopArtistsResponse403 = {
 export type getAdminActivityTopArtistsResponseSuccess = (getAdminActivityTopArtistsResponse200) & {
   headers: Headers;
 };
-export type getAdminActivityTopArtistsResponseError = (getAdminActivityTopArtistsResponse403) & {
+export type getAdminActivityTopArtistsResponseError = (getAdminActivityTopArtistsResponse400 | getAdminActivityTopArtistsResponse403) & {
   headers: Headers;
 };
 
@@ -6166,6 +6185,11 @@ export type getAdminActivityEngagementResponse200 = {
   status: 200
 }
 
+export type getAdminActivityEngagementResponse400 = {
+  data: ApiError
+  status: 400
+}
+
 export type getAdminActivityEngagementResponse403 = {
   data: ApiError
   status: 403
@@ -6174,7 +6198,7 @@ export type getAdminActivityEngagementResponse403 = {
 export type getAdminActivityEngagementResponseSuccess = (getAdminActivityEngagementResponse200) & {
   headers: Headers;
 };
-export type getAdminActivityEngagementResponseError = (getAdminActivityEngagementResponse403) & {
+export type getAdminActivityEngagementResponseError = (getAdminActivityEngagementResponse400 | getAdminActivityEngagementResponse403) & {
   headers: Headers;
 };
 
@@ -6293,6 +6317,11 @@ export type getActivityHistoryResponse200 = {
   status: 200
 }
 
+export type getActivityHistoryResponse400 = {
+  data: ApiError
+  status: 400
+}
+
 export type getActivityHistoryResponse401 = {
   data: ApiError
   status: 401
@@ -6301,7 +6330,7 @@ export type getActivityHistoryResponse401 = {
 export type getActivityHistoryResponseSuccess = (getActivityHistoryResponse200) & {
   headers: Headers;
 };
-export type getActivityHistoryResponseError = (getActivityHistoryResponse401) & {
+export type getActivityHistoryResponseError = (getActivityHistoryResponse400 | getActivityHistoryResponse401) & {
   headers: Headers;
 };
 

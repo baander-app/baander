@@ -32,9 +32,9 @@ final class ActivityService implements ActivityPortInterface
         return $this->activityRepository->findByPublicId($publicId);
     }
 
-    public function findByUser(Uuid $userId, int $limit = 50): array
+    public function findByUser(Uuid $userId, int $limit = 50, int $offset = 0): array
     {
-        return $this->activityRepository->findByUser($userId, $limit);
+        return $this->activityRepository->findByUser($userId, $limit, $offset);
     }
 
     public function findForSong(Uuid $userId, Uuid $songId): ?MediaActivity

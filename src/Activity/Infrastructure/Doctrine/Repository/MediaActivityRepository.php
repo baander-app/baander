@@ -55,7 +55,7 @@ final class MediaActivityRepository implements MediaActivityRepositoryInterface
     /**
      * @return MediaActivity[]
      */
-    public function findByUser(Uuid $userId, int $limit = 50): array
+    public function findByUser(Uuid $userId, int $limit = 50, int $offset = 0): array
     {
         $entities = $this->entityManager
             ->getRepository(MediaActivityEntity::class)
@@ -63,7 +63,9 @@ final class MediaActivityRepository implements MediaActivityRepositoryInterface
             ->where('a.user = :userId')
             ->setParameter('userId', $userId)
             ->orderBy('a.lastPlayedAt', 'DESC')
+            ->addOrderBy('a.id', 'DESC')
             ->setMaxResults($limit)
+            ->setFirstResult($offset)
             ->getQuery()
             ->getResult();
 
@@ -236,6 +238,8 @@ final class MediaActivityRepository implements MediaActivityRepositoryInterface
 
     /**
      * Resolve an optional FK relation and call the entity setter.
+     *
+     * @param class-string $entityClass
      */
     private function setOptionalRelation(
         MediaActivityEntity $entity,
