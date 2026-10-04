@@ -2051,10 +2051,13 @@ export type GetUserRecent200 = {
 export type GetAdminLoginBlocksListParams = {
 /**
  * Results per page
+ * @minimum 1
+ * @maximum 100
  */
 limit?: number;
 /**
  * Result offset
+ * @minimum 0
  */
 offset?: number;
 };
@@ -6854,12 +6857,19 @@ export type getAdminLoginBlocksListResponse200 = {
   status: 200
 }
 
+export type getAdminLoginBlocksListResponse400 = {
+  data: ApiError
+  status: 400
+}
+
 export type getAdminLoginBlocksListResponseSuccess = (getAdminLoginBlocksListResponse200) & {
   headers: Headers;
 };
-;
+export type getAdminLoginBlocksListResponseError = (getAdminLoginBlocksListResponse400) & {
+  headers: Headers;
+};
 
-export type getAdminLoginBlocksListResponse = (getAdminLoginBlocksListResponseSuccess)
+export type getAdminLoginBlocksListResponse = (getAdminLoginBlocksListResponseSuccess | getAdminLoginBlocksListResponseError)
 
 export const getGetAdminLoginBlocksListUrl = (params?: GetAdminLoginBlocksListParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -6901,7 +6911,7 @@ export const getGetAdminLoginBlocksListQueryKey = (params?: GetAdminLoginBlocksL
     }
 
 
-export const getGetAdminLoginBlocksListQueryOptions = <TData = Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError = ErrorType<unknown>>(params?: GetAdminLoginBlocksListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetAdminLoginBlocksListQueryOptions = <TData = Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError = ErrorType<ApiError>>(params?: GetAdminLoginBlocksListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -6920,10 +6930,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetAdminLoginBlocksListQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminLoginBlocksList>>>
-export type GetAdminLoginBlocksListQueryError = ErrorType<unknown>
+export type GetAdminLoginBlocksListQueryError = ErrorType<ApiError>
 
 
-export function useGetAdminLoginBlocksList<TData = Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError = ErrorType<unknown>>(
+export function useGetAdminLoginBlocksList<TData = Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetAdminLoginBlocksListParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getAdminLoginBlocksList>>,
@@ -6933,7 +6943,7 @@ export function useGetAdminLoginBlocksList<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetAdminLoginBlocksList<TData = Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError = ErrorType<unknown>>(
+export function useGetAdminLoginBlocksList<TData = Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError = ErrorType<ApiError>>(
  params?: GetAdminLoginBlocksListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getAdminLoginBlocksList>>,
@@ -6943,7 +6953,7 @@ export function useGetAdminLoginBlocksList<TData = Awaited<ReturnType<typeof get
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetAdminLoginBlocksList<TData = Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError = ErrorType<unknown>>(
+export function useGetAdminLoginBlocksList<TData = Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError = ErrorType<ApiError>>(
  params?: GetAdminLoginBlocksListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -6951,7 +6961,7 @@ export function useGetAdminLoginBlocksList<TData = Awaited<ReturnType<typeof get
  * @summary List recent honeypot blocks (paginated)
  */
 
-export function useGetAdminLoginBlocksList<TData = Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError = ErrorType<unknown>>(
+export function useGetAdminLoginBlocksList<TData = Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError = ErrorType<ApiError>>(
  params?: GetAdminLoginBlocksListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminLoginBlocksList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {

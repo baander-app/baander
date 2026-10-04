@@ -10,6 +10,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
+use Symfony\Component\HttpFoundation\Exception\BadRequestException;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -31,8 +32,8 @@ final class AdminLoginBlockController
         path: '/api/admin/login-blocks',
         summary: 'List recent honeypot blocks (paginated)',
         parameters: [
-            new OA\Parameter(name: 'limit', description: 'Results per page', in: 'query', schema: new OA\Schema(type: 'integer', default: 50)),
-            new OA\Parameter(name: 'offset', description: 'Result offset', in: 'query', schema: new OA\Schema(type: 'integer', default: 0)),
+            new OA\Parameter(name: 'limit', description: 'Results per page', in: 'query', schema: new OA\Schema(type: 'integer', default: 50, maximum: 100, minimum: 1)),
+            new OA\Parameter(name: 'offset', description: 'Result offset', in: 'query', schema: new OA\Schema(type: 'integer', default: 0, minimum: 0)),
         ],
         responses: [
             new OA\Response(
@@ -49,13 +50,22 @@ final class AdminLoginBlockController
                     ],
                 ),
             ),
+            new OA\Response(response: '400', description: 'Invalid pagination', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('', name: 'list', methods: ['GET'])]
     public function list(Request $request): JsonResponse
     {
-        $limit = (int) $request->query->get('limit', 50);
-        $offset = (int) $request->query->get('offset', 0);
+        try {
+            $limit = $request->query->getInt('limit', 50);
+            $offset = $request->query->getInt('offset', 0);
+        } catch (BadRequestException) {
+            return $this->errorResponse('Limit and offset must be integers.');
+        }
+
+        if ($limit < 1 || $limit > 100 || $offset < 0) {
+            return $this->errorResponse('Limit must be between 1 and 100 and offset must be nonnegative.');
+        }
 
         $blocks = $this->repository->findRecent($limit, $offset);
         $total = $this->repository->countRecent();
