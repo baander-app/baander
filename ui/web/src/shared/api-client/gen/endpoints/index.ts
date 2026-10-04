@@ -2084,10 +2084,13 @@ role?: GetAdminUsersListRole;
 disabled?: boolean;
 /**
  * Results per page
+ * @minimum 1
+ * @maximum 100
  */
 limit?: number;
 /**
  * Result offset
+ * @minimum 0
  */
 offset?: number;
 };
@@ -7155,12 +7158,19 @@ export type getAdminUsersListResponse200 = {
   status: 200
 }
 
+export type getAdminUsersListResponse400 = {
+  data: ApiError
+  status: 400
+}
+
 export type getAdminUsersListResponseSuccess = (getAdminUsersListResponse200) & {
   headers: Headers;
 };
-;
+export type getAdminUsersListResponseError = (getAdminUsersListResponse400) & {
+  headers: Headers;
+};
 
-export type getAdminUsersListResponse = (getAdminUsersListResponseSuccess)
+export type getAdminUsersListResponse = (getAdminUsersListResponseSuccess | getAdminUsersListResponseError)
 
 export const getGetAdminUsersListUrl = (params?: GetAdminUsersListParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -7202,7 +7212,7 @@ export const getGetAdminUsersListQueryKey = (params?: GetAdminUsersListParams,) 
     }
 
 
-export const getGetAdminUsersListQueryOptions = <TData = Awaited<ReturnType<typeof getAdminUsersList>>, TError = ErrorType<unknown>>(params?: GetAdminUsersListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUsersList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetAdminUsersListQueryOptions = <TData = Awaited<ReturnType<typeof getAdminUsersList>>, TError = ErrorType<ApiError>>(params?: GetAdminUsersListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUsersList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -7221,10 +7231,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetAdminUsersListQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminUsersList>>>
-export type GetAdminUsersListQueryError = ErrorType<unknown>
+export type GetAdminUsersListQueryError = ErrorType<ApiError>
 
 
-export function useGetAdminUsersList<TData = Awaited<ReturnType<typeof getAdminUsersList>>, TError = ErrorType<unknown>>(
+export function useGetAdminUsersList<TData = Awaited<ReturnType<typeof getAdminUsersList>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetAdminUsersListParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUsersList>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getAdminUsersList>>,
@@ -7234,7 +7244,7 @@ export function useGetAdminUsersList<TData = Awaited<ReturnType<typeof getAdminU
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetAdminUsersList<TData = Awaited<ReturnType<typeof getAdminUsersList>>, TError = ErrorType<unknown>>(
+export function useGetAdminUsersList<TData = Awaited<ReturnType<typeof getAdminUsersList>>, TError = ErrorType<ApiError>>(
  params?: GetAdminUsersListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUsersList>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getAdminUsersList>>,
@@ -7244,7 +7254,7 @@ export function useGetAdminUsersList<TData = Awaited<ReturnType<typeof getAdminU
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetAdminUsersList<TData = Awaited<ReturnType<typeof getAdminUsersList>>, TError = ErrorType<unknown>>(
+export function useGetAdminUsersList<TData = Awaited<ReturnType<typeof getAdminUsersList>>, TError = ErrorType<ApiError>>(
  params?: GetAdminUsersListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUsersList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -7252,7 +7262,7 @@ export function useGetAdminUsersList<TData = Awaited<ReturnType<typeof getAdminU
  * @summary List all users (paginated)
  */
 
-export function useGetAdminUsersList<TData = Awaited<ReturnType<typeof getAdminUsersList>>, TError = ErrorType<unknown>>(
+export function useGetAdminUsersList<TData = Awaited<ReturnType<typeof getAdminUsersList>>, TError = ErrorType<ApiError>>(
  params?: GetAdminUsersListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUsersList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {

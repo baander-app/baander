@@ -803,7 +803,9 @@
                         "description": "Results per page",
                         "schema": {
                             "type": "integer",
-                            "default": 50
+                            "default": 50,
+                            "maximum": 100,
+                            "minimum": 1
                         }
                     },
                     {
@@ -812,7 +814,8 @@
                         "description": "Result offset",
                         "schema": {
                             "type": "integer",
-                            "default": 0
+                            "default": 0,
+                            "minimum": 0
                         }
                     }
                 ],
@@ -845,6 +848,16 @@
                                         }
                                     },
                                     "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid pagination",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
