@@ -14,6 +14,7 @@ use App\Session\Interface\Request\ClaimSessionRequest;
 use App\Session\Interface\Request\CreateSessionRequest;
 use App\Session\Interface\Request\SyncSessionRequest;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Request;
@@ -23,9 +24,9 @@ use Symfony\Component\Messenger\Stamp\HandledStamp;
 
 final class SessionControllerTest extends TestCase
 {
-    private Security $security;
-    private SessionPortInterface $sessionPort;
-    private MessageBusInterface $commandBus;
+    private Security&Stub $security;
+    private SessionPortInterface&Stub $sessionPort;
+    private MessageBusInterface&Stub $commandBus;
     private SessionController $controller;
 
     protected function setUp(): void

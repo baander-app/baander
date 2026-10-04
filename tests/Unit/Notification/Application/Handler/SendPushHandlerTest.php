@@ -71,6 +71,7 @@ final class SendPushHandlerTest extends TestCase
         $this->handler($repository, $webPush)($this->command());
     }
 
+    /** @return iterable<string, array{int|null}> */
     public static function failedReports(): iterable
     {
         yield 'authentication' => [401];
@@ -97,6 +98,7 @@ final class SendPushHandlerTest extends TestCase
         $this->handler($repository, $webPush)($this->command());
     }
 
+    /** @return iterable<string, array{int}> */
     public static function expiredReports(): iterable
     {
         yield 'not found' => [404];

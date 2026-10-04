@@ -296,6 +296,7 @@ final class PlayerPreferencesControllerTest extends TestCase
     // Helpers
     // ---------------------------------------------------------------
 
+    /** @return array{shuffle: bool, repeat: string, volume: float, muted: bool, crossfadeEnabled: bool, crossfadeDuration: float, replayGainEnabled: bool, replayGainMode: string, replayGainPreAmp: float} */
     private function validPayload(float $volume = 0.8, string $repeat = 'off'): array
     {
         return [
@@ -311,6 +312,7 @@ final class PlayerPreferencesControllerTest extends TestCase
         ];
     }
 
+    /** @param array<string, mixed> $payload */
     private function savePreferences(User $user, array $payload, int $version): Response
     {
         $this->client->request('PUT', '/api/user/player-preferences/', [], [], [

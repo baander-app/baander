@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Controller;
 
+use App\Auth\Domain\Model\User;
 use App\Tests\Functional\TestCase;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Functional tests for user favorites (Favorites bounded context).
@@ -175,7 +177,7 @@ final class FavoritesControllerTest extends TestCase
     // Helpers
     // ---------------------------------------------------------------
 
-    private function addFavorite($user, string $entityType, string $entityPublicId)
+    private function addFavorite(User $user, string $entityType, string $entityPublicId): Response
     {
         return $this->authenticatedRequest('POST', '/api/favorites/', $user, [
             'entityType' => $entityType,

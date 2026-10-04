@@ -15,13 +15,14 @@ use App\Party\Domain\Model\SyncedPartySession;
 use App\Party\Domain\ValueObject\MemberRole;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 final class CreatePartySessionHandlerTest extends TestCase
 {
-    private PartySessionPortInterface $sessionPort;
-    private PartyMemberPortInterface $memberPort;
+    private PartySessionPortInterface&Stub $sessionPort;
+    private PartyMemberPortInterface&Stub $memberPort;
     private EventDispatcherInterface&MockObject $eventDispatcher;
     private CreatePartySessionHandler $handler;
 

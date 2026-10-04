@@ -15,6 +15,7 @@ use App\Notification\Domain\Model\Notification;
 use App\Notification\Domain\Repository\NotificationRepositoryInterface;
 use App\Notification\Domain\Service\EventCategoryResolver;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -24,11 +25,11 @@ final class CreateNotificationHandlerTest extends TestCase
 {
     private EventCategoryResolver $categoryResolver;
     private NotificationContentResolver $contentResolver;
-    private TranslatorInterface $translator;
-    private NotificationRepositoryInterface $notificationRepository;
-    private LibraryMembershipQueryPort $libraryMembershipQuery;
-    private UserRepositoryInterface $userRepository;
-    private MessageBusInterface $bus;
+    private TranslatorInterface&Stub $translator;
+    private NotificationRepositoryInterface&Stub $notificationRepository;
+    private LibraryMembershipQueryPort&Stub $libraryMembershipQuery;
+    private UserRepositoryInterface&Stub $userRepository;
+    private MessageBusInterface&Stub $bus;
 
     protected function setUp(): void
     {

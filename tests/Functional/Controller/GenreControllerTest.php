@@ -6,6 +6,7 @@ namespace App\Tests\Functional\Controller;
 
 use App\Auth\Domain\Model\User;
 use App\Tests\Functional\TestCase;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Functional tests for genre management (Catalog bounded context).
@@ -233,7 +234,7 @@ final class GenreControllerTest extends TestCase
     // Helpers
     // ---------------------------------------------------------------
 
-    private function createGenre(User $admin, string $name, string $slug)
+    private function createGenre(User $admin, string $name, string $slug): Response
     {
         return $this->authenticatedRequest('POST', '/api/genres/', $admin, [
             'name' => $name,

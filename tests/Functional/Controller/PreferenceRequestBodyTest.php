@@ -12,6 +12,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 final class PreferenceRequestBodyTest extends TestCase
 {
+    /** @param 'audio'|'layout'|'player' $preference */
     #[DataProvider('invalidBodies')]
     public function testInvalidEnvelopePreservesPreferencesAndHistory(
         string $preference,
@@ -40,7 +41,7 @@ final class PreferenceRequestBodyTest extends TestCase
         $this->assertNotSame('', $error['error']['message']);
     }
 
-    /** @return iterable<string, array{string, string, string, string, int}> */
+    /** @return iterable<string, array{'audio'|'layout'|'player', string, string, string, int}> */
     public static function invalidBodies(): iterable
     {
         foreach (['audio', 'player', 'layout'] as $preference) {
@@ -70,7 +71,10 @@ final class PreferenceRequestBodyTest extends TestCase
         }
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @param 'audio'|'layout'|'player' $preference
+     * @return array<string, mixed>
+     */
     private static function validPayload(string $preference): array
     {
         return match ($preference) {

@@ -14,6 +14,7 @@ use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\Exception\TransportException;
@@ -45,6 +46,7 @@ final class WebhookFailurePropagationTest extends TestCase
         }
     }
 
+    /** @return iterable<string, array{int|null}> */
     public static function transientStatuses(): iterable
     {
         yield 'timeout' => [408];
@@ -62,6 +64,7 @@ final class WebhookFailurePropagationTest extends TestCase
         self::assertSame(1, $client->getRequestsCount());
     }
 
+    /** @return iterable<string, array{int}> */
     public static function permanentStatuses(): iterable
     {
         yield 'redirect' => [302];
@@ -170,7 +173,7 @@ final class WebhookFailurePropagationTest extends TestCase
     }
 
     /** @param list<WebhookEntity> $webhooks */
-    private function service(array $webhooks, MockHttpClient $client, ?EntityManagerInterface $em = null, ?WebhookSecretPortInterface $secrets = null, ?WebhookDestinationPolicy $policy = null): WebhookDeliveryService
+    private function service(array $webhooks, MockHttpClient $client, (EntityManagerInterface&Stub)|null $em = null, ?WebhookSecretPortInterface $secrets = null, ?WebhookDestinationPolicy $policy = null): WebhookDeliveryService
     {
         $repository = $this->createStub(EntityRepository::class);
         $repository->method('findAll')->willReturn($webhooks);

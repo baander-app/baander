@@ -7,6 +7,7 @@ namespace App\Tests\Functional\Controller;
 use App\Auth\Domain\Model\User;
 use App\Tests\Fixtures\AudioPreferencePayload;
 use App\Tests\Functional\TestCase;
+use Symfony\Component\HttpFoundation\Response;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
@@ -227,6 +228,7 @@ final class AudioPreferencesControllerTest extends TestCase
         $this->assertSame(500, $response->getStatusCode(), $response->getContent());
     }
 
+    /** @param array<string, mixed> $payload */
     #[DataProvider('validPayloads')]
     public function testSaveAcceptsCompleteBoundaryAndEnumSnapshots(array $payload): void
     {
@@ -266,6 +268,7 @@ final class AudioPreferencesControllerTest extends TestCase
         }
     }
 
+    /** @param array<string, mixed> $payload */
     #[DataProvider('invalidPayloads')]
     public function testInvalidPayloadPreservesSavedPreferencesAndHistory(array $payload): void
     {
@@ -330,7 +333,8 @@ final class AudioPreferencesControllerTest extends TestCase
     // Helpers
     // ---------------------------------------------------------------
 
-    private function savePreferences(User $user, array $payload, int $version)
+    /** @param array<string, mixed> $payload */
+    private function savePreferences(User $user, array $payload, int $version): Response
     {
         return $this->authenticatedRequest('PUT', '/api/user/audio-preferences/', $user, [
             'payload' => $payload,

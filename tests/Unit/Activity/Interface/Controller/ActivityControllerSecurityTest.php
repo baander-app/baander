@@ -16,6 +16,7 @@ use App\Catalog\Application\Port\SongPortInterface;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Response;
@@ -31,14 +32,14 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  */
 final class ActivityControllerSecurityTest extends TestCase
 {
-    private Security $security;
-    private ActivityPortInterface $activityService;
+    private Security&Stub $security;
+    private ActivityPortInterface&Stub $activityService;
     private MessageBusInterface&MockObject $commandBus;
-    private SongPortInterface $songPort;
-    private AlbumPortInterface $albumPort;
-    private ArtistPortInterface $artistPort;
-    private MoviePortInterface $moviePort;
-    private ImagePortInterface $imagePort;
+    private SongPortInterface&Stub $songPort;
+    private AlbumPortInterface&Stub $albumPort;
+    private ArtistPortInterface&Stub $artistPort;
+    private MoviePortInterface&Stub $moviePort;
+    private ImagePortInterface&Stub $imagePort;
     private ActivityController $controller;
 
     protected function setUp(): void

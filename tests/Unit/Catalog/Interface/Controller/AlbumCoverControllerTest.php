@@ -14,6 +14,7 @@ use App\Media\Domain\Model\Image;
 use App\Media\Domain\Model\StoredFile;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -22,10 +23,10 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 
 final class AlbumCoverControllerTest extends TestCase
 {
-    private AlbumPortInterface $albumService;
-    private ImagePortInterface $imagePort;
-    private StoragePortInterface $storage;
-    private MimeDetectorPortInterface $mimeDetector;
+    private AlbumPortInterface&Stub $albumService;
+    private ImagePortInterface&Stub $imagePort;
+    private StoragePortInterface&Stub $storage;
+    private MimeDetectorPortInterface&Stub $mimeDetector;
     private AlbumCoverController $controller;
 
     protected function setUp(): void

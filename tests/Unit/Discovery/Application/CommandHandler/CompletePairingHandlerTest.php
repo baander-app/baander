@@ -15,14 +15,16 @@ use App\Discovery\Domain\ValueObject\PairingCode;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
+use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 final class CompletePairingHandlerTest extends TestCase
 {
-    private DiscoveryPortInterface $discoveryPort;
-    private EventDispatcherInterface $eventDispatcher;
+    private DiscoveryPortInterface&Stub $discoveryPort;
+    private EventDispatcherInterface&Stub $eventDispatcher;
     private CompletePairingHandler $handler;
 
     protected function setUp(): void
@@ -32,7 +34,7 @@ final class CompletePairingHandlerTest extends TestCase
         $this->handler = $this->createCompletePairingHandlerFixture();
     }
 
-    private function createEventDispatcher(bool $expectCalls = false): EventDispatcherInterface
+    private function createEventDispatcher(bool $expectCalls = false): EventDispatcherInterface&Stub
     {
         $double = $expectCalls ? $this->createMock(EventDispatcherInterface::class) : $this->createStub(EventDispatcherInterface::class);
         $double->method('dispatch')->willReturnCallback(fn (object $e) => $e);
@@ -61,6 +63,7 @@ final class CompletePairingHandlerTest extends TestCase
             ->method('completePairing')
             ->with($session)
             ->willReturnCallback(fn (PairingSession $s) => $s->complete());
+        self::assertInstanceOf(MockObject::class, $this->eventDispatcher);
         $this->eventDispatcher->expects($this->once())
             ->method('dispatch')
             ->with($this->callback(fn (object $e) => $e instanceof PairingCompleted));
@@ -85,6 +88,7 @@ final class CompletePairingHandlerTest extends TestCase
 
         $this->discoveryPort->method('findByPairingCode')->willReturn($session);
         $this->discoveryPort->expects($this->never())->method('completePairing');
+        self::assertInstanceOf(MockObject::class, $this->eventDispatcher);
         $this->eventDispatcher->expects($this->never())->method('dispatch');
 
         $result = ($this->handler)(new CompletePairingCommand(

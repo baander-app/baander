@@ -6,6 +6,7 @@ namespace App\Tests\Functional\Controller;
 
 use App\Auth\Domain\Model\User;
 use App\Tests\Functional\TestCase;
+use Symfony\Component\HttpFoundation\Response;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
@@ -177,6 +178,7 @@ final class LayoutPreferencesControllerTest extends TestCase
         yield 'extra field' => [['mode' => 'expanded', 'activeTab' => 'queue', 'extra' => true]];
     }
 
+    /** @param array<string, mixed> $invalidPayload */
     #[DataProvider('invalidLayouts')]
     public function testSaveRejectsInvalidLayoutWithoutChangingPayloadVersionOrHistory(array $invalidPayload): void
     {
@@ -276,12 +278,14 @@ final class LayoutPreferencesControllerTest extends TestCase
     // Helpers
     // ---------------------------------------------------------------
 
+    /** @return array{mode: string, activeTab: string} */
     private function validPayload(string $mode = 'expanded', string $activeTab = 'queue'): array
     {
         return ['mode' => $mode, 'activeTab' => $activeTab];
     }
 
-    private function savePreferences(User $user, array $payload, int $version)
+    /** @param array<string, mixed> $payload */
+    private function savePreferences(User $user, array $payload, int $version): Response
     {
         return $this->authenticatedRequest('PUT', '/api/user/layout-preferences/', $user, [
             'payload' => $payload,

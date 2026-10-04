@@ -8,11 +8,12 @@ use App\Session\Application\Command\ClaimSessionCommand;
 use App\Session\Application\CommandHandler\ClaimSessionCommandHandler;
 use App\Session\Application\Port\SessionPortInterface;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 
 final class ClaimSessionCommandHandlerTest extends TestCase
 {
-    private SessionPortInterface $sessionPort;
+    private SessionPortInterface&Stub $sessionPort;
     private ClaimSessionCommandHandler $handler;
 
     protected function setUp(): void

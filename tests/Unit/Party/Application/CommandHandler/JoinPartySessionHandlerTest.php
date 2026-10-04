@@ -18,15 +18,17 @@ use App\Party\Domain\ValueObject\PlaybackState;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
+use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 final class JoinPartySessionHandlerTest extends TestCase
 {
-    private PartySessionPortInterface $sessionPort;
-    private PartyMemberPortInterface $memberPort;
-    private EventDispatcherInterface $eventDispatcher;
+    private PartySessionPortInterface&Stub $sessionPort;
+    private PartyMemberPortInterface&Stub $memberPort;
+    private EventDispatcherInterface&Stub $eventDispatcher;
     private JoinPartySessionHandler $handler;
 
     protected function setUp(): void
@@ -37,7 +39,7 @@ final class JoinPartySessionHandlerTest extends TestCase
         $this->handler = $this->createJoinPartySessionHandlerFixture();
     }
 
-    private function createEventDispatcher(bool $expectCalls = false): EventDispatcherInterface
+    private function createEventDispatcher(bool $expectCalls = false): EventDispatcherInterface&Stub
     {
         $double = $expectCalls ? $this->createMock(EventDispatcherInterface::class) : $this->createStub(EventDispatcherInterface::class);
         $double->method('dispatch')->willReturnCallback(fn (object $e) => $e);
@@ -80,6 +82,7 @@ final class JoinPartySessionHandlerTest extends TestCase
                 return true;
             }));
 
+        self::assertInstanceOf(MockObject::class, $this->eventDispatcher);
         $this->eventDispatcher->expects($this->never())->method('dispatch');
 
         $result = ($this->handler)(new JoinPartySessionCommand($userId, $session->getId()));
@@ -105,6 +108,7 @@ final class JoinPartySessionHandlerTest extends TestCase
             ->with($userId, $session->getId())
             ->willReturn($newMember);
 
+        self::assertInstanceOf(MockObject::class, $this->eventDispatcher);
         $this->eventDispatcher->expects($this->once())
             ->method('dispatch')
             ->with($this->callback(function (object $e) use ($userId, $session): bool {

@@ -10,12 +10,13 @@ use App\Favorites\Application\Port\FavoritesPortInterface;
 use App\Favorites\Domain\Model\UserFavorite;
 use App\Favorites\Domain\ValueObject\FavoriteType;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use ValueError;
 
 final class AddFavoriteHandlerTest extends TestCase
 {
-    private FavoritesPortInterface $favoritesPort;
+    private FavoritesPortInterface&Stub $favoritesPort;
     private AddFavoriteHandler $handler;
 
     protected function setUp(): void

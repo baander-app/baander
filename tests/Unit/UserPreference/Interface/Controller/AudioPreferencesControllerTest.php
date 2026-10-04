@@ -8,6 +8,7 @@ use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Shared\Domain\Model\Uuid;
 use App\UserPreference\Application\Port\AudioPreferencesPortInterface;
 use App\UserPreference\Interface\Controller\AudioPreferencesController;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Request;
@@ -18,9 +19,9 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 final class AudioPreferencesControllerTest extends TestCase
 {
-    private AudioPreferencesPortInterface $port;
-    private ValidatorInterface $validator;
-    private Security $security;
+    private AudioPreferencesPortInterface&Stub $port;
+    private ValidatorInterface&Stub $validator;
+    private Security&Stub $security;
     private AudioPreferencesController $controller;
 
     protected function setUp(): void

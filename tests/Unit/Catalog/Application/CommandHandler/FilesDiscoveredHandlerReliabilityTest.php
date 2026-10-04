@@ -20,6 +20,7 @@ use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Psr\Log\NullLogger;
@@ -271,10 +272,13 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
         self::fail('Song flush failure must reach Messenger before cover dispatch.');
     }
 
+    /**
+     * @return array{FilesDiscoveredHandler, FilesDiscovered, SongPortInterface&MockObject, MessageBusInterface&MockObject, object{album: Album|null, pendingSongs: list<Song>, visibleSongs: list<Song>, events: list<string>} & \stdClass}
+     */
     private function prepareCoverFanout(int $attempts = 1, ?Album $existingAlbum = null, ?LoggerInterface $logger = null, ?RuntimeException $persistFailure = null, ?RuntimeException $flushFailure = null): array
     {
         $libraryId = Uuid::v7();
-        $state = (object) ['album' => $existingAlbum, 'pendingSongs' => [], 'visibleSongs' => [], 'events' => []];
+        $state = $this->createCoverFanoutState($existingAlbum);
         $albumPort = $this->createStub(AlbumPortInterface::class);
         $albumPort->method('findByTitleAndLibrary')->willReturnCallback(static fn (): ?Album => $state->album);
         $albumPort->method('persist')->willReturnCallback(static function (Album $album) use ($state): void {
@@ -319,6 +323,17 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
         $message = new FilesDiscovered($libraryId, 'music', '/music/Test Album', [$file]);
 
         return [$handler, $message, $songPort, $bus, $state];
+    }
+
+    /** @return object{album: Album|null, pendingSongs: list<Song>, visibleSongs: list<Song>, events: list<string>}&\stdClass */
+    private function createCoverFanoutState(?Album $existingAlbum): \stdClass
+    {
+        return (object) [
+            'album' => $existingAlbum,
+            'pendingSongs' => [],
+            'visibleSongs' => [],
+            'events' => [],
+        ];
     }
 
 }

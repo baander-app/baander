@@ -13,6 +13,7 @@ use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
@@ -22,10 +23,11 @@ final class WebhookDeliveryServiceTest extends TestCase
 {
     private WebhookDeliveryService $service;
     private EntityManagerInterface&MockObject $entityManager;
-    private HttpClientInterface $httpClient;
+    private HttpClientInterface&Stub $httpClient;
     private HmacSigner $hmacSigner;
-    private LoggerInterface $logger;
-    private EntityRepository $webhookRepo;
+    private LoggerInterface&Stub $logger;
+    /** @var EntityRepository<WebhookEntity>&Stub */
+    private EntityRepository&Stub $webhookRepo;
 
     protected function setUp(): void
     {

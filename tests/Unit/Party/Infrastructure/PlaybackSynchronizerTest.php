@@ -12,13 +12,14 @@ use App\Party\Domain\ValueObject\MemberRole;
 use App\Party\Infrastructure\PlaybackSynchronizer;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 final class PlaybackSynchronizerTest extends TestCase
 {
-    private PartySessionPortInterface $sessionPort;
-    private PartyMemberPortInterface $memberPort;
+    private PartySessionPortInterface&Stub $sessionPort;
+    private PartyMemberPortInterface&Stub $memberPort;
     private PlaybackSynchronizer $synchronizer;
 
     protected function setUp(): void

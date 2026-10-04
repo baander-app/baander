@@ -10,6 +10,7 @@ use App\Notification\Domain\Repository\NotificationPreferenceRepositoryInterface
 use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Notification\Domain\ValueObject\NotificationChannel;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mailer\MailerInterface;
@@ -18,10 +19,10 @@ use Twig\Environment;
 
 final class SendEmailHandlerTest extends TestCase
 {
-    private NotificationPreferenceRepositoryInterface $preferenceRepository;
-    private MailerInterface $mailer;
-    private Environment $twig;
-    private LoggerInterface $logger;
+    private NotificationPreferenceRepositoryInterface&Stub $preferenceRepository;
+    private MailerInterface&Stub $mailer;
+    private Environment&Stub $twig;
+    private LoggerInterface&Stub $logger;
 
     protected function setUp(): void
     {

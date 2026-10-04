@@ -15,16 +15,17 @@ use App\Lyrics\Application\Port\LrclibClientInterface;
 use App\Lyrics\Domain\Model\Lyrics;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
 final class FetchLyricsHandlerTest extends TestCase
 {
-    private SongPortInterface $songPort;
-    private AlbumPortInterface $albumPort;
-    private LrclibClientInterface $lrclibClient;
-    private LyricsRepositoryInterface $lyricsRepository;
-    private LoggerInterface $logger;
+    private SongPortInterface&Stub $songPort;
+    private AlbumPortInterface&Stub $albumPort;
+    private LrclibClientInterface&Stub $lrclibClient;
+    private LyricsRepositoryInterface&Stub $lyricsRepository;
+    private LoggerInterface&Stub $logger;
     private FetchLyricsHandler $handler;
 
     protected function setUp(): void
