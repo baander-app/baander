@@ -40,6 +40,7 @@ final class UserResource extends AbstractResource
     /**
      * @deprecated Use from() instead. Kept for backward compatibility during migration.
      */
+    /** @return array{uuid: string, publicId: string, name: string, email: string, emailVerifiedAt: string|null, createdAt: string, roles: array<array-key, string>} */
     public static function fromDomain(User $user): array
     {
         return self::from($user);

@@ -27,7 +27,7 @@ final class ScopeRepository implements ScopeRepositoryInterface
     ) {
     }
 
-    public function getScopeEntityByIdentifier(string $identifier): ?ScopeEntityInterface
+    public function getScopeEntityByIdentifier(string $identifier): ScopeEntityInterface
     {
         return new ScopeEntity($identifier, '');
     }

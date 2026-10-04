@@ -34,10 +34,10 @@ final class TotpServiceTest extends TestCase
     public function testGetProvisioningUri(): void
     {
         $secret = $this->service->generateSecret();
-        $uri = $this->service->getProvisioningUri($secret, 'user@example.com');
+        $uri = $this->service->getProvisioningUri($secret, 'user@baander.app');
 
         $this->assertStringStartsWith('otpauth://totp/', $uri);
-        $this->assertStringContainsString('user%40example.com', $uri);
+        $this->assertStringContainsString('user%40baander.app', $uri);
         $this->assertStringContainsString('issuer=TestApp', $uri);
     }
 
@@ -45,9 +45,8 @@ final class TotpServiceTest extends TestCase
     {
         $secret = $this->service->generateSecret();
 
-        // OTPHP verify won't accept random codes, but the method itself should not throw
-        $result = $this->service->verifyCode($secret, '123456');
+        $code = \OTPHP\TOTP::create($secret)->now();
 
-        $this->assertIsBool($result);
+        $this->assertTrue($this->service->verifyCode($secret, $code));
     }
 }

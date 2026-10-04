@@ -18,6 +18,7 @@ final class Passkey
     /**
      * Create a new passkey via registration.
      */
+    /** @param array<array-key, mixed> $data */
     public static function create(
         Uuid $id,
         string $name,
@@ -89,6 +90,7 @@ final class Passkey
         return $this->state->credentialId;
     }
 
+    /** @return array<array-key, mixed> */
     public function getData(): array
     {
         return $this->state->data;

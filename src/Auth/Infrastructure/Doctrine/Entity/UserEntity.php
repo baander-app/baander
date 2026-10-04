@@ -43,12 +43,14 @@ class UserEntity
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $updatedAt;
 
+    /** @var array<array-key, string> */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '["ROLE_USER"]'])]
     private array $roles = ['ROLE_USER'];
 
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
     private bool $disabled = false;
 
+    /** @param array<array-key, string> $roles */
     public function __construct(
         PublicId $publicId,
         string $name,
@@ -143,11 +145,13 @@ class UserEntity
         $this->totp_secret = $totp_secret;
     }
 
+    /** @return array<array-key, string> */
     public function getRoles(): array
     {
         return $this->roles;
     }
 
+    /** @param array<array-key, string> $roles */
     public function setRoles(array $roles): void
     {
         $this->roles = $roles;

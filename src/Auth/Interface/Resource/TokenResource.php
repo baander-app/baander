@@ -52,6 +52,7 @@ final class TokenResource extends AbstractResource
     /**
      * @deprecated Use from() instead. Kept for backward compatibility during migration.
      */
+    /** @return array{accessToken: string, tokenType: string, expiresIn: int, refreshToken: string|null} */
     public static function fromDto(TokenResponseDTO $dto): array
     {
         return self::from($dto);

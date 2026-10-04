@@ -95,6 +95,7 @@ final class RateLimitListenerTest extends TestCase
         );
     }
 
+    /** @param array<string, mixed> $body */
     private function createJsonRequest(string $path, string $method = 'POST', array $body = [], string $ip = '192.168.1.1'): Request
     {
         $request = Request::create($path, $method, [], [], [], [

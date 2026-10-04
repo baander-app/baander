@@ -20,6 +20,7 @@ final readonly class PasswordChanged extends AbstractDomainEvent
         parent::__construct($occurredAt);
     }
 
+    /** @param array<string, mixed> $payload */
     public static function fromPayload(array $payload): static
     {
         return new self(
@@ -29,6 +30,7 @@ final readonly class PasswordChanged extends AbstractDomainEvent
         );
     }
 
+    /** @return array<string, mixed> */
     public function toPayload(): array
     {
         return [

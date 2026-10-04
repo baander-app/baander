@@ -70,7 +70,7 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
         $this->domainRepository->save($domain);
     }
 
-    public function revokeRefreshToken($tokenId): void
+    public function revokeRefreshToken(string $tokenId): void
     {
         $domain = $this->domainRepository->findByTokenId(TokenId::fromString($tokenId));
 
@@ -80,7 +80,7 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
         }
     }
 
-    public function isRefreshTokenRevoked($tokenId): bool
+    public function isRefreshTokenRevoked(string $tokenId): bool
     {
         $domain = $this->domainRepository->findByTokenId(TokenId::fromString($tokenId));
 
@@ -126,7 +126,7 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
                 return 'stub-client';
             }
 
-            public function getRedirectUri(): string|array
+            public function getRedirectUri(): string
             {
                 return '';
             }

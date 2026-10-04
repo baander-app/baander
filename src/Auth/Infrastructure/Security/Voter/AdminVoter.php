@@ -11,6 +11,8 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
 /**
  * Voter for administrative access control.
  *
+ * @extends Voter<string, mixed>
+ *
  * Single attribute: ADMIN_ACCESS — grants access only to users
  * with the ROLE_ADMIN role. All other users are denied.
  */

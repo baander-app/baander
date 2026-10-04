@@ -13,12 +13,12 @@ use App\Auth\Interface\Controller\User\AuthController;
 use App\Auth\Interface\Request\User\VerifyEmailRequest;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
-use Symfony\Bridge\PsrHttpMessage\HttpMessageFactoryInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Messenger\Envelope;
@@ -35,10 +35,9 @@ use Webauthn\Counter\CounterChecker;
  */
 final class AuthControllerVerifyEmailTest extends TestCase
 {
-    private Security $security;
+    private Security&Stub $security;
     private MessageBusInterface&MockObject $commandBus;
     private UserPortInterface $userService;
-    private HttpMessageFactoryInterface $psrHttpFactory;
     private JsonEncoder $jsonEncoder;
     private AuthController $controller;
 
@@ -47,7 +46,6 @@ final class AuthControllerVerifyEmailTest extends TestCase
         $this->security = $this->createStub(Security::class);
         $this->commandBus = $this->createMock(MessageBusInterface::class);
         $this->userService = $this->createStub(UserPortInterface::class);
-        $this->psrHttpFactory = $this->createStub(HttpMessageFactoryInterface::class);
         $this->jsonEncoder = new JsonEncoder();
 
         // verifyEmail() does not use these dependencies, but they are final and
@@ -79,7 +77,6 @@ final class AuthControllerVerifyEmailTest extends TestCase
             $this->security,
             $this->commandBus,
             $this->userService,
-            $this->psrHttpFactory,
             $passkeyService,
             $dpopProofValidator,
             $dpopNonceManager,
@@ -90,6 +87,13 @@ final class AuthControllerVerifyEmailTest extends TestCase
         $translator = $this->createStub(TranslatorInterface::class);
         $translator->method('trans')->willReturnArgument(0);
         $this->controller->setTranslator($translator);
+    }
+
+    public function testMeRejectsPrincipalWithoutApplicationIdentity(): void
+    {
+        $this->security->method('getUser')->willReturn($this->createStub(\Symfony\Component\Security\Core\User\UserInterface::class));
+        $this->commandBus->expects($this->never())->method('dispatch');
+        $this->assertSame(Response::HTTP_NOT_FOUND, $this->controller->me()->getStatusCode());
     }
 
     public function testVerifyEmailDispatchesCommandAndMarksVerified(): void

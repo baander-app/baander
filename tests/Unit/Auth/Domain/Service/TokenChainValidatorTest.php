@@ -57,7 +57,7 @@ final class TokenChainValidatorTest extends TestCase
 
         $this->validator->validate($token, null);
 
-        $this->assertTrue(true);
+        $this->assertFalse($token->isRevoked());
     }
 
     public function testValidateReplayRevokesChain(): void
@@ -121,7 +121,7 @@ final class TokenChainValidatorTest extends TestCase
 
         $this->validator->validateWithLoadedPrevious($token);
 
-        $this->assertTrue(true);
+        $this->assertFalse($token->isRevoked());
     }
 
     public function testRevokeChain(): void

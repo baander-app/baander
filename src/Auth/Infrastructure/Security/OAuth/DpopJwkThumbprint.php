@@ -14,6 +14,7 @@ final class DpopJwkThumbprint
         'OKP' => ['crv', 'kty', 'x'],
     ];
 
+    /** @param array<string, mixed> $jwk */
     public static function compute(array $jwk): string
     {
         $kty = $jwk['kty'] ?? null;

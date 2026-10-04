@@ -41,7 +41,7 @@ final class OAuth2Authenticator extends AbstractAuthenticator
     ) {
     }
 
-    public function supports(Request $request): ?bool
+    public function supports(Request $request): bool
     {
         $authHeader = $request->headers->get('Authorization', '');
 
@@ -176,7 +176,7 @@ final class OAuth2Authenticator extends AbstractAuthenticator
         }
     }
 
-    public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response
+    public function onAuthenticationFailure(Request $request, AuthenticationException $exception): Response
     {
         $messageData = $exception instanceof CustomUserMessageAuthenticationException
             ? $exception->getMessageData()

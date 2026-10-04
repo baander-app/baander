@@ -27,6 +27,7 @@ final class CreateUserCommandTest extends TestCase
         $this->command = new CreateUserCommand($this->commandBus);
     }
 
+    /** @param array<array-key, string> $roles */
     private function mockDispatchReturningUser(
         string $publicId = 'usr_test123',
         string $name = 'Alice',

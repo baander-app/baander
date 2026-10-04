@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Controller\User;
 
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Application\Command\OAuth\IssueTokenCommand;
 use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Domain\Model\OAuth\ValueObject\DpopValidationResult;
@@ -63,7 +64,7 @@ final class LoginController
     public function __invoke(Request $request): JsonResponse
     {
         $securityUser = $this->security->getUser();
-        if ($securityUser === null) {
+        if (!$securityUser instanceof AuthenticatedUserIdentityInterface) {
             return $this->unauthorized();
         }
 

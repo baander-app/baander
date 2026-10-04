@@ -8,6 +8,7 @@ use App\Auth\Application\Command\OAuth\RefreshTokenCommand;
 use App\Auth\Application\Command\User\RegisterUserCommand;
 use App\Auth\Application\Command\User\RequestPasswordResetCommand;
 use App\Auth\Application\Command\OAuth\RevokeTokenCommand;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Application\Port\UserPortInterface;
 use App\Auth\Domain\Model\User;
 use App\Auth\Infrastructure\Security\OAuth\DpopNonceManager;
@@ -30,13 +31,11 @@ use App\Shared\Interface\Controller\TranslatorTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
-use Symfony\Bridge\PsrHttpMessage\HttpMessageFactoryInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
-use Symfony\Component\Messenger\Exception\ExceptionInterface;
 use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
@@ -54,7 +53,6 @@ final class AuthController
         private readonly Security $security,
         private readonly MessageBusInterface $commandBus,
         private readonly UserPortInterface $userService,
-        private readonly HttpMessageFactoryInterface $psrHttpFactory,
         private readonly PasskeyService $passkeyService,
         private readonly DpopProofValidator $dpopProofValidator,
         private readonly DpopNonceManager $dpopNonceManager,
@@ -104,7 +102,7 @@ final class AuthController
             $envelope = $this->commandBus->dispatch($command);
             $stamp = $envelope->last(HandledStamp::class);
             $user = $stamp?->getResult();
-        } catch (ExceptionInterface|\Throwable $e) {
+        } catch (\Throwable $e) {
             return $this->handleCommandException(
                 $e,
                 $this->trans('errors.internal', domain: 'auth'),
@@ -157,7 +155,7 @@ final class AuthController
 
         try {
             $this->commandBus->dispatch($command);
-        } catch (ExceptionInterface|\Throwable $e) {
+        } catch (\Throwable $e) {
             // RFC 7009: revocation endpoint must return 200 even on failure.
             $this->logger->warning('Token revocation failed during logout.', [
                 'exception' => $e,
@@ -238,7 +236,7 @@ final class AuthController
             $envelope = $this->commandBus->dispatch($command);
             $stamp = $envelope->last(HandledStamp::class);
             $tokenResponse = $stamp?->getResult();
-        } catch (ExceptionInterface|\Throwable $e) {
+        } catch (\Throwable $e) {
             return $this->handleCommandException(
                 $e,
                 $this->trans('errors.internal', domain: 'auth'),
@@ -294,7 +292,7 @@ final class AuthController
 
         try {
             $this->commandBus->dispatch($command);
-        } catch (ExceptionInterface|\Throwable $e) {
+        } catch (\Throwable $e) {
             // Always return 200 to avoid revealing whether the email exists.
             $this->logger->error('Password reset request failed.', [
                 'exception' => $e,
@@ -444,7 +442,7 @@ final class AuthController
             $envelope = $this->commandBus->dispatch($command);
             $stamp = $envelope->last(HandledStamp::class);
             $verified = $stamp?->getResult() === true;
-        } catch (ExceptionInterface|\Throwable $e) {
+        } catch (\Throwable $e) {
             return $this->handleCommandException(
                 $e,
                 $this->trans('errors.email_verification_failed', domain: 'auth'),
@@ -582,7 +580,7 @@ final class AuthController
     private function getCurrentUser(): ?User
     {
         $securityUser = $this->security->getUser();
-        if ($securityUser === null) {
+        if (!$securityUser instanceof AuthenticatedUserIdentityInterface) {
             return null;
         }
 

@@ -39,6 +39,7 @@ final readonly class TokenRevoked extends AbstractDomainEvent
         return $this->userId;
     }
 
+    /** @param array<string, mixed> $payload */
     public static function fromPayload(array $payload): static
     {
         return new self(
@@ -49,6 +50,7 @@ final readonly class TokenRevoked extends AbstractDomainEvent
         );
     }
 
+    /** @return array<string, mixed> */
     public function toPayload(): array
     {
         return [

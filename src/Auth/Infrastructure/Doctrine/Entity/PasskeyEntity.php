@@ -28,6 +28,7 @@ class PasskeyEntity
     #[ORM\Column(type: 'text')]
     private string $credentialId;
 
+    /** @var array<array-key, mixed> */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '{}'])]
     private array $data;
 
@@ -43,6 +44,7 @@ class PasskeyEntity
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $updatedAt;
 
+    /** @param array<array-key, mixed> $data */
     public function __construct(
         UserEntity $user,
         string $name,
@@ -87,11 +89,13 @@ class PasskeyEntity
         return $this->credentialId;
     }
 
+    /** @return array<array-key, mixed> */
     public function getData(): array
     {
         return $this->data;
     }
 
+    /** @param array<array-key, mixed> $data */
     public function setData(array $data): void
     {
         $this->data = $data;

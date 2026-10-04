@@ -20,6 +20,7 @@ final class TokenMetadata
     /** @var array<int, array{ip: string, seen_at: string}> */
     private array $ipHistory;
 
+    /** @param array<int, array{ip: string, seen_at: string}> $ipHistoryParam */
     private function __construct(
         private readonly Uuid $id,
         private readonly Uuid $tokenId,

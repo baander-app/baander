@@ -11,13 +11,14 @@ use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Auth\Infrastructure\Security\UserProvider;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Security\Core\Exception\UnsupportedUserException;
 use Symfony\Component\Security\Core\Exception\UserNotFoundException;
 
 final class UserProviderTest extends TestCase
 {
-    private UserRepositoryInterface $userRepository;
+    private UserRepositoryInterface&Stub $userRepository;
     private UserProvider $provider;
 
     protected function setUp(): void
@@ -30,25 +31,11 @@ final class UserProviderTest extends TestCase
     {
         $fixture = new UserProvider(
             $this->userRepository,
-            $this->createPasswordHasher(),
         );
         return $fixture;
     }
 
-    private function createPasswordHasher(): \App\Auth\Infrastructure\Security\User\PasswordHasher
-    {
-        $factory = $this->createMock(
-            \Symfony\Component\PasswordHasher\Hasher\PasswordHasherFactoryInterface::class,
-        );
-        $symfonyHasher = $this->createStub(
-            \Symfony\Component\PasswordHasher\PasswordHasherInterface::class,
-        );
-        $factory->expects($this->once())->method('getPasswordHasher')->with(SecurityUser::class)->willReturn($symfonyHasher);
-
-        return new \App\Auth\Infrastructure\Security\User\PasswordHasher($factory);
-    }
-
-    private function createDomainUser(string $email = 'test@example.com', string $password = 'hashed-pw'): User
+    private function createDomainUser(string $email = 'test@baander.app', string $password = 'hashed-pw'): User
     {
         return User::reconstitute(new UserState(
             id: Uuid::v4(),
@@ -82,7 +69,7 @@ final class UserProviderTest extends TestCase
         $this->userRepository = $this->createMock(UserRepositoryInterface::class);
         $this->provider = $this->createUserProviderFixture();
 
-        $email = 'test@example.com';
+        $email = 'test@baander.app';
         $domainUser = $this->createDomainUser($email, 'hashed-pw');
 
         $this->userRepository
@@ -101,14 +88,14 @@ final class UserProviderTest extends TestCase
 
     public function testThrowsWhenUserNotFoundByEmail(): void
     {
-        $email = 'nonexistent@example.com';
+        $email = 'nonexistent@baander.app';
 
         $this->userRepository
             ->method('findByEmail')
             ->willReturn(null);
 
         $this->expectException(UserNotFoundException::class);
-        $this->expectExceptionMessage('User "nonexistent@example.com" not found.');
+        $this->expectExceptionMessage('User "nonexistent@baander.app" not found.');
 
         $this->provider->loadUserByIdentifier($email);
     }
@@ -127,10 +114,10 @@ final class UserProviderTest extends TestCase
         $this->userRepository = $this->createMock(UserRepositoryInterface::class);
         $this->provider = $this->createUserProviderFixture();
 
-        $domainUser = $this->createDomainUser('test@example.com', 'new-hash');
+        $domainUser = $this->createDomainUser('test@baander.app', 'new-hash');
         $securityUser = new SecurityUser(
             $domainUser->getId()->toString(),
-            'test@example.com',
+            'test@baander.app',
             'old-hash',
         );
 
@@ -159,7 +146,7 @@ final class UserProviderTest extends TestCase
     public function testThrowsWhenUserNotFoundDuringRefresh(): void
     {
         $userUuid = Uuid::v4();
-        $securityUser = new SecurityUser($userUuid->toString(), 'test@example.com', 'hash');
+        $securityUser = new SecurityUser($userUuid->toString(), 'test@baander.app', 'hash');
 
         $this->userRepository
             ->method('findByUuid')
@@ -178,12 +165,12 @@ final class UserProviderTest extends TestCase
         $this->userRepository = $this->createMock(UserRepositoryInterface::class);
         $this->provider = $this->createUserProviderFixture();
 
-        $domainUser = $this->createDomainUser('test@example.com', 'old-hash');
+        $domainUser = $this->createDomainUser('test@baander.app', 'old-hash');
         $newHash = 'new-hashed-password';
 
         $securityUser = new SecurityUser(
             $domainUser->getId()->toString(),
-            'test@example.com',
+            'test@baander.app',
             'old-hash',
         );
 
@@ -224,7 +211,7 @@ final class UserProviderTest extends TestCase
         $this->provider = $this->createUserProviderFixture();
 
         $userUuid = Uuid::v4();
-        $securityUser = new SecurityUser($userUuid->toString(), 'test@example.com', 'old-hash');
+        $securityUser = new SecurityUser($userUuid->toString(), 'test@baander.app', 'old-hash');
 
         $this->userRepository
             ->method('findByUuid')

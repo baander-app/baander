@@ -125,7 +125,7 @@ final class RateLimitListener
             $key = ($rule['key_resolver'])($request);
 
             // Skip compound limiters when key is empty (e.g., no email in login body)
-            if (isset($rule['skip_empty_key']) && $rule['skip_empty_key'] && $key === '') {
+            if (($rule['skip_empty_key'] ?? false) && $key === '') {
                 continue;
             }
 

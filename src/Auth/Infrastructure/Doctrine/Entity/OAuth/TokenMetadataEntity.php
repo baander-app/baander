@@ -39,6 +39,7 @@ class TokenMetadataEntity
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $ipAddress = null;
 
+    /** @var array<int, array{ip: string, seen_at: string}> */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '[]'])]
     private array $ipHistory = [];
 
@@ -147,6 +148,7 @@ class TokenMetadataEntity
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /** @return array<int, array{ip: string, seen_at: string}> */
     public function getIpHistory(): array
     {
         return $this->ipHistory;

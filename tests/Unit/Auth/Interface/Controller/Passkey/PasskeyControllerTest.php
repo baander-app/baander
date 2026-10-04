@@ -12,13 +12,14 @@ use App\Auth\Interface\Controller\Passkey\PasskeyController;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 
 final class PasskeyControllerTest extends TestCase
 {
-    private Security $security;
-    private PasskeyRepositoryInterface $passkeyRepository;
+    private Security&Stub $security;
+    private PasskeyRepositoryInterface&Stub $passkeyRepository;
     private PasskeyController $controller;
 
     protected function setUp(): void
@@ -47,7 +48,7 @@ final class PasskeyControllerTest extends TestCase
         $userId = Uuid::v4();
         $user = new SecurityUser(
             id: $userId->toString(),
-            email: 'user@example.com',
+            email: 'user@baander.app',
             password: 'hashed-pw',
         );
         $this->security->method('getUser')->willReturn($user);
@@ -76,7 +77,7 @@ final class PasskeyControllerTest extends TestCase
         $userId = Uuid::v4();
         $user = new SecurityUser(
             id: $userId->toString(),
-            email: 'user@example.com',
+            email: 'user@baander.app',
             password: 'hashed-pw',
         );
         $this->security->method('getUser')->willReturn($user);
@@ -104,7 +105,7 @@ final class PasskeyControllerTest extends TestCase
         $userId = Uuid::v4();
         $user = new SecurityUser(
             id: $userId->toString(),
-            email: 'user@example.com',
+            email: 'user@baander.app',
             password: 'hashed-pw',
         );
         $this->security->method('getUser')->willReturn($user);
@@ -126,7 +127,7 @@ final class PasskeyControllerTest extends TestCase
         $userId = Uuid::v4();
         $user = new SecurityUser(
             id: $userId->toString(),
-            email: 'user@example.com',
+            email: 'user@baander.app',
             password: 'hashed-pw',
         );
         $this->security->method('getUser')->willReturn($user);

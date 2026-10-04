@@ -6,7 +6,6 @@ namespace App\Auth\Infrastructure\Security;
 
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
-use App\Auth\Infrastructure\Security\User\PasswordHasher;
 use App\Shared\Domain\Model\Email;
 use Symfony\Component\Security\Core\Exception\UnsupportedUserException;
 use Symfony\Component\Security\Core\Exception\UserNotFoundException;
@@ -15,15 +14,15 @@ use Symfony\Component\Security\Core\User\PasswordUpgraderInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Core\User\UserProviderInterface;
 
+/** @implements UserProviderInterface<SecurityUser> */
 final class UserProvider implements UserProviderInterface, PasswordUpgraderInterface
 {
     public function __construct(
         private readonly UserRepositoryInterface $userRepository,
-        private readonly PasswordHasher $passwordHasher,
     ) {
     }
 
-    public function loadUserByIdentifier(string $identifier): UserInterface
+    public function loadUserByIdentifier(string $identifier): SecurityUser
     {
         $email = new Email($identifier);
         $user = $this->userRepository->findByEmail($email);
@@ -40,7 +39,7 @@ final class UserProvider implements UserProviderInterface, PasswordUpgraderInter
         );
     }
 
-    public function refreshUser(UserInterface $user): UserInterface
+    public function refreshUser(UserInterface $user): SecurityUser
     {
         if (!$user instanceof SecurityUser) {
             throw new UnsupportedUserException(sprintf('Instances of "%s" are not supported.', get_debug_type($user)));

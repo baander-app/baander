@@ -316,7 +316,7 @@ final class RefreshTokenRepositoryTest extends TestCase
             null,
             ['read'],
             null,
-            $chainId?->toString(),
+            $chainId?->getUuid(),
         );
     }
 

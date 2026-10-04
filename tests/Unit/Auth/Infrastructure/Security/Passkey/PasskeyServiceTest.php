@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Auth\Infrastructure\Security;
 
 use App\Auth\Infrastructure\Security\Passkey\PasskeyService;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
@@ -19,10 +20,10 @@ use Webauthn\PublicKeyCredentialRequestOptions;
 
 final class PasskeyServiceTest extends TestCase
 {
-    private LoggerInterface $logger;
+    private LoggerInterface&Stub $logger;
     private CounterChecker $counterChecker;
-    private EventDispatcherInterface $eventDispatcher;
-    private CacheItemPoolInterface $cache;
+    private EventDispatcherInterface&Stub $eventDispatcher;
+    private CacheItemPoolInterface&Stub $cache;
     private PasskeyService $service;
 
     protected function setUp(): void

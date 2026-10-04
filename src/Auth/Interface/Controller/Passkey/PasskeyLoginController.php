@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Controller\Passkey;
 
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Application\Command\OAuth\IssueTokenCommand;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
@@ -59,7 +60,7 @@ final class PasskeyLoginController
     public function __invoke(Request $request): JsonResponse
     {
         $securityUser = $this->security->getUser();
-        if ($securityUser === null) {
+        if (!$securityUser instanceof AuthenticatedUserIdentityInterface) {
             return $this->unauthorized();
         }
 

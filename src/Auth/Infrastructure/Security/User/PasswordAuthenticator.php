@@ -36,7 +36,7 @@ final class PasswordAuthenticator extends AbstractAuthenticator
     ) {
     }
 
-    public function supports(Request $request): ?bool
+    public function supports(Request $request): bool
     {
         return $request->getPathInfo() === '/api/auth/login'
             && $request->isMethod('POST');
@@ -114,7 +114,7 @@ final class PasswordAuthenticator extends AbstractAuthenticator
         return null;
     }
 
-    public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response
+    public function onAuthenticationFailure(Request $request, AuthenticationException $exception): Response
     {
         $messageData = $exception instanceof CustomUserMessageAuthenticationException
             ? $exception->getMessageData()

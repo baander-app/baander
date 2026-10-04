@@ -10,6 +10,7 @@ use DateTimeImmutable;
 
 final readonly class TokenIssued extends AbstractDomainEvent
 {
+    /** @param array<array-key, string> $scopes */
     public function __construct(
         private readonly string $tokenId,
         private readonly array $scopes,
@@ -28,6 +29,7 @@ final readonly class TokenIssued extends AbstractDomainEvent
         return $this->tokenId;
     }
 
+    /** @return array<array-key, string> */
     public function getScopes(): array
     {
         return $this->scopes;

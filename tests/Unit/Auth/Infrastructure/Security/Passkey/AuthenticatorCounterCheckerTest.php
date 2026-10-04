@@ -56,7 +56,6 @@ final class AuthenticatorCounterCheckerTest extends TestCase
 
         $this->checker->check($credential, 100);
 
-        $this->assertTrue(true);
     }
 
     public function testCheckFailsWhenCounterIsEqual(): void

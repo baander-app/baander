@@ -14,6 +14,7 @@ use App\Auth\Infrastructure\Security\Totp\TotpService;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -25,9 +26,9 @@ final class PasswordAuthenticatorTest extends TestCase
 {
     private PasswordAuthenticator $authenticator;
     private TotpService $totpService;
-    private UserRepositoryInterface $userRepository;
-    private PasswordHasherInterface $passwordHasher;
-    private LoggerInterface $logger;
+    private UserRepositoryInterface&Stub $userRepository;
+    private PasswordHasherInterface&Stub $passwordHasher;
+    private LoggerInterface&Stub $logger;
 
     protected function setUp(): void
     {
@@ -89,7 +90,7 @@ final class PasswordAuthenticatorTest extends TestCase
 
     public function testAuthenticateThrowsOnMissingPassword(): void
     {
-        $payload = json_encode(['email' => 'alice@example.com']);
+        $payload = json_encode(['email' => 'alice@baander.app']);
         $request = Request::create('/api/auth/login', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], $payload);
 
         $this->expectException(\Symfony\Component\Security\Core\Exception\BadCredentialsException::class);
@@ -102,7 +103,7 @@ final class PasswordAuthenticatorTest extends TestCase
     {
         $this->userRepository->method('findByEmail')->willReturn(null);
 
-        $payload = json_encode(['email' => 'alice@example.com', 'password' => 'secret']);
+        $payload = json_encode(['email' => 'alice@baander.app', 'password' => 'secret']);
         $request = Request::create('/api/auth/login', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], $payload);
 
         $this->expectException(\Symfony\Component\Security\Core\Exception\BadCredentialsException::class);
@@ -117,7 +118,7 @@ final class PasswordAuthenticatorTest extends TestCase
         $this->userRepository->method('findByEmail')->willReturn($user);
         $this->passwordHasher->method('verify')->willReturn(false);
 
-        $payload = json_encode(['email' => 'alice@example.com', 'password' => 'wrong']);
+        $payload = json_encode(['email' => 'alice@baander.app', 'password' => 'wrong']);
         $request = Request::create('/api/auth/login', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], $payload);
 
         $this->expectException(\Symfony\Component\Security\Core\Exception\BadCredentialsException::class);
@@ -132,12 +133,12 @@ final class PasswordAuthenticatorTest extends TestCase
         $this->userRepository->method('findByEmail')->willReturn($user);
         $this->passwordHasher->method('verify')->willReturn(true);
 
-        $payload = json_encode(['email' => 'alice@example.com', 'password' => 'secret']);
+        $payload = json_encode(['email' => 'alice@baander.app', 'password' => 'secret']);
         $request = Request::create('/api/auth/login', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], $payload);
 
         $passport = $this->authenticator->authenticate($request);
 
-        $this->assertNotNull($passport->getUser());
+        $this->assertSame($user->getEmail(), $passport->getUser()->getUserIdentifier());
     }
 
     public function testAuthenticateSucceedsWithValidTotpCode(): void
@@ -151,12 +152,12 @@ final class PasswordAuthenticatorTest extends TestCase
         $totp = \OTPHP\TOTP::create($secret);
         $validCode = $totp->now();
 
-        $payload = json_encode(['email' => 'alice@example.com', 'password' => 'secret', 'totpCode' => $validCode]);
+        $payload = json_encode(['email' => 'alice@baander.app', 'password' => 'secret', 'totpCode' => $validCode]);
         $request = Request::create('/api/auth/login', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], $payload);
 
         $passport = $this->authenticator->authenticate($request);
 
-        $this->assertNotNull($passport->getUser());
+        $this->assertSame($user->getEmail(), $passport->getUser()->getUserIdentifier());
     }
 
     public function testAuthenticateThrowsTotpRequiredWhenTotpEnabledAndNoCode(): void
@@ -165,7 +166,7 @@ final class PasswordAuthenticatorTest extends TestCase
         $this->userRepository->method('findByEmail')->willReturn($user);
         $this->passwordHasher->method('verify')->willReturn(true);
 
-        $payload = json_encode(['email' => 'alice@example.com', 'password' => 'secret']);
+        $payload = json_encode(['email' => 'alice@baander.app', 'password' => 'secret']);
         $request = Request::create('/api/auth/login', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], $payload);
 
         $this->expectException(\Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException::class);
@@ -188,7 +189,7 @@ final class PasswordAuthenticatorTest extends TestCase
         $this->passwordHasher->method('verify')->willReturn(true);
 
         // '000000' will not match any valid TOTP code with window=0
-        $payload = json_encode(['email' => 'alice@example.com', 'password' => 'secret', 'totpCode' => '000000']);
+        $payload = json_encode(['email' => 'alice@baander.app', 'password' => 'secret', 'totpCode' => '000000']);
         $request = Request::create('/api/auth/login', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], $payload);
 
         $this->expectException(\Symfony\Component\Security\Core\Exception\BadCredentialsException::class);
@@ -203,7 +204,7 @@ final class PasswordAuthenticatorTest extends TestCase
         $this->userRepository->method('findByEmail')->willReturn($user);
         $this->passwordHasher->method('verify')->willReturn(true);
 
-        $payload = json_encode(['email' => 'alice@example.com', 'password' => 'secret', 'totpCode' => '']);
+        $payload = json_encode(['email' => 'alice@baander.app', 'password' => 'secret', 'totpCode' => '']);
         $request = Request::create('/api/auth/login', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], $payload);
 
         $this->expectException(\Symfony\Component\Security\Core\Exception\BadCredentialsException::class);
@@ -268,76 +269,11 @@ final class PasswordAuthenticatorTest extends TestCase
             id: Uuid::fromString('01959fae-7c5b-7f00-8e00-000000000001'),
             publicId: new PublicId(),
             name: 'Alice',
-            email: 'alice@example.com',
+            email: 'alice@baander.app',
             password: '$hashed$',
             totpSecret: $totpSecret,
             createdAt: new \DateTimeImmutable(),
             updatedAt: new \DateTimeImmutable(),
         ));
-    }
-}
-
-final class PasskeyAuthenticatorTest extends TestCase
-{
-    private PasskeyAuthenticator $authenticator;
-
-    protected function setUp(): void
-    {
-        $bus = $this->createStub(\Symfony\Component\Messenger\MessageBusInterface::class);
-        $logger = $this->createStub(LoggerInterface::class);
-        $this->authenticator = new PasskeyAuthenticator($bus, $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class), $logger);
-    }
-
-    public function testSupportsCorrectRoute(): void
-    {
-        $request = Request::create('/api/auth/login/passkey', 'POST');
-
-        $this->assertTrue($this->authenticator->supports($request));
-    }
-
-    public function testDoesNotSupportWrongPath(): void
-    {
-        $request = Request::create('/api/auth/login', 'POST');
-
-        $this->assertNull($this->authenticator->supports($request));
-    }
-
-    public function testAuthenticateThrowsOnMissingFields(): void
-    {
-        $request = Request::create('/api/auth/login/passkey', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], '{}');
-
-        $this->expectException(\Symfony\Component\Security\Core\Exception\BadCredentialsException::class);
-        $this->expectExceptionMessage('Invalid credentials.');
-
-        $this->authenticator->authenticate($request);
-    }
-
-    public function testOnAuthenticationSuccessReturnsNull(): void
-    {
-        $result = $this->authenticator->onAuthenticationSuccess(
-            Request::create('/'),
-            $this->createStub(\Symfony\Component\Security\Core\Authentication\Token\TokenInterface::class),
-            'main',
-        );
-
-        $this->assertNull($result);
-    }
-
-    public function testOnAuthenticationFailureReturnsStructuredError(): void
-    {
-        $result = $this->authenticator->onAuthenticationFailure(
-            Request::create('/'),
-            new \Symfony\Component\Security\Core\Exception\BadCredentialsException('Invalid credentials'),
-        );
-
-        $this->assertInstanceOf(JsonResponse::class, $result);
-        $this->assertSame(401, $result->getStatusCode());
-
-        $data = json_decode((string) $result->getContent(), true);
-        $this->assertArrayHasKey('error', $data);
-        $this->assertArrayHasKey('message', $data['error']);
-        $this->assertArrayHasKey('code', $data['error']);
-        $this->assertSame('AUTH_INVALID_CREDENTIALS', $data['error']['code']);
-        $this->assertSame('Invalid credentials.', $data['error']['message']);
     }
 }

@@ -18,6 +18,7 @@ final class ThirdPartyCredential
     /**
      * Create a new third-party credential.
      */
+    /** @param array<array-key, mixed> $metadata */
     public static function create(
         Uuid $userId,
         string $provider,
@@ -145,6 +146,7 @@ final class ThirdPartyCredential
         return $this->state->expiresAt;
     }
 
+    /** @return array<array-key, mixed> */
     public function getMetadata(): array
     {
         return $this->state->metadata;

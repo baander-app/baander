@@ -10,6 +10,7 @@ use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Auth\Interface\Controller\OAuth\ClientController;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInterface;
@@ -19,8 +20,8 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 
 final class ClientControllerTest extends TestCase
 {
-    private Security $security;
-    private ClientRepositoryInterface $clientRepository;
+    private Security&Stub $security;
+    private ClientRepositoryInterface&Stub $clientRepository;
     private ClientController $controller;
 
     protected function setUp(): void
@@ -53,7 +54,7 @@ final class ClientControllerTest extends TestCase
         $userId = Uuid::v4();
         $user = new SecurityUser(
             id: $userId->toString(),
-            email: 'user@example.com',
+            email: 'user@baander.app',
             password: 'hashed-pw',
         );
 
@@ -83,7 +84,7 @@ final class ClientControllerTest extends TestCase
         $userId = Uuid::v4();
         $user = new SecurityUser(
             id: $userId->toString(),
-            email: 'user@example.com',
+            email: 'user@baander.app',
             password: 'hashed-pw',
         );
 
@@ -126,7 +127,7 @@ final class ClientControllerTest extends TestCase
         $userIdB = Uuid::v4();
         $userA = new SecurityUser(
             id: $userIdA->toString(),
-            email: 'usera@example.com',
+            email: 'usera@baander.app',
             password: 'hashed-pw',
         );
 
@@ -152,7 +153,7 @@ final class ClientControllerTest extends TestCase
         $userId = Uuid::v4();
         $user = new SecurityUser(
             id: $userId->toString(),
-            email: 'user@example.com',
+            email: 'user@baander.app',
             password: 'hashed-pw',
         );
 
@@ -173,7 +174,7 @@ final class ClientControllerTest extends TestCase
         $userId = Uuid::v4();
         $user = new SecurityUser(
             id: $userId->toString(),
-            email: 'user@example.com',
+            email: 'user@baander.app',
             password: 'hashed-pw',
         );
 
@@ -193,7 +194,7 @@ final class ClientControllerTest extends TestCase
         $userId = Uuid::v4();
         $user = new SecurityUser(
             id: $userId->toString(),
-            email: 'user@example.com',
+            email: 'user@baander.app',
             password: 'hashed-pw',
         );
 

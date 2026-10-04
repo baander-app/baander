@@ -15,6 +15,7 @@ use DateTimeImmutable;
  */
 final class ThirdPartyCredentialState
 {
+    /** @param array<array-key, mixed> $metadata */
     public function __construct(
         public readonly Uuid $id,
         public readonly Uuid $userId,

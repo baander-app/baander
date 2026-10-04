@@ -17,7 +17,6 @@ use OpenApi\Attributes as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
-use Symfony\Component\Messenger\Exception\ExceptionInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Contracts\Cache\CacheInterface;
@@ -126,7 +125,7 @@ final class TotpController
 
         try {
             $this->commandBus->dispatch($command);
-        } catch (ExceptionInterface|\Throwable $e) {
+        } catch (\Throwable $e) {
             return $this->errorResponse($e->getMessage());
         }
 
@@ -177,7 +176,7 @@ final class TotpController
 
         try {
             $this->commandBus->dispatch($command);
-        } catch (ExceptionInterface|\Throwable $e) {
+        } catch (\Throwable $e) {
             return $this->errorResponse($e->getMessage());
         }
 

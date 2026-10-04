@@ -42,6 +42,7 @@ class RecommendationJobEntity
     #[ORM\Column(type: 'text', options: ['default' => ''])]
     private string $currentStrategy;
 
+    /** @var array<string, int> */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '{}'])]
     private array $strategyCounts;
 
@@ -60,22 +61,12 @@ class RecommendationJobEntity
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $completedAt = null;
 
+    /** @var array<string, mixed> */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '{}'])]
     private array $metadata = [];
 
     #[ORM\Column(type: 'uuid', nullable: true)]
     private ?Uuid $originalJobId = null;
-
-    #[ORM\PrePersist]
-    public function onPrePersist(): void
-    {
-        if (!isset($this->createdAt)) {
-            $this->createdAt = new \DateTimeImmutable();
-        }
-        if (!isset($this->updatedAt)) {
-            $this->updatedAt = new \DateTimeImmutable();
-        }
-    }
 
     #[ORM\PreUpdate]
     public function onPreUpdate(): void
@@ -163,11 +154,13 @@ class RecommendationJobEntity
         $this->currentStrategy = $currentStrategy;
     }
 
+    /** @return array<string, int> */
     public function getStrategyCounts(): array
     {
         return $this->strategyCounts;
     }
 
+    /** @param array<string, int> $strategyCounts */
     public function setStrategyCounts(array $strategyCounts): void
     {
         $this->strategyCounts = $strategyCounts;
@@ -213,11 +206,13 @@ class RecommendationJobEntity
         $this->completedAt = $completedAt;
     }
 
+    /** @return array<string, mixed> */
     public function getMetadata(): array
     {
         return $this->metadata;
     }
 
+    /** @param array<string, mixed> $metadata */
     public function setMetadata(array $metadata): void
     {
         $this->metadata = $metadata;

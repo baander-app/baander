@@ -275,6 +275,7 @@ final class DpopProofValidator
         throw new InvalidArgumentException(sprintf('Unsupported JWK key type: "%s".', $kty));
     }
 
+    /** @param array<string, mixed> $jwk */
     private function jwkOkpToKey(array $jwk): InMemory
     {
         // EdDSA with Ed25519: sodium expects raw 32-byte public key
@@ -300,6 +301,7 @@ final class DpopProofValidator
         return base64_decode($padded);
     }
 
+    /** @param array<string, mixed> $jwk */
     private function jwkEcToPem(array $jwk): InMemory
     {
         $crv = $jwk['crv'] ?? '';
@@ -335,6 +337,7 @@ final class DpopProofValidator
         return InMemory::plainText($pem);
     }
 
+    /** @param array<string, mixed> $jwk */
     private function jwkRsaToPem(array $jwk): InMemory
     {
         $n = $this->base64urlDecode($jwk['n'] ?? '');

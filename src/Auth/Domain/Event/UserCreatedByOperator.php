@@ -27,6 +27,7 @@ final readonly class UserCreatedByOperator extends AbstractDomainEvent
         parent::__construct($occurredAt);
     }
 
+    /** @param array<string, mixed> $payload */
     public static function fromPayload(array $payload): static
     {
         return new self(
@@ -40,6 +41,7 @@ final readonly class UserCreatedByOperator extends AbstractDomainEvent
         );
     }
 
+    /** @return array<string, mixed> */
     public function toPayload(): array
     {
         return [
@@ -78,6 +80,7 @@ final readonly class UserCreatedByOperator extends AbstractDomainEvent
         return $this->name;
     }
 
+    /** @return array<array-key, string> */
     public function getRoles(): array
     {
         return $this->roles;

@@ -171,6 +171,7 @@ final class User
      *
      * Unlike register(), this pre-verifies the email and accepts roles.
      */
+    /** @param array<array-key, string> $roles */
     public static function createByOperator(Email $email, string $hashedPassword, string $name, array $roles): self
     {
         if (trim($name) === '') {
@@ -194,6 +195,7 @@ final class User
     /**
      * Get the user's assigned roles.
      */
+    /** @return array<array-key, string> */
     public function getRoles(): array
     {
         return $this->state->roles;
