@@ -10,6 +10,9 @@ use Psr\Log\LoggerInterface;
 
 final class Id3ParserTest extends TestCase
 {
+    /** @var list<string> */
+    private array $temporaryFiles = [];
+
     private LoggerInterface $logger;
 
     protected function setUp(): void
@@ -259,6 +262,7 @@ final class Id3ParserTest extends TestCase
     private function tempFile(string $content, string $name = 'test.mp3'): string
     {
         $path = sys_get_temp_dir() . '/' . $name . '_' . uniqid();
+        $this->temporaryFiles[] = $path;
         file_put_contents($path, $content);
 
         return $path;
@@ -266,10 +270,11 @@ final class Id3ParserTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach (glob(sys_get_temp_dir() . '/*_*') as $file) {
-            if (is_file($file) && str_contains(basename($file), '_')) {
-                @unlink($file);
+        foreach ($this->temporaryFiles as $file) {
+            if (is_file($file)) {
+                unlink($file);
             }
         }
+        $this->temporaryFiles = [];
     }
 }

@@ -9,6 +9,9 @@ use PHPUnit\Framework\TestCase;
 
 final class FormatDetectorTest extends TestCase
 {
+    /** @var list<string> */
+    private array $temporaryFiles = [];
+
     private FormatDetector $detector;
 
     protected function setUp(): void
@@ -124,6 +127,7 @@ final class FormatDetectorTest extends TestCase
         $ext = pathinfo($name, PATHINFO_EXTENSION);
         $base = pathinfo($name, PATHINFO_FILENAME);
         $path = sys_get_temp_dir() . '/' . $base . '_' . uniqid() . '.' . $ext;
+        $this->temporaryFiles[] = $path;
         file_put_contents($path, $content);
 
         return $path;
@@ -131,10 +135,11 @@ final class FormatDetectorTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach (glob(sys_get_temp_dir() . '/*_*') as $file) {
-            if (is_file($file) && str_contains(basename($file), '_')) {
-                @unlink($file);
+        foreach ($this->temporaryFiles as $file) {
+            if (is_file($file)) {
+                unlink($file);
             }
         }
+        $this->temporaryFiles = [];
     }
 }
