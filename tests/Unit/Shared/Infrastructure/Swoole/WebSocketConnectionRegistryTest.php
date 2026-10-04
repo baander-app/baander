@@ -34,7 +34,7 @@ final class WebSocketConnectionRegistryTest extends TestCase
         $this->assertNotNull($conn);
         $this->assertSame('user-uuid-1', $conn['user_id']);
         $this->assertSame(0, $conn['worker_id']);
-        $this->assertIsInt($conn['connected_at']);
+        $this->assertGreaterThan(0, $conn['connected_at']);
     }
 
     public function testAddConnectionStoresCurrentTimestamp(): void

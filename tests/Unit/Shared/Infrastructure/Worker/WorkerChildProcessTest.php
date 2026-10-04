@@ -24,7 +24,7 @@ final class WorkerChildProcessTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->children = [];
+        array_splice($this->children, 0);
         fclose($this->stdout);
         fclose($this->stderr);
     }

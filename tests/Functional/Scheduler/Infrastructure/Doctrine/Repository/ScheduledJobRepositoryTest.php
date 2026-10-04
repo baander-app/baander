@@ -6,7 +6,6 @@ namespace App\Tests\Functional\Scheduler\Infrastructure\Doctrine\Repository;
 
 use App\Scheduler\Application\Port\ScheduledJobPortInterface;
 use App\Scheduler\Domain\Model\ScheduledJob;
-use App\Scheduler\Domain\Repository\ScheduledJobRepositoryInterface;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Domain\ValueObject\ScheduleStatus;
 use App\Shared\Domain\Model\Uuid;
@@ -14,7 +13,6 @@ use App\Tests\Functional\TestCase;
 
 final class ScheduledJobRepositoryTest extends TestCase
 {
-    private ScheduledJobRepositoryInterface $repository;
     private ScheduledJobPortInterface $service;
 
     protected function setUp(): void
@@ -22,7 +20,6 @@ final class ScheduledJobRepositoryTest extends TestCase
         parent::setUp();
 
         $container = static::getContainer();
-        $this->repository = $container->get(ScheduledJobRepositoryInterface::class);
         $this->service = $container->get(ScheduledJobPortInterface::class);
     }
 

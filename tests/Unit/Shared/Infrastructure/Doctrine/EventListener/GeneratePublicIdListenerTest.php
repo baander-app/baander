@@ -55,7 +55,7 @@ final class GeneratePublicIdListenerTest extends TestCase
 
     public function testSetsPublicIdOnUninitializedReadonlyProperty(): void
     {
-        $entity = new EntityWithReadonlyPublicId();
+        $entity = (new \ReflectionClass(EntityWithReadonlyPublicId::class))->newInstanceWithoutConstructor();
 
         $args = $this->createEventArgs($entity);
 
@@ -66,7 +66,7 @@ final class GeneratePublicIdListenerTest extends TestCase
 
     public function testSetsPublicIdOnUninitializedNonReadonlyProperty(): void
     {
-        $entity = new EntityWithMutablePublicId();
+        $entity = (new \ReflectionClass(EntityWithMutablePublicId::class))->newInstanceWithoutConstructor();
 
         $args = $this->createEventArgs($entity);
 
@@ -85,9 +85,14 @@ final class GeneratePublicIdListenerTest extends TestCase
 
 class EntityWithReadonlyPublicId
 {
-    private ?PublicId $publicId = null;
+    private readonly PublicId $publicId;
 
-    public function getPublicId(): ?PublicId
+    public function __construct(PublicId $publicId)
+    {
+        $this->publicId = $publicId;
+    }
+
+    public function getPublicId(): PublicId
     {
         return $this->publicId;
     }
@@ -95,9 +100,14 @@ class EntityWithReadonlyPublicId
 
 class EntityWithMutablePublicId
 {
-    private ?PublicId $publicId = null;
+    private PublicId $publicId;
 
-    public function getPublicId(): ?PublicId
+    public function __construct(PublicId $publicId)
+    {
+        $this->publicId = $publicId;
+    }
+
+    public function getPublicId(): PublicId
     {
         return $this->publicId;
     }

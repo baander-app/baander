@@ -26,6 +26,7 @@ use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
 
 final class NotificationDeliveryTest extends TestCase
 {
+    /** @param 'email'|'push'|'webhook' $channel */
     #[DataProvider('channels')]
     public function testBusPersistsVersionedIntent(string $channel): void
     {
@@ -41,6 +42,7 @@ final class NotificationDeliveryTest extends TestCase
         self::assertSame($message, $bus->dispatch($message)->getMessage());
     }
 
+    /** @return iterable<int, array{'email'|'push'|'webhook'}> */
     public static function channels(): iterable
     {
         yield ['email'];
@@ -57,13 +59,14 @@ final class NotificationDeliveryTest extends TestCase
         $message = match ($case) {
             'unsupported' => new \stdClass(),
             'envelope stamps' => new Envelope(self::message('push'), [new DelayStamp(100)]),
-            'missing ID' => new SendEmailCommand(Uuid::v4(), 'user@example.com', NotificationCategory::Security, 'title', 'body', new \DateTimeImmutable()),
+            'missing ID' => new SendEmailCommand(Uuid::v4(), 'user@baander.app', NotificationCategory::Security, 'title', 'body', new \DateTimeImmutable()),
             default => self::message('push'),
         };
         $this->expectException(\InvalidArgumentException::class);
         $bus->dispatch($message, $case === 'argument stamps' ? [new DelayStamp(100)] : []);
     }
 
+    /** @return iterable<int, array{string}> */
     public static function unsupportedMessages(): iterable
     {
         yield ['unsupported'];
@@ -95,6 +98,7 @@ final class NotificationDeliveryTest extends TestCase
         (new NotificationDeliveryRepository($connection))->fetchPending($size);
     }
 
+    /** @return iterable<int, array{int}> */
     public static function invalidBatchSizes(): iterable
     {
         yield [0];
@@ -153,6 +157,7 @@ final class NotificationDeliveryTest extends TestCase
         }
     }
 
+    /** @return iterable<int, array{string, int}> */
     public static function retryCases(): iterable
     {
         yield ['transport', 0];
@@ -173,25 +178,27 @@ final class NotificationDeliveryTest extends TestCase
         ]);
         $connection = $this->createMock(Connection::class);
         $connection->expects($this->once())->method('executeQuery')->willReturn($result);
-        $sent = false;
+        $handoff = new class {
+            public bool $sent = false;
+        };
         $connection->expects($this->exactly($acknowledged ? 2 : 3))->method('executeStatement')
-            ->willReturnCallback(static function (string $sql, array $parameters) use (&$sent, $acknowledged): int {
+            ->willReturnCallback(static function (string $sql, array $parameters) use ($handoff, $acknowledged): int {
                 self::assertSame(7, $parameters['id']);
                 self::assertSame('lease', $parameters['leaseToken']);
                 self::assertStringContainsString('lease_until > NOW()', $sql);
                 if (str_contains($sql, 'SET relayed_at =')) {
-                    self::assertTrue($sent, 'Acknowledge only after a durable transport handoff.');
+                    self::assertTrue($handoff->sent, 'Acknowledge only after a durable transport handoff.');
                     return $acknowledged ? 1 : 0;
                 }
                 return 1;
             });
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($this->once())->method('dispatch')
-            ->willReturnCallback(static function (object $message, array $stamps) use (&$sent): Envelope {
+            ->willReturnCallback(static function (object $message, array $stamps) use ($handoff): Envelope {
                 self::assertCount(1, $stamps);
                 self::assertInstanceOf(TransportNamesStamp::class, $stamps[0]);
                 self::assertSame(['async'], $stamps[0]->getTransportNames());
-                $sent = true;
+                $handoff->sent = true;
                 return new Envelope($message);
             });
         $handler = new RelayNotificationDeliveriesHandler(new NotificationDeliveryRepository($connection), $bus, $codec, new NullLogger());
@@ -201,6 +208,7 @@ final class NotificationDeliveryTest extends TestCase
         self::assertSame(1, $handler());
     }
 
+    /** @return iterable<string, array{bool}> */
     public static function acknowledgements(): iterable
     {
         yield 'successful acknowledgement' => [true];
@@ -222,11 +230,12 @@ final class NotificationDeliveryTest extends TestCase
         self::assertSame(0, $handler());
     }
 
+    /** @param 'email'|'push'|'webhook' $channel */
     private static function message(string $channel): object
     {
         $user = Uuid::fromString('0198ebcf-8b2a-7110-8f07-174f3359b428');
         return match ($channel) {
-            'email' => new SendEmailCommand($user, 'user@example.com', NotificationCategory::Security, 'title', 'body', new \DateTimeImmutable(), 'notification-1'),
+            'email' => new SendEmailCommand($user, 'user@baander.app', NotificationCategory::Security, 'title', 'body', new \DateTimeImmutable(), 'notification-1'),
             'push' => new SendPushCommand($user, NotificationCategory::Security, 'title', 'body', 'notification-1'),
             'webhook' => new SendWebhookCommand($user, NotificationCategory::Security, 'title', 'body', 'notification-1'),
         };

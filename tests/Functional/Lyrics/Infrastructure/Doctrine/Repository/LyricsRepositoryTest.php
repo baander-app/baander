@@ -269,6 +269,6 @@ final class LyricsRepositoryTest extends TestCase
         // Never saved, should not throw
         $this->lyricsRepository->delete($lyrics);
 
-        $this->assertTrue(true);
+        $this->assertNull($this->lyricsRepository->findBySongId($lyrics->getSongId()));
     }
 }

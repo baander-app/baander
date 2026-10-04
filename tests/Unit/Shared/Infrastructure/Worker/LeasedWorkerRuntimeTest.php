@@ -52,7 +52,7 @@ PHP);
         self::assertSame(0, $this->launches);
         self::assertFalse($runtime->isStopped());
         self::assertFalse($runtime->isReady([]));
-        $this->await(fn (): bool => $this->launches === 1);
+        $this->await($this->hasLaunchedWorker(...));
         $runtime->tick();
         $row = $runtime->snapshot()['first'];
         self::assertTrue($runtime->isReady(['first' => ['pid' => $row['pid'], 'identity' => $row['identity']]]));
@@ -73,7 +73,7 @@ PHP);
     public function testHungRenewalDoesNotBlockDrainAtTheOldAuthorityDeadline(): void
     {
         $runtime = $this->createRuntime('hang');
-        $this->await(fn (): bool => $this->launches === 1);
+        $this->await($this->hasLaunchedWorker(...));
         $this->now = 3.0; // Past renewal threshold 2.9, before effective deadline 4.9.
         $runtime->tick();
         $this->await(fn (): bool => is_file($this->directory . '/bin/renew.ready'));
@@ -115,7 +115,7 @@ PHP);
     public function testInvalidClockStillSignalsLiveWorkerBeforeReportingFailure(): void
     {
         $runtime = $this->createRuntime();
-        $this->await(fn (): bool => $this->launches === 1);
+        $this->await($this->hasLaunchedWorker(...));
         $pid = $runtime->snapshot()['first']['pid'];
         self::assertIsInt($pid);
         $this->now = NAN;
@@ -129,13 +129,12 @@ PHP);
         // further runtime polling that could send a replacement stop signal.
         $deadline = microtime(true) + 5;
         do {
-            $stat = @file_get_contents('/proc/' . $pid . '/stat');
-            if ($stat === false || preg_match('/\) [ZX] /', $stat) === 1) {
+            if ($this->hasProcessExited($pid)) {
                 break;
             }
             usleep(1000);
         } while (microtime(true) < $deadline);
-        self::assertTrue($stat === false || preg_match('/\) [ZX] /', $stat) === 1, 'Initial TERM must be attempted despite invalid clock.');
+        self::assertTrue($this->hasProcessExited($pid), 'Initial TERM must be attempted despite invalid clock.');
         $this->now = 1;
         $this->await($runtime->areDirectChildrenReaped(...));
         self::assertSame(1, $this->launches);
@@ -206,4 +205,17 @@ PHP);
         rmdir($this->directory . '/bin');
         rmdir($this->directory);
     }
+
+    private function hasLaunchedWorker(): bool
+    {
+        return $this->launches === 1;
+    }
+
+    private function hasProcessExited(int $pid): bool
+    {
+        $stat = @file_get_contents('/proc/' . $pid . '/stat');
+
+        return $stat === false || preg_match('/\) [ZX] /', $stat) === 1;
+    }
+
 }

@@ -74,6 +74,7 @@ final class WebSocketControllerTest extends TestCase
         );
     }
 
+    /** @return array<string, mixed>|null */
     private function lastPushedPayload(): ?array
     {
         $last = end($this->pushedMessages);
@@ -84,6 +85,7 @@ final class WebSocketControllerTest extends TestCase
         return json_decode($last['data'], true);
     }
 
+    /** @return list<array{fd: int, payload: array<string, mixed>}> */
     private function allPushedPayloads(): array
     {
         return array_map(fn (array $m): array => [
@@ -92,6 +94,7 @@ final class WebSocketControllerTest extends TestCase
         ], $this->pushedMessages);
     }
 
+    /** @param array<string, mixed> $extra */
     private function assertLastPushMatches(int $fd, string $type, array $extra = []): void
     {
         $payload = $this->lastPushedPayload();
@@ -442,7 +445,7 @@ final class WebSocketControllerTest extends TestCase
         }
 
         $all = $this->allPushedPayloads();
-        $pongCount = array_filter($all, fn (array $m): bool => ($m['payload'] ?? null)['type'] === 'pong');
+        $pongCount = array_filter($all, fn (array $m): bool => $m['payload']['type'] === 'pong');
         $this->assertCount(30, $pongCount);
 
         $this->controller->onMessage(1, json_encode(['type' => 'ping']));
@@ -461,7 +464,7 @@ final class WebSocketControllerTest extends TestCase
 
         $this->controller->onClose(1);
 
-        $this->assertNull($this->registry->getConnection(1));
+        $this->assertConnectionMissing(1);
     }
 
     public function testOnCloseDoesNotThrowForUnknownFd(): void
@@ -479,7 +482,7 @@ final class WebSocketControllerTest extends TestCase
 
         $this->controller->onClose(1);
 
-        $this->assertNull($this->registry->getConnection(1));
+        $this->assertConnectionMissing(1);
         $this->assertSame([], $this->registry->getRoomMembers('room:123'));
     }
 
@@ -494,7 +497,7 @@ final class WebSocketControllerTest extends TestCase
 
         // Close the connection
         $this->controller->onClose(1);
-        $this->assertNull($this->registry->getConnection(1));
+        $this->assertConnectionMissing(1);
 
         // Simulate a new connection on the same FD (as would happen after reconnect)
         // The WithWebSocketHandler will call onOpen, but we test auth.reconnect directly
@@ -565,4 +568,10 @@ final class WebSocketControllerTest extends TestCase
         ]));
         $this->assertLastPushMatches(1, 'error', ['message' => 'Invalid or expired reconnection token']);
     }
+
+    private function assertConnectionMissing(int $fd): void
+    {
+        self::assertNull($this->registry->getConnection($fd));
+    }
+
 }
