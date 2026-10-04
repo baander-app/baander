@@ -21,12 +21,16 @@ import {
   getGetLyricsSongLyricsQueryKey,
 } from '@/shared/api-client/gen/endpoints'
 import type {
+  GetLyricsSongLyrics200,
+  GetLyricsSearch200,
   LyricsResource,
   LrclibSearchResource,
 } from '@/shared/api-client/gen/endpoints'
+import { useIsAdmin } from '@/features/auth/hooks/use-admin-check'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Search, Download, Check, Music } from 'lucide-react'
+import { formatDuration } from '@/shared/utils/format-duration'
 import { interactiveTransition } from '@/shared/theme'
 
 const LyricsPre = styled.pre`
@@ -167,13 +171,15 @@ export function LyricsDialog({
   songTitle,
   artistName,
 }: LyricsDialogProps) {
+  const isAdmin = useIsAdmin()
   const [tab, setTab] = useState<'lyrics' | 'search'>('lyrics')
   const [searchQuery, setSearchQuery] = useState('')
+  const activeTab = isAdmin ? tab : 'lyrics'
 
   const queryClient = useQueryClient()
 
   // Fetch cached lyrics
-  const { data: lyricsData, isLoading: lyricsLoading } = useGetLyricsSongLyrics(songPublicId, {
+  const { data: lyricsData, isLoading: lyricsLoading, isError: lyricsError } = useGetLyricsSongLyrics(songPublicId, {
     query: { enabled: open },
   })
 
@@ -183,8 +189,8 @@ export function LyricsDialog({
   // Fetch from LRCLIB
   const fetchMutation = usePostLyricsSongLyricsFetch({
     mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetLyricsSongLyricsQueryKey(songPublicId) })
+      onSuccess: (_data, variables) => {
+        queryClient.invalidateQueries({ queryKey: getGetLyricsSongLyricsQueryKey(variables.publicId) })
         toast.success('Lyrics fetched')
       },
       onError: () => {
@@ -196,7 +202,7 @@ export function LyricsDialog({
   // Search LRCLIB
   const { data: searchData, isLoading: searchLoading } = useGetLyricsSearch(
     { q: searchQuery },
-    { query: { enabled: tab === 'search' && searchQuery.length >= 2 } },
+    { query: { enabled: open && isAdmin && activeTab === 'search' && searchQuery.length >= 2 } },
   )
 
   const searchResults = extractSearchResults(searchData)
@@ -204,8 +210,8 @@ export function LyricsDialog({
   // Apply search result
   const applyMutation = usePostLyricsApply({
     mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getGetLyricsSongLyricsQueryKey(songPublicId) })
+      onSuccess: (_data, variables) => {
+        queryClient.invalidateQueries({ queryKey: getGetLyricsSongLyricsQueryKey(variables.data.songPublicId) })
         toast.success('Lyrics applied')
         setTab('lyrics')
       },
@@ -216,20 +222,26 @@ export function LyricsDialog({
   })
 
   const handleFetch = useCallback(() => {
+    if (!isAdmin) return
+
     fetchMutation.mutate({ publicId: songPublicId })
-  }, [fetchMutation, songPublicId])
+  }, [fetchMutation, isAdmin, songPublicId])
 
   const handleSearch = useCallback(() => {
+    if (!isAdmin) return
+
     const q = [songTitle, artistName].filter(Boolean).join(' ')
     setSearchQuery(q)
     setTab('search')
-  }, [songTitle, artistName])
+  }, [isAdmin, songTitle, artistName])
 
   const handleApply = useCallback(
     (resultId: number) => {
+      if (!isAdmin) return
+
       applyMutation.mutate({ resultId, data: { songPublicId } })
     },
-    [applyMutation, songPublicId],
+    [applyMutation, isAdmin, songPublicId],
   )
 
   const defaultQuery = [songTitle, artistName].filter(Boolean).join(' ')
@@ -240,14 +252,21 @@ export function LyricsDialog({
         <DialogHeader>
           <DialogTitle>Lyrics \u2014 {songTitle}</DialogTitle>
           <DialogDescription>
-            {artistName ? `${artistName}` : 'View and fetch lyrics for this track'}
+            {artistName ?? 'View lyrics for this track'}
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={tab} onValueChange={(v) => setTab(v as 'lyrics' | 'search')}>
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => {
+            if (value === 'lyrics' || (isAdmin && value === 'search')) {
+              setTab(value)
+            }
+          }}
+        >
           <TabsList>
             <TabsTrigger value="lyrics">Lyrics</TabsTrigger>
-            <TabsTrigger value="search">Search</TabsTrigger>
+            {isAdmin && <TabsTrigger value="search">Search</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="lyrics">
@@ -258,6 +277,10 @@ export function LyricsDialog({
                 <Skeleton style={{ height: '1rem', width: '100%' }} />
                 <Skeleton style={{ height: '1rem', width: '60%' }} />
               </div>
+            ) : lyricsError ? (
+              <NoLyricsContainer>
+                <NoLyricsText>Unable to load lyrics</NoLyricsText>
+              </NoLyricsContainer>
             ) : hasLyrics ? (
               <ScrollArea style={{ height: '18rem' }}>
                 {lyrics.syncedLyrics ? (
@@ -278,70 +301,74 @@ export function LyricsDialog({
             ) : (
               <NoLyricsContainer>
                 <NoLyricsText>No lyrics cached for this track.</NoLyricsText>
-                <Button
-                  size="sm"
-                  onClick={handleFetch}
-                  disabled={fetchMutation.isPending}
-                >
-                  <Download size={14} />
-                  {fetchMutation.isPending ? 'Fetching\u2026' : 'Fetch from LRCLIB'}
-                </Button>
+                {isAdmin && (
+                  <Button
+                    size="sm"
+                    onClick={handleFetch}
+                    disabled={fetchMutation.isPending}
+                  >
+                    <Download size={14} />
+                    {fetchMutation.isPending ? 'Fetching\u2026' : 'Fetch from LRCLIB'}
+                  </Button>
+                )}
               </NoLyricsContainer>
             )}
           </TabsContent>
 
-          <TabsContent value="search">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <SearchRow>
-                <Input
-                  placeholder="Search lyrics\u2026"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && searchQuery.length >= 2) {
-                      // refetch happens via react-query enabled
-                    }
-                  }}
-                />
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleSearch}
-                  style={{ flexShrink: 0 }}
-                >
-                  <Search size={14} />
-                  Auto
-                </Button>
-              </SearchRow>
+          {isAdmin && (
+            <TabsContent value="search">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <SearchRow>
+                  <Input
+                    placeholder="Search lyrics\u2026"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && searchQuery.length >= 2) {
+                        // refetch happens via react-query enabled
+                      }
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleSearch}
+                    style={{ flexShrink: 0 }}
+                  >
+                    <Search size={14} />
+                    Auto
+                  </Button>
+                </SearchRow>
 
-              {searchLoading ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <Skeleton key={i} style={{ height: '4rem', width: '100%', borderRadius: 'var(--radius-md)' }} />
-                  ))}
-                </div>
-              ) : searchResults.length === 0 && searchQuery.length >= 2 ? (
-                <NoResultsText>No results found for &ldquo;{searchQuery}&rdquo;</NoResultsText>
-              ) : (
-                <ScrollArea style={{ height: '16rem' }}>
-                  <SearchResultsList>
-                    {searchResults.map((result) => (
-                      <SearchResultItem
-                        key={result.id}
-                        result={result}
-                        onApply={handleApply}
-                        isApplying={applyMutation.isPending}
-                      />
+                {searchLoading ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    {Array.from({ length: 3 }).map((_, i) => (
+                      <Skeleton key={i} style={{ height: '4rem', width: '100%', borderRadius: 'var(--radius-md)' }} />
                     ))}
-                  </SearchResultsList>
-                </ScrollArea>
-              )}
+                  </div>
+                ) : searchResults.length === 0 && searchQuery.length >= 2 ? (
+                  <NoResultsText>No results found for &ldquo;{searchQuery}&rdquo;</NoResultsText>
+                ) : (
+                  <ScrollArea style={{ height: '16rem' }}>
+                    <SearchResultsList>
+                      {searchResults.map((result) => (
+                        <SearchResultItem
+                          key={result.id}
+                          result={result}
+                          onApply={handleApply}
+                          isApplying={applyMutation.isPending}
+                        />
+                      ))}
+                    </SearchResultsList>
+                  </ScrollArea>
+                )}
 
-              {!searchQuery && defaultQuery && (
-                <SearchHint>Press &ldquo;Auto&rdquo; to search for &ldquo;{defaultQuery}&rdquo;</SearchHint>
-              )}
-            </div>
-          </TabsContent>
+                {!searchQuery && defaultQuery && (
+                  <SearchHint>Press &ldquo;Auto&rdquo; to search for &ldquo;{defaultQuery}&rdquo;</SearchHint>
+                )}
+              </div>
+            </TabsContent>
+          )}
         </Tabs>
 
         <DialogFooter showCloseButton />
@@ -414,20 +441,14 @@ function SearchResultItem({
   )
 }
 
-function formatDuration(seconds: number): string {
-  const m = Math.floor(seconds / 60)
-  const s = Math.floor(seconds % 60)
-  return `${m}:${s.toString().padStart(2, '0')}`
-}
-
-function extractLyrics(data: unknown): CachedLyrics | null {
-  const d = (data as { data?: LyricsResource } | undefined)?.data
-  if (!d || (typeof d === 'object' && Object.keys(d).length === 0)) return null
+function extractLyrics(data: GetLyricsSongLyrics200 | undefined): CachedLyrics | null {
+  const d = data?.data
+  if (!d || Array.isArray(d)) return null
   return d
 }
 
-function extractSearchResults(data: unknown): SearchResult[] {
-  const d = (data as { data?: LrclibSearchResource[] } | undefined)?.data
+function extractSearchResults(data: GetLyricsSearch200 | undefined): SearchResult[] {
+  const d = data?.data
   if (!Array.isArray(d)) return []
   return d
 }

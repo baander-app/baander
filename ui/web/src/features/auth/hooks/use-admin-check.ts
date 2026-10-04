@@ -8,3 +8,10 @@ export function useAdminCheck() {
 
   return { isAdmin, isSuperAdmin, roles }
 }
+
+export function useIsAdmin(): boolean {
+  return useAuthStore((state) =>
+    state.user?.roles.includes('ROLE_ADMIN') === true
+    || state.user?.roles.includes('ROLE_SUPER_ADMIN') === true,
+  )
+}

@@ -7514,13 +7514,25 @@
                                 "schema": {
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/components/schemas/LyricsResource"
+                                            "oneOf": [
+                                                {
+                                                    "$ref": "#/components/schemas/LyricsResource"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {},
+                                                    "maxItems": 0
+                                                }
+                                            ]
                                         }
                                     },
                                     "type": "object"
                                 }
                             }
                         }
+                    },
+                    "401": {
+                        "description": "Authentication required"
                     },
                     "404": {
                         "description": "Song not found",
@@ -7561,13 +7573,28 @@
                                 "schema": {
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/components/schemas/LyricsResource"
+                                            "oneOf": [
+                                                {
+                                                    "$ref": "#/components/schemas/LyricsResource"
+                                                },
+                                                {
+                                                    "type": "array",
+                                                    "items": {},
+                                                    "maxItems": 0
+                                                }
+                                            ]
                                         }
                                     },
                                     "type": "object"
                                 }
                             }
                         }
+                    },
+                    "403": {
+                        "description": "Administrator role required"
+                    },
+                    "401": {
+                        "description": "Authentication required"
                     },
                     "404": {
                         "description": "Song not found",
@@ -7676,6 +7703,12 @@
                                 }
                             }
                         }
+                    },
+                    "403": {
+                        "description": "Administrator role required"
+                    },
+                    "401": {
+                        "description": "Authentication required"
                     },
                     "404": {
                         "description": "Song or lyrics result not found",

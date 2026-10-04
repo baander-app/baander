@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Lyrics\Interface\Controller;
 
+use App\Library\Application\Port\LibraryAccessPortInterface;
+use App\Lyrics\Application\Port\LrclibClientInterface;
 use App\Lyrics\Domain\Model\Lyrics;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
@@ -17,13 +19,17 @@ final class LyricsControllerTest extends TestCase
     {
         parent::setUp();
 
+        $remote = $this->createStub(LrclibClientInterface::class);
+        $remote->method('search')->willReturn([]);
+        static::getContainer()->set(LrclibClientInterface::class, $remote);
+
         $this->lyricsRepository = static::getContainer()->get(LyricsRepositoryInterface::class);
     }
 
     public function testGetLyricsReturnsEmptyWhenNoLyricsExist(): void
     {
         $user = $this->createTestUser();
-        [, , $songPublicId] = $this->createSongFixture();
+        [, , $songPublicId] = $this->createSongFixture($user->getId());
 
         $response = $this->authenticatedRequest(
             'GET',
@@ -39,7 +45,7 @@ final class LyricsControllerTest extends TestCase
     public function testGetLyricsReturnsLyricsWhenExist(): void
     {
         $user = $this->createTestUser();
-        [$songId, , $songPublicId] = $this->createSongFixture();
+        [$songId, , $songPublicId] = $this->createSongFixture($user->getId());
 
         $lyrics = Lyrics::create(
             songId: $songId,
@@ -78,7 +84,7 @@ final class LyricsControllerTest extends TestCase
 
     public function testFetchLyricsReturns404ForInvalidPublicId(): void
     {
-        $user = $this->createTestUser();
+        $user = $this->createAdminUser();
 
         $response = $this->authenticatedRequest(
             'POST',
@@ -91,8 +97,8 @@ final class LyricsControllerTest extends TestCase
 
     public function testFetchLyricsReturnsExistingLyricsWithoutReFetch(): void
     {
-        $user = $this->createTestUser();
-        [$songId, , $songPublicId] = $this->createSongFixture();
+        $user = $this->createAdminUser();
+        [$songId, , $songPublicId] = $this->createSongFixture($user->getId());
 
         $lyrics = Lyrics::create(
             songId: $songId,
@@ -145,7 +151,7 @@ final class LyricsControllerTest extends TestCase
 
     public function testApplyLyricsReturnsErrorForInvalidPublicId(): void
     {
-        $user = $this->createTestUser();
+        $user = $this->createAdminUser();
 
         $response = $this->authenticatedRequest(
             'POST',
@@ -163,7 +169,7 @@ final class LyricsControllerTest extends TestCase
      *
      * @return array{0: Uuid, 1: Uuid, 2: string} [songId, albumId, songPublicId]
      */
-    private function createSongFixture(): array
+    private function createSongFixture(Uuid $userId): array
     {
         $libraryId = Uuid::v7();
         $albumId = Uuid::v7();
@@ -217,6 +223,9 @@ final class LyricsControllerTest extends TestCase
                 $now,
             ],
         );
+
+        $access = static::getContainer()->get(LibraryAccessPortInterface::class);
+        $access->grant($userId, $libraryId);
 
         // Clear EM cache so it picks up the raw-inserted entities
         $this->entityManager->clear();

@@ -560,6 +560,6 @@ function formatTime(seconds: number): string {
 
 function extractLyrics(data: GetLyricsSongLyrics200 | undefined): CachedLyrics | null {
   const d = data?.data
-  if (!d || (typeof d === 'object' && Object.keys(d).length === 0)) return null
+  if (!d || Array.isArray(d)) return null
   return d
 }

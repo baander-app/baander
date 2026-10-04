@@ -6,6 +6,7 @@ namespace App\Lyrics\Interface\Controller;
 
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Domain\Model\Song;
+use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Lyrics\Application\Port\LyricsPortInterface;
 use App\Lyrics\Interface\Request\ApplyLyricsRequest;
 use App\Lyrics\Interface\Request\SearchLyricsRequest;
@@ -20,6 +21,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapQueryString;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[OA\Tag(name: 'Lyrics', description: 'Song lyrics retrieval, search, and management')]
 #[Route('/api', name: 'lyrics_')]
@@ -31,6 +33,7 @@ final class LyricsController
     public function __construct(
         private readonly LyricsPortInterface $lyricsPort,
         private readonly SongPortInterface $songPort,
+        private readonly LibraryReadScopeProviderInterface $libraryReadScope,
     ) {
     }
 
@@ -45,8 +48,12 @@ final class LyricsController
         ],
         responses: [
             new OA\Response(response: '200', description: 'Lyrics for the song', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', ref: new Model(type: LyricsResource::class))],
+                properties: [new OA\Property(property: 'data', oneOf: [
+                    new OA\Schema(ref: new Model(type: LyricsResource::class)),
+                    new OA\Schema(type: 'array', maxItems: 0, items: new OA\Items()),
+                ])],
             )),
+            new OA\Response(response: '401', description: 'Authentication required'),
             new OA\Response(response: '404', description: 'Song not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
@@ -79,12 +86,18 @@ final class LyricsController
         ],
         responses: [
             new OA\Response(response: '200', description: 'Lyrics fetched and stored', content: new OA\JsonContent(
-                properties: [new OA\Property(property: 'data', ref: new Model(type: LyricsResource::class))],
+                properties: [new OA\Property(property: 'data', oneOf: [
+                    new OA\Schema(ref: new Model(type: LyricsResource::class)),
+                    new OA\Schema(type: 'array', maxItems: 0, items: new OA\Items()),
+                ])],
             )),
+            new OA\Response(response: '403', description: 'Administrator role required'),
+            new OA\Response(response: '401', description: 'Authentication required'),
             new OA\Response(response: '404', description: 'Song not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/songs/{publicId}/lyrics/fetch', name: 'song_lyrics_fetch', methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function fetch(string $publicId): JsonResponse
     {
         $song = $this->resolveSong($publicId);
@@ -133,6 +146,7 @@ final class LyricsController
      */
     #[OA\Post(
         path: '/api/lyrics/search/{resultId}/apply',
+        requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: ApplyLyricsRequest::class))),
         summary: 'Apply an LRCLIB search result to a song',
         parameters: [
             new OA\Parameter(name: 'resultId', description: 'LRCLIB search result ID', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
@@ -141,10 +155,13 @@ final class LyricsController
             new OA\Response(response: '200', description: 'Lyrics applied to song', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', ref: new Model(type: LyricsResource::class))],
             )),
+            new OA\Response(response: '403', description: 'Administrator role required'),
+            new OA\Response(response: '401', description: 'Authentication required'),
             new OA\Response(response: '404', description: 'Song or lyrics result not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/lyrics/search/{resultId}/apply', name: 'apply', methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function apply(int $resultId, #[MapRequestPayload] ApplyLyricsRequest $payload): JsonResponse
     {
         try {
@@ -153,7 +170,7 @@ final class LyricsController
             return $this->errorResponse($this->trans('errors.invalid_public_id'));
         }
 
-        $song = $this->songPort->findByPublicId($publicId);
+        $song = $this->songPort->findVisibleByPublicId($publicId, $this->libraryReadScope->current());
 
         if ($song === null) {
             return $this->notFound();
@@ -176,6 +193,6 @@ final class LyricsController
             return null;
         }
 
-        return $this->songPort->findByPublicId($resolvedPublicId);
+        return $this->songPort->findVisibleByPublicId($resolvedPublicId, $this->libraryReadScope->current());
     }
 }

@@ -3590,11 +3590,11 @@ export type GetAdminLyricsSyncStatus200 = {
 };
 
 export type GetLyricsSongLyrics200 = {
-  data?: LyricsResource;
+  data?: LyricsResource | unknown[];
 };
 
 export type PostLyricsSongLyricsFetch200 = {
-  data?: LyricsResource;
+  data?: LyricsResource | unknown[];
 };
 
 export type GetLyricsSearchParams = {
@@ -15455,7 +15455,7 @@ export const getGetLyricsSongLyricsQueryKey = (publicId: string,) => {
     }
 
 
-export const getGetLyricsSongLyricsQueryOptions = <TData = Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError = ErrorType<ApiError>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetLyricsSongLyricsQueryOptions = <TData = Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError = ErrorType<void | ApiError>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -15474,10 +15474,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetLyricsSongLyricsQueryResult = NonNullable<Awaited<ReturnType<typeof getLyricsSongLyrics>>>
-export type GetLyricsSongLyricsQueryError = ErrorType<ApiError>
+export type GetLyricsSongLyricsQueryError = ErrorType<void | ApiError>
 
 
-export function useGetLyricsSongLyrics<TData = Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError = ErrorType<ApiError>>(
+export function useGetLyricsSongLyrics<TData = Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError = ErrorType<void | ApiError>>(
  publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getLyricsSongLyrics>>,
@@ -15487,7 +15487,7 @@ export function useGetLyricsSongLyrics<TData = Awaited<ReturnType<typeof getLyri
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetLyricsSongLyrics<TData = Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError = ErrorType<ApiError>>(
+export function useGetLyricsSongLyrics<TData = Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError = ErrorType<void | ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getLyricsSongLyrics>>,
@@ -15497,7 +15497,7 @@ export function useGetLyricsSongLyrics<TData = Awaited<ReturnType<typeof getLyri
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetLyricsSongLyrics<TData = Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError = ErrorType<ApiError>>(
+export function useGetLyricsSongLyrics<TData = Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError = ErrorType<void | ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -15505,7 +15505,7 @@ export function useGetLyricsSongLyrics<TData = Awaited<ReturnType<typeof getLyri
  * @summary Get cached lyrics for a song
  */
 
-export function useGetLyricsSongLyrics<TData = Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError = ErrorType<ApiError>>(
+export function useGetLyricsSongLyrics<TData = Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError = ErrorType<void | ApiError>>(
  publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLyricsSongLyrics>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -15548,7 +15548,7 @@ export const postLyricsSongLyricsFetch = async (publicId: string, options?: Requ
 
 
 
-export const getPostLyricsSongLyricsFetchMutationOptions = <TError = ErrorType<ApiError>,
+export const getPostLyricsSongLyricsFetchMutationOptions = <TError = ErrorType<void | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postLyricsSongLyricsFetch>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postLyricsSongLyricsFetch>>, TError,{publicId: string}, TContext> => {
 
@@ -15577,12 +15577,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostLyricsSongLyricsFetchMutationResult = NonNullable<Awaited<ReturnType<typeof postLyricsSongLyricsFetch>>>
 
-    export type PostLyricsSongLyricsFetchMutationError = ErrorType<ApiError>
+    export type PostLyricsSongLyricsFetchMutationError = ErrorType<void | ApiError>
 
     /**
  * @summary Fetch lyrics from LRCLIB for a song
  */
-export const usePostLyricsSongLyricsFetch = <TError = ErrorType<ApiError>,
+export const usePostLyricsSongLyricsFetch = <TError = ErrorType<void | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postLyricsSongLyricsFetch>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postLyricsSongLyricsFetch>>,
@@ -15727,7 +15727,7 @@ export const postLyricsApply = async (resultId: number,
 
 
 
-export const getPostLyricsApplyMutationOptions = <TError = ErrorType<ApiError>,
+export const getPostLyricsApplyMutationOptions = <TError = ErrorType<void | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postLyricsApply>>, TError,{resultId: number;data: BodyType<ApplyLyricsRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postLyricsApply>>, TError,{resultId: number;data: BodyType<ApplyLyricsRequest>}, TContext> => {
 
@@ -15756,12 +15756,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostLyricsApplyMutationResult = NonNullable<Awaited<ReturnType<typeof postLyricsApply>>>
     export type PostLyricsApplyMutationBody = BodyType<ApplyLyricsRequest>
-    export type PostLyricsApplyMutationError = ErrorType<ApiError>
+    export type PostLyricsApplyMutationError = ErrorType<void | ApiError>
 
     /**
  * @summary Apply an LRCLIB search result to a song
  */
-export const usePostLyricsApply = <TError = ErrorType<ApiError>,
+export const usePostLyricsApply = <TError = ErrorType<void | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postLyricsApply>>, TError,{resultId: number;data: BodyType<ApplyLyricsRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postLyricsApply>>,

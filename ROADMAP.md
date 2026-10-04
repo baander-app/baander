@@ -11,6 +11,22 @@ regional measurements, and backup-destination restore qualification remain pendi
 
 ## Latest verified backend batches
 
+Lyrics reads now resolve songs through the current library scope; cached misses
+remain read-only. Fetch/apply require administrator privileges before provider
+calls or persistence. The real OAuth/DPoP and PostgreSQL matrix plus existing
+functional tests pass 35 tests (232 assertions). The exact scope-port architecture
+regression passes 20 assertions and still rejects foreign internal services.
+Locked full PHPStan reports zero errors; Unit/StaticAnalysisRules pass 4,565 tests
+(19,233 assertions). Deptrac remains at 298 active violations, 679 skipped
+occurrences and zero errors, without baseline expansion. OpenAPI now documents
+authorization, empty cached results and the apply request body; clients are
+regenerated from the same specification.
+The lyrics UI hides management actions from ordinary users, disables closed or
+unauthorized provider searches, and distinguishes failed reads from empty caches.
+Twelve UI regressions cover permissions, demotion, request-specific invalidation,
+and the boolean admin selector avoiding unrelated user/token rerenders. Full web
+and worker typechecks and scoped lint pass; this is component-level evidence.
+
 Signed delivery now shares full-query signature validation across manifests and
 segments. The production-firewall matrix passes 25 cases (313 assertions), with
 182 related unit tests (797 assertions). It covers seven delivery routes, five
@@ -358,8 +374,8 @@ pairs: 257 violations remain, down from 259, with zero configuration/baseline
 errors after removing four obsolete entries. The public authenticated-identity
 contract has an exact layer allowance for its consuming controllers; Auth internals
 remain isolated. Catalog's playlist-impact helper now accepts only song UUIDs.
-Lyrics Application is still missing from Deptrac's collectors, an enforcement gap
-to address during the separate architecture remediation.
+At that checkpoint Lyrics Application was missing from Deptrac's collectors; the
+subsequent coverage audit recorded above has closed that enforcement gap.
 
 ## Production authentication and contract drift gates
 

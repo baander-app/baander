@@ -2,6 +2,7 @@ import type { GetLyricsSongLyrics200 } from '@/shared/api-client/gen/endpoints'
 import styled, { css } from 'styled-components'
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { motion } from 'motion/react'
+import { useIsAdmin } from '@/features/auth/hooks/use-admin-check'
 import { usePlayerStore } from '@/features/player/stores/player-store'
 import { useCurrentTime } from '@/features/player/stores/player-time-tracker'
 import { Button } from '@/shared/components/ui/button'
@@ -158,12 +159,13 @@ const PlainText = styled.pre`
 `
 
 export function LyricsTab() {
+  const isAdmin = useIsAdmin()
   const currentTrack = usePlayerStore((s) => s.currentTrack)
   const publicId = currentTrack?.publicId ?? ''
   const queryClient = useQueryClient()
   const toggleFullscreen = useLyricsFullscreenStore((s) => s.toggle)
 
-  const { data: lyricsData, isLoading } = useGetLyricsSongLyrics(publicId, {
+  const { data: lyricsData, isLoading, isError } = useGetLyricsSongLyrics(publicId, {
     query: { enabled: !!publicId },
   })
 
@@ -180,8 +182,10 @@ export function LyricsTab() {
   })
 
   const handleFetch = useCallback(() => {
-    if (publicId) fetchMutation.mutate({ publicId })
-  }, [fetchMutation, publicId])
+    if (!isAdmin || !publicId) return
+
+    fetchMutation.mutate({ publicId })
+  }, [fetchMutation, isAdmin, publicId])
 
   if (!currentTrack) {
     return (
@@ -207,14 +211,24 @@ export function LyricsTab() {
     )
   }
 
+  if (isError) {
+    return (
+      <EmptyState>
+        <EmptyText>Unable to load lyrics</EmptyText>
+      </EmptyState>
+    )
+  }
+
   if (!lyrics || (!lyrics.plainLyrics && !lyrics.syncedLyrics)) {
     return (
       <FetchState>
         <EmptyText>No lyrics cached</EmptyText>
-        <Button size="sm" onClick={handleFetch} disabled={fetchMutation.isPending}>
-          <Download size={14} />
-          {fetchMutation.isPending ? 'Fetching…' : 'Fetch from LRCLIB'}
-        </Button>
+        {isAdmin && (
+          <Button size="sm" onClick={handleFetch} disabled={fetchMutation.isPending}>
+            <Download size={14} />
+            {fetchMutation.isPending ? 'Fetching…' : 'Fetch from LRCLIB'}
+          </Button>
+        )}
       </FetchState>
     )
   }
@@ -409,6 +423,6 @@ function PlainLyricsView({
 
 function extractLyrics(data: GetLyricsSongLyrics200 | undefined): CachedLyrics | null {
   const d = data?.data
-  if (!d || (typeof d === 'object' && Object.keys(d).length === 0)) return null
+  if (!d || Array.isArray(d)) return null
   return d
 }

@@ -1294,6 +1294,7 @@ deptrac:
       - 'Shared Interface'
 
     'Lyrics Interface':
+      - 'Library Read Scope Contract'
       - 'Lyrics Application'
       - 'Lyrics Resources'
       - 'Shared Domain'
