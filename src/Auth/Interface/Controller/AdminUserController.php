@@ -17,7 +17,6 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
-use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -34,7 +33,6 @@ final class AdminUserController
 
     public function __construct(
         private readonly UserPortInterface $userService,
-        private readonly Security $security,
     ) {
     }
 
@@ -301,6 +299,12 @@ final class AdminUserController
 
     private function findUserOr404(string $id): ?User
     {
-        return $this->userService->findByUuid(Uuid::fromString($id));
+        try {
+            $uuid = Uuid::fromString($id);
+        } catch (\InvalidArgumentException) {
+            return null;
+        }
+
+        return $this->userService->findByUuid($uuid);
     }
 }
