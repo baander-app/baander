@@ -218,6 +218,7 @@ final class ArtistController
         ],
     )]
     #[Route('/{publicId}', name: 'update', methods: ['PATCH'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function update(string $publicId, #[MapRequestPayload] UpdateArtistRequest $payload): JsonResponse
     {
         try {
@@ -270,6 +271,7 @@ final class ArtistController
         ],
     )]
     #[Route('/{publicId}', name: 'destroy', methods: ['DELETE'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function destroy(string $publicId): JsonResponse
     {
         try {
