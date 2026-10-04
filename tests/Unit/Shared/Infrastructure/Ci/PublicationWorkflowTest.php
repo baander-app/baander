@@ -30,7 +30,8 @@ final class PublicationWorkflowTest extends TestCase
     {
         $jobs = $this->workflow('ci.yaml')['jobs'];
         $publisher = $jobs['build-and-push'];
-        self::assertSame(['quality-gate', 'frontend-quality', 'dsp-quality'], $publisher['needs']);
+        self::assertSame(['quality-gate', 'frontend-quality', 'dsp-quality', 'registry-quality'], $publisher['needs']);
+        self::assertSame(['release', 'sanitize'], $jobs['registry-quality']['strategy']['matrix']['mode']);
         self::assertArrayNotHasKey('continue-on-error', $publisher);
         self::assertArrayNotHasKey('if', $publisher);
 
@@ -62,6 +63,7 @@ final class PublicationWorkflowTest extends TestCase
         string $job,
         string $stepName,
         string $command,
+        string $matrixMode = 'release',
     ): void {
         $jobs = $this->workflow('ci.yaml')['jobs'];
         $step = $this->step($jobs[$job], $stepName);
@@ -82,6 +84,7 @@ SH;
             chmod($tools . '/' . $tool, 0755);
         }
         $shell = str_replace('/tmp/baander-dsp-emsdk', $this->directory . '/sdk', $step['run']);
+        $shell = str_replace('${{ matrix.mode }}', $matrixMode, $shell);
         $process = new Process(['/bin/bash', '-eo', 'pipefail', '-c', $shell], $this->directory, [
             'PATH' => $tools . ':' . getenv('PATH'),
             'CALL_LOG' => $log,
@@ -162,10 +165,16 @@ SH;
         self::assertFalse($process->isSuccessful());
     }
 
-    /** @return iterable<string, array{string, string, string}> */
+    /** @return iterable<string, array{0: string, 1: string, 2: string, 3?: string}> */
     public static function failedQualificationProvider(): iterable
     {
         foreach (self::qualificationCommands() as $name => $case) {
+            if ($name === 'registry') {
+                foreach (['release', 'sanitize'] as $mode) {
+                    yield $name . ' ' . $mode => [$case[0], $case[1], $case[2], $mode];
+                }
+                continue;
+            }
             yield $name => $case;
         }
     }
@@ -186,6 +195,7 @@ SH;
             'embedded typecheck' => ['frontend-quality', 'Embedded player checks', 'corepack yarn typecheck'],
             'embedded unit' => ['frontend-quality', 'Embedded player checks', 'corepack yarn test'],
             'DSP' => ['dsp-quality', 'Build and qualify analysis modules', 'bash scripts/test-dsp-analysis.sh'],
+            'registry' => ['registry-quality', 'Build and qualify registry', 'bash scripts/test-registry.sh'],
         ];
     }
 
