@@ -26,6 +26,15 @@ webhook signer dependency. The scan reports 238 active violations, 676 skipped
 occurrences, and zero configuration errors. Uncovered contexts remain work.
 The full configured PHPStan scan remains at zero errors after these batches.
 
+The subsequent coverage audit added the missing Radio, Scheduler, Session, QoL,
+Lyrics Application/Interface, and Filesystem Infrastructure layers. A real Deptrac
+regression previously allowed application-to-infrastructure leaks in these contexts;
+it now rejects them. This exposes 142 previously unreported occurrences across 60
+dependency pairs. With the token-port repair removing four existing occurrences,
+the scan reports 376 active violations and zero configuration errors. No baseline
+entries were added. Some newly visible edges are legitimate application contracts
+requiring precise public-contract rules; others are implementation coupling to fix.
+
 ## Delivery horizons
 
 The destination is a reliable private self-hosted backend/web application, a small

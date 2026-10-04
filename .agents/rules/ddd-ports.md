@@ -34,7 +34,7 @@ are not permission to place framework objects in persisted event payloads.
 Verify interface resolution, concrete implementation, authorization, error mapping,
 and resource output together. Resource/model dependencies are intentional data
 mapping, while controller repository/infrastructure shortcuts remain debt. Deptrac
-currently baselines both; do not treat its baseline as a universal permission.
+has dedicated resource layers; remaining baselines are debt, not permission.
 
 The project's custom PHPStan rules check OpenAPI tag descriptions and request-payload
 typing, not complete DDD conformance. Parsed-source tests verify that the payload

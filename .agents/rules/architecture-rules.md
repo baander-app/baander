@@ -32,7 +32,7 @@ violations. A baseline is recorded debt, not approval. Dedicated resource layers
 allow mapping their own domain models while controller layers remain restricted.
 Some cross-context ports still have policy mismatches; report them rather than
 broadening dependencies during an unrelated task.
-Radio, Scheduler, QoL, and Session are not covered by its context collectors.
+Radio, Scheduler, QoL, Session, Lyrics, and Filesystem are covered by collectors.
 External framework dependencies also require review beyond its internal layers.
 
 Use GitNexus as required by `AGENTS.md`; inspect actual contracts, imports, service

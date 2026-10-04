@@ -32,9 +32,9 @@ deptrac:
         Activity: ['Activity Domain', 'Activity Application', 'Activity Infrastructure', 'Activity Resources', 'Activity Interface']
         Auth: ['Auth Domain', 'Auth Identity Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
         Catalog: ['Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Resources', 'Catalog Interface']
-        Filesystem: ['Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
+        Filesystem: ['Filesystem Infrastructure', 'Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
         Library: ['Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
-        Lyrics: ['Lyrics Domain', 'Lyrics Infrastructure']
+        Lyrics: ['Lyrics Domain', 'Lyrics Application', 'Lyrics Infrastructure', 'Lyrics Resources', 'Lyrics Interface']
         Media: ['Media Domain', 'Media Application', 'Media Infrastructure', 'Media Resources', 'Media Interface']
         Metadata: ['Metadata Domain', 'Metadata Application', 'Metadata Infrastructure', 'Metadata Interface']
         Notification: ['Notification Domain', 'Notification Application', 'Notification Infrastructure', 'Notification Resources', 'Notification Interface']
@@ -45,6 +45,10 @@ deptrac:
         UserPreference: ['UserPreference Domain', 'UserPreference Application', 'UserPreference Infrastructure', 'UserPreference Resources', 'UserPreference Interface']
         Discovery: ['Discovery Domain', 'Discovery Application', 'Discovery Infrastructure', 'Discovery Resources', 'Discovery Interface']
         Favorites: ['Favorites Domain', 'Favorites Application', 'Favorites Infrastructure', 'Favorites Resources', 'Favorites Interface']
+        Radio: ['Radio Domain', 'Radio Application', 'Radio Infrastructure', 'Radio Resources', 'Radio Interface']
+        Scheduler: ['Scheduler Domain', 'Scheduler Application', 'Scheduler Infrastructure', 'Scheduler Resources', 'Scheduler Interface']
+        Session: ['Session Domain', 'Session Application', 'Session Infrastructure', 'Session Resources', 'Session Interface']
+        QoL: ['QoL Domain', 'QoL Application', 'QoL Infrastructure', 'QoL Resources', 'QoL Interface']
         Command: ['Command Utility']
 
   layers:
@@ -238,7 +242,7 @@ deptrac:
               value: '^App\\Library\\Interface\\Resource\\'
 
     # =============================================
-    # Lyrics (Domain + Infrastructure only)
+    # Lyrics
     # =============================================
     - name: 'Lyrics Domain'
       collectors:
@@ -578,6 +582,151 @@ deptrac:
             - type: classLike
               value: '^App\\Favorites\\Interface\\Resource\\'
 
+    - name: 'Radio Domain'
+      collectors:
+        - type: classLike
+          value: '^App\\Radio\\Domain\\'
+
+    - name: 'Radio Application'
+      collectors:
+        - type: classLike
+          value: '^App\\Radio\\Application\\'
+
+    - name: 'Radio Infrastructure'
+      collectors:
+        - type: classLike
+          value: '^App\\Radio\\Infrastructure\\'
+
+    - name: 'Radio Resources'
+      collectors:
+        - type: classLike
+          value: '^App\\Radio\\Interface\\Resource\\'
+
+    - name: 'Radio Interface'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Radio\\Interface\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Radio\\Interface\\Resource\\'
+
+    - name: 'Scheduler Domain'
+      collectors:
+        - type: classLike
+          value: '^App\\Scheduler\\Domain\\'
+
+    - name: 'Scheduler Application'
+      collectors:
+        - type: classLike
+          value: '^App\\Scheduler\\Application\\'
+
+    - name: 'Scheduler Infrastructure'
+      collectors:
+        - type: classLike
+          value: '^App\\Scheduler\\Infrastructure\\'
+
+    - name: 'Scheduler Resources'
+      collectors:
+        - type: classLike
+          value: '^App\\Scheduler\\Interface\\Resource\\'
+
+    - name: 'Scheduler Interface'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Scheduler\\Interface\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Scheduler\\Interface\\Resource\\'
+
+    - name: 'Session Domain'
+      collectors:
+        - type: classLike
+          value: '^App\\Session\\Domain\\'
+
+    - name: 'Session Application'
+      collectors:
+        - type: classLike
+          value: '^App\\Session\\Application\\'
+
+    - name: 'Session Infrastructure'
+      collectors:
+        - type: classLike
+          value: '^App\\Session\\Infrastructure\\'
+
+    - name: 'Session Resources'
+      collectors:
+        - type: classLike
+          value: '^App\\Session\\Interface\\Resource\\'
+
+    - name: 'Session Interface'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Session\\Interface\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Session\\Interface\\Resource\\'
+
+    - name: 'QoL Domain'
+      collectors:
+        - type: classLike
+          value: '^App\\QoL\\Domain\\'
+
+    - name: 'QoL Application'
+      collectors:
+        - type: classLike
+          value: '^App\\QoL\\Application\\'
+
+    - name: 'QoL Infrastructure'
+      collectors:
+        - type: classLike
+          value: '^App\\QoL\\Infrastructure\\'
+
+    - name: 'QoL Resources'
+      collectors:
+        - type: classLike
+          value: '^App\\QoL\\Interface\\Resource\\'
+
+    - name: 'QoL Interface'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\QoL\\Interface\\'
+          must_not:
+            - type: classLike
+              value: '^App\\QoL\\Interface\\Resource\\'
+
+    - name: 'Lyrics Application'
+      collectors:
+        - type: classLike
+          value: '^App\\Lyrics\\Application\\'
+
+    - name: 'Lyrics Resources'
+      collectors:
+        - type: classLike
+          value: '^App\\Lyrics\\Interface\\Resource\\'
+
+    - name: 'Lyrics Interface'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Lyrics\\Interface\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Lyrics\\Interface\\Resource\\'
+
+    - name: 'Filesystem Infrastructure'
+      collectors:
+        - type: classLike
+          value: '^App\\Filesystem\\Infrastructure\\'
+
   ruleset:
     # =============================================
     # IDEAL RULES — these define the target architecture.
@@ -724,6 +873,7 @@ deptrac:
     'Lyrics Domain':
       - 'Shared Domain'
     'Lyrics Infrastructure':
+      - 'Lyrics Application'
       - 'Lyrics Domain'
       - 'Shared Domain'
       - 'Shared Infrastructure'
@@ -977,3 +1127,144 @@ deptrac:
     # --- Command (flat utility) ---
     'Command Utility':
       - 'Shared Domain'
+
+    'Radio Domain':
+      - 'Shared Domain'
+
+    'Radio Application':
+      - 'Radio Domain'
+      - 'Shared Domain'
+      - 'Shared Application'
+
+    'Radio Infrastructure':
+      - 'Radio Domain'
+      - 'Radio Application'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Infrastructure'
+
+    'Radio Resources':
+      - 'Radio Domain'
+      - 'Radio Application'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Interface'
+
+    'Radio Interface':
+      - 'Radio Application'
+      - 'Radio Resources'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Interface'
+
+    'Scheduler Domain':
+      - 'Shared Domain'
+
+    'Scheduler Application':
+      - 'Scheduler Domain'
+      - 'Shared Domain'
+      - 'Shared Application'
+
+    'Scheduler Infrastructure':
+      - 'Scheduler Domain'
+      - 'Scheduler Application'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Infrastructure'
+
+    'Scheduler Resources':
+      - 'Scheduler Domain'
+      - 'Scheduler Application'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Interface'
+
+    'Scheduler Interface':
+      - 'Scheduler Application'
+      - 'Scheduler Resources'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Interface'
+
+    'Session Domain':
+      - 'Shared Domain'
+
+    'Session Application':
+      - 'Session Domain'
+      - 'Shared Domain'
+      - 'Shared Application'
+
+    'Session Infrastructure':
+      - 'Session Domain'
+      - 'Session Application'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Infrastructure'
+
+    'Session Resources':
+      - 'Session Domain'
+      - 'Session Application'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Interface'
+
+    'Session Interface':
+      - 'Session Application'
+      - 'Session Resources'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Interface'
+
+    'QoL Domain':
+      - 'Shared Domain'
+
+    'QoL Application':
+      - 'QoL Domain'
+      - 'Shared Domain'
+      - 'Shared Application'
+
+    'QoL Infrastructure':
+      - 'QoL Domain'
+      - 'QoL Application'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Infrastructure'
+
+    'QoL Resources':
+      - 'QoL Domain'
+      - 'QoL Application'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Interface'
+
+    'QoL Interface':
+      - 'QoL Application'
+      - 'QoL Resources'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Interface'
+
+    'Lyrics Application':
+      - 'Lyrics Domain'
+      - 'Shared Domain'
+      - 'Shared Application'
+
+    'Lyrics Resources':
+      - 'Lyrics Domain'
+      - 'Lyrics Application'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Interface'
+
+    'Lyrics Interface':
+      - 'Lyrics Application'
+      - 'Lyrics Resources'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Interface'
+
+    'Filesystem Infrastructure':
+      - 'Filesystem Application'
+      - 'Shared Domain'
+      - 'Shared Application'
+      - 'Shared Infrastructure'
