@@ -705,8 +705,7 @@ export class AudioProcessor {
     this.sourceGainB.connect(this.analyzerNode)
 
     this.activeSource = 'A'
-    this.sourceGainA.gain.value = 1
-    this.sourceGainB.gain.value = 0
+    this.cancelCrossfade()
 
     this.audioElement = elementA
     this.isConnected = true
@@ -779,6 +778,8 @@ export class AudioProcessor {
    * Crossfade from the active source to the inactive one over `duration` seconds.
    */
   crossfadeToInactive(duration: number): void {
+    if (!Number.isFinite(duration) || duration < 0) throw new RangeError('Invalid crossfade duration')
+    this.cancelCrossfade()
     const t = this.audioContext.currentTime
     if (this.activeSource === 'A') {
       this.sourceGainA.gain.linearRampToValueAtTime(0, t + duration)
@@ -795,16 +796,17 @@ export class AudioProcessor {
    * Instantly swap active source (no ramp — for gapless without crossfade).
    */
   instantSwap(): void {
+    this.activeSource = this.activeSource === 'A' ? 'B' : 'A'
+    this.cancelCrossfade()
+  }
+
+  /** Finish an interrupted transition on the current active source. */
+  cancelCrossfade(): void {
     const t = this.audioContext.currentTime
-    if (this.activeSource === 'A') {
-      this.sourceGainA.gain.setValueAtTime(0, t)
-      this.sourceGainB.gain.setValueAtTime(1, t)
-      this.activeSource = 'B'
-    } else {
-      this.sourceGainB.gain.setValueAtTime(0, t)
-      this.sourceGainA.gain.setValueAtTime(1, t)
-      this.activeSource = 'A'
-    }
+    this.sourceGainA.gain.cancelScheduledValues(t)
+    this.sourceGainB.gain.cancelScheduledValues(t)
+    this.sourceGainA.gain.setValueAtTime(this.activeSource === 'A' ? 1 : 0, t)
+    this.sourceGainB.gain.setValueAtTime(this.activeSource === 'B' ? 1 : 0, t)
   }
 
   destroy() {

@@ -54,6 +54,7 @@ export interface PlayerState {
   insertAfterCurrent: (tracks: Track[]) => void
   reorderQueue: (fromIndex: number, toIndex: number) => void
   playNext: () => void
+  adoptPreloadedNext: (element: HTMLAudioElement, expectedCurrentId: string, expectedNextId: string) => boolean
   playPrevious: () => void
   removeFromQueue: (index: number) => void
   clearQueue: () => void
@@ -273,6 +274,27 @@ export const usePlayerStore = create<PlayerState>()(
         updateTime(0)
       },
 
+      adoptPreloadedNext: (element, expectedCurrentId, expectedNextId) => {
+        const { queue, currentIndex, currentTrack, shuffle, repeat, shuffleBag, volume, muted } = get()
+        if (repeat === 'one' || currentTrack?.publicId !== expectedCurrentId) return false
+        const nextIndex = resolveNextIndex(queue, currentIndex, shuffle, repeat, shuffleBag)
+        const track = nextIndex === null ? undefined : queue[nextIndex]
+        if (nextIndex === null || !track || track.publicId !== expectedNextId) return false
+
+        element.volume = volume / 100
+        element.muted = muted
+        set({
+          audioElement: element,
+          currentIndex: nextIndex,
+          currentTrack: track,
+          isPlaying: true,
+          duration: Number.isFinite(element.duration) ? element.duration : 0,
+        })
+        updateTime(element.currentTime)
+        void activityService.recordPlay({ songId: track.publicId, albumId: track.albumPublicId })
+        return true
+      },
+
       playPrevious: () => {
         const { queue, currentIndex, audioElement, currentTime } = get()
         if (queue.length === 0) return
@@ -402,7 +424,8 @@ export const usePlayerStore = create<PlayerState>()(
       setAudioElement: (el) => {
         const { volume, muted } = get()
         if (el) {
-          el.volume = muted ? 0 : volume / 100
+          el.volume = volume / 100
+          el.muted = muted
         }
         set({ audioElement: el })
       },

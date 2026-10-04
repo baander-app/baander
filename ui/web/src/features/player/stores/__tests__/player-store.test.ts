@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { activityService } from '../../services/activity-service'
 import {
   usePlayerStore,
   generateShuffleBag,
@@ -67,6 +68,77 @@ function seedQueue(current = 0, n = 3): Track[] {
 describe('player-store', () => {
   beforeEach(() => {
     resetStore()
+  })
+
+  describe('adoptPreloadedNext', () => {
+    it('adopts the playing element without reloading or playing it again', () => {
+      const queue = seedQueue()
+      const incoming = makeAudioStub()
+      incoming.src = '/api/stream/track?id=t1'
+      incoming.currentTime = 1.5
+      Object.defineProperty(incoming, 'duration', { value: 120 })
+      const recordPlay = vi.spyOn(activityService, 'recordPlay').mockResolvedValue()
+      usePlayerStore.setState({ volume: 40, muted: true })
+
+      expect(usePlayerStore.getState().adoptPreloadedNext(incoming, 't0', 't1')).toBe(true)
+
+      expect(usePlayerStore.getState()).toMatchObject({
+        audioElement: incoming, currentTrack: queue[1], currentIndex: 1,
+        isPlaying: true, currentTime: 1.5, duration: 120,
+      })
+      expect(incoming.src).toBe('/api/stream/track?id=t1')
+      expect(incoming.play).not.toHaveBeenCalled()
+      expect(incoming.volume).toBe(0.4)
+      expect(incoming.muted).toBe(true)
+      expect(recordPlay).toHaveBeenCalledExactlyOnceWith({ songId: 't1', albumId: undefined })
+      expect(usePlayerStore.getState().adoptPreloadedNext(incoming, 't0', 't1')).toBe(false)
+      expect(recordPlay).toHaveBeenCalledTimes(1)
+      recordPlay.mockRestore()
+    })
+
+    it.each([
+      { current: 'stale', next: 't1', repeat: 'off' as const },
+      { current: 't0', next: 'stale', repeat: 'off' as const },
+      { current: 't0', next: 't1', repeat: 'one' as const },
+    ])('rejects stale or repeat-one transitions: %o', ({ current, next, repeat }) => {
+      seedQueue()
+      usePlayerStore.setState({ repeat })
+      const before = usePlayerStore.getState()
+      expect(before.adoptPreloadedNext(makeAudioStub(), current, next)).toBe(false)
+      expect(usePlayerStore.getState()).toBe(before)
+    })
+
+    it('rejects the last track without repeat', () => {
+      seedQueue(2)
+      const before = usePlayerStore.getState()
+      expect(before.adoptPreloadedNext(makeAudioStub(), 't2', 't0')).toBe(false)
+      expect(usePlayerStore.getState()).toBe(before)
+    })
+
+    it.each([
+      { index: 0, shuffle: true, repeat: 'off' as const, next: 't2', expectedIndex: 2 },
+      { index: 2, shuffle: false, repeat: 'all' as const, next: 't0', expectedIndex: 0 },
+      { index: 1, shuffle: true, repeat: 'all' as const, next: 't0', expectedIndex: 0 },
+    ])('resolves latest shuffle and repeat order: %o', ({ index, shuffle, repeat, next, expectedIndex }) => {
+      seedQueue(index)
+      usePlayerStore.setState({ shuffle, repeat, shuffleBag: [0, 2, 1] })
+      const recordPlay = vi.spyOn(activityService, 'recordPlay').mockResolvedValue()
+      expect(usePlayerStore.getState().adoptPreloadedNext(makeAudioStub(), `t${index}`, next)).toBe(true)
+      expect(usePlayerStore.getState().currentIndex).toBe(expectedIndex)
+      expect(usePlayerStore.getState().duration).toBe(0)
+      recordPlay.mockRestore()
+    })
+  })
+
+  it('keeps stored volume when attaching muted audio so unmute restores sound', () => {
+    usePlayerStore.setState({ volume: 40, muted: true })
+    const audio = makeAudioStub()
+    usePlayerStore.getState().setAudioElement(audio)
+    expect(audio.volume).toBe(0.4)
+    expect(audio.muted).toBe(true)
+    usePlayerStore.getState().setMuted(false)
+    expect(audio.volume).toBe(0.4)
+    expect(audio.muted).toBe(false)
   })
 
   // =========================================================================

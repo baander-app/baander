@@ -6,249 +6,271 @@ import { createLogger } from '@/shared/lib/logger'
 
 const logger = createLogger('AudioPlayback')
 
-type PreloadState = 'idle' | 'preloading' | 'ready'
-
-/**
- * Manages dual audio elements and AudioService lifecycle for gapless/crossfade playback.
- * Mount once in AppShell above the router outlet so the audio elements
- * persist across page navigation.
- */
+/** Owns persistent dual audio elements, including transition and teardown work. */
 export function useAudioPlayback() {
   const audioRefA = useRef<HTMLAudioElement | null>(null)
   const audioRefB = useRef<HTMLAudioElement | null>(null)
-  const preloadState = useRef<PreloadState>('idle')
-  const preloadedTrackId = useRef<string | null>(null)
   const lifetimeRef = useRef<{ active: boolean } | null>(null)
-
   const setAudioElement = usePlayerStore((s) => s.setAudioElement)
   const setIsPlaying = usePlayerStore((s) => s.setIsPlaying)
-  const setDuration = usePlayerStore((s) => s.setDuration)
-  const playNext = usePlayerStore((s) => s.playNext)
 
   useEffect(() => {
     const lifetime = { active: true }
     lifetimeRef.current = lifetime
-
-    // Create dual persistent audio elements
     const audioA = new Audio()
-    audioA.crossOrigin = 'anonymous'
-    audioA.preload = 'auto'
-
     const audioB = new Audio()
-    audioB.crossOrigin = 'anonymous'
-    audioB.preload = 'auto'
-
     audioRefA.current = audioA
     audioRefB.current = audioB
-
-    // Set volume from persisted store
-    const { volume, muted } = usePlayerStore.getState()
-    audioA.volume = muted ? 0 : volume / 100
-    audioB.volume = 0 // inactive starts silent
-
-    // Wire primary element to player store
+    for (const audio of [audioA, audioB]) {
+      audio.crossOrigin = 'anonymous'
+      audio.preload = 'auto'
+    }
     setAudioElement(audioA)
-
-    // Initialize AudioService
     audioService.initialize()
 
-    // Connect processor when first src is set (not available at mount time)
-    const dualConnected = { value: false }
+    let connection: Promise<void> | undefined
+    const connect = () => {
+      connection ??= Promise.resolve(audioService.connectDualAudioElements(audioA, audioB))
+      return connection
+    }
     const onLoadStart = () => {
-      if (lifetime.active && audioA.src && !dualConnected.value) {
-        audioService.connectDualAudioElements(audioA, audioB)
-        dualConnected.value = true
-        audioA.removeEventListener('loadstart', onLoadStart)
-      }
+      if (lifetime.active && audioA.src) void connect().catch((err) => {
+        if (lifetime.active) logger.warn('Dual audio connection failed:', err)
+      })
     }
     audioA.addEventListener('loadstart', onLoadStart)
 
+    type Candidate = {
+      audio: HTMLAudioElement
+      owner: HTMLAudioElement
+      ownerSrc: string
+      currentId: string
+      nextId: string
+      src: string
+      ready: boolean
+    }
+    let candidate: Candidate | undefined
+    let transitionPending = false
+    let generation = 0
+    let adopting = false
+    let fadeTimer: ReturnType<typeof setTimeout> | undefined
+    let removeReadyListeners: (() => void) | undefined
+    const active = () => usePlayerStore.getState().audioElement
+    const inactive = () => active() === audioA ? audioB : audioA
+    const syncVolume = () => {
+      const { volume, muted } = usePlayerStore.getState()
+      for (const audio of [audioA, audioB]) {
+        audio.volume = volume / 100
+        audio.muted = muted
+      }
+    }
+    syncVolume()
+
+    const invalidate = () => {
+      generation++
+      transitionPending = false
+      removeReadyListeners?.()
+      candidate = undefined
+      if (fadeTimer !== undefined) clearTimeout(fadeTimer)
+      fadeTimer = undefined
+      audioService.getProcessor()?.cancelCrossfade()
+      inactive().pause()
+    }
+    const valid = (next: Candidate) => {
+      const state = usePlayerStore.getState()
+      const index = resolveNextIndex(state.queue, state.currentIndex, state.shuffle, state.repeat, state.shuffleBag)
+      return lifetime.active && candidate === next && active() === next.owner
+        && next.owner.src === next.ownerSrc && next.audio.src === next.src
+        && state.currentTrack?.publicId === next.currentId && state.repeat !== 'one'
+        && index !== null && state.queue[index]?.publicId === next.nextId
+    }
+    const handoff = async (fade: boolean) => {
+      const next = candidate
+      if (!next?.ready || transitionPending || !valid(next)) return
+      const token = generation
+      const startingTime = next.owner.currentTime
+      transitionPending = true
+      try {
+        await connect()
+        if (token !== generation || !valid(next)) return
+        const processor = audioService.getProcessor()
+        if (!processor || processor.passive) {
+          invalidate()
+          if (next.owner.ended) usePlayerStore.getState().playNext()
+          return
+        }
+        await next.audio.play()
+        if (token !== generation || !valid(next)) {
+          if (active() !== next.audio && candidate?.audio !== next.audio) next.audio.pause()
+          return
+        }
+        const remaining = next.owner.duration - next.owner.currentTime
+        const state = usePlayerStore.getState()
+        if (next.owner.seeking || next.owner.currentTime < startingTime || (fade && (!state.isPlaying || remaining > state.crossfadeDuration))) {
+          invalidate()
+          return
+        }
+        const duration = fade ? Math.max(0, Math.min(usePlayerStore.getState().crossfadeDuration, remaining)) : 0
+        adopting = true
+        const adopted = usePlayerStore.getState().adoptPreloadedNext(next.audio, next.currentId, next.nextId)
+        adopting = false
+        if (!adopted) { invalidate(); return }
+        removeReadyListeners?.()
+        candidate = undefined
+        if (duration > 0) {
+          processor.crossfadeToInactive(duration)
+          fadeTimer = setTimeout(() => {
+            if (!lifetime.active || generation !== token) return
+            fadeTimer = undefined
+            next.owner.pause()
+            next.owner.currentTime = 0
+          }, duration * 1000)
+        } else {
+          processor.instantSwap()
+          next.owner.pause()
+          next.owner.currentTime = 0
+        }
+        audioService.setPlayingState(true)
+      } catch (err) {
+        if (token !== generation || !lifetime.active) return
+        logger.warn('Preloaded playback failed:', err)
+        invalidate()
+        if (next.owner.ended) usePlayerStore.getState().playNext()
+      } finally {
+        adopting = false
+        if (generation === token) transitionPending = false
+      }
+    }
+    const maybeFade = () => {
+      const state = usePlayerStore.getState()
+      const audio = active()
+      if (audio && state.isPlaying && state.crossfadeEnabled && state.crossfadeDuration > 0
+        && audio.duration - audio.currentTime <= state.crossfadeDuration) void handoff(true)
+    }
+    const schedulePreload = (audio: HTMLAudioElement) => {
+      if (candidate || transitionPending || fadeTimer !== undefined || !Number.isFinite(audio.duration) || audio.duration <= 0) return
+      const processor = audioService.getProcessor()
+      if (!processor || processor.passive) return
+      const state = usePlayerStore.getState()
+      if (state.repeat === 'one' || !state.currentTrack) return
+      const threshold = state.crossfadeEnabled ? state.crossfadeDuration + 3 : 6
+      if (audio.duration - audio.currentTime >= threshold) return
+      const index = resolveNextIndex(state.queue, state.currentIndex, state.shuffle, state.repeat, state.shuffleBag)
+      if (index === null) return
+      const nextAudio = inactive()
+      const next: Candidate = {
+        audio: nextAudio, owner: audio, ownerSrc: audio.src,
+        currentId: state.currentTrack.publicId, nextId: state.queue[index].publicId,
+        src: '', ready: false,
+      }
+      candidate = next
+      const onReady = () => {
+        if (!valid(next)) return
+        removeReadyListeners?.()
+        next.ready = true
+        maybeFade()
+      }
+      const onError = () => { if (candidate === next) invalidate() }
+      removeReadyListeners = () => {
+        nextAudio.removeEventListener('canplaythrough', onReady)
+        nextAudio.removeEventListener('error', onError)
+        removeReadyListeners = undefined
+      }
+      nextAudio.addEventListener('canplaythrough', onReady)
+      nextAudio.addEventListener('error', onError)
+      nextAudio.src = buildStreamUrl(next.nextId)
+      next.src = nextAudio.src
+      nextAudio.load()
+    }
+    const removers = [audioA, audioB].map((audio) => {
+      const owned = () => lifetime.active && active() === audio
+      const onPlay = () => {
+        if (!owned()) return
+        usePlayerStore.getState().setIsPlaying(true)
+        audioService.setPlayingState(true)
+      }
+      const onPause = () => {
+        if (!owned() || audio.ended) return
+        usePlayerStore.getState().setIsPlaying(false)
+        audioService.setPlayingState(false)
+      }
+      const onTimeUpdate = () => {
+        if (!owned()) return
+        updateTime(audio.currentTime)
+        if (candidate && !valid(candidate)) invalidate()
+        schedulePreload(audio)
+        maybeFade()
+      }
+      const onDurationChange = () => {
+        if (owned() && Number.isFinite(audio.duration) && audio.duration > 0) usePlayerStore.getState().setDuration(audio.duration)
+      }
+      const onEnded = () => {
+        if (!owned() || transitionPending) return
+        const state = usePlayerStore.getState()
+        if (state.repeat === 'one' && state.currentTrack) {
+          audio.currentTime = 0
+          void audio.play().catch((err) => { if (owned()) logger.warn('Repeat-one resume failed:', err) })
+        } else if (candidate?.ready && valid(candidate)) {
+          void handoff(false)
+        } else {
+          invalidate()
+          state.playNext()
+        }
+      }
+      const onSeeking = () => { if (owned()) invalidate() }
+      const onSourceChange = () => { if (owned()) invalidate() }
+      const listeners = { seeking: onSeeking, loadstart: onSourceChange, play: onPlay, pause: onPause, timeupdate: onTimeUpdate, durationchange: onDurationChange, ended: onEnded }
+      for (const [name, listener] of Object.entries(listeners)) audio.addEventListener(name, listener)
+      return () => { for (const [name, listener] of Object.entries(listeners)) audio.removeEventListener(name, listener) }
+    })
+    const unsubscribe = usePlayerStore.subscribe((state, previous) => {
+      if (state.volume !== previous.volume || state.muted !== previous.muted) syncVolume()
+      if (!adopting && (state.queue !== previous.queue || state.currentTrack !== previous.currentTrack
+        || state.currentIndex !== previous.currentIndex || state.audioElement !== previous.audioElement
+        || state.shuffle !== previous.shuffle || state.repeat !== previous.repeat || state.shuffleBag !== previous.shuffleBag
+        || state.crossfadeEnabled !== previous.crossfadeEnabled || state.crossfadeDuration !== previous.crossfadeDuration
+        || (!state.isPlaying && previous.isPlaying))) invalidate()
+    })
     return () => {
       lifetime.active = false
       lifetimeRef.current = null
+      unsubscribe()
+      invalidate()
       audioA.removeEventListener('loadstart', onLoadStart)
+      removers.forEach((remove) => remove())
       audioRefA.current = null
       audioRefB.current = null
-      preloadState.current = 'idle'
-      preloadedTrackId.current = null
-      const storedAudio = usePlayerStore.getState().audioElement
-      if (storedAudio === audioA || storedAudio === audioB) setAudioElement(null)
-      audioA.pause()
-      audioA.src = ''
-      audioB.pause()
-      audioB.src = ''
+      if (active() === audioA || active() === audioB) setAudioElement(null)
+      for (const audio of [audioA, audioB]) { audio.pause(); audio.src = '' }
       audioService.destroy()
     }
   }, [setAudioElement])
 
-  // Sync store isPlaying → active audio element (store → DOM direction)
   const isPlaying = usePlayerStore((s) => s.isPlaying)
-
   useEffect(() => {
-    const audio = audioRefA.current
+    const audio = usePlayerStore.getState().audioElement
     if (!audio || !audio.src) return
-
+    const src = audio.src
+    const track = usePlayerStore.getState().currentTrack
     let cancelled = false
     const lifetime = lifetimeRef.current
-    const isActive = () => !cancelled && lifetime?.active === true && audioRefA.current === audio
-
+    const isActive = () => !cancelled && lifetime?.active === true
+      && usePlayerStore.getState().audioElement === audio && audio.src === src
+      && usePlayerStore.getState().currentTrack === track
     if (isPlaying && audio.paused) {
-      audioService.resumeContextIfNeeded().then(() => {
-        // Re-check after async resume — user might have paused again
-        if (isActive() && usePlayerStore.getState().isPlaying) {
-          audio.play().catch((err) => {
-            if (!isActive()) return
-            logger.warn('Playback resume failed:', err)
-            setIsPlaying(false)
-          })
-        }
+      void audioService.resumeContextIfNeeded().then(async () => {
+        if (isActive() && usePlayerStore.getState().isPlaying) await audio.play()
       }).catch((err) => {
         if (!isActive()) return
-        logger.warn('Audio context resume failed:', err)
+        logger.warn('Playback resume failed:', err)
         setIsPlaying(false)
       })
-    } else if (!isPlaying && !audio.paused) {
+    } else if (!isPlaying) {
       audio.pause()
       audioService.setPlayingState(false)
     }
     return () => { cancelled = true }
   }, [isPlaying, setIsPlaying])
-
-  // Sync audio element events to player store (DOM → store direction)
-  useEffect(() => {
-    const audio = audioRefA.current
-    if (!audio) return
-
-    const lifetime = lifetimeRef.current
-    let removePreloadListeners: (() => void) | undefined
-
-    const onPlay = () => {
-      if (!lifetime?.active) return
-      setIsPlaying(true)
-      audioService.setPlayingState(true)
-    }
-    const onPause = () => {
-      if (!lifetime?.active) return
-      setIsPlaying(false)
-      audioService.setPlayingState(false)
-    }
-
-    const onTimeUpdate = () => {
-      if (!lifetime?.active) return
-      updateTime(audio.currentTime)
-
-      // --- Preload scheduler ---
-      if (preloadState.current !== 'idle') return
-      if (!audio.duration || !isFinite(audio.duration)) return
-
-      const { queue, currentIndex, shuffle, repeat, shuffleBag, crossfadeEnabled, crossfadeDuration } = usePlayerStore.getState()
-      const PRELOAD_THRESHOLD_GAPLESS = 6
-      const PRELOAD_BUFFER = 3
-      const threshold = crossfadeEnabled ? crossfadeDuration + PRELOAD_BUFFER : PRELOAD_THRESHOLD_GAPLESS
-
-      if (audio.duration - audio.currentTime < threshold) {
-        const nextIdx = resolveNextIndex(queue, currentIndex, shuffle, repeat, shuffleBag)
-        if (nextIdx !== null) {
-          const nextTrack = queue[nextIdx]
-          const processor = audioService.getProcessor()
-          const inactiveAudio = processor?.getActiveSource() === 'A'
-            ? audioRefB.current
-            : audioRefA.current
-
-          if (inactiveAudio && nextTrack) {
-            inactiveAudio.src = buildStreamUrl(nextTrack.publicId)
-            inactiveAudio.preload = 'auto'
-            preloadState.current = 'preloading'
-            preloadedTrackId.current = nextTrack.publicId
-
-            removePreloadListeners?.()
-            const onReady = () => {
-              removePreloadListeners?.()
-              if (lifetime?.active) preloadState.current = 'ready'
-            }
-            const onError = () => {
-              removePreloadListeners?.()
-              if (!lifetime?.active) return
-              preloadState.current = 'idle'
-              preloadedTrackId.current = null
-            }
-            removePreloadListeners = () => {
-              inactiveAudio.removeEventListener('canplaythrough', onReady)
-              inactiveAudio.removeEventListener('error', onError)
-              removePreloadListeners = undefined
-            }
-            inactiveAudio.addEventListener('canplaythrough', onReady, { once: true })
-            inactiveAudio.addEventListener('error', onError, { once: true })
-          }
-        }
-      }
-    }
-
-    const onDurationChange = () => {
-      if (!lifetime?.active) return
-      if (audio.duration && isFinite(audio.duration)) {
-        setDuration(audio.duration)
-      }
-    }
-
-    const onEnded = () => {
-      if (!lifetime?.active) return
-      const { repeat, currentTrack, crossfadeEnabled, crossfadeDuration } = usePlayerStore.getState()
-
-      // Repeat-one: restart current track
-      if (repeat === 'one' && currentTrack) {
-        audio.currentTime = 0
-        audio.play().catch((err) => {
-          if (lifetime?.active) logger.warn('Repeat-one resume failed:', err)
-        })
-        return
-      }
-
-      // Gapless / crossfade transition
-      const processor = audioService.getProcessor()
-      if (preloadState.current === 'ready' && processor) {
-        const activeSrc = processor.getActiveSource()
-        const inactiveAudio = activeSrc === 'A' ? audioRefB.current! : audioRefA.current!
-        const activeAudio = activeSrc === 'A' ? audioRefA.current! : audioRefB.current!
-
-        if (crossfadeEnabled && crossfadeDuration > 0) {
-          processor.crossfadeToInactive(crossfadeDuration)
-        } else {
-          processor.instantSwap()
-        }
-
-        inactiveAudio.play().catch((err) => {
-          if (lifetime?.active) logger.warn('Crossfade playback failed:', err)
-        })
-        activeAudio.pause()
-        activeAudio.currentTime = 0
-
-        playNext()
-
-        // Reset preload state for next track
-        preloadState.current = 'idle'
-        preloadedTrackId.current = null
-      } else {
-        // Fallback: normal playback with audible gap
-        playNext()
-      }
-    }
-
-    audio.addEventListener('play', onPlay)
-    audio.addEventListener('pause', onPause)
-    audio.addEventListener('timeupdate', onTimeUpdate)
-    audio.addEventListener('durationchange', onDurationChange)
-    audio.addEventListener('ended', onEnded)
-
-    return () => {
-      removePreloadListeners?.()
-      audio.removeEventListener('play', onPlay)
-      audio.removeEventListener('pause', onPause)
-      audio.removeEventListener('timeupdate', onTimeUpdate)
-      audio.removeEventListener('durationchange', onDurationChange)
-      audio.removeEventListener('ended', onEnded)
-    }
-  }, [setIsPlaying, setDuration, playNext])
 
   // Resume AudioContext + re-apply EQ on user interaction
   // Browsers suspend AudioContext until first user gesture.

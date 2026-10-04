@@ -22,6 +22,7 @@ const processorMock = vi.hoisted(() => {
       connectDualAudioElements: vi.fn(() => Promise.resolve()),
       setPlayingState: vi.fn(),
       resumeContextIfNeeded: vi.fn(() => Promise.resolve()),
+      cancelCrossfade: vi.fn(),
       destroy: vi.fn(),
     },
     __resetActive: () => { active = 'A' },
@@ -59,6 +60,8 @@ function createStubAudioElement(): MockAudioElement {
     volume: 1,
     muted: false,
     paused: true,
+    ended: false,
+    seeking: false,
     crossOrigin: '',
     play: vi.fn(() => Promise.resolve()),
     pause: vi.fn(),
@@ -169,6 +172,7 @@ describe('useAudioPlayback', () => {
 
   afterEach(() => {
     cleanup()
+    vi.useRealTimers()
     if (RealAudio) globalThis.Audio = RealAudio
   })
 
@@ -380,7 +384,7 @@ describe('useAudioPlayback', () => {
       void result
     })
 
-    it('instant-swaps to the preloaded element when preload is ready and crossfade is off', () => {
+    it('instant-swaps to the preloaded element when preload is ready and crossfade is off', async () => {
       seedQueue(0, 2) // t0 → t1
       renderHook(() => useAudioPlayback())
       const [a, b] = capturedAudioElements
@@ -394,7 +398,7 @@ describe('useAudioPlayback', () => {
       const playSpy = vi.mocked(b.play)
       playSpy.mockClear()
 
-      act(() => {
+      await act(async () => {
         a.dispatchEvent(new Event('ended'))
       })
 
@@ -409,7 +413,7 @@ describe('useAudioPlayback', () => {
       expect(usePlayerStore.getState().currentIndex).toBe(1)
     })
 
-    it('crossfades to the preloaded element when crossfade is enabled', () => {
+    it('crossfades before ended and retains the outgoing element until the fade completes', async () => {
       seedQueue(0, 2)
       resetStore({
         queue: [track('t0'), track('t1')],
@@ -417,6 +421,7 @@ describe('useAudioPlayback', () => {
         currentTrack: track('t0'),
         crossfadeEnabled: true,
         crossfadeDuration: 4.0,
+        isPlaying: true,
       })
       renderHook(() => useAudioPlayback())
       const [a, b] = capturedAudioElements
@@ -426,11 +431,16 @@ describe('useAudioPlayback', () => {
         b.dispatchEvent(new Event('canplaythrough'))
       })
 
-      act(() => {
-        a.dispatchEvent(new Event('ended'))
-      })
+      vi.useFakeTimers()
+      await act(async () => { timeUpdate(a, 97, 100) })
+      expect(a.pause).not.toHaveBeenCalled()
+      expect(usePlayerStore.getState().audioElement).toBe(b)
+      expect(b.volume).toBe(0.75)
+      act(() => { vi.advanceTimersByTime(3000) })
+      expect(a.pause).toHaveBeenCalled()
+      vi.useRealTimers()
 
-      expect(processorMock.instance.crossfadeToInactive).toHaveBeenCalledWith(4.0)
+      expect(processorMock.instance.crossfadeToInactive).toHaveBeenCalledWith(3.0)
       expect(processorMock.instance.instantSwap).not.toHaveBeenCalled()
       expect(usePlayerStore.getState().currentIndex).toBe(1)
     })
@@ -467,6 +477,139 @@ describe('useAudioPlayback', () => {
 
       expect(processorMock.instance.instantSwap).not.toHaveBeenCalled()
       expect(usePlayerStore.getState().currentIndex).toBe(1)
+    })
+  })
+
+  describe('transition ownership and cancellation', () => {
+    it('uses B events and controls after handoff, then preloads and adopts A again', async () => {
+      seedQueue(0, 3)
+      renderHook(() => useAudioPlayback())
+      const [a, b] = capturedAudioElements
+      a.src = '/api/stream/track?id=t0'
+      await act(async () => {
+        timeUpdate(a, 95, 100)
+        b.dispatchEvent(new Event('canplaythrough'))
+        a.dispatchEvent(new Event('ended'))
+      })
+      expect(usePlayerStore.getState().audioElement).toBe(b)
+      expect(a.src).toContain('t0')
+      act(() => {
+        b.duration = 120
+        b.dispatchEvent(new Event('durationchange'))
+        a.duration = 999
+        a.dispatchEvent(new Event('durationchange'))
+      })
+      expect(usePlayerStore.getState().duration).toBe(120)
+      b.paused = false
+      act(() => { usePlayerStore.setState({ isPlaying: false }) })
+      expect(b.pause).toHaveBeenCalled()
+      await act(async () => { usePlayerStore.setState({ isPlaying: true }) })
+      await act(async () => {
+        timeUpdate(b, 115, 120)
+        a.dispatchEvent(new Event('canplaythrough'))
+        b.dispatchEvent(new Event('ended'))
+      })
+      expect(usePlayerStore.getState().audioElement).toBe(a)
+      expect(usePlayerStore.getState().currentIndex).toBe(2)
+      expect(a.src).toContain('t2')
+    })
+
+    it('retains the prepared next track across the natural pause then ended event sequence', async () => {
+      seedQueue(0, 2)
+      usePlayerStore.setState({ isPlaying: true })
+      renderHook(() => useAudioPlayback())
+      const [a, b] = capturedAudioElements
+      await act(async () => {
+        timeUpdate(a, 95, 100)
+        b.dispatchEvent(new Event('canplaythrough'))
+        a.ended = true
+        a.dispatchEvent(new Event('pause'))
+        a.dispatchEvent(new Event('ended'))
+      })
+      expect(usePlayerStore.getState().audioElement).toBe(b)
+      expect(processorMock.instance.instantSwap).toHaveBeenCalledOnce()
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+    })
+
+    it('does not adopt or swap until incoming playback succeeds', async () => {
+      seedQueue(0, 2)
+      renderHook(() => useAudioPlayback())
+      const [a, b] = capturedAudioElements
+      let resolvePlay!: () => void
+      vi.mocked(b.play).mockReturnValue(new Promise<void>((resolve) => { resolvePlay = resolve }))
+      await act(async () => {
+        timeUpdate(a, 95, 100)
+        b.dispatchEvent(new Event('canplaythrough'))
+        a.dispatchEvent(new Event('ended'))
+      })
+      expect(usePlayerStore.getState().audioElement).toBe(a)
+      expect(processorMock.instance.instantSwap).not.toHaveBeenCalled()
+      await act(async () => { resolvePlay() })
+      expect(usePlayerStore.getState().audioElement).toBe(b)
+    })
+
+    it.each([true, false])('cancels deferred fade after seeking backward (seeking event: %s)', async (dispatchSeeking) => {
+      seedQueue(0, 2)
+      usePlayerStore.setState({ isPlaying: true, crossfadeEnabled: true, crossfadeDuration: 4 })
+      renderHook(() => useAudioPlayback())
+      const [a, b] = capturedAudioElements
+      let resolvePlay!: () => void
+      vi.mocked(b.play).mockReturnValue(new Promise<void>((resolve) => { resolvePlay = resolve }))
+      await act(async () => {
+        timeUpdate(a, 97, 100)
+        b.dispatchEvent(new Event('canplaythrough'))
+      })
+      act(() => {
+        a.currentTime = 10
+        a.seeking = true
+        if (dispatchSeeking) a.dispatchEvent(new Event('seeking'))
+      })
+      await act(async () => { resolvePlay() })
+      expect(usePlayerStore.getState().audioElement).toBe(a)
+      expect(usePlayerStore.getState().currentIndex).toBe(0)
+      expect(processorMock.instance.crossfadeToInactive).not.toHaveBeenCalled()
+      expect(b.pause).toHaveBeenCalled()
+    })
+
+    it.each(['pause', 'queue', 'unmount'] as const)('invalidates incoming play when interrupted by %s', async (interruption) => {
+      seedQueue(0, 2)
+      usePlayerStore.setState({ isPlaying: true })
+      const { unmount } = renderHook(() => useAudioPlayback())
+      const [a, b] = capturedAudioElements
+      let resolvePlay!: () => void
+      vi.mocked(b.play).mockReturnValue(new Promise<void>((resolve) => { resolvePlay = resolve }))
+      await act(async () => {
+        timeUpdate(a, 95, 100)
+        b.dispatchEvent(new Event('canplaythrough'))
+        a.dispatchEvent(new Event('ended'))
+      })
+      act(() => {
+        if (interruption === 'pause') usePlayerStore.setState({ isPlaying: false })
+        if (interruption === 'queue') usePlayerStore.setState({ queue: [track('t0'), track('changed')] })
+        if (interruption === 'unmount') unmount()
+      })
+      await act(async () => { resolvePlay() })
+      expect(usePlayerStore.getState().currentIndex).toBe(0)
+      expect(processorMock.instance.instantSwap).not.toHaveBeenCalled()
+      expect(b.pause).toHaveBeenCalled()
+    })
+
+    it('keeps both elements volume and mute synchronized after handoff', async () => {
+      seedQueue(0, 2)
+      renderHook(() => useAudioPlayback())
+      const [a, b] = capturedAudioElements
+      await act(async () => {
+        timeUpdate(a, 95, 100)
+        b.dispatchEvent(new Event('canplaythrough'))
+        a.dispatchEvent(new Event('ended'))
+      })
+      act(() => {
+        usePlayerStore.getState().setMuted(true)
+        usePlayerStore.getState().setVolume(40)
+        usePlayerStore.getState().setMuted(false)
+      })
+      expect([a.volume, b.volume]).toEqual([0.4, 0.4])
+      expect([a.muted, b.muted]).toEqual([false, false])
     })
   })
 

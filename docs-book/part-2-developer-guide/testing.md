@@ -16,8 +16,12 @@ application.
 These browser tests render the real `AudioProcessor` nodes with
 `OfflineAudioContext` and compare stereo, processing order, and normalization
 against reference signals. They replace external WASM analysis and workers;
-they do not certify those modules, codecs, media-element transport, or audible
-clicks during live graph changes. Rebuild timing and worklet graph attachment
+they do not certify those modules, production codecs, or audible clicks during
+live graph changes. Native media tests use locally generated WAV files and the
+real playback hook, store, service, and processor to exercise repeated preloaded
+handoffs, crossfade overlap, promoted-element controls, and interrupted fades.
+These verify element ownership and timing, not sample-accurate gaplessness or
+authenticated streaming. Rebuild timing and worklet graph attachment
 also have unit regressions in `audio-processor-rebuild.test.ts`. Deferred module
 and WASM loading, connection replacement, and React StrictMode cleanup have
 processor, service, and playback-hook regressions. Native browser lifecycle tests

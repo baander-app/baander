@@ -90,6 +90,48 @@ afterEach(() => {
 })
 
 describe('AudioProcessor rebuild lifecycle', () => {
+  it('anchors both fade ramps at the current audio time', () => {
+    processor.crossfadeToInactive(4)
+    const outgoing = processor.getSourceGainA().gain
+    const incoming = processor.getSourceGainB().gain
+    expect(outgoing.cancelScheduledValues).toHaveBeenCalledWith(10)
+    expect(incoming.cancelScheduledValues).toHaveBeenCalledWith(10)
+    expect(outgoing.setValueAtTime).toHaveBeenCalledWith(1, 10)
+    expect(incoming.setValueAtTime).toHaveBeenCalledWith(0, 10)
+    expect(outgoing.linearRampToValueAtTime).toHaveBeenCalledWith(0, 14)
+    expect(incoming.linearRampToValueAtTime).toHaveBeenCalledWith(1, 14)
+    expect(processor.getActiveSource()).toBe('B')
+  })
+
+  it('cancels pending fades when an instant swap chooses a new active source', () => {
+    processor.crossfadeToInactive(4)
+    vi.clearAllMocks()
+    processor.instantSwap()
+    expect(processor.getActiveSource()).toBe('A')
+    expect(processor.getSourceGainA().gain.cancelScheduledValues).toHaveBeenCalledWith(10)
+    expect(processor.getSourceGainB().gain.cancelScheduledValues).toHaveBeenCalledWith(10)
+    expect(processor.getSourceGainA().gain.setValueAtTime).toHaveBeenCalledWith(1, 10)
+    expect(processor.getSourceGainB().gain.setValueAtTime).toHaveBeenCalledWith(0, 10)
+  })
+
+  it('finishes an interrupted fade on the adopted source without another swap', () => {
+    processor.crossfadeToInactive(4)
+    vi.clearAllMocks()
+    processor.cancelCrossfade()
+    expect(processor.getActiveSource()).toBe('B')
+    expect(processor.getSourceGainA().gain.setValueAtTime).toHaveBeenCalledWith(0, 10)
+    expect(processor.getSourceGainB().gain.setValueAtTime).toHaveBeenCalledWith(1, 10)
+    expect(processor.getSourceGainA().gain.cancelScheduledValues).toHaveBeenCalledWith(10)
+    expect(processor.getSourceGainB().gain.cancelScheduledValues).toHaveBeenCalledWith(10)
+  })
+
+  it.each([-1, NaN, Infinity])('rejects invalid fade duration %s without switching source', (duration) => {
+    expect(() => processor.crossfadeToInactive(duration)).toThrow(RangeError)
+    expect(processor.getActiveSource()).toBe('A')
+    expect(processor.getSourceGainA().gain.linearRampToValueAtTime).not.toHaveBeenCalled()
+    expect(processor.getSourceGainB().gain.linearRampToValueAtTime).not.toHaveBeenCalled()
+  })
+
   it.each([
     ['eq', 'compressor', 'eq'],
     ['unknown-module'],

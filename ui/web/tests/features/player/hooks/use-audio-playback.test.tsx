@@ -30,6 +30,7 @@ vi.mock('@/features/player/services/audio-service', () => ({
   audioService: {
     initialize: mockInitialize,
     connectAudioElement: mockConnectAudioElement,
+    getProcessor: vi.fn(() => null),
     setPlayingState: mockSetPlayingState,
     resumeContextIfNeeded: mockResumeContextIfNeeded,
     destroy: mockDestroy,
@@ -51,7 +52,7 @@ vi.mock('@/features/player/stores/player-store', () => {
   return {
     usePlayerStore: Object.assign(
       (selector: (state: Record<string, unknown>) => unknown) => selector(mockState),
-      { getState: () => mockState },
+      { getState: () => mockState, subscribe: vi.fn(() => () => {}) },
     ),
   }
 })
