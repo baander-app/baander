@@ -86,4 +86,104 @@ async function render(options: RenderOptions) {
   return { left, right, leftGain: projection(left), rightGain: projection(right) }
 }
 
-Object.assign(window, { audioGraphFixture: { render } })
+export type LifecycleCase = 'ready-cleanup' | 'disconnect' | 'destroy'
+
+export interface LifecycleResult {
+  nativeNodes: boolean
+  ready: boolean
+  spectrumConnected: boolean
+  sinkConnected: boolean
+  closedPorts: number
+  handlersCleared: boolean
+  lateNodes: boolean
+  moduleCalls: number
+  fallbackActive: boolean
+}
+
+async function lifecycle(scenario: LifecycleCase): Promise<LifecycleResult> {
+  // Nodes and ports are native; only WASM bytes and DSP APIs are fixture data.
+  const processor = new AudioProcessor()
+  const graph = processor as unknown as {
+    audioContext: AudioContext
+    analyzerNode: AnalyserNode
+    analysisSink: GainNode
+    audioWorkletNode: AudioWorkletNode | null
+    wasmSpectrumNode: AudioWorkletNode | null
+    wasmSpectrumReady: boolean
+    analysisInterval: number | null
+  }
+  const context = graph.audioContext
+  const waitFor = async (condition: () => boolean) => {
+    const deadline = performance.now() + 3000
+    while (!condition()) {
+      if (performance.now() > deadline) throw new Error('Native worklet lifecycle timed out')
+      await new Promise(resolve => setTimeout(resolve, 5))
+    }
+  }
+  try {
+    await context.resume()
+    if (scenario !== 'ready-cleanup') {
+      let release!: () => void
+      let moduleLoaded!: () => void
+      const gate = new Promise<void>(resolve => { release = resolve })
+      const loaded = new Promise<void>(resolve => { moduleLoaded = resolve })
+      const addModule = context.audioWorklet.addModule.bind(context.audioWorklet)
+      let moduleCalls = 0
+      context.audioWorklet.addModule = async (...args) => {
+        moduleCalls++
+        await addModule(...args)
+        moduleLoaded()
+        await gate
+      }
+      await processor.connectDualAudioElements(new Audio(), new Audio())
+      await loaded
+      processor[scenario]()
+      release()
+      await new Promise(resolve => setTimeout(resolve, 100))
+      return {
+        nativeNodes: true, ready: graph.wasmSpectrumReady,
+        spectrumConnected: false, sinkConnected: false, closedPorts: 0,
+        handlersCleared: true,
+        lateNodes: !!(graph.audioWorkletNode || graph.wasmSpectrumNode),
+        moduleCalls, fallbackActive: graph.analysisInterval !== null,
+      }
+    }
+
+    const connections: AudioNode[] = []
+    const connect = graph.analyzerNode.connect.bind(graph.analyzerNode)
+    graph.analyzerNode.connect = ((destination: AudioNode) => {
+      connections.push(destination)
+      return connect(destination)
+    }) as typeof graph.analyzerNode.connect
+    await processor.connectDualAudioElements(new Audio(), new Audio())
+    await waitFor(() => graph.wasmSpectrumReady)
+    const meter = graph.audioWorkletNode!
+    const spectrum = graph.wasmSpectrumNode!
+    const nodes = [meter, spectrum]
+    // The ready callback makes both native connections in the same message turn.
+    // Native disconnect(destination) throws if that particular edge is absent.
+    let sinkConnected = false
+    try { spectrum.disconnect(graph.analysisSink); sinkConnected = true } catch { /* missing edge */ }
+    if (sinkConnected) spectrum.connect(graph.analysisSink)
+    let closedPorts = 0
+    for (const node of nodes) {
+      const close = node.port.close.bind(node.port)
+      node.port.close = () => { closedPorts++; close() }
+    }
+    const ready = graph.wasmSpectrumReady
+    const spectrumConnected = connections.includes(spectrum)
+    processor.disconnect()
+    return {
+      nativeNodes: nodes.every(node => node instanceof AudioWorkletNode && node.port instanceof MessagePort),
+      ready, spectrumConnected, sinkConnected, closedPorts,
+      handlersCleared: nodes.every(node => node.port.onmessage === null),
+      lateNodes: !!(graph.audioWorkletNode || graph.wasmSpectrumNode),
+      moduleCalls: 2, fallbackActive: graph.analysisInterval !== null,
+    }
+  } finally {
+    processor.destroy()
+    if (context.state !== 'closed') await context.close()
+  }
+}
+
+Object.assign(window, { audioGraphFixture: { render, lifecycle } })

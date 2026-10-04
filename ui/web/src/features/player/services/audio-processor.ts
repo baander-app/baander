@@ -63,6 +63,9 @@ export class AudioProcessor {
   private analysisSink!: GainNode
   private rebuildTimer: ReturnType<typeof setTimeout> | null = null
   private destroyed = false
+  private workletGeneration = 0
+  private workletAbort = new AbortController()
+  private readonly workerAbort = new AbortController()
   private chainEntry: AudioNode | null = null
   private masterGainNode!: GainNode
   private compressorNode!: DynamicsCompressorNode
@@ -143,45 +146,59 @@ export class AudioProcessor {
 
   private async initializeDSP() {
     try {
-      ;[this.loudnessAPI, this.dynamicsAPI, this.spectralAPI] = await Promise.all([
+      const [loudness, dynamics, spectral] = await Promise.all([
         getLoudness(),
         getDynamics(),
         getSpectralFeatures(),
       ])
 
+      if (this.destroyed) return
+      this.loudnessAPI = loudness
+      this.dynamicsAPI = dynamics
+      this.spectralAPI = spectral
       this.loudnessAPI.init(this.audioContext.sampleRate, 2)
       this.dynamicsAPI.init(10, 100, this.audioContext.sampleRate)
       this.spectralAPI.init(this.FFT_SIZE, this.audioContext.sampleRate)
 
       this.dspReady = true
     } catch (error) {
+      if (this.destroyed) return
       console.warn('[AudioProcessor] Failed to initialize DSP modules:', error)
       this.dspReady = false
     }
   }
 
-  private async initializeWasmSpectrum() {
+  private ownsWorkletGeneration(generation: number): boolean {
+    return !this.destroyed && !this.passiveMode && generation === this.workletGeneration
+  }
+
+  private async initializeWasmSpectrum(generation = this.workletGeneration) {
+    const signal = this.workletAbort.signal
+    let node: AudioWorkletNode | null = null
     try {
-      if (this.audioContext.state !== 'running') {
-        await this.audioContext.resume()
-      }
+      if (!this.ownsWorkletGeneration(generation)) return
+      if (this.audioContext.state !== 'running') await this.audioContext.resume()
+      if (!this.ownsWorkletGeneration(generation)) return
 
       await this.audioContext.audioWorklet.addModule(getAudioWorkletUrl('wasm-spectrum.js'))
-
-      this.wasmSpectrumNode = new AudioWorkletNode(this.audioContext, 'wasm-spectrum', {
+      if (!this.ownsWorkletGeneration(generation) || this.wasmSpectrumNode) return
+      node = new AudioWorkletNode(this.audioContext, 'wasm-spectrum', {
         numberOfInputs: 1,
         numberOfOutputs: 1,
         channelCount: 2,
         channelCountMode: 'explicit',
         channelInterpretation: 'speakers',
       })
-
-      const wasmBytes = await fetch(getWasmUrl('fft2048.wasm')).then((r) => r.arrayBuffer())
-      this.wasmSpectrumNode.port.postMessage({ type: 'wasm', bytes: wasmBytes })
-
-      this.wasmSpectrumNode.port.onmessage = (event: MessageEvent) => {
+      this.wasmSpectrumNode = node
+      const ownedNode = node
+      node.port.onmessage = (event: MessageEvent) => {
+        if (!this.ownsWorkletGeneration(generation) || this.wasmSpectrumNode !== ownedNode) return
         const msg = event.data as WasmSpectrumMessage
         if (msg.type === 'ready') {
+          if (!this.wasmSpectrumReady) {
+            this.analyzerNode.connect(ownedNode)
+            ownedNode.connect(this.analysisSink)
+          }
           this.wasmSpectrumReady = true
         } else if (msg.type === 'error') {
           console.error('[AudioProcessor] WASM spectrum error:', msg)
@@ -191,13 +208,23 @@ export class AudioProcessor {
           const timeLen = Math.min(this.timeDomainData.length, msg.timeDomainData.length)
           for (let i = 0; i < freqLen; i++) this.frequencyData[i] = msg.frequencyData[i]
           for (let i = 0; i < timeLen; i++) this.timeDomainData[i] = msg.timeDomainData[i]
-
-          if (this.spectralAPI && this.dspReady) {
-            this.computeSpectralFeatures(msg.frequencyData)
-          }
+          if (this.spectralAPI && this.dspReady) this.computeSpectralFeatures(msg.frequencyData)
         }
       }
+
+      const response = await fetch(getWasmUrl('fft2048.wasm'), { signal })
+      if (!response.ok) throw new Error(`Spectrum WASM request failed: ${response.status}`)
+      const wasmBytes = await response.arrayBuffer()
+      if (!this.ownsWorkletGeneration(generation) || this.wasmSpectrumNode !== node) return
+      node.port.postMessage({ type: 'wasm', bytes: wasmBytes })
     } catch (error) {
+      if (!this.ownsWorkletGeneration(generation)) return
+      if (node && this.wasmSpectrumNode === node) {
+        node.port.onmessage = null
+        node.port.close()
+        node.disconnect()
+        this.wasmSpectrumNode = null
+      }
       console.warn('[AudioProcessor] Failed to initialize WASM spectrum:', error)
       this.wasmSpectrumReady = false
     }
@@ -387,9 +414,11 @@ export class AudioProcessor {
 
   private initializeWorker() {
     try {
-      this.analysisWorker = new Worker(getAudioWorkletUrl('audio-analysis-worker.js'))
+      const worker = new Worker(getAudioWorkletUrl('audio-analysis-worker.js'))
+      this.analysisWorker = worker
 
       this.analysisWorker.onmessage = (e: MessageEvent) => {
+        if (this.destroyed || this.analysisWorker !== worker || !this.isConnected || !this.isPlaying) return
         const data = e.data as { type: string; frequencyData?: Uint8Array; timeDomainData?: Uint8Array; peakFrequency?: number; spectralCentroid?: number; spectralRolloff?: number; spectralFlux?: number; spectralFlatness?: number }
         if (data.type === 'analysis-result') {
           if (!this.sharedFrequencyBuffer) {
@@ -411,6 +440,11 @@ export class AudioProcessor {
       }
 
       this.analysisWorker.onerror = () => {
+        if (this.destroyed || this.analysisWorker !== worker) return
+        worker.onmessage = null
+        worker.onerror = null
+        worker.terminate()
+        this.workerAbort.abort()
         this.workerReady = false
         this.analysisWorker = null
         this.setupFallbackAnalysis()
@@ -433,6 +467,12 @@ export class AudioProcessor {
       this.sendSpectralWasmToWorker()
       this.workerReady = true
     } catch {
+      if (this.analysisWorker) {
+        this.analysisWorker.onmessage = null
+        this.analysisWorker.onerror = null
+        this.analysisWorker.terminate()
+      }
+      this.workerAbort.abort()
       this.workerReady = false
       this.analysisWorker = null
       this.setupFallbackAnalysis()
@@ -440,10 +480,16 @@ export class AudioProcessor {
   }
 
   private async sendSpectralWasmToWorker() {
+    const worker = this.analysisWorker
     try {
-      const spectralWasm = await fetch(getWasmUrl('spectral_features.wasm')).then((r) => r.arrayBuffer())
-      this.analysisWorker?.postMessage({ type: 'init-spectral-wasm', spectralWasm })
+      const response = await fetch(getWasmUrl('spectral_features.wasm'), { signal: this.workerAbort.signal })
+      if (!response.ok) throw new Error(`Spectral WASM request failed: ${response.status}`)
+      const spectralWasm = await response.arrayBuffer()
+      if (!this.destroyed && this.analysisWorker === worker) {
+        worker?.postMessage({ type: 'init-spectral-wasm', spectralWasm })
+      }
     } catch (error) {
+      if (this.destroyed || this.analysisWorker !== worker) return
       console.warn('[AudioProcessor] Failed to send spectral WASM to worker:', error)
     }
   }
@@ -451,6 +497,7 @@ export class AudioProcessor {
   // --- Analysis ---
 
   private setupFallbackAnalysis() {
+    if (this.destroyed || !this.isConnected || !this.isPlaying) return
     if (this.analysisInterval) clearInterval(this.analysisInterval)
     this.analysisInterval = window.setInterval(() => this.performUnifiedAnalysis(), this.ANALYSIS_INTERVAL)
   }
@@ -514,83 +561,76 @@ export class AudioProcessor {
 
   // --- Worklet for LUFS/meter analysis ---
 
-  private async setupVolumeNormalization() {
+  private async setupVolumeNormalization(generation = this.workletGeneration) {
     try {
-      if (this.passiveMode) return
-
-      if (this.audioContext.state !== 'running') {
-        await this.audioContext.resume()
-      }
-
-      if (!this.audioContext.audioWorklet) {
-        throw new Error('AudioWorklet not supported')
-      }
+      if (!this.ownsWorkletGeneration(generation)) return
+      if (this.audioContext.state !== 'running') await this.audioContext.resume()
+      if (!this.ownsWorkletGeneration(generation)) return
+      if (!this.audioContext.audioWorklet) throw new Error('AudioWorklet not supported')
 
       if (!this.audioWorkletNode) {
         await this.audioContext.audioWorklet.addModule(getAudioWorkletUrl('magic-soup-processor.js'))
-        this.audioWorkletNode = new AudioWorkletNode(this.audioContext, 'magic-soup-processor', {
+        if (!this.ownsWorkletGeneration(generation) || this.audioWorkletNode) return
+        const node = new AudioWorkletNode(this.audioContext, 'magic-soup-processor', {
           numberOfInputs: 1,
           numberOfOutputs: 1,
           channelCount: 2,
           channelCountMode: 'explicit',
           channelInterpretation: 'speakers',
         })
-
-        this.audioWorkletNode.port.onmessage = (event: MessageEvent) => {
+        this.audioWorkletNode = node
+        node.port.onmessage = (event: MessageEvent) => {
+          if (!this.ownsWorkletGeneration(generation) || this.audioWorkletNode !== node) return
           const msg = event.data as { type: string; lufs?: number }
           if (msg.type === 'request-dsp-init') {
-            this.sendDSPToWorklet()
-          } else if (msg?.type === 'analysis') {
+            void this.sendDSPToWorklet(node, generation)
+          } else if (msg.type === 'analysis') {
             if (msg.lufs != null) this.lufsBuffer.push(msg.lufs)
             if (this.lufsBuffer.length > this.LUFS_WINDOW_SIZE) this.lufsBuffer.shift()
           }
         }
       }
-
-      // Metering observes the input and cannot rewrite the selected processing order.
       this.analyzerNode.connect(this.audioWorkletNode)
       this.audioWorkletNode.connect(this.analysisSink)
     } catch {
-      this.setupFallbackAnalysis()
+      if (this.ownsWorkletGeneration(generation)) this.setupFallbackAnalysis()
     }
   }
 
-  private async sendDSPToWorklet() {
+  private async sendDSPToWorklet(node: AudioWorkletNode, generation: number) {
+    const signal = this.workletAbort.signal
     try {
       const [loudnessWasm, dynamicsWasm] = await Promise.all([
-        fetch(getWasmUrl('loudness_r128.wasm')).then((r) => r.arrayBuffer()),
-        fetch(getWasmUrl('dynamics_meter.wasm')).then((r) => r.arrayBuffer()),
-      ])
-
-      if (this.audioWorkletNode) {
-        this.audioWorkletNode.port.postMessage({ type: 'init-dsp', loudnessWasm, dynamicsWasm })
+        getWasmUrl('loudness_r128.wasm'), getWasmUrl('dynamics_meter.wasm'),
+      ].map(async url => {
+        const response = await fetch(url, { signal })
+        if (!response.ok) throw new Error(`DSP WASM request failed: ${response.status}`)
+        return response.arrayBuffer()
+      }))
+      if (this.ownsWorkletGeneration(generation) && this.audioWorkletNode === node) {
+        node.port.postMessage({ type: 'init-dsp', loudnessWasm, dynamicsWasm })
       }
     } catch (error) {
+      if (!this.ownsWorkletGeneration(generation) || this.audioWorkletNode !== node) return
       console.warn('[AudioProcessor] Failed to send DSP to worklet:', error)
     }
   }
 
   private teardownWorklet() {
-    if (this.audioWorkletNode) {
-      try {
-        this.analyzerNode.disconnect(this.audioWorkletNode)
-        this.audioWorkletNode.disconnect()
-      } catch {
-        // ignore
-      }
-      this.audioWorkletNode = null
+    // Invalidate continuations before disconnecting nodes or aborting requests.
+    this.workletGeneration++
+    this.workletAbort.abort()
+    this.workletAbort = new AbortController()
+    for (const node of [this.audioWorkletNode, this.wasmSpectrumNode]) {
+      if (!node) continue
+      node.port.onmessage = null
+      node.port.close()
+      try { this.analyzerNode.disconnect(node) } catch { /* not yet attached */ }
+      node.disconnect()
     }
-
-    if (this.wasmSpectrumNode) {
-      try {
-        this.analyzerNode.disconnect(this.wasmSpectrumNode)
-        this.wasmSpectrumNode.disconnect()
-      } catch {
-        // ignore
-      }
-      this.wasmSpectrumNode = null
-      this.wasmSpectrumReady = false
-    }
+    this.audioWorkletNode = null
+    this.wasmSpectrumNode = null
+    this.wasmSpectrumReady = false
   }
 
   // --- Public API ---
@@ -631,7 +671,7 @@ export class AudioProcessor {
    * Each source → its own GainNode → analyzerNode (summing junction).
    */
   async connectDualAudioElements(elementA: HTMLAudioElement, elementB: HTMLAudioElement) {
-    if (this.analysisInterval) clearInterval(this.analysisInterval)
+    if (this.destroyed) return
 
     // Guard: skip if already connected to the same pair
     if (
@@ -639,6 +679,12 @@ export class AudioProcessor {
       this.audioElement === elementA &&
       this.sourceNodeA && this.sourceNodeB
     ) return
+
+    this.teardownWorklet()
+    if (this.analysisInterval) {
+      clearInterval(this.analysisInterval)
+      this.analysisInterval = null
+    }
 
     // Disconnect old gain nodes from analyzerNode (source nodes persist)
     try { this.sourceGainA.disconnect() } catch { /* ignore */ }
@@ -674,6 +720,7 @@ export class AudioProcessor {
    * Backward-compat single-element connect: creates a dummy for the B channel.
    */
   async connectAudioElement(audioElement: HTMLAudioElement) {
+    if (this.destroyed) return
     if (!this.dummyElement) {
       this.dummyElement = new Audio()
       this.dummyElement.crossOrigin = 'anonymous'
@@ -686,17 +733,21 @@ export class AudioProcessor {
    * Runs in the background after the core audio graph is wired.
    */
   private async initAdvancedProcessing() {
-    await this.setupVolumeNormalization()
-    await this.initializeWasmSpectrum()
-    if (this.wasmSpectrumNode && this.wasmSpectrumReady) {
-      this.analyzerNode.connect(this.wasmSpectrumNode)
-    }
+    const generation = this.workletGeneration
+    await this.setupVolumeNormalization(generation)
+    if (!this.ownsWorkletGeneration(generation)) return
+    await this.initializeWasmSpectrum(generation)
   }
 
   async initializePassiveMode() {
+    if (this.destroyed) return
+    this.teardownWorklet()
     this.passiveMode = true
     this.isConnected = true
-    if (this.analysisInterval) clearInterval(this.analysisInterval)
+    if (this.analysisInterval) {
+      clearInterval(this.analysisInterval)
+      this.analysisInterval = null
+    }
     if (this.isPlaying) this.setupFallbackAnalysis()
   }
 
@@ -757,7 +808,13 @@ export class AudioProcessor {
   }
 
   destroy() {
+    if (this.destroyed) return
     this.destroyed = true
+    this.workerAbort.abort()
+    if (this.analysisWorker) {
+      this.analysisWorker.onmessage = null
+      this.analysisWorker.onerror = null
+    }
     if (this.rebuildTimer !== null) {
       clearTimeout(this.rebuildTimer)
       this.rebuildTimer = null
@@ -769,7 +826,6 @@ export class AudioProcessor {
     this.analysisWorker?.terminate()
     this.analysisWorker = null
     this.workerReady = false
-    this.teardownWorklet()
     this.disconnect()
     if (this.audioContext.state !== 'closed') {
       this.audioContext.close()

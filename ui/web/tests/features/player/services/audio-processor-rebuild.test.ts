@@ -54,7 +54,7 @@ class MockContext {
 }
 
 class MockWorklet extends MockNode {
-  port = { onmessage: null, postMessage: vi.fn() }
+  port = { onmessage: null, postMessage: vi.fn(), close: vi.fn() }
 }
 
 type GraphInspection = {
@@ -78,7 +78,7 @@ beforeEach(() => {
     postMessage = vi.fn()
     terminate = vi.fn()
   })
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ arrayBuffer: async () => new ArrayBuffer(0) }))
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, arrayBuffer: async () => new ArrayBuffer(0) }))
   processor = new AudioProcessor()
   graph = processor as unknown as GraphInspection
 })

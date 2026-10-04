@@ -95,3 +95,26 @@ if (process.env.AUDIO_GRAPH_CDP_PORT) {
     console.log('agent-browser native rendered signal:', result.stdout.trim())
   })
 }
+
+
+test('native spectrum readiness connects analysis and closes both worklet ports', async ({ lifecycle }) => {
+  const result = await lifecycle('ready-cleanup')
+  expect(result.nativeNodes).toBe(true)
+  expect(result.ready).toBe(true)
+  expect(result.spectrumConnected).toBe(true)
+  expect(result.sinkConnected).toBe(true)
+  expect(result.closedPorts).toBe(2)
+  expect(result.handlersCleared).toBe(true)
+  expect(result.lateNodes).toBe(false)
+  expect(result.fallbackActive).toBe(false)
+})
+
+for (const stop of ['disconnect', 'destroy'] as const) {
+  test(`native addModule completion cannot recreate analysis after ${stop}`, async ({ lifecycle }) => {
+    const result = await lifecycle(stop)
+    expect(result.moduleCalls).toBe(1)
+    expect(result.lateNodes).toBe(false)
+    expect(result.ready).toBe(false)
+    expect(result.fallbackActive).toBe(false)
+  })
+}

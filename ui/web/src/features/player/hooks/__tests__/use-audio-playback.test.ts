@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { renderHook, act } from '@testing-library/react'
+import { renderHook, act, cleanup } from '@testing-library/react'
+import { reapplyAllEqState } from '@/features/equalizer/stores/eq-reapply'
 import { audioService } from '@/features/player/services/audio-service'
 
 // --- Mocks must be hoisted before the hook imports them ---------------------
@@ -46,7 +47,9 @@ vi.mock('@/features/equalizer/stores/eq-reapply', () => ({
 // Build a minimal HTMLAudioElement that supports addEventListener/dispatchEvent
 // (jsdom's HTMLAudioElement does, but `new Audio()` returns a real element whose
 // src/preload/etc. work; we wrap it so we can read src and fire events).
-function createStubAudioElement(): HTMLAudioElement {
+type MockAudioElement = { -readonly [Key in keyof HTMLAudioElement]: HTMLAudioElement[Key] }
+
+function createStubAudioElement(): MockAudioElement {
   const listeners = new Map<string, Set<EventListenerOrEventListenerObject>>()
   const el = {
     src: '',
@@ -79,12 +82,12 @@ function createStubAudioElement(): HTMLAudioElement {
       return true
     }),
   }
-  return el as unknown as HTMLAudioElement
+  return el as unknown as MockAudioElement
 }
 
 // Capture the audio elements the hook creates via `new Audio()` so tests can
 // drive events on them. A and B in creation order.
-let capturedAudioElements: HTMLAudioElement[] = []
+let capturedAudioElements: MockAudioElement[] = []
 let RealAudio: typeof Audio | undefined
 
 import { useAudioPlayback } from '../use-audio-playback'
@@ -128,9 +131,9 @@ function seedQueue(current = 0, n = 3): Track[] {
 
 /** Fire a timeupdate on the active (A) element. Reads threshold from the code:
  *  gapless = 6s, crossfade = crossfadeDuration + 3 (PRELOAD_BUFFER). */
-function timeUpdate(el: HTMLAudioElement, currentTime: number, duration: number) {
-  ;(el as any).currentTime = currentTime
-  ;(el as any).duration = duration
+function timeUpdate(el: MockAudioElement, currentTime: number, duration: number) {
+  ;el.currentTime = currentTime
+  ;el.duration = duration
   el.dispatchEvent(new Event('timeupdate'))
 }
 
@@ -139,6 +142,7 @@ function timeUpdate(el: HTMLAudioElement, currentTime: number, duration: number)
 describe('useAudioPlayback', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(audioService.resumeContextIfNeeded).mockResolvedValue(undefined)
     // vi.clearAllMocks wipes mock implementations; restore the swap state machine.
     // getActiveSource returns the current `active`, instantSwap/crossfade flip it
     // (mirrors the real AudioProcessor behavior).
@@ -164,7 +168,86 @@ describe('useAudioPlayback', () => {
   })
 
   afterEach(() => {
+    cleanup()
     if (RealAudio) globalThis.Audio = RealAudio
+  })
+
+  it('recreates playable resources when StrictMode replays setup', () => {
+    const { result, unmount } = renderHook(() => useAudioPlayback(), {
+      reactStrictMode: true,
+    })
+    expect(capturedAudioElements).toHaveLength(4)
+    const [retired, , active] = capturedAudioElements
+    expect(retired.src).toBe('')
+    expect(result.current.current).toBe(active)
+    expect(usePlayerStore.getState().audioElement).toBe(active)
+    active.src = '/api/stream/track?id=t0'
+    act(() => { active.dispatchEvent(new Event('loadstart')) })
+    expect(audioService.connectDualAudioElements).toHaveBeenCalledWith(active, capturedAudioElements[3])
+    act(() => { active.dispatchEvent(new Event('play')) })
+    expect(usePlayerStore.getState().isPlaying).toBe(true)
+    unmount()
+    expect(result.current.current).toBeNull()
+    expect(usePlayerStore.getState().audioElement).toBeNull()
+  })
+
+  it('removes loadstart and pending preload listeners on teardown', () => {
+    seedQueue(0, 2)
+    const { unmount } = renderHook(() => useAudioPlayback())
+    const [a, b] = capturedAudioElements
+    act(() => { timeUpdate(a, 95, 100) })
+    unmount()
+    expect(a.removeEventListener).toHaveBeenCalledWith('loadstart', expect.any(Function))
+    expect(b.removeEventListener).toHaveBeenCalledWith('canplaythrough', expect.any(Function))
+    expect(b.removeEventListener).toHaveBeenCalledWith('error', expect.any(Function))
+    a.src = '/api/stream/track?id=t0'
+    a.dispatchEvent(new Event('loadstart'))
+    expect(audioService.connectDualAudioElements).not.toHaveBeenCalled()
+  })
+
+  it('does not publish pause events raised while disposing the owned elements', () => {
+    const { unmount } = renderHook(() => useAudioPlayback())
+    const [a] = capturedAudioElements
+    vi.mocked(a.pause).mockImplementation(() => { a.dispatchEvent(new Event('pause')) })
+    act(() => { usePlayerStore.setState({ isPlaying: true }) })
+    unmount()
+    expect(usePlayerStore.getState().isPlaying).toBe(true)
+    expect(usePlayerStore.getState().audioElement).toBeNull()
+  })
+
+  it('does not resume a retired element after deferred context resume', async () => {
+    let resolveResume!: () => void
+    vi.mocked(audioService.resumeContextIfNeeded).mockReturnValue(new Promise<void>((resolve) => { resolveResume = resolve }))
+    const { unmount } = renderHook(() => useAudioPlayback())
+    const [a] = capturedAudioElements
+    a.src = '/api/stream/track?id=t0'
+    act(() => { usePlayerStore.setState({ isPlaying: true }) })
+    unmount()
+    await act(async () => { resolveResume() })
+    expect(a.play).not.toHaveBeenCalled()
+  })
+
+  it('ignores playback failures delivered after teardown', async () => {
+    let rejectPlay!: (reason: Error) => void
+    const { unmount } = renderHook(() => useAudioPlayback())
+    const [a] = capturedAudioElements
+    vi.mocked(a.play).mockReturnValue(new Promise<void>((_, reject) => { rejectPlay = reject }))
+    a.src = '/api/stream/track?id=t0'
+    await act(async () => { usePlayerStore.setState({ isPlaying: true }) })
+    expect(a.play).toHaveBeenCalledOnce()
+    unmount()
+    await act(async () => { rejectPlay(new Error('retired playback')) })
+    expect(usePlayerStore.getState().isPlaying).toBe(true)
+  })
+
+  it('does not reapply EQ after a user gesture resume completes after teardown', async () => {
+    let resolveResume!: () => void
+    vi.mocked(audioService.resumeContextIfNeeded).mockReturnValue(new Promise<void>((resolve) => { resolveResume = resolve }))
+    const { unmount } = renderHook(() => useAudioPlayback())
+    act(() => { document.dispatchEvent(new Event('click')) })
+    unmount()
+    await act(async () => { resolveResume() })
+    expect(reapplyAllEqState).not.toHaveBeenCalled()
   })
 
   it('creates dual audio elements, wires the primary (A) element to the store, and inits the audio service', () => {
@@ -188,15 +271,15 @@ describe('useAudioPlayback', () => {
 
       // Far from end — no preload.
       timeUpdate(a, 10, 100)
-      expect((b as any).src).toBe('')
+      expect(b.src).toBe('')
 
       // Cross gapless threshold: 100 - 95 = 5 < 6.
       act(() => {
         timeUpdate(a, 95, 100)
       })
 
-      expect((b as any).src).toBe(`/api/stream/track?id=${q[1].publicId}`)
-      expect((b as any).preload).toBe('auto')
+      expect(b.src).toBe(`/api/stream/track?id=${q[1].publicId}`)
+      expect(b.preload).toBe('auto')
 
       // canplaythrough promotes preload state to 'ready' (observable only via
       // the ended path, exercised below); fire it to complete the cycle.
@@ -205,11 +288,11 @@ describe('useAudioPlayback', () => {
       })
 
       // A second timeupdate near the end must NOT re-prime (preloadState != idle).
-      const srcAfterReady = (b as any).src
+      const srcAfterReady = b.src
       act(() => {
         timeUpdate(a, 97, 100)
       })
-      expect((b as any).src).toBe(srcAfterReady)
+      expect(b.src).toBe(srcAfterReady)
 
       void result
     })
@@ -230,7 +313,7 @@ describe('useAudioPlayback', () => {
       act(() => {
         timeUpdate(a, 90, 100)
       })
-      expect((b as any).src).toContain('t1')
+      expect(b.src).toContain('t1')
     })
 
     it('does not preload when there is no next track (end of non-repeating queue)', () => {
@@ -241,7 +324,7 @@ describe('useAudioPlayback', () => {
       act(() => {
         timeUpdate(a, 95, 100)
       })
-      expect((b as any).src).toBe('')
+      expect(b.src).toBe('')
     })
 
     it('does not preload when duration is not finite', () => {
@@ -253,7 +336,7 @@ describe('useAudioPlayback', () => {
       act(() => {
         timeUpdate(a, 50, Infinity)
       })
-      expect((b as any).src).toBe('')
+      expect(b.src).toBe('')
     })
 
     it('resets preloadState to idle on element error', () => {
@@ -264,7 +347,7 @@ describe('useAudioPlayback', () => {
       act(() => {
         timeUpdate(a, 95, 100) // → preloading
       })
-      expect((b as any).src).toContain('t1')
+      expect(b.src).toContain('t1')
 
       // Fire error → state back to idle. A subsequent timeupdate past threshold
       // should attempt to re-prime (src gets set again).
@@ -272,7 +355,7 @@ describe('useAudioPlayback', () => {
         b.dispatchEvent(new Event('error'))
         timeUpdate(a, 96, 100)
       })
-      expect((b as any).src).toContain('t1')
+      expect(b.src).toContain('t1')
     })
   })
 
@@ -284,13 +367,13 @@ describe('useAudioPlayback', () => {
       usePlayerStore.setState({ repeat: 'one', currentTrack: q[0] })
       const { result } = renderHook(() => useAudioPlayback())
       const [a] = capturedAudioElements
-      ;(a as any).currentTime = 42
+      ;a.currentTime = 42
 
       act(() => {
         a.dispatchEvent(new Event('ended'))
       })
 
-      expect((a as any).currentTime).toBe(0)
+      expect(a.currentTime).toBe(0)
       expect(a.play).toHaveBeenCalled()
       // playNext must NOT be called: index unchanged.
       expect(usePlayerStore.getState().currentIndex).toBe(0)
@@ -308,7 +391,7 @@ describe('useAudioPlayback', () => {
         b.dispatchEvent(new Event('canplaythrough'))
       })
 
-      const playSpy = (b as any).play as ReturnType<typeof vi.fn>
+      const playSpy = vi.mocked(b.play)
       playSpy.mockClear()
 
       act(() => {
@@ -321,7 +404,7 @@ describe('useAudioPlayback', () => {
       // Inactive (B) is now played; active (A) paused + rewound.
       expect(playSpy).toHaveBeenCalled()
       expect(a.pause).toHaveBeenCalled()
-      expect((a as any).currentTime).toBe(0)
+      expect(a.currentTime).toBe(0)
       // Store advanced to next track.
       expect(usePlayerStore.getState().currentIndex).toBe(1)
     })
@@ -395,8 +478,8 @@ describe('useAudioPlayback', () => {
       usePlayerStore.setState({ isPlaying: true })
       renderHook(() => useAudioPlayback())
       const [a] = capturedAudioElements
-      ;(a as any).paused = false // pretend it's playing
-      ;(a as any).src = 'https://example/audio.mp3' // effect guards on !audio.src
+      ;a.paused = false // pretend it's playing
+      ;a.src = 'https://baander.app/audio.mp3' // effect guards on !audio.src
 
       await act(async () => {
         usePlayerStore.setState({ isPlaying: false })
@@ -410,8 +493,8 @@ describe('useAudioPlayback', () => {
       usePlayerStore.setState({ isPlaying: false })
       renderHook(() => useAudioPlayback())
       const [a] = capturedAudioElements
-      ;(a as any).src = '/api/stream/track?id=t0'
-      ;(a as any).paused = true
+      ;a.src = '/api/stream/track?id=t0'
+      ;a.paused = true
 
       await act(async () => {
         usePlayerStore.setState({ isPlaying: true })

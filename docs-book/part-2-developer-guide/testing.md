@@ -18,8 +18,12 @@ These browser tests render the real `AudioProcessor` nodes with
 against reference signals. They replace external WASM analysis and workers;
 they do not certify those modules, codecs, media-element transport, or audible
 clicks during live graph changes. Rebuild timing and worklet graph attachment
-also have unit regressions in `audio-processor-rebuild.test.ts`. The browser
-suite runs as a blocking step in the frontend workflow.
+also have unit regressions in `audio-processor-rebuild.test.ts`. Deferred module
+and WASM loading, connection replacement, and React StrictMode cleanup have
+processor, service, and playback-hook regressions. Native browser lifecycle tests
+use small fixture worklets to verify readiness and teardown; they do not replace
+tests of the production WASM algorithms. The browser suite runs as a blocking
+step in the frontend workflow.
 
 ## Test Suites
 

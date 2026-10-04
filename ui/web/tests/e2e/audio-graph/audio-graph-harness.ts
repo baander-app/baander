@@ -6,10 +6,10 @@ import { tmpdir } from 'node:os'
 import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { RenderOptions } from './browser-fixture'
+import type { RenderOptions, LifecycleCase, LifecycleResult } from './browser-fixture'
 
 export interface Signal { left: number[]; right: number[]; leftGain: number; rightGain: number }
-export const test = base.extend<{ render: (options: RenderOptions) => Promise<Signal> }, { origin: string }>({
+export const test = base.extend<{ render: (options: RenderOptions) => Promise<Signal>; lifecycle: (scenario: LifecycleCase) => Promise<LifecycleResult> }, { origin: string }>({
   origin: [async ({ browserName }, provide) => {
     if (browserName !== 'chromium') throw new Error('The audio regression harness requires Chromium')
     const temporary = mkdtempSync(resolve(tmpdir(), 'baander-audio-graph-'))
@@ -27,7 +27,7 @@ export const test = base.extend<{ render: (options: RenderOptions) => Promise<Si
           plugin.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: `
             const api = new Proxy({}, { get: () => () => {} });
             export const getLoudness=async()=>api, getDynamics=async()=>api, getSpectralFeatures=async()=>api;
-            export const getWasmUrl=()=>'/analysis.wasm', getAudioWorkletUrl=()=>'/analysis-worker.js';
+            export const getWasmUrl=()=>'/analysis.wasm', getAudioWorkletUrl=file=>'/'+file;
           ` }))
         } }],
       })
@@ -35,6 +35,25 @@ export const test = base.extend<{ render: (options: RenderOptions) => Promise<Si
         if (request.url === '/fixture.js') {
           response.setHeader('Content-Type', 'application/javascript')
           response.end('window.Worker=class { postMessage(){} terminate(){} };\n' + bundle.outputFiles[0].text)
+        } else if (request.url === '/magic-soup-processor.js' || request.url === '/wasm-spectrum.js') {
+          response.setHeader('Content-Type', 'application/javascript')
+          response.end(`
+            class FixtureAnalysis extends AudioWorkletProcessor {
+              constructor() {
+                super();
+                this.port.onmessage = event => {
+                  if (event.data.type === 'wasm') this.port.postMessage({type:'ready'});
+                };
+              }
+              process(inputs, outputs) {
+                for (let channel=0; channel<outputs[0].length; channel++) {
+                  if (inputs[0]?.[channel]) outputs[0][channel].set(inputs[0][channel]);
+                }
+                return true;
+              }
+            }
+            registerProcessor('${request.url === '/wasm-spectrum.js' ? 'wasm-spectrum' : 'magic-soup-processor'}', FixtureAnalysis);
+          `)
         } else if (request.url === '/analysis.wasm') response.end('')
         else response.end('<!doctype html><title>Native audio graph regression</title><script src="/fixture.js"></script>')
       })
@@ -48,13 +67,20 @@ export const test = base.extend<{ render: (options: RenderOptions) => Promise<Si
     }
   }, { scope: 'worker' }],
   browser: async ({ playwright }, provide) => {
-    const browser = await playwright.chromium.launch({ args: ['--host-resolver-rules=MAP audio.baander.app 127.0.0.1', '--no-proxy-server',
+    const browser = await playwright.chromium.launch({ args: ['--host-resolver-rules=MAP audio.baander.app 127.0.0.1', '--no-proxy-server', '--autoplay-policy=no-user-gesture-required',
       ...(process.env.AUDIO_GRAPH_CDP_PORT ? [`--remote-debugging-port=${process.env.AUDIO_GRAPH_CDP_PORT}`] : [])] })
     try { await provide(browser) } finally { await browser.close() }
   },
   context: async ({ browser }, provide) => {
     const context = await browser.newContext({ ignoreHTTPSErrors: true })
     try { await provide(context) } finally { await context.close() }
+  },
+  lifecycle: async ({ page, origin }, provide) => {
+    await page.goto(origin)
+    await page.waitForFunction(() => 'audioGraphFixture' in window)
+    await provide(scenario => page.evaluate(scenario => (window as unknown as {
+      audioGraphFixture: { lifecycle(scenario: LifecycleCase): Promise<LifecycleResult> }
+    }).audioGraphFixture.lifecycle(scenario), scenario))
   },
   render: async ({ page, origin }, provide) => {
     await page.goto(origin)

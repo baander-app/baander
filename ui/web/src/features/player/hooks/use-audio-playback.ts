@@ -18,7 +18,7 @@ export function useAudioPlayback() {
   const audioRefB = useRef<HTMLAudioElement | null>(null)
   const preloadState = useRef<PreloadState>('idle')
   const preloadedTrackId = useRef<string | null>(null)
-  const initialized = useRef(false)
+  const lifetimeRef = useRef<{ active: boolean } | null>(null)
 
   const setAudioElement = usePlayerStore((s) => s.setAudioElement)
   const setIsPlaying = usePlayerStore((s) => s.setIsPlaying)
@@ -26,8 +26,8 @@ export function useAudioPlayback() {
   const playNext = usePlayerStore((s) => s.playNext)
 
   useEffect(() => {
-    if (initialized.current) return
-    initialized.current = true
+    const lifetime = { active: true }
+    lifetimeRef.current = lifetime
 
     // Create dual persistent audio elements
     const audioA = new Audio()
@@ -55,7 +55,7 @@ export function useAudioPlayback() {
     // Connect processor when first src is set (not available at mount time)
     const dualConnected = { value: false }
     const onLoadStart = () => {
-      if (audioA.src && !dualConnected.value) {
+      if (lifetime.active && audioA.src && !dualConnected.value) {
         audioService.connectDualAudioElements(audioA, audioB)
         dualConnected.value = true
         audioA.removeEventListener('loadstart', onLoadStart)
@@ -64,14 +64,22 @@ export function useAudioPlayback() {
     audioA.addEventListener('loadstart', onLoadStart)
 
     return () => {
+      lifetime.active = false
+      lifetimeRef.current = null
+      audioA.removeEventListener('loadstart', onLoadStart)
+      audioRefA.current = null
+      audioRefB.current = null
+      preloadState.current = 'idle'
+      preloadedTrackId.current = null
+      const storedAudio = usePlayerStore.getState().audioElement
+      if (storedAudio === audioA || storedAudio === audioB) setAudioElement(null)
       audioA.pause()
       audioA.src = ''
       audioB.pause()
       audioB.src = ''
       audioService.destroy()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [setAudioElement])
 
   // Sync store isPlaying → active audio element (store → DOM direction)
   const isPlaying = usePlayerStore((s) => s.isPlaying)
@@ -80,17 +88,30 @@ export function useAudioPlayback() {
     const audio = audioRefA.current
     if (!audio || !audio.src) return
 
+    let cancelled = false
+    const lifetime = lifetimeRef.current
+    const isActive = () => !cancelled && lifetime?.active === true && audioRefA.current === audio
+
     if (isPlaying && audio.paused) {
       audioService.resumeContextIfNeeded().then(() => {
         // Re-check after async resume — user might have paused again
-        if (usePlayerStore.getState().isPlaying) {
-          audio.play().catch((err) => { logger.warn('Playback resume failed:', err); setIsPlaying(false) })
+        if (isActive() && usePlayerStore.getState().isPlaying) {
+          audio.play().catch((err) => {
+            if (!isActive()) return
+            logger.warn('Playback resume failed:', err)
+            setIsPlaying(false)
+          })
         }
+      }).catch((err) => {
+        if (!isActive()) return
+        logger.warn('Audio context resume failed:', err)
+        setIsPlaying(false)
       })
     } else if (!isPlaying && !audio.paused) {
       audio.pause()
       audioService.setPlayingState(false)
     }
+    return () => { cancelled = true }
   }, [isPlaying, setIsPlaying])
 
   // Sync audio element events to player store (DOM → store direction)
@@ -98,16 +119,22 @@ export function useAudioPlayback() {
     const audio = audioRefA.current
     if (!audio) return
 
+    const lifetime = lifetimeRef.current
+    let removePreloadListeners: (() => void) | undefined
+
     const onPlay = () => {
+      if (!lifetime?.active) return
       setIsPlaying(true)
       audioService.setPlayingState(true)
     }
     const onPause = () => {
+      if (!lifetime?.active) return
       setIsPlaying(false)
       audioService.setPlayingState(false)
     }
 
     const onTimeUpdate = () => {
+      if (!lifetime?.active) return
       updateTime(audio.currentTime)
 
       // --- Preload scheduler ---
@@ -134,34 +161,46 @@ export function useAudioPlayback() {
             preloadState.current = 'preloading'
             preloadedTrackId.current = nextTrack.publicId
 
-            inactiveAudio.addEventListener('canplaythrough', function onReady() {
-              inactiveAudio.removeEventListener('canplaythrough', onReady)
-              preloadState.current = 'ready'
-            }, { once: true })
-
-            inactiveAudio.addEventListener('error', function onError() {
-              inactiveAudio.removeEventListener('error', onError)
+            removePreloadListeners?.()
+            const onReady = () => {
+              removePreloadListeners?.()
+              if (lifetime?.active) preloadState.current = 'ready'
+            }
+            const onError = () => {
+              removePreloadListeners?.()
+              if (!lifetime?.active) return
               preloadState.current = 'idle'
               preloadedTrackId.current = null
-            }, { once: true })
+            }
+            removePreloadListeners = () => {
+              inactiveAudio.removeEventListener('canplaythrough', onReady)
+              inactiveAudio.removeEventListener('error', onError)
+              removePreloadListeners = undefined
+            }
+            inactiveAudio.addEventListener('canplaythrough', onReady, { once: true })
+            inactiveAudio.addEventListener('error', onError, { once: true })
           }
         }
       }
     }
 
     const onDurationChange = () => {
+      if (!lifetime?.active) return
       if (audio.duration && isFinite(audio.duration)) {
         setDuration(audio.duration)
       }
     }
 
     const onEnded = () => {
+      if (!lifetime?.active) return
       const { repeat, currentTrack, crossfadeEnabled, crossfadeDuration } = usePlayerStore.getState()
 
       // Repeat-one: restart current track
       if (repeat === 'one' && currentTrack) {
         audio.currentTime = 0
-        audio.play().catch((err) => { logger.warn('Repeat-one resume failed:', err) })
+        audio.play().catch((err) => {
+          if (lifetime?.active) logger.warn('Repeat-one resume failed:', err)
+        })
         return
       }
 
@@ -178,7 +217,9 @@ export function useAudioPlayback() {
           processor.instantSwap()
         }
 
-        inactiveAudio.play().catch((err) => { logger.warn('Crossfade playback failed:', err) })
+        inactiveAudio.play().catch((err) => {
+          if (lifetime?.active) logger.warn('Crossfade playback failed:', err)
+        })
         activeAudio.pause()
         activeAudio.currentTime = 0
 
@@ -200,27 +241,32 @@ export function useAudioPlayback() {
     audio.addEventListener('ended', onEnded)
 
     return () => {
+      removePreloadListeners?.()
       audio.removeEventListener('play', onPlay)
       audio.removeEventListener('pause', onPause)
       audio.removeEventListener('timeupdate', onTimeUpdate)
       audio.removeEventListener('durationchange', onDurationChange)
       audio.removeEventListener('ended', onEnded)
     }
-  }, [setIsPlaying, setDuration, playNext, updateTime])
+  }, [setIsPlaying, setDuration, playNext])
 
   // Resume AudioContext + re-apply EQ on user interaction
   // Browsers suspend AudioContext until first user gesture.
   // After resume, EQ params set while suspended need to be refreshed.
   useEffect(() => {
+    let cancelled = false
     const resumeAndReapply = async () => {
       await audioService.resumeContextIfNeeded()
+      if (cancelled) return
       // Re-apply persisted EQ state now that the context is running
       const { reapplyAllEqState } = await import('@/features/equalizer/stores/eq-reapply')
-      reapplyAllEqState()
+      if (!cancelled) reapplyAllEqState()
     }
 
     const onFirstInteraction = () => {
-      resumeAndReapply()
+      void resumeAndReapply().catch((err) => {
+        if (!cancelled) logger.warn('Audio context resume failed:', err)
+      })
       document.removeEventListener('click', onFirstInteraction)
       document.removeEventListener('keydown', onFirstInteraction)
     }
@@ -229,6 +275,7 @@ export function useAudioPlayback() {
     document.addEventListener('keydown', onFirstInteraction)
 
     return () => {
+      cancelled = true
       document.removeEventListener('click', onFirstInteraction)
       document.removeEventListener('keydown', onFirstInteraction)
     }
