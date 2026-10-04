@@ -28134,6 +28134,11 @@ export type putDeviceRenameResponse401 = {
   status: 401
 }
 
+export type putDeviceRenameResponse404 = {
+  data: ApiError
+  status: 404
+}
+
 export type putDeviceRenameResponse422 = {
   data: ValidationError
   status: 422
@@ -28142,7 +28147,7 @@ export type putDeviceRenameResponse422 = {
 export type putDeviceRenameResponseSuccess = (putDeviceRenameResponse200) & {
   headers: Headers;
 };
-export type putDeviceRenameResponseError = (putDeviceRenameResponse401 | putDeviceRenameResponse422) & {
+export type putDeviceRenameResponseError = (putDeviceRenameResponse401 | putDeviceRenameResponse404 | putDeviceRenameResponse422) & {
   headers: Headers;
 };
 

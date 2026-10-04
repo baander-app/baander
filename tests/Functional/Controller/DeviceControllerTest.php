@@ -149,8 +149,8 @@ final class DeviceControllerTest extends TestCase
 
     public function testListReturnsOnlyTheUsersOwnDevices(): void
     {
-        $userA = $this->createTestUser('owner-a@example.com');
-        $userB = $this->createTestUser('owner-b@example.com');
+        $userA = $this->createTestUser('owner-a@baander.app');
+        $userB = $this->createTestUser('owner-b@baander.app');
 
         $this->authenticatedRequest('POST', '/api/devices', $userA, [
             'deviceId' => $this->validDeviceId(),
@@ -262,18 +262,46 @@ final class DeviceControllerTest extends TestCase
         $this->assertJsonResponse($response, 400);
     }
 
-    public function testRenameNonExistentDeviceSurfacesServerError(): void
+    public function testRenameNonExistentDeviceReturnsNotFound(): void
     {
         $user = $this->createTestUser();
 
-        // renameDevice() throws a RuntimeException for an unknown device; the
-        // global ExceptionSubscriber maps non-HTTP exceptions to 500. This pins
-        // the current behaviour (rename is NOT idempotent, unlike forget).
         $response = $this->authenticatedRequest('PUT', '/api/devices/' . $this->validDeviceId(), $user, [
             'name' => 'Ghost Device',
         ]);
 
-        $this->assertSame(500, $response->getStatusCode(), $response->getContent());
+        $this->assertJsonResponse($response, 404);
+    }
+
+    public function testRenameAnotherUsersDeviceReturnsNotFoundAndLeavesDevicesUnchanged(): void
+    {
+        $owner = $this->createTestUser('owner@baander.app');
+        $otherUser = $this->createTestUser('other@baander.app');
+        $ownedDeviceId = $this->validDeviceId();
+        $unrelatedDeviceId = $this->validDeviceId();
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/devices', $owner, [
+            'deviceId' => $ownedDeviceId,
+            'name' => 'Owner Device',
+        ]), 200);
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/devices', $otherUser, [
+            'deviceId' => $unrelatedDeviceId,
+            'name' => 'Other Device',
+        ]), 200);
+
+        $response = $this->authenticatedRequest('PUT', '/api/devices/' . $ownedDeviceId, $otherUser, [
+            'name' => 'Attempted Rename',
+        ]);
+
+        $this->assertJsonResponse($response, 404);
+        $this->entityManager->clear();
+        $ownedDevices = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/devices', $owner), 200, 'data')['data'];
+        $otherDevices = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/devices', $otherUser), 200, 'data')['data'];
+        $this->assertCount(1, $ownedDevices);
+        $this->assertSame($ownedDeviceId, $ownedDevices[0]['deviceId']);
+        $this->assertSame('Owner Device', $ownedDevices[0]['name']);
+        $this->assertCount(1, $otherDevices);
+        $this->assertSame($unrelatedDeviceId, $otherDevices[0]['deviceId']);
+        $this->assertSame('Other Device', $otherDevices[0]['name']);
     }
 
     // ---------------------------------------------------------------

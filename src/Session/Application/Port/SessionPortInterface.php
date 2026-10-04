@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Session\Application\Port;
 
+use App\Session\Application\Exception\DeviceNotFound;
 use App\Shared\Domain\Model\Uuid;
 
 interface SessionPortInterface
@@ -54,6 +55,8 @@ interface SessionPortInterface
 
     /**
      * Rename a device.
+     *
+     * @throws DeviceNotFound When the device is not registered for this user.
      */
     public function renameDevice(Uuid $userId, Uuid $deviceId, string $name): void;
 

@@ -13546,6 +13546,16 @@
                             }
                         }
                     },
+                    "404": {
+                        "description": "Device not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Validation error",
                         "content": {

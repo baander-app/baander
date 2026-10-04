@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Session\Interface\Controller;
 
 use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Session\Application\Exception\DeviceNotFound;
 use App\Session\Application\Port\SessionPortInterface;
 use App\Session\Interface\Request\RegisterDeviceRequest;
 use App\Session\Interface\Request\RenameDeviceRequest;
@@ -154,6 +155,7 @@ final class DeviceController
                 ),
             ),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '404', description: 'Device not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
@@ -173,7 +175,11 @@ final class DeviceController
             return $this->errorResponse('Invalid device ID.');
         }
 
-        $this->sessionPort->renameDevice($userId, $deviceUuid, $payload->name);
+        try {
+            $this->sessionPort->renameDevice($userId, $deviceUuid, $payload->name);
+        } catch (DeviceNotFound) {
+            return $this->notFound('Device not found.');
+        }
 
         return $this->successResponse(['message' => 'Device renamed.']);
     }

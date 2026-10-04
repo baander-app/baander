@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Session\Infrastructure;
 
+use App\Session\Application\Exception\DeviceNotFound;
 use App\Session\Application\Port\SessionPortInterface;
 use App\Session\Domain\Model\Device\Device;
 use App\Session\Domain\Model\ListeningSession\ListeningSession;
@@ -115,7 +116,7 @@ final class SessionAdapter implements SessionPortInterface
         $device = $this->deviceRepository->findByUserAndDevice($userId, $deviceId);
 
         if ($device === null) {
-            throw new RuntimeException('Device not found.');
+            throw new DeviceNotFound('Device not found.');
         }
 
         $device->rename($name);
