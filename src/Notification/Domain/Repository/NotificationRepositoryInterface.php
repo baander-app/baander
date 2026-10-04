@@ -24,6 +24,7 @@ interface NotificationRepositoryInterface
         ?int $limit = null,
         ?string $cursor = null,
         string $direction = 'desc',
+        ?\DateTimeImmutable $since = null,
     ): array;
 
     public function countUnread(Uuid $userId): int;

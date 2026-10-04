@@ -12,6 +12,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
+use App\Shared\Interface\Request\QueryParameters;
 use OpenApi\Attributes as OA;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -44,12 +45,13 @@ final class NotificationController
         parameters: [
             new OA\Parameter(name: 'category', description: 'Filter by category', in: 'query', schema: new OA\Schema(type: 'string', enum: ['security', 'background_jobs', 'media_changes', 'admin_operations'])),
             new OA\Parameter(name: 'unread', description: 'Filter unread only', in: 'query', schema: new OA\Schema(type: 'boolean')),
-            new OA\Parameter(name: 'limit', description: 'Items per page', in: 'query', schema: new OA\Schema(type: 'integer', default: 50)),
-            new OA\Parameter(name: 'cursor', description: 'Cursor for pagination', in: 'query', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'since', description: 'ISO 8601 timestamp for polling fallback', in: 'query', schema: new OA\Schema(type: 'string', format: 'date-time')),
+            new OA\Parameter(name: 'limit', description: 'Items per page', in: 'query', schema: new OA\Schema(type: 'integer', default: 50, maximum: 100, minimum: 1)),
+            new OA\Parameter(name: 'cursor', description: 'Internal notification UUID for pagination', in: 'query', schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'since', description: 'Exclusive creation timestamp with timezone (RFC 3339, up to six fractional digits)', in: 'query', schema: new OA\Schema(type: 'string', format: 'date-time')),
         ],
         responses: [
             new OA\Response(response: '200', description: 'List of notifications', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'publicId', type: 'string'), new OA\Property(property: 'eventType', type: 'string'), new OA\Property(property: 'isRead', type: 'boolean'), new OA\Property(property: 'createdAt', type: 'string', format: 'date-time')]))])),
+            new OA\Response(response: '400', description: 'Invalid query parameters', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
@@ -60,38 +62,20 @@ final class NotificationController
         $user = $this->security->getUser();
         $userId = Uuid::fromString($user->getId());
 
-        $category = null;
-        $categoryParam = $request->query->get('category');
-        if ($categoryParam !== null) {
-            $category = NotificationCategory::tryFrom($categoryParam);
-            if ($category === null) {
-                return $this->errorResponse(
-                    sprintf('Invalid category: %s.', $categoryParam),
-                    400,
-                );
-            }
-        }
-
-        $unreadOnly = $request->query->getBoolean('unread', false);
-        $limit = min(100, max(1, (int) $request->query->get('limit', 50)));
-        $cursor = $request->query->get('cursor');
-
-        $since = null;
-        $sinceParam = $request->query->get('since');
-        if ($sinceParam !== null) {
-            try {
-                $since = new \DateTimeImmutable($sinceParam);
-            } catch (\Throwable) {
-                return $this->errorResponse('Invalid "since" timestamp format.', 400);
-            }
-        }
+        $categoryParam = QueryParameters::optionalChoice($request->query, 'category', array_column(NotificationCategory::cases(), 'value'));
+        $category = $categoryParam === null ? null : NotificationCategory::from($categoryParam);
+        $unreadOnly = QueryParameters::optionalBoolean($request->query, 'unread');
+        $limit = QueryParameters::integer($request->query, 'limit', 50, 1, 100);
+        $cursor = QueryParameters::optionalUuid($request->query, 'cursor');
+        $since = QueryParameters::optionalDateTime($request->query, 'since');
 
         $notifications = $this->notificationRepository->findByUserId(
             $userId,
             $category,
             $unreadOnly ?: null,
             $limit,
-            $cursor,
+            $cursor?->toString(),
+            since: $since,
         );
 
         $items = NotificationResource::collection($notifications);

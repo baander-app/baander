@@ -3712,14 +3712,16 @@ category?: GetNotificationIndexCategory;
 unread?: boolean;
 /**
  * Items per page
+ * @minimum 1
+ * @maximum 100
  */
 limit?: number;
 /**
- * Cursor for pagination
+ * Internal notification UUID for pagination
  */
 cursor?: string;
 /**
- * ISO 8601 timestamp for polling fallback
+ * Exclusive creation timestamp with timezone (RFC 3339, up to six fractional digits)
  */
 since?: string;
 };
@@ -20035,12 +20037,19 @@ export type getNotificationIndexResponse200 = {
   status: 200
 }
 
+export type getNotificationIndexResponse400 = {
+  data: ApiError
+  status: 400
+}
+
 export type getNotificationIndexResponseSuccess = (getNotificationIndexResponse200) & {
   headers: Headers;
 };
-;
+export type getNotificationIndexResponseError = (getNotificationIndexResponse400) & {
+  headers: Headers;
+};
 
-export type getNotificationIndexResponse = (getNotificationIndexResponseSuccess)
+export type getNotificationIndexResponse = (getNotificationIndexResponseSuccess | getNotificationIndexResponseError)
 
 export const getGetNotificationIndexUrl = (params?: GetNotificationIndexParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -20082,7 +20091,7 @@ export const getGetNotificationIndexQueryKey = (params?: GetNotificationIndexPar
     }
 
 
-export const getGetNotificationIndexQueryOptions = <TData = Awaited<ReturnType<typeof getNotificationIndex>>, TError = ErrorType<unknown>>(params?: GetNotificationIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNotificationIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetNotificationIndexQueryOptions = <TData = Awaited<ReturnType<typeof getNotificationIndex>>, TError = ErrorType<ApiError>>(params?: GetNotificationIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNotificationIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -20101,10 +20110,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetNotificationIndexQueryResult = NonNullable<Awaited<ReturnType<typeof getNotificationIndex>>>
-export type GetNotificationIndexQueryError = ErrorType<unknown>
+export type GetNotificationIndexQueryError = ErrorType<ApiError>
 
 
-export function useGetNotificationIndex<TData = Awaited<ReturnType<typeof getNotificationIndex>>, TError = ErrorType<unknown>>(
+export function useGetNotificationIndex<TData = Awaited<ReturnType<typeof getNotificationIndex>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetNotificationIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNotificationIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getNotificationIndex>>,
@@ -20114,7 +20123,7 @@ export function useGetNotificationIndex<TData = Awaited<ReturnType<typeof getNot
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetNotificationIndex<TData = Awaited<ReturnType<typeof getNotificationIndex>>, TError = ErrorType<unknown>>(
+export function useGetNotificationIndex<TData = Awaited<ReturnType<typeof getNotificationIndex>>, TError = ErrorType<ApiError>>(
  params?: GetNotificationIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNotificationIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getNotificationIndex>>,
@@ -20124,7 +20133,7 @@ export function useGetNotificationIndex<TData = Awaited<ReturnType<typeof getNot
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetNotificationIndex<TData = Awaited<ReturnType<typeof getNotificationIndex>>, TError = ErrorType<unknown>>(
+export function useGetNotificationIndex<TData = Awaited<ReturnType<typeof getNotificationIndex>>, TError = ErrorType<ApiError>>(
  params?: GetNotificationIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNotificationIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -20132,7 +20141,7 @@ export function useGetNotificationIndex<TData = Awaited<ReturnType<typeof getNot
  * @summary List notifications
  */
 
-export function useGetNotificationIndex<TData = Awaited<ReturnType<typeof getNotificationIndex>>, TError = ErrorType<unknown>>(
+export function useGetNotificationIndex<TData = Awaited<ReturnType<typeof getNotificationIndex>>, TError = ErrorType<ApiError>>(
  params?: GetNotificationIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getNotificationIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {

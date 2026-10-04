@@ -8927,21 +8927,24 @@
                         "description": "Items per page",
                         "schema": {
                             "type": "integer",
-                            "default": 50
+                            "default": 50,
+                            "maximum": 100,
+                            "minimum": 1
                         }
                     },
                     {
                         "name": "cursor",
                         "in": "query",
-                        "description": "Cursor for pagination",
+                        "description": "Internal notification UUID for pagination",
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "format": "uuid"
                         }
                     },
                     {
                         "name": "since",
                         "in": "query",
-                        "description": "ISO 8601 timestamp for polling fallback",
+                        "description": "Exclusive creation timestamp with timezone (RFC 3339, up to six fractional digits)",
                         "schema": {
                             "type": "string",
                             "format": "date-time"
@@ -8978,6 +8981,16 @@
                                         }
                                     },
                                     "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid query parameters",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }

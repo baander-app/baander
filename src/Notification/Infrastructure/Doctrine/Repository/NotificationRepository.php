@@ -11,6 +11,7 @@ use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Notification\Infrastructure\Doctrine\Entity\NotificationEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class NotificationRepository implements NotificationRepositoryInterface
@@ -20,6 +21,7 @@ final class NotificationRepository implements NotificationRepositoryInterface
     ) {
     }
 
+    /** @return \Doctrine\ORM\EntityRepository<NotificationEntity> */
     private function getEntityRepository(): \Doctrine\ORM\EntityRepository
     {
         return $this->entityManager->getRepository(NotificationEntity::class);
@@ -61,6 +63,7 @@ final class NotificationRepository implements NotificationRepositoryInterface
         ?int $limit = null,
         ?string $cursor = null,
         string $direction = 'desc',
+        ?\DateTimeImmutable $since = null,
     ): array {
         $qb = $this->entityManager->createQueryBuilder();
         $qb->select('e')
@@ -68,6 +71,16 @@ final class NotificationRepository implements NotificationRepositoryInterface
             ->where('e.user = :userId')
             ->setParameter('userId', $userId)
             ->orderBy('e.id', $direction === 'asc' ? 'ASC' : 'DESC');
+
+        if ($since !== null) {
+            // Preserve fractions and normalize RFC 3339 offsets beyond PostgreSQL's accepted range.
+            $qb->andWhere('e.createdAt > :since')
+                ->setParameter(
+                    'since',
+                    $since->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d H:i:s.uP'),
+                    ParameterType::STRING,
+                );
+        }
 
         if ($category !== null) {
             $qb->andWhere('e.category = :category')

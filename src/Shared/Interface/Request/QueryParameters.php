@@ -4,12 +4,57 @@ declare(strict_types=1);
 
 namespace App\Shared\Interface\Request;
 
+use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Exception\InvalidQueryParameter;
 use Symfony\Component\HttpFoundation\Exception\BadRequestException;
 use Symfony\Component\HttpFoundation\InputBag;
 
 final class QueryParameters
 {
+    /** @param InputBag<covariant string|int|float|bool|null> $query */
+    public static function optionalDateTime(InputBag $query, string $name): ?\DateTimeImmutable
+    {
+        if (!$query->has($name)) {
+            return null;
+        }
+
+        $value = $query->all()[$name];
+        if (is_string($value)
+            && preg_match('/\A([0-9]{4})-([0-9]{2})-([0-9]{2})T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\.[0-9]{1,6})?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])\z/', $value, $parts) === 1
+            && checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1])) {
+            $format = str_contains($value, '.') ? '!Y-m-d\TH:i:s.uP' : '!Y-m-d\TH:i:sP';
+            $date = \DateTimeImmutable::createFromFormat($format, $value);
+            if ($date !== false) {
+                if ((int) $date->setTimezone(new \DateTimeZone('UTC'))->format('Y') < 1) {
+                    throw new InvalidQueryParameter($name, sprintf('%s must represent a UTC instant in year 0001 or later.', $name));
+                }
+
+                return $date;
+            }
+        }
+
+        throw new InvalidQueryParameter($name, sprintf('%s must be an RFC 3339 timestamp with a timezone and at most six fractional digits.', $name));
+    }
+
+    /** @param InputBag<covariant string|int|float|bool|null> $query */
+    public static function optionalUuid(InputBag $query, string $name): ?Uuid
+    {
+        if (!$query->has($name)) {
+            return null;
+        }
+
+        $value = $query->all()[$name];
+        if (is_string($value)) {
+            try {
+                return Uuid::fromString($value);
+            } catch (\InvalidArgumentException) {
+                // Map only malformed input to the shared query error contract.
+            }
+        }
+
+        throw new InvalidQueryParameter($name, sprintf('%s must be a UUID.', $name));
+    }
+
     /** @param InputBag<covariant string|int|float|bool|null> $query */
     public static function optionalDate(InputBag $query, string $name): ?\DateTimeImmutable
     {
