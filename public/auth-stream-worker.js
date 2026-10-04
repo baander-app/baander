@@ -5,8 +5,8 @@
   const MAX_PENDING_REFRESHES = 32;
   let pendingProofs = 0;
   let pendingRefreshes = 0;
-  self.addEventListener("install", () => {
-    void self.skipWaiting();
+  self.addEventListener("install", (event) => {
+    event.waitUntil(self.skipWaiting());
   });
   self.addEventListener("activate", (event) => {
     event.waitUntil(self.clients.claim().then(async () => {
@@ -172,7 +172,7 @@
       if (!refreshed?.accessToken || refreshed.session !== auth.session || refreshed.apiOrigin !== auth.apiOrigin) return response;
       const { proof: retryProof } = await requestDpopProof(event.clientId, event.request.method, htu, refreshed);
       if (!retryProof || clientAuth.get(event.clientId) !== refreshed) return response;
-      void response.body?.cancel().catch(() => {
+      response.body?.cancel().catch(() => {
       });
       const retry = await authorizedFetch(event.request, refreshed, retryProof);
       updateNonce(event.clientId, refreshed, retry);

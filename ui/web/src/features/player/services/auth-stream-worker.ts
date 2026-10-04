@@ -18,7 +18,9 @@ const MAX_PENDING_REFRESHES = 32;
 let pendingProofs = 0;
 let pendingRefreshes = 0;
 
-self.addEventListener('install', () => { void self.skipWaiting(); });
+self.addEventListener('install', (event) => {
+  event.waitUntil(self.skipWaiting());
+});
 self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim().then(async () => {
     const clients = await self.clients.matchAll();
@@ -199,7 +201,7 @@ self.addEventListener('fetch', (event: FetchEvent) => {
     const { proof: retryProof } = await requestDpopProof(event.clientId, event.request.method, htu, refreshed);
     if (!retryProof || clientAuth.get(event.clientId) !== refreshed) return response;
     // Keep the first error readable until recovery has a valid, current proof.
-    void response.body?.cancel().catch(() => {});
+    response.body?.cancel().catch(() => {});
     const retry = await authorizedFetch(event.request, refreshed, retryProof);
     updateNonce(event.clientId, refreshed, retry);
     return retry;
