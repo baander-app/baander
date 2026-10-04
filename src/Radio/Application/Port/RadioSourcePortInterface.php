@@ -15,6 +15,7 @@ interface RadioSourcePortInterface
 
     /**
      * @return array<string, mixed>
+     * @param array<string, mixed> $syncConfig
      */
     public function createSource(string $name, string $type, string $syncUrl, array $syncConfig, ?string $syncSchedule = null): array;
 }

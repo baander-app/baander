@@ -13,10 +13,13 @@ interface RadioStationRepositoryInterface
 
     public function findBySourceAndExternalId(Uuid $sourceId, string $externalId): ?RadioStation;
 
+    /** @return list<RadioStation> */
     public function findByCountry(string $countryCode): array;
 
+    /** @return list<RadioStation> */
     public function findBySourceAndCountry(Uuid $sourceId, string $countryCode): array;
 
+    /** @return list<RadioStation> */
     public function search(string $query, ?string $countryCode = null): array;
 
     public function save(RadioStation $station): void;

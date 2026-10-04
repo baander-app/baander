@@ -36,6 +36,7 @@ final class RadioStationDoctrineRepository implements RadioStationRepositoryInte
         return $entity !== null ? $this->toDomain($entity) : null;
     }
 
+    /** @return list<RadioStation> */
     public function findByCountry(string $countryCode): array
     {
         $entities = $this->entityManager
@@ -45,6 +46,7 @@ final class RadioStationDoctrineRepository implements RadioStationRepositoryInte
         return array_map($this->toDomain(...), $entities);
     }
 
+    /** @return list<RadioStation> */
     public function findBySourceAndCountry(Uuid $sourceId, string $countryCode): array
     {
         $entities = $this->entityManager
@@ -54,6 +56,7 @@ final class RadioStationDoctrineRepository implements RadioStationRepositoryInte
         return array_map($this->toDomain(...), $entities);
     }
 
+    /** @return list<RadioStation> */
     public function search(string $query, ?string $countryCode = null): array
     {
         $qb = $this->entityManager

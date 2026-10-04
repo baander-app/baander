@@ -18,6 +18,7 @@ final class ScheduledJob
     ) {
     }
 
+    /** @param array<string, mixed> $parameters */
     public static function create(
         string $name,
         string $expression,
@@ -99,6 +100,7 @@ final class ScheduledJob
         return $this->state->description;
     }
 
+    /** @return array<string, mixed> */
     public function getParameters(): array
     {
         return $this->state->parameters;
@@ -146,6 +148,7 @@ final class ScheduledJob
 
     // --- Behavior ---
 
+    /** @param array<string, mixed> $parameters */
     public function update(
         string $name,
         string $expression,

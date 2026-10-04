@@ -11,6 +11,7 @@ use InvalidArgumentException;
 
 final class RadioSource
 {
+    /** @var list<object> */
     private array $pendingEvents = [];
 
     private function __construct(

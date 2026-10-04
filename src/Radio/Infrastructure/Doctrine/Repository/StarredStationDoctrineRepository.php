@@ -27,6 +27,7 @@ final class StarredStationDoctrineRepository implements StarredStationRepository
         return $entity !== null ? $this->toDomain($entity) : null;
     }
 
+    /** @return list<StarredStation> */
     public function findByUserId(Uuid $userId): array
     {
         $entities = $this->entityManager

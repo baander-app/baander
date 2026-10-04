@@ -120,6 +120,7 @@ HTML;
         file_put_contents($outputDir . '/css/style.css', $css);
     }
 
+    /** @param list<BoundedContext> $contexts */
     private function renderApiReference(array $contexts, string $outputDir, string $phpdocDir): void
     {
         $sections = '';
@@ -152,6 +153,7 @@ HTML;
         );
     }
 
+    /** @param list<BoundedContext> $contexts */
     private function renderDomainModels(array $contexts, string $outputDir, string $phpdocDir): void
     {
         $sections = '';
@@ -197,6 +199,7 @@ HTML;
         );
     }
 
+    /** @param list<BoundedContext> $contexts */
     private function renderArchitectureGuide(array $contexts, string $outputDir, string $phpdocDir): void
     {
         $cqrsSection = '';

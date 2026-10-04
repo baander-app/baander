@@ -12,6 +12,7 @@ use DomainException;
 
 final class RadioSession
 {
+    /** @var list<object> */
     private array $pendingEvents = [];
 
     private function __construct(

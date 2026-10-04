@@ -6,6 +6,7 @@ namespace App\Scheduler\Application\Command;
 
 final readonly class ExecuteScheduledJobCommand
 {
+    /** @param array<string, mixed> $parameters */
     public function __construct(
         public string $jobId,
         public string $jobType,

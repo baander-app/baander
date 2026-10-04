@@ -11,6 +11,7 @@ interface CountrySubscriptionRepositoryInterface
 {
     public function find(Uuid $id): ?CountrySubscription;
 
+    /** @return list<CountrySubscription> */
     public function findByUserId(Uuid $userId): array;
 
     public function findByUserAndSourceAndCountry(Uuid $userId, Uuid $sourceId, string $countryCode): ?CountrySubscription;

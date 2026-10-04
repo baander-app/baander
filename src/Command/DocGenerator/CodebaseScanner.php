@@ -9,6 +9,7 @@ use App\Command\DocGenerator\Model\ClassInfo;
 use App\Command\DocGenerator\Model\HandlerInfo;
 use App\Command\DocGenerator\Model\RouteInfo;
 use phpDocumentor\Reflection\DocBlockFactory;
+use phpDocumentor\Reflection\DocBlockFactoryInterface;
 use ReflectionClass;
 use ReflectionMethod;
 use Symfony\Component\Routing\Attribute\Route;
@@ -25,7 +26,7 @@ final class CodebaseScanner
         'Command/DocGenerator/',
     ];
 
-    private DocBlockFactory $docBlockFactory;
+    private DocBlockFactoryInterface $docBlockFactory;
 
     public function __construct()
     {
@@ -179,10 +180,10 @@ final class CodebaseScanner
         }
 
         $description = $this->getDocblockDescription($reflection);
-        $interfaces = array_map(
+        $interfaces = array_values(array_map(
             fn (ReflectionClass $i) => $i->getShortName(),
             $reflection->getInterfaces(),
-        );
+        ));
 
         $properties = [];
         foreach ($reflection->getProperties() as $property) {
@@ -208,6 +209,7 @@ final class CodebaseScanner
         );
     }
 
+    /** @param ReflectionClass<object> $reflection */
     private function getDocblockDescription(ReflectionClass $reflection): string
     {
         $docComment = $reflection->getDocComment();
@@ -219,7 +221,7 @@ final class CodebaseScanner
         try {
             $docBlock = $this->docBlockFactory->create($docComment);
 
-            return $docBlock->getSummary() ?? '';
+            return $docBlock->getSummary();
         } catch (\Throwable) {
             return '';
         }
@@ -236,7 +238,7 @@ final class CodebaseScanner
         try {
             $docBlock = $this->docBlockFactory->create($docComment);
 
-            return $docBlock->getSummary() ?? '';
+            return $docBlock->getSummary();
         } catch (\Throwable) {
             return '';
         }
@@ -330,6 +332,7 @@ final class CodebaseScanner
         );
     }
 
+    /** @param ReflectionClass<object> $reflection */
     private function isValueObject(ReflectionClass $reflection, string $relativePath): bool
     {
         if ($reflection->isEnum()) {
@@ -347,7 +350,7 @@ final class CodebaseScanner
             return false;
         }
 
-        if (!$reflection->isReadOnly() && !$reflection->isEnum()) {
+        if (!$reflection->isReadOnly()) {
             return false;
         }
 
@@ -398,6 +401,7 @@ final class CodebaseScanner
         return $interfaces;
     }
 
+    /** @param list<ClassInfo> $classes */
     private function extractContextDescription(string $contextName, array $classes): string
     {
         foreach ($classes as $classInfo) {

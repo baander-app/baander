@@ -13,6 +13,10 @@ namespace App\Scheduler\Domain\Model;
  */
 interface SchedulableConsoleCommandInterface
 {
+    public function getName(): ?string;
+
+    public function getDescription(): string;
+
     /**
      * Parameter schema for the admin panel.
      *

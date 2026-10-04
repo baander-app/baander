@@ -9,6 +9,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 final readonly class UpdateScheduledJobRequest
 {
+    /** @param array<string, mixed> $parameters */
     public function __construct(
         #[Assert\NotBlank]
         #[Assert\Length(max: 255)]

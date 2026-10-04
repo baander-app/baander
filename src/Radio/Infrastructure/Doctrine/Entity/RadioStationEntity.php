@@ -35,12 +35,15 @@ class RadioStationEntity
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $language = null;
 
+    /** @var list<string> */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '[]'])]
     private array $genres = [];
 
+    /** @var list<string> */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '[]'])]
     private array $tags = [];
 
+    /** @var list<array{url: string, format: string, bitrate: int, reliability: float}> */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '[]'])]
     private array $streams = [];
 
@@ -123,33 +126,39 @@ class RadioStationEntity
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /** @return list<string> */
     public function getGenres(): array
     {
         return $this->genres;
     }
 
+    /** @param list<string> $genres */
     public function setGenres(array $genres): void
     {
         $this->genres = $genres;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /** @return list<string> */
     public function getTags(): array
     {
         return $this->tags;
     }
 
+    /** @param list<string> $tags */
     public function setTags(array $tags): void
     {
         $this->tags = $tags;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /** @return list<array{url: string, format: string, bitrate: int, reliability: float}> */
     public function getStreams(): array
     {
         return $this->streams;
     }
 
+    /** @param list<array{url: string, format: string, bitrate: int, reliability: float}> $streams */
     public function setStreams(array $streams): void
     {
         $this->streams = $streams;

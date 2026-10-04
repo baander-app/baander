@@ -10,7 +10,7 @@ use App\Library\Application\Command\CreateLibraryCommand;
 use App\Library\Application\CommandHandler\CreateLibraryHandler;
 use App\Library\Application\CommandHandler\ScanLibraryHandler;
 use App\Library\Application\MovieScanner;
-use App\Library\Domain\ValueObject\FilesystemType;
+use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;

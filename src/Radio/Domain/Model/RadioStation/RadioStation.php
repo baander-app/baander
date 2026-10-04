@@ -10,6 +10,7 @@ use InvalidArgumentException;
 
 final class RadioStation
 {
+    /** @var list<object> */
     private array $pendingEvents = [];
 
     private function __construct(

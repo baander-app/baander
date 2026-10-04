@@ -25,6 +25,7 @@ class RadioSourceEntity
     #[ORM\Column(type: 'text')]
     private string $syncUrl;
 
+    /** @var array<string, mixed> */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '{}'])]
     private array $syncConfig = [];
 
@@ -40,6 +41,7 @@ class RadioSourceEntity
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $updatedAt;
 
+    /** @param array<string, mixed> $syncConfig */
     public function __construct(
         Uuid $id,
         string $name,
@@ -97,11 +99,13 @@ class RadioSourceEntity
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /** @return array<string, mixed> */
     public function getSyncConfig(): array
     {
         return $this->syncConfig;
     }
 
+    /** @param array<string, mixed> $syncConfig */
     public function setSyncConfig(array $syncConfig): void
     {
         $this->syncConfig = $syncConfig;

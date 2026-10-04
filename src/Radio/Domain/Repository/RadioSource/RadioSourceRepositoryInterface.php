@@ -11,10 +11,13 @@ interface RadioSourceRepositoryInterface
 {
     public function find(Uuid $id): ?RadioSource;
 
+    /** @return list<RadioSource> */
     public function findAll(): array;
 
+    /** @return list<RadioSource> */
     public function findByType(string $type): array;
 
+    /** @return list<RadioSource> */
     public function findActive(): array;
 
     public function save(RadioSource $source): void;

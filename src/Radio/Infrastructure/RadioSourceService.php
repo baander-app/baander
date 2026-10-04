@@ -24,6 +24,7 @@ final class RadioSourceService implements RadioSourcePortInterface
         return array_map($this->sourceToArray(...), $sources);
     }
 
+    /** @param array<string, mixed> $syncConfig */
     public function createSource(string $name, string $type, string $syncUrl, array $syncConfig, ?string $syncSchedule = null): array
     {
         $source = RadioSource::create(

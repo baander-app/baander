@@ -11,6 +11,7 @@ interface StarredStationRepositoryInterface
 {
     public function find(Uuid $id): ?StarredStation;
 
+    /** @return list<StarredStation> */
     public function findByUserId(Uuid $userId): array;
 
     public function findByUserIdAndStationId(Uuid $userId, Uuid $stationId): ?StarredStation;

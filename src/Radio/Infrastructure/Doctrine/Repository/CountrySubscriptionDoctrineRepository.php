@@ -9,6 +9,7 @@ use App\Radio\Domain\Model\CountrySubscription\CountrySubscription;
 use App\Radio\Domain\Model\CountrySubscription\CountrySubscriptionState;
 use App\Radio\Domain\Repository\CountrySubscription\CountrySubscriptionRepositoryInterface;
 use App\Radio\Infrastructure\Doctrine\Entity\CountrySubscriptionEntity;
+use App\Radio\Infrastructure\Doctrine\Entity\RadioSourceEntity;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -26,6 +27,7 @@ final class CountrySubscriptionDoctrineRepository implements CountrySubscription
         return $entity !== null ? $this->toDomain($entity) : null;
     }
 
+    /** @return list<CountrySubscription> */
     public function findByUserId(Uuid $userId): array
     {
         $entities = $this->entityManager

@@ -26,6 +26,7 @@ final class RadioSourceDoctrineRepository implements RadioSourceRepositoryInterf
         return $entity !== null ? $this->toDomain($entity) : null;
     }
 
+    /** @return list<RadioSource> */
     public function findAll(): array
     {
         $entities = $this->entityManager
@@ -35,6 +36,7 @@ final class RadioSourceDoctrineRepository implements RadioSourceRepositoryInterf
         return array_map($this->toDomain(...), $entities);
     }
 
+    /** @return list<RadioSource> */
     public function findByType(string $type): array
     {
         $entities = $this->entityManager
@@ -44,6 +46,7 @@ final class RadioSourceDoctrineRepository implements RadioSourceRepositoryInterf
         return array_map($this->toDomain(...), $entities);
     }
 
+    /** @return list<RadioSource> */
     public function findActive(): array
     {
         $entities = $this->entityManager

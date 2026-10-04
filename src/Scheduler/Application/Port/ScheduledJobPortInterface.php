@@ -11,6 +11,7 @@ use App\Shared\Domain\Model\Uuid;
 
 interface ScheduledJobPortInterface
 {
+    /** @param array<string, mixed> $parameters */
     public function create(
         string $name,
         string $expression,

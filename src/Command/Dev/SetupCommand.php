@@ -82,6 +82,7 @@ final class SetupCommand extends Command
      * Subprocesses boot a fresh kernel, so they are immune to the cache-clear
      * performed by --fresh — which deletes compiled container classes that the
      * parent process has already loaded.
+     * @param list<string> $args
      */
     private function runConsole(SymfonyStyle $io, array $args): void
     {

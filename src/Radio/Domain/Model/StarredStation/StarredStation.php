@@ -9,6 +9,7 @@ use DateTimeImmutable;
 
 final class StarredStation
 {
+    /** @var list<object> */
     private array $pendingEvents = [];
 
     private function __construct(

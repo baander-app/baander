@@ -68,7 +68,7 @@ class SchedulerRegistry
     }
 
     /**
-     * @return array<class-string<SchedulableCommandInterface>, array{description: string, parameters: array}>
+     * @return array<class-string<SchedulableCommandInterface>, array{description: string, parameters: array<string, array{type: string, required: bool, description?: string, default?: mixed}>}>
      */
     public function getMessengerCommands(): array
     {
@@ -86,7 +86,7 @@ class SchedulerRegistry
     }
 
     /**
-     * @return array<string, array{description: string, parameters: array}>
+     * @return array<string, array{description: string, parameters: array<string, array{type: string, required: bool, description?: string, default?: mixed}>}>
      */
     public function getConsoleCommands(): array
     {
@@ -95,7 +95,7 @@ class SchedulerRegistry
         $result = [];
         foreach ($this->consoleCommands as $name => $command) {
             $result[$name] = [
-                'description' => $command->getDescription() ?? $name,
+                'description' => $command->getDescription(),
                 'parameters' => $command::schedulerParameters(),
             ];
         }

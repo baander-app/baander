@@ -21,6 +21,7 @@ final class ScheduledJobService implements ScheduledJobPortInterface
     ) {
     }
 
+    /** @param array<string, mixed> $parameters */
     public function create(
         string $name,
         string $expression,
@@ -62,6 +63,7 @@ final class ScheduledJobService implements ScheduledJobPortInterface
         $this->repository->delete($job);
     }
 
+    /** @param array<string, mixed> $parameters */
     private function validateCommand(JobType $jobType, string $command, array $parameters): void
     {
         $schema = match ($jobType) {

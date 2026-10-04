@@ -8,6 +8,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 final readonly class CreateRadioSourceRequest
 {
+    /** @param array<string, mixed> $syncConfig */
     public function __construct(
         #[Assert\NotBlank]
         public string $name,
