@@ -23,6 +23,21 @@ final class PreferenceRequestBodyTest extends TestCase
         self::assertEquals(json_decode($body), json_decode(json_encode($parsed, JSON_THROW_ON_ERROR)));
     }
 
+    public function testNumericObjectKeysDoNotBecomeJsonLists(): void
+    {
+        $json = '{"payload":{"object":{"0":"eq","1":"compressor"},"list":["eq","compressor"]},"version":0}';
+        $parsed = (new PreferenceRequestBody())->save($json);
+        self::assertInstanceOf(\stdClass::class, $parsed['payload']['object']);
+        self::assertSame(['eq', 'compressor'], $parsed['payload']['list']);
+        self::assertEquals(json_decode($json), json_decode(json_encode($parsed, JSON_THROW_ON_ERROR)));
+    }
+
+    public function testNumericPreferenceFieldNamesAreRejected(): void
+    {
+        $this->expectException(\App\UserPreference\Interface\Exception\InvalidPreferenceRequestBody::class);
+        (new PreferenceRequestBody())->save('{"payload":{"0":true},"version":0}');
+    }
+
     public function testSaveAcceptsTheLargestRepresentableIntegerVersion(): void
     {
         $parsed = (new PreferenceRequestBody())->save('{"payload":{"enabled":true},"version":' . PHP_INT_MAX . '}');

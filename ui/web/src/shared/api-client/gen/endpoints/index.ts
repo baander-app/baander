@@ -1865,6 +1865,152 @@ export interface TranscodeSessionResource {
   updatedAt: string;
 }
 
+export type SaveAudioPreferencesRequestPayloadBandsItem = {
+  /**
+     * @minimum -12
+     * @maximum 12
+     */
+  gain: number;
+  /**
+     * @minimum 0.1
+     * @maximum 10
+     */
+  q: number;
+};
+
+export type SaveAudioPreferencesRequestPayloadPreset = typeof SaveAudioPreferencesRequestPayloadPreset[keyof typeof SaveAudioPreferencesRequestPayloadPreset];
+
+
+export const SaveAudioPreferencesRequestPayloadPreset = {
+  FLAT: 'FLAT',
+  ROCK: 'ROCK',
+  POP: 'POP',
+  JAZZ: 'JAZZ',
+  CLASSICAL: 'CLASSICAL',
+  BASS: 'BASS',
+  TREBLE: 'TREBLE',
+  VOCAL: 'VOCAL',
+  LOUDNESS: 'LOUDNESS',
+} as const;
+
+export type SaveAudioPreferencesRequestPayloadTargetLufs = typeof SaveAudioPreferencesRequestPayloadTargetLufs[keyof typeof SaveAudioPreferencesRequestPayloadTargetLufs];
+
+
+export const SaveAudioPreferencesRequestPayloadTargetLufs = {
+  NUMBER_MINUS_14: -14,
+  NUMBER_MINUS_16: -16,
+  NUMBER_MINUS_18: -18,
+  NUMBER_MINUS_23: -23,
+} as const;
+
+export type SaveAudioPreferencesRequestPayloadVisualizerMode = typeof SaveAudioPreferencesRequestPayloadVisualizerMode[keyof typeof SaveAudioPreferencesRequestPayloadVisualizerMode];
+
+
+export const SaveAudioPreferencesRequestPayloadVisualizerMode = {
+  'enhanced-spectrum': 'enhanced-spectrum',
+  circular: 'circular',
+  spectrogram: 'spectrogram',
+  particles: 'particles',
+  spectrum: 'spectrum',
+  meters: 'meters',
+  phase: 'phase',
+} as const;
+
+export type SaveAudioPreferencesRequestPayloadStereoMode = typeof SaveAudioPreferencesRequestPayloadStereoMode[keyof typeof SaveAudioPreferencesRequestPayloadStereoMode];
+
+
+export const SaveAudioPreferencesRequestPayloadStereoMode = {
+  normal: 'normal',
+  mid: 'mid',
+  side: 'side',
+} as const;
+
+export type SaveAudioPreferencesRequestPayloadCrossfeedPreset = typeof SaveAudioPreferencesRequestPayloadCrossfeedPreset[keyof typeof SaveAudioPreferencesRequestPayloadCrossfeedPreset];
+
+
+export const SaveAudioPreferencesRequestPayloadCrossfeedPreset = {
+  light: 'light',
+  normal: 'normal',
+  heavy: 'heavy',
+} as const;
+
+export type SaveAudioPreferencesRequestPayloadChainOrderItem = typeof SaveAudioPreferencesRequestPayloadChainOrderItem[keyof typeof SaveAudioPreferencesRequestPayloadChainOrderItem];
+
+
+export const SaveAudioPreferencesRequestPayloadChainOrderItem = {
+  eq: 'eq',
+  compressor: 'compressor',
+  stereo: 'stereo',
+  crossfeed: 'crossfeed',
+  loudness: 'loudness',
+  masterGain: 'masterGain',
+} as const;
+
+export type SaveAudioPreferencesRequestPayload = {
+  enabled: boolean;
+  /**
+     * @minItems 10
+     * @maxItems 10
+     */
+  bands: SaveAudioPreferencesRequestPayloadBandsItem[];
+  preset: SaveAudioPreferencesRequestPayloadPreset;
+  compressionEnabled: boolean;
+  /**
+     * @minimum -50
+     * @maximum 0
+     */
+  compressorThreshold: number;
+  /**
+     * @minimum 1
+     * @maximum 20
+     */
+  compressorRatio: number;
+  /**
+     * @minimum 0
+     * @maximum 40
+     */
+  compressorKnee: number;
+  /**
+     * @minimum 0.1
+     * @maximum 100
+     */
+  compressorAttack: number;
+  /**
+     * @minimum 10
+     * @maximum 1000
+     */
+  compressorRelease: number;
+  /**
+     * @minimum -12
+     * @maximum 12
+     */
+  masterGain: number;
+  normalizationEnabled: boolean;
+  targetLufs: SaveAudioPreferencesRequestPayloadTargetLufs;
+  visualizerMode: SaveAudioPreferencesRequestPayloadVisualizerMode;
+  stereoEnabled: boolean;
+  /**
+     * @minimum 0
+     * @maximum 2
+     */
+  stereoWidth: number;
+  stereoMode: SaveAudioPreferencesRequestPayloadStereoMode;
+  crossfeedEnabled: boolean;
+  crossfeedPreset: SaveAudioPreferencesRequestPayloadCrossfeedPreset;
+  loudnessContourEnabled: boolean;
+  /**
+     * @minItems 6
+     * @maxItems 6
+     */
+  chainOrder: SaveAudioPreferencesRequestPayloadChainOrderItem[];
+};
+
+export interface SaveAudioPreferencesRequest {
+  payload: SaveAudioPreferencesRequestPayload;
+  /** @minimum 0 */
+  version: number;
+}
+
 /**
  * EQ configuration payload
  */
@@ -5552,30 +5698,23 @@ export type PutAccentColorUpdate200 = {
 };
 
 /**
- * Flexible JSONB payload. See SaveAudioPreferencesRequest for full schema.
+ * Audio settings snapshot; see SaveAudioPreferencesRequest for its fields.
  */
 export type GetAudioPreferencesIndex200Payload = { [key: string]: unknown };
 
 export type GetAudioPreferencesIndex200 = {
-  /** Flexible JSONB payload. See SaveAudioPreferencesRequest for full schema. */
+  /** Audio settings snapshot; see SaveAudioPreferencesRequest for its fields. */
   payload?: GetAudioPreferencesIndex200Payload;
   version?: number;
 };
 
-export type PutAudioPreferencesUpdateBodyPayload = { [key: string]: unknown };
-
-export type PutAudioPreferencesUpdateBody = {
-  payload: PutAudioPreferencesUpdateBodyPayload;
-  version: number;
-};
-
 /**
- * Flexible JSONB payload. Echoed back from request.
+ * Validated audio settings echoed back from the request.
  */
 export type PutAudioPreferencesUpdate200Payload = { [key: string]: unknown };
 
 export type PutAudioPreferencesUpdate200 = {
-  /** Flexible JSONB payload. Echoed back from request. */
+  /** Validated audio settings echoed back from the request. */
   payload?: PutAudioPreferencesUpdate200Payload;
   version?: number;
 };
@@ -5594,12 +5733,12 @@ export type PostAudioPreferencesRollbackBody = {
 };
 
 /**
- * Flexible JSONB payload at the rolled-back version.
+ * Audio settings at the rolled-back version.
  */
 export type PostAudioPreferencesRollback200Payload = { [key: string]: unknown };
 
 export type PostAudioPreferencesRollback200 = {
-  /** Flexible JSONB payload at the rolled-back version. */
+  /** Audio settings at the rolled-back version. */
   payload?: PostAudioPreferencesRollback200Payload;
   version?: number;
 };
@@ -28561,7 +28700,7 @@ export const getGetAudioPreferencesIndexUrl = () => {
 }
 
 /**
- * Returns the audio preferences for the authenticated user. Payload shape follows schema version 2 (flexible JSONB).
+ * Returns the audio preferences for the authenticated user. Payload uses the validated flat audio settings contract.
  * @summary Get audio preferences
  */
 export const getAudioPreferencesIndex = async ( options?: RequestInit): Promise<GetAudioPreferencesIndex200> => {
@@ -28665,14 +28804,14 @@ export const getPutAudioPreferencesUpdateUrl = () => {
 /**
  * @summary Save audio preferences
  */
-export const putAudioPreferencesUpdate = async (putAudioPreferencesUpdateBody: PutAudioPreferencesUpdateBody, options?: RequestInit): Promise<PutAudioPreferencesUpdate200> => {
+export const putAudioPreferencesUpdate = async (saveAudioPreferencesRequest: SaveAudioPreferencesRequest, options?: RequestInit): Promise<PutAudioPreferencesUpdate200> => {
 
   return customInstance<PutAudioPreferencesUpdate200>(getPutAudioPreferencesUpdateUrl(),
   {
     ...options,
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(putAudioPreferencesUpdateBody)
+    body: JSON.stringify(saveAudioPreferencesRequest)
   }
 );}
 
@@ -28680,8 +28819,8 @@ export const putAudioPreferencesUpdate = async (putAudioPreferencesUpdateBody: P
 
 
 export const getPutAudioPreferencesUpdateMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAudioPreferencesUpdate>>, TError,{data: BodyType<PutAudioPreferencesUpdateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof putAudioPreferencesUpdate>>, TError,{data: BodyType<PutAudioPreferencesUpdateBody>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAudioPreferencesUpdate>>, TError,{data: BodyType<SaveAudioPreferencesRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof putAudioPreferencesUpdate>>, TError,{data: BodyType<SaveAudioPreferencesRequest>}, TContext> => {
 
 const mutationKey = ['putAudioPreferencesUpdate'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -28693,7 +28832,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putAudioPreferencesUpdate>>, {data: BodyType<PutAudioPreferencesUpdateBody>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putAudioPreferencesUpdate>>, {data: BodyType<SaveAudioPreferencesRequest>}> = (props) => {
           const {data} = props ?? {};
 
           return  putAudioPreferencesUpdate(data,requestOptions)
@@ -28707,18 +28846,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PutAudioPreferencesUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof putAudioPreferencesUpdate>>>
-    export type PutAudioPreferencesUpdateMutationBody = BodyType<PutAudioPreferencesUpdateBody>
+    export type PutAudioPreferencesUpdateMutationBody = BodyType<SaveAudioPreferencesRequest>
     export type PutAudioPreferencesUpdateMutationError = ErrorType<ApiError>
 
     /**
  * @summary Save audio preferences
  */
 export const usePutAudioPreferencesUpdate = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAudioPreferencesUpdate>>, TError,{data: BodyType<PutAudioPreferencesUpdateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAudioPreferencesUpdate>>, TError,{data: BodyType<SaveAudioPreferencesRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof putAudioPreferencesUpdate>>,
         TError,
-        {data: BodyType<PutAudioPreferencesUpdateBody>},
+        {data: BodyType<SaveAudioPreferencesRequest>},
         TContext
       > => {
       return useMutation(getPutAudioPreferencesUpdateMutationOptions(options), queryClient);

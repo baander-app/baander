@@ -16,6 +16,7 @@ import { registerEqHandlers } from '@/features/equalizer/stores/eq-handlers'
 import { usePlayerStore } from '@/features/player/stores/player-store'
 import { registerPlayerHandlers } from '@/features/player/stores/player-handlers'
 import { useContextPanelStore } from '@/features/layout/stores/context-panel-store'
+import { audioPreferenceFixture } from './audio-preference-fixture'
 import { PreferenceSyncProvider } from '../hooks/use-preference-bootstrap'
 
 registerEqHandlers()
@@ -121,10 +122,10 @@ describe('PreferenceSyncProvider store persistence', () => {
     const processing = Object.fromEntries(processingChanges.map(({ field, value }) => [field, value]))
     http.get.mockImplementation(async (url: string) => {
       const payload = url === audioUrl ? {
-        ...processing,
+        ...audioPreferenceFixture(), ...processing,
         compressionEnabled: true, masterGain: -2, normalizationEnabled: true, targetLufs: -18,
         enabled: true, preset: 'ROCK', visualizerMode: 'spectrum',
-        bandsV2: initialBands.bands.map(() => ({ gain: 3, q: 1.2 })),
+        bands: initialBands.bands.map(() => ({ gain: 3, q: 1.2 })),
       } : url === playerUrl ? {
         volume: 0.4, shuffle: true, repeat: 'all', muted: true,
         crossfadeEnabled: true, crossfadeDuration: 7,

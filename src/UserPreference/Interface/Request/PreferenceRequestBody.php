@@ -16,8 +16,16 @@ final class PreferenceRequestBody
             throw new InvalidPreferenceRequestBody(422, 'Payload must be a JSON object.');
         }
 
+        $payload = [];
+        foreach ($this->objectToArray($body->payload) as $name => $value) {
+            if (!is_string($name)) {
+                throw new InvalidPreferenceRequestBody(422, 'Preference field names must not be numeric.');
+            }
+            $payload[$name] = $value;
+        }
+
         return [
-            'payload' => $this->objectToArray($body->payload),
+            'payload' => $payload,
             'version' => $this->version($body, 0),
         ];
     }
@@ -51,7 +59,7 @@ final class PreferenceRequestBody
         return $body->version;
     }
 
-    /** @return array<string, mixed> */
+    /** @return array<array-key, mixed> */
     private function objectToArray(\stdClass $object): array
     {
         $values = get_object_vars($object);
@@ -65,8 +73,9 @@ final class PreferenceRequestBody
     private function convertNestedValue(mixed $value): mixed
     {
         if ($value instanceof \stdClass) {
-            // Preserve empty nested objects for the flexible audio JSON payload.
-            return get_object_vars($value) === [] ? $value : $this->objectToArray($value);
+            // Empty and sequential numeric-key objects must not become JSON lists.
+            $properties = $this->objectToArray($value);
+            return array_is_list($properties) ? $value : $properties;
         }
 
         if (is_array($value)) {

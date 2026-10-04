@@ -85,6 +85,42 @@ final class OpenApiSpecTest extends KernelTestCase
         }
     }
 
+    public function test_audio_save_schema_matches_the_canonical_flat_contract(): void
+    {
+        $spec = $this->getSpec();
+        $body = $spec['paths']['/api/user/audio-preferences/']['put']['requestBody']['content']['application/json']['schema'];
+        self::assertSame('#/components/schemas/SaveAudioPreferencesRequest', $body['$ref']);
+        $schema = $spec['components']['schemas']['SaveAudioPreferencesRequest'];
+        self::assertEqualsCanonicalizing(['payload', 'version'], $schema['required']);
+        $payload = $schema['properties']['payload'];
+        $fields = [
+            'enabled', 'bands', 'preset', 'visualizerMode', 'compressionEnabled',
+            'compressorThreshold', 'compressorRatio', 'compressorKnee', 'compressorAttack', 'compressorRelease',
+            'masterGain', 'normalizationEnabled', 'targetLufs', 'stereoEnabled', 'stereoWidth',
+            'stereoMode', 'crossfeedEnabled', 'crossfeedPreset', 'loudnessContourEnabled', 'chainOrder',
+        ];
+        self::assertEqualsCanonicalizing($fields, $payload['required']);
+        self::assertEqualsCanonicalizing($fields, array_keys($payload['properties']));
+        self::assertSame('object', $payload['type']);
+        self::assertFalse($payload['additionalProperties']);
+        self::assertArrayNotHasKey('default', $payload);
+        $bands = $payload['properties']['bands'];
+        self::assertSame('array', $bands['type']);
+        self::assertSame(10, $bands['minItems']);
+        self::assertSame(10, $bands['maxItems']);
+        self::assertEqualsCanonicalizing(['gain', 'q'], $bands['items']['required']);
+        self::assertFalse($bands['items']['additionalProperties']);
+        self::assertSame(-12, $bands['items']['properties']['gain']['minimum']);
+        self::assertSame(12, $bands['items']['properties']['gain']['maximum']);
+        self::assertSame(0.1, $bands['items']['properties']['q']['minimum']);
+        self::assertSame(10, $bands['items']['properties']['q']['maximum']);
+        $chain = $payload['properties']['chainOrder'];
+        self::assertSame(6, $chain['minItems']);
+        self::assertSame(6, $chain['maxItems']);
+        self::assertTrue($chain['uniqueItems']);
+        self::assertEqualsCanonicalizing(['eq', 'compressor', 'stereo', 'crossfeed', 'loudness', 'masterGain'], $chain['items']['enum']);
+    }
+
     public function test_raw_path_stream_is_absent_from_contract(): void
     {
         $spec = $this->getSpec();

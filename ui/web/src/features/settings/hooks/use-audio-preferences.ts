@@ -1,28 +1,19 @@
 import { useCallback } from 'react'
-import { useEqBandsStore, DEFAULT_Q, type EqBandsState } from '@/features/equalizer/stores/eq-bands-store'
-import { useEqProcessingStore, type EqProcessingState } from '@/features/equalizer/stores/eq-processing-store'
+import { useEqBandsStore } from '@/features/equalizer/stores/eq-bands-store'
+import { useEqProcessingStore } from '@/features/equalizer/stores/eq-processing-store'
 import { mediator } from '@/shared/lib/mediator/bus'
 import { SETTINGS_ACTIONS, type SettingsApplyEqPayload } from '@/features/settings/settings-actions'
+import { validateAudioPreferencePayload } from '../audio-preference-payload'
 import { usePreferenceSync } from './use-preference-sync'
 
-type AudioPreferencePayload = Pick<EqBandsState, 'enabled' | 'preset' | 'visualizerMode'> & Pick<
-  EqProcessingState,
-  | 'compressionEnabled' | 'compressorThreshold' | 'compressorRatio' | 'compressorKnee'
-  | 'compressorAttack' | 'compressorRelease' | 'masterGain' | 'normalizationEnabled'
-  | 'targetLufs' | 'stereoEnabled' | 'stereoWidth' | 'stereoMode' | 'crossfeedEnabled'
-  | 'crossfeedPreset' | 'loudnessContourEnabled' | 'chainOrder'
-> & {
-  bands: number[]
-  bandsV2?: Array<{ gain: number; q: number }>
-}
+type AudioPreferencePayload = SettingsApplyEqPayload
 
 function snapshotAudioPreferences(): AudioPreferencePayload {
   const bandsState = useEqBandsStore.getState()
   const processingState = useEqProcessingStore.getState()
   return {
     enabled: bandsState.enabled,
-    bands: bandsState.bands.map((b) => b.gain),
-    bandsV2: bandsState.bands.map((band) => ({ ...band })),
+    bands: bandsState.bands.map((band) => ({ ...band })),
     preset: bandsState.preset,
     compressionEnabled: processingState.compressionEnabled,
     compressorThreshold: processingState.compressorThreshold,
@@ -50,31 +41,9 @@ export function useAudioPreferences(isActive?: () => boolean) {
     isActive,
     baseUrl: '/api/user/audio-preferences/',
     toPayload: (state) => ({ ...state }),
-    fromPayload: (payload) => payload as unknown as AudioPreferencePayload,
+    fromPayload: validateAudioPreferencePayload,
     onRemoteUpdate: useCallback((data) => {
-      mediator.dispatch(SETTINGS_ACTIONS.APPLY_EQ, {
-        enabled: data.enabled,
-        bands: data.bandsV2 ? undefined : data.bands,
-        bandsV2: data.bandsV2 ?? data.bands?.map((gain: number) => ({ gain, q: DEFAULT_Q })),
-        preset: data.preset,
-        compressionEnabled: data.compressionEnabled,
-        compressorThreshold: data.compressorThreshold,
-        compressorRatio: data.compressorRatio,
-        compressorKnee: data.compressorKnee,
-        compressorAttack: data.compressorAttack,
-        compressorRelease: data.compressorRelease,
-        masterGain: data.masterGain,
-        normalizationEnabled: data.normalizationEnabled,
-        targetLufs: data.targetLufs,
-        visualizerMode: data.visualizerMode,
-        stereoEnabled: data.stereoEnabled,
-        stereoWidth: data.stereoWidth,
-        stereoMode: data.stereoMode,
-        crossfeedEnabled: data.crossfeedEnabled,
-        crossfeedPreset: data.crossfeedPreset,
-        loudnessContourEnabled: data.loudnessContourEnabled,
-        chainOrder: data.chainOrder,
-      } satisfies SettingsApplyEqPayload, 'settings')
+      mediator.dispatch(SETTINGS_ACTIONS.APPLY_EQ, data, 'settings')
     }, []),
   })
 

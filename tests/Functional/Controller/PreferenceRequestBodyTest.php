@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Controller;
 
 use App\Auth\Domain\Model\User;
+use App\Tests\Fixtures\AudioPreferencePayload;
 use App\Tests\Functional\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\HttpFoundation\Response;
@@ -69,11 +70,11 @@ final class PreferenceRequestBodyTest extends TestCase
         }
     }
 
-    /** @return array<string, bool|float|string> */
+    /** @return array<string, mixed> */
     private static function validPayload(string $preference): array
     {
         return match ($preference) {
-            'audio' => ['preset' => 'FLAT', 'masterGain' => 1.5],
+            'audio' => AudioPreferencePayload::valid(['masterGain' => 1.5]),
             'layout' => ['mode' => 'expanded', 'activeTab' => 'queue'],
             'player' => [
                 'shuffle' => false,

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Controller;
 
 use App\Auth\Domain\Model\User;
+use App\Tests\Fixtures\AudioPreferencePayload;
 use App\Tests\Functional\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
  * Functional tests for audio-preferences management.
@@ -43,7 +45,7 @@ final class AudioPreferencesControllerTest extends TestCase
     public function testIndexReturnsSavedPreferences(): void
     {
         $user = $this->createTestUser();
-        $payload = ['eqMode' => 'flat', 'masterGain' => 1.5];
+        $payload = AudioPreferencePayload::valid(['masterGain' => 1.5]);
 
         $this->savePreferences($user, $payload, 0);
 
@@ -64,7 +66,7 @@ final class AudioPreferencesControllerTest extends TestCase
     public function testSaveRequiresAuthentication(): void
     {
         $response = $this->anonymousRequest('PUT', '/api/user/audio-preferences/', [
-            'payload' => ['eqMode' => 'flat'],
+            'payload' => AudioPreferencePayload::valid(),
             'version' => 0,
         ]);
 
@@ -74,7 +76,7 @@ final class AudioPreferencesControllerTest extends TestCase
     public function testSaveCreatesPreferencesWithVersionOne(): void
     {
         $user = $this->createTestUser();
-        $payload = ['eqMode' => 'simple', 'enabled' => true];
+        $payload = AudioPreferencePayload::valid(['enabled' => true]);
 
         $data = $this->assertJsonResponse(
             $this->savePreferences($user, $payload, 0),
@@ -90,36 +92,36 @@ final class AudioPreferencesControllerTest extends TestCase
     {
         $user = $this->createTestUser();
 
-        $first = $this->assertJsonResponse($this->savePreferences($user, ['preset' => 'FLAT'], 0), 200, 'data');
+        $first = $this->assertJsonResponse($this->savePreferences($user, AudioPreferencePayload::valid(), 0), 200, 'data');
         $this->assertSame(1, $first['data']['version']);
 
-        $second = $this->assertJsonResponse($this->savePreferences($user, ['preset' => 'BASS'], 1), 200, 'data');
+        $second = $this->assertJsonResponse($this->savePreferences($user, AudioPreferencePayload::valid(['preset' => 'BASS']), 1), 200, 'data');
         $this->assertSame(2, $second['data']['version']);
-        $this->assertSame(['preset' => 'BASS'], $second['data']['payload']);
+        $this->assertEquals(AudioPreferencePayload::valid(['preset' => 'BASS']), $second['data']['payload']);
     }
 
     public function testSaveRejectsStaleVersionWithoutChangingPayloadOrHistory(): void
     {
         $user = $this->createTestUser();
 
-        $this->savePreferences($user, ['preset' => 'FLAT'], 0);   // -> version 1
-        $stale = $this->savePreferences($user, ['preset' => 'BASS'], 0); // stale version 0
+        $this->savePreferences($user, AudioPreferencePayload::valid(), 0);   // -> version 1
+        $stale = $this->savePreferences($user, AudioPreferencePayload::valid(['preset' => 'BASS']), 0); // stale version 0
 
         $conflict = $this->assertJsonResponse($stale, 409);
         $this->assertSame(1, $conflict['error']['details']['currentVersion']);
         $saved = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/user/audio-preferences/', $user), 200, 'data');
-        $this->assertSame(['preset' => 'FLAT'], $saved['data']['payload']);
+        $this->assertEquals(AudioPreferencePayload::valid(), $saved['data']['payload']);
         $this->assertSame(1, $saved['data']['version']);
         $history = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/user/audio-preferences/history', $user), 200, 'data');
         $this->assertCount(1, $history['data']['history']);
-        $retry = $this->assertJsonResponse($this->savePreferences($user, ['preset' => 'FLAT'], 1), 200, 'data');
+        $retry = $this->assertJsonResponse($this->savePreferences($user, AudioPreferencePayload::valid(), 1), 200, 'data');
         $this->assertSame(2, $retry['data']['version']);
     }
 
     public function testSaveRejectsNonzeroVersionWhenAbsent(): void
     {
         $user = $this->createTestUser();
-        $conflict = $this->assertJsonResponse($this->savePreferences($user, ['preset' => 'FLAT'], 3), 409);
+        $conflict = $this->assertJsonResponse($this->savePreferences($user, AudioPreferencePayload::valid(), 3), 409);
         $this->assertSame(0, $conflict['error']['details']['currentVersion']);
         $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/user/audio-preferences/', $user), 404);
     }
@@ -127,10 +129,10 @@ final class AudioPreferencesControllerTest extends TestCase
     public function testSaveRejectsStalePositiveAndFutureVersions(): void
     {
         $user = $this->createTestUser();
-        $this->assertJsonResponse($this->savePreferences($user, ['preset' => 'FLAT'], 0), 200);
-        $this->assertJsonResponse($this->savePreferences($user, ['preset' => 'FLAT'], 1), 200);
+        $this->assertJsonResponse($this->savePreferences($user, AudioPreferencePayload::valid(), 0), 200);
+        $this->assertJsonResponse($this->savePreferences($user, AudioPreferencePayload::valid(), 1), 200);
         foreach ([1, 9] as $expectedVersion) {
-            $conflict = $this->assertJsonResponse($this->savePreferences($user, ['preset' => 'FLAT'], $expectedVersion), 409);
+            $conflict = $this->assertJsonResponse($this->savePreferences($user, AudioPreferencePayload::valid(), $expectedVersion), 409);
             $this->assertSame(2, $conflict['error']['details']['currentVersion']);
         }
     }
@@ -139,7 +141,7 @@ final class AudioPreferencesControllerTest extends TestCase
     {
         $user = $this->createTestUser();
 
-        $response = $this->savePreferences($user, ['eqMode' => 'flat'], -1);
+        $response = $this->savePreferences($user, AudioPreferencePayload::valid(), -1);
 
         $this->assertJsonResponse($response, 422);
     }
@@ -159,8 +161,8 @@ final class AudioPreferencesControllerTest extends TestCase
     {
         $user = $this->createTestUser();
 
-        $this->savePreferences($user, ['preset' => 'FLAT'], 0);
-        $this->savePreferences($user, ['preset' => 'BASS'], 1);
+        $this->savePreferences($user, AudioPreferencePayload::valid(), 0);
+        $this->savePreferences($user, AudioPreferencePayload::valid(['preset' => 'BASS']), 1);
 
         $data = $this->assertJsonResponse(
             $this->authenticatedRequest('GET', '/api/user/audio-preferences/history', $user),
@@ -189,8 +191,8 @@ final class AudioPreferencesControllerTest extends TestCase
     public function testRollbackRestoresPreviousVersionPayload(): void
     {
         $user = $this->createTestUser();
-        $firstPayload = ['preset' => 'FLAT'];
-        $secondPayload = ['preset' => 'BASS'];
+        $firstPayload = AudioPreferencePayload::valid();
+        $secondPayload = AudioPreferencePayload::valid(['preset' => 'BASS']);
 
         $this->savePreferences($user, $firstPayload, 0);   // version 1
         $this->savePreferences($user, $secondPayload, 1);  // version 2
@@ -223,6 +225,105 @@ final class AudioPreferencesControllerTest extends TestCase
         $response = $this->authenticatedRequest('POST', '/api/user/audio-preferences/rollback', $user, ['version' => 999]);
 
         $this->assertSame(500, $response->getStatusCode(), $response->getContent());
+    }
+
+    #[DataProvider('validPayloads')]
+    public function testSaveAcceptsCompleteBoundaryAndEnumSnapshots(array $payload): void
+    {
+        $user = $this->createTestUser();
+        $saved = $this->assertJsonResponse($this->savePreferences($user, $payload, 0), 200, 'data');
+        $this->assertEquals($payload, $saved['data']['payload']);
+        $state = $this->readAudioState($user);
+        $this->assertEquals($payload, $state['saved']['payload']);
+        $this->assertCount(1, $state['history']['history']);
+        $this->assertEquals($payload, $state['history']['history'][0]['payload']);
+    }
+
+    /** @return iterable<string, array{array<string, mixed>}> */
+    public static function validPayloads(): iterable
+    {
+        foreach (['lower' => ['gain' => -12, 'q' => 0.1, 'compressorThreshold' => -50, 'compressorRatio' => 1, 'compressorKnee' => 0, 'compressorAttack' => 0.1, 'compressorRelease' => 10, 'masterGain' => -12, 'stereoWidth' => 0], 'upper' => ['gain' => 12, 'q' => 10, 'compressorThreshold' => 0, 'compressorRatio' => 20, 'compressorKnee' => 40, 'compressorAttack' => 100, 'compressorRelease' => 1000, 'masterGain' => 12, 'stereoWidth' => 2]] as $case => $values) {
+            $band = ['gain' => $values['gain'], 'q' => $values['q']];
+            unset($values['gain'], $values['q']);
+            yield $case => [AudioPreferencePayload::valid([...$values, 'bands' => array_fill(0, 10, $band), 'chainOrder' => array_reverse(AudioPreferencePayload::valid()['chainOrder'])])];
+        }
+        foreach (['FLAT', 'ROCK', 'POP', 'JAZZ', 'CLASSICAL', 'BASS', 'TREBLE', 'VOCAL', 'LOUDNESS'] as $index => $preset) {
+            yield $preset => [AudioPreferencePayload::valid([
+                'preset' => $preset,
+                'visualizerMode' => ['enhanced-spectrum', 'circular', 'spectrogram', 'particles', 'spectrum', 'meters', 'phase'][$index % 7],
+                'targetLufs' => [-14, -16, -18, -23][$index % 4],
+                'stereoMode' => ['normal', 'mid', 'side'][$index % 3],
+                'crossfeedPreset' => ['light', 'normal', 'heavy'][$index % 3],
+                'bands' => array_fill(0, 10, ['gain' => 1.5, 'q' => 0.7]),
+                'compressorThreshold' => -20.5,
+                'compressorRatio' => 2.5,
+                'compressorKnee' => 10.5,
+                'compressorAttack' => 2.5,
+                'compressorRelease' => 100.5,
+                'masterGain' => 0.5,
+                'stereoWidth' => 1.5,
+            ])];
+        }
+    }
+
+    #[DataProvider('invalidPayloads')]
+    public function testInvalidPayloadPreservesSavedPreferencesAndHistory(array $payload): void
+    {
+        $user = $this->createTestUser();
+        $this->assertJsonResponse($this->savePreferences($user, AudioPreferencePayload::valid(), 0), 200);
+        $before = $this->readAudioState($user);
+        $response = $this->savePreferences($user, $payload, 1);
+        $this->assertSame($before, $this->readAudioState($user));
+        $this->assertJsonResponse($response, 422, 'error');
+    }
+
+    /** @return iterable<string, array{array<string, mixed>}> */
+    public static function invalidPayloads(): iterable
+    {
+        $valid = AudioPreferencePayload::valid();
+        foreach ($valid as $field => $value) {
+            $missing = $valid;
+            unset($missing[$field]);
+            yield 'missing-' . $field => [$missing];
+            yield 'null-' . $field => [array_replace($valid, [$field => null])];
+            if (is_bool($value)) {
+                foreach ([0, 1, 'true', 'false'] as $index => $invalid) {
+                    yield "boolean-$field-$index" => [array_replace($valid, [$field => $invalid])];
+                }
+            }
+        }
+        foreach (['schemaVersion' => 2, 'bandsV2' => $valid['bands'], 'eqMode' => 'simple', 'compressor' => [], 'peqPoints' => [], 'compareSlots' => [], 'activeProfileId' => null, 'unknown' => true] as $field => $value) {
+            yield 'extra-' . $field => [array_replace($valid, [$field => $value])];
+        }
+        foreach (['compressorThreshold' => [-50, 0], 'compressorRatio' => [1, 20], 'compressorKnee' => [0, 40], 'compressorAttack' => [0.1, 100], 'compressorRelease' => [10, 1000], 'masterGain' => [-12, 12], 'stereoWidth' => [0, 2]] as $field => [$min, $max]) {
+            foreach (['below' => $min - 0.01, 'above' => $max + 0.01, 'string' => (string) $min, 'boolean' => false, 'list' => []] as $case => $invalid) {
+                yield "$field-$case" => [array_replace($valid, [$field => $invalid])];
+            }
+        }
+        foreach (['preset' => 'CUSTOM', 'visualizerMode' => 'waveform', 'stereoMode' => 'mono', 'crossfeedPreset' => 'custom', 'targetLufs' => -15] as $field => $value) {
+            yield 'enum-' . $field => [array_replace($valid, [$field => $value])];
+        }
+        yield 'lufs-string' => [array_replace($valid, ['targetLufs' => '-14'])];
+        foreach (['nine' => array_slice($valid['bands'], 0, 9), 'eleven' => [...$valid['bands'], $valid['bands'][0]], 'legacy-gains' => array_fill(0, 10, 0), 'object' => ['band' => $valid['bands'][0]], 'numeric-object' => (object) $valid['bands']] as $case => $bands) {
+            yield 'bands-' . $case => [array_replace($valid, ['bands' => $bands])];
+        }
+        foreach (['missing-gain' => ['q' => 1], 'missing-q' => ['gain' => 0], 'extra' => ['gain' => 0, 'q' => 1, 'frequency' => 100], 'gain-low' => ['gain' => -12.01, 'q' => 1], 'gain-high' => ['gain' => 12.01, 'q' => 1], 'q-low' => ['gain' => 0, 'q' => 0.09], 'q-high' => ['gain' => 0, 'q' => 10.01], 'gain-string' => ['gain' => '0', 'q' => 1], 'q-string' => ['gain' => 0, 'q' => '1'], 'gain-bool' => ['gain' => false, 'q' => 1], 'q-bool' => ['gain' => 0, 'q' => true], 'null' => null, 'string' => 'band', 'list' => [0, 1], 'empty-object' => (object) [], 'empty-list' => [], 'gain-null' => ['gain' => null, 'q' => 1], 'q-null' => ['gain' => 0, 'q' => null]] as $case => $band) {
+            $bands = $valid['bands'];
+            $bands[0] = $band;
+            yield 'band-' . $case => [array_replace($valid, ['bands' => $bands])];
+        }
+        foreach (['missing' => array_slice($valid['chainOrder'], 0, 5), 'duplicate' => ['eq', 'eq', 'stereo', 'crossfeed', 'loudness', 'masterGain'], 'unknown' => ['eq', 'compressor', 'stereo', 'crossfeed', 'loudness', 'unknown'], 'extra' => [...$valid['chainOrder'], 'eq'], 'object' => array_combine($valid['chainOrder'], $valid['chainOrder']), 'numeric-object' => (object) $valid['chainOrder'], 'string' => 'eq'] as $case => $order) {
+            yield 'chain-' . $case => [array_replace($valid, ['chainOrder' => $order])];
+        }
+    }
+
+    /** @return array<string, mixed> */
+    private function readAudioState(User $user): array
+    {
+        $saved = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/user/audio-preferences/', $user), 200, 'data');
+        $history = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/user/audio-preferences/history', $user), 200, 'data');
+
+        return ['saved' => $saved['data'], 'history' => $history['data']];
     }
 
     // ---------------------------------------------------------------

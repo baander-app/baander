@@ -16941,7 +16941,7 @@
                     "User Preferences"
                 ],
                 "summary": "Get audio preferences",
-                "description": "Returns the audio preferences for the authenticated user. Payload shape follows schema version 2 (flexible JSONB).",
+                "description": "Returns the audio preferences for the authenticated user. Payload uses the validated flat audio settings contract.",
                 "operationId": "get_audio_preferences_index",
                 "responses": {
                     "200": {
@@ -16951,7 +16951,7 @@
                                 "schema": {
                                     "properties": {
                                         "payload": {
-                                            "description": "Flexible JSONB payload. See SaveAudioPreferencesRequest for full schema.",
+                                            "description": "Audio settings snapshot; see SaveAudioPreferencesRequest for its fields.",
                                             "type": "object"
                                         },
                                         "version": {
@@ -16996,19 +16996,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "required": [
-                                    "payload",
-                                    "version"
-                                ],
-                                "properties": {
-                                    "payload": {
-                                        "type": "object"
-                                    },
-                                    "version": {
-                                        "type": "integer"
-                                    }
-                                },
-                                "type": "object"
+                                "$ref": "#/components/schemas/SaveAudioPreferencesRequest"
                             }
                         }
                     }
@@ -17021,7 +17009,7 @@
                                 "schema": {
                                     "properties": {
                                         "payload": {
-                                            "description": "Flexible JSONB payload. Echoed back from request.",
+                                            "description": "Validated audio settings echoed back from the request.",
                                             "type": "object"
                                         },
                                         "version": {
@@ -17158,7 +17146,7 @@
                                 "schema": {
                                     "properties": {
                                         "payload": {
-                                            "description": "Flexible JSONB payload at the rolled-back version.",
+                                            "description": "Audio settings at the rolled-back version.",
                                             "type": "object"
                                         },
                                         "version": {
@@ -22050,6 +22038,194 @@
                         "description": "Last update timestamp",
                         "type": "string",
                         "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "SaveAudioPreferencesRequest": {
+                "required": [
+                    "payload",
+                    "version"
+                ],
+                "properties": {
+                    "payload": {
+                        "required": [
+                            "enabled",
+                            "bands",
+                            "preset",
+                            "compressionEnabled",
+                            "compressorThreshold",
+                            "compressorRatio",
+                            "compressorKnee",
+                            "compressorAttack",
+                            "compressorRelease",
+                            "masterGain",
+                            "normalizationEnabled",
+                            "targetLufs",
+                            "visualizerMode",
+                            "stereoEnabled",
+                            "stereoWidth",
+                            "stereoMode",
+                            "crossfeedEnabled",
+                            "crossfeedPreset",
+                            "loudnessContourEnabled",
+                            "chainOrder"
+                        ],
+                        "properties": {
+                            "enabled": {
+                                "type": "boolean"
+                            },
+                            "bands": {
+                                "type": "array",
+                                "items": {
+                                    "required": [
+                                        "gain",
+                                        "q"
+                                    ],
+                                    "properties": {
+                                        "gain": {
+                                            "type": "number",
+                                            "maximum": 12,
+                                            "minimum": -12
+                                        },
+                                        "q": {
+                                            "type": "number",
+                                            "maximum": 10,
+                                            "minimum": 0.1
+                                        }
+                                    },
+                                    "type": "object",
+                                    "additionalProperties": false
+                                },
+                                "maxItems": 10,
+                                "minItems": 10
+                            },
+                            "preset": {
+                                "type": "string",
+                                "enum": [
+                                    "FLAT",
+                                    "ROCK",
+                                    "POP",
+                                    "JAZZ",
+                                    "CLASSICAL",
+                                    "BASS",
+                                    "TREBLE",
+                                    "VOCAL",
+                                    "LOUDNESS"
+                                ]
+                            },
+                            "compressionEnabled": {
+                                "type": "boolean"
+                            },
+                            "compressorThreshold": {
+                                "type": "number",
+                                "maximum": 0,
+                                "minimum": -50
+                            },
+                            "compressorRatio": {
+                                "type": "number",
+                                "maximum": 20,
+                                "minimum": 1
+                            },
+                            "compressorKnee": {
+                                "type": "number",
+                                "maximum": 40,
+                                "minimum": 0
+                            },
+                            "compressorAttack": {
+                                "type": "number",
+                                "maximum": 100,
+                                "minimum": 0.1
+                            },
+                            "compressorRelease": {
+                                "type": "number",
+                                "maximum": 1000,
+                                "minimum": 10
+                            },
+                            "masterGain": {
+                                "type": "number",
+                                "maximum": 12,
+                                "minimum": -12
+                            },
+                            "normalizationEnabled": {
+                                "type": "boolean"
+                            },
+                            "targetLufs": {
+                                "type": "number",
+                                "enum": [
+                                    -14,
+                                    -16,
+                                    -18,
+                                    -23
+                                ]
+                            },
+                            "visualizerMode": {
+                                "type": "string",
+                                "enum": [
+                                    "enhanced-spectrum",
+                                    "circular",
+                                    "spectrogram",
+                                    "particles",
+                                    "spectrum",
+                                    "meters",
+                                    "phase"
+                                ]
+                            },
+                            "stereoEnabled": {
+                                "type": "boolean"
+                            },
+                            "stereoWidth": {
+                                "type": "number",
+                                "maximum": 2,
+                                "minimum": 0
+                            },
+                            "stereoMode": {
+                                "type": "string",
+                                "enum": [
+                                    "normal",
+                                    "mid",
+                                    "side"
+                                ]
+                            },
+                            "crossfeedEnabled": {
+                                "type": "boolean"
+                            },
+                            "crossfeedPreset": {
+                                "type": "string",
+                                "enum": [
+                                    "light",
+                                    "normal",
+                                    "heavy"
+                                ]
+                            },
+                            "loudnessContourEnabled": {
+                                "type": "boolean"
+                            },
+                            "chainOrder": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "enum": [
+                                        "eq",
+                                        "compressor",
+                                        "stereo",
+                                        "crossfeed",
+                                        "loudness",
+                                        "masterGain"
+                                    ]
+                                },
+                                "maxItems": 6,
+                                "minItems": 6,
+                                "uniqueItems": true
+                            }
+                        },
+                        "type": "object",
+                        "additionalProperties": false
+                    },
+                    "version": {
+                        "type": "integer",
+                        "example": 0,
+                        "minimum": 0
                     }
                 },
                 "type": "object"

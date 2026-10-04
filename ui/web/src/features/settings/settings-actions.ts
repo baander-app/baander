@@ -1,3 +1,4 @@
+import type { VisualizerMode } from '@/features/visualizer/types'
 import type { EqPresetName } from '@/features/equalizer/stores/eq-bands-store'
 import type { LufsTarget, ProcessingModule } from '@/features/equalizer/stores/eq-processing-store'
 import type { ContextPanelMode, ContextPanelTab } from '@/features/layout/stores/context-panel-store'
@@ -16,29 +17,26 @@ export const SETTINGS_ACTIONS = {
 } as const
 
 export interface SettingsApplyEqPayload {
-  enabled?: boolean
-  /** @deprecated Use bandsV2 instead. v1 flat gain array. */
-  bands?: number[]
-  /** v2 bands with per-band gain + Q */
-  bandsV2?: Array<{ gain: number; q: number }>
-  preset?: EqPresetName
-  visualizerMode?: string
-  compressionEnabled?: boolean
-  compressorThreshold?: number
-  compressorRatio?: number
-  compressorKnee?: number
-  compressorAttack?: number
-  compressorRelease?: number
-  masterGain?: number
-  normalizationEnabled?: boolean
-  targetLufs?: LufsTarget
-  stereoEnabled?: boolean
-  stereoWidth?: number
-  stereoMode?: 'normal' | 'mid' | 'side'
-  crossfeedEnabled?: boolean
-  crossfeedPreset?: 'light' | 'normal' | 'heavy'
-  chainOrder?: ProcessingModule[]
-  loudnessContourEnabled?: boolean
+  enabled: boolean
+  bands: Array<{ gain: number; q: number }>
+  preset: EqPresetName
+  visualizerMode: VisualizerMode
+  compressionEnabled: boolean
+  compressorThreshold: number
+  compressorRatio: number
+  compressorKnee: number
+  compressorAttack: number
+  compressorRelease: number
+  masterGain: number
+  normalizationEnabled: boolean
+  targetLufs: LufsTarget
+  stereoEnabled: boolean
+  stereoWidth: number
+  stereoMode: 'normal' | 'mid' | 'side'
+  crossfeedEnabled: boolean
+  crossfeedPreset: 'light' | 'normal' | 'heavy'
+  chainOrder: ProcessingModule[]
+  loudnessContourEnabled: boolean
 }
 
 export interface SettingsApplyPlayerPayload {
