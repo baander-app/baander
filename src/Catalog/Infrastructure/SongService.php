@@ -33,6 +33,11 @@ final class SongService implements SongPortInterface
         return $this->songRepository->findVisibleByUuid($uuid, $scope);
     }
 
+    public function findVisibleByUuids(array $uuids, LibraryReadScope $scope): array
+    {
+        return $this->songRepository->findVisibleByUuids($uuids, $scope);
+    }
+
     public function searchVisible(SearchOptions $options, LibraryReadScope $scope): SearchResult
     {
         return $this->songRepository->searchVisible($options, $scope);

@@ -79,8 +79,20 @@ visible children become scoped roots; stored hierarchy data remains unchanged.
 The combined firewall and existing genre-controller gate passes 111 tests (991
 assertions), with four PostgreSQL hierarchy tests (44 assertions). Existing success
 fixtures now create real grants and media associations; explicit denied/orphan
-cases remain covered. Playlist reads also require a separate ownership audit:
-the current show endpoint does not enforce the owner/admin policy of its voter.
+cases remain covered.
+
+Playlist detail now enforces the existing owner/admin voter before song enrichment;
+public/collaborative flags do not override that policy. Detail, list and edit-response
+counts include only accessible songs, and denied song IDs/filesystem paths are not
+returned. Immutable list projections preserve empty playlists, and scoped song
+snapshots cannot expose pending managed-entity changes. Metadata edits retain hidden
+stored entries and positions. The locked production-firewall, persistence and existing
+functional gate passes 25 tests (197 assertions); full Unit/StaticAnalysisRules pass
+4,564 tests (19,219 assertions) and PHPStan remains at zero errors. Exact scope-port
+architecture rules preserve rejection of foreign internal services. Deptrac remains
+at 298 active violations with 679 skipped occurrences and zero errors; no baseline
+entries were added. Playlist OpenAPI now describes the actual song payload and
+authorization responses, and specification/client generation is verified together.
 
 Malformed DPoP verification keys now return an authentication rejection instead
 of an uncaught server error. Deterministic leading-zero EC key fixtures exercise

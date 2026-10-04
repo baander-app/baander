@@ -20,6 +20,12 @@ interface SongRepositoryInterface extends Searchable
 
     public function findVisibleByUuid(Uuid $uuid, LibraryReadScope $scope): ?Song;
 
+    /**
+     * @param Uuid[] $uuids
+     * @return array<string, Song> keyed by UUID string
+     */
+    public function findVisibleByUuids(array $uuids, LibraryReadScope $scope): array;
+
     public function searchVisible(SearchOptions $options, LibraryReadScope $scope): SearchResult;
 
     public function countVisible(LibraryReadScope $scope): int;

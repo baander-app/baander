@@ -8,11 +8,14 @@ use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Playlist\Domain\Model\Playlist;
 use App\Playlist\Domain\Model\PlaylistSong;
+use App\Playlist\Domain\ReadModel\PlaylistReadView;
 use App\Playlist\Domain\Repository\PlaylistRepositoryInterface;
 use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistEntity;
 use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistSongEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class PlaylistRepository implements PlaylistRepositoryInterface
@@ -63,6 +66,64 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
             ->getResult();
 
         return array_map(fn(PlaylistEntity $entity) => $this->toDomain($entity), $entities);
+    }
+
+    public function findReadByUser(Uuid $ownerId, LibraryReadScope $scope): array
+    {
+        $query = $this->entityManager->createQueryBuilder()
+            ->select(
+                'p.id, p.publicId, IDENTITY(p.user) AS userId',
+                'p.name, p.description, p.isPublic, p.isCollaborative, p.isSmart',
+                'p.smartRules, p.createdAt, p.updatedAt',
+                'COUNT(read_song.id) AS songCount',
+            )
+            ->from(PlaylistEntity::class, 'p')
+            ->leftJoin(PlaylistSongEntity::class, 'membership', 'WITH', 'membership.playlist = p.id')
+            ->where('IDENTITY(p.user) = :ownerId')
+            ->setParameter('ownerId', $ownerId, 'uuid')
+            ->groupBy('p.id')
+            ->orderBy('p.name', 'ASC')
+            ->addOrderBy('p.id', 'ASC');
+
+        if ($scope->isUnrestricted()) {
+            $query->leftJoin('membership.song', 'read_song');
+        } elseif ($scope->getLibraryIds() === []) {
+            $query->leftJoin('membership.song', 'read_song', 'WITH', '1 = 0');
+        } else {
+            $visibleAlbum = <<<'DQL'
+                read_song.album IN (
+                    SELECT scoped_album.id
+                    FROM App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity scoped_album
+                    WHERE IDENTITY(scoped_album.library) IN (:libraryIds)
+                )
+                DQL;
+            $query->leftJoin('membership.song', 'read_song', 'WITH', $visibleAlbum)
+                ->setParameter('libraryIds', $scope->getLibraryIds(), ArrayParameterType::STRING);
+        }
+
+        /**
+         * @var list<array{
+         *     id: Uuid, publicId: PublicId, userId: string, name: string,
+         *     description: ?string, isPublic: bool, isCollaborative: bool, isSmart: bool,
+         *     smartRules: array<array-key, mixed>, createdAt: \DateTimeImmutable,
+         *     updatedAt: \DateTimeImmutable, songCount: int|string
+         * }> $rows
+         */
+        $rows = $query->getQuery()->getArrayResult();
+        return array_map(static fn (array $row): PlaylistReadView => new PlaylistReadView(
+            id: $row['id'],
+            publicId: $row['publicId'],
+            userId: Uuid::fromString($row['userId']),
+            name: $row['name'],
+            description: $row['description'],
+            isPublic: $row['isPublic'],
+            isCollaborative: $row['isCollaborative'],
+            isSmart: $row['isSmart'],
+            smartRules: $row['smartRules'],
+            createdAt: $row['createdAt'],
+            updatedAt: $row['updatedAt'],
+            songCount: (int) $row['songCount'],
+        ), $rows);
     }
 
     public function findWithSongs(Uuid $id): ?Playlist

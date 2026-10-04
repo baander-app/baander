@@ -1642,7 +1642,12 @@ export interface NotificationResource {
 export interface PlaylistResource {
   /** Playlist UUID */
   uuid: string;
-  /** Public identifier */
+  /**
+     * Public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId: string;
   /** Owner user UUID */
   userId: string;
@@ -1659,7 +1664,7 @@ export interface PlaylistResource {
   isCollaborative: boolean;
   /** Whether the playlist is auto-generated */
   isSmart: boolean;
-  /** Number of songs */
+  /** Number of accessible songs */
   songCount: number;
   /** Creation timestamp */
   createdAt: string;
@@ -4304,19 +4309,59 @@ export type PostPlaylistStoreBody = {
 };
 
 export type GetPlaylistShow200DataSongsItem = {
-  songId?: string;
+  uuid?: string;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId?: string;
+  /** Album public identifier, or UUID when unavailable */
+  albumId?: string;
+  /** Stored playlist position */
   position?: number;
+  title?: string;
+  /** @nullable */
+  artistName?: string | null;
+  /** @nullable */
+  albumName?: string | null;
+  /** @nullable */
+  year?: number | null;
+  /**
+     * Duration in seconds
+     * @nullable
+     */
+  length?: number | null;
+  /** @nullable */
+  track?: number | null;
+  /** @nullable */
+  disc?: number | null;
+  /** @nullable */
+  bitrate?: number | null;
+  explicit?: boolean;
+  lockedFields?: string[];
+  createdAt?: string;
 };
 
 export type GetPlaylistShow200Data = {
   uuid?: string;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId?: string;
   userId?: string;
   name?: string;
-  description?: string;
+  /** @nullable */
+  description?: string | null;
   isPublic?: boolean;
   isCollaborative?: boolean;
   isSmart?: boolean;
+  /**
+     * Number of accessible songs returned in the songs array
+     * @minimum 0
+     */
   songCount?: number;
   createdAt?: string;
   songs?: GetPlaylistShow200DataSongsItem[];
@@ -19522,7 +19567,7 @@ export const getGetPlaylistShowUrl = (publicId: string,) => {
 }
 
 /**
- * @summary Get a single playlist with its songs
+ * @summary Get an owned playlist and accessible songs (administrators may read any playlist)
  */
 export const getPlaylistShow = async (publicId: string, options?: RequestInit): Promise<GetPlaylistShow200> => {
 
@@ -19593,7 +19638,7 @@ export function useGetPlaylistShow<TData = Awaited<ReturnType<typeof getPlaylist
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get a single playlist with its songs
+ * @summary Get an owned playlist and accessible songs (administrators may read any playlist)
  */
 
 export function useGetPlaylistShow<TData = Awaited<ReturnType<typeof getPlaylistShow>>, TError = ErrorType<ApiError>>(

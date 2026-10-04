@@ -212,6 +212,101 @@ final class SongRepository implements SongRepositoryInterface
         return $result;
     }
 
+    public function findVisibleByUuids(array $uuids, LibraryReadScope $scope): array
+    {
+        if ($uuids === []) {
+            return [];
+        }
+
+        /**
+         * @var list<array{
+         *     id: Uuid,
+         *     publicId: PublicId,
+         *     title: string,
+         *     path: string,
+         *     size: int,
+         *     mimeType: string,
+         *     length: ?float,
+         *     lyrics: ?string,
+         *     track: ?int,
+         *     disc: ?int,
+         *     year: ?int,
+         *     comment: ?string,
+         *     hash: ?string,
+         *     bitrate: ?int,
+         *     sampleRate: ?int,
+         *     channels: ?int,
+         *     codec: ?string,
+         *     explicit: bool,
+         *     energy: ?float,
+         *     danceability: ?float,
+         *     valence: ?float,
+         *     acousticness: ?float,
+         *     instrumentalness: ?float,
+         *     liveness: ?float,
+         *     spechiness: ?float,
+         *     loudness: ?float,
+         *     mbid: ?string,
+         *     discogsId: ?string,
+         *     spotifyId: ?string,
+         *     lockedFields: list<string>,
+         *     createdAt: \DateTimeImmutable,
+         *     updatedAt: \DateTimeImmutable,
+         *     album: array{id: Uuid, publicId: PublicId}
+         * }> $rows
+         */
+        $rows = $this->visibleQuery($scope)
+            ->addSelect('read_album')
+            ->innerJoin('visible.album', 'read_album')
+            ->andWhere('visible.id IN (:ids)')
+            ->setParameter('ids', $uuids)
+            ->getQuery()
+            ->getArrayResult();
+
+        $result = [];
+        foreach ($rows as $row) {
+            $song = Song::reconstitute(new SongState(
+                album: $row['album']['id'],
+                albumPublicId: $row['album']['publicId'],
+                id: $row['id'],
+                publicId: $row['publicId'],
+                title: $row['title'],
+                path: $row['path'],
+                size: $row['size'],
+                mimeType: $row['mimeType'],
+                length: $row['length'],
+                lyrics: $row['lyrics'],
+                track: $row['track'],
+                disc: $row['disc'],
+                year: $row['year'],
+                comment: $row['comment'],
+                hash: $row['hash'],
+                bitrate: $row['bitrate'],
+                sampleRate: $row['sampleRate'],
+                channels: $row['channels'],
+                codec: $row['codec'],
+                explicit: $row['explicit'],
+                energy: $row['energy'],
+                danceability: $row['danceability'],
+                valence: $row['valence'],
+                acousticness: $row['acousticness'],
+                instrumentalness: $row['instrumentalness'],
+                liveness: $row['liveness'],
+                spechiness: $row['spechiness'],
+                loudness: $row['loudness'],
+                mbid: $row['mbid'],
+                discogsId: $row['discogsId'],
+                spotifyId: $row['spotifyId'],
+                lockedFields: $row['lockedFields'],
+                createdAt: $row['createdAt'],
+                updatedAt: $row['updatedAt'],
+            ));
+            $result[$song->getId()->toString()] = $song;
+        }
+
+        return $result;
+    }
+
     /**
      * @return Song[]
      */

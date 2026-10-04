@@ -6,15 +6,23 @@ namespace App\Playlist\Infrastructure;
 
 use App\Playlist\Application\Port\PlaylistPortInterface;
 use App\Playlist\Domain\Model\Playlist;
+use App\Playlist\Domain\ReadModel\PlaylistReadView;
 use App\Playlist\Domain\Repository\PlaylistRepositoryInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 
 final class PlaylistService implements PlaylistPortInterface
 {
     public function __construct(
         private readonly PlaylistRepositoryInterface $playlistRepository,
     ) {
+    }
+
+    /** @return list<PlaylistReadView> */
+    public function findReadByUser(Uuid $ownerId, LibraryReadScope $scope): array
+    {
+        return $this->playlistRepository->findReadByUser($ownerId, $scope);
     }
 
     public function save(Playlist $playlist): void

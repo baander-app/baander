@@ -35,6 +35,11 @@ final class BoundaryController {
 }
 namespace App\Library\Application\Port;
 interface LibraryReadScopeProviderInterface {}
+namespace App\Playlist\Interface\Controller;
+final class BoundaryController {
+    public function scope(\App\Library\Application\Port\LibraryReadScopeProviderInterface $scope): void {}
+    public function internal(\App\Library\Application\InternalApplicationService $service): void {}
+}
 namespace App\Library\Application;
 final class InternalApplicationService {}
 namespace App\Auth\Application\Port;

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Controller;
 
+use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
@@ -68,7 +69,7 @@ final class PlaylistControllerTest extends TestCase
         $user = $this->createTestUser();
 
         // A real song row the playlist_song FK can reference.
-        $libraryId = $this->createLibraryFixture();
+        $libraryId = $this->createLibraryFixture($user->getId());
         $albumId = $this->createAlbumFixture($libraryId, 'Album');
         $songId = $this->createSongFixture($albumId, 'track.mp3', 'hash1', 'Track');
 
@@ -96,7 +97,7 @@ final class PlaylistControllerTest extends TestCase
     {
         $user = $this->createTestUser();
 
-        $libraryId = $this->createLibraryFixture();
+        $libraryId = $this->createLibraryFixture($user->getId());
         $albumId = $this->createAlbumFixture($libraryId, 'Album');
         $songId = $this->createSongFixture($albumId, 'track.mp3', 'hash1', 'Track');
 
@@ -121,7 +122,7 @@ final class PlaylistControllerTest extends TestCase
         $this->assertCount(1, $show['data']['songs'], 'Metadata update must not drop persisted songs.');
     }
 
-    private function createLibraryFixture(): Uuid
+    private function createLibraryFixture(Uuid $userId): Uuid
     {
         $libraryId = Uuid::v7();
         $now = new \DateTimeImmutable();
@@ -140,6 +141,10 @@ final class PlaylistControllerTest extends TestCase
                 $now->format('Y-m-d H:i:s'),
             ],
         );
+
+        $access = static::getContainer()->get(LibraryAccessPortInterface::class);
+        self::assertInstanceOf(LibraryAccessPortInterface::class, $access);
+        $access->grant($userId, $libraryId);
 
         return $libraryId;
     }

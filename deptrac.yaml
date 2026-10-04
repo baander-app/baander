@@ -1020,6 +1020,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Playlist Interface':
+      - 'Library Read Scope Contract'
       - 'Playlist Resources'
       - 'Auth Identity Contract'
       - 'Playlist Application'

@@ -10439,7 +10439,7 @@
                 "tags": [
                     "Playlist"
                 ],
-                "summary": "Get a single playlist with its songs",
+                "summary": "Get an owned playlist and accessible songs (administrators may read any playlist)",
                 "operationId": "get_playlist_show",
                 "parameters": [
                     {
@@ -10468,7 +10468,10 @@
                                                 },
                                                 "publicId": {
                                                     "type": "string",
-                                                    "example": "aB3dE5fG7hJ9kL1mN3p"
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "example": "aB3dE5fG7hJ9kL1mN3pQr",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "userId": {
                                                     "type": "string",
@@ -10481,7 +10484,8 @@
                                                 },
                                                 "description": {
                                                     "type": "string",
-                                                    "example": "A collection of my favorite songs"
+                                                    "example": "A collection of my favorite songs",
+                                                    "nullable": true
                                                 },
                                                 "isPublic": {
                                                     "type": "boolean",
@@ -10496,8 +10500,10 @@
                                                     "example": false
                                                 },
                                                 "songCount": {
+                                                    "description": "Number of accessible songs returned in the songs array",
                                                     "type": "integer",
-                                                    "example": 25
+                                                    "example": 25,
+                                                    "minimum": 0
                                                 },
                                                 "createdAt": {
                                                     "type": "string",
@@ -10507,14 +10513,69 @@
                                                     "type": "array",
                                                     "items": {
                                                         "properties": {
-                                                            "songId": {
+                                                            "uuid": {
                                                                 "type": "string",
-                                                                "format": "uuid",
-                                                                "example": "770f9510-f30c-52e5-b827-557755550222"
+                                                                "format": "uuid"
+                                                            },
+                                                            "publicId": {
+                                                                "type": "string",
+                                                                "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                                "maxLength": 21,
+                                                                "minLength": 21
+                                                            },
+                                                            "albumId": {
+                                                                "description": "Album public identifier, or UUID when unavailable",
+                                                                "type": "string"
                                                             },
                                                             "position": {
+                                                                "description": "Stored playlist position",
                                                                 "type": "integer",
                                                                 "example": 0
+                                                            },
+                                                            "title": {
+                                                                "type": "string"
+                                                            },
+                                                            "artistName": {
+                                                                "type": "string",
+                                                                "nullable": true
+                                                            },
+                                                            "albumName": {
+                                                                "type": "string",
+                                                                "nullable": true
+                                                            },
+                                                            "year": {
+                                                                "type": "integer",
+                                                                "nullable": true
+                                                            },
+                                                            "length": {
+                                                                "description": "Duration in seconds",
+                                                                "type": "number",
+                                                                "nullable": true
+                                                            },
+                                                            "track": {
+                                                                "type": "integer",
+                                                                "nullable": true
+                                                            },
+                                                            "disc": {
+                                                                "type": "integer",
+                                                                "nullable": true
+                                                            },
+                                                            "bitrate": {
+                                                                "type": "integer",
+                                                                "nullable": true
+                                                            },
+                                                            "explicit": {
+                                                                "type": "boolean"
+                                                            },
+                                                            "lockedFields": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "createdAt": {
+                                                                "type": "string",
+                                                                "format": "date-time"
                                                             }
                                                         },
                                                         "type": "object"
@@ -10525,6 +10586,26 @@
                                         }
                                     },
                                     "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Playlist belongs to another user; public and collaborative flags do not grant read access",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -21673,7 +21754,9 @@
                     "publicId": {
                         "description": "Public identifier",
                         "type": "string",
-                        "format": "uuid"
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "userId": {
                         "description": "Owner user UUID",
@@ -21702,7 +21785,7 @@
                         "type": "boolean"
                     },
                     "songCount": {
-                        "description": "Number of songs",
+                        "description": "Number of accessible songs",
                         "type": "integer"
                     },
                     "createdAt": {

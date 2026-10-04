@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Playlist\Interface\Controller;
 
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
+use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Playlist\Application\Command\AddSongCommand;
 use App\Playlist\Application\Command\CreatePlaylistCommand;
 use App\Playlist\Application\Command\RemoveSongCommand;
@@ -31,6 +32,7 @@ use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 #[OA\Tag(name: 'Playlist', description: 'Playlist management endpoints')]
 #[Route('/api/playlists', name: 'playlist_')]
@@ -44,6 +46,7 @@ final class PlaylistController
         private readonly PlaylistPortInterface $playlistService,
         private readonly SongPortInterface $songService,
         private readonly MessageBusInterface $commandBus,
+        private readonly LibraryReadScopeProviderInterface $libraryScopes,
     ) {
     }
 
@@ -68,8 +71,9 @@ final class PlaylistController
             return $this->unauthorized();
         }
 
-        $playlists = $this->playlistService->findByUser(
+        $playlists = $this->playlistService->findReadByUser(
             Uuid::fromString($user->getId()),
+            $this->libraryScopes->current(),
         );
 
         return $this->successResponse(PlaylistResource::collection($playlists));
@@ -132,7 +136,7 @@ final class PlaylistController
      */
     #[OA\Get(
         path: '/api/playlists/{publicId}',
-        summary: 'Get a single playlist with its songs',
+        summary: 'Get an owned playlist and accessible songs (administrators may read any playlist)',
         parameters: [
             new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
@@ -141,22 +145,37 @@ final class PlaylistController
                 properties: [
                     new OA\Property(property: 'data', properties: [
                         new OA\Property(property: 'uuid', type: 'string', format: 'uuid', example: '550e8400-e29b-41d4-a716-446655440000'),
-                        new OA\Property(property: 'publicId', type: 'string', example: 'aB3dE5fG7hJ9kL1mN3p'),
+                        new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, example: 'aB3dE5fG7hJ9kL1mN3pQr'),
                         new OA\Property(property: 'userId', type: 'string', format: 'uuid', example: '660f9510-f30c-52e5-b827-557755550111'),
                         new OA\Property(property: 'name', type: 'string', example: 'My Favorites'),
-                        new OA\Property(property: 'description', type: 'string', example: 'A collection of my favorite songs'),
+                        new OA\Property(property: 'description', type: 'string', nullable: true, example: 'A collection of my favorite songs'),
                         new OA\Property(property: 'isPublic', type: 'boolean', example: true),
                         new OA\Property(property: 'isCollaborative', type: 'boolean', example: false),
                         new OA\Property(property: 'isSmart', type: 'boolean', example: false),
-                        new OA\Property(property: 'songCount', type: 'integer', example: 25),
+                        new OA\Property(property: 'songCount', type: 'integer', minimum: 0, description: 'Number of accessible songs returned in the songs array', example: 25),
                         new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
                         new OA\Property(property: 'songs', type: 'array', items: new OA\Items(properties: [
-                            new OA\Property(property: 'songId', type: 'string', format: 'uuid', example: '770f9510-f30c-52e5-b827-557755550222'),
-                            new OA\Property(property: 'position', type: 'integer', example: 0),
+                            new OA\Property(property: 'uuid', type: 'string', format: 'uuid'),
+                            new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
+                            new OA\Property(property: 'albumId', type: 'string', description: 'Album public identifier, or UUID when unavailable'),
+                            new OA\Property(property: 'position', type: 'integer', description: 'Stored playlist position', example: 0),
+                            new OA\Property(property: 'title', type: 'string'),
+                            new OA\Property(property: 'artistName', type: 'string', nullable: true),
+                            new OA\Property(property: 'albumName', type: 'string', nullable: true),
+                            new OA\Property(property: 'year', type: 'integer', nullable: true),
+                            new OA\Property(property: 'length', type: 'number', nullable: true, description: 'Duration in seconds'),
+                            new OA\Property(property: 'track', type: 'integer', nullable: true),
+                            new OA\Property(property: 'disc', type: 'integer', nullable: true),
+                            new OA\Property(property: 'bitrate', type: 'integer', nullable: true),
+                            new OA\Property(property: 'explicit', type: 'boolean'),
+                            new OA\Property(property: 'lockedFields', type: 'array', items: new OA\Items(type: 'string')),
+                            new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
                         ], type: 'object')),
                     ], type: 'object'),
                 ], type: 'object',
             )),
+            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '403', description: 'Playlist belongs to another user; public and collaborative flags do not grant read access', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
@@ -175,39 +194,41 @@ final class PlaylistController
             return $this->notFound();
         }
 
-        $playlistWithSongs = $this->playlistService->findWithSongs($playlist->getId());
+        if (!$this->security->isGranted('VIEW', $playlist)) {
+            throw new AccessDeniedException();
+        }
+
+        $scope = $this->libraryScopes->current();
+        $songIds = array_map(
+            static fn(\App\Playlist\Domain\Model\PlaylistSong $song) => $song->getSongId(),
+            $playlist->getSongs(),
+        );
+        $songMap = $this->songService->findVisibleByUuids($songIds, $scope);
+        $visibleSongIds = array_map(
+            static fn(\App\Catalog\Domain\Model\Song $song) => $song->getId(),
+            array_values($songMap),
+        );
+        $artistNames = $this->songService->getVisibleArtistNamesForSongs($visibleSongIds, $scope);
+        $albumIds = array_map(
+            static fn(\App\Catalog\Domain\Model\Song $song) => $song->getAlbumId(),
+            array_values($songMap),
+        );
+        $albumTitles = $this->songService->getVisibleAlbumTitlesByIds($albumIds, $scope);
 
         $songs = [];
-        if ($playlistWithSongs !== null) {
-            $songIds = array_map(
-                static fn(\App\Playlist\Domain\Model\PlaylistSong $s) => $s->getSongId(),
-                $playlistWithSongs->getSongs(),
-            );
-
-            $songMap = $this->songService->findByUuids($songIds);
-            $artistNames = $this->songService->getArtistNamesForSongs($songIds);
-
-            $albumIds = array_map(
-                static fn(\App\Catalog\Domain\Model\Song $s) => $s->getAlbumId(),
-                array_values($songMap),
-            );
-            $albumTitles = $this->songService->getAlbumTitlesByIds($albumIds);
-
-            foreach ($playlistWithSongs->getSongs() as $playlistSong) {
-                $songUuid = $playlistSong->getSongId()->toString();
-                $song = $songMap[$songUuid] ?? null;
-                $songs[] = array_merge(
-                    ['position' => $playlistSong->getPosition()],
-                    $song !== null
-                        ? SongResource::fromWithMeta($song, $artistNames, $albumTitles)
-                        : ['uuid' => $songUuid],
-                );
+        foreach ($playlist->getSongs() as $playlistSong) {
+            $song = $songMap[$playlistSong->getSongId()->toString()] ?? null;
+            if ($song === null) {
+                continue;
             }
+            $data = SongResource::fromWithMeta($song, $artistNames, $albumTitles);
+            unset($data['path']);
+            $songs[] = array_merge(['position' => $playlistSong->getPosition()], $data);
         }
 
         return $this->successResponse(array_merge(
-            PlaylistResource::from($playlistWithSongs ?? $playlist),
-            ['songs' => $songs],
+            PlaylistResource::from($playlist),
+            ['songs' => $songs, 'songCount' => count($songs)],
         ));
     }
 
@@ -270,8 +291,19 @@ final class PlaylistController
             isPublic: $isPublic,
         ));
 
-        return $this->successResponse(PlaylistResource::from(
-            $envelope->last(HandledStamp::class)?->getResult(),
+        $updatedPlaylist = $envelope->last(HandledStamp::class)?->getResult();
+        if (!$updatedPlaylist instanceof Playlist) {
+            throw new \LogicException('Playlist update did not return a playlist.');
+        }
+        $songIds = array_map(
+            static fn(\App\Playlist\Domain\Model\PlaylistSong $song) => $song->getSongId(),
+            $updatedPlaylist->getSongs(),
+        );
+        $visibleCount = count($this->songService->findVisibleByUuids($songIds, $this->libraryScopes->current()));
+
+        return $this->successResponse(array_merge(
+            PlaylistResource::from($updatedPlaylist),
+            ['songCount' => $visibleCount],
         ));
     }
 
