@@ -257,4 +257,95 @@ async function passiveAnalysis(): Promise<PassiveAnalysisResult> {
   }
 }
 
-Object.assign(window, { audioGraphFixture: { render, lifecycle, passiveAnalysis } })
+export interface StereoAnalysisOptions {
+  mode: 'fallback' | 'worklet'
+  signal: 'right' | 'antiphase' | 'asymmetric' | 'mono'
+}
+
+export interface StereoAnalysisResult {
+  before: { leftChannel: number; rightChannel: number; rms: number; lufs: number }
+  after: { leftChannel: number; rightChannel: number; rms: number; lufs: number }
+  workletReports: number
+  wasmLoudnessReported: boolean
+  beforeWorkletFrame: StereoAnalysisResult['before'] | null
+  afterWorkletFrame: StereoAnalysisResult['after'] | null
+}
+
+async function stereoAnalysis(options: StereoAnalysisOptions): Promise<StereoAnalysisResult> {
+  const processor = new AudioProcessor()
+  const graph = processor as unknown as {
+    audioContext: AudioContext
+    sourceGainA: GainNode
+    audioWorkletNode: AudioWorkletNode | null
+  }
+  const context = graph.audioContext
+  const source = context.createBufferSource()
+  const buffer = context.createBuffer(options.signal === 'mono' ? 1 : 2, context.sampleRate, context.sampleRate)
+  // An integer number of periods in every 2048-frame analyser window makes
+  // the expected RMS independent of the browser's sampling time.
+  const frequency = context.sampleRate / 64
+  for (let i = 0; i < buffer.length; i++) {
+    const value = Math.sin(2 * Math.PI * frequency * i / context.sampleRate)
+    buffer.getChannelData(0)[i] = options.signal === 'right' ? 0 : 0.2 * value
+    if (buffer.numberOfChannels > 1) buffer.getChannelData(1)[i] = (options.signal === 'antiphase' ? -0.2 : options.signal === 'asymmetric' ? 0.1 : 0.2) * value
+  }
+  source.buffer = buffer
+  source.loop = true
+  let workletReports = 0
+  let wasmLoudnessReported = false
+  let latestWorkletFrame: StereoAnalysisResult['before'] | null = null
+  const waitFor = async (condition: () => boolean) => {
+    const deadline = performance.now() + 5000
+    while (!condition()) {
+      if (performance.now() > deadline) throw new Error('Stereo analysis did not become ready')
+      await new Promise(resolve => setTimeout(resolve, 10))
+    }
+  }
+  if (options.mode === 'fallback') {
+    context.audioWorklet.addModule = async () => { throw new Error('Fixture selects stereo analyser fallback') }
+  }
+  try {
+    await context.resume()
+    await processor.connectDualAudioElements(new Audio(), new Audio())
+    source.connect(graph.sourceGainA)
+    processor.setPlayingState(true)
+    if (options.mode === 'worklet') {
+      await waitFor(() => graph.audioWorkletNode !== null)
+      // Observe native reports without replacing the production message handler.
+      graph.audioWorkletNode!.port.addEventListener('message', event => {
+        if (event.data.type !== 'analysis') return
+        workletReports++
+        const { leftChannel, rightChannel, rms, lufs } = event.data
+        latestWorkletFrame = { leftChannel, rightChannel, rms, lufs }
+        // Native R128 sums stereo energy and applies K weighting; the JS
+        // fallback instead reports the unweighted, channel-averaged RMS LUFS.
+        if (rms > 0 && lufs > -0.691 + 20 * Math.log10(rms) + 2
+          && Number.isFinite(event.data.truePeak)) wasmLoudnessReported = true
+      })
+    }
+    source.start()
+    const started = context.currentTime
+    await waitFor(() => context.currentTime - started > 0.45 && processor.getAnalysisData().rms > 0.05
+      && (options.mode === 'fallback' || wasmLoudnessReported))
+    const read = () => {
+      const { leftChannel, rightChannel, rms, lufs } = processor.getAnalysisData()
+      return { leftChannel, rightChannel, rms, lufs }
+    }
+    const before = read()
+    const beforeWorkletFrame = latestWorkletFrame
+    processor.setVolume(0.1)
+    processor.setMasterGain(-20)
+    const changed = context.currentTime
+    const reportsBefore = workletReports
+    await waitFor(() => context.currentTime - changed > 0.3
+      && (options.mode === 'fallback' || workletReports > reportsBefore + 2))
+    return { before, after: read(), workletReports, wasmLoudnessReported, beforeWorkletFrame, afterWorkletFrame: latestWorkletFrame }
+  } finally {
+    source.stop()
+    source.disconnect()
+    processor.destroy()
+    if (context.state !== 'closed') await context.close()
+  }
+}
+
+Object.assign(window, { audioGraphFixture: { render, lifecycle, passiveAnalysis, stereoAnalysis } })

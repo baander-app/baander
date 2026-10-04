@@ -13,6 +13,14 @@ interface WasmSpectrumMessage {
   timeDomainData?: Uint8Array
 }
 
+interface MeterFrame {
+  leftChannel: number
+  rightChannel: number
+  rms: number
+  lufs: number
+  receivedAt: number
+}
+
 // --- Analysis data shape ---
 
 export interface AnalysisData {
@@ -57,6 +65,9 @@ export class AudioProcessor {
   private activeSource: 'A' | 'B' = 'A'
   private dummyElement: HTMLAudioElement | null = null
   private analyzerNode!: AnalyserNode
+  private meterSplitter!: ChannelSplitterNode
+  private leftMeterAnalyzer!: AnalyserNode
+  private rightMeterAnalyzer!: AnalyserNode
   private gainNode!: GainNode
   private rebuildGain!: GainNode
   private analysisSink!: GainNode
@@ -94,6 +105,8 @@ export class AudioProcessor {
   private timeDomainData!: Uint8Array
   private tempFrequencyData!: Uint8Array
   private tempTimeDomainData!: Uint8Array
+  private readonly leftMeterData = new Float32Array(2048)
+  private readonly rightMeterData = new Float32Array(2048)
 
   // Analysis results
   private peakFrequency = 0
@@ -101,9 +114,9 @@ export class AudioProcessor {
   private spectralRolloff = 0
   private spectralFlux = 0
   private spectralFlatness = 0
-  private lufsBuffer: number[] = []
+  private latestMeterFrame: MeterFrame | null = null
   private programmeGeneration = 0
-  private readonly LUFS_WINDOW_SIZE = 400
+  private readonly METER_FRAME_MAX_AGE = 0.25 // Seconds of processed audio.
   private readonly SMOOTHING_TIME = 0.1
 
   // State
@@ -244,12 +257,29 @@ export class AudioProcessor {
     this.analyzerNode = this.audioContext.createAnalyser()
     this.analyzerNode.fftSize = this.FFT_SIZE
     this.analyzerNode.smoothingTimeConstant = 0.8
+    // Both meter branches observe the same stereo mix, including mono upmix.
+    this.analyzerNode.channelCount = 2
+    this.analyzerNode.channelCountMode = 'explicit'
+    this.analyzerNode.channelInterpretation = 'speakers'
 
     this.gainNode = this.audioContext.createGain()
     this.rebuildGain = this.audioContext.createGain()
     this.analysisSink = this.audioContext.createGain()
     this.analysisSink.gain.value = 0
     this.analysisSink.connect(this.audioContext.destination)
+    // Split before waveform analysis so stereo energy survives opposite phase.
+    this.meterSplitter = this.audioContext.createChannelSplitter(2)
+    this.leftMeterAnalyzer = this.audioContext.createAnalyser()
+    this.rightMeterAnalyzer = this.audioContext.createAnalyser()
+    for (const analyzer of [this.leftMeterAnalyzer, this.rightMeterAnalyzer]) {
+      analyzer.fftSize = this.TIME_SIZE
+      analyzer.channelCount = 1
+      analyzer.channelCountMode = 'explicit'
+      analyzer.connect(this.analysisSink)
+    }
+    this.analyzerNode.connect(this.meterSplitter)
+    this.meterSplitter.connect(this.leftMeterAnalyzer, 0)
+    this.meterSplitter.connect(this.rightMeterAnalyzer, 1)
     this.gainNode.connect(this.rebuildGain)
     this.rebuildGain.connect(this.audioContext.destination)
     this.masterGainNode = this.audioContext.createGain()
@@ -386,7 +416,7 @@ export class AudioProcessor {
     this.spectralRolloff = 0
     this.spectralFlux = 0
     this.spectralFlatness = 0
-    this.lufsBuffer = []
+    this.latestMeterFrame = null
   }
 
   private setupFallbackAnalysis() {
@@ -416,18 +446,6 @@ export class AudioProcessor {
       if (this.spectralAPI && this.dspReady) {
         this.computeSpectralFeatures(this.tempFrequencyData)
       }
-
-      let sum = 0
-      const step = 4
-      for (let i = 0; i < this.tempTimeDomainData.length; i += step) {
-        const normalized = (this.tempTimeDomainData[i] - 128) / 128
-        sum += normalized * normalized
-      }
-      const rms = Math.sqrt(sum / (this.tempTimeDomainData.length / step))
-      const estimatedLufs = -0.691 + 10 * Math.log10(rms * rms + 1e-10)
-
-      this.lufsBuffer.push(estimatedLufs)
-      if (this.lufsBuffer.length > this.LUFS_WINDOW_SIZE) this.lufsBuffer.shift()
     }
   }
 
@@ -453,12 +471,20 @@ export class AudioProcessor {
         this.audioWorkletNode = node
         node.port.onmessage = (event: MessageEvent) => {
           if (!this.ownsWorkletGeneration(generation) || this.audioWorkletNode !== node) return
-          const msg = event.data as { type: string; lufs?: number; programmeGeneration?: number }
+          if (event.data === null || typeof event.data !== 'object') return
+          const msg = event.data as { type: string; programmeGeneration?: number } & Partial<MeterFrame>
           if (msg.type === 'request-dsp-init') {
             void this.sendDSPToWorklet(node, generation)
-          } else if (msg.type === 'analysis' && msg.programmeGeneration === this.programmeGeneration) {
-            if (typeof msg.lufs === 'number' && Number.isFinite(msg.lufs)) this.lufsBuffer.push(msg.lufs)
-            if (this.lufsBuffer.length > this.LUFS_WINDOW_SIZE) this.lufsBuffer.shift()
+          } else if (msg.type === 'analysis' && msg.programmeGeneration === this.programmeGeneration
+            && this.isConnected && this.isPlaying
+            && typeof msg.leftChannel === 'number' && Number.isFinite(msg.leftChannel) && msg.leftChannel >= 0 && msg.leftChannel <= 100
+            && typeof msg.rightChannel === 'number' && Number.isFinite(msg.rightChannel) && msg.rightChannel >= 0 && msg.rightChannel <= 100
+            && typeof msg.rms === 'number' && Number.isFinite(msg.rms) && msg.rms >= 0
+            && typeof msg.lufs === 'number' && Number.isFinite(msg.lufs)) {
+            this.latestMeterFrame = {
+              leftChannel: msg.leftChannel, rightChannel: msg.rightChannel, rms: msg.rms,
+              lufs: msg.lufs, receivedAt: this.audioContext.currentTime,
+            }
           }
         }
       }
@@ -492,6 +518,7 @@ export class AudioProcessor {
   }
 
   private teardownWorklet() {
+    this.latestMeterFrame = null
     // Invalidate continuations before disconnecting nodes or aborting requests.
     this.workletGeneration++
     this.workletAbort.abort()
@@ -514,7 +541,7 @@ export class AudioProcessor {
   public resetProgramme() {
     if (this.destroyed) return
     this.programmeGeneration++
-    this.lufsBuffer = []
+    this.latestMeterFrame = null
     this.audioWorkletNode?.port.postMessage({
       type: 'reset-programme', programmeGeneration: this.programmeGeneration,
     })
@@ -809,58 +836,44 @@ export class AudioProcessor {
       }
     }
 
-    if (this.analyzerNode) {
-      this.analyzerNode.getByteFrequencyData(this.tempFrequencyData as Uint8Array<ArrayBuffer>)
-      this.analyzerNode.getByteTimeDomainData(this.tempTimeDomainData as Uint8Array<ArrayBuffer>)
+    if (!this.wasmSpectrumReady) this.performUnifiedAnalysis()
 
-      for (let i = 0; i < this.tempFrequencyData.length && i < this.frequencyData.length; i++) {
-        this.frequencyData[i] = this.tempFrequencyData[i]
-      }
-      for (let i = 0; i < this.tempTimeDomainData.length && i < this.timeDomainData.length; i++) {
-        this.timeDomainData[i] = this.tempTimeDomainData[i]
-      }
-
-      const bufferLength = this.analyzerNode.frequencyBinCount
+    const frame = this.latestMeterFrame
+    const age = frame ? this.audioContext.currentTime - frame.receivedAt : Infinity
+    let leftChannel: number, rightChannel: number, rms: number, lufs: number
+    if (frame && age >= 0 && age <= this.METER_FRAME_MAX_AGE) {
+      // Worklet LUFS and RMS already have their own audio-time windows.
+      leftChannel = frame.leftChannel
+      rightChannel = frame.rightChannel
+      rms = frame.rms
+      lufs = frame.lufs
+    } else {
+      this.leftMeterAnalyzer.getFloatTimeDomainData(this.leftMeterData)
+      this.rightMeterAnalyzer.getFloatTimeDomainData(this.rightMeterData)
       let leftSum = 0, rightSum = 0
-      for (let i = 0; i < bufferLength; i += 4) {
-        const value = this.tempTimeDomainData[i] / 128.0 - 1.0
-        if (i % 8 === 0) leftSum += value * value
-        else rightSum += value * value
+      for (let i = 0; i < this.TIME_SIZE; i++) {
+        leftSum += this.leftMeterData[i] * this.leftMeterData[i]
+        rightSum += this.rightMeterData[i] * this.rightMeterData[i]
       }
-      const leftLevel = Math.sqrt(leftSum / (bufferLength / 8)) * 100
-      const rightLevel = Math.sqrt(rightSum / (bufferLength / 8)) * 100
-
-      const lufs = this.lufsBuffer.length > 0
-        ? this.lufsBuffer.reduce((a, b) => a + b, 0) / this.lufsBuffer.length
-        : -30
-
-      return {
-        frequencyData: this.frequencyData,
-        timeDomainData: this.timeDomainData,
-        leftChannel: leftLevel,
-        rightChannel: rightLevel,
-        lufs,
-        peakFrequency: this.peakFrequency,
-        spectralCentroid: this.spectralCentroid,
-        spectralRolloff: this.spectralRolloff,
-        spectralFlux: this.spectralFlux,
-        spectralFlatness: this.spectralFlatness,
-        rms: Math.sqrt((leftSum + rightSum) / (bufferLength / 4)),
-      }
+      leftChannel = Math.min(100, Math.sqrt(leftSum / this.TIME_SIZE) * 100)
+      rightChannel = Math.min(100, Math.sqrt(rightSum / this.TIME_SIZE) * 100)
+      rms = Math.sqrt((leftSum + rightSum) / (2 * this.TIME_SIZE))
+      // Unweighted stereo energy estimate, not EBU R128 loudness.
+      lufs = rms < 1e-6 ? -60 : -0.691 + 20 * Math.log10(rms)
     }
 
     return {
       frequencyData: this.frequencyData,
       timeDomainData: this.timeDomainData,
-      leftChannel: 0,
-      rightChannel: 0,
-      lufs: -30,
-      peakFrequency: 0,
-      spectralCentroid: 0,
-      spectralRolloff: 0,
-      spectralFlux: 0,
-      spectralFlatness: 0,
-      rms: 0,
+      leftChannel,
+      rightChannel,
+      lufs,
+      peakFrequency: this.peakFrequency,
+      spectralCentroid: this.spectralCentroid,
+      spectralRolloff: this.spectralRolloff,
+      spectralFlux: this.spectralFlux,
+      spectralFlatness: this.spectralFlatness,
+      rms,
     }
   }
 

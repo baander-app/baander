@@ -54,8 +54,9 @@ class MockNode {
     if (target) this.outputs.delete(target)
     else this.outputs.clear()
   })
-  getByteFrequencyData = vi.fn()
-  getByteTimeDomainData = vi.fn()
+  getByteFrequencyData = vi.fn((data: Uint8Array) => data)
+  getByteTimeDomainData = vi.fn((data: Uint8Array) => data)
+  getFloatTimeDomainData = vi.fn((data: Float32Array) => data.fill(0))
 }
 
 class MockContext {
@@ -100,6 +101,8 @@ type ProcessorInspection = {
   analyzerNode: MockNode
   analysisSink: MockNode
   wasmSpectrumReady: boolean
+  leftMeterAnalyzer: MockNode
+  rightMeterAnalyzer: MockNode
 }
 
 let processor: AudioProcessor
@@ -385,7 +388,7 @@ describe('AudioProcessor asynchronous analysis lifecycle', () => {
     state.frequencyData.fill(200)
     state.timeDomainData.fill(220)
     Object.assign(processor, { peakFrequency: 1000, spectralCentroid: 2000, spectralRolloff: 4000,
-      spectralFlux: 1, spectralFlatness: 0.5, lufsBuffer: [-12] })
+      spectralFlux: 1, spectralFlatness: 0.5, latestMeterFrame: { leftChannel: 80, rightChannel: 60, rms: 0.7, lufs: -12, receivedAt: 10 } })
     await processor.initializePassiveMode()
     expect(vi.getTimerCount()).toBe(0)
     for (let i = 0; i < 3; i++) {
@@ -442,22 +445,23 @@ describe('programme measurement ownership', () => {
     await connect()
     await settle()
     const meter = worklet('magic-soup-processor')
-    const readings = processor as unknown as { lufsBuffer: number[] }
-    meter.emit({ type: 'analysis', programmeGeneration: 0, lufs: -12 })
-    expect(readings.lufsBuffer).toEqual([-12])
+    processor.setPlayingState(true)
+    const report = { type: 'analysis', leftChannel: 20, rightChannel: 40, rms: 0.316 }
+    meter.emit({ ...report, programmeGeneration: 0, lufs: -12 })
+    expect(processor.getAnalysisData().lufs).toBe(-12)
     processor.resetProgramme()
-    expect(readings.lufsBuffer).toEqual([])
+    expect(processor.getAnalysisData().rms).toBe(0)
     expect(meter.port.postMessage).toHaveBeenCalledWith({ type: 'reset-programme', programmeGeneration: 1 })
-    meter.emit({ type: 'analysis', programmeGeneration: 0, lufs: -1 })
-    meter.emit({ type: 'analysis', lufs: -1 })
-    meter.emit({ type: 'analysis', programmeGeneration: 1, lufs: NaN })
-    expect(readings.lufsBuffer).toEqual([])
-    meter.emit({ type: 'analysis', programmeGeneration: 1, lufs: -24 })
-    expect(readings.lufsBuffer).toEqual([-24])
+    meter.emit({ ...report, programmeGeneration: 0, lufs: -1 })
+    meter.emit({ ...report, lufs: -1 })
+    meter.emit({ ...report, programmeGeneration: 1, lufs: NaN })
+    expect(processor.getAnalysisData().rms).toBe(0)
+    meter.emit({ ...report, programmeGeneration: 1, lufs: -24 })
+    expect(processor.getAnalysisData().lufs).toBe(-24)
     processor.resetProgramme()
-    meter.emit({ type: 'analysis', programmeGeneration: 1, lufs: -2 })
-    meter.emit({ type: 'analysis', programmeGeneration: 2, lufs: -30 })
-    expect(readings.lufsBuffer).toEqual([-30])
+    meter.emit({ ...report, programmeGeneration: 1, lufs: -2 })
+    meter.emit({ ...report, programmeGeneration: 2, lufs: -30 })
+    expect(processor.getAnalysisData().lufs).toBe(-30)
   })
 
   it('carries the latest boundary through delayed worklet creation and reconnection', async () => {
@@ -482,5 +486,87 @@ describe('programme measurement ownership', () => {
     processor.destroy()
     processor.resetProgramme()
     expect(meter.port.postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'reset-programme' }))
+  })
+})
+
+
+describe('stereo meter report ownership', () => {
+  it('uses real stereo reports without replacing or averaging them with analyser estimates', async () => {
+    await connect()
+    await settle()
+    processor.setPlayingState(true)
+    const meter = worklet('magic-soup-processor')
+    const report = { type: 'analysis', programmeGeneration: 0, leftChannel: 0, rightChannel: 80, rms: Math.sqrt(0.32), lufs: -9 }
+    meter.emit(report)
+    vi.advanceTimersByTime(160) // fallback spectrum polling is independent of meter ownership
+    expect(processor.getAnalysisData()).toMatchObject({ leftChannel: 0, rightChannel: 80, rms: report.rms, lufs: -9 })
+    meter.emit({ ...report, leftChannel: 40, rightChannel: 20, rms: Math.sqrt(0.1), lufs: -27 })
+    expect(processor.getAnalysisData()).toMatchObject({ leftChannel: 40, rightChannel: 20, rms: Math.sqrt(0.1), lufs: -27 })
+    expect(graph.leftMeterAnalyzer.getFloatTimeDomainData).not.toHaveBeenCalled()
+  })
+
+  it('rejects incomplete, nonfinite and out-of-range reports atomically', async () => {
+    await connect()
+    await settle()
+    processor.setPlayingState(true)
+    const meter = worklet('magic-soup-processor')
+    const report = { type: 'analysis', programmeGeneration: 0, leftChannel: 10, rightChannel: 20, rms: 0.15, lufs: -20 }
+    meter.emit(report)
+    for (const malformed of [null, undefined, 'analysis', 42]) {
+      expect(() => meter.emit(malformed)).not.toThrow()
+    }
+    for (const invalid of [{ lufs: NaN }, { rms: Infinity }, { rms: -1 }, { leftChannel: -1 },
+      { rightChannel: 101 }, { leftChannel: undefined }, { rightChannel: '20' }, { programmeGeneration: 99 }]) {
+      meter.emit({ ...report, lufs: -1, ...invalid })
+      expect(processor.getAnalysisData()).toMatchObject({ leftChannel: 10, rightChannel: 20, rms: 0.15, lufs: -20 })
+    }
+  })
+
+  it('expires stopped reports and measures both complete fallback channel windows', async () => {
+    await connect()
+    await settle()
+    processor.setPlayingState(true)
+    graph.leftMeterAnalyzer.getFloatTimeDomainData.mockImplementation(data => { data.fill(0); data.fill(0.5, 1024); return data })
+    graph.rightMeterAnalyzer.getFloatTimeDomainData.mockImplementation(data => data.fill(-0.25))
+    const meter = worklet('magic-soup-processor')
+    meter.emit({ type: 'analysis', programmeGeneration: 0, leftChannel: 90, rightChannel: 90, rms: 0.9, lufs: -1 })
+    graph.audioContext.currentTime += 0.3
+    const data = processor.getAnalysisData()
+    expect(data.leftChannel).toBeCloseTo(Math.sqrt(0.125) * 100)
+    expect(data.rightChannel).toBe(25)
+    expect(data.rms).toBeCloseTo(Math.sqrt((0.125 + 0.0625) / 2))
+    expect(data.lufs).toBeCloseTo(-0.691 + 20 * Math.log10(data.rms))
+    expect(graph.leftMeterAnalyzer.getFloatTimeDomainData).toHaveBeenCalledOnce()
+    expect(graph.rightMeterAnalyzer.getFloatTimeDomainData).toHaveBeenCalledOnce()
+  })
+
+  it('clears a paused report and ignores queued reports until resumed', async () => {
+    await connect()
+    await settle()
+    processor.setPlayingState(true)
+    const meter = worklet('magic-soup-processor')
+    const report = { type: 'analysis', programmeGeneration: 0, leftChannel: 50, rightChannel: 25, rms: 0.4, lufs: -10 }
+    meter.emit(report)
+    processor.setPlayingState(false)
+    meter.emit(report)
+    expect(processor.getAnalysisData().rms).toBe(0)
+    processor.setPlayingState(true)
+    expect(processor.getAnalysisData().rms).toBe(0)
+    meter.emit(report)
+    expect(processor.getAnalysisData().rms).toBe(0.4)
+  })
+
+  it('preserves worklet spectrum buffers when the UI reads meter data', async () => {
+    await connect()
+    await settle()
+    processor.setPlayingState(true)
+    const spectrum = worklet('wasm-spectrum')
+    spectrum.emit({ type: 'ready' })
+    spectrum.emit({ type: 'spectrum', frequencyData: new Uint8Array(1024).fill(123), timeDomainData: new Uint8Array(2048).fill(130) })
+    graph.analyzerNode.getByteFrequencyData.mockImplementation((data: Uint8Array) => data.fill(9))
+    const result = processor.getAnalysisData()
+    expect(result.frequencyData.every(value => value === 123)).toBe(true)
+    expect(result.timeDomainData.every(value => value === 130)).toBe(true)
+    expect(graph.analyzerNode.getByteFrequencyData).not.toHaveBeenCalled()
   })
 })

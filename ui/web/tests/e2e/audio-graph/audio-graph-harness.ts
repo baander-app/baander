@@ -6,10 +6,10 @@ import { tmpdir } from 'node:os'
 import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { RenderOptions, LifecycleCase, LifecycleResult, PassiveAnalysisResult } from './browser-fixture'
+import type { RenderOptions, LifecycleCase, LifecycleResult, PassiveAnalysisResult, StereoAnalysisOptions, StereoAnalysisResult } from './browser-fixture'
 
 export interface Signal { left: number[]; right: number[]; leftGain: number; rightGain: number }
-export const test = base.extend<{ render: (options: RenderOptions) => Promise<Signal>; lifecycle: (scenario: LifecycleCase) => Promise<LifecycleResult>; passiveAnalysis: () => Promise<PassiveAnalysisResult> }, { origin: string }>({
+export const test = base.extend<{ render: (options: RenderOptions) => Promise<Signal>; lifecycle: (scenario: LifecycleCase) => Promise<LifecycleResult>; passiveAnalysis: () => Promise<PassiveAnalysisResult>; stereoAnalysis: (options: StereoAnalysisOptions) => Promise<StereoAnalysisResult> }, { origin: string }>({
   origin: [async ({ browserName }, provide) => {
     if (browserName !== 'chromium') throw new Error('The audio regression harness requires Chromium')
     const temporary = mkdtempSync(resolve(tmpdir(), 'baander-audio-graph-'))
@@ -27,7 +27,8 @@ export const test = base.extend<{ render: (options: RenderOptions) => Promise<Si
           plugin.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ contents: `
             const api = new Proxy({}, { get: () => () => {} });
             export const getLoudness=async()=>api, getDynamics=async()=>api, getSpectralFeatures=async()=>api;
-            export const getWasmUrl=()=>'/analysis.wasm', getAudioWorkletUrl=file=>'/'+file;
+            export const getWasmUrl=file=>location.pathname.startsWith('/real/')?'/dsp/'+file:'/analysis.wasm';
+            export const getAudioWorkletUrl=file=>location.pathname.startsWith('/real/')?'/real/'+file:'/'+file;
           ` }))
         } }],
       })
@@ -39,9 +40,12 @@ export const test = base.extend<{ render: (options: RenderOptions) => Promise<Si
         if (request.url === '/wasm-loader.js') {
           response.setHeader('Content-Type', 'application/javascript')
           response.end(wasmLoaderBundle.outputFiles[0].text)
-        } else if (/^\/dsp\/(loudness_r128|dynamics_meter|spectral_features)\.wasm$/.test(request.url ?? '')) {
+        } else if (/^\/dsp\/(loudness_r128|dynamics_meter|spectral_features|fft2048)\.wasm$/.test(request.url ?? '')) {
           response.setHeader('Content-Type', 'application/wasm')
           response.end(readFileSync(resolve(dspDirectory, request.url!.slice('/dsp/'.length))))
+        } else if (request.url === '/real/magic-soup-processor.js' || request.url === '/real/wasm-spectrum.js') {
+          response.setHeader('Content-Type', 'application/javascript')
+          response.end(readFileSync(resolve(dspDirectory, '../audio-worklets', request.url.slice('/real/'.length))))
         } else if (request.url === '/fixture.js') {
           response.setHeader('Content-Type', 'application/javascript')
           response.end('window.Worker=class { postMessage(){} terminate(){} };\n' + bundle.outputFiles[0].text)
@@ -80,6 +84,15 @@ export const test = base.extend<{ render: (options: RenderOptions) => Promise<Si
     const browser = await playwright.chromium.launch({ args: ['--host-resolver-rules=MAP audio.baander.app 127.0.0.1', '--no-proxy-server', '--autoplay-policy=no-user-gesture-required',
       ...(process.env.AUDIO_GRAPH_CDP_PORT ? [`--remote-debugging-port=${process.env.AUDIO_GRAPH_CDP_PORT}`] : [])] })
     try { await provide(browser) } finally { await browser.close() }
+  },
+  stereoAnalysis: async ({ page, origin }, provide) => {
+    await provide(async options => {
+      await page.goto(origin + (options.mode === 'worklet' ? '/real/' : '/'))
+      await page.waitForFunction(() => 'audioGraphFixture' in window)
+      return page.evaluate(options => (window as unknown as {
+        audioGraphFixture: { stereoAnalysis(options: StereoAnalysisOptions): Promise<StereoAnalysisResult> }
+      }).audioGraphFixture.stereoAnalysis(options), options)
+    })
   },
   context: async ({ browser }, provide) => {
     const context = await browser.newContext({ ignoreHTTPSErrors: true })
