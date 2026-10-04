@@ -6,7 +6,7 @@ namespace App\Transcode\Interface\Security;
 
 use App\Transcode\Application\Port\StreamAuthPortInterface;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Security\Core\Exception\AccessDeniedException;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 final readonly class SignedStreamRequest
 {
@@ -16,20 +16,26 @@ final readonly class SignedStreamRequest
 
     public function validate(Request $request): void
     {
+        if (!$this->isValid($request)) {
+            throw new AccessDeniedHttpException('Invalid or expired signature.');
+        }
+    }
+
+    public function isValid(Request $request): bool
+    {
         $query = $request->query->all();
         $signature = $query['sig'] ?? null;
         $expiry = $query['exp'] ?? null;
         if (!is_string($signature) || !is_string($expiry) || !ctype_digit($expiry)
             || filter_var($expiry, FILTER_VALIDATE_INT) === false) {
-            throw new AccessDeniedException('Invalid or expired signature.');
+            return false;
         }
         unset($query['sig'], $query['exp']);
         $path = $request->getPathInfo();
         if ($query !== []) {
-            $path .= '?'.http_build_query($query);
+            $path .= '?' . http_build_query($query);
         }
-        if (!$this->streamAuth->validateUrl($path, $signature, (int) $expiry)) {
-            throw new AccessDeniedException('Invalid or expired signature.');
-        }
+
+        return $this->streamAuth->validateUrl($path, $signature, (int) $expiry);
     }
 }

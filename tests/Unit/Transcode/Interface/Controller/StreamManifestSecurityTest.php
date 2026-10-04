@@ -14,7 +14,7 @@ use App\Transcode\Interface\Security\SignedStreamRequest;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Security\Core\Exception\AccessDeniedException;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 final class StreamManifestSecurityTest extends TestCase
 {
@@ -48,7 +48,7 @@ final class StreamManifestSecurityTest extends TestCase
         $playback->expects($this->never())->method('start');
         $controller = new StreamManifestController($streaming, new SignedStreamRequest($signer), $playback);
         if (!$valid) {
-            $this->expectException(AccessDeniedException::class);
+            $this->expectException(AccessDeniedHttpException::class);
         }
         $request = Request::create($url);
         $response = match ($method) {

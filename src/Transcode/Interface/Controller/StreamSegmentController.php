@@ -9,7 +9,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Swoole\Async;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Transcode\Application\Port\SegmentAvailabilityInterface;
-use App\Transcode\Application\Port\StreamAuthPortInterface;
+use App\Transcode\Interface\Security\SignedStreamRequest;
 use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
 use OpenApi\Attributes as OA;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -28,7 +28,7 @@ final class StreamSegmentController
 
     public function __construct(
         private readonly TranscodeStreamingPortInterface $streamingService,
-        private readonly StreamAuthPortInterface $streamAuth,
+        private readonly SignedStreamRequest $signedRequest,
         private readonly SegmentAvailabilityInterface $segmentAvailability,
     ) {
     }
@@ -56,7 +56,7 @@ final class StreamSegmentController
     #[Route('/init', name: 'init_segment', methods: ['GET'])]
     public function initSegment(string $jobPublicId, Request $request): Response
     {
-        if (!$this->validateSignature($request)) {
+        if (!$this->signedRequest->isValid($request)) {
             return new JsonResponse(['error' => 'Invalid or expired signature'], Response::HTTP_FORBIDDEN);
         }
 
@@ -97,7 +97,7 @@ final class StreamSegmentController
     #[Route('/segment', name: 'segment', methods: ['GET'])]
     public function segment(string $jobPublicId, Request $request): Response
     {
-        if (!$this->validateSignature($request)) {
+        if (!$this->signedRequest->isValid($request)) {
             return new JsonResponse(['error' => 'Invalid or expired signature'], Response::HTTP_FORBIDDEN);
         }
 
@@ -131,28 +131,6 @@ final class StreamSegmentController
         return $this->streamFile($readyPath, 'video/mp4');
     }
 
-    private function validateSignature(Request $request): bool
-    {
-        $sig = $request->query->get('sig');
-        $exp = $request->query->getInt('exp');
-
-        if ($sig === null || $exp === 0) {
-            return false;
-        }
-
-        // Reconstruct the signed path including query parameters that were part
-        // of the signed URL. The manifest signs the full path+query string
-        // (e.g. /segment?index=0), but getPathInfo() returns only the path.
-        // We must include the index param so the HMAC matches.
-        $path = '/' . ltrim($request->getPathInfo(), '/');
-        $index = $request->query->get('index');
-        if ($index !== null) {
-            $path .= '?index=' . $index;
-        }
-
-        return $this->streamAuth->validateUrl($path, $sig, $exp);
-    }
-
     // --- Subtitle Segment Delivery ---
 
     #[OA\Get(
@@ -174,7 +152,7 @@ final class StreamSegmentController
     #[Route('/subtitles/{language}/{segment}.vtt', name: 'subtitle_segment', methods: ['GET'])]
     public function subtitleSegment(string $jobPublicId, string $language, string $segment, Request $request): Response
     {
-        if (!$this->validateSignature($request)) {
+        if (!$this->signedRequest->isValid($request)) {
             return new JsonResponse(['error' => 'Invalid or expired signature'], Response::HTTP_FORBIDDEN);
         }
 

@@ -9,19 +9,14 @@ use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
-use App\Kernel;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
-use Defuse\Crypto\Key;
+use App\Tests\Fixtures\Auth\ProductionOAuthKernel;
 use Doctrine\ORM\EntityManagerInterface;
-use Monolog\Handler\NullHandler;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
-use Symfony\Component\DependencyInjection\ContainerBuilder;
-use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -31,7 +26,7 @@ final class OAuthFirewallAcceptanceTest extends TestCase
 {
     private string $directory;
     private string $privateKey;
-    private OAuthFirewallAcceptanceKernel $kernel;
+    private ProductionOAuthKernel $kernel;
     private EntityManagerInterface $manager;
     private User $user;
     private ClientEntity $client;
@@ -56,7 +51,7 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         self::assertSame(strlen($details['key']), file_put_contents($this->directory . '/public.pem', $details['key']));
         self::assertTrue(chmod($this->directory . '/private.pem', 0600));
         self::assertTrue(chmod($this->directory . '/public.pem', 0600));
-        $this->kernel = new OAuthFirewallAcceptanceKernel($this->directory, $url);
+        $this->kernel = new ProductionOAuthKernel($this->directory, $url);
         $this->kernel->boot();
         $container = $this->kernel->getContainer();
         self::assertSame('prod', $container->getParameter('kernel.environment'));
@@ -174,52 +169,5 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         $this->kernel->terminate($request, $response);
 
         return $response;
-    }
-}
-
-final class OAuthFirewallAcceptanceKernel extends Kernel
-{
-    public function __construct(private readonly string $directory, private readonly string $databaseUrl)
-    {
-        parent::__construct('prod', false);
-    }
-
-    public function getProjectDir(): string
-    {
-        return dirname(__DIR__, 2);
-    }
-
-    public function getCacheDir(): string
-    {
-        return $this->directory . '/cache';
-    }
-
-    public function getLogDir(): string
-    {
-        return $this->directory . '/logs';
-    }
-
-    protected function build(ContainerBuilder $container): void
-    {
-        parent::build($container);
-        $container->setAlias('oauth.acceptance.entity_manager', EntityManagerInterface::class)->setPublic(true);
-        $container->setAlias('oauth.acceptance.users', UserRepositoryInterface::class)->setPublic(true);
-        $container->addCompilerPass(new class($this->directory, $this->databaseUrl) implements CompilerPassInterface {
-            public function __construct(private readonly string $directory, private readonly string $databaseUrl)
-            {
-            }
-
-            public function process(ContainerBuilder $container): void
-            {
-                foreach (['stdout', 'security', 'messenger'] as $handler) {
-                    $container->setDefinition('monolog.handler.' . $handler, new Definition(NullHandler::class));
-                }
-                $container->setParameter('auth.private_key_path', $this->directory . '/private.pem');
-                $container->setParameter('auth.public_key_path', $this->directory . '/public.pem');
-                $container->setParameter('auth.encryption_key', Key::createNewRandomKey()->saveToAsciiSafeString());
-                $container->setParameter('auth.oauth.issuer', 'https://baander.app');
-                $container->setParameter('env(DATABASE_URL)', $this->databaseUrl);
-            }
-        });
     }
 }

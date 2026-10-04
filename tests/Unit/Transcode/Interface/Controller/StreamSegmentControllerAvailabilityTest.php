@@ -10,6 +10,7 @@ use App\Transcode\Application\Port\SegmentAvailabilityInterface;
 use App\Transcode\Application\Port\StreamAuthPortInterface;
 use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
 use App\Transcode\Interface\Controller\StreamSegmentController;
+use App\Transcode\Interface\Security\SignedStreamRequest;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
@@ -60,7 +61,7 @@ final class StreamSegmentControllerAvailabilityTest extends TestCase
                 'matching' => $this->expectedPath,
                 default => null,
             });
-        $controller = new StreamSegmentController($streaming, $auth, $availability);
+        $controller = new StreamSegmentController($streaming, new SignedStreamRequest($auth), $availability);
         $request = Request::create('https://baander.app/api/transcode/' . $publicId . '/segment?index=7&sig=valid-signature&exp=2000000000');
 
         $response = $controller->segment($publicId->toString(), $request);
@@ -94,7 +95,7 @@ final class StreamSegmentControllerAvailabilityTest extends TestCase
             ->willReturn($this->stalePath);
         $controller = new StreamSegmentController(
             $this->createStub(TranscodeStreamingPortInterface::class),
-            $this->createStub(StreamAuthPortInterface::class),
+            new SignedStreamRequest($this->createStub(StreamAuthPortInterface::class)),
             $availability,
         );
 
