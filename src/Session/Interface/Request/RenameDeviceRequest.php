@@ -17,7 +17,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 final readonly class RenameDeviceRequest
 {
     public function __construct(
-        #[Assert\NotBlank(message: 'Device name is required.')]
+        #[Assert\NotBlank(message: 'Device name is required.', normalizer: 'trim')]
         #[Assert\Length(max: 255, maxMessage: 'Device name cannot exceed {{ limit }} characters.')]
         public string $name = '',
     ) {
