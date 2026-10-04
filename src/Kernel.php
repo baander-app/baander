@@ -16,6 +16,7 @@ use SwooleBundle\SwooleBundle\Reflection\ClassModifier;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Compiler\PassConfig;
+use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpKernel\Kernel as BaseKernel;
 
 class Kernel extends BaseKernel
@@ -49,31 +50,27 @@ class Kernel extends BaseKernel
     }
 
     /**
-     * Wraps container initialization in an exclusive file lock and temporarily
-     * disables coroutine hooks to prevent segfaults from hooked flock() and
-     * race conditions when multiple Swoole workers compile the cache simultaneously.
+     * Serializes container compilation across workers sharing the cache directory.
      */
     protected function initializeContainer(): void
     {
         $cacheDir = $this->getCacheDir();
-        if (!is_dir($cacheDir)) {
-            mkdir($cacheDir, 0777, true);
-        }
+        (new Filesystem())->mkdir($cacheDir);
 
         $lockFile = $cacheDir . '/.container.lock';
-        $lock = fopen($lockFile, 'c+');
-
-        if ($lock !== false) {
-            flock($lock, LOCK_EX);
+        $lock = @fopen($lockFile, 'c+');
+        if ($lock === false) {
+            throw new \RuntimeException('Cannot open the container initialization lock.');
         }
 
         try {
+            if (!@flock($lock, LOCK_EX)) {
+                throw new \RuntimeException('Cannot acquire the container initialization lock.');
+            }
             $this->bootContainer($cacheDir);
         } finally {
-            if ($lock !== false) {
-                flock($lock, LOCK_UN);
-                fclose($lock);
-            }
+            flock($lock, LOCK_UN);
+            fclose($lock);
         }
     }
 
