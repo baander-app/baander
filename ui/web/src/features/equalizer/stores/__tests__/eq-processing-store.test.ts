@@ -100,6 +100,8 @@ describe('useEqProcessingStore — setCompressorParams partial merge', () => {
   })
 
   it('forwards the partial params to the processor', () => {
+    useEqProcessingStore.getState().setCompressionEnabled(true)
+    mockProcessor.setCompressorParams.mockClear()
     const params = { attack: 20, release: 300 }
     useEqProcessingStore.getState().setCompressorParams(params)
     expect(mockProcessor.setCompressorParams).toHaveBeenCalledWith(params)

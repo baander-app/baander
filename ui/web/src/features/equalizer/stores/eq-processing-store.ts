@@ -61,6 +61,15 @@ export interface EqProcessingState {
   setChainOrder: (order: ProcessingModule[]) => void
 }
 
+export const getEffectiveStereoWidth = (
+  state: Pick<EqProcessingState, 'stereoEnabled' | 'stereoMode' | 'stereoWidth'>,
+): number => {
+  if (!state.stereoEnabled) return 1
+  if (state.stereoMode === 'mid') return 0
+  if (state.stereoMode === 'side') return 2
+  return state.stereoWidth
+}
+
 export const reapplyProcessingState = () => {
   const state = useEqProcessingStore.getState()
   const processor = audioService.getProcessor()
@@ -98,7 +107,18 @@ export const useEqProcessingStore = create<EqProcessingState>()(
 
       setCompressionEnabled: (enabled) => {
         set({ compressionEnabled: enabled })
-        audioService.getProcessor()?.setCompression(enabled)
+        const processor = audioService.getProcessor()
+        processor?.setCompression(enabled)
+        if (enabled) {
+          const state = useEqProcessingStore.getState()
+          processor?.setCompressorParams({
+            threshold: state.compressorThreshold,
+            ratio: state.compressorRatio,
+            knee: state.compressorKnee,
+            attack: state.compressorAttack,
+            release: state.compressorRelease,
+          })
+        }
       },
 
       setCompressorParams: (params) => {
@@ -109,7 +129,9 @@ export const useEqProcessingStore = create<EqProcessingState>()(
           compressorAttack: params.attack ?? s.compressorAttack,
           compressorRelease: params.release ?? s.compressorRelease,
         }))
-        audioService.getProcessor()?.setCompressorParams(params)
+        if (useEqProcessingStore.getState().compressionEnabled) {
+          audioService.getProcessor()?.setCompressorParams(params)
+        }
       },
 
       setMasterGain: (gain) => {
@@ -130,23 +152,22 @@ export const useEqProcessingStore = create<EqProcessingState>()(
 
       setStereoEnabled: (enabled) => {
         set({ stereoEnabled: enabled })
-        const width = enabled ? useEqProcessingStore.getState().stereoWidth : 1
-        audioService.getProcessor()?.setStereoWidth(enabled ? width : 1)
+        audioService.getProcessor()?.setStereoWidth(getEffectiveStereoWidth(useEqProcessingStore.getState()))
       },
 
       setStereoWidth: (width) => {
         set({ stereoWidth: width })
-        if (useEqProcessingStore.getState().stereoEnabled) {
-          audioService.getProcessor()?.setStereoWidth(width)
+        const state = useEqProcessingStore.getState()
+        if (state.stereoEnabled) {
+          audioService.getProcessor()?.setStereoWidth(getEffectiveStereoWidth(state))
         }
       },
 
       setStereoMode: (mode) => {
         set({ stereoMode: mode })
-        if (useEqProcessingStore.getState().stereoEnabled) {
-          audioService.getProcessor()?.setStereoWidth(
-            mode === 'mid' ? 0 : mode === 'side' ? 2 : useEqProcessingStore.getState().stereoWidth
-          )
+        const state = useEqProcessingStore.getState()
+        if (state.stereoEnabled) {
+          audioService.getProcessor()?.setStereoWidth(getEffectiveStereoWidth(state))
         }
       },
 

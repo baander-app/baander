@@ -1,6 +1,6 @@
 import { audioService } from '@/features/player/services/audio-service'
 import { useEqBandsStore, flatBands } from './eq-bands-store'
-import { useEqProcessingStore, CROSSFEED_PRESETS } from './eq-processing-store'
+import { useEqProcessingStore, CROSSFEED_PRESETS, getEffectiveStereoWidth } from './eq-processing-store'
 
 /**
  * Reapply all EQ-related state to the audio processor.
@@ -34,7 +34,7 @@ export function reapplyAllEqState() {
   processor.setMasterGain(processingState.masterGain)
 
   // Stereo width
-  processor.setStereoWidth(processingState.stereoEnabled ? processingState.stereoWidth : 1)
+  processor.setStereoWidth(getEffectiveStereoWidth(processingState))
 
   // Crossfeed
   processor.setCrossfeed(
@@ -48,4 +48,6 @@ export function reapplyAllEqState() {
   if (!processingState.normalizationEnabled) {
     processor.applyVolumeNormalization(0, 0)
   }
+
+  processor.rebuildChain(processingState.chainOrder)
 }
