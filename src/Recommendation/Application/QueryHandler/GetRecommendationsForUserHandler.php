@@ -27,6 +27,15 @@ final class GetRecommendationsForUserHandler
     ) {
     }
 
+    /**
+     * @return list<array{
+     *     id: string, name: string, source_type: string, source_id: string,
+     *     target_type: string, target_id: string, score: float, position: int|null,
+     *     user_id: string|null, created_at: string, updated_at: string,
+     *     sourceName: string|null, targetTitle: string|null,
+     *     targetArtistName: string|null, coverImageUrl: string|null
+     * }>
+     */
     #[AsMessageHandler]
     public function __invoke(GetRecommendationsForUserQuery $query): array
     {

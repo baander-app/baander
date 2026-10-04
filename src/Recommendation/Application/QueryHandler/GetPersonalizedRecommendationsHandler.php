@@ -10,6 +10,9 @@ use App\Recommendation\Domain\Repository\RecommendationRepositoryInterface;
 use App\Recommendation\Domain\ValueObject\RecommendationType;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
+/**
+ * @phpstan-type RecommendedSong array{id: string, public_id: string, title: string, album_id: string, track: int|null, disc: int|null, year: int|null, length: float|null}
+ */
 final class GetPersonalizedRecommendationsHandler
 {
     private const STRATEGY_LABELS = [
@@ -25,6 +28,7 @@ final class GetPersonalizedRecommendationsHandler
     ) {
     }
 
+    /** @return list<array{target_id: string, target_type: string, total_score: float, explanation: string, strategies: array<string, float>, song: RecommendedSong}> */
     #[AsMessageHandler]
     public function __invoke(GetPersonalizedRecommendationsQuery $query): array
     {
@@ -93,6 +97,7 @@ final class GetPersonalizedRecommendationsHandler
         return $result;
     }
 
+    /** @return RecommendedSong */
     private function songToArray(\App\Catalog\Domain\Model\Song $song): array
     {
         return [

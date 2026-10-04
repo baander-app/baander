@@ -15,6 +15,7 @@ final class GetTargetingRecommendationsHandler
     ) {
     }
 
+    /** @return \App\Recommendation\Domain\Model\Recommendation[] */
     #[AsMessageHandler]
     public function __invoke(GetTargetingRecommendationsQuery $query): array
     {

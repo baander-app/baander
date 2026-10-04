@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Recommendation\Interface\Controller;
 
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Recommendation\Application\Command\DeleteRecommendationCommand;
 use App\Recommendation\Application\Command\DeleteRecommendationsBySourceCommand;
 use App\Recommendation\Application\Command\SaveRecommendationCommand;
@@ -57,7 +58,7 @@ final class RecommendationController
     public function index(Request $request): JsonResponse
     {
         $user = $this->security->getUser();
-        if ($user === null) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return $this->unauthorized();
         }
 
@@ -111,7 +112,7 @@ final class RecommendationController
     public function forYou(Request $request): JsonResponse
     {
         $user = $this->security->getUser();
-        if ($user === null) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return $this->unauthorized();
         }
 
@@ -226,7 +227,7 @@ final class RecommendationController
     public function store(Request $request): JsonResponse
     {
         $user = $this->security->getUser();
-        if ($user === null) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return $this->unauthorized();
         }
 
@@ -271,7 +272,7 @@ final class RecommendationController
     public function destroy(string $uuid): JsonResponse
     {
         $user = $this->security->getUser();
-        if ($user === null) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return $this->unauthorized();
         }
 
@@ -305,7 +306,7 @@ final class RecommendationController
     public function destroyBySource(string $sourceType, string $sourceId): JsonResponse
     {
         $user = $this->security->getUser();
-        if ($user === null) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return $this->unauthorized();
         }
 

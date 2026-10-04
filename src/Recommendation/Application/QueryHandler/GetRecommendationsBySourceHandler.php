@@ -15,6 +15,7 @@ final class GetRecommendationsBySourceHandler
     ) {
     }
 
+    /** @return \App\Recommendation\Domain\Model\Recommendation[] */
     #[AsMessageHandler]
     public function __invoke(GetRecommendationsBySourceQuery $query): array
     {

@@ -312,6 +312,7 @@ final class RecommendationPoolWorker implements ProcessPoolWorkerInterface
         $pdo->exec("DELETE FROM recommendations WHERE source_type = 'song' AND target_type = 'song'");
     }
 
+    /** @param array<string, int>|null $strategyCounts */
     private function updateJobStatus(\PDO $pdo, string $jobId, string $status, ?string $failReason = null, ?array $strategyCounts = null): void
     {
         $fields = ['status' => $status, 'updated_at' => new \DateTime()];
@@ -385,6 +386,7 @@ final class RecommendationPoolWorker implements ProcessPoolWorkerInterface
     }
 
     /**
+     * @param array<string, mixed> $row Raw PDO associative row.
      * @return array<string, float>
      */
     private function extractFeatures(array $row): array
@@ -461,6 +463,10 @@ final class RecommendationPoolWorker implements ProcessPoolWorkerInterface
         return array_slice($scores, 0, $limit);
     }
 
+    /**
+     * @param array<string, float> $a
+     * @param array<string, float> $b
+     */
     private function cosineSimilarity(array $a, array $b): float
     {
         $keys = array_intersect(array_keys($a), array_keys($b));
@@ -487,6 +493,10 @@ final class RecommendationPoolWorker implements ProcessPoolWorkerInterface
         return $dotProduct / $denominator;
     }
 
+    /**
+     * @param list<string> $a
+     * @param list<string> $b
+     */
     private function jaccardSimilarity(array $a, array $b): float
     {
         $intersection = count(array_intersect($a, $b));

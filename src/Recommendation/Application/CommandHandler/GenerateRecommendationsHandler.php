@@ -41,6 +41,7 @@ final class GenerateRecommendationsHandler
     ) {
     }
 
+    /** @return array<string, int>|RecommendationJob */
     #[AsMessageHandler]
     public function __invoke(GenerateRecommendationsCommand $command): array|RecommendationJob
     {
@@ -84,6 +85,7 @@ final class GenerateRecommendationsHandler
         return $job;
     }
 
+    /** @return array<string, int> */
     private function executeSynchronously(GenerateRecommendationsCommand $command): array
     {
         $userId = $command->getUserId();
@@ -252,8 +254,8 @@ final class GenerateRecommendationsHandler
             $similar = $this->contentCalculator->findMostSimilar($sourceFeatures, $candidates, limit: 15);
 
             foreach ($similar as $rec) {
-                $targetId = $rec['id'] ?? '';
-                $score = $rec['score'] ?? 0;
+                $targetId = $rec['id'];
+                $score = $rec['score'];
 
                 if ($score < 0.1) {
                     continue;

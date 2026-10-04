@@ -182,10 +182,10 @@ final class RecommendationTest extends TestCase
         $this->assertInstanceOf(Uuid::class, $rec->getId());
         $this->assertInstanceOf(RecommendationType::class, $rec->getSourceType());
         $this->assertInstanceOf(RecommendationType::class, $rec->getTargetType());
-        $this->assertIsString($rec->getName());
-        $this->assertIsString($rec->getSourceId());
-        $this->assertIsString($rec->getTargetId());
-        $this->assertIsFloat($rec->getScore());
+        $this->assertSame('default', $rec->getName());
+        $this->assertSame('s1', $rec->getSourceId());
+        $this->assertSame('s2', $rec->getTargetId());
+        $this->assertSame(50.0, $rec->getScore());
         $this->assertInstanceOf(\DateTimeImmutable::class, $rec->getCreatedAt());
         $this->assertInstanceOf(\DateTimeImmutable::class, $rec->getUpdatedAt());
     }

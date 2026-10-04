@@ -7,6 +7,13 @@ namespace App\Recommendation\Interface\Resource;
 use App\Recommendation\Domain\Model\Recommendation;
 use OpenApi\Attributes as OA;
 
+/**
+ * @phpstan-type RecommendationData array{
+ *     id: string, name: string, source_type: string, source_id: string,
+ *     target_type: string, target_id: string, score: float, position: int|null,
+ *     user_id: string|null, created_at: string, updated_at: string
+ * }
+ */
 #[OA\Schema(
     schema: 'RecommendationResource',
     properties: [
@@ -25,6 +32,7 @@ use OpenApi\Attributes as OA;
 )]
 final class RecommendationResource
 {
+    /** @return RecommendationData */
     public static function from(Recommendation $recommendation): array
     {
         return [

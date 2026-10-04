@@ -18,6 +18,7 @@ final class RecommendationJob
     ) {
     }
 
+    /** @param array<string, mixed> $metadata */
     public static function create(
         bool $isFull,
         ?Uuid $userId = null,
@@ -61,6 +62,7 @@ final class RecommendationJob
         $this->state->updatedAt = new DateTimeImmutable();
     }
 
+    /** @param array<string, int> $strategyCounts */
     public function updateProgress(string $strategy, int $completedCount, array $strategyCounts): void
     {
         if ($this->state->status !== RecommendationJobStatus::InProgress) {
@@ -73,6 +75,7 @@ final class RecommendationJob
         $this->state->updatedAt = new DateTimeImmutable();
     }
 
+    /** @param array<string, int> $finalCounts */
     public function markCompleted(array $finalCounts): void
     {
         if ($this->state->status !== RecommendationJobStatus::InProgress) {
@@ -204,6 +207,7 @@ final class RecommendationJob
         return $this->state->originalJobId;
     }
 
+    /** @param array<string, mixed> $metadata */
     public function withMetadata(array $metadata): self
     {
         $this->state->metadata = [...$this->state->metadata, ...$metadata];
