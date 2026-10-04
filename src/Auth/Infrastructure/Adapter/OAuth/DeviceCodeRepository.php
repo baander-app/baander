@@ -59,6 +59,10 @@ final class DeviceCodeRepository implements DeviceCodeRepositoryInterface
 
         $clientDomain = $this->clientRepository->findClientByUuid($entity->getClient()->getId());
 
+        if ($clientDomain === null) {
+            throw new \RuntimeException('Device code client no longer exists.');
+        }
+
         $userDomain = $entity->getUser() !== null
             ? $this->userRepository->findByUuid($entity->getUser()->getId())
             : null;
@@ -177,7 +181,9 @@ final class DeviceCodeRepository implements DeviceCodeRepositoryInterface
             $user->getName(),
             $user->getEmail(),
             $user->getPassword(),
-            $user->getId(),
+            $user->getTotpSecret() ?? '',
+            id: $user->getId(),
+            roles: $user->getRoles(),
         );
     }
 
@@ -194,6 +200,7 @@ final class DeviceCodeRepository implements DeviceCodeRepositoryInterface
             $client->isDeviceClient(),
             $client->isConfidential(),
             $client->isFirstParty(),
+            id: $client->getId(),
         );
     }
 

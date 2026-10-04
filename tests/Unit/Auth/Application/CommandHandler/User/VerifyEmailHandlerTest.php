@@ -15,15 +15,16 @@ use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 final class VerifyEmailHandlerTest extends TestCase
 {
-    private EmailVerificationTokenRepositoryInterface $tokenRepository;
-    private UserRepositoryInterface $userRepository;
-    private EventDispatcherInterface $eventDispatcher;
-    private TransactionPortInterface $transaction;
+    private EmailVerificationTokenRepositoryInterface&Stub $tokenRepository;
+    private UserRepositoryInterface&Stub $userRepository;
+    private EventDispatcherInterface&Stub $eventDispatcher;
+    private TransactionPortInterface&Stub $transaction;
     private VerifyEmailHandler $handler;
 
     protected function setUp(): void

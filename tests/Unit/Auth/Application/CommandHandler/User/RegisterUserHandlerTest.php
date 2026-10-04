@@ -15,6 +15,7 @@ use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\Envelope;
@@ -23,12 +24,12 @@ use RuntimeException;
 
 final class RegisterUserHandlerTest extends TestCase
 {
-    private UserRepositoryInterface $userRepository;
-    private PasswordHasherInterface $passwordHasher;
-    private EventDispatcherInterface $eventDispatcher;
-    private MessageBusInterface $bus;
-    private EmailVerificationTokenRepositoryInterface $emailVerificationTokenRepository;
-    private TransactionPortInterface $transaction;
+    private UserRepositoryInterface&Stub $userRepository;
+    private PasswordHasherInterface&Stub $passwordHasher;
+    private EventDispatcherInterface&Stub $eventDispatcher;
+    private MessageBusInterface&Stub $bus;
+    private EmailVerificationTokenRepositoryInterface&Stub $emailVerificationTokenRepository;
+    private TransactionPortInterface&Stub $transaction;
     private RegisterUserHandler $handler;
 
     protected function setUp(): void
@@ -44,7 +45,8 @@ final class RegisterUserHandlerTest extends TestCase
         $this->handler = $this->createRegisterUserHandlerFixture();
     }
 
-    private function createVerificationTokenRepository(bool $expectCalls = false): EmailVerificationTokenRepositoryInterface
+    /** @return ($expectCalls is true ? EmailVerificationTokenRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject : EmailVerificationTokenRepositoryInterface&Stub) */
+    private function createVerificationTokenRepository(bool $expectCalls = false): EmailVerificationTokenRepositoryInterface&Stub
     {
         $double = $expectCalls ? $this->createMock(EmailVerificationTokenRepositoryInterface::class) : $this->createStub(EmailVerificationTokenRepositoryInterface::class);
         $double->method('createForUser')->willReturnCallback(

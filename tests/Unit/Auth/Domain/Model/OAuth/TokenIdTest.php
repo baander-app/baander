@@ -17,6 +17,16 @@ final class TokenIdTest extends TestCase
         $this->assertNotSame($id1->toString(), $id2->toString());
     }
 
+    public function testGenerationDoesNotUseSeededMtRand(): void
+    {
+        mt_srand(42);
+        $first = TokenId::generate()->toString();
+        mt_srand(42);
+        $second = TokenId::generate()->toString();
+        $this->assertNotSame($first, $second);
+        $this->assertMatchesRegularExpression('/^[A-Za-z0-9\-._~]{80}$/D', $first);
+    }
+
     public function testFromString(): void
     {
         $string = TokenId::generate()->toString();

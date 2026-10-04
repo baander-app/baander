@@ -27,7 +27,7 @@ final readonly class TokenId implements Stringable, JsonSerializable
     {
         if ($value === null) {
             $client = new Client();
-            $this->value = $client->generateId(self::LENGTH, self::ALPHABET);
+            $this->value = $client->formattedId(self::ALPHABET, self::LENGTH);
 
             return;
         }

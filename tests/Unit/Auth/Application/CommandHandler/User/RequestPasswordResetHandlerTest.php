@@ -11,11 +11,12 @@ use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Domain\Model\Email;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 
 final class RequestPasswordResetHandlerTest extends TestCase
 {
-    private UserRepositoryInterface $userRepository;
+    private UserRepositoryInterface&Stub $userRepository;
     private PasswordResetTokenRepositoryInterface&MockObject $tokenRepository;
     private RequestPasswordResetHandler $handler;
 
@@ -28,15 +29,15 @@ final class RequestPasswordResetHandlerTest extends TestCase
 
     public function testCreatesTokenForExistingUser(): void
     {
-        $user = User::register(new Email('test@example.com'), 'hashed', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
         $this->userRepository->method('findByEmail')->willReturn($user);
 
         $this->tokenRepository
             ->expects($this->once())
             ->method('save')
-            ->with($this->equalTo('test@example.com'), $this->callback(fn($v) => is_string($v)));
+            ->with($this->equalTo('test@baander.app'), $this->callback(fn($v) => is_string($v)));
 
-        ($this->handler)(new RequestPasswordResetCommand(new Email('test@example.com')));
+        ($this->handler)(new RequestPasswordResetCommand(new Email('test@baander.app')));
     }
 
     public function testDoesNothingForUnknownEmail(): void
@@ -52,34 +53,34 @@ final class RequestPasswordResetHandlerTest extends TestCase
 
     public function testUpdatesTokenWhenOneAlreadyExists(): void
     {
-        $user = User::register(new Email('test@example.com'), 'hashed', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
         $this->userRepository->method('findByEmail')->willReturn($user);
 
-        $stored = ['test@example.com' => 'existing-token-string'];
+        $stored = ['test@baander.app' => 'existing-token-string'];
         $this->tokenRepository->expects($this->once())->method('save')
-            ->with('test@example.com', $this->callback(static fn (string $token): bool => \Symfony\Component\Uid\Ulid::isValid($token)))
+            ->with('test@baander.app', $this->callback(static fn (string $token): bool => \Symfony\Component\Uid\Ulid::isValid($token)))
             ->willReturnCallback(static function (string $email, string $token) use (&$stored): void {
                 $stored[$email] = $token;
             });
 
-        ($this->handler)(new RequestPasswordResetCommand(new Email('test@example.com')));
-        self::assertNotSame('existing-token-string', $stored['test@example.com']);
+        ($this->handler)(new RequestPasswordResetCommand(new Email('test@baander.app')));
+        self::assertNotSame('existing-token-string', $stored['test@baander.app']);
     }
 
     public function testCreatesNewTokenWhenNoneExists(): void
     {
-        $user = User::register(new Email('test@example.com'), 'hashed', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
         $this->userRepository->method('findByEmail')->willReturn($user);
 
         $stored = [];
         $this->tokenRepository->expects($this->once())->method('save')
-            ->with('test@example.com', $this->callback(static fn (string $token): bool => \Symfony\Component\Uid\Ulid::isValid($token)))
+            ->with('test@baander.app', $this->callback(static fn (string $token): bool => \Symfony\Component\Uid\Ulid::isValid($token)))
             ->willReturnCallback(static function (string $email, string $token) use (&$stored): void {
                 $stored[$email] = $token;
             });
 
-        ($this->handler)(new RequestPasswordResetCommand(new Email('test@example.com')));
-        self::assertArrayHasKey('test@example.com', $stored);
+        ($this->handler)(new RequestPasswordResetCommand(new Email('test@baander.app')));
+        self::assertArrayHasKey('test@baander.app', $stored);
 
     }
 }

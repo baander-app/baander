@@ -38,6 +38,7 @@ class DeviceCodeEntity implements DeviceCodeEntityInterface
     #[ORM\JoinColumn(name: 'client_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private ClientEntity $client;
 
+    /** @var array<array-key, string>|null */
     #[ORM\Column(type: 'json', nullable: true, options: ['jsonb' => true])]
     private ?array $scopes = null;
 
@@ -71,6 +72,7 @@ class DeviceCodeEntity implements DeviceCodeEntityInterface
     #[ORM\Column(type: 'datetime_immutable')]
     private DateTimeImmutable $updatedAt;
 
+    /** @param array<array-key, string>|null $scopes */
     public function __construct(
         string $deviceCode,
         string $userCode,
@@ -210,7 +212,7 @@ class DeviceCodeEntity implements DeviceCodeEntityInterface
         return $this->id;
     }
 
-    public function getClient(): ClientEntityInterface
+    public function getClient(): ClientEntity
     {
         return $this->client;
     }

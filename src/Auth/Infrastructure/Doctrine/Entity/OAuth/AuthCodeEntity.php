@@ -32,6 +32,7 @@ class AuthCodeEntity implements AuthCodeEntityInterface
     #[ORM\JoinColumn(name: 'client_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private ClientEntity $client;
 
+    /** @var array<array-key, string>|null */
     #[ORM\Column(type: 'json', nullable: true, options: ['jsonb' => true])]
     private ?array $scopes = null;
 
@@ -55,6 +56,9 @@ class AuthCodeEntity implements AuthCodeEntityInterface
 
     private ?string $redirectUri = null;
 
+    private ?string $userIdentifier = null;
+
+    /** @param array<array-key, string>|null $scopes */
     public function __construct(
         string $codeId,
         UserEntity $user,
@@ -128,15 +132,15 @@ class AuthCodeEntity implements AuthCodeEntityInterface
 
     public function setUserIdentifier(string $identifier): void
     {
-        // User is set via constructor; this is a no-op for the league interface contract.
+        $this->userIdentifier = $identifier;
     }
 
     public function getUserIdentifier(): string
     {
-        return $this->user->getId()->toString();
+        return $this->userIdentifier ?? $this->user->getId()->toString();
     }
 
-    public function getClient(): ClientEntityInterface
+    public function getClient(): ClientEntity
     {
         return $this->client;
     }

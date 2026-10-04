@@ -38,6 +38,7 @@ class ThirdPartyCredentialEntity
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $refreshToken = null;
 
+    /** @var array<array-key, mixed> */
     #[ORM\Column(type: 'json', options: ['jsonb' => true, 'default' => '{}'])]
     private array $meta;
 
@@ -47,6 +48,7 @@ class ThirdPartyCredentialEntity
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $updatedAt;
 
+    /** @param array<array-key, mixed> $meta */
     public function __construct(
         PublicId $publicId,
         UserEntity $user,
@@ -89,6 +91,12 @@ class ThirdPartyCredentialEntity
         return $this->provider;
     }
 
+    public function setProvider(string $provider): void
+    {
+        $this->provider = $provider;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
     public function getExpiresAt(): ?\DateTimeImmutable
     {
         return $this->expiresAt;
@@ -122,11 +130,13 @@ class ThirdPartyCredentialEntity
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    /** @return array<array-key, mixed> */
     public function getMeta(): array
     {
         return $this->meta;
     }
 
+    /** @param array<array-key, mixed> $meta */
     public function setMeta(array $meta): void
     {
         $this->meta = $meta;

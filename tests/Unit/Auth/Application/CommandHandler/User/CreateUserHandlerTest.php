@@ -13,6 +13,7 @@ use App\Notification\Application\DTO\SeedDefaultPreferencesCommand;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
 use InvalidArgumentException;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -21,11 +22,11 @@ use Symfony\Component\Messenger\MessageBusInterface;
 
 final class CreateUserHandlerTest extends TestCase
 {
-    private UserRepositoryInterface $userRepository;
-    private PasswordHasherInterface $passwordHasher;
-    private EventDispatcherInterface $eventDispatcher;
-    private MessageBusInterface $bus;
-    private TransactionPortInterface $transaction;
+    private UserRepositoryInterface&Stub $userRepository;
+    private PasswordHasherInterface&Stub $passwordHasher;
+    private EventDispatcherInterface&Stub $eventDispatcher;
+    private MessageBusInterface&Stub $bus;
+    private TransactionPortInterface&Stub $transaction;
     private CreateUserHandler $handler;
 
     protected function setUp(): void
@@ -39,7 +40,8 @@ final class CreateUserHandlerTest extends TestCase
         $this->handler = $this->createCreateUserHandlerFixture();
     }
 
-    private function createMessageBus(bool $expectCalls = false): MessageBusInterface
+    /** @return ($expectCalls is true ? MessageBusInterface&\PHPUnit\Framework\MockObject\MockObject : MessageBusInterface&Stub) */
+    private function createMessageBus(bool $expectCalls = false): MessageBusInterface&Stub
     {
         $double = $expectCalls ? $this->createMock(MessageBusInterface::class) : $this->createStub(MessageBusInterface::class);
         $double->method('dispatch')->willReturnCallback(fn (object $m) => new Envelope($m));

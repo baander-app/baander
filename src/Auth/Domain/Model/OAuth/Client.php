@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Domain\Model\OAuth;
 
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use InvalidArgumentException;
@@ -113,6 +114,7 @@ final class Client
         $this->state->updatedAt = new DateTimeImmutable();
     }
 
+    /** @param array<array-key, string> $redirectUris */
     public function updateRedirectUris(array $redirectUris): void
     {
         $this->state->redirectUris = $redirectUris;

@@ -35,7 +35,7 @@ final class AuthCodeRepository implements AuthCodeRepositoryInterface
     {
         return new AuthCodeEntity(
             bin2hex(random_bytes(40)),
-            new UserEntity(new \App\Shared\Domain\Model\PublicId(), '', '', ''),
+            new UserEntity(new \App\Shared\Domain\Model\PublicId(), '', '', '', ''),
             new \App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity(
                 new \App\Shared\Domain\Model\PublicId(),
                 '',
@@ -54,8 +54,12 @@ final class AuthCodeRepository implements AuthCodeRepositoryInterface
             throw UniqueTokenIdentifierConstraintViolationException::create();
         }
 
-        $userDomain = $this->userRepository->findByUuid($entity->getUser()->getId());
+        $userDomain = $this->userRepository->findByUuid(Uuid::fromString($entity->getUserIdentifier()));
         $clientDomain = $this->clientRepository->findClientByUuid($entity->getClient()->getId());
+
+        if ($userDomain === null || $clientDomain === null) {
+            throw new \RuntimeException('Auth code user or client no longer exists.');
+        }
 
         $domain = AuthCode::reconstitute(new AuthCodeState(
             id: Uuid::generate(),
