@@ -3,7 +3,10 @@
 #include <algorithm>
 #include <array>
 #include <boost/url.hpp>
+#include <charconv>
+#include <openssl/crypto.h>
 #include <openssl/evp.h>
+#include <openssl/hmac.h>
 
 namespace registry {
 namespace {
@@ -84,8 +87,8 @@ Registration validate_registration(const Json &body) {
         parsed->host().empty() || parsed->host_type() != boost::urls::host_type::name ||
         parsed->encoded_host().find('%') != boost::urls::pct_string_view::npos ||
         parsed->has_userinfo() || parsed->has_fragment())
-        throw Failure(
-            422, "Registration requires an HTTPS hostname URL without credentials or fragment.");
+        throw Failure(422, "Registration requires an HTTPS hostname URL without "
+                           "credentials or fragment.");
     r.name = field(body, "name", 128, true);
     r.version = body.contains("version") ? field(body, "version", 64) : "0.0.0";
     const auto credential = field(body, "apiKey", 64);
@@ -98,7 +101,8 @@ Registration validate_registration(const Json &body) {
 namespace {
 constexpr const char *migration_schema = "CREATE TABLE IF NOT EXISTS schema_migrations (version "
                                          "INTEGER PRIMARY KEY NOT NULL, checksum TEXT NOT NULL)";
-constexpr const char *registry_schema = R"SQL(CREATE TABLE IF NOT EXISTS registries (
+constexpr const char *registry_schema =
+    R"SQL(CREATE TABLE IF NOT EXISTS registries (
     public_id TEXT PRIMARY KEY NOT NULL,
     credential_digest TEXT NOT NULL,
     url TEXT NOT NULL, name TEXT NOT NULL, version TEXT NOT NULL,
@@ -115,7 +119,8 @@ DatabaseRequest schema_request() {
                          Json::array({"INSERT INTO schema_migrations(version, checksum) VALUES(1, "
                                       "?) ON CONFLICT(version) DO NOTHING",
                                       schema_checksum()}),
-                         "SELECT version, checksum FROM schema_migrations ORDER BY version"})};
+                         "SELECT version, checksum FROM schema_migrations ORDER BY "
+                         "version"})};
 }
 void validate_schema_result(unsigned status, const Json &response) {
     validate_database_result(status, response, 4);
@@ -128,25 +133,66 @@ void validate_schema_result(unsigned status, const Json &response) {
         throw Failure(503, "Registry schema is incompatible.");
     }
 }
-DatabaseRequest register_request(const Registration &r, std::int64_t now_ms) {
+bool validate_enrollment(const Registration &r, const std::string &token, const std::string &key,
+                         std::int64_t now_ms) {
+    if (key.size() < 32 || key.size() > 4096 || now_ms < 0)
+        throw Failure(503, "Enrollment verification unavailable.");
+    if (token.size() < 69 || token.size() > 81 || !token.starts_with("v1."))
+        return false;
+    const auto separator = token.find('.', 3);
+    if (separator == std::string::npos || separator < 4 || separator > 16)
+        return false;
+    const auto expiry_text = token.substr(3, separator - 3);
+    if (expiry_text[0] == '0' || !std::all_of(expiry_text.begin(), expiry_text.end(),
+                                              [](char c) { return c >= '0' && c <= '9'; }))
+        return false;
+    std::int64_t expiry = 0;
+    const auto parsed =
+        std::from_chars(expiry_text.data(), expiry_text.data() + expiry_text.size(), expiry);
+    if (parsed.ec != std::errc{} || expiry <= now_ms || expiry - now_ms > 300000)
+        return false;
+    const auto signature = token.substr(separator + 1);
+    if (!hex_credential(signature))
+        return false;
+    const auto message = "baander-registry-enrollment-v1\n" + r.public_id + "\n" +
+                         r.credential_digest + "\n" + expiry_text;
+    std::array<unsigned char, 32> expected{}, supplied{};
+    unsigned length = 0;
+    if (!HMAC(EVP_sha256(), key.data(), static_cast<int>(key.size()),
+              reinterpret_cast<const unsigned char *>(message.data()), message.size(),
+              expected.data(), &length) ||
+        length != expected.size())
+        throw Failure(503, "Enrollment verification unavailable.");
+    auto nibble = [](char c) { return c <= '9' ? c - '0' : c - 'a' + 10; };
+    for (std::size_t i = 0; i < supplied.size(); ++i)
+        supplied[i] = static_cast<unsigned char>((nibble(signature[2 * i]) << 4) |
+                                                 nibble(signature[2 * i + 1]));
+    return CRYPTO_memcmp(expected.data(), supplied.data(), expected.size()) == 0;
+}
+DatabaseRequest register_request(const Registration &r, std::int64_t now_ms,
+                                 bool enrollment_allowed) {
     if (now_ms < 0)
         throw Failure(503, "Registry clock unavailable.");
+    const Json parameters{{"public_id", r.public_id},
+                          {"credential_digest", r.credential_digest},
+                          {"url", r.url},
+                          {"name", r.name},
+                          {"version", r.version},
+                          {"now_ms", now_ms}};
+    auto insert_parameters = parameters;
+    insert_parameters["enrollment_allowed"] = enrollment_allowed ? 1 : 0;
     return {
         "/db/request?transaction&level=linearizable&associative",
-        Json::array({Json::array({R"SQL(INSERT INTO registries
+        Json::array({Json::array({R"SQL(UPDATE registries SET
+          url=:url, name=:name, version=:version,
+          updated_ms=MAX(updated_ms, :now_ms), last_seen_ms=MAX(last_seen_ms, :now_ms), revision=revision+1
+          WHERE public_id=:public_id AND credential_digest=:credential_digest)SQL",
+                                  parameters}),
+                     Json::array({R"SQL(INSERT INTO registries
           (public_id, credential_digest, url, name, version, created_ms, updated_ms, last_seen_ms, revision)
-          VALUES (:public_id, :credential_digest, :url, :name, :version, :now_ms, :now_ms, :now_ms, 1)
-          ON CONFLICT(public_id) DO UPDATE SET
-            url=excluded.url, name=excluded.name, version=excluded.version,
-            updated_ms=MAX(registries.updated_ms, excluded.updated_ms),
-            last_seen_ms=MAX(registries.last_seen_ms, excluded.last_seen_ms), revision=registries.revision+1
-          WHERE registries.credential_digest=excluded.credential_digest)SQL",
-                                  Json{{"public_id", r.public_id},
-                                       {"credential_digest", r.credential_digest},
-                                       {"url", r.url},
-                                       {"name", r.name},
-                                       {"version", r.version},
-                                       {"now_ms", now_ms}}}),
+          SELECT :public_id, :credential_digest, :url, :name, :version, :now_ms, :now_ms, :now_ms, 1
+          WHERE :enrollment_allowed=1 ON CONFLICT(public_id) DO NOTHING)SQL",
+                                  insert_parameters}),
                      Json::array({R"SQL(SELECT revision, updated_ms, last_seen_ms FROM registries
           WHERE public_id=:public_id AND credential_digest=:credential_digest)SQL",
                                   Json{{"public_id", r.public_id},
@@ -162,12 +208,12 @@ void validate_database_result(unsigned status, const Json &response, std::size_t
             throw Failure(503, "Authoritative registry result unavailable.");
 }
 Json register_result(const Registration &r, unsigned status, const Json &response) {
-    validate_database_result(status, response, 2);
+    validate_database_result(status, response, 3);
     const auto &result_rows =
-        rows(response["results"][1],
+        rows(response["results"][2],
              {{"revision", "integer"}, {"updated_ms", "integer"}, {"last_seen_ms", "integer"}});
     if (result_rows.empty())
-        throw Failure(403, "Public identity belongs to another credential.");
+        throw Failure(403, "Enrollment or ownership authorization required.");
     if (result_rows.size() != 1)
         throw Failure(503, "Registry result unavailable.");
     const auto &row = result_rows[0];

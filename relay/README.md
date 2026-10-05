@@ -19,6 +19,10 @@ Credentials must encode 32 client-generated random bytes as 64 lowercase hex
 characters. Validation cannot prove the client's randomness: clients must use a
 cryptographic random generator. Only the SHA-256 digest produced by OpenSSL is
 persisted, and neither the credential nor digest appears in public responses.
+The first claim of a public identity additionally requires an operator-issued
+`X-Baander-Enrollment` capability. It is bound to that identity and credential
+digest and expires within five minutes. A matching owner can send later heartbeats
+without the capability. Registration JSON fields remain unchanged.
 
 The initial schema has `schema_migrations` (version and SHA-256 checksum) and
 `registries` tables. The schema-result validator requires the supported version
@@ -38,8 +42,9 @@ unified endpoint with the same consistency parameter, never queued writes. Every
 HTTP status, result count, statement error and selected-column type is checked.
 Quorum failures and malformed results produce 503, not a stale result or 404.
 The HTTP layer adds `Retry-After: 1` to 503 and 429 responses. A confirmed
-empty or offline lookup produces 404 without disclosing a stale URL; a wrong-owner
-registration produces 403. Lookup considers a server offline after ten minutes.
+empty or offline lookup produces 404 without disclosing a stale URL. A wrong-owner
+registration or first claim without valid enrollment produces 403. Lookup considers
+a server offline after ten minutes.
 Public response envelopes remain `data`, with registration status and lookup
 metadata; revision, update and heartbeat milliseconds make the new lifecycle explicit.
 
@@ -190,6 +195,7 @@ operator-provided files; the repository contains no deployment credentials.
     "address": "127.0.0.1", "port": 9502,
     "certificate": "/etc/baander-registry/api.crt",
     "key": "/etc/baander-registry/api.key",
+    "enrollmentKeyFile": "/etc/baander-registry/enrollment.key",
     "maximumSessions": 64, "deadlineMs": 2000, "shutdownGraceMs": 5000,
     "requestsPerSecond": 200, "burst": 200
   },
@@ -205,17 +211,38 @@ operator-provided files; the repository contains no deployment credentials.
 }
 ```
 
+Generate a random enrollment key in a private operator location, then make the
+same raw key available to every API deployment. The registry refuses to start if
+the key file is missing or outside 32–4096 bytes. To issue a capability, compute
+the SHA-256 digest of the client's 64-character ASCII `apiKey` and run:
+
+```sh
+python3 relay/tools/issue_enrollment.py \
+  --key-file /etc/baander-registry/enrollment.key \
+  --public-id my-server \
+  --credential-digest DIGEST \
+  --ttl-seconds 240
+```
+
+The command prints only the capability. Send it in `X-Baander-Enrollment` with
+the first registration; keep the `apiKey` private and omit the enrollment header
+from ordinary heartbeats. The issuer's key must remain restricted to operators
+and the API processes. Enrollment authorizes a specific identity and credential,
+so a captured capability cannot claim another identity or change its owner.
+The default 240-second lifetime leaves room for network transit and modest clock
+skew; the maximum is 300 seconds. Keep issuer and API clocks synchronized.
+
 The API is TLS only. Routes are `POST /api/servers/register`,
 `GET /api/servers/{publicId}`, `GET /health` and `GET /ready`. Each TLS connection
 serves one request and closes. Request headers and bodies are limited to 8 KiB,
 and registration JSON is limited to eight nesting levels during parsing.
-Malformed JSON returns 400, invalid fields 422, wrong ownership 403, oversized
-bodies 413, rate limiting 429 and authoritative unavailability 503. Liveness
-never depends on rqlite. Readiness reads the schema and registry columns with
-linearizable consistency; schema initialization is retried at startup with a
-one-second delay, rather than written on every readiness request. A failed schema
-read marks the API unready; a later compatible authoritative readiness read
-restores it without rewriting the schema.
+Malformed JSON returns 400, invalid fields 422, unauthorized enrollment or
+wrong ownership 403, oversized bodies 413, rate limiting 429, and authoritative
+unavailability 503. Liveness never depends on rqlite. Readiness reads the schema
+and registry columns with linearizable consistency. Schema initialization retries
+at startup with a one-second delay; readiness itself never writes. A failed schema
+read marks the API unready. A later compatible authoritative read restores it
+without rewriting the schema.
 
 The server runs one Asio event-loop thread. Session capacity is fixed (default
 64, configurable 1–256); excess connections close without queued tasks. Each

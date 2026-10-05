@@ -16,6 +16,7 @@ import subprocess
 import tempfile
 import time
 from run_transport_contract import certificate
+from enrollment_support import issue_token
 
 
 def port():
@@ -73,6 +74,8 @@ def main():
             )
         )
         db_port, raft_port, api_port = port(), port(), port()
+        enrollment_key = b"native-contract-enrollment-key-32-bytes"
+        (directory / "enrollment.key").write_bytes(enrollment_key)
         config = {
             "database": {
                 "endpoints": [
@@ -87,6 +90,7 @@ def main():
                 "deadlineMs": 500,
             },
             "api": {
+                "enrollmentKeyFile": str(directory / "enrollment.key"),
                 "address": "127.0.0.1",
                 "port": api_port,
                 "certificate": str(api_certificate),
@@ -197,12 +201,24 @@ def main():
             stderr=subprocess.STDOUT,
         )
 
-        def request(method, target, body=None, selected_port=api_port):
+        def request(method, target, body=None, selected_port=api_port, enrollment=True):
             connection = LocalHTTPS(
                 "api.registry.baander.app", selected_port, context=tls, timeout=3
             )
             try:
-                connection.request(method, target, body, {"Content-Type": "application/json"})
+                headers = {"Content-Type": "application/json"}
+                if method == "POST" and target == "/api/servers/register" and enrollment:
+                    try:
+                        registration_body = json.loads(body)
+                        if isinstance(registration_body, dict) and "apiKey" in registration_body:
+                            headers["X-Baander-Enrollment"] = issue_token(
+                                enrollment_key, registration_body, int(time.time() * 1000) + 60000
+                            )
+                    except (ValueError, KeyError):
+                        pass
+                if isinstance(enrollment, str):
+                    headers["X-Baander-Enrollment"] = enrollment
+                connection.request(method, target, body, headers)
                 response = connection.getresponse()
                 return response.status, json.loads(response.read()), dict(response.getheaders())
             finally:
@@ -247,10 +263,40 @@ def main():
             }
             encoded = json.dumps(registration)
             owned_registration = dict(registration)
+            timestamp = int(time.time() * 1000)
+            invalid_enrollments = (
+                False,
+                "v1.bad",
+                issue_token(enrollment_key, registration, timestamp - 1),
+                issue_token(enrollment_key, registration, timestamp + 600000),
+                issue_token(
+                    enrollment_key, dict(registration, publicId="wrong-id"), timestamp + 60000
+                ),
+                issue_token(
+                    enrollment_key, dict(registration, apiKey="cd" * 32), timestamp + 60000
+                ),
+            )
+            for enrollment in invalid_enrollments:
+                assert request(
+                    "POST", "/api/servers/register", encoded, enrollment=enrollment
+                )[0] == 403
+                assert request("GET", "/api/servers/server-one")[0] == 404
+            enrollment_token = issue_token(enrollment_key, registration, timestamp + 60000)
+            duplicate_enrollment = (
+                "POST /api/servers/register HTTP/1.1\r\n"
+                "Host: api.registry.baander.app\r\n"
+                "Content-Type: application/json\r\n"
+                f"X-Baander-Enrollment: {enrollment_token}\r\n"
+                f"X-Baander-Enrollment: {enrollment_token}\r\n"
+                f"Content-Length: {len(encoded.encode())}\r\n\r\n"
+                f"{encoded}"
+            ).encode()
+            assert raw_request(duplicate_enrollment)[0] == 403
+            assert request("GET", "/api/servers/server-one")[0] == 404
             status, body, _ = request("POST", "/api/servers/register", encoded)
             assert status == 200 and body["data"]["revision"] == 1
             assert registration["apiKey"] not in json.dumps(body)
-            status, body, _ = request("POST", "/api/servers/register", encoded)
+            status, body, _ = request("POST", "/api/servers/register", encoded, enrollment=False)
             assert status == 200 and body["data"]["revision"] == 2
             status, body, _ = request("GET", "/api/servers/server-one")
             assert status == 200 and body["data"]["url"] == registration["url"]
@@ -298,12 +344,15 @@ def main():
             )
             assert status == 413 and error == {"error": "Invalid or oversized HTTP request."}
 
-            pipelined_registration = json.dumps(
-                dict(owned_registration, publicId="pipelined-claim")
-            ).encode()
+            pipelined_claim = dict(owned_registration, publicId="pipelined-claim")
+            pipelined_registration = json.dumps(pipelined_claim).encode()
+            pipelined_enrollment = issue_token(
+                enrollment_key, pipelined_claim, int(time.time() * 1000) + 60000
+            )
             status, body = raw_request(
                 b"GET /health HTTP/1.1\r\nHost: api.registry.baander.app\r\n\r\n"
                 + hostile_http
+                + f"X-Baander-Enrollment: {pipelined_enrollment}\r\n".encode()
                 + f"Content-Length: {len(pipelined_registration)}\r\n\r\n".encode()
                 + pipelined_registration
             )
@@ -618,7 +667,7 @@ def main():
             assert pending.recv(1) == b""
             pending.close()
             print(
-                "PASS: native TLS API contract/concurrent ownership, depth/body bounds, rate/pool limits, schema recovery, outage/readiness/liveness, overall deadlines, graceful commit drain and forced shutdown."
+                "PASS: native TLS API enrollment capability/anonymous denial/owner heartbeat/concurrent ownership, depth/body bounds, rate/pool limits, schema recovery, outage/readiness/liveness, overall deadlines, graceful commit drain and forced shutdown."
             )
         except Exception:
             db_log.flush()

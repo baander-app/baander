@@ -63,6 +63,7 @@ class CleanupTest(unittest.TestCase):
                 api_key=root / "unused.key",
                 client_cert=root / "unused-client.crt",
                 client_key=root / "unused-client.key",
+                enrollment_key_file=root / "unused-enrollment.key",
             )
             children = []
             native_popen = subprocess.Popen

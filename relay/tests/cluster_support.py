@@ -4,6 +4,7 @@ import asyncio
 import base64
 import json
 from pathlib import Path
+import secrets
 import socket
 import ssl
 import subprocess
@@ -178,6 +179,10 @@ class Cluster:
         self.directory = Path(directory)
         self.binary = binary
         self.count = count
+        self.enrollment_key = secrets.token_bytes(32)
+        self.enrollment_key_file = self.directory / "enrollment.key"
+        self.enrollment_key_file.write_bytes(self.enrollment_key)
+        self.enrollment_key_file.chmod(0o600)
         self.processes = []
         self.logs = []
         subprocess.run(

@@ -4,6 +4,7 @@
     "port": 9502,
     "certificate": "/run/secrets/registry/api.crt",
     "key": "/run/secrets/registry/api.key",
+    "enrollmentKeyFile": "/run/secrets/registry/enrollment.key",
     "maximumSessions": 64,
     "deadlineMs": 2000,
     "shutdownGraceMs": 5000,

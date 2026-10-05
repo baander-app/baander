@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+#include "registry/http_headers.hpp"
 #include "registry/transport.hpp"
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
@@ -25,6 +26,7 @@ struct Server {
     DatabasePool database;
     std::set<std::shared_ptr<Session>> sessions;
     Json schema_snapshot;
+    std::string enrollment_key;
     bool initialized = false;
     bool schema_bootstrapped = false;
     asio::steady_timer shutdown_timer;
@@ -47,6 +49,15 @@ struct Server {
             burst < 1 || burst > 10000 || deadline.count() < 50 || deadline.count() > 10000 ||
             shutdown_grace.count() < 50 || shutdown_grace.count() > 10000)
             throw std::invalid_argument("Invalid bounded API configuration.");
+        std::ifstream enrollment_file(config.at("enrollmentKeyFile").get<std::string>(),
+                                      std::ios::binary);
+        enrollment_key.resize(4097);
+        enrollment_file.read(enrollment_key.data(),
+                             static_cast<std::streamsize>(enrollment_key.size()));
+        enrollment_key.resize(static_cast<std::size_t>(enrollment_file.gcount()));
+        if (!enrollment_file.is_open() || enrollment_file.bad() || enrollment_key.size() < 32 ||
+            enrollment_key.size() > 4096)
+            throw std::invalid_argument("Invalid enrollment key file.");
         tls.set_options(ssl::context::default_workarounds | ssl::context::no_sslv2 |
                         ssl::context::no_sslv3 | ssl::context::no_tlsv1 | ssl::context::no_tlsv1_1);
         tls.use_certificate_chain_file(config.at("certificate"));
@@ -91,10 +102,12 @@ struct Server {
             try {
                 DatabaseRequest readiness_request{
                     "/db/query?level=linearizable&associative",
-                    Json::array(
-                        {"SELECT version, checksum FROM schema_migrations ORDER BY version",
-                         "SELECT public_id, credential_digest, url, name, version, created_ms, "
-                         "updated_ms, last_seen_ms, revision FROM registries WHERE 0"})};
+                    Json::array({"SELECT version, checksum FROM schema_migrations "
+                                 "ORDER BY version",
+                                 "SELECT public_id, credential_digest, url, name, "
+                                 "version, created_ms, "
+                                 "updated_ms, last_seen_ms, revision FROM registries "
+                                 "WHERE 0"})};
                 auto result =
                     co_await database.request(std::move(readiness_request), database_deadline);
                 validate_database_result(result.status, result.body, 2);
@@ -125,8 +138,21 @@ struct Server {
         if (request.method() == http::verb::post && target == "/api/servers/register") {
             const auto registration =
                 validate_registration(parse_json_body(request.body(), 8192, 8));
-            auto result = co_await database.request(register_request(registration, now_ms()),
-                                                    database_deadline);
+            const auto timestamp = now_ms();
+            std::string enrollment;
+            unsigned enrollment_headers = 0;
+            for (const auto &header : request) {
+                if (beast::iequals(header.name_string(), header_name(BaanderHeader::Enrollment))) {
+                    enrollment = std::string(header.value());
+                    ++enrollment_headers;
+                }
+            }
+
+            const bool allowed =
+                enrollment_headers == 1 &&
+                validate_enrollment(registration, enrollment, enrollment_key, timestamp);
+            auto result = co_await database.request(
+                register_request(registration, timestamp, allowed), database_deadline);
             co_return register_result(registration, result.status, result.body);
         }
         const std::string prefix = "/api/servers/";
@@ -138,7 +164,8 @@ struct Server {
         throw Failure(404, "Route not found.");
     }
     asio::awaitable<void> initialize() {
-        // Retry initialization with a bounded delay; readiness itself never writes schema.
+        // Retry initialization with a bounded delay; readiness itself never writes
+        // schema.
         while (!stopping && !initialized) {
             try {
                 auto result = co_await database.request(schema_request());
@@ -228,12 +255,13 @@ struct Server::Session : std::enable_shared_from_this<Session> {
             response.keep_alive(false);
             response.body() = body.dump();
             response.prepare_payload();
-            // The session timer also bounds the complete handshake/read/database/write lifecycle.
+            // The session timer also bounds the complete
+            // handshake/read/database/write lifecycle.
             beast::get_lowest_layer(stream).expires_at(deadline_time);
             co_await http::async_write(stream, response, asio::use_awaitable);
         } catch (const std::exception &) {
-            // Transport disconnect/deadline errors never include credentials or request bodies in
-            // logs.
+            // Transport disconnect/deadline errors never include credentials or
+            // request bodies in logs.
         }
         deadline_timer.cancel();
         close();

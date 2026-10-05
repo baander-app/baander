@@ -4,11 +4,13 @@
 import argparse
 import json
 from pathlib import Path
+import secrets as secure_random
 import shutil
 import subprocess
 import tempfile
 import time
 import uuid
+from enrollment_support import issue_token
 
 
 def docker(*arguments, check=True, input=None):
@@ -287,12 +289,15 @@ def main():
                 return
             for index in range(5):
                 start(index, "bootstrap")
+            enrollment_key = secure_random.token_bytes(32)
+            (directory / "enrollment.key").write_bytes(enrollment_key)
             config = {
                 "api": {
                     "address": "0.0.0.0",
                     "port": 9502,
                     "certificate": "/fixture/api.crt",
                     "key": "/fixture/api.key",
+                    "enrollmentKeyFile": "/fixture/enrollment.key",
                 },
                 "database": {
                     "endpoints": [
@@ -318,6 +323,7 @@ def main():
                 "client.key",
                 "ca.crt",
                 "password",
+                "enrollment.key",
                 "database-curl.conf",
                 "status-curl.conf",
             ]:
@@ -377,6 +383,16 @@ def main():
                 ]
                 if body is not None:
                     command += ["--header", "Content-Type: application/json", "--data-binary", "@-"]
+                    if method == "POST" and target == "/api/servers/register":
+                        command += [
+                            "--header",
+                            "X-Baander-Enrollment: "
+                            + issue_token(
+                                enrollment_key,
+                                body,
+                                int(time.time() * 1000) + 60000,
+                            ),
+                        ]
                 command += ["https://api.registry.baander.app:9502" + target]
                 response = docker(
                     *command, check=False, input=json.dumps(body) if body is not None else None

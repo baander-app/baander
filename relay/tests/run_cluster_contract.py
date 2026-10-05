@@ -11,6 +11,7 @@ import tempfile
 import time
 from cluster_support import Cluster
 from cluster_http_observer import Observer
+from enrollment_support import issue_token
 from run_http_contract import LocalHTTPS, port
 
 
@@ -24,6 +25,7 @@ class Api:
                 "port": self.port,
                 "certificate": str(cluster.api_cert),
                 "key": str(cluster.api_key),
+                "enrollmentKeyFile": str(cluster.enrollment_key_file),
                 "deadlineMs": 5000,
             },
             "database": {
@@ -66,14 +68,22 @@ class Api:
             "api.registry.baander.app", self.port, context=self.cluster.api_tls, timeout=6
         )
 
-    def request(self, method, target, body=None):
+    def request(self, method, target, body=None, enrollment=True):
         connection = self.connection()
         try:
+            headers = {"Content-Type": "application/json"}
+            if method == "POST" and target == "/api/servers/register" and enrollment:
+                headers["X-Baander-Enrollment"] = issue_token(
+                    self.cluster.enrollment_key,
+                    body,
+                    int(time.time() * 1000) + 60000,
+                )
+
             connection.request(
                 method,
                 target,
                 json.dumps(body) if body is not None else None,
-                {"Content-Type": "application/json"},
+                headers,
             )
             response = connection.getresponse()
             return response.status, json.loads(response.read()), dict(response.getheaders())
@@ -225,11 +235,19 @@ def main():
             observer.clear()
             partition_started = time.monotonic()
             cluster.network.partition(minority, blackhole=args.nodes == 5)
+            uncertain_registration = registration("uncertain-partition")
             connection.request(
                 "POST",
                 "/api/servers/register",
-                json.dumps(registration("uncertain-partition")),
-                {"Content-Type": "application/json"},
+                json.dumps(uncertain_registration),
+                {
+                    "Content-Type": "application/json",
+                    "X-Baander-Enrollment": issue_token(
+                        cluster.enrollment_key,
+                        uncertain_registration,
+                        int(time.time() * 1000) + 60000,
+                    ),
+                },
             )
             response = connection.getresponse()
             assert response.status == 503 and response.getheader("Retry-After") == "1"

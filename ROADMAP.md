@@ -625,6 +625,23 @@ a bounded response reserve. Failure-injection tests verify test-harness process 
 listener cleanup even when readiness or teardown fails. The blocking CI recipe now
 also runs the three-voter partition/failover gate.
 
+First-claim registration now requires an operator-issued enrollment capability
+valid for at most five minutes and bound to the public ID and credential digest.
+Matching owners can retry and heartbeat without it. The single rqlite transaction
+handles competing claims
+without transferring ownership; anonymous and wrong-owner attempts fail with 403.
+Native HTTP, three/five-voter, restore, and production-container contracts pass
+with enrollment enabled. The capability issuer reads a private key file and
+prints only the token. API deployments must share the key until a future
+asymmetric enrollment design replaces that operational trust boundary.
+The sanitizer-backed parser fuzz gate passed its bounded run and its deliberate
+ASan failure control after the enrollment parser was added to the fuzz target.
+The separate ThreadSanitizer qualification also passed with enrollment enabled.
+
+A harmless EICAR repository canary is detected by ClamAV locally and excluded
+from deployment images. External scanner visibility depends on publication; it
+has not been demonstrated for a public Baander endpoint.
+
 - [ ] Complete/verify C++20 registry with Beast/Asio, OpenSSL, nlohmann/json,
   pinned dependencies, CMake/Ninja, GoogleTest, and bounded async rqlite pools.
   Replace the PHP registry; no Symfony serialization, Redis, Sentinel, or Electric.

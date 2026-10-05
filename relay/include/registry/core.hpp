@@ -27,7 +27,10 @@ Registration validate_registration(const Json &body);
 void validate_public_id(const std::string &public_id);
 DatabaseRequest schema_request();
 void validate_schema_result(unsigned http_status, const Json &response);
-DatabaseRequest register_request(const Registration &registration, std::int64_t now_ms);
+bool validate_enrollment(const Registration &registration, const std::string &token,
+                         const std::string &key, std::int64_t now_ms);
+DatabaseRequest register_request(const Registration &registration, std::int64_t now_ms,
+                                 bool enrollment_allowed = false);
 Json register_result(const Registration &registration, unsigned http_status, const Json &response);
 DatabaseRequest lookup_request(const std::string &public_id);
 Json lookup_result(unsigned http_status, const Json &response, std::int64_t now_ms);

@@ -44,20 +44,21 @@ int main(int argc, char **) {
                               {"revision", revision}});
     };
     add("schema", schema_request(), "schema");
-    add("first claim", register_request(registration, 1000), "register", 1);
-    add("heartbeat retry", register_request(registration, 2000), "register", 2);
+    add("anonymous first claim is denied", register_request(registration, 900, false), "conflict");
+    add("first claim", register_request(registration, 1000, true), "register", 1);
+    add("heartbeat retry", register_request(registration, 2000, false), "register", 2);
     add("schema reopening", schema_request(), "schema");
     add("preserved after reopening", lookup_request(registration.public_id), "lookup", 2);
     body["apiKey"] = std::string(64, 'b');
-    add("different credential cannot claim", register_request(validate_registration(body), 3000),
+    add("different credential cannot claim", register_request(validate_registration(body), 3000, true),
         "conflict");
     body["apiKey"] = std::string(64, 'a');
     body["publicId"] = "different-public-id";
     add("credential can own a separate identity",
-        register_request(validate_registration(body), 3000), "register", 1);
+        register_request(validate_registration(body), 3000, true), "register", 1);
     body["publicId"] = registration.public_id;
     body["name"] = "Updated fixture";
-    add("owned metadata update", register_request(validate_registration(body), 500), "register", 3);
+    add("owned metadata update", register_request(validate_registration(body), 500, false), "register", 3);
     add("lookup latest revision", lookup_request(registration.public_id), "lookup", 3);
     add("offline does not return stale URL", lookup_request(registration.public_id), "offline");
     add("inject checksum mismatch",

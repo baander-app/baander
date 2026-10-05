@@ -26,7 +26,7 @@ Json lookup_types() {
 }
 Json committed_registration() {
     return {
-        {"results", Json::array({Json{{"rows_affected", 1}},
+        {"results", Json::array({Json{{"rows_affected", 1}}, Json{{"rows_affected", 0}},
                                  Json{{"types", Json{{"revision", "integer"},
                                                      {"updated_ms", "integer"},
                                                      {"last_seen_ms", "integer"}}},
@@ -41,7 +41,7 @@ TEST(Registration, StoresOnlyDigestsAndParameterizedValues) {
     EXPECT_NE(body()["apiKey"].get<std::string>(), r.credential_digest);
     const auto request = register_request(r, 1000);
     EXPECT_EQ("/db/request?transaction&level=linearizable&associative", request.target);
-    EXPECT_EQ(2, request.statements.size());
+    EXPECT_EQ(3, request.statements.size());
     EXPECT_EQ(std::string::npos,
               request.statements.dump().find(body()["apiKey"].get<std::string>()));
     EXPECT_EQ(r.public_id, request.statements[0][1]["public_id"].get<std::string>());
@@ -112,10 +112,10 @@ TEST(Database, RejectsHttpErrorsStatementErrorsMissingOrExtraResults) {
 TEST(Registration, OwnershipConflictAndMalformedResultFailClosed) {
     auto r = validate_registration(body());
     auto response = committed_registration();
-    response["results"][1]["rows"] = Json::array();
+    response["results"][2]["rows"] = Json::array();
     failure(403, [&] { register_result(r, 200, response); });
     response = committed_registration();
-    response["results"][1]["rows"][0]["revision"] = "1";
+    response["results"][2]["rows"][0]["revision"] = "1";
     failure(503, [&] { register_result(r, 200, response); });
 }
 TEST(Lookup, ExplicitLinearizableRequestNeverSelectsCredentials) {
