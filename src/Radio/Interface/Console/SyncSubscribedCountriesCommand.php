@@ -8,9 +8,6 @@ use App\Radio\Application\Port\CountrySubscriptionPortInterface;
 use App\Radio\Application\Port\RadioSourcePortInterface;
 use App\Radio\Application\Port\RadioStationPortInterface;
 use App\Radio\Application\Port\StationSyncPortInterface;
-use App\Radio\Domain\Model\RadioSource\RadioSource;
-use App\Radio\Domain\Repository\RadioSource\RadioSourceRepositoryInterface;
-use App\Radio\Domain\ValueObject\SyncConfig;
 use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -31,7 +28,6 @@ final class SyncSubscribedCountriesCommand extends Command
     public function __construct(
         private readonly RadioSourcePortInterface $sourcePort,
         private readonly CountrySubscriptionPortInterface $subscriptionPort,
-        private readonly RadioSourceRepositoryInterface $sourceRepository,
         private readonly StationSyncPortInterface $syncAdapter,
         private readonly RadioStationPortInterface $stationPort,
     ) {
@@ -61,23 +57,15 @@ final class SyncSubscribedCountriesCommand extends Command
                 return Command::SUCCESS;
             }
 
-            $source = RadioSource::create(
-                name: self::IPRD_SOURCE_NAME,
-                type: self::IPRD_SOURCE_TYPE,
-                syncConfig: new SyncConfig(
-                    syncUrl: 'https://iprd-org.github.io/iprd',
-                    schedule: '0 */6 * * *',
-                    config: [],
-                ),
+            $activeSource = $this->sourcePort->createSource(
+                self::IPRD_SOURCE_NAME,
+                self::IPRD_SOURCE_TYPE,
+                'https://iprd-org.github.io/iprd',
+                [],
+                '0 */6 * * *',
             );
-            $this->sourceRepository->save($source);
 
-            $io->success(sprintf('Created default IPRD source: %s', $source->getId()->toString()));
-            $activeSource = [
-                'id' => $source->getId()->toString(),
-                'name' => $source->getName(),
-                'isActive' => true,
-            ];
+            $io->success(sprintf('Created default IPRD source: %s', $activeSource['id']));
         } else {
             $activeSource = null;
             foreach ($sources as $source) {
