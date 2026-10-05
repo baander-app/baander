@@ -18,6 +18,7 @@ use App\Library\Infrastructure\Doctrine\Entity\UserLibraryAccessEntity;
 use App\Media\Application\Port\ImageConversionPortInterface;
 use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Infrastructure\Doctrine\Entity\ImageEntity;
+use App\Media\Infrastructure\Storage\FlysystemStorage;
 use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistEntity;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
@@ -229,6 +230,72 @@ final class ImageReadFirewallTest extends TestCase
         self::assertSame($playlistId->toString(), $image->getPlaylist()?->getId()->toString());
     }
 
+    public function testPresetSymlinkOutsideStorageRootServesOnlyOriginalImage(): void
+    {
+        $this->authenticate('member');
+        $image = $this->images['album'];
+        [$storageRoot, $originalPath] = $this->configureRealStorage($image);
+        $presetPath = $this->derivedPath($storageRoot, $image->getPath(), 'thumb');
+        $privatePath = self::$directory . '/private-preset.webp';
+        $privateContents = 'private-derived-content';
+        self::assertSame(strlen($privateContents), file_put_contents($privatePath, $privateContents));
+        self::assertTrue(symlink($privatePath, $presetPath));
+
+        $response = $this->request($image, '/file?preset=thumb');
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertInstanceOf(BinaryFileResponse::class, $response);
+        self::assertSame($originalPath, $response->getFile()->getPathname());
+        self::assertSame('private-derived-content', file_get_contents($privatePath));
+    }
+
+    public function testWebpSymlinkOutsideStorageRootServesOnlyOriginalImage(): void
+    {
+        $this->authenticate('member');
+        $image = new ImageEntity(
+            'internal/' . $this->allowedLibrary->getId() . '/authorized-source.jpg',
+            'jpg',
+            'image/jpeg',
+            new PublicId(),
+            42,
+            1,
+            1,
+            'album',
+        );
+        $image->setAlbum($this->images['album']->getAlbum());
+        $this->persist($image);
+        $this->manager->flush();
+        [$storageRoot, $originalPath] = $this->configureRealStorage($image);
+        $webpPath = $this->derivedPath($storageRoot, $image->getPath());
+        $privatePath = self::$directory . '/private-webp.webp';
+        $privateContents = 'private-webp-content';
+        self::assertSame(strlen($privateContents), file_put_contents($privatePath, $privateContents));
+        self::assertTrue(symlink($privatePath, $webpPath));
+
+        $response = $this->request($image, '/file');
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertInstanceOf(BinaryFileResponse::class, $response);
+        self::assertSame($originalPath, $response->getFile()->getPathname());
+        self::assertSame('private-webp-content', file_get_contents($privatePath));
+    }
+
+    public function testExistingPresetInsideStorageRootIsServed(): void
+    {
+        $this->authenticate('member');
+        $image = $this->images['album'];
+        [$storageRoot] = $this->configureRealStorage($image);
+        $presetPath = $this->derivedPath($storageRoot, $image->getPath(), 'small');
+        $derivedContents = 'authorized-derived-content';
+        self::assertSame(strlen($derivedContents), file_put_contents($presetPath, $derivedContents));
+
+        $response = $this->request($image, '/file?preset=small');
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertInstanceOf(BinaryFileResponse::class, $response);
+        self::assertSame($presetPath, $response->getFile()->getPathname());
+    }
+
     public function testRevocationImmediatelyDeniesAllImageReadRoutes(): void
     {
         $this->authenticate('member');
@@ -346,5 +413,28 @@ final class ImageReadFirewallTest extends TestCase
         $this->kernel->terminate($request, $response);
 
         return $response;
+    }
+
+    /** @return array{string, string} */
+    private function configureRealStorage(ImageEntity $image): array
+    {
+        $storageRoot = self::$directory . '/storage-root-' . bin2hex(random_bytes(8));
+        $originalPath = $storageRoot . '/' . $image->getPath();
+        self::assertTrue(mkdir(dirname($originalPath), 0700, true));
+        $contents = file_get_contents(self::$directory . '/image.gif');
+        self::assertNotFalse($contents);
+        self::assertSame(strlen($contents), file_put_contents($originalPath, $contents));
+        $this->kernel->getContainer()->set(StoragePortInterface::class, new FlysystemStorage($storageRoot));
+
+        return [$storageRoot, $originalPath];
+    }
+
+    private function derivedPath(string $storageRoot, string $sourcePath, ?string $preset = null): string
+    {
+        $directory = pathinfo($sourcePath, PATHINFO_DIRNAME);
+        $name = pathinfo($sourcePath, PATHINFO_FILENAME);
+        $filename = $preset === null ? $name . '.webp' : $name . '_' . $preset . '.webp';
+
+        return $storageRoot . '/' . ($directory === '.' ? '' : $directory . '/') . $filename;
     }
 }

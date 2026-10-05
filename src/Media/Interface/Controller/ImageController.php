@@ -119,18 +119,18 @@ final class ImageController
 
         $outputDir = dirname($fullPath);
         $extension = $image->getExtension();
+        $sourcePath = $image->getPath();
+        $sourceDirectory = pathinfo($sourcePath, PATHINFO_DIRNAME);
+        $sourceName = pathinfo($sourcePath, PATHINFO_FILENAME);
+        $derivedBasePath = ($sourceDirectory === '.' ? '' : $sourceDirectory . '/') . $sourceName;
 
         // Support preset-based size selection (e.g., ?preset=thumb)
         $preset = $request->query->get('preset');
         if ($preset !== null && in_array($preset, ['thumb', 'small', 'medium', 'large'], true)) {
-            $presetPath = str_replace(
-                '.' . $extension,
-                '_' . $preset . '.webp',
-                $fullPath,
-            );
-            if (file_exists($presetPath)) {
+            $presetPath = $this->resolveDerivedPath($derivedBasePath . '_' . $preset . '.webp');
+            if ($presetPath !== null && file_exists($presetPath)) {
                 $fullPath = $presetPath;
-            } else {
+            } elseif ($presetPath !== null) {
                 // Fire-and-forget: generate preset in background, serve original now
                 $this->coWrapper->go(function () use ($fullPath, $outputDir, $preset): void {
                     try {
@@ -146,10 +146,10 @@ final class ImageController
             }
         } elseif (!in_array($extension, ['webp', 'gif'], true)) {
             // Unconditional WebP conversion for non-WebP, non-GIF sources
-            $webpPath = str_replace('.' . $extension, '.webp', $fullPath);
-            if (file_exists($webpPath)) {
+            $webpPath = $this->resolveDerivedPath($derivedBasePath . '.webp');
+            if ($webpPath !== null && file_exists($webpPath)) {
                 $fullPath = $webpPath;
-            } else {
+            } elseif ($webpPath !== null) {
                 // Fire-and-forget: generate WebP in background, serve original now
                 $this->coWrapper->go(function () use ($fullPath, $outputDir): void {
                     try {
@@ -171,6 +171,15 @@ final class ImageController
         $response->headers->set('Cache-Control', 'private, no-store');
 
         return $response;
+    }
+
+    private function resolveDerivedPath(string $relativePath): ?string
+    {
+        try {
+            return $this->storage->resolve($relativePath);
+        } catch (\RuntimeException) {
+            return null;
+        }
     }
 
     #[OA\Get(

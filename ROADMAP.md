@@ -607,7 +607,7 @@ release, without weakening consistency or increasing the agreed host budget.
 - [ ] Kill relay workers at claim, consumer, and transport-acknowledgement
   boundaries; verify lease expiry and downstream recovery through the supervised
   worker runtime under each crash point.
-- [ ] Test storage directory-boundary comparisons, validation before mkdir,
+- [x] Test storage directory-boundary comparisons, validation before mkdir,
   traversal and symlink escapes across read/write/delete/derived-file resolution.
 - [ ] Test webhook DNS and connection-time destination checks, corrected link-local
   ranges, disabled redirects, empty-by-default LAN allowlist, category validation,
