@@ -133,6 +133,12 @@ PYTHONDONTWRITEBYTECODE=1 python3 relay/tests/run_cluster_contract.py \
 The tests check minority 503 responses, majority progress, leader recovery within
 30 seconds, retained acknowledged metadata/revisions, rejoin, abrupt voter crashes
 (one of three or two of five), and durable catch-up after process restart.
+They then stop a majority including the leader (two of three or three of five)
+while the API stays running. Existing and absent lookups, registration and readiness
+must return 503 with `Retry-After: 1` and fixed public errors without credentials or
+metadata; health stays 200. Restarting the persisted voters must restore quorum and
+API readiness within 30 seconds, preserve acknowledged identities and revisions,
+and allow a new registration.
 Uncertain writes are submitted once and are not retried. The actual lease-loss
 response can be either HTTP 200 with an error or HTTP 503; a deterministic TLS
 pool test replays the observed 200 error to verify next-request rotation without

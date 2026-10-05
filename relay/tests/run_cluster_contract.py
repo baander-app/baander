@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: Apache-2.0
-"""Real 3/5-voter TLS partitions, acknowledged data, crashes and rejoin."""
+"""Real 3/5-voter TLS partitions, quorum loss, acknowledged data and rejoin."""
 import argparse
 import http.client
 import json
@@ -309,10 +309,79 @@ def main():
             )
             for index in sorted(failures):
                 cluster.start_node(index)
-            wait_converged(cluster, range(args.nodes), final_index)
+            recovered_leader = wait_converged(cluster, range(args.nodes), final_index)
             verify(survivor_api, acknowledged)
             print(
                 f"PASS: no acknowledged loss after {len(failures)} abrupt voter failures, restart and catch-up",
+                flush=True,
+            )
+            # Keep the API and its configured endpoints alive while stopping enough
+            # persisted voters, including the leader, to make every quorum impossible.
+            absent_identifier = "absent-before-quorum-loss"
+            pinned.wait_ready()
+            absent_status, absent_body, _ = pinned.request(
+                "GET", "/api/servers/" + absent_identifier
+            )
+            assert absent_status == 404, (absent_status, absent_body)
+            stopped = {recovered_leader}
+            stopped.update(
+                [index for index in range(args.nodes) if index != recovered_leader][
+                    : args.nodes // 2
+                ]
+            )
+            for index in sorted(stopped):
+                cluster.processes[index].kill()
+                cluster.processes[index].wait(timeout=3)
+            assert len(stopped) == args.nodes // 2 + 1
+            outage_registration = registration("uncertain-quorum-loss")
+            public_unavailability_errors = {
+                "Authoritative registry unavailable.",
+                "Authoritative database result unavailable.",
+                "Authoritative registry result unavailable.",
+                "Database request budget exhausted.",
+                "Database request deadline exceeded.",
+                "Registry query result unavailable.",
+                "Registry result unavailable.",
+            }
+            outage_started = time.monotonic()
+            for method, target, payload in (
+                ("GET", "/api/servers/before-partition-0", None),
+                ("GET", "/api/servers/" + absent_identifier, None),
+                ("POST", "/api/servers/register", outage_registration),
+                ("GET", "/ready", None),
+            ):
+                request_started = time.monotonic()
+                status, body, headers = pinned.request(method, target, payload)
+                elapsed = time.monotonic() - request_started
+                assert elapsed < 6, f"No-quorum {method} {target} exceeded API deadline: {elapsed:.2f}s"
+                assert status == 503, f"No-quorum {method} {target} returned {status}"
+                assert headers.get("Retry-After") == "1", target
+                # Fixed public errors exclude stored metadata, credentials, SQL,
+                # upstream responses and the uncertain registration's request body.
+                assert set(body) == {"error"} and body["error"] in public_unavailability_errors, (
+                    target,
+                    body,
+                )
+                assert pinned.process.poll() is None, "Registry exited during quorum loss."
+                health_started = time.monotonic()
+                health_status, health_body, _ = pinned.request("GET", "/health")
+                assert time.monotonic() - health_started < 6
+                assert health_status == 200 and health_body == {"data": {"alive": True}}
+            assert time.monotonic() - outage_started < 30, "No-quorum probes exceeded 30 seconds."
+            # A failed write has an uncertain outcome. Do not replay it or assert
+            # its absence after recovery; only acknowledged identities are required.
+            restart_started = time.monotonic()
+            for index in sorted(stopped):
+                cluster.start_node(index)
+            wait_converged(cluster, range(args.nodes), final_index)
+            pinned.wait_ready()
+            assert time.monotonic() - restart_started <= 30, "Quorum recovery exceeded 30 seconds."
+            verify(pinned, acknowledged)
+            write(pinned, "after-quorum-restoration")
+            verify(pinned, acknowledged)
+            print(
+                f"PASS: {len(stopped)}/{args.nodes} voters stopped, public 503 and live health, "
+                "persisted quorum recovery within 30s without acknowledged loss",
                 flush=True,
             )
         except Exception:
