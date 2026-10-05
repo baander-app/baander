@@ -53,7 +53,7 @@ final class NginxTemplateTest extends TestCase
      */
     public function testSubstitutionReplacesAllPlaceholders(): void
     {
-        $domain = 'myapp.example.com';
+        $domain = 'myapp.baander.app';
         $config = $this->substitute($domain);
 
         $this->assertStringNotContainsString('${SERVER_NAME}', $config);
@@ -111,7 +111,7 @@ final class NginxTemplateTest extends TestCase
             'location ~ ^/api/stream/.+\.m4s$',
             'location ~ ^/api/stream/.+/init\.mp4$',
             'location ~ ^/api/stream/.+\.(m3u8|mpd)$',
-            'location ~ ^/api/stream/(track|media)$',
+            'location = /api/stream/track',
             'location ~ ^/api/images/[^/]+/file$',
             'location /',
         ];

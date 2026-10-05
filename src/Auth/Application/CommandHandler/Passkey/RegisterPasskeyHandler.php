@@ -9,6 +9,7 @@ use App\Auth\Domain\Event\Passkey\PasskeyRegistered;
 use App\Auth\Domain\Model\Passkey\Passkey;
 use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use RuntimeException;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -20,6 +21,7 @@ final class RegisterPasskeyHandler
         private readonly UserRepositoryInterface $userRepository,
         private readonly PasskeyRepositoryInterface $passkeyRepository,
         private readonly EventDispatcherInterface $eventDispatcher,
+        private readonly TransactionPortInterface $transaction,
     ) {
     }
 
@@ -49,15 +51,17 @@ final class RegisterPasskeyHandler
             $command->getCounter(),
         );
 
-        $this->passkeyRepository->save($passkey, $userId);
+        return $this->transaction->run(function () use ($passkey, $userId, $command): Passkey {
+            $this->passkeyRepository->save($passkey, $userId);
 
-        $this->eventDispatcher->dispatch(new PasskeyRegistered(
-            userId: $userId,
-            passkeyId: $passkey->getId(),
-            credentialId: $command->getCredentialId(),
-            name: $command->getName(),
-        ));
+            $this->eventDispatcher->dispatch(new PasskeyRegistered(
+                userId: $userId,
+                passkeyId: $passkey->getId(),
+                credentialId: $command->getCredentialId(),
+                name: $command->getName(),
+            ));
 
-        return $passkey;
+            return $passkey;
+        });
     }
 }

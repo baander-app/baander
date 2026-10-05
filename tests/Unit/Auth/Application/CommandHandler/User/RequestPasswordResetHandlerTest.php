@@ -48,7 +48,7 @@ final class RequestPasswordResetHandlerTest extends TestCase
             ->expects($this->never())
             ->method('save');
 
-        ($this->handler)(new RequestPasswordResetCommand(new Email('unknown@example.com')));
+        ($this->handler)(new RequestPasswordResetCommand(new Email('unknown@baander.app')));
     }
 
     public function testUpdatesTokenWhenOneAlreadyExists(): void

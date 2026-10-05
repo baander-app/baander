@@ -19,7 +19,7 @@ final class RadioEventsTest extends TestCase
     {
         $userId = Uuid::v7();
         $stationId = Uuid::v7();
-        $streamUrl = 'https://stream.example.com/high';
+        $streamUrl = 'https://stream.baander.app/high';
 
         $event = new RadioSessionStarted($userId, $stationId, $streamUrl);
 
@@ -39,14 +39,14 @@ final class RadioEventsTest extends TestCase
         $userId = Uuid::v7();
         $stationId = Uuid::v7();
 
-        $original = new RadioSessionStarted($userId, $stationId, 'https://stream.example.com');
+        $original = new RadioSessionStarted($userId, $stationId, 'https://stream.baander.app');
         $payload = $original->toPayload();
 
         $restored = RadioSessionStarted::fromPayload($payload);
 
         $this->assertTrue($restored->getUserId()->equals($userId));
         $this->assertTrue($restored->getStationId()->equals($stationId));
-        $this->assertSame('https://stream.example.com', $restored->getStreamUrl());
+        $this->assertSame('https://stream.baander.app', $restored->getStreamUrl());
     }
 
     public function testRadioSessionStoppedConstructsWithCorrectPayload(): void

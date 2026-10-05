@@ -24,8 +24,8 @@ final class RadioStationTest extends TestCase
     public function testCreateWithMultipleStreams(): void
     {
         $streams = [
-            new Stream(url: 'https://stream.example.com/high', format: 'aac', bitrate: 320, reliability: 0.99),
-            new Stream(url: 'https://stream.example.com/low', format: 'mp3', bitrate: 128, reliability: 0.95),
+            new Stream(url: 'https://stream.baander.app/high', format: 'aac', bitrate: 320, reliability: 0.99),
+            new Stream(url: 'https://stream.baander.app/low', format: 'mp3', bitrate: 128, reliability: 0.95),
         ];
 
         $station = RadioStation::create(
@@ -42,7 +42,7 @@ final class RadioStationTest extends TestCase
         $this->assertSame('Radio Example FM', $station->getName());
         $this->assertSame('DE', $station->getCountry());
         $this->assertCount(2, $station->getStreams());
-        $this->assertSame('https://stream.example.com/high', $station->getStreams()[0]->url);
+        $this->assertSame('https://stream.baander.app/high', $station->getStreams()[0]->url);
         $this->assertSame(320, $station->getStreams()[0]->bitrate);
         $this->assertNull($station->getLanguage());
         $this->assertSame([], $station->getGenres());
@@ -88,7 +88,7 @@ final class RadioStationTest extends TestCase
         $lastCheckedAt = new DateTimeImmutable('2025-06-01 11:00:00');
 
         $streams = [
-            new Stream('https://stream.example.com', 'mp3', 128, 0.9),
+            new Stream('https://stream.baander.app', 'mp3', 128, 0.9),
         ];
 
         $state = new RadioStationState(
@@ -101,8 +101,8 @@ final class RadioStationTest extends TestCase
             genres: ['rock', 'pop'],
             tags: ['news'],
             streams: $streams,
-            logo: 'https://example.com/logo.png',
-            website: 'https://example.com',
+            logo: 'https://baander.app/logo.png',
+            website: 'https://baander.app',
             lastCheckedAt: $lastCheckedAt,
             createdAt: $createdAt,
             updatedAt: $updatedAt,
@@ -119,21 +119,21 @@ final class RadioStationTest extends TestCase
         $this->assertSame(['rock', 'pop'], $station->getGenres());
         $this->assertSame(['news'], $station->getTags());
         $this->assertCount(1, $station->getStreams());
-        $this->assertSame('https://example.com/logo.png', $station->getLogo());
-        $this->assertSame('https://example.com', $station->getWebsite());
+        $this->assertSame('https://baander.app/logo.png', $station->getLogo());
+        $this->assertSame('https://baander.app', $station->getWebsite());
         $this->assertEquals($lastCheckedAt, $station->getLastCheckedAt());
     }
 
     public function testStreamValueObjectStoresUrlFormatBitrateReliability(): void
     {
         $stream = new Stream(
-            url: 'https://stream.example.com/high',
+            url: 'https://stream.baander.app/high',
             format: 'aac',
             bitrate: 320,
             reliability: 0.99,
         );
 
-        $this->assertSame('https://stream.example.com/high', $stream->url);
+        $this->assertSame('https://stream.baander.app/high', $stream->url);
         $this->assertSame('aac', $stream->format);
         $this->assertSame(320, $stream->bitrate);
         $this->assertSame(0.99, $stream->reliability);

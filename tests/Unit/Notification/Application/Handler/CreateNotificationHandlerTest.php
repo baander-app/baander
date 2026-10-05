@@ -66,7 +66,7 @@ final class CreateNotificationHandlerTest extends TestCase
         $userId = Uuid::generate();
         $command = new CreateNotificationCommand(
             eventClass: \App\Auth\Domain\Event\PasswordChanged::class,
-            payload: ['user_id' => $userId->toString(), 'email' => 'test@example.com', 'occurred_at' => '2026-04-19T00:00:00+00:00'],
+            payload: ['user_id' => $userId->toString(), 'email' => 'test@baander.app', 'occurred_at' => '2026-04-19T00:00:00+00:00'],
             eventName: 'user.password_changed',
         );
 
@@ -188,7 +188,7 @@ final class CreateNotificationHandlerTest extends TestCase
             id: $userId,
             publicId: new \App\Shared\Domain\Model\PublicId(),
             name: 'Test',
-            email: 'user@example.com',
+            email: 'user@baander.app',
             password: 'hashed',
             totpSecret: null,
             createdAt: new \DateTimeImmutable(),
@@ -200,7 +200,7 @@ final class CreateNotificationHandlerTest extends TestCase
 
         $command = new CreateNotificationCommand(
             eventClass: \App\Auth\Domain\Event\PasswordChanged::class,
-            payload: ['user_id' => $userId->toString(), 'email' => 'user@example.com', 'occurred_at' => '2026-04-19T00:00:00+00:00'],
+            payload: ['user_id' => $userId->toString(), 'email' => 'user@baander.app', 'occurred_at' => '2026-04-19T00:00:00+00:00'],
             eventName: 'user.password_changed',
         );
 
@@ -222,7 +222,7 @@ final class CreateNotificationHandlerTest extends TestCase
             id: $userId,
             publicId: new \App\Shared\Domain\Model\PublicId(),
             name: 'Test',
-            email: 'user@example.com',
+            email: 'user@baander.app',
             password: 'hashed',
             totpSecret: null,
             createdAt: new \DateTimeImmutable(),
@@ -233,7 +233,7 @@ final class CreateNotificationHandlerTest extends TestCase
 
         $command = new CreateNotificationCommand(
             eventClass: \App\Auth\Domain\Event\PasswordChanged::class,
-            payload: ['user_id' => $userId->toString(), 'email' => 'user@example.com', 'occurred_at' => '2026-04-19T00:00:00+00:00'],
+            payload: ['user_id' => $userId->toString(), 'email' => 'user@baander.app', 'occurred_at' => '2026-04-19T00:00:00+00:00'],
             eventName: 'user.password_changed',
         );
 
@@ -255,7 +255,7 @@ final class CreateNotificationHandlerTest extends TestCase
 
         $command = new CreateNotificationCommand(
             eventClass: \App\Auth\Domain\Event\PasswordChanged::class,
-            payload: ['user_id' => $userId->toString(), 'email' => 'user@example.com', 'occurred_at' => '2026-04-19T00:00:00+00:00'],
+            payload: ['user_id' => $userId->toString(), 'email' => 'user@baander.app', 'occurred_at' => '2026-04-19T00:00:00+00:00'],
             eventName: 'user.password_changed',
         );
 

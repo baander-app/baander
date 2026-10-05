@@ -33,7 +33,7 @@ final class CreatePairingCodeHandlerTest extends TestCase
     public function testCreatesPairingSessionWhenServerFound(): void
     {
         $server = ServerInstance::create(
-            serverUrl: 'https://music.example.com',
+            serverUrl: 'https://music.baander.app',
             name: 'Home Server',
             version: '1.2.3',
             apiKey: 'secret-key',
@@ -44,7 +44,7 @@ final class CreatePairingCodeHandlerTest extends TestCase
         $session = PairingSession::create(
             serverId: $serverId,
             serverPublicId: $serverPublicId,
-            serverUrl: 'https://music.example.com',
+            serverUrl: 'https://music.baander.app',
             serverName: 'Home Server',
             method: AuthenticationMethod::QrCode,
         );
@@ -58,7 +58,7 @@ final class CreatePairingCodeHandlerTest extends TestCase
             ->with(
                 $serverId,
                 $serverPublicId,
-                'https://music.example.com',
+                'https://music.baander.app',
                 'Home Server',
                 AuthenticationMethod::QrCode,
             )

@@ -31,7 +31,7 @@ final class DomainEventsTest extends TestCase
         $event = new UserRegistered(
             Uuid::v4(),
             new PublicId(),
-            new Email('test@example.com'),
+            new Email('test@baander.app'),
             'Alice',
             $this->now,
         );
@@ -50,7 +50,7 @@ final class DomainEventsTest extends TestCase
 
     public function testPasswordChangedToPayloadAndBack(): void
     {
-        $event = new PasswordChanged(Uuid::v4(), new Email('test@example.com'), $this->now);
+        $event = new PasswordChanged(Uuid::v4(), new Email('test@baander.app'), $this->now);
         $payload = $event->toPayload();
         $restored = PasswordChanged::fromPayload($payload);
 
@@ -62,7 +62,7 @@ final class DomainEventsTest extends TestCase
 
     public function testEmailVerifiedToPayloadAndBack(): void
     {
-        $event = new EmailVerified(Uuid::v4(), new Email('test@example.com'), $this->now);
+        $event = new EmailVerified(Uuid::v4(), new Email('test@baander.app'), $this->now);
         $payload = $event->toPayload();
         $restored = EmailVerified::fromPayload($payload);
 

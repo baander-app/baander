@@ -42,7 +42,7 @@ final class AuthCodeRepositoryFlushTest extends TestCase
 
     public function testSaveDoesNotFlushInsideTransaction(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = Client::create(
             name: 'Test App',
             redirectUris: ['http://localhost'],

@@ -50,7 +50,7 @@ final class SessionControllerTest extends TestCase
     public function testGetReturnsSession(): void
     {
         $userId = Uuid::v7()->toString();
-        $user = new SecurityUser($userId, 'test@example.com', 'hash');
+        $user = new SecurityUser($userId, 'test@baander.app', 'hash');
         $this->security->method('getUser')->willReturn($user);
 
         $sessionData = [
@@ -73,7 +73,7 @@ final class SessionControllerTest extends TestCase
 
     public function testGetReturns200WithNullDataWhenNoSession(): void
     {
-        $user = new SecurityUser(Uuid::v7()->toString(), 'test@example.com', 'hash');
+        $user = new SecurityUser(Uuid::v7()->toString(), 'test@baander.app', 'hash');
         $this->security->method('getUser')->willReturn($user);
 
         $this->sessionPort->method('getSession')->willReturn(null);
@@ -101,7 +101,7 @@ final class SessionControllerTest extends TestCase
         $this->commandBus = $this->createMock(MessageBusInterface::class);
         $this->controller = $this->createSessionControllerFixture();
 
-        $user = new SecurityUser(Uuid::v7()->toString(), 'test@example.com', 'hash');
+        $user = new SecurityUser(Uuid::v7()->toString(), 'test@baander.app', 'hash');
         $this->security->method('getUser')->willReturn($user);
 
         $deviceId = Uuid::v7()->toString();
@@ -133,7 +133,7 @@ final class SessionControllerTest extends TestCase
 
     public function testSyncReturns422WhenMissingDeviceId(): void
     {
-        $user = new SecurityUser(Uuid::v7()->toString(), 'test@example.com', 'hash');
+        $user = new SecurityUser(Uuid::v7()->toString(), 'test@baander.app', 'hash');
         $this->security->method('getUser')->willReturn($user);
 
         $request = new Request();
@@ -149,7 +149,7 @@ final class SessionControllerTest extends TestCase
         $this->commandBus = $this->createMock(MessageBusInterface::class);
         $this->controller = $this->createSessionControllerFixture();
 
-        $user = new SecurityUser(Uuid::v7()->toString(), 'test@example.com', 'hash');
+        $user = new SecurityUser(Uuid::v7()->toString(), 'test@baander.app', 'hash');
         $this->security->method('getUser')->willReturn($user);
 
         $payload = new ClaimSessionRequest(deviceId: Uuid::v7()->toString());
@@ -173,7 +173,7 @@ final class SessionControllerTest extends TestCase
         $this->commandBus = $this->createMock(MessageBusInterface::class);
         $this->controller = $this->createSessionControllerFixture();
 
-        $user = new SecurityUser(Uuid::v7()->toString(), 'test@example.com', 'hash');
+        $user = new SecurityUser(Uuid::v7()->toString(), 'test@baander.app', 'hash');
         $this->security->method('getUser')->willReturn($user);
 
         $payload = new CreateSessionRequest(

@@ -23,7 +23,7 @@ final class DomainEventRoundTripTest extends TestCase
         $original = new ServerRegistered(
             serverId: $serverId,
             serverPublicId: $serverPublicId,
-            serverUrl: 'https://music.example.com',
+            serverUrl: 'https://music.baander.app',
             name: 'Home Server',
             occurredAt: $occurredAt,
         );
@@ -34,7 +34,7 @@ final class DomainEventRoundTripTest extends TestCase
         $this->assertSame($original->eventName(), $restored->eventName());
         $this->assertTrue($original->getServerId()->equals($restored->getServerId()));
         $this->assertTrue($original->getServerPublicId()->equals($restored->getServerPublicId()));
-        $this->assertSame('https://music.example.com', $restored->getServerUrl());
+        $this->assertSame('https://music.baander.app', $restored->getServerUrl());
         $this->assertSame('Home Server', $restored->getName());
         $this->assertSame(
             $occurredAt->format(DateTimeImmutable::ATOM),

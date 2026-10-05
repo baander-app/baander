@@ -35,7 +35,7 @@ final class StartRadioHandlerTest extends TestCase
 
         $userId = Uuid::v7();
         $stationId = Uuid::v7();
-        $streamUrl = 'https://stream.example.com/live.mp3';
+        $streamUrl = 'https://stream.baander.app/live.mp3';
 
         $expectedResult = [
             'id' => Uuid::v7()->toString(),
@@ -73,7 +73,7 @@ final class StartRadioHandlerTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Station not found.');
 
-        $command = new StartRadioCommand($userId, $stationId, 'https://stream.example.com/live.mp3');
+        $command = new StartRadioCommand($userId, $stationId, 'https://stream.baander.app/live.mp3');
         ($this->handler)($command);
     }
 }

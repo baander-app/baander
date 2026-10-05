@@ -11,13 +11,13 @@ final class SecurityUserTest extends TestCase
 {
     public function testGetters(): void
     {
-        $user = new SecurityUser('uuid-123', 'test@example.com', 'hashed-pw', ['ROLE_USER', 'ROLE_ADMIN']);
+        $user = new SecurityUser('uuid-123', 'test@baander.app', 'hashed-pw', ['ROLE_USER', 'ROLE_ADMIN']);
 
         $this->assertSame('uuid-123', $user->getId());
-        $this->assertSame('test@example.com', $user->getEmail());
+        $this->assertSame('test@baander.app', $user->getEmail());
         $this->assertSame('hashed-pw', $user->getPassword());
         $this->assertSame(['ROLE_USER', 'ROLE_ADMIN'], $user->getRoles());
-        $this->assertSame('test@example.com', $user->getUserIdentifier());
+        $this->assertSame('test@baander.app', $user->getUserIdentifier());
     }
 
     public function testDefaultRole(): void

@@ -84,7 +84,7 @@ final class OutboxReliabilityTest extends TestCase
             'payload' => json_encode([
                 'user_id' => $userId->toString(),
                 'public_id' => $publicId->toString(),
-                'email' => 'test@example.com',
+                'email' => 'test@baander.app',
                 'name' => 'Test User',
                 'occurred_at' => (new \DateTimeImmutable())->format(\DateTimeImmutable::ATOM),
             ], JSON_THROW_ON_ERROR),
@@ -142,7 +142,7 @@ final class OutboxReliabilityTest extends TestCase
             'payload' => json_encode([
                 'user_id' => $userId->toString(),
                 'public_id' => $publicId->toString(),
-                'email' => 'test@example.com',
+                'email' => 'test@baander.app',
                 'name' => 'Test User',
                 'occurred_at' => (new \DateTimeImmutable())->format(\DateTimeImmutable::ATOM),
             ], JSON_THROW_ON_ERROR),

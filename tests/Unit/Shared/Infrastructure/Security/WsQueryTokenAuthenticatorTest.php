@@ -177,7 +177,7 @@ final class WsQueryTokenAuthenticatorTest extends TestCase
             id: $uuid,
             publicId: new PublicId(),
             name: 'Test User',
-            email: 'user@example.com',
+            email: 'user@baander.app',
             password: 'hashed-password',
             totpSecret: null,
             createdAt: new \DateTimeImmutable(),

@@ -63,13 +63,13 @@ final class AdminUserControllerTest extends TestCase
         $superAdmin = $this->createSuperAdminUser();
 
         $response = $this->authenticatedRequest('POST', '/api/admin/users', $superAdmin, [
-            'email' => 'newuser@example.com',
+            'email' => 'newuser@baander.app',
             'password' => 'securePassword123',
             'name' => 'New User',
         ]);
 
         $data = $this->assertJsonResponse($response, 201, 'data');
-        $this->assertSame('newuser@example.com', $data['data']['email']);
+        $this->assertSame('newuser@baander.app', $data['data']['email']);
         $this->assertSame('New User', $data['data']['name']);
         $this->assertContains('ROLE_USER', $data['data']['roles']);
     }
@@ -79,7 +79,7 @@ final class AdminUserControllerTest extends TestCase
         $superAdmin = $this->createSuperAdminUser();
 
         $response = $this->authenticatedRequest('POST', '/api/admin/users', $superAdmin, [
-            'email' => 'admin2@example.com',
+            'email' => 'admin2@baander.app',
             'password' => 'securePassword123',
             'name' => 'Admin Two',
             'roles' => ['ROLE_USER', 'ROLE_ADMIN'],
@@ -94,7 +94,7 @@ final class AdminUserControllerTest extends TestCase
         $admin = $this->createAdminUser();
 
         $response = $this->authenticatedRequest('POST', '/api/admin/users', $admin, [
-            'email' => 'blocked@example.com',
+            'email' => 'blocked@baander.app',
             'password' => 'securePassword123',
             'name' => 'Blocked',
         ]);
@@ -115,12 +115,12 @@ final class AdminUserControllerTest extends TestCase
             'PATCH',
             '/api/admin/users/' . $target->getId()->toString(),
             $superAdmin,
-            ['name' => 'Updated Name', 'email' => 'updated@example.com'],
+            ['name' => 'Updated Name', 'email' => 'updated@baander.app'],
         );
 
         $data = $this->assertJsonResponse($response, 200, 'data');
         $this->assertSame('Updated Name', $data['data']['name']);
-        $this->assertSame('updated@example.com', $data['data']['email']);
+        $this->assertSame('updated@baander.app', $data['data']['email']);
     }
 
     public function testUpdateNonExistentUserReturns404(): void

@@ -142,7 +142,7 @@ final class CompletePairingHandlerTest extends TestCase
         return PairingSession::create(
             serverId: Uuid::v4(),
             serverPublicId: $serverPublicId,
-            serverUrl: 'https://music.example.com',
+            serverUrl: 'https://music.baander.app',
             serverName: 'Home Server',
             method: AuthenticationMethod::QrCode,
         );
@@ -155,7 +155,7 @@ final class CompletePairingHandlerTest extends TestCase
             publicId: new PublicId(),
             serverId: Uuid::v4(),
             serverPublicId: $serverPublicId,
-            serverUrl: 'https://music.example.com',
+            serverUrl: 'https://music.baander.app',
             serverName: 'Home Server',
             pairingCode: PairingCode::fromString('BCDF-GHJK'),
             method: AuthenticationMethod::QrCode,

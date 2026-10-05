@@ -21,7 +21,7 @@ final class AuthCodeTest extends TestCase
     protected function setUp(): void
     {
         $this->client = Client::create('Test', []);
-        $this->user = User::register(new Email('test@example.com'), 'hashed', 'Alice');
+        $this->user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
     }
 
     public function testCreateWithMinimalParams(): void

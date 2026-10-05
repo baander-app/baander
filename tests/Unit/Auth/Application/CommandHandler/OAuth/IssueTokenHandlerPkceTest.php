@@ -93,7 +93,7 @@ final class IssueTokenHandlerPkceTest extends TestCase
 
     public function testAuthorizationCodeWithMismatchedCodeVerifierIsRejected(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
         $authCode = AuthCode::create(
             $user,
@@ -122,7 +122,7 @@ final class IssueTokenHandlerPkceTest extends TestCase
 
     public function testAuthorizationCodeWithoutCodeVerifierWhenPkceRequiredIsRejected(): void
     {
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $client = $this->createConfidentialClient();
         $authCode = AuthCode::create(
             $user,

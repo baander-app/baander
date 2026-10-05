@@ -11,7 +11,7 @@ final class PasswordResetTokenEntityTest extends TestCase
 {
     public function testFreshTokenIsNotExpired(): void
     {
-        $token = new PasswordResetTokenEntity('user@example.com', 'some-token');
+        $token = new PasswordResetTokenEntity('user@baander.app', 'some-token');
 
         $this->assertNull($token->getExpiresAt());
         $this->assertFalse($token->isExpired());
@@ -19,7 +19,7 @@ final class PasswordResetTokenEntityTest extends TestCase
 
     public function testTokenWithFutureExpirationIsNotExpired(): void
     {
-        $token = new PasswordResetTokenEntity('user@example.com', 'some-token');
+        $token = new PasswordResetTokenEntity('user@baander.app', 'some-token');
         $token->setExpiresAt(new \DateTimeImmutable('+1 hour'));
 
         $this->assertFalse($token->isExpired());
@@ -27,7 +27,7 @@ final class PasswordResetTokenEntityTest extends TestCase
 
     public function testTokenWithPastExpirationIsExpired(): void
     {
-        $token = new PasswordResetTokenEntity('user@example.com', 'some-token');
+        $token = new PasswordResetTokenEntity('user@baander.app', 'some-token');
         $token->setExpiresAt(new \DateTimeImmutable('-1 minute'));
 
         $this->assertTrue($token->isExpired());
@@ -35,7 +35,7 @@ final class PasswordResetTokenEntityTest extends TestCase
 
     public function testTokenWithExactlyNowExpirationIsNotExpired(): void
     {
-        $token = new PasswordResetTokenEntity('user@example.com', 'some-token');
+        $token = new PasswordResetTokenEntity('user@baander.app', 'some-token');
         $token->setExpiresAt(new \DateTimeImmutable('+1 second'));
 
         // isExpired uses strict less-than (<), so "now + 1s" is not yet expired
@@ -44,7 +44,7 @@ final class PasswordResetTokenEntityTest extends TestCase
 
     public function testSetExpiresAtOverridesPreviousValue(): void
     {
-        $token = new PasswordResetTokenEntity('user@example.com', 'some-token');
+        $token = new PasswordResetTokenEntity('user@baander.app', 'some-token');
         $future = new \DateTimeImmutable('+2 hours');
         $token->setExpiresAt($future);
 

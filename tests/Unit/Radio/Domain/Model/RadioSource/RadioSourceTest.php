@@ -17,7 +17,7 @@ final class RadioSourceTest extends TestCase
     public function testCreateWithConfig(): void
     {
         $syncConfig = new SyncConfig(
-            syncUrl: 'https://example.com/api',
+            syncUrl: 'https://baander.app/api',
             schedule: '0 */6 * * *',
             config: ['timeout' => 30],
         );
@@ -31,7 +31,7 @@ final class RadioSourceTest extends TestCase
         $this->assertInstanceOf(Uuid::class, $source->getId());
         $this->assertSame('IPRD', $source->getName());
         $this->assertSame('iprd', $source->getType());
-        $this->assertSame('https://example.com/api', $source->getSyncConfig()->syncUrl);
+        $this->assertSame('https://baander.app/api', $source->getSyncConfig()->syncUrl);
         $this->assertSame('0 */6 * * *', $source->getSyncConfig()->schedule);
         $this->assertSame(['timeout' => 30], $source->getSyncConfig()->config);
         $this->assertTrue($source->isActive());
@@ -47,7 +47,7 @@ final class RadioSourceTest extends TestCase
         RadioSource::create(
             name: '',
             type: 'iprd',
-            syncConfig: new SyncConfig('https://example.com', null, []),
+            syncConfig: new SyncConfig('https://baander.app', null, []),
         );
     }
 
@@ -59,7 +59,7 @@ final class RadioSourceTest extends TestCase
         RadioSource::create(
             name: 'IPRD',
             type: '',
-            syncConfig: new SyncConfig('https://example.com', null, []),
+            syncConfig: new SyncConfig('https://baander.app', null, []),
         );
     }
 
@@ -68,7 +68,7 @@ final class RadioSourceTest extends TestCase
         $source = RadioSource::create(
             name: 'IPRD',
             type: 'iprd',
-            syncConfig: new SyncConfig('https://example.com', null, []),
+            syncConfig: new SyncConfig('https://baander.app', null, []),
         );
 
         $this->assertTrue($source->isActive());
@@ -81,7 +81,7 @@ final class RadioSourceTest extends TestCase
         $id = Uuid::v7();
         $createdAt = new DateTimeImmutable('2025-01-01 00:00:00');
         $updatedAt = new DateTimeImmutable('2025-06-01 12:00:00');
-        $syncConfig = new SyncConfig('https://example.com/api', '0 */6 * * *', ['key' => 'val']);
+        $syncConfig = new SyncConfig('https://baander.app/api', '0 */6 * * *', ['key' => 'val']);
 
         $state = new RadioSourceState(
             id: $id,
@@ -101,6 +101,6 @@ final class RadioSourceTest extends TestCase
         $this->assertFalse($source->isActive());
         $this->assertEquals($createdAt, $source->getCreatedAt());
         $this->assertEquals($updatedAt, $source->getUpdatedAt());
-        $this->assertSame('https://example.com/api', $source->getSyncConfig()->syncUrl);
+        $this->assertSame('https://baander.app/api', $source->getSyncConfig()->syncUrl);
     }
 }

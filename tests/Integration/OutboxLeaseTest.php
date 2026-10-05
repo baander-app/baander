@@ -115,7 +115,7 @@ final class OutboxLeaseTest extends TestCase
         $event = new \App\Auth\Domain\Event\UserRegistered(
             \App\Shared\Domain\Model\Uuid::v4(),
             \App\Shared\Domain\Model\PublicId::fromString('aaaaaaaaaaaaaaaaaaaaa'),
-            \App\Shared\Domain\Model\Email::fromString('outbox@example.com'),
+            \App\Shared\Domain\Model\Email::fromString('outbox@baander.app'),
             'Outbox test',
         );
         $repository->append($event::class, $event->eventName(), $event->toPayload());

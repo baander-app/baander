@@ -17,13 +17,13 @@ final class ServerInstanceTest extends TestCase
     public function testCreateSetsIdentityAndDefaults(): void
     {
         $server = ServerInstance::create(
-            serverUrl: 'https://music.example.com',
+            serverUrl: 'https://music.baander.app',
             name: 'Home Server',
             version: '1.2.3',
             apiKey: 'secret-key',
         );
 
-        $this->assertSame('https://music.example.com', $server->getServerUrl());
+        $this->assertSame('https://music.baander.app', $server->getServerUrl());
         $this->assertSame('Home Server', $server->getName());
         $this->assertSame('1.2.3', $server->getVersion());
         $this->assertSame('secret-key', $server->getApiKey());
@@ -36,7 +36,7 @@ final class ServerInstanceTest extends TestCase
     public function testNewlyCreatedServerIsHealthy(): void
     {
         $server = ServerInstance::create(
-            serverUrl: 'https://music.example.com',
+            serverUrl: 'https://music.baander.app',
             name: 'Home Server',
             version: '1.2.3',
             apiKey: 'secret-key',
@@ -58,7 +58,7 @@ final class ServerInstanceTest extends TestCase
     public function testUpdateStatusChangesStatus(): void
     {
         $server = ServerInstance::create(
-            serverUrl: 'https://music.example.com',
+            serverUrl: 'https://music.baander.app',
             name: 'Home Server',
             version: '1.2.3',
             apiKey: 'secret-key',
@@ -72,7 +72,7 @@ final class ServerInstanceTest extends TestCase
     public function testUpdateVersionChangesVersion(): void
     {
         $server = ServerInstance::create(
-            serverUrl: 'https://music.example.com',
+            serverUrl: 'https://music.baander.app',
             name: 'Home Server',
             version: '1.2.3',
             apiKey: 'secret-key',
@@ -95,7 +95,7 @@ final class ServerInstanceTest extends TestCase
         $server = ServerInstance::reconstitute(new ServerInstanceState(
             id: Uuid::v4(),
             publicId: new PublicId(),
-            serverUrl: 'https://music.example.com',
+            serverUrl: 'https://music.baander.app',
             name: 'Home Server',
             apiKey: 'secret-key',
             createdAt: new DateTimeImmutable('-1 hour'),
@@ -121,7 +121,7 @@ final class ServerInstanceTest extends TestCase
         $state = new ServerInstanceState(
             id: Uuid::v4(),
             publicId: new PublicId(),
-            serverUrl: 'https://music.example.com',
+            serverUrl: 'https://music.baander.app',
             name: 'Home Server',
             apiKey: 'secret-key',
             createdAt: new DateTimeImmutable('-1 hour'),
@@ -150,7 +150,7 @@ final class ServerInstanceTest extends TestCase
         return ServerInstance::reconstitute(new ServerInstanceState(
             id: Uuid::v4(),
             publicId: new PublicId(),
-            serverUrl: 'https://music.example.com',
+            serverUrl: 'https://music.baander.app',
             name: 'Home Server',
             apiKey: 'secret-key',
             createdAt: new DateTimeImmutable('-1 hour'),

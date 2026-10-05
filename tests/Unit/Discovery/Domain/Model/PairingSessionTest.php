@@ -31,7 +31,7 @@ final class PairingSessionTest extends TestCase
         $session = PairingSession::create(
             serverId: $this->serverId,
             serverPublicId: $this->serverPublicId,
-            serverUrl: 'https://music.example.com',
+            serverUrl: 'https://music.baander.app',
             serverName: 'Home Server',
             method: AuthenticationMethod::QrCode,
         );
@@ -40,7 +40,7 @@ final class PairingSessionTest extends TestCase
         $this->assertFalse($session->getPublicId()->equals($this->serverPublicId));
         $this->assertTrue($session->getServerId()->equals($this->serverId));
         $this->assertTrue($session->getServerPublicId()->equals($this->serverPublicId));
-        $this->assertSame('https://music.example.com', $session->getServerUrl());
+        $this->assertSame('https://music.baander.app', $session->getServerUrl());
         $this->assertSame('Home Server', $session->getServerName());
         $this->assertSame(AuthenticationMethod::QrCode, $session->getMethod());
 
@@ -56,7 +56,7 @@ final class PairingSessionTest extends TestCase
         $session = PairingSession::create(
             serverId: $this->serverId,
             serverPublicId: $this->serverPublicId,
-            serverUrl: 'https://music.example.com',
+            serverUrl: 'https://music.baander.app',
             serverName: 'Home Server',
             method: AuthenticationMethod::QrCode,
             ttl: new DateInterval('PT60S'),
@@ -162,7 +162,7 @@ final class PairingSessionTest extends TestCase
             publicId: new PublicId(),
             serverId: $this->serverId,
             serverPublicId: $this->serverPublicId,
-            serverUrl: 'https://music.example.com',
+            serverUrl: 'https://music.baander.app',
             serverName: 'Home Server',
             pairingCode: \App\Discovery\Domain\ValueObject\PairingCode::fromString('BCDF-GHJK'),
             method: AuthenticationMethod::EmailUrl,
@@ -182,7 +182,7 @@ final class PairingSessionTest extends TestCase
         return PairingSession::create(
             serverId: $this->serverId,
             serverPublicId: $this->serverPublicId,
-            serverUrl: 'https://music.example.com',
+            serverUrl: 'https://music.baander.app',
             serverName: 'Home Server',
             method: AuthenticationMethod::QrCode,
         );
@@ -195,7 +195,7 @@ final class PairingSessionTest extends TestCase
             publicId: new PublicId(),
             serverId: $this->serverId,
             serverPublicId: $this->serverPublicId,
-            serverUrl: 'https://music.example.com',
+            serverUrl: 'https://music.baander.app',
             serverName: 'Home Server',
             pairingCode: \App\Discovery\Domain\ValueObject\PairingCode::fromString('BCDF-GHJK'),
             method: AuthenticationMethod::QrCode,

@@ -28,7 +28,7 @@ final class DpopAwareBearerTokenValidatorTest extends TestCase
         $matching->setPublicKey($publicKey);
         self::assertSame('user-uuid', $matching->validateAuthorization($request)->getAttribute('oauth_user_id'));
 
-        $validator = new DpopAwareBearerTokenValidator($this->accessTokenRepository, null, 'https://baander.example.com');
+        $validator = new DpopAwareBearerTokenValidator($this->accessTokenRepository, null, 'https://api.baander.app');
         $validator->setPublicKey($publicKey);
         $this->expectException(OAuthServerException::class);
         $validator->validateAuthorization($request);
@@ -36,8 +36,8 @@ final class DpopAwareBearerTokenValidatorTest extends TestCase
 
     public function testValidatorParsesClientIdFromJwt(): void
     {
-        [$request, $publicKey] = $this->signedRequest('https://baander.example.com');
-        $validator = new DpopAwareBearerTokenValidator($this->accessTokenRepository, null, 'https://baander.example.com');
+        [$request, $publicKey] = $this->signedRequest('https://api.baander.app');
+        $validator = new DpopAwareBearerTokenValidator($this->accessTokenRepository, null, 'https://api.baander.app');
         $validator->setPublicKey($publicKey);
         $validated = $validator->validateAuthorization($request);
         self::assertSame('client-uuid', $validated->getAttribute('oauth_client_id'));
@@ -46,7 +46,7 @@ final class DpopAwareBearerTokenValidatorTest extends TestCase
 
     public function testValidatorWorksWithoutResourceServerUri(): void
     {
-        [$request, $publicKey] = $this->signedRequest('https://baander.example.com');
+        [$request, $publicKey] = $this->signedRequest('https://api.baander.app');
         $validator = new DpopAwareBearerTokenValidator($this->accessTokenRepository);
         $validator->setPublicKey($publicKey);
         self::assertSame('client-uuid', $validator->validateAuthorization($request)->getAttribute('oauth_client_id'));
@@ -69,7 +69,7 @@ final class DpopAwareBearerTokenValidatorTest extends TestCase
             . $encode(json_encode($claims, JSON_THROW_ON_ERROR));
         self::assertTrue(openssl_sign($body, $signature, $key, OPENSSL_ALGO_SHA256));
         return [
-            new ServerRequest('GET', 'https://baander.example.com/api/test', ['Authorization' => 'Bearer ' . $body . '.' . $encode($signature)]),
+            new ServerRequest('GET', 'https://api.baander.app/api/test', ['Authorization' => 'Bearer ' . $body . '.' . $encode($signature)]),
             new CryptKey($details['key'], null, false),
         ];
     }
@@ -78,7 +78,7 @@ final class DpopAwareBearerTokenValidatorTest extends TestCase
     {
         // Use reflection to test the private parseJwtClaims method
         $payload = base64_encode(json_encode([
-            'aud' => 'https://baander.example.com',
+            'aud' => 'https://api.baander.app',
             'client_id' => 'client-uuid-123',
             'sub' => 'user-uuid-456',
         ]));
@@ -91,13 +91,13 @@ final class DpopAwareBearerTokenValidatorTest extends TestCase
         $validator = new DpopAwareBearerTokenValidator(
             $this->accessTokenRepository,
             null,
-            'https://baander.example.com',
+            'https://api.baander.app',
         );
 
         $reflection = new \ReflectionMethod($validator, 'parseJwtClaims');
         $claims = $reflection->invoke($validator, $jwt);
 
-        $this->assertSame('https://baander.example.com', $claims['aud']);
+        $this->assertSame('https://api.baander.app', $claims['aud']);
         $this->assertSame('client-uuid-123', $claims['client_id']);
         $this->assertSame('user-uuid-456', $claims['sub']);
     }

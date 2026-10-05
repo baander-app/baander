@@ -23,7 +23,7 @@ final class AdminVoterTest extends TestCase
     /** @param array<array-key, string> $roles */
     private function createToken(string $userId, array $roles): TokenInterface&Stub
     {
-        $user = new SecurityUser($userId, 'user@example.com', 'hashed', $roles);
+        $user = new SecurityUser($userId, 'user@baander.app', 'hashed', $roles);
 
         $token = $this->createStub(TokenInterface::class);
         $token->method('getUser')->willReturn($user);

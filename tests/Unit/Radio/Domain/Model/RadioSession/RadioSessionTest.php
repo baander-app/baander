@@ -39,7 +39,7 @@ final class RadioSessionTest extends TestCase
     {
         $session = RadioSession::create(userId: $this->userId);
 
-        $streamUrl = 'https://stream.example.com/high';
+        $streamUrl = 'https://stream.baander.app/high';
         $session->start(stationId: $this->stationId, streamUrl: $streamUrl);
 
         $this->assertSame('playing', $session->getState());
@@ -50,7 +50,7 @@ final class RadioSessionTest extends TestCase
     public function testStopPlaying(): void
     {
         $session = RadioSession::create(userId: $this->userId);
-        $session->start(stationId: $this->stationId, streamUrl: 'https://stream.example.com');
+        $session->start(stationId: $this->stationId, streamUrl: 'https://stream.baander.app');
 
         $this->assertSame('playing', $session->getState());
 
@@ -67,7 +67,7 @@ final class RadioSessionTest extends TestCase
         // Creation doesn't fire events for radio sessions
         $this->assertCount(0, $session->drainPendingEvents());
 
-        $session->start(stationId: $this->stationId, streamUrl: 'https://stream.example.com');
+        $session->start(stationId: $this->stationId, streamUrl: 'https://stream.baander.app');
 
         $events = $session->drainPendingEvents();
         $this->assertCount(1, $events);
@@ -77,7 +77,7 @@ final class RadioSessionTest extends TestCase
     public function testStopFiresRadioSessionStoppedEvent(): void
     {
         $session = RadioSession::create(userId: $this->userId);
-        $session->start(stationId: $this->stationId, streamUrl: 'https://stream.example.com');
+        $session->start(stationId: $this->stationId, streamUrl: 'https://stream.baander.app');
         $session->drainPendingEvents();
 
         $session->stop();
@@ -100,12 +100,12 @@ final class RadioSessionTest extends TestCase
     public function testStartWhenAlreadyPlayingThrows(): void
     {
         $session = RadioSession::create(userId: $this->userId);
-        $session->start(stationId: $this->stationId, streamUrl: 'https://stream.example.com');
+        $session->start(stationId: $this->stationId, streamUrl: 'https://stream.baander.app');
 
         $this->expectException(DomainException::class);
         $this->expectExceptionMessage('Cannot start a session that is already playing.');
 
-        $session->start(stationId: $this->stationId, streamUrl: 'https://stream.example.com');
+        $session->start(stationId: $this->stationId, streamUrl: 'https://stream.baander.app');
     }
 
     public function testReconstituteRoundtrip(): void
@@ -118,7 +118,7 @@ final class RadioSessionTest extends TestCase
             id: $id,
             userId: $this->userId,
             activeStationId: $this->stationId,
-            activeStreamUrl: 'https://stream.example.com',
+            activeStreamUrl: 'https://stream.baander.app',
             state: 'playing',
             createdAt: $createdAt,
             updatedAt: $updatedAt,
@@ -129,7 +129,7 @@ final class RadioSessionTest extends TestCase
         $this->assertTrue($session->getId()->equals($id));
         $this->assertTrue($session->getUserId()->equals($this->userId));
         $this->assertTrue($session->getActiveStationId()->equals($this->stationId));
-        $this->assertSame('https://stream.example.com', $session->getActiveStreamUrl());
+        $this->assertSame('https://stream.baander.app', $session->getActiveStreamUrl());
         $this->assertSame('playing', $session->getState());
         $this->assertEquals($createdAt, $session->getCreatedAt());
         $this->assertEquals($updatedAt, $session->getUpdatedAt());
@@ -138,7 +138,7 @@ final class RadioSessionTest extends TestCase
     public function testDrainPendingEventsClearsEvents(): void
     {
         $session = RadioSession::create(userId: $this->userId);
-        $session->start(stationId: $this->stationId, streamUrl: 'https://stream.example.com');
+        $session->start(stationId: $this->stationId, streamUrl: 'https://stream.baander.app');
 
         $this->assertCount(1, $session->drainPendingEvents());
         $this->assertCount(0, $session->drainPendingEvents());

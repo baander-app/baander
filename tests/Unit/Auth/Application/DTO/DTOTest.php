@@ -67,10 +67,10 @@ final class DTOTest extends TestCase
 
     public function testRegisterUserDTOValid(): void
     {
-        $dto = new RegisterUserDTO('Alice', 'alice@example.com', 'password123');
+        $dto = new RegisterUserDTO('Alice', 'alice@baander.app', 'password123');
 
         $this->assertSame('Alice', $dto->getName());
-        $this->assertSame('alice@example.com', $dto->getEmail()->toString());
+        $this->assertSame('alice@baander.app', $dto->getEmail()->toString());
         $this->assertSame('password123', $dto->getPassword());
     }
 

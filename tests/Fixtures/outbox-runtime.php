@@ -46,9 +46,9 @@ if ($mode === 'prepare') {
         $db->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
     }
 
-    $user = new UserEntity(new PublicId(), 'Outbox User', 'outbox-user@example.com', 'unused-password', '');
+    $user = new UserEntity(new PublicId(), 'Outbox User', 'outbox-user@baander.app', 'unused-password', '');
     $user->markEmailAsVerified();
-    $admin = new UserEntity(new PublicId(), 'Outbox Admin', 'outbox-admin@example.com', 'unused-password', '', roles: ['ROLE_USER', 'ROLE_ADMIN']);
+    $admin = new UserEntity(new PublicId(), 'Outbox Admin', 'outbox-admin@baander.app', 'unused-password', '', roles: ['ROLE_USER', 'ROLE_ADMIN']);
     $admin->markEmailAsVerified();
     $em->persist($user);
     $em->persist($admin);

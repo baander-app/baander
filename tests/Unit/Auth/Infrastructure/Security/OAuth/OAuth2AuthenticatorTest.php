@@ -178,7 +178,7 @@ final class OAuth2AuthenticatorTest extends TestCase
         $userRepository = $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class);
         $userRepository->method('findByUuid')->willReturn(
             \App\Auth\Domain\Model\User::register(
-                new \App\Shared\Domain\Model\Email('test@example.com'),
+                new \App\Shared\Domain\Model\Email('test@baander.app'),
                 'hashed-pw',
                 'Test User',
             ),

@@ -34,7 +34,7 @@ final class MarkdownConverterTest extends TestCase
             . "[back](../README.md)\n\n"
             . "[details](details.md)\n\n"
             . "[frag](details.md#section)\n\n"
-            . "[ext](https://example.com/page.md)\n",
+            . "[ext](https://baander.app/page.md)\n",
         );
 
         // part-2 is remapped to developer-guide; its README becomes the dir index.
@@ -109,7 +109,7 @@ final class MarkdownConverterTest extends TestCase
         // Fragment is preserved.
         $this->assertStringContainsString('<a href="details.html#section">frag</a>', $html);
         // External http link survives unchanged through Parsedown.
-        $this->assertStringContainsString('<a href="https://example.com/page.md">ext</a>', $html);
+        $this->assertStringContainsString('<a href="https://baander.app/page.md">ext</a>', $html);
     }
 
     public function testDeveloperGuideReadmeBecomesDirectoryIndex(): void

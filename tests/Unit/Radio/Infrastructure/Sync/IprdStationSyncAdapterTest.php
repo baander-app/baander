@@ -23,8 +23,8 @@ final class IprdStationSyncAdapterTest extends TestCase
                 'language' => [],
                 'genres' => ['pop'],
                 'tags' => ['berlin'],
-                'streams' => [['url' => 'https://stream.example.com/rb', 'format' => 'mp3', 'bitrate' => 128, 'reliability' => 0.9]],
-                'logo' => 'https://example.com/logo.png',
+                'streams' => [['url' => 'https://stream.baander.app/rb', 'format' => 'mp3', 'bitrate' => 128, 'reliability' => 0.9]],
+                'logo' => 'https://baander.app/logo.png',
                 'website' => 'https://radioberlin.de',
             ],
             [
@@ -138,7 +138,7 @@ final class IprdStationSyncAdapterTest extends TestCase
         $this->assertSame('Radio Berlin', $stations[0]['name']);
         $this->assertSame('Germany', $stations[0]['country']);
         $this->assertCount(1, $stations[0]['streams']);
-        $this->assertSame('https://stream.example.com/rb', $stations[0]['streams'][0]['url']);
+        $this->assertSame('https://stream.baander.app/rb', $stations[0]['streams'][0]['url']);
     }
 
     public function testFetchStationsByCountryReturnsEmptyForUnknownCode(): void

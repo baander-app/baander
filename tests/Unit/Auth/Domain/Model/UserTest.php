@@ -15,10 +15,10 @@ final class UserTest extends TestCase
 {
     public function testRegisterCreatesUser(): void
     {
-        $user = User::register(new Email('test@example.com'), 'hashed-pw', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'hashed-pw', 'Alice');
 
         $this->assertSame('Alice', $user->getName());
-        $this->assertSame('test@example.com', $user->getEmail());
+        $this->assertSame('test@baander.app', $user->getEmail());
         $this->assertSame('hashed-pw', $user->getPassword());
         $this->assertFalse($user->isEmailVerified());
         $this->assertNull($user->getEmailVerifiedAt());
@@ -29,7 +29,7 @@ final class UserTest extends TestCase
     {
         $this->expectException(InvalidArgumentException::class);
 
-        User::register(new Email('test@example.com'), 'hashed-pw', '  ');
+        User::register(new Email('test@baander.app'), 'hashed-pw', '  ');
     }
 
     public function testReconstituteRestoresAllFields(): void
@@ -40,7 +40,7 @@ final class UserTest extends TestCase
             id: \App\Shared\Domain\Model\Uuid::v4(),
             publicId: \App\Shared\Domain\Model\PublicId::fromString('usr_abc123def456ghjkl'),
             name: 'Bob',
-            email: 'bob@example.com',
+            email: 'bob@baander.app',
             password: 'hashed',
             totpSecret: null,
             createdAt: $now,
@@ -59,7 +59,7 @@ final class UserTest extends TestCase
             id: \App\Shared\Domain\Model\Uuid::v4(),
             publicId: \App\Shared\Domain\Model\PublicId::fromString('usr_abc123def456ghjkl'),
             name: 'Bob',
-            email: 'bob@example.com',
+            email: 'bob@baander.app',
             password: 'hashed',
             totpSecret: null,
             createdAt: new \DateTimeImmutable(),
@@ -72,7 +72,7 @@ final class UserTest extends TestCase
 
     public function testVerifyEmailMarksAsVerified(): void
     {
-        $user = User::register(new Email('test@example.com'), 'hashed-pw', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'hashed-pw', 'Alice');
 
         $user->verifyEmail();
 
@@ -82,7 +82,7 @@ final class UserTest extends TestCase
 
     public function testVerifyEmailIdempotent(): void
     {
-        $user = User::register(new Email('test@example.com'), 'hashed-pw', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'hashed-pw', 'Alice');
         $user->verifyEmail();
         $before = $user->getEmailVerifiedAt();
 
@@ -93,7 +93,7 @@ final class UserTest extends TestCase
 
     public function testChangePassword(): void
     {
-        $user = User::register(new Email('test@example.com'), 'old-hash', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'old-hash', 'Alice');
 
         $user->changePassword('new-hash');
 
@@ -102,7 +102,7 @@ final class UserTest extends TestCase
 
     public function testChangePasswordSameValueIsNoOp(): void
     {
-        $user = User::register(new Email('test@example.com'), 'same-hash', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'same-hash', 'Alice');
         $before = $user->getUpdatedAt();
 
         $user->changePassword('same-hash');
@@ -112,7 +112,7 @@ final class UserTest extends TestCase
 
     public function testUpdateName(): void
     {
-        $user = User::register(new Email('test@example.com'), 'hashed-pw', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'hashed-pw', 'Alice');
 
         $user->updateName('Bob');
 
@@ -121,7 +121,7 @@ final class UserTest extends TestCase
 
     public function testUpdateNameThrowsOnEmpty(): void
     {
-        $user = User::register(new Email('test@example.com'), 'hashed-pw', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'hashed-pw', 'Alice');
 
         $this->expectException(InvalidArgumentException::class);
 
@@ -130,7 +130,7 @@ final class UserTest extends TestCase
 
     public function testSetTotpSecret(): void
     {
-        $user = User::register(new Email('test@example.com'), 'hashed-pw', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'hashed-pw', 'Alice');
 
         $user->setTotpSecret('secret123');
 
@@ -139,7 +139,7 @@ final class UserTest extends TestCase
 
     public function testGettersReturnExpectedTypes(): void
     {
-        $user = User::register(new Email('test@example.com'), 'hashed-pw', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'hashed-pw', 'Alice');
 
         $this->assertInstanceOf(\App\Shared\Domain\Model\Uuid::class, $user->getId());
         $this->assertInstanceOf(\App\Shared\Domain\Model\PublicId::class, $user->getPublicId());
@@ -149,7 +149,7 @@ final class UserTest extends TestCase
 
     public function testRegisterAssignsUserRoleByDefault(): void
     {
-        $user = User::register(new Email('test@example.com'), 'hashed-pw', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'hashed-pw', 'Alice');
 
         $this->assertSame(['ROLE_USER'], $user->getRoles());
     }
@@ -157,14 +157,14 @@ final class UserTest extends TestCase
     public function testCreateByOperatorCreatesAdminWithEmailVerified(): void
     {
         $user = User::createByOperator(
-            new Email('admin@example.com'),
+            new Email('admin@baander.app'),
             'hashed-pw',
             'Admin',
             ['ROLE_ADMIN'],
         );
 
         $this->assertSame('Admin', $user->getName());
-        $this->assertSame('admin@example.com', $user->getEmail());
+        $this->assertSame('admin@baander.app', $user->getEmail());
         $this->assertSame(['ROLE_ADMIN'], $user->getRoles());
         $this->assertTrue($user->isEmailVerified());
         $this->assertNotNull($user->getEmailVerifiedAt());
@@ -173,7 +173,7 @@ final class UserTest extends TestCase
     public function testCreateByOperatorCreatesUserWithEmailVerified(): void
     {
         $user = User::createByOperator(
-            new Email('user@example.com'),
+            new Email('user@baander.app'),
             'hashed-pw',
             'User',
             ['ROLE_USER'],
@@ -188,7 +188,7 @@ final class UserTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         User::createByOperator(
-            new Email('test@example.com'),
+            new Email('test@baander.app'),
             'hashed-pw',
             '  ',
             ['ROLE_USER'],
@@ -198,7 +198,7 @@ final class UserTest extends TestCase
     public function testHasRoleReturnsTrueForDirectlyAssignedRole(): void
     {
         $user = User::createByOperator(
-            new Email('admin@example.com'),
+            new Email('admin@baander.app'),
             'hashed-pw',
             'Admin',
             ['ROLE_ADMIN'],
@@ -210,7 +210,7 @@ final class UserTest extends TestCase
     public function testHasRoleResolvesHierarchy(): void
     {
         $user = User::createByOperator(
-            new Email('admin@example.com'),
+            new Email('admin@baander.app'),
             'hashed-pw',
             'Admin',
             ['ROLE_ADMIN'],
@@ -222,7 +222,7 @@ final class UserTest extends TestCase
     public function testHasRoleReturnsFalseForNonexistentRole(): void
     {
         $user = User::createByOperator(
-            new Email('user@example.com'),
+            new Email('user@baander.app'),
             'hashed-pw',
             'User',
             ['ROLE_USER'],
@@ -234,7 +234,7 @@ final class UserTest extends TestCase
     public function testHasRoleReturnsFalseForRoleAboveInHierarchy(): void
     {
         $user = User::createByOperator(
-            new Email('user@example.com'),
+            new Email('user@baander.app'),
             'hashed-pw',
             'User',
             ['ROLE_USER'],

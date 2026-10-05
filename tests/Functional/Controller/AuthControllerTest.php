@@ -17,7 +17,7 @@ final class AuthControllerTest extends TestCase
 
     public function testRegisterCreatesUser(): void
     {
-        $email = 'new-' . bin2hex(random_bytes(4)) . '@example.com';
+        $email = 'new-' . bin2hex(random_bytes(4)) . '@baander.app';
 
         $response = $this->anonymousRequest('POST', '/api/auth/register', [
             'email' => $email,
@@ -32,7 +32,7 @@ final class AuthControllerTest extends TestCase
 
     public function testRegisterPersistsUser(): void
     {
-        $email = 'persist-' . bin2hex(random_bytes(4)) . '@example.com';
+        $email = 'persist-' . bin2hex(random_bytes(4)) . '@baander.app';
 
         $this->anonymousRequest('POST', '/api/auth/register', [
             'email' => $email,
@@ -49,7 +49,7 @@ final class AuthControllerTest extends TestCase
 
     public function testRegisterWithDuplicateEmailFails(): void
     {
-        $email = 'dup-' . bin2hex(random_bytes(4)) . '@example.com';
+        $email = 'dup-' . bin2hex(random_bytes(4)) . '@baander.app';
         $this->createTestUser($email);
 
         $response = $this->anonymousRequest('POST', '/api/auth/register', [

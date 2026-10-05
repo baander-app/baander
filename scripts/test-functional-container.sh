@@ -35,7 +35,7 @@ if [ "$ready" != true ]; then
     exit 1
 fi
 
-archive_paths=(vendor src tests config packages migrations bin docker/general templates public phpunit.xml.dist
+archive_paths=(vendor src tests config packages migrations bin docker/general docker/dev docker/prod templates public phpunit.xml.dist
     .env .env.test composer.json composer.lock translations)
 if [ "${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" = 1 ]; then
     archive_paths=(--files-from /dev/null)

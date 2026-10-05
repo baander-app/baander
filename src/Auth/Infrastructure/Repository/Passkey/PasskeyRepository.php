@@ -42,6 +42,7 @@ final class PasskeyRepository implements PasskeyRepositoryInterface
             $passkey->getCredentialId(),
             $passkey->getData(),
             $passkey->getCounter(),
+            $passkey->getId(),
         );
 
         $this->entityManager->persist($entity);

@@ -298,7 +298,7 @@ final class RefreshTokenRepositoryTest extends TestCase
         return new UserEntity(
             new PublicId(),
             'Test User',
-            'test@example.com',
+            'test@baander.app',
             'hashed-password',
             '',
         );

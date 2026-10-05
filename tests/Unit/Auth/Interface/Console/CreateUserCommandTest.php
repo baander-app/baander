@@ -31,7 +31,7 @@ final class CreateUserCommandTest extends TestCase
     private function mockDispatchReturningUser(
         string $publicId = 'usr_test123',
         string $name = 'Alice',
-        string $email = 'alice@example.com',
+        string $email = 'alice@baander.app',
         array $roles = ['ROLE_USER'],
     ): void {
         $user = User::createByOperator(
@@ -65,11 +65,11 @@ final class CreateUserCommandTest extends TestCase
 
     public function testCreateUserSuccess(): void
     {
-        $this->mockDispatchReturningUser('usr_test123', 'Alice', 'alice@example.com', ['ROLE_USER']);
+        $this->mockDispatchReturningUser('usr_test123', 'Alice', 'alice@baander.app', ['ROLE_USER']);
 
         $tester = new CommandTester($this->createCommandWithStream("securepassword\n"));
         $tester->execute([
-            'email' => 'alice@example.com',
+            'email' => 'alice@baander.app',
             'name' => 'Alice',
             '--password' => true,
             '--role' => 'user',
@@ -81,11 +81,11 @@ final class CreateUserCommandTest extends TestCase
 
     public function testCreateAdminUser(): void
     {
-        $this->mockDispatchReturningUser('usr_test123', 'Admin', 'admin@example.com', ['ROLE_ADMIN']);
+        $this->mockDispatchReturningUser('usr_test123', 'Admin', 'admin@baander.app', ['ROLE_ADMIN']);
 
         $tester = new CommandTester($this->createCommandWithStream("adminpassword\n"));
         $tester->execute([
-            'email' => 'admin@example.com',
+            'email' => 'admin@baander.app',
             'name' => 'Admin',
             '--password' => true,
             '--role' => 'admin',
@@ -114,7 +114,7 @@ final class CreateUserCommandTest extends TestCase
 
         $tester = new CommandTester($this->createCommandWithStream("password123\n"));
         $tester->execute([
-            'email' => 'exists@example.com',
+            'email' => 'exists@baander.app',
             'name' => 'Alice',
             '--password' => true,
         ], ['interactive' => false]);
@@ -127,7 +127,7 @@ final class CreateUserCommandTest extends TestCase
     {
         $tester = new CommandTester($this->createCommandWithStream("password123\n"));
         $statusCode = $tester->execute([
-            'email' => 'test@example.com',
+            'email' => 'test@baander.app',
             'name' => 'Alice',
             '--password' => true,
             '--role' => 'superadmin',
@@ -141,7 +141,7 @@ final class CreateUserCommandTest extends TestCase
     {
         $tester = new CommandTester($this->createCommandWithStream("short\n"));
         $tester->execute([
-            'email' => 'test@example.com',
+            'email' => 'test@baander.app',
             'name' => 'Alice',
             '--password' => true,
         ], ['interactive' => false]);

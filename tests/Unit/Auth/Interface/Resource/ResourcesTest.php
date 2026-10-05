@@ -17,20 +17,20 @@ final class ResourcesTest extends TestCase
 {
     public function testUserResourceFrom(): void
     {
-        $user = User::register(new Email('test@example.com'), 'hashed', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
         $result = UserResource::from($user);
 
         $this->assertSame($user->getId()->toString(), $result['uuid']);
         $this->assertSame($user->getPublicId()->toString(), $result['publicId']);
         $this->assertSame('Alice', $result['name']);
-        $this->assertSame('test@example.com', $result['email']);
+        $this->assertSame('test@baander.app', $result['email']);
         $this->assertNull($result['emailVerifiedAt']);
         $this->assertArrayHasKey('createdAt', $result);
     }
 
     public function testUserResourceFromDomainBackwardCompat(): void
     {
-        $user = User::register(new Email('test@example.com'), 'hashed', 'Alice');
+        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
         $result = UserResource::fromDomain($user);
 
         $this->assertSame('Alice', $result['name']);

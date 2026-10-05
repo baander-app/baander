@@ -11,39 +11,39 @@ final class EmailTest extends TestCase
 {
     public function testFromStringWithValidEmail(): void
     {
-        $email = Email::fromString('user@example.com');
+        $email = Email::fromString('user@baander.app');
 
-        $this->assertSame('user@example.com', $email->toString());
+        $this->assertSame('user@baander.app', $email->toString());
     }
 
     public function testEqualsReturnsTrueForSameEmail(): void
     {
-        $a = Email::fromString('user@example.com');
-        $b = Email::fromString('user@example.com');
+        $a = Email::fromString('user@baander.app');
+        $b = Email::fromString('user@baander.app');
 
         $this->assertTrue($a->equals($b));
     }
 
     public function testEqualsReturnsFalseForDifferentEmail(): void
     {
-        $a = Email::fromString('user@example.com');
-        $b = Email::fromString('other@example.com');
+        $a = Email::fromString('user@baander.app');
+        $b = Email::fromString('other@baander.app');
 
         $this->assertFalse($a->equals($b));
     }
 
     public function testToStringReturnsLowercaseEmail(): void
     {
-        $email = Email::fromString('user@example.com');
+        $email = Email::fromString('user@baander.app');
 
-        $this->assertSame('user@example.com', (string) $email);
+        $this->assertSame('user@baander.app', (string) $email);
     }
 
     public function testJsonSerializeReturnsLowercaseEmail(): void
     {
-        $email = Email::fromString('user@example.com');
+        $email = Email::fromString('user@baander.app');
 
-        $this->assertSame('user@example.com', $email->jsonSerialize());
+        $this->assertSame('user@baander.app', $email->jsonSerialize());
     }
 
     public function testFromStringNormalizesCaseToLowerCase(): void
@@ -55,9 +55,9 @@ final class EmailTest extends TestCase
 
     public function testDomainReturnsDomainPart(): void
     {
-        $email = Email::fromString('user@example.com');
+        $email = Email::fromString('user@baander.app');
 
-        $this->assertSame('example.com', $email->domain());
+        $this->assertSame('baander.app', $email->domain());
     }
 
     public function testFromStringWithEmptyStringThrows(): void

@@ -30,7 +30,7 @@ final class RegisterServerHandlerTest extends TestCase
     public function testRegistersServerAndDispatchesEvent(): void
     {
         $server = ServerInstance::create(
-            serverUrl: 'https://music.example.com',
+            serverUrl: 'https://music.baander.app',
             name: 'Home Server',
             version: '1.2.3',
             apiKey: 'secret-key',
@@ -38,17 +38,17 @@ final class RegisterServerHandlerTest extends TestCase
 
         $this->serverPort->expects($this->once())
             ->method('register')
-            ->with('https://music.example.com', 'Home Server', '1.2.3', 'secret-key')
+            ->with('https://music.baander.app', 'Home Server', '1.2.3', 'secret-key')
             ->willReturn($server);
 
         $this->eventDispatcher->expects($this->once())
             ->method('dispatch')
             ->with($this->callback(fn (object $e) => $e instanceof ServerRegistered
-                && $e->getServerUrl() === 'https://music.example.com'
+                && $e->getServerUrl() === 'https://music.baander.app'
                 && $e->getName() === 'Home Server'));
 
         $result = ($this->handler)(new RegisterServerCommand(
-            'https://music.example.com',
+            'https://music.baander.app',
             'Home Server',
             '1.2.3',
             'secret-key',

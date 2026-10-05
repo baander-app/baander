@@ -599,11 +599,14 @@ release, without weakening consistency or increasing the agreed host budget.
   rollback recoverability on persistence/signing failure, and replay detection.
   Exercise expiry, logout, multiple tabs, concurrent requests, service-worker
   restart, nonce challenges, and foreign-origin credential exclusion together.
-- [ ] Verify actual Messenger middleware/Redis delivery with Swoole unavailable.
-  Replayed outbox events reach concrete consumers without being re-enqueued.
-  Durable expiring leases survive worker crashes; unsupported payloads enter
-  retry/dead-letter handling. External delivery is idempotent where supported,
-  with uncertain outcomes documented rather than an exactly-once guarantee.
+- [x] Verify actual Messenger middleware/Redis delivery when Swoole dispatch fails,
+  concrete outbox consumers without replay re-enqueue, expiring leases across
+  independent PostgreSQL connections, poison-event retry/dead-letter handling, and
+  idempotent durable notification effects. External delivery remains at-least-once;
+  uncertain outcomes are not represented as exactly-once.
+- [ ] Kill relay workers at claim, consumer, and transport-acknowledgement
+  boundaries; verify lease expiry and downstream recovery through the supervised
+  worker runtime under each crash point.
 - [ ] Test storage directory-boundary comparisons, validation before mkdir,
   traversal and symlink escapes across read/write/delete/derived-file resolution.
 - [ ] Test webhook DNS and connection-time destination checks, corrected link-local

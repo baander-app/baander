@@ -80,7 +80,7 @@ final class AccessTokenRepositoryTest extends TestCase
 
     public function testRevokeForUserExecutesBulkUpdate(): void
     {
-        $user = User::register(new Email('test@example.com'), 'hashed', 'Test User');
+        $user = User::register(new Email('test@baander.app'), 'hashed', 'Test User');
         $userId = $user->getId();
 
         $this->connection->expects($this->once())
@@ -98,7 +98,7 @@ final class AccessTokenRepositoryTest extends TestCase
 
     public function testRevokeForUserClearsEntityManager(): void
     {
-        $user = User::register(new Email('test@example.com'), 'hashed', 'Test User');
+        $user = User::register(new Email('test@baander.app'), 'hashed', 'Test User');
         $callOrder = [];
 
         $this->connection->expects($this->once())
@@ -138,7 +138,7 @@ final class AccessTokenRepositoryTest extends TestCase
 
     public function testRevokeForUserWithNoMatchingTokensDoesNotError(): void
     {
-        $user = User::register(new Email('test@example.com'), 'hashed', 'Test User');
+        $user = User::register(new Email('test@baander.app'), 'hashed', 'Test User');
 
         $this->connection->expects($this->once())
             ->method('executeStatement')

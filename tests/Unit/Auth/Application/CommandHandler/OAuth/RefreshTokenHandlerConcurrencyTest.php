@@ -78,7 +78,7 @@ final class RefreshTokenHandlerConcurrencyTest extends TestCase
     {
         $tokenIdString = 'same-refresh-token-id-used-twice-concurrently';
         $client = $this->createConfidentialClient();
-        $user = User::register(new Email('user@example.com'), 'hashed-pw', 'Test User');
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
         $chainId = ChainId::generate();
 
         // Simulate two concurrent requests reading the same DB row before either
