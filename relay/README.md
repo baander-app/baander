@@ -102,8 +102,9 @@ python3 relay/tests/run_rqlite_contract.py \
 ```
 
 The transport test uses a disposable CA, authenticated TLS upstream and client
-certificate. It checks SNI and hostname verification, deadlines, pool saturation,
-reconnection within the same pool, connection reuse, redirects and invalid JSON.
+certificate. It checks SNI and hostname verification, untrusted and expired
+certificates, legacy TLS rejection, deadlines, pool saturation, reconnection
+within the same pool, connection reuse, redirects and invalid JSON.
 The API test uses native rqlite with authentication and mTLS, and verifies the
 public contract, concurrent claims, readiness, limits, outage and shutdown.
 

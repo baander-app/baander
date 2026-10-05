@@ -24,6 +24,7 @@ var/
 .env.local
 .env.*.local
 .env.local.php
+relay/honeypots/
 storage/muzak
 storage/logs/*.{log,json}
 qodana.yaml

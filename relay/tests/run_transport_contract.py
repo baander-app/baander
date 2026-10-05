@@ -6,14 +6,43 @@ import base64
 import http.server
 import json
 from pathlib import Path
+import socket
 import ssl
 import subprocess
 import tempfile
 import threading
 import time
+import warnings
 
 
-def certificate(directory, name, hostname=None):
+def authority(directory):
+    subprocess.run(
+        [
+            "openssl",
+            "req",
+            "-x509",
+            "-newkey",
+            "rsa:2048",
+            "-nodes",
+            "-keyout",
+            str(directory / "ca.key"),
+            "-out",
+            str(directory / "ca.crt"),
+            "-days",
+            "1",
+            "-addext",
+            "basicConstraints=critical,CA:TRUE",
+            "-addext",
+            "keyUsage=critical,keyCertSign,cRLSign",
+            "-subj",
+            "/CN=Baander disposable CA",
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+
+def certificate(directory, name, hostname=None, expired=False):
     key = directory / (name + ".key")
     request = directory / (name + ".csr")
     certificate_path = directory / (name + ".crt")
@@ -41,6 +70,12 @@ def certificate(directory, name, hostname=None):
         if hostname
         else "extendedKeyUsage=clientAuth\n"
     )
+    validity = (
+        ["-not_before", "20000101000000Z", "-not_after", "20010101000000Z"]
+        if expired
+        else []
+    )
+
     subprocess.run(
         [
             "openssl",
@@ -57,6 +92,7 @@ def certificate(directory, name, hostname=None):
             str(certificate_path),
             "-days",
             "1",
+            *validity,
             "-extfile",
             str(extension),
         ],
@@ -72,30 +108,7 @@ def main():
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="baander-registry-tls-") as temporary:
         directory = Path(temporary)
-        subprocess.run(
-            [
-                "openssl",
-                "req",
-                "-x509",
-                "-newkey",
-                "rsa:2048",
-                "-nodes",
-                "-keyout",
-                str(directory / "ca.key"),
-                "-out",
-                str(directory / "ca.crt"),
-                "-days",
-                "1",
-                "-addext",
-                "basicConstraints=critical,CA:TRUE",
-                "-addext",
-                "keyUsage=critical,keyCertSign,cRLSign",
-                "-subj",
-                "/CN=Baander disposable CA",
-            ],
-            check=True,
-            capture_output=True,
-        )
+        authority(directory)
         server_key, server_certificate = certificate(directory, "server", "rqlite.baander.app")
         client_key, client_certificate = certificate(directory, "client")
         (directory / "password").write_text("disposable-test-secret\n")
@@ -173,6 +186,12 @@ def main():
                 timeout=5,
             )
             actual = completed.stdout.splitlines()
+            diagnostic = completed.stdout + completed.stderr
+
+            assert "disposable-test-secret" not in diagnostic, "Transport leaked its password."
+            assert base64.b64encode(b"registry:disposable-test-secret").decode() not in diagnostic, (
+                "Transport leaked its Authorization credential."
+            )
             assert actual == expected if ordered else sorted(actual) == sorted(expected), (
                 completed.stdout + completed.stderr
             )
@@ -262,8 +281,119 @@ def main():
             before = len(observations)
             run(["503"])
             assert len(observations) == before, "Wrong TLS hostname reached authenticated HTTP."
+            config["url"] = f"https://rqlite.baander.app:{server.server_port}"
+            behavior["body"] = b'{"results":[{"values":[[1]]}]}'
+
+            def rejected_tls(label, changes):
+                previous = dict(config)
+                before = len(observations)
+                config.update(changes)
+                try:
+                    # Both sequential attempts must fail without exposing HTTP credentials.
+                    run(["503", "503"], -2, ordered=True)
+                    assert len(observations) == before, (
+                        label + " reached authenticated upstream HTTP."
+                    )
+                finally:
+                    config.clear()
+                    config.update(previous)
+                run(["200"])
+                assert len(observations) == before + 1, label + " prevented healthy recovery."
+
+            unrelated = directory / "unrelated-authority"
+            unrelated.mkdir()
+            authority(unrelated)
+            rejected_tls("Untrusted server chain", {"ca": str(unrelated / "ca.crt")})
+
+            rogue_key, rogue_certificate = certificate(unrelated, "untrusted-client")
+            rejected_tls(
+                "Untrusted client chain",
+                {"certificate": str(rogue_certificate), "key": str(rogue_key)},
+            )
+
+            expired_key, expired_certificate = certificate(
+                directory, "expired-server", "rqlite.baander.app", expired=True
+            )
+            expired_check = subprocess.run(
+                [
+                    "openssl",
+                    "x509",
+                    "-in",
+                    str(expired_certificate),
+                    "-checkend",
+                    "0",
+                    "-noout",
+                ],
+                capture_output=True,
+            )
+            assert expired_check.returncode == 1, "Expired certificate fixture is still valid."
+
+            def server_rejection(label, key, cert, legacy=False):
+                rejected_server = DisposableServer(("127.0.0.1", 0), Handler)
+                rejected_server.daemon_threads = True
+                context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+                context.load_cert_chain(cert, key)
+                context.load_verify_locations(directory / "ca.crt")
+                context.verify_mode = ssl.CERT_REQUIRED
+
+                if legacy:
+                    with warnings.catch_warnings():
+                        warnings.simplefilter("ignore", DeprecationWarning)
+                        context.minimum_version = ssl.TLSVersion.TLSv1_1
+                        context.maximum_version = ssl.TLSVersion.TLSv1_1
+                    context.set_ciphers("DEFAULT:@SECLEVEL=0")
+
+                rejected_server.socket = context.wrap_socket(
+                    rejected_server.socket,
+                    server_side=True,
+                )
+                rejected_thread = threading.Thread(
+                    target=rejected_server.serve_forever,
+                    daemon=True,
+                )
+                rejected_thread.start()
+
+                try:
+                    if legacy:
+                        # A permissive control proves the endpoint actually supports TLS 1.1.
+                        control = ssl.create_default_context(cafile=str(directory / "ca.crt"))
+                        control.load_cert_chain(client_certificate, client_key)
+
+                        with warnings.catch_warnings():
+                            warnings.simplefilter("ignore", DeprecationWarning)
+                            control.minimum_version = ssl.TLSVersion.TLSv1_1
+                            control.maximum_version = ssl.TLSVersion.TLSv1_1
+                        control.set_ciphers("DEFAULT:@SECLEVEL=0")
+
+                        address = ("127.0.0.1", rejected_server.server_port)
+                        with socket.create_connection(address, timeout=2) as raw:
+                            with control.wrap_socket(
+                                raw,
+                                server_hostname="rqlite.baander.app",
+                            ) as verified:
+                                assert verified.version() == "TLSv1.1", (
+                                    "Legacy TLS control failed."
+                                )
+
+                    rejected_tls(
+                        label,
+                        {"url": f"https://rqlite.baander.app:{rejected_server.server_port}"},
+                    )
+                finally:
+                    rejected_server.shutdown()
+                    rejected_server.server_close()
+                    rejected_thread.join(timeout=2)
+
+            server_rejection("Expired server certificate", expired_key, expired_certificate)
+            server_rejection("TLS 1.1 protocol", server_key, server_certificate, legacy=True)
+
             print(
-                "PASS: native TLS authentication/SNI, saturation/deadline, same-pool reconnect/keepalive, observed-error rotation without replay, redirect, malformed response, hostname verification."
+                "PASS: native TLS authentication/SNI, saturation/deadline, "
+                "same-pool reconnect/keepalive, observed-error rotation without replay, "
+                "redirect, malformed response, hostname verification, "
+                "untrusted server/client chains, expired server certificate, "
+                "TLS 1.1 rejection with positive control, "
+                "credential redaction and healthy recovery."
             )
         finally:
             server.shutdown()
