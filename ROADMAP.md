@@ -88,6 +88,17 @@ recovery. Full Unit/StaticAnalysisRules pass 4,580 tests (19,323 assertions), an
 the full PHPStan scan reports zero errors. A development-setup subprocess can still
 log failure while reporting overall success; that follow-up remains open.
 
+Baander-defined HTTP headers now use the `X-Baander-` prefix across backend,
+web, Android, Electron, webhook delivery, and test authentication. A shared
+`BaanderHeader` enum owns PHP wire names and server keys; CORS and OpenAPI
+describe the new session header. The old device header is rejected by a real
+preflight regression. Unit/StaticAnalysisRules pass 4,582 tests (19,335 assertions),
+affected functional tests pass 230 (3,188 assertions), full PHPStan is clean,
+and OpenAPI/client drift checks pass. Deptrac still reports 296 active violations
+and 672 skipped occurrences, none from the new header dependency. The full web
+suite caught a stale activity-view auth mock, corrected in its test fixture;
+the rerun passes all 1,630 tests across 146 files, plus typecheck and lint.
+
 Deptrac resource layers now enforce the documented resource-to-model exception
 without allowing controllers to depend on domain models. A real Deptrac fixture
 tests both sides. Removed 23 obsolete resource baseline pairs and the removed

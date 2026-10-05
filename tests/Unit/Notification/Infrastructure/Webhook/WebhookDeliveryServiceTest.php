@@ -268,7 +268,7 @@ final class WebhookDeliveryServiceTest extends TestCase
         $timestamps = [];
         $this->httpClient->expects($this->exactly(2))->method('request')
             ->willReturnCallback(function (string $method, string $url, array $options) use (&$timestamps) {
-                $timestamps[] = $options['headers']['X-Webhook-Timestamp'];
+                $timestamps[] = $options['headers']['X-Baander-Webhook-Timestamp'];
                 $response = $this->createStub(\Symfony\Contracts\HttpClient\ResponseInterface::class);
                 // First attempt 5xx (retry), second attempt 2xx (success).
                 $response->method('getStatusCode')->willReturn(count($timestamps) === 1 ? 500 : 200);

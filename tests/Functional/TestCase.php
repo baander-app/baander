@@ -7,6 +7,7 @@ namespace App\Tests\Functional;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
@@ -85,7 +86,7 @@ abstract class TestCase extends WebTestCase
     {
         $headers = [
             'CONTENT_TYPE' => 'application/json',
-            'HTTP_X_Test_User_Id' => $user->getId()->toString(),
+            BaanderHeader::TestUserId->serverKey() => $user->getId()->toString(),
         ];
 
         if ($content !== []) {

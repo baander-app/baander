@@ -22,7 +22,7 @@ final readonly class CreateRadioSourceRequest
         public string $syncUrl,
 
         #[Assert\Type('array')]
-        #[OA\Property(default: new \stdClass())]
+        #[OA\Property(type: 'object', default: new \stdClass(), additionalProperties: new OA\AdditionalProperties(nullable: true))]
         public array $syncConfig = [],
 
         public ?string $syncSchedule = null,

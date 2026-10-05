@@ -7,6 +7,7 @@ namespace App\Auth\Infrastructure\Security\OAuth;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\Uuid;
 use League\OAuth2\Server\ResourceServer;
 use League\OAuth2\Server\Exception\OAuthServerException;
@@ -159,7 +160,7 @@ final class OAuth2Authenticator extends AbstractAuthenticator
             return;
         }
 
-        $requestFingerprint = $request->headers->get('X-Client-Fingerprint', '');
+        $requestFingerprint = $request->headers->get(BaanderHeader::ClientFingerprint->value, '');
         if ($requestFingerprint === '') {
             return;
         }

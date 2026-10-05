@@ -29,7 +29,7 @@ final readonly class CreateScheduledJobRequest
 
         public ?string $description = null,
 
-        #[OA\Property(default: new \stdClass())]
+        #[OA\Property(type: 'object', default: new \stdClass(), additionalProperties: new OA\AdditionalProperties(nullable: true))]
         public array $parameters = [],
     ) {
     }

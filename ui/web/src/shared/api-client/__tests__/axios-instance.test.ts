@@ -30,7 +30,7 @@ describe('customInstance', () => {
 
   it('returns body data without transport metadata', async () => {
     const body = { data: { name: 'test', value: 42 } };
-    mock.onGet('/api/test').reply(200, body, { 'x-custom': 'header-val' });
+    mock.onGet('/api/test').reply(200, body, { 'X-Baander-Test': 'header-val' });
 
     const result = await customInstance<Record<string, unknown>>('/api/test', {
       method: 'GET',

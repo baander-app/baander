@@ -58,6 +58,8 @@ coordinate a single writer and review those updates with the implementation.
 
 Do not prefix function or method calls with `void`. Keep asynchronous error
 handling explicit.
+Prefix Baander-defined HTTP headers with `X-Baander-`; preserve generic protocol,
+proxy, and security header names.
 
 For backend changes, read [architecture rules](.agents/rules/architecture-rules.md)
 and the relevant `ddd-*.md` reference in `.agents/rules/`. For web changes, read

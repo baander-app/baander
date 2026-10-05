@@ -444,13 +444,13 @@ Functional tests live in `tests/Functional/` and extend `App\Tests\Functional\Te
 | `createTestUser(?string $email, string $name, string $password)` | Creates a `ROLE_USER` user with a random email |
 | `createAdminUser()` | Creates a `ROLE_ADMIN` user |
 | `createSuperAdminUser()` | Creates a `ROLE_SUPER_ADMIN` user |
-| `authenticatedRequest(string $method, string $uri, User $user, array $content)` | Sends an HTTP request as the given user. Sets `X-Test-User-Id` header, which the `TestAuthenticator` picks up to authenticate without a real JWT. |
+| `authenticatedRequest(string $method, string $uri, User $user, array $content)` | Sends an HTTP request as the given user. Sets `X-Baander-Test-User-Id` header, which the `TestAuthenticator` picks up to authenticate without a real JWT. |
 | `anonymousRequest(string $method, string $uri, array $content)` | Sends an unauthenticated HTTP request |
 | `assertJsonResponse(Response $response, int $expectedStatus, ?string $expectedKey)` | Asserts status code + valid JSON. If `$expectedKey` is set, asserts the key exists in the decoded body. Returns the decoded array. |
 
 ### Authentication in Tests
 
-Tests do not use real JWT tokens or `loginUser()`. Instead, the `TestAuthenticator` (registered in `config/packages/test/security.yaml`) reads the `X-Test-User-Id` header and returns a `SecurityUser` for the corresponding user ID. This is set automatically by `authenticatedRequest()`.
+Tests do not use real JWT tokens or `loginUser()`. Instead, the `TestAuthenticator` (registered in `config/packages/test/security.yaml`) reads the `X-Baander-Test-User-Id` header and returns a `SecurityUser` for the corresponding user ID. This is set automatically by `authenticatedRequest()`.
 
 ```php
 // Anonymous request — no auth headers

@@ -84,9 +84,9 @@ Each webhook delivery uses signature protocol version 2 and includes these heade
 
 | Header | Description |
 |--------|-------------|
-| `X-Webhook-Signature-Version` | Always `2` |
-| `X-Webhook-Timestamp` | Unix timestamp of the delivery |
-| `X-Webhook-Signature` | HMAC-SHA256 signature over `{timestamp}.{payload}` |
+| `X-Baander-Webhook-Signature-Version` | Always `2` |
+| `X-Baander-Webhook-Timestamp` | Unix timestamp of the delivery |
+| `X-Baander-Webhook-Signature` | HMAC-SHA256 signature over `{timestamp}.{payload}` |
 
 To verify a delivery, compute `sha256=` followed by the hexadecimal HMAC-SHA256
 of the header timestamp, a literal `.`, and the exact raw request body. Use the

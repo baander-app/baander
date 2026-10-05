@@ -10,9 +10,15 @@ import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 
 const testTheme = resolveTheme('dark', 'violet')
 
-vi.mock('@/features/auth/stores/auth-store', () => ({
-  useAuthStore: { getState: () => ({ accessToken: null, refreshToken: null }) },
-}))
+vi.mock('@/features/auth/stores/auth-store', () => {
+  const state = { accessToken: null, refreshToken: null, user: null }
+  return {
+    useAuthStore: Object.assign(
+      (selector: (value: typeof state) => unknown) => selector(state),
+      { getState: () => state },
+    ),
+  }
+})
 vi.mock('@/shared/crypto/dpop-store', () => ({
   getDpopKeyPair: () => null, getDpopNonce: () => null, setDpopNonce: vi.fn(),
 }))

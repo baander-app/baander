@@ -98,7 +98,7 @@ final class PreferenceRequestBodyTest extends TestCase
     {
         $this->client->request($method, $uri, [], [], [
             'CONTENT_TYPE' => 'application/json',
-            'HTTP_X_Test_User_Id' => $user->getId()->toString(),
+            'HTTP_X_BAANDER_TEST_USER_ID' => $user->getId()->toString(),
         ], $body);
 
         return $this->client->getResponse();

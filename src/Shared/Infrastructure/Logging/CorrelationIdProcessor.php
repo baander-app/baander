@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Logging;
 
+use App\Shared\Application\Http\BaanderHeader;
 use Monolog\LogRecord;
 use Monolog\Processor\ProcessorInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -14,7 +15,7 @@ use Symfony\Contracts\Service\ResetInterface;
  *
  * Resolution order:
  *  1. Explicit ID set via setCorrelationId() (used by Messenger stamp propagation)
- *  2. X-Correlation-ID HTTP request header
+ *  2. X-Baander-Correlation-ID HTTP request header
  *  3. Generated random ID (once per lifecycle, then reused)
  *
  * Tagged with kernel.reset so the Swoole bundle proxifies this service into a
@@ -24,8 +25,6 @@ use Symfony\Contracts\Service\ResetInterface;
  */
 final class CorrelationIdProcessor implements ProcessorInterface, ResetInterface
 {
-    public const string HEADER = 'X-Correlation-ID';
-
     private ?string $correlationId = null;
 
     public function __construct(
@@ -38,8 +37,8 @@ final class CorrelationIdProcessor implements ProcessorInterface, ResetInterface
         if ($this->correlationId === null) {
             $request = $this->requestStack->getCurrentRequest();
 
-            if ($request !== null && $request->headers->has(self::HEADER)) {
-                $this->correlationId = $request->headers->get(self::HEADER);
+            if ($request !== null && $request->headers->has(BaanderHeader::CorrelationId->value)) {
+                $this->correlationId = $request->headers->get(BaanderHeader::CorrelationId->value);
             } else {
                 $this->correlationId = bin2hex(random_bytes(16));
             }

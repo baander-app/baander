@@ -165,7 +165,7 @@ final class ManualTriggerTest extends TestCase
         $this->client->request('POST', $this->path($job), server: [
             'HTTP_HOST' => 'baander.app',
             'CONTENT_TYPE' => 'application/json',
-            'HTTP_X_TEST_USER_ID' => $user->getId()->toString(),
+            'HTTP_X_BAANDER_TEST_USER_ID' => $user->getId()->toString(),
             'HTTP_IDEMPOTENCY_KEY' => $requestId,
         ]);
         return $this->client->getResponse();

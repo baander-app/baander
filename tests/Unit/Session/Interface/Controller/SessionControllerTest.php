@@ -106,7 +106,7 @@ final class SessionControllerTest extends TestCase
 
         $deviceId = Uuid::v7()->toString();
         $request = new Request();
-        $request->headers->set('X-Device-Id', $deviceId);
+        $request->headers->set('X-Baander-Device-Id', $deviceId);
 
         $payload = new SyncSessionRequest(
             queue: ['track1'],

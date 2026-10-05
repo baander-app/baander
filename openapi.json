@@ -14082,7 +14082,7 @@
                         }
                     },
                     "422": {
-                        "description": "Validation error or missing X-Device-Id header",
+                        "description": "Validation error or missing X-Baander-Device-Id header",
                         "content": {
                             "application/json": {
                                 "schema": {

@@ -317,7 +317,7 @@ final class PlayerPreferencesControllerTest extends TestCase
     {
         $this->client->request('PUT', '/api/user/player-preferences/', [], [], [
             'CONTENT_TYPE' => 'application/json',
-            'HTTP_X_Test_User_Id' => $user->getId()->toString(),
+            'HTTP_X_BAANDER_TEST_USER_ID' => $user->getId()->toString(),
         ], json_encode([
             'payload' => $payload,
             'version' => $version,

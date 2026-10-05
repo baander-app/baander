@@ -2,7 +2,7 @@
  * Session API -- API client for session/queue sync endpoints.
  *
  * Uses shared Axios instance with DPoP auth.
- * Includes X-Device-Id header for multi-device awareness.
+ * Includes X-Baander-Device-Id header for multi-device awareness.
  */
 
 import { catalogApi } from '@/features/catalog/api/catalog-api';
@@ -47,7 +47,7 @@ function getDeviceId(): string {
 /** Fetch current session state including queue. */
 export async function getSession(): Promise<Session> {
   const { data } = await catalogApi.get<{ data: Session }>('/api/session', {
-    headers: { 'X-Device-Id': getDeviceId() },
+    headers: { 'X-Baander-Device-Id': getDeviceId() },
   });
   return data.data;
 }
@@ -57,7 +57,7 @@ export async function syncSession(queue: SessionTrack[]): Promise<Session> {
   const { data } = await catalogApi.put<{ data: Session }>(
     '/api/session/queue',
     { queue },
-    { headers: { 'X-Device-Id': getDeviceId() } },
+    { headers: { 'X-Baander-Device-Id': getDeviceId() } },
   );
   return data.data;
 }

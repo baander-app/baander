@@ -50,11 +50,11 @@ final class WebhookPayloadFormatTest extends TestCase
 
             $headers = $options['normalized_headers'];
             self::assertSame('Content-Type: application/json', $headers['content-type'][0]);
-            self::assertSame('X-Webhook-Signature-Version: ' . 2, $headers['x-webhook-signature-version'][0]);
-            $timestamp = substr($headers['x-webhook-timestamp'][0], strlen('X-Webhook-Timestamp: '));
+            self::assertSame('X-Baander-Webhook-Signature-Version: ' . 2, $headers['x-baander-webhook-signature-version'][0]);
+            $timestamp = substr($headers['x-baander-webhook-timestamp'][0], strlen('X-Baander-Webhook-Timestamp: '));
             $key = $secret;
             $signature = 'sha256=' . hash_hmac('sha256', $timestamp . '.' . $payload, $key);
-            self::assertSame('X-Webhook-Signature: ' . $signature, $headers['x-webhook-signature'][0]);
+            self::assertSame('X-Baander-Webhook-Signature: ' . $signature, $headers['x-baander-webhook-signature'][0]);
 
             return new MockResponse('', ['http_code' => 200]);
         });

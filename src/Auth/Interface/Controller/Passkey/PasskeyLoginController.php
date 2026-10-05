@@ -10,6 +10,7 @@ use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Interface\Resource\TokenResource;
 use App\Auth\Interface\Resource\UserResource;
+use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -84,7 +85,7 @@ final class PasskeyLoginController
             userId: $user->getId(),
             ipAddress: $request->getClientIp(),
             userAgent: $request->headers->get('User-Agent'),
-            clientFingerprint: $request->headers->get('X-Client-Fingerprint'),
+            clientFingerprint: $request->headers->get(BaanderHeader::ClientFingerprint->value),
         ));
 
         $tokenResponse = $envelope->last(HandledStamp::class)?->getResult();

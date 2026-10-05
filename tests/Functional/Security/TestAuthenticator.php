@@ -7,6 +7,7 @@ namespace App\Tests\Functional\Security;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -19,7 +20,7 @@ use Symfony\Component\Security\Http\Authenticator\Passport\Badge\UserBadge;
 use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPassport;
 
 /**
- * Test authenticator that accepts X-Test-User-Id header.
+ * Test authenticator that accepts X-Baander-Test-User-Id header.
  *
  * Only active in test environment via security_test.yaml override.
  */
@@ -32,15 +33,15 @@ final class TestAuthenticator extends AbstractAuthenticator
 
     public function supports(Request $request): bool
     {
-        return $request->headers->has('X-Test-User-Id');
+        return $request->headers->has(BaanderHeader::TestUserId->value);
     }
 
     public function authenticate(Request $request): SelfValidatingPassport
     {
-        $userId = $request->headers->get('X-Test-User-Id');
+        $userId = $request->headers->get(BaanderHeader::TestUserId->value);
 
         if ($userId === null || $userId === '') {
-            throw new UserNotFoundException('X-Test-User-Id header is empty.');
+            throw new UserNotFoundException(BaanderHeader::TestUserId->value . ' header is empty.');
         }
 
         $badge = new UserBadge(

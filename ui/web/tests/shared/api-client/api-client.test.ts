@@ -35,12 +35,12 @@ describe('customInstance', () => {
     const controller = new AbortController()
     mock.onPost('/test').reply((config) => {
       expect(config.data).toBe('{"title":"Updated"}')
-      expect(config.headers?.['X-Test']).toBe('baander')
+      expect(config.headers?.['X-Baander-Test']).toBe('baander')
       expect(config.signal).toBe(controller.signal)
       return [201, { saved: true }]
     })
     expect(await customInstance('/test', {
-      method: 'POST', body: '{"title":"Updated"}', headers: { 'X-Test': 'baander' }, signal: controller.signal,
+      method: 'POST', body: '{"title":"Updated"}', headers: { 'X-Baander-Test': 'baander' }, signal: controller.signal,
     })).toEqual({ saved: true })
   })
 })

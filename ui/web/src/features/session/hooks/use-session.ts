@@ -332,7 +332,7 @@ export function useSession() {
         position: currentTime,
         playbackState: isPlaying ? 'playing' : 'paused',
       }, {
-        headers: { 'X-Device-Id': deviceId },
+        headers: { 'X-Baander-Device-Id': deviceId },
       }).catch((err) => { logger.warn('REST session sync failed:', err) })
     }
   }, [deviceId, query.data?.activeDeviceId])

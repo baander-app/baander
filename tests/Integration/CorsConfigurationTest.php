@@ -179,6 +179,22 @@ final class CorsConfigurationTest extends TestCase
         self::assertSame(200, $this->preflight('/api/stream/sign', 'POST', 'Content-Type, Authorization, DPoP')->getStatusCode());
     }
 
+    public function testSessionPreflightAllowsBaanderHeadersAndRejectsOldDeviceHeader(): void
+    {
+        $headers = 'Authorization, DPoP, X-Baander-Device-Id, X-Baander-Client-Fingerprint, X-Baander-Correlation-ID';
+        $response = $this->preflight('/api/session', 'PUT', $headers);
+
+        self::assertSame(200, $response->getStatusCode());
+        foreach (['x-baander-device-id', 'x-baander-client-fingerprint', 'x-baander-correlation-id'] as $header) {
+            self::assertContains($header, $this->headerList($response, 'Access-Control-Allow-Headers'));
+        }
+        self::assertNotContains('x-ratelimit-limit', $this->headerList(
+            $this->actual('/api/session', self::ORIGIN, new Response()),
+            'Access-Control-Expose-Headers',
+        ));
+        self::assertSame(400, $this->preflight('/api/session', 'PUT', 'Authorization, DPoP, X-Device-Id')->getStatusCode());
+    }
+
     public function testMediaRejectsWriteMethodsAndUnknownHeaders(): void
     {
         foreach (['POST', 'DELETE'] as $method) {

@@ -50,7 +50,7 @@ $expected = 'sha256=' . hash_hmac('sha256', $timestamp . '.' . $rawBody, $secret
 $valid = hash_equals($expected, $signature);
 ```
 
-Read `$timestamp` from `X-Webhook-Timestamp` and `$signature` from `X-Webhook-Signature`. Check timestamp freshness and deduplicate using `notification_id`; delivery can be retried. `X-Webhook-Signature-Version: 2` uses the original secret.
+Read `$timestamp` from `X-Baander-Webhook-Timestamp` and `$signature` from `X-Baander-Webhook-Signature`. Check timestamp freshness and deduplicate using `notification_id`; delivery can be retried. `X-Baander-Webhook-Signature-Version: 2` uses the original secret.
 
 Webhook secrets are encrypted using Defuse and `APP_SECRET`. Back up that secret alongside the database, and keep it consistent across workers. A restore needs the matching `APP_SECRET`; an incorrect key fails delivery rather than changing the signature scheme. Before changing `APP_SECRET`, pause webhook delivery and arrange rotation of each webhook and its receiver. If the old key is lost, rotate each affected webhook to establish a new shared secret.
 

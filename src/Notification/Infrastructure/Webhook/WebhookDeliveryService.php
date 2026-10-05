@@ -6,6 +6,7 @@ namespace App\Notification\Infrastructure\Webhook;
 
 use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Notification\Application\Port\WebhookSecretPortInterface;
+use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Infrastructure\Swoole\Async;
 use App\Notification\Infrastructure\Doctrine\Entity\WebhookDeliveryLogEntity;
 use App\Notification\Infrastructure\Doctrine\Entity\WebhookEntity;
@@ -153,9 +154,9 @@ final class WebhookDeliveryService
                 $response = $this->httpClient->request('POST', $url, [
                     'headers' => [
                         'Content-Type' => 'application/json',
-                        'X-Webhook-Signature' => $signature,
-                        'X-Webhook-Signature-Version' => (string) $webhook->getSigningVersion(),
-                        'X-Webhook-Timestamp' => $timestamp,
+                        BaanderHeader::WebhookSignature->value => $signature,
+                        BaanderHeader::WebhookSignatureVersion->value => (string) $webhook->getSigningVersion(),
+                        BaanderHeader::WebhookTimestamp->value => $timestamp,
                         'Idempotency-Key' => hash('sha256', $notificationId . ':' . $webhook->getId()->toString()),
                         'User-Agent' => 'Baander-Webhook/1.0',
                     ],

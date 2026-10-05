@@ -3,8 +3,8 @@ nelmio_cors:
         origin_regex: false
         allow_origin: []
         allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
-        allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'Accept', 'Origin']
-        expose_headers: ['Link', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'DPoP-Nonce']
+        allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'X-Baander-Device-Id', 'X-Baander-Client-Fingerprint', 'X-Baander-Correlation-ID', 'Accept', 'Origin']
+        expose_headers: ['Link', 'DPoP-Nonce']
         max_age: 3600
     paths:
         # RFC 9700 §2.6: Authorization endpoint MUST NOT have CORS
@@ -16,37 +16,37 @@ nelmio_cors:
         # OAuth protocol endpoints: allow cross-origin clients
         '^/api/oauth/token$':
             allow_origin: ['*']
-            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'Accept', 'Origin']
+            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'X-Baander-Client-Fingerprint', 'X-Baander-Correlation-ID', 'Accept', 'Origin']
             allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
-            expose_headers: ['Link', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'DPoP-Nonce']
+            expose_headers: ['Link', 'DPoP-Nonce']
             max_age: 3600
 
         '^/api/oauth/introspect$':
             allow_origin: ['*']
-            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'Accept', 'Origin']
+            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'X-Baander-Client-Fingerprint', 'X-Baander-Correlation-ID', 'Accept', 'Origin']
             allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
-            expose_headers: ['Link', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'DPoP-Nonce']
+            expose_headers: ['Link', 'DPoP-Nonce']
             max_age: 3600
 
         '^/api/oauth/revoke$':
             allow_origin: ['*']
-            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'Accept', 'Origin']
+            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'X-Baander-Client-Fingerprint', 'X-Baander-Correlation-ID', 'Accept', 'Origin']
             allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
-            expose_headers: ['Link', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'DPoP-Nonce']
+            expose_headers: ['Link', 'DPoP-Nonce']
             max_age: 3600
 
         '^/api/oauth/device/':
             allow_origin: ['*']
-            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'Accept', 'Origin']
+            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'X-Baander-Client-Fingerprint', 'X-Baander-Correlation-ID', 'Accept', 'Origin']
             allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
-            expose_headers: ['Link', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'DPoP-Nonce']
+            expose_headers: ['Link', 'DPoP-Nonce']
             max_age: 3600
 
         # RFC 8414: Metadata and JWKS endpoints — public, allow all origins
         '^/\.well-known/':
             allow_origin: ['*']
             allow_methods: ['GET', 'OPTIONS']
-            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'Accept', 'Origin']
+            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'X-Baander-Correlation-ID', 'Accept', 'Origin']
             expose_headers: ['DPoP-Nonce']
             max_age: 3600
 
@@ -54,7 +54,7 @@ nelmio_cors:
         '^/api/discovery/':
             allow_origin: ['*']
             allow_methods: ['GET', 'OPTIONS', 'POST']
-            allow_headers: ['Content-Type', 'X-Requested-With', 'Accept', 'Origin']
+            allow_headers: ['Content-Type', 'X-Requested-With', 'X-Baander-Correlation-ID', 'Accept', 'Origin']
             expose_headers: ['Link']
             max_age: 3600
 
@@ -62,21 +62,21 @@ nelmio_cors:
         '^/api/favorites':
             allow_origin: ['%env(APP_URL)%']
             allow_methods: ['GET', 'OPTIONS', 'POST', 'DELETE']
-            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'Accept', 'Origin']
-            expose_headers: ['Link', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'DPoP-Nonce']
+            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'X-Baander-Client-Fingerprint', 'X-Baander-Correlation-ID', 'Accept', 'Origin']
+            expose_headers: ['Link', 'DPoP-Nonce']
             max_age: 3600
 
         # Native media uses proof headers and byte-range requests.
         '^/api/(images/|stream/track$)':
             allow_origin: ['%env(APP_URL)%']
             allow_methods: ['GET', 'HEAD', 'OPTIONS']
-            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'Accept', 'Origin', 'Range', 'If-Range']
-            expose_headers: ['Link', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'DPoP-Nonce', 'Content-Range', 'Accept-Ranges', 'ETag', 'Last-Modified']
+            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'X-Baander-Client-Fingerprint', 'X-Baander-Correlation-ID', 'Accept', 'Origin', 'Range', 'If-Range']
+            expose_headers: ['Link', 'DPoP-Nonce', 'Content-Range', 'Accept-Ranges', 'ETag', 'Last-Modified']
 
         # Catch-all for all other API routes (SPA, auth, etc.)
         '^/api/':
             allow_origin: ['%env(APP_URL)%']
-            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'Accept', 'Origin']
+            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'X-Baander-Device-Id', 'X-Baander-Client-Fingerprint', 'X-Baander-Correlation-ID', 'Accept', 'Origin']
             allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
-            expose_headers: ['Link', 'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset', 'DPoP-Nonce']
+            expose_headers: ['Link', 'DPoP-Nonce']
             max_age: 3600

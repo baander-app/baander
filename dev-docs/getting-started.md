@@ -84,7 +84,7 @@ yarn test:watch         # Watch mode
 yarn build              # Production build
 ```
 
-For functional test conventions (TestCase base class, test authentication via `X-Test-User-Id`, response shape patterns, and bugs discovered by tests), see the [Testing Guide](../docs-book/part-2-developer-guide/testing.md).
+For functional test conventions (TestCase base class, test authentication via `X-Baander-Test-User-Id`, response shape patterns, and bugs discovered by tests), see the [Testing Guide](../docs-book/part-2-developer-guide/testing.md).
 
 ## Dev Users
 

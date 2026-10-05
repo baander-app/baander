@@ -127,7 +127,7 @@ final class OAuth2AuthenticatorTest extends TestCase
 
         $request = Request::create('/');
         $request->headers->set('Authorization', 'Bearer token123');
-        $request->headers->set('X-Client-Fingerprint', 'matching-fingerprint');
+        $request->headers->set('X-Baander-Client-Fingerprint', 'matching-fingerprint');
 
         $passport = $authenticator->authenticate($request);
 
@@ -152,7 +152,7 @@ final class OAuth2AuthenticatorTest extends TestCase
 
         $request = Request::create('/');
         $request->headers->set('Authorization', 'Bearer token123');
-        $request->headers->set('X-Client-Fingerprint', 'different-fingerprint');
+        $request->headers->set('X-Baander-Client-Fingerprint', 'different-fingerprint');
 
         $this->expectException(\Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException::class);
         $this->expectExceptionMessage('Invalid or expired token.');

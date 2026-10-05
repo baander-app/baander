@@ -12,6 +12,7 @@ use App\Session\Application\Port\SessionPortInterface;
 use App\Session\Interface\Request\ClaimSessionRequest;
 use App\Session\Interface\Request\CreateSessionRequest;
 use App\Session\Interface\Request\SyncSessionRequest;
+use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -120,7 +121,7 @@ final class SessionController
                 ),
             ),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error or missing X-Device-Id header', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '422', description: 'Validation error or missing X-Baander-Device-Id header', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
     #[Route('', name: 'sync', methods: ['PUT'])]
@@ -131,15 +132,15 @@ final class SessionController
             return $this->unauthorized();
         }
 
-        $deviceIdString = $request->headers->get('X-Device-Id');
+        $deviceIdString = $request->headers->get(BaanderHeader::DeviceId->value);
         if ($deviceIdString === null || $deviceIdString === '') {
-            return $this->errorResponse('X-Device-Id header is required.', Response::HTTP_UNPROCESSABLE_ENTITY);
+            return $this->errorResponse(BaanderHeader::DeviceId->value . ' header is required.', Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         try {
             $deviceId = Uuid::fromString($deviceIdString);
         } catch (\InvalidArgumentException) {
-            return $this->errorResponse('Invalid X-Device-Id header.', Response::HTTP_UNPROCESSABLE_ENTITY);
+            return $this->errorResponse('Invalid ' . BaanderHeader::DeviceId->value . ' header.', Response::HTTP_UNPROCESSABLE_ENTITY);
         }
 
         $userId = Uuid::fromString($user->getId());

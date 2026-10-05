@@ -61,7 +61,7 @@ it('syncs continuously at a bounded cadence using the latest sole-clock position
   expect(renders).toBe(initialRenders)
   act(() => { usePlayerStore.getState().setIsPlaying(false); vi.advanceTimersByTime(2000) })
   expect(AXIOS_INSTANCE.put).toHaveBeenLastCalledWith('/api/session', expect.objectContaining({ position: 6, playbackState: 'paused' }),
-    { headers: { 'X-Device-Id': 'local-device' } })
+    { headers: { 'X-Baander-Device-Id': 'local-device' } })
   act(() => { updateTime(7) })
   hook.unmount()
   act(() => { vi.advanceTimersByTime(2500); updateTime(8); vi.advanceTimersByTime(2500) })

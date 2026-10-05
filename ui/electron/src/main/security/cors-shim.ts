@@ -89,7 +89,7 @@ export function installOrUpdateCorsShim(userServerURL: string | null, rendererOr
       const allowMethods = cached?.reqMethod || 'GET,POST,PUT,PATCH,DELETE,OPTIONS';
       const allowHeaders =
         cached?.reqHeaders ||
-        'Content-Type, Authorization, X-Requested-With, X-CSRF-Token, Accept, Origin';
+        'Content-Type, Authorization, X-Requested-With, Accept, Origin';
 
       set('Access-Control-Allow-Methods', allowMethods);
       set('Access-Control-Allow-Headers', allowHeaders);

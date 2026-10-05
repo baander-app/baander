@@ -45,7 +45,7 @@ final class DeviceRegistrationValidationTest extends TestCase
 
         $this->client->request('POST', '/api/devices', [], [], [
             'CONTENT_TYPE' => 'application/json',
-            'HTTP_X_Test_User_Id' => $user->getId()->toString(),
+            'HTTP_X_BAANDER_TEST_USER_ID' => $user->getId()->toString(),
         ], '{"deviceId":');
 
         $this->assertJsonResponse($this->client->getResponse(), 400);
