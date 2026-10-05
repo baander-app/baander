@@ -36,6 +36,10 @@ final class JobStatePersisterTest extends TestCase
         if (is_dir($this->stateDir)) {
             $this->removeDirectory($this->stateDir);
         }
+        $outsidePath = $this->stateDir . '-outside.json';
+        if (is_file($outsidePath) || is_link($outsidePath)) {
+            unlink($outsidePath);
+        }
     }
 
     public function testPersistAndLoadRoundTripsCorrectly(): void
@@ -99,6 +103,52 @@ final class JobStatePersisterTest extends TestCase
         $result = $persister->load(new PublicId());
 
         $this->assertNull($result);
+    }
+
+    public function testLoadIgnoresSymlinkToStateOutsideDirectory(): void
+    {
+        $publicId = new PublicId();
+        $this->storage = $this->createMock(TranscodeStoragePortInterface::class);
+        $this->storage->expects($this->never())->method('exists');
+        $persister = new JobStatePersister($this->storage, $this->logger, $this->stateDir, new JsonEncoder());
+        $outsidePath = $this->stateDir . '-outside.json';
+        file_put_contents($outsidePath, '{"completedSegments":[]}');
+        symlink($outsidePath, $this->statePath($publicId));
+
+        self::assertNull($persister->load($publicId));
+        self::assertSame('{"completedSegments":[]}', file_get_contents($outsidePath));
+    }
+
+    public function testPersistAtomicallyReplacesSymlinkWithoutWritingOutsideStateDirectory(): void
+    {
+        $job = $this->createInProgressJob();
+        $persister = new JobStatePersister($this->storage, $this->logger, $this->stateDir, new JsonEncoder());
+        $outsidePath = $this->stateDir . '-outside.json';
+        file_put_contents($outsidePath, 'private-state');
+        symlink($outsidePath, $this->statePath($job->getPublicId()));
+
+        $persister->persist($job);
+
+        self::assertFalse(is_link($this->statePath($job->getPublicId())));
+        self::assertSame('private-state', file_get_contents($outsidePath));
+        $loaded = $persister->load($job->getPublicId());
+        self::assertNotNull($loaded);
+        self::assertSame($job->getId()->toString(), $loaded['jobId']);
+    }
+
+    public function testListAndCleanupTreatSymlinkAsLinkRatherThanStateFile(): void
+    {
+        $publicId = new PublicId();
+        $persister = new JobStatePersister($this->storage, $this->logger, $this->stateDir, new JsonEncoder());
+        $outsidePath = $this->stateDir . '-outside.json';
+        file_put_contents($outsidePath, 'private-state');
+        symlink($outsidePath, $this->statePath($publicId));
+
+        self::assertNotContains($publicId->toString(), $persister->listPersistedJobs());
+        $persister->cleanup($publicId);
+
+        self::assertFalse(is_link($this->statePath($publicId)));
+        self::assertSame('private-state', file_get_contents($outsidePath));
     }
 
     public function testPersistForCompletedJobIsNoOp(): void
@@ -202,6 +252,11 @@ final class JobStatePersisterTest extends TestCase
         $job->markSegmentCompleted(2, '/tmp/output/seg2.m4s', 5200, 2.0);
 
         return $job;
+    }
+
+    private function statePath(PublicId $publicId): string
+    {
+        return $this->stateDir . '/' . $publicId->toString() . '.json';
     }
 
     private function removeDirectory(string $dir): void

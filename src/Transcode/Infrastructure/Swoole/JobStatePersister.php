@@ -21,6 +21,8 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
  */
 final class JobStatePersister
 {
+    private readonly string $canonicalStateDir;
+
     /**
      * @param string $stateDir Absolute path to the state directory
      */
@@ -31,8 +33,18 @@ final class JobStatePersister
         private readonly JsonEncoder $jsonEncoder,
     ) {
         if (!is_dir($stateDir)) {
-            mkdir($stateDir, 0755, true);
+            if (!mkdir($stateDir, 0755, true) && !is_dir($stateDir)) {
+                throw new \RuntimeException(sprintf('Unable to create transcode state directory "%s".', $stateDir));
+            }
         }
+
+        $canonicalStateDir = realpath($stateDir);
+        if ($canonicalStateDir === false) {
+            throw new \RuntimeException(sprintf('Unable to resolve transcode state directory "%s".', $stateDir));
+        }
+        $this->canonicalStateDir = $canonicalStateDir === DIRECTORY_SEPARATOR
+            ? DIRECTORY_SEPARATOR
+            : rtrim($canonicalStateDir, DIRECTORY_SEPARATOR);
     }
 
     /**
@@ -62,7 +74,24 @@ final class JobStatePersister
         ];
 
         $filePath = $this->stateFilePath($job->getPublicId());
-        file_put_contents($filePath, $this->jsonEncoder->encode($data, 'json', [JsonEncode::OPTIONS => JSON_PRETTY_PRINT]));
+        $temporaryPath = tempnam($this->canonicalStateDir, '.job-state-');
+        if ($temporaryPath === false) {
+            throw new \RuntimeException('Unable to create temporary transcode state file.');
+        }
+
+        try {
+            $encoded = $this->jsonEncoder->encode($data, 'json', [JsonEncode::OPTIONS => JSON_PRETTY_PRINT]);
+            if (file_put_contents($temporaryPath, $encoded) === false) {
+                throw new \RuntimeException('Unable to write transcode state file.');
+            }
+            if (!rename($temporaryPath, $filePath)) {
+                throw new \RuntimeException('Unable to replace transcode state file.');
+            }
+        } finally {
+            if (file_exists($temporaryPath) || is_link($temporaryPath)) {
+                unlink($temporaryPath);
+            }
+        }
 
         $this->logger->debug('Persisted job state', [
             'jobId' => $state->id->toString(),
@@ -79,11 +108,15 @@ final class JobStatePersister
     {
         $filePath = $this->stateFilePath($jobPublicId);
 
-        if (!file_exists($filePath)) {
+        if (is_link($filePath) || !is_file($filePath)) {
             return null;
         }
 
-        $data = $this->jsonEncoder->decode(file_get_contents($filePath), 'json');
+        $contents = file_get_contents($filePath);
+        if ($contents === false) {
+            return null;
+        }
+        $data = $this->jsonEncoder->decode($contents, 'json');
 
         $existingSegments = array_filter(
             $data['completedSegments'] ?? [],
@@ -111,7 +144,10 @@ final class JobStatePersister
             return [];
         }
 
-        return array_map(static fn(string $file) => basename($file, '.json'), $files);
+        return array_values(array_map(
+            static fn(string $file): string => basename($file, '.json'),
+            array_filter($files, static fn(string $file): bool => !is_link($file) && is_file($file)),
+        ));
     }
 
     /**
@@ -121,13 +157,13 @@ final class JobStatePersister
     {
         $filePath = $this->stateFilePath($jobPublicId);
 
-        if (file_exists($filePath)) {
+        if (is_file($filePath) || is_link($filePath)) {
             unlink($filePath);
         }
     }
 
     private function stateFilePath(PublicId $jobPublicId): string
     {
-        return sprintf('%s/%s.json', $this->stateDir, $jobPublicId->toString());
+        return sprintf('%s/%s.json', $this->canonicalStateDir, $jobPublicId->toString());
     }
 }
