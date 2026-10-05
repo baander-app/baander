@@ -51,6 +51,7 @@ The CI entrypoint builds pinned dependencies in a disposable directory:
 bash scripts/test-registry.sh release
 bash scripts/test-registry.sh sanitize
 bash scripts/test-registry.sh thread
+bash scripts/test-registry.sh fuzz
 ```
 
 It compiles OpenSSL 3.5.3 into an isolated prefix and checks its source archive
@@ -65,6 +66,10 @@ that must report an actual data race and exit 66. The probe repeats volatile wri
 so its conflicting accesses are retained and a tiny race window does not make
 detection intermittent.
 Runtime initialization failures do not pass that control. Neither mode establishes complete third-party instrumentation.
+The `fuzz` mode uses Clang libFuzzer with ASan/UBSan to exercise bounded JSON
+parsing and registration validation against committed seeds and mutations. It
+runs the native contracts first and checks that a known use-after-free is detected.
+It does not fuzz the HTTP protocol or instrument external rqlite binaries.
 
 For a manual TSan build, add `-DREGISTRY_THREAD_SANITIZER=ON`,
 `-DCMAKE_CXX_COMPILER=clang++` and `-DCMAKE_BUILD_TYPE=RelWithDebInfo` to CMake.
@@ -112,7 +117,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 relay/tests/run_http_contract.py \
 
 These checks establish local behavior and TLS interoperability. They do not
 qualify whole-host capacity, regional latency, physical failure, operational backup
-recovery, fuzzing or the 24-hour soak. Those remain release gates
+recovery, HTTP fuzzing or the 24-hour soak. Those remain release gates
 in the root roadmap; regional inventory and real S3 access are not available yet.
 
 The cluster harness starts three or five native voters with HTTPS authentication

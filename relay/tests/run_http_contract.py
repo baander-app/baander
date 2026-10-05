@@ -208,6 +208,21 @@ def main():
             finally:
                 connection.close()
 
+        def raw_request(payload):
+            with socket.create_connection(("127.0.0.1", api_port), timeout=3) as socket_connection:
+                with tls.wrap_socket(
+                    socket_connection,
+                    server_hostname="api.registry.baander.app",
+                ) as connection:
+                    connection.settimeout(3)
+                    connection.sendall(payload)
+                    response = http.client.HTTPResponse(connection)
+                    response.begin()
+                    status = response.status
+                    body = json.loads(response.read())
+                    assert connection.recv(1) == b"", "Registry kept a raw request connection open."
+                    return status, body
+
         try:
             status, readiness_body = None, None
             until = time.monotonic() + 15
@@ -231,6 +246,7 @@ def main():
                 "apiKey": "ab" * 32,
             }
             encoded = json.dumps(registration)
+            owned_registration = dict(registration)
             status, body, _ = request("POST", "/api/servers/register", encoded)
             assert status == 200 and body["data"]["revision"] == 1
             assert registration["apiKey"] not in json.dumps(body)
@@ -239,15 +255,62 @@ def main():
             status, body, _ = request("GET", "/api/servers/server-one")
             assert status == 200 and body["data"]["url"] == registration["url"]
             assert registration["apiKey"] not in json.dumps(body)
-            registration["apiKey"] = "cd" * 32
+            registration.update(
+                apiKey="cd" * 32,
+                url="https://attacker.baander.app",
+                name="Hostile replacement",
+                version="99.0.0",
+            )
+            before_hostile_update = body["data"]
             assert request("POST", "/api/servers/register", json.dumps(registration))[0] == 403
+            assert request("GET", "/api/servers/server-one")[1]["data"] == before_hostile_update
             assert request("GET", "/api/servers/missing")[0] == 404
             assert request("POST", "/api/servers/register", "{")[0] == 400
             assert request("POST", "/api/servers/register", "{}")[0] == 422
             assert request("POST", "/api/servers/register", "[" * 9 + "0" + "]" * 9)[0] == 400
             assert request("POST", "/api/servers/register", " " * 8193)[0] == 413
             assert request("GET", "/db/query")[0] == 404
-            assert request("GET", "/status")[0] == 404  # Upstream administration is never proxied.
+            assert request("GET", "/status")[0] == 404
+            for target in ("/db/execute", "/db/request", "/db/load", "/db/backup", "/join"):
+                assert request("POST", target, "[]")[0] == 404
+
+            hostile_http = (
+                b"POST /api/servers/register HTTP/1.1\r\n"
+                b"Host: api.registry.baander.app\r\n"
+                b"Content-Type: application/json\r\n"
+            )
+            malformed_requests = (
+                hostile_http + b"Content-Length: 0\r\nContent-Length: 9\r\n\r\n",
+                hostile_http + b"Content-Length: 0\r\nTransfer-Encoding: chunked\r\n\r\n0\r\n\r\n",
+                b"GET /health HTTP/1.1\r\nHost: " + b"a" * 8192 + b"\r\n\r\n",
+            )
+            for malformed_request in malformed_requests:
+                status, error = raw_request(malformed_request)
+                assert status == 400 and error == {"error": "Invalid or oversized HTTP request."}
+
+            oversized_chunk = b" " * 8193
+            status, error = raw_request(
+                hostile_http
+                + b"Transfer-Encoding: chunked\r\n\r\n"
+                + f"{len(oversized_chunk):x}\r\n".encode()
+                + oversized_chunk
+                + b"\r\n0\r\n\r\n"
+            )
+            assert status == 413 and error == {"error": "Invalid or oversized HTTP request."}
+
+            pipelined_registration = json.dumps(
+                dict(owned_registration, publicId="pipelined-claim")
+            ).encode()
+            status, body = raw_request(
+                b"GET /health HTTP/1.1\r\nHost: api.registry.baander.app\r\n\r\n"
+                + hostile_http
+                + f"Content-Length: {len(pipelined_registration)}\r\n\r\n".encode()
+                + pipelined_registration
+            )
+            assert status == 200 and body == {"data": {"alive": True}}
+            assert request("GET", "/api/servers/pipelined-claim")[0] == 404
+            assert request("GET", "/api/servers/server-one")[1]["data"] == before_hostile_update
+            assert request("GET", "/health")[0] == 200
             claim_a = dict(
                 registration, publicId="concurrent-owner", name="Owner A", apiKey="ef" * 32
             )
@@ -360,6 +423,24 @@ def main():
                     return result
                 finally:
                     connection.close()
+
+            owned_row = [
+                "SELECT public_id, credential_digest, url, name, version, created_ms, "
+                "updated_ms, last_seen_ms, revision FROM registries WHERE public_id=?",
+                "server-one",
+            ]
+            before_rejected_claim = database_request([owned_row], True)["results"][0]["rows"][0]
+            assert request("POST", "/api/servers/register", json.dumps(registration))[0] == 403
+            after_rejected_claim = database_request([owned_row], True)["results"][0]["rows"][0]
+            assert after_rejected_claim == before_rejected_claim
+
+            database_request([
+                ["UPDATE registries SET last_seen_ms=? WHERE public_id=?", 1, "server-one"]
+            ])
+            assert request("GET", "/api/servers/server-one")[0] == 404
+            assert request("POST", "/api/servers/register", json.dumps(registration))[0] == 403
+            assert request("POST", "/api/servers/register", json.dumps(owned_registration))[0] == 200
+            assert request("GET", "/api/servers/server-one")[1]["data"]["url"] == owned_registration["url"]
 
             gate["malformedReadiness"] = True
             assert request("GET", "/ready")[0] == 503

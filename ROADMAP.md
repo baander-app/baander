@@ -19,9 +19,12 @@ image now includes nginx; real development and production config syntax checks
 pass and reject malformed config or a missing binary. The startup-unavailable 503
 OpenAPI responses match the shared error envelope, the generated web client is
 updated, specification drift and web typechecking pass, and full PHPStan has zero
-errors. Deptrac still has 282 active violations, so release quality gates are not
-fully green. Local coverage-merging checks pass; the full instrumented CI coverage
-run remains unverified on this host.
+errors at the last full scan. Subsequent focused PHPStan checks for the QoL
+boundary pass. Deptrac is down to 224 active violations, so release quality gates
+are not fully green. The locked CI image completed all 143 full-suite PHPUnit
+shards with Xdebug coverage and a merged report: 6,368 discovered tests and no
+failed shards. The final 512 MiB child-process image separately passed its Shared
+unit coverage run; the entire suite has not yet been rerun in that final image.
 
 ## Latest verified backend batches
 
