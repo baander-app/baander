@@ -8,6 +8,7 @@ External acceptance: deployment access/inventory for `de`, `ca`, `sg`, `au`, and
 `fi`, and the S3 backup configuration are unavailable (user confirmed 2026-10-04).
 Continue local implementation and emulated acceptance; actual regional deployment,
 regional measurements, and backup-destination restore qualification remain pending.
+React Native and Android work is deferred at the user's request (2026-10-05).
 
 ## Latest verified backend batches
 
@@ -72,12 +73,18 @@ attempts the pinned local destination even with a proxy configured. The 76 webho
 units, 18 functional controller tests, and full PHPStan scan pass. The notification
 runbook now describes the sole encrypted original-secret format.
 
-The current supervised `app:worker` Docker drill now kills the direct outbox relay
-after a committed claim and before projection. It proves child containment,
-unchanged claim token and expiry, zero pre-recovery effects, and a replacement
-worker's single projection receipt after the original 60-second lease expires.
-The full worker drill passes. Consumer and transport-acknowledgement crash points
-remain separate acceptance work.
+The supervised `app:worker` Docker drill kills the direct outbox relay after a
+committed claim and again during notification insertion inside the projection
+transaction. It proves child containment, rollback with zero visible effects,
+unchanged claim tokens and expiry, and a replacement worker's single projection
+receipt after each natural 60-second lease expiry. The full worker drill passes.
+Consumer and transport-acknowledgement crash points remain separate acceptance work.
+
+Radio source initialization now uses the existing application port instead of
+creating and persisting an aggregate from the console boundary. Focused command
+regressions verify the source settings, returned ID, and missing-source behavior;
+62 Radio unit tests and container wiring pass. Deptrac falls from 296 to 290
+active violations with no baseline changes; full PHPStan remains clean.
 
 OAuth key initialization now refuses existing files, symlinks and path aliases,
 validates a generated pair before exclusive 0600 writes, and removes only its own
@@ -642,9 +649,9 @@ release, without weakening consistency or increasing the agreed host budget.
   independent PostgreSQL connections, poison-event retry/dead-letter handling, and
   idempotent durable notification effects. External delivery remains at-least-once;
   uncertain outcomes are not represented as exactly-once.
-- [ ] Kill relay workers at claim, consumer, and transport-acknowledgement
-  boundaries; verify lease expiry and downstream recovery through the supervised
-  worker runtime under each crash point.
+- [ ] Finish supervised crash tests at consumer and transport-acknowledgement
+  boundaries. Claim and mid-projection transaction crashes now verify lease expiry,
+  rollback, and downstream recovery through the current worker runtime.
 - [x] Test storage directory-boundary comparisons, validation before mkdir,
   traversal and symlink escapes across read/write/delete/derived-file resolution.
 - [x] Test webhook DNS and connection-time destination checks, corrected link-local

@@ -14,8 +14,36 @@ if (!is_array($arguments)) {
     throw new RuntimeException('Invalid isolated worker command arguments.');
 }
 [$script, $mode, $namespace, $bootId] = $arguments + [null, null, null, null];
-if (!in_array($mode, ['hold-relay-claim', 'release-relay-claim', 'verify-claim-blocked', 'verify-claim-contained', 'verify-claim-recovered', 'kill-relay-claimed', 'ready', 'kill-consumer', 'kill-scheduler', 'reserved', 'expire', 'seed-outbox', 'verify-outbox', 'replay-outbox', 'seed-scheduler', 'verify-scheduler', 'replay-scheduler'], true)
-    || !is_string($namespace) || !is_string($bootId)) {
+$allowedModes = [
+    'hold-relay-projection',
+    'release-relay-projection',
+    'verify-projection-blocked',
+    'verify-projection-contained',
+    'kill-relay-projecting',
+    'hold-relay-claim',
+    'release-relay-claim',
+    'verify-claim-blocked',
+    'verify-claim-contained',
+    'verify-claim-recovered',
+    'kill-relay-claimed',
+    'ready',
+    'kill-consumer',
+    'kill-scheduler',
+    'reserved',
+    'expire',
+    'seed-outbox',
+    'verify-outbox',
+    'replay-outbox',
+    'seed-scheduler',
+    'verify-scheduler',
+    'replay-scheduler',
+];
+
+if (
+    !in_array($mode, $allowedModes, true)
+    || !is_string($namespace)
+    || !is_string($bootId)
+) {
     throw new RuntimeException('Invalid isolated worker check request.');
 }
 App\Shared\Infrastructure\Worker\DeploymentLease::validateIdentity($namespace, $bootId);
@@ -50,6 +78,86 @@ if ($mode === 'release-relay-claim') {
     echo "Disposable claim gate removed.\n";
     exit(0);
 }
+
+// Block the ORM flush inside the receipt/projection transaction. A killed relay
+// must roll back both the uncommitted receipt and every projection effect.
+if ($mode === 'hold-relay-projection') {
+    $db->executeQuery('SELECT pg_advisory_lock(87365022)')->free();
+    $db->executeStatement(<<<'SQL'
+        CREATE FUNCTION worker_command_projection_gate() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            PERFORM pg_advisory_xact_lock(87365022);
+            RETURN NEW;
+        END;
+        $$
+        SQL);
+    $db->executeStatement(<<<'SQL'
+        CREATE TRIGGER worker_command_projection_gate
+        BEFORE INSERT ON notifications
+        FOR EACH ROW EXECUTE FUNCTION worker_command_projection_gate()
+        SQL);
+    echo "Projection gate armed.\n";
+    flush();
+    $db->executeQuery('SELECT pg_sleep(120)')->free();
+    throw new RuntimeException('Projection gate exceeded its bounded lifetime.');
+}
+if ($mode === 'release-relay-projection') {
+    $db->executeStatement('DROP TRIGGER worker_command_projection_gate ON notifications');
+    $db->executeStatement('DROP FUNCTION worker_command_projection_gate()');
+    echo "Disposable projection gate removed.\n";
+    exit(0);
+}
+$projectionModes = [
+    'verify-projection-blocked',
+    'verify-projection-contained',
+    'kill-relay-projecting',
+];
+
+if (in_array($mode, $projectionModes, true)) {
+    $projectionClaim = $db->fetchAssociative(<<<'SQL'
+        SELECT id, lease_token, lease_until FROM domain_event_outbox
+        WHERE event_name = 'user.registered' AND payload->>'email' = :email
+            AND lease_token IS NOT NULL AND lease_until > clock_timestamp()
+            AND relayed_at IS NULL AND attempts = 0 AND next_attempt_at IS NULL AND dead_lettered_at IS NULL
+        SQL, ['email' => 'worker-command@baander.app']);
+    if (
+        $projectionClaim === false
+        || (int) $db->fetchOne('SELECT count(*) FROM notifications') !== 0
+        || (int) $db->fetchOne('SELECT count(*) FROM domain_event_outbox_receipt') !== 0
+        || (int) $db->fetchOne('SELECT count(*) FROM domain_event_outbox_delivery') !== 0
+    ) {
+        throw new RuntimeException(
+            'Projection claim must remain committed with zero visible receipt, projection, delivery or failure effects.',
+        );
+    }
+    $projecting = (int) $db->fetchOne(<<<'SQL'
+        SELECT count(*) FROM pg_locks l JOIN pg_stat_activity a ON a.pid = l.pid
+        WHERE l.locktype = 'advisory' AND l.classid = 0 AND l.objid = 87365022
+            AND NOT l.granted AND a.xact_start IS NOT NULL
+            AND a.query ILIKE '%INSERT INTO notifications%'
+        SQL);
+    if ($mode === 'verify-projection-contained') {
+        if (
+            $projecting !== 0
+            || ($arguments[4] ?? null) !== $projectionClaim['lease_token']
+            || ($arguments[5] ?? null) !== $projectionClaim['lease_until']
+        ) {
+            throw new RuntimeException(
+                'Contained projection relay must roll back its transaction and preserve the unchanged original claim.',
+            );
+        }
+        echo "Killed projection transaction rolled back; unchanged lease and zero durable effects remain.\n";
+        exit(0);
+    }
+    if ($projecting !== 1) {
+        throw new RuntimeException('Relay has not reached notification flush inside its receipt/projection transaction.');
+    }
+    if ($mode === 'verify-projection-blocked') {
+        echo json_encode($projectionClaim, JSON_THROW_ON_ERROR) . "\n";
+        exit(0);
+    }
+}
+
 $claimedEvent = null;
 if (in_array($mode, ['verify-claim-blocked', 'verify-claim-contained', 'kill-relay-claimed'], true)) {
     $claimedEvent = $db->fetchAssociative(<<<'SQL'
@@ -282,8 +390,9 @@ $expected = 'worker-' . substr(hash('sha256', $namespace), 0, 16) . '-' . $bootI
 if (!is_array($consumers) || !in_array($expected, array_column($consumers, 'name'), true)) {
     throw new RuntimeException('Expected Redis consumer ' . $expected . '; observed ' . json_encode($consumers, JSON_THROW_ON_ERROR));
 }
-if ($mode === 'kill-relay-claimed' && !posix_kill($roles['relay'], SIGKILL)) {
-    throw new RuntimeException('Could not kill the direct relay child at its committed claim boundary.');
+if (in_array($mode, ['kill-relay-claimed', 'kill-relay-projecting'], true)
+    && !posix_kill($roles['relay'], SIGKILL)) {
+    throw new RuntimeException('Could not kill the direct relay child at its verified crash boundary.');
 }
 if ($mode === 'kill-consumer' && !posix_kill($roles['consumer'], SIGKILL)) {
     throw new RuntimeException('Could not kill the disposable consumer fixture.');

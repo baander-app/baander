@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 if [ "${BAANDER_WORKER_COMMAND_TIMEOUT_ACTIVE:-0}" != 1 ]; then
-    exec env BAANDER_WORKER_COMMAND_TIMEOUT_ACTIVE=1 timeout 300s bash "$0" "$@"
+    exec env BAANDER_WORKER_COMMAND_TIMEOUT_ACTIVE=1 timeout 420s bash "$0" "$@"
 fi
 cd "$(dirname "$0")/.."
 run_id="baander-worker-command-$(date +%s)-$$"
@@ -202,6 +202,72 @@ docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_
 docker rm -f "$run_id-claim-gate" >/dev/null
 docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_image" \
     -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php release-relay-claim "$claim_namespace" "$claim_boot"
+# Recover the pending event under a distinct admitted deployment, then kill the
+# relay during ORM flush while its receipt/projection transaction is still open.
+projection_boot="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
+projection_namespace=baander.app:commandprojectioncrash
+containers+=("$run_id-projection-gate")
+
+docker run -d --name "$run_id-projection-gate" "${common[@]}" --entrypoint php "$app_image" \
+    -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php \
+    hold-relay-projection "$projection_namespace" "$projection_boot" >/dev/null
+
+gate_ready=false
+for attempt in $(seq 1 30); do
+    if docker logs "$run_id-projection-gate" 2>&1 | grep -qx 'Projection gate armed.'; then
+        gate_ready=true
+        break
+    fi
+    sleep 0.2
+done
+
+if [ "$gate_ready" != true ]; then
+    docker logs "$run_id-projection-gate" >&2
+    exit 1
+fi
+
+launch "$run_id-projection-crash" "$projection_namespace" "$projection_boot"
+await_ready "$run_id-projection-crash" "$projection_namespace" "$projection_boot"
+docker exec "$run_id-projection-crash" php -d memory_limit=64M \
+    tests/Fixtures/Worker/worker-command-check.php verify-claim-contained \
+    "$projection_namespace" "$projection_boot" "$claim_token" "$claim_until"
+
+projection_snapshot=""
+for attempt in $(seq 1 350); do
+    if projection_snapshot="$(docker exec "$run_id-projection-crash" php -d memory_limit=64M \
+        tests/Fixtures/Worker/worker-command-check.php verify-projection-blocked \
+        "$projection_namespace" "$projection_boot" 2>/dev/null)"; then
+        break
+    fi
+    sleep 0.2
+done
+
+if [ -z "$projection_snapshot" ]; then
+    docker logs --tail 60 "$run_id-projection-crash" >&2
+    echo 'Relay did not reach the projection transaction within the bounded check.' >&2
+    exit 1
+fi
+
+projection_token="$(python3 -c 'import json, sys; print(json.loads(sys.argv[1])["lease_token"])' "$projection_snapshot")"
+projection_until="$(python3 -c 'import json, sys; print(json.loads(sys.argv[1])["lease_until"])' "$projection_snapshot")"
+[[ "$projection_token" =~ ^[a-f0-9]{64}$ && "$projection_token" != "$claim_token" ]]
+
+docker exec "$run_id-projection-crash" php -d memory_limit=64M \
+    tests/Fixtures/Worker/worker-command-check.php kill-relay-projecting \
+    "$projection_namespace" "$projection_boot"
+await_exit "$run_id-projection-crash" 1 3
+reserved "$projection_namespace" "$projection_boot"
+
+docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_image" \
+    -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php \
+    verify-projection-contained "$projection_namespace" "$projection_boot" \
+    "$projection_token" "$projection_until"
+
+docker rm -f "$run_id-projection-gate" >/dev/null
+docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_image" \
+    -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php \
+    release-relay-projection "$projection_namespace" "$projection_boot"
+
 docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_image" \
     -d memory_limit=256M tests/Fixtures/Worker/worker-command-check.php seed-scheduler baander.app:commandtest aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
@@ -209,10 +275,14 @@ boot="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
 namespace=baander.app:commandtest
 launch "$run_id-crash" "$namespace" "$boot"
 await_ready "$run_id-crash" "$namespace" "$boot"
-docker exec "$run_id-crash" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php verify-claim-contained "$namespace" "$boot" "$claim_token" "$claim_until"
+docker exec "$run_id-crash" php -d memory_limit=64M \
+    tests/Fixtures/Worker/worker-command-check.php verify-projection-contained \
+    "$namespace" "$boot" "$projection_token" "$projection_until"
 # No lease rewrite: the supervised relay must wait for natural 60-second claim expiry.
 await_outbox "$run_id-crash" 350
-docker exec "$run_id-crash" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php verify-claim-recovered "$namespace" "$boot" "$claim_until"
+docker exec "$run_id-crash" php -d memory_limit=64M \
+    tests/Fixtures/Worker/worker-command-check.php verify-claim-recovered \
+    "$namespace" "$boot" "$projection_until"
 await_scheduler "$run_id-crash" "$namespace" "$boot"
 docker exec "$run_id-crash" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php replay-outbox "$namespace" "$boot"
 await_outbox "$run_id-crash"
@@ -251,4 +321,4 @@ docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_
 # Allow the renewal schedule plus its bounded 35-second drain and harness headroom.
 await_exit "$run_id-expiry" 1 3 60
 reserved "$expiry_namespace" "$expiry_boot"
-echo 'Real app:worker committed-claim relay SIGKILL/natural expiry recovery, manual occurrence/replay, consumer/scheduler crash, TERM, same-boot denial, and renewal loss acceptance passed; reservations remain active.'
+echo 'Real app:worker claim and projection crash recovery, replay, and lifecycle acceptance passed.'
