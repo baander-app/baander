@@ -72,17 +72,29 @@ final class SetupCommandTest extends TestCase
         yield 'OAuth keys' => [
             'app:oauth:generate-keys',
             [],
-            ['doctrine:migrations:migrate', 'app:oauth:generate-keys'],
+            [
+                'doctrine:migrations:migrate',
+                'app:oauth:generate-keys',
+            ],
         ];
         yield 'OAuth clients' => [
             'app:auth:setup-clients',
             [],
-            ['doctrine:migrations:migrate', 'app:oauth:generate-keys', 'app:auth:setup-clients'],
+            [
+                'doctrine:migrations:migrate',
+                'app:oauth:generate-keys',
+                'app:auth:setup-clients',
+            ],
         ];
         yield 'dev users' => [
             'app:dev:create-users',
             [],
-            ['doctrine:migrations:migrate', 'app:oauth:generate-keys', 'app:auth:setup-clients', 'app:dev:create-users'],
+            [
+                'doctrine:migrations:migrate',
+                'app:oauth:generate-keys',
+                'app:auth:setup-clients',
+                'app:dev:create-users',
+            ],
         ];
     }
 
@@ -105,8 +117,10 @@ final class SetupCommandTest extends TestCase
             [var_export($log, true), var_export($failedStage, true)],
             <<<'PHP'
 <?php
+
 $stage = $argv[1] ?? '';
 file_put_contents(__LOG__, $stage . PHP_EOL, FILE_APPEND);
+
 if ($stage === __FAIL__) {
     fwrite(STDERR, 'intentional setup failure');
     exit(17);
