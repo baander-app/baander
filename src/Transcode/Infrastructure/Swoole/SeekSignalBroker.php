@@ -6,6 +6,7 @@ namespace App\Transcode\Infrastructure\Swoole;
 
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Swoole\Async;
+use Swoole\Coroutine\Channel;
 
 /**
  * Inter-coroutine signal broker for playback position changes.
@@ -17,14 +18,14 @@ use App\Shared\Infrastructure\Swoole\Async;
  */
 final class SeekSignalBroker
 {
-    /** @var array<string, \Swoole\Coroutine\Channel> */
+    /** @var array<string, Channel> */
     private array $channels = [];
 
     public function open(Uuid $jobId): void
     {
         $key = $jobId->toString();
         if (!isset($this->channels[$key])) {
-            $this->channels[$key] = new \Swoole\Coroutine\Channel(16);
+            $this->channels[$key] = new Channel(1);
         }
     }
 
@@ -33,6 +34,13 @@ final class SeekSignalBroker
         $key = $jobId->toString();
         $channel = $this->channels[$key] ?? null;
         if ($channel !== null) {
+            // Signals represent the latest playback state, so replace pending
+            // state before enqueueing. Both operations complete without yielding
+            // because the pop is buffered and the push has an empty slot.
+            if (!$channel->isEmpty()) {
+                $channel->pop(0.001);
+            }
+
             $channel->push(['position' => $position, 'action' => $action], 0.001);
         }
     }
