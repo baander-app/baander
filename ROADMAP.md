@@ -65,6 +65,13 @@ and rotation against receiver-side HMAC verification. Webhook/handler units pass
 79 tests; functional/schema checks pass 21 tests, with independent-connection
 migration checks. No production deployment or local database reset was performed.
 
+Webhook delivery now disables proxy use through transport-compatible `no_proxy`
+instead of the empty `proxy` option rejected by Symfony's native HTTP client.
+A regression captures the real delivery options and verifies the native client
+attempts the pinned local destination even with a proxy configured. The 76 webhook
+units, 18 functional controller tests, and full PHPStan scan pass. The notification
+runbook now describes the sole encrypted original-secret format.
+
 Deptrac resource layers now enforce the documented resource-to-model exception
 without allowing controllers to depend on domain models. A real Deptrac fixture
 tests both sides. Removed 23 obsolete resource baseline pairs and the removed
@@ -609,7 +616,7 @@ release, without weakening consistency or increasing the agreed host budget.
   worker runtime under each crash point.
 - [x] Test storage directory-boundary comparisons, validation before mkdir,
   traversal and symlink escapes across read/write/delete/derived-file resolution.
-- [ ] Test webhook DNS and connection-time destination checks, corrected link-local
+- [x] Test webhook DNS and connection-time destination checks, corrected link-local
   ranges, disabled redirects, empty-by-default LAN allowlist, category validation,
   and original-secret signature verification. Since there is no production install,
   remove obsolete legacy formats rather than inventing compatibility obligations.

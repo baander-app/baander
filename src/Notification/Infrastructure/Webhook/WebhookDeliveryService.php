@@ -165,7 +165,7 @@ final class WebhookDeliveryService
                     'max_duration' => 10,
                     'resolve' => $resolve,
                     'max_redirects' => 0,
-                    'proxy' => '',
+                    'no_proxy' => '*',
                 ]);
 
                 $statusCode = $response->getStatusCode();

@@ -14,18 +14,18 @@ final class WebhookDestinationPolicyTest extends TestCase
     {
         $lookups = 0;
         $policy = new WebhookDestinationPolicy(dnsResolver: static function (string $host) use (&$lookups): array {
-            self::assertSame('hooks.example', $host);
+            self::assertSame('hooks.baander.app', $host);
             return ++$lookups === 1 ? ['93.184.216.34', '2606:4700:4700::1111'] : ['93.184.216.34', '::ffff:127.0.0.1'];
         });
-        self::assertSame(['host' => 'hooks.example', 'ips' => ['93.184.216.34', '2606:4700:4700::1111']], $policy->resolve('https://hooks.example/hook'));
-        self::assertNull($policy->resolve('https://hooks.example/hook'));
+        self::assertSame(['host' => 'hooks.baander.app', 'ips' => ['93.184.216.34', '2606:4700:4700::1111']], $policy->resolve('https://hooks.baander.app/hook'));
+        self::assertNull($policy->resolve('https://hooks.baander.app/hook'));
         self::assertSame(2, $lookups);
     }
 
     public function testDnsFailureRejectsDestination(): void
     {
         $policy = new WebhookDestinationPolicy(dnsResolver: static fn (string $host): array => []);
-        self::assertNull($policy->resolve('https://missing.example/hook'));
+        self::assertNull($policy->resolve('https://missing.baander.app/hook'));
     }
 
     /** @return iterable<string, array{string}> */

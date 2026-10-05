@@ -43,16 +43,16 @@ None. Notification is a pure consumer — it receives events and dispatches deli
 
 Webhook destinations are checked when configured and again before delivery. Each request pins a validated IP address, disables proxies, and refuses redirects. `WEBHOOK_LAN_ALLOWLIST` is a comma-separated list of permitted LAN IP addresses or CIDRs, empty by default. For example, `192.168.1.20,fd00:1234::20` permits those two addresses. Loopback, link-local, and metadata addresses remain blocked.
 
-New webhooks and `POST /api/webhooks/{id}/rotate-secret` use signature version 2. Retain the returned secret; it is returned only on creation or rotation. Verify the raw request body with:
+Webhooks use signature version 2. Retain the secret returned by creation or `POST /api/webhooks/{id}/rotate-secret`; it is returned only once. Verify the raw request body with:
 
 ```php
 $expected = 'sha256=' . hash_hmac('sha256', $timestamp . '.' . $rawBody, $secret);
 $valid = hash_equals($expected, $signature);
 ```
 
-Read `$timestamp` from `X-Webhook-Timestamp` and `$signature` from `X-Webhook-Signature`. Check timestamp freshness and deduplicate using `notification_id`; delivery can be retried. `X-Webhook-Signature-Version: 2` uses the original secret. Version 1 preserves the historical key `hash('sha256', $secret)` until the webhook is rotated.
+Read `$timestamp` from `X-Webhook-Timestamp` and `$signature` from `X-Webhook-Signature`. Check timestamp freshness and deduplicate using `notification_id`; delivery can be retried. `X-Webhook-Signature-Version: 2` uses the original secret.
 
-Version 2 secrets are encrypted using Defuse and `APP_SECRET`. Back up that secret alongside the database, and keep it consistent across workers. A restore needs the matching `APP_SECRET`; an incorrect key fails delivery rather than changing the signature scheme. Before changing `APP_SECRET`, pause webhook delivery and arrange rotation of each webhook and its receiver. If the old key is lost, rotate each affected webhook to establish a new shared secret. The additive migration preserves version 1 rows; rollback after creating version 2 webhooks requires a matching pre-migration database backup.
+Webhook secrets are encrypted using Defuse and `APP_SECRET`. Back up that secret alongside the database, and keep it consistent across workers. A restore needs the matching `APP_SECRET`; an incorrect key fails delivery rather than changing the signature scheme. Before changing `APP_SECRET`, pause webhook delivery and arrange rotation of each webhook and its receiver. If the old key is lost, rotate each affected webhook to establish a new shared secret.
 
 Webhook requests include an `Idempotency-Key` derived from the notification ID and
 webhook ID. It stays the same across retries. Request timestamps and signatures
