@@ -595,6 +595,9 @@ services:
             $appName: '%app.name%'
 
     # --- Notification Push ---
+    App\Notification\Application\Port\PushSubscriptionRemovalPortInterface:
+        alias: App\Notification\Infrastructure\Push\PushSubscriptionRepository
+
     App\Notification\Infrastructure\Push\PushSubscriptionRepositoryInterface:
         alias: App\Notification\Infrastructure\Push\PushSubscriptionRepository
 
@@ -602,7 +605,7 @@ services:
         arguments:
             $auth:
                 VAPID:
-                    subject: 'mailto:admin@example.com'
+                    subject: 'mailto:admin@baander.app'
                     publicKey: '%env(VAPID_PUBLIC_KEY)%'
                     privateKey: '%env(VAPID_PRIVATE_KEY)%'
 

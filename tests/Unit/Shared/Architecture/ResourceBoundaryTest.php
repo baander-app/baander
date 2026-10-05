@@ -49,6 +49,14 @@ namespace App\Library\Application;
 final class InternalApplicationService {}
 namespace App\Auth\Application\Port;
 interface AuthenticatedUserIdentityInterface {}
+namespace App\Auth\Application;
+final class InternalApplicationService {}
+namespace App\Notification\Interface\Controller;
+final class BoundaryController {
+    public function user(\App\Auth\Application\Port\AuthenticatedUserIdentityInterface $identity): void {}
+    public function internal(\App\Auth\Application\InternalApplicationService $service): void {}
+}
+
 namespace App\Media\Infrastructure;
 final class BoundaryReadScopeProvider {
     public function current(
@@ -87,6 +95,7 @@ SOURCE);
                     self::assertStringContainsString('BoundaryController must not depend on', $message['message']);
                     self::assertStringNotContainsString('BoundaryResource', $message['message']);
                     self::assertStringNotContainsString('LibraryReadScopeProviderInterface', $message['message']);
+                    self::assertStringNotContainsString('AuthenticatedUserIdentityInterface', $message['message']);
                 }
             }
             self::assertStringContainsString('BoundaryModel', implode('\n', $violations));

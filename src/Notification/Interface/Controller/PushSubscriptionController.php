@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Notification\Interface\Controller;
 
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Notification\Application\Port\PushSubscriptionRemovalPortInterface;
+use App\Shared\Domain\Model\Uuid;
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Notification\Infrastructure\Doctrine\Entity\PushSubscriptionEntity;
 use App\Notification\Infrastructure\Push\PushSubscriptionRepositoryInterface;
@@ -43,6 +46,7 @@ final class PushSubscriptionController
         private readonly JsonEncoder $jsonEncoder,
         private readonly Security $security,
         private readonly EntityManagerInterface $entityManager,
+        private readonly PushSubscriptionRemovalPortInterface $subscriptionRemoval,
     ) {
     }
 
@@ -152,7 +156,12 @@ final class PushSubscriptionController
             return $this->errorResponse('Endpoint is required.', 422);
         }
 
-        $this->subscriptionRepository->removeByEndpoint($data['endpoint']);
+        $user = $this->security->getUser();
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
+            return $this->errorResponse('Authentication required.', 401);
+        }
+
+        $this->subscriptionRemoval->removeForUser(Uuid::fromString($user->getId()), $data['endpoint']);
 
         return $this->noContent();
     }

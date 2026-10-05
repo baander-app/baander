@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-10-04. This is the working delivery record for the remediation,
+Updated: 2026-10-05. This is the working delivery record for the remediation,
 registry, and web-state plans. Update it when scope changes or a stage is verified.
 Completed code is not proof of production or performance qualification.
 
@@ -10,6 +10,19 @@ Continue local implementation and emulated acceptance; actual regional deploymen
 regional measurements, and backup-destination restore qualification remain pending.
 
 ## Latest verified backend batches
+
+Push unsubscribe now deletes only the authenticated owner's endpoint, with identical
+204 responses for missing and unrelated subscriptions. Real OAuth regressions
+reject deletion by unrelated members and administrators. The atomic PostgreSQL
+DELETE returns deleted IDs so Doctrine can detach them without initializing lazy
+references, flushing unrelated writes or committing caller transactions. Lazy
+reference, rollback and independent-observer commit tests pass. The exact-lock
+push suite passes 190 tests (585 assertions); full PHPStan remains at zero and
+Deptrac at 298 active violations, 679 skipped occurrences and zero errors. The
+exact authenticated-identity port rule permits the public contract while its
+architecture fixture still rejects Auth internals. Existing timezone-free push
+creation timestamps and subscribe endpoint ownership/rotation behavior remain
+separate follow-ups.
 
 Lyrics reads now resolve songs through the current library scope; cached misses
 remain read-only. Fetch/apply require administrator privileges before provider

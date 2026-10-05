@@ -13,8 +13,6 @@ interface PushSubscriptionRepositoryInterface
 
     public function remove(PushSubscriptionEntity $subscription): void;
 
-    public function removeByEndpoint(string $endpoint): void;
-
     public function removeAllForUser(Uuid $userId): void;
 
     /**

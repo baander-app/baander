@@ -967,6 +967,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Notification Interface':
+      - 'Auth Identity Contract'
       - 'Notification Resources'
       - 'Notification Application'
       - 'Shared Domain'

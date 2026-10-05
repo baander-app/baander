@@ -30,7 +30,7 @@ final class PushSubscriptionRepositoryTest extends TestCase
     {
         $subscription = new PushSubscriptionEntity(
             user: $this->createStub(UserEntity::class),
-            endpoint: 'https://fcm.googleapis.com/test',
+            endpoint: 'https://push.baander.app/test',
             publicKey: 'pk',
             authKey: 'ak',
             contentEncoding: 'aes128gcm',
@@ -46,7 +46,7 @@ final class PushSubscriptionRepositoryTest extends TestCase
     {
         $subscription = new PushSubscriptionEntity(
             user: $this->createStub(UserEntity::class),
-            endpoint: 'https://fcm.googleapis.com/test',
+            endpoint: 'https://push.baander.app/test',
             publicKey: 'pk',
             authKey: 'ak',
             contentEncoding: 'aes128gcm',
@@ -75,7 +75,7 @@ final class PushSubscriptionRepositoryTest extends TestCase
 
     public function testFindByEndpointQueriesRepository(): void
     {
-        $endpoint = 'https://fcm.googleapis.com/test';
+        $endpoint = 'https://push.baander.app/test';
 
         $repo = $this->createMock(\Doctrine\ORM\EntityRepository::class);
         $this->entityManager->expects($this->once())->method('getRepository')
@@ -86,40 +86,5 @@ final class PushSubscriptionRepositoryTest extends TestCase
             ->with(['endpoint' => $endpoint]);
 
         $this->createRepository()->findByEndpoint($endpoint);
-    }
-
-    public function testRemoveByEndpointRemovesIfFound(): void
-    {
-        $endpoint = 'https://fcm.googleapis.com/test';
-        $subscription = new PushSubscriptionEntity(
-            user: $this->createStub(UserEntity::class),
-            endpoint: $endpoint,
-            publicKey: 'pk',
-            authKey: 'ak',
-            contentEncoding: 'aes128gcm',
-        );
-
-        $repo = $this->createMock(\Doctrine\ORM\EntityRepository::class);
-        $this->entityManager->expects($this->once())->method('getRepository')
-            ->willReturn($repo);
-        $repo->expects($this->once())->method('findOneBy')
-            ->with(['endpoint' => $endpoint])
-            ->willReturn($subscription);
-
-        $this->entityManager->expects($this->once())->method('remove');
-
-        $this->createRepository()->removeByEndpoint($endpoint);
-    }
-
-    public function testRemoveByEndpointDoesNothingIfNotFound(): void
-    {
-        $repo = $this->createMock(\Doctrine\ORM\EntityRepository::class);
-        $this->entityManager->expects($this->once())->method('getRepository')
-            ->willReturn($repo);
-        $repo->expects($this->once())->method('findOneBy')->willReturn(null);
-
-        $this->entityManager->expects($this->never())->method('remove');
-
-        $this->createRepository()->removeByEndpoint('https://fcm.googleapis.com/nonexistent');
     }
 }
