@@ -36,7 +36,7 @@ if [ "$ready" != true ]; then
 fi
 
 archive_paths=(vendor src tests config packages migrations bin docker/general docker/dev docker/prod templates public phpunit.xml.dist
-    .env .env.test composer.json composer.lock translations)
+    .env .env.test .forgejo composer.json composer.lock deptrac.yaml deptrac.baseline.yaml translations)
 if [ "${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" = 1 ]; then
     archive_paths=(--files-from /dev/null)
 fi
