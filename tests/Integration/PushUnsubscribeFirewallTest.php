@@ -21,6 +21,8 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 
 /** Production OAuth/DPoP and actual PostgreSQL deletion, without push delivery. */
 final class PushUnsubscribeFirewallTest extends TestCase
@@ -60,7 +62,18 @@ final class PushUnsubscribeFirewallTest extends TestCase
         if ($url === false || $url === '') {
             self::markTestSkipped('Run with disposable PostgreSQL and Redis.');
         }
-        $this->kernel = new ProductionOAuthKernel(self::$directory, $url);
+        $this->kernel = new class(self::$directory, $url) extends ProductionOAuthKernel {
+            protected function build(ContainerBuilder $container): void
+            {
+                parent::build($container);
+                $container->addCompilerPass(new class implements CompilerPassInterface {
+                    public function process(ContainerBuilder $container): void
+                    {
+                        $container->setParameter('notification.push.allowed_domains', ['push.baander.app']);
+                    }
+                });
+            }
+        };
         $this->kernel->boot();
         $manager = $this->kernel->getContainer()->get('oauth.acceptance.entity_manager');
         self::assertInstanceOf(EntityManagerInterface::class, $manager);
@@ -158,5 +171,79 @@ final class PushUnsubscribeFirewallTest extends TestCase
         self::assertInstanceOf(UserEntity::class, $entity);
         $this->entities[] = $entity;
         return $entity;
+    }
+
+    /** @return iterable<string, array{string, bool, int}> */
+    public static function registrations(): iterable
+    {
+        yield 'owner creation' => ['owner', false, 201];
+        yield 'owner rotation' => ['owner', true, 200];
+        yield 'unrelated claim' => ['unrelated', true, 409];
+        yield 'admin claim' => ['admin', true, 409];
+        yield 'anonymous' => ['anonymous', true, 401];
+    }
+
+    #[DataProvider('registrations')]
+    public function testProductionRegistrationCreatesRotatesOrRejectsClaim(string $actor, bool $existing, int $status): void
+    {
+        $owner = $this->createUser('owner');
+        $endpoint = 'https://push.baander.app/registration-' . bin2hex(random_bytes(8));
+        if ($existing) {
+            $subscription = new PushSubscriptionEntity($owner, $endpoint, 'old-public', 'old-auth', 'aes128gcm', 'old-agent');
+            $this->manager->persist($subscription);
+            $this->entities[] = $subscription;
+        }
+        $proof = new SignedDpopProof();
+        $jwt = null;
+        if ($actor !== 'anonymous') {
+            $user = $actor === 'owner' ? $owner : $this->createUser($actor);
+            $client = new ClientEntity(new PublicId(), 'Push registration', json_encode(['https://baander.app/callback'], JSON_THROW_ON_ERROR));
+            $token = new AccessTokenEntity((new Uuid())->toString(), $client, $user, scopes: ['library'], expiresAt: new \DateTimeImmutable('+1 hour'));
+            $token->setDpopJkt($proof->thumbprint());
+            $this->manager->persist($client);
+            $this->manager->persist($token);
+            $this->entities[] = $client;
+            $this->entities[] = $token;
+            $this->manager->flush();
+            $jwt = OAuthAccessTokenJwt::sign(self::$privateKey, $token);
+        } else {
+            $this->manager->flush();
+        }
+        $before = $this->manager->getConnection()->fetchAssociative('SELECT * FROM push_subscriptions WHERE endpoint = :endpoint', ['endpoint' => $endpoint]);
+        $this->manager->clear();
+        $uri = 'https://baander.app/api/push/subscribe';
+        $request = Request::create($uri, 'POST', content: json_encode([
+            'endpoint' => $endpoint, 'keys' => ['p256dh' => 'new-public', 'auth' => 'new-auth'], 'contentEncoding' => 'aesgcm',
+        ], JSON_THROW_ON_ERROR));
+        $request->headers->set('Content-Type', 'application/json');
+        $request->headers->set('User-Agent', 'new-agent');
+        if ($jwt !== null) {
+            $request->headers->set('Authorization', 'DPoP ' . $jwt);
+            $request->headers->set('DPoP', $proof->create('POST', $uri, $jwt));
+        }
+        $response = $this->kernel->handle($request);
+        $this->kernel->terminate($request, $response);
+        self::assertSame($status, $response->getStatusCode(), (string) $response->getContent());
+        $after = $this->manager->getConnection()->fetchAssociative('SELECT * FROM push_subscriptions WHERE endpoint = :endpoint', ['endpoint' => $endpoint]);
+        self::assertIsArray($after);
+        if ($status >= 400) {
+            self::assertSame($before, $after);
+            return;
+        }
+        self::assertSame(['status' => 'subscribed'], json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR));
+        self::assertSame($owner->getId()->toString(), $after['user_id']);
+        self::assertSame('new-public', $after['public_key']);
+        self::assertSame('new-auth', $after['auth_key']);
+        self::assertSame('aesgcm', $after['content_encoding']);
+        self::assertSame('new-agent', $after['user_agent']);
+        if ($existing) {
+            self::assertIsArray($before);
+            self::assertSame($before['id'], $after['id']);
+            self::assertSame($before['created_at'], $after['created_at']);
+        } else {
+            $created = $this->manager->find(PushSubscriptionEntity::class, Uuid::fromString($after['id']));
+            self::assertNotNull($created);
+            $this->entities[] = $created;
+        }
     }
 }

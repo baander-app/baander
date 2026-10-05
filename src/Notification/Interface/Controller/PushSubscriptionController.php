@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace App\Notification\Interface\Controller;
 
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Notification\Application\DTO\PushSubscriptionRegistration;
+use App\Notification\Application\DTO\PushSubscriptionRegistrationResult;
+use App\Notification\Application\Port\PushSubscriptionRegistrationPortInterface;
 use App\Notification\Application\Port\PushSubscriptionRemovalPortInterface;
 use App\Shared\Domain\Model\Uuid;
-use App\Auth\Infrastructure\Security\SecurityUser;
-use App\Notification\Infrastructure\Doctrine\Entity\PushSubscriptionEntity;
-use App\Notification\Infrastructure\Push\PushSubscriptionRepositoryInterface;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -32,21 +30,14 @@ final class PushSubscriptionController
 {
     use ApiResponsesTrait;
 
-    private const ALLOWED_PUSH_DOMAINS = [
-        'fcm.googleapis.com',
-        'updates.push.services.mozilla.com',
-        'push.services.mozilla.com',
-        'web.push.apple.com',
-        'gcm.googleapis.com',
-    ];
-
+    /** @param list<string> $allowedPushDomains */
     public function __construct(
-        private readonly PushSubscriptionRepositoryInterface $subscriptionRepository,
+        private readonly PushSubscriptionRegistrationPortInterface $subscriptionRegistration,
         private readonly ValidatorInterface $validator,
         private readonly JsonEncoder $jsonEncoder,
         private readonly Security $security,
-        private readonly EntityManagerInterface $entityManager,
         private readonly PushSubscriptionRemovalPortInterface $subscriptionRemoval,
+        private readonly array $allowedPushDomains,
     ) {
     }
 
@@ -74,7 +65,18 @@ final class PushSubscriptionController
             ),
         ),
         responses: [
-            new OA\Response(response: '201', description: 'Subscribed', content: new OA\JsonContent(properties: [new OA\Property(property: 'status', type: 'string')])),
+            new OA\Response(response: '200', description: 'Updated owned subscription', content: new OA\JsonContent(
+                required: ['status'],
+                properties: [new OA\Property(property: 'status', type: 'string', enum: ['subscribed'])],
+            )),
+            new OA\Response(response: '201', description: 'Subscribed', content: new OA\JsonContent(
+                required: ['status'],
+                properties: [new OA\Property(property: 'status', type: 'string', enum: ['subscribed'])],
+            )),
+            new OA\Response(response: '401', description: 'Authentication required'),
+            new OA\Response(response: '409', description: 'Subscription unavailable', content: new OA\JsonContent(
+                ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class),
+            )),
             new OA\Response(response: '422', description: 'Invalid subscription', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
@@ -101,27 +103,23 @@ final class PushSubscriptionController
             return $this->errorResponse('Endpoint domain is not a known push service.', 422);
         }
 
-        /** @var SecurityUser $user */
         $user = $this->security->getUser();
-        $userId = \App\Shared\Domain\Model\Uuid::fromString($user->getId());
-
-        $existing = $this->subscriptionRepository->findByEndpoint($endpoint);
-        if ($existing !== null) {
-            return $this->successResponse(['status' => 'already_subscribed']);
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
+            return $this->errorResponse('Authentication required.', 401);
         }
-
-        $subscription = new PushSubscriptionEntity(
-            user: $this->entityManager->getReference(UserEntity::class, $userId),
+        $registration = new PushSubscriptionRegistration(
             endpoint: $endpoint,
             publicKey: $data['keys']['p256dh'],
             authKey: $data['keys']['auth'],
             contentEncoding: $data['contentEncoding'],
             userAgent: $request->headers->get('User-Agent'),
         );
+        $result = $this->subscriptionRegistration->registerForUser(Uuid::fromString($user->getId()), $registration);
+        if ($result === PushSubscriptionRegistrationResult::Conflict) {
+            return $this->errorResponse('Subscription could not be registered.', 409);
+        }
 
-        $this->subscriptionRepository->save($subscription);
-
-        return $this->created(['status' => 'subscribed']);
+        return $this->json(['status' => 'subscribed'], $result === PushSubscriptionRegistrationResult::Created ? 201 : 200);
     }
 
     /**
@@ -144,6 +142,8 @@ final class PushSubscriptionController
         ),
         responses: [
             new OA\Response(response: '204', description: 'Unsubscribed'),
+            new OA\Response(response: '401', description: 'Authentication required'),
+            new OA\Response(response: '422', description: 'Invalid endpoint'),
         ],
     )]
     #[Route('/subscribe', name: 'unsubscribe', methods: ['DELETE'])]
@@ -174,17 +174,19 @@ final class PushSubscriptionController
         summary: 'Remove all push subscriptions',
         responses: [
             new OA\Response(response: '204', description: 'All subscriptions removed'),
+            new OA\Response(response: '401', description: 'Authentication required'),
         ],
     )]
     #[Route('/subscriptions', name: 'remove_all', methods: ['DELETE'])]
     #[IsGranted('IS_AUTHENTICATED_FULLY')]
     public function removeAll(Request $request): JsonResponse
     {
-        /** @var SecurityUser $user */
         $user = $this->security->getUser();
-        $userId = \App\Shared\Domain\Model\Uuid::fromString($user->getId());
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
+            return $this->errorResponse('Authentication required.', 401);
+        }
 
-        $this->subscriptionRepository->removeAllForUser($userId);
+        $this->subscriptionRemoval->removeAllForUser(Uuid::fromString($user->getId()));
 
         return $this->noContent();
     }
@@ -217,7 +219,7 @@ final class PushSubscriptionController
 
     private function isAllowedPushDomain(string $host): bool
     {
-        foreach (self::ALLOWED_PUSH_DOMAINS as $allowedDomain) {
+        foreach ($this->allowedPushDomains as $allowedDomain) {
             if ($host === $allowedDomain || str_ends_with($host, '.' . $allowedDomain)) {
                 return true;
             }

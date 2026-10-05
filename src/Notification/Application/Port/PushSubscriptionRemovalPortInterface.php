@@ -14,4 +14,7 @@ interface PushSubscriptionRemovalPortInterface
      * or commit an existing caller transaction.
      */
     public function removeForUser(Uuid $ownerId, string $endpoint): void;
+
+    /** Remove only the actor's rows without flushing or committing caller work. */
+    public function removeAllForUser(Uuid $ownerId): void;
 }

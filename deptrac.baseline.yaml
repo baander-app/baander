@@ -284,10 +284,6 @@ deptrac:
       - App\Notification\Domain\Repository\NotificationPreferenceRepositoryInterface
       - App\Notification\Domain\ValueObject\NotificationCategory
       - App\Notification\Domain\ValueObject\NotificationChannel
-    App\Notification\Interface\Controller\PushSubscriptionController:
-      - App\Auth\Infrastructure\Security\SecurityUser
-      - App\Notification\Infrastructure\Doctrine\Entity\PushSubscriptionEntity
-      - App\Notification\Infrastructure\Push\PushSubscriptionRepositoryInterface
     App\Notification\Interface\Controller\WebhookController:
       - App\Notification\Infrastructure\Doctrine\Entity\WebhookEntity
     App\Party\Application\CommandHandler\PausePlaybackHandler:

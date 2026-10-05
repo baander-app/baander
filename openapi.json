@@ -9378,17 +9378,57 @@
                     }
                 },
                 "responses": {
+                    "200": {
+                        "description": "Updated owned subscription",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "status"
+                                    ],
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "enum": [
+                                                "subscribed"
+                                            ]
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
                     "201": {
                         "description": "Subscribed",
                         "content": {
                             "application/json": {
                                 "schema": {
+                                    "required": [
+                                        "status"
+                                    ],
                                     "properties": {
                                         "status": {
-                                            "type": "string"
+                                            "type": "string",
+                                            "enum": [
+                                                "subscribed"
+                                            ]
                                         }
                                     },
                                     "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required"
+                    },
+                    "409": {
+                        "description": "Subscription unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -9432,6 +9472,12 @@
                 "responses": {
                     "204": {
                         "description": "Unsubscribed"
+                    },
+                    "401": {
+                        "description": "Authentication required"
+                    },
+                    "422": {
+                        "description": "Invalid endpoint"
                     }
                 }
             }
@@ -9446,6 +9492,9 @@
                 "responses": {
                     "204": {
                         "description": "All subscriptions removed"
+                    },
+                    "401": {
+                        "description": "Authentication required"
                     }
                 }
             }

@@ -26,22 +26,6 @@ final class PushSubscriptionRepositoryTest extends TestCase
         return new PushSubscriptionRepository($this->entityManager);
     }
 
-    public function testSavePersistsAndFlushes(): void
-    {
-        $subscription = new PushSubscriptionEntity(
-            user: $this->createStub(UserEntity::class),
-            endpoint: 'https://push.baander.app/test',
-            publicKey: 'pk',
-            authKey: 'ak',
-            contentEncoding: 'aes128gcm',
-        );
-
-        $this->entityManager->expects($this->once())->method('persist');
-        $this->entityManager->expects($this->once())->method('flush');
-
-        $this->createRepository()->save($subscription);
-    }
-
     public function testRemoveDeletesAndFlushes(): void
     {
         $subscription = new PushSubscriptionEntity(
@@ -73,18 +57,4 @@ final class PushSubscriptionRepositoryTest extends TestCase
         $this->createRepository()->findByUser($userId);
     }
 
-    public function testFindByEndpointQueriesRepository(): void
-    {
-        $endpoint = 'https://push.baander.app/test';
-
-        $repo = $this->createMock(\Doctrine\ORM\EntityRepository::class);
-        $this->entityManager->expects($this->once())->method('getRepository')
-            ->with(PushSubscriptionEntity::class)
-            ->willReturn($repo);
-
-        $repo->expects($this->once())->method('findOneBy')
-            ->with(['endpoint' => $endpoint]);
-
-        $this->createRepository()->findByEndpoint($endpoint);
-    }
 }

@@ -11,6 +11,12 @@ parameters:
     app.swoole.dbal.ping_interval: 10
     app.swoole.dbal.check_active_transactions: true
     app.websocket.allowed_origins: [ ]
+    notification.push.allowed_domains:
+        - fcm.googleapis.com
+        - updates.push.services.mozilla.com
+        - push.services.mozilla.com
+        - web.push.apple.com
+        - gcm.googleapis.com
     app.result_stamp_classes:
         - App\Shared\Infrastructure\Messenger\Stamp\PlaylistResultStamp
         - App\Shared\Infrastructure\Messenger\Stamp\PartyMemberResultStamp
@@ -595,6 +601,13 @@ services:
             $appName: '%app.name%'
 
     # --- Notification Push ---
+    App\Notification\Application\Port\PushSubscriptionRegistrationPortInterface:
+        alias: App\Notification\Infrastructure\Push\PushSubscriptionRepository
+
+    App\Notification\Interface\Controller\PushSubscriptionController:
+        arguments:
+            $allowedPushDomains: '%notification.push.allowed_domains%'
+
     App\Notification\Application\Port\PushSubscriptionRemovalPortInterface:
         alias: App\Notification\Infrastructure\Push\PushSubscriptionRepository
 
@@ -1214,6 +1227,8 @@ services:
         alias: App\Shared\Infrastructure\Worker\WorkerSupervisorRunner
 
 when@test:
+    parameters:
+        notification.push.allowed_domains: ['push.baander.app']
     services:
         test.scheduler_manual_recorder:
             alias: App\Scheduler\Application\Port\SchedulerManualOccurrenceRecorderInterface

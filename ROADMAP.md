@@ -11,6 +11,19 @@ regional measurements, and backup-destination restore qualification remain pendi
 
 ## Latest verified backend batches
 
+Push registration now atomically creates or rotates an owned endpoint. Unrelated
+claims return 409 without changing credentials; same-owner updates preserve the
+ID and creation time. Concurrent registrations are tested against real PostgreSQL
+unique-index locking, and delivery tests consume the rotated keys. Registration
+and bulk removal use application ports, with no controller ORM/entity dependencies
+and no implicit flush or commit of caller work. Production provider defaults are
+unchanged; test configuration uses `push.baander.app`. Exact-lock tests pass 214
+tests (758 assertions); Unit/StaticAnalysisRules pass 4,562 tests (19,242 assertions).
+PHPStan remains at zero. Deptrac falls to 296 active violations and 672 skipped
+occurrences with zero errors after removing three obsolete baseline pairs. OpenAPI
+and clients document 200/201/409 and the shared success shape; web typechecking
+passes. Actual browser push-manager lifecycle qualification is still pending.
+
 Push unsubscribe now deletes only the authenticated owner's endpoint, with identical
 204 responses for missing and unrelated subscriptions. Real OAuth regressions
 reject deletion by unrelated members and administrators. The atomic PostgreSQL
@@ -21,8 +34,7 @@ push suite passes 190 tests (585 assertions); full PHPStan remains at zero and
 Deptrac at 298 active violations, 679 skipped occurrences and zero errors. The
 exact authenticated-identity port rule permits the public contract while its
 architecture fixture still rejects Auth internals. Existing timezone-free push
-creation timestamps and subscribe endpoint ownership/rotation behavior remain
-separate follow-ups.
+creation timestamps remain a separate persistence follow-up.
 
 Lyrics reads now resolve songs through the current library scope; cached misses
 remain read-only. Fetch/apply require administrator privileges before provider

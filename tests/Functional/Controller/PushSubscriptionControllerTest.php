@@ -55,15 +55,15 @@ final class PushSubscriptionControllerTest extends TestCase
         // Same endpoint again -> recognised, not re-created.
         $second = $this->authenticatedRequest('POST', '/api/push/subscribe', $user, $this->validPayload($endpoint));
 
-        $data = $this->assertJsonResponse($second, 200, 'data');
-        $this->assertSame('already_subscribed', $data['data']['status']);
+        $data = $this->assertJsonResponse($second, 200);
+        $this->assertSame(['status' => 'subscribed'], $data);
     }
 
     public function testSubscribeWithHttpEndpointFails(): void
     {
         $user = $this->createTestUser();
-        $payload = $this->validPayload('http://fcm.googleapis.com/fcm/send/abc');
-        $payload['endpoint'] = 'http://fcm.googleapis.com/fcm/send/' . bin2hex(random_bytes(6));
+        $payload = $this->validPayload('http://push.baander.app/abc');
+        $payload['endpoint'] = 'http://push.baander.app/' . bin2hex(random_bytes(6));
 
         $response = $this->authenticatedRequest('POST', '/api/push/subscribe', $user, $payload);
 
@@ -74,7 +74,7 @@ final class PushSubscriptionControllerTest extends TestCase
     public function testSubscribeWithDisallowedDomainFails(): void
     {
         $user = $this->createTestUser();
-        $payload = $this->validPayload('https://example.com/push/abc');
+        $payload = $this->validPayload('https://unknown.baander.app/push/abc');
 
         $response = $this->authenticatedRequest('POST', '/api/push/subscribe', $user, $payload);
 
@@ -206,7 +206,7 @@ final class PushSubscriptionControllerTest extends TestCase
 
     private function fcmEndpoint(): string
     {
-        return 'https://fcm.googleapis.com/fcm/send/' . bin2hex(random_bytes(8));
+        return 'https://push.baander.app/' . bin2hex(random_bytes(8));
     }
 
     /**

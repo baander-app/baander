@@ -4127,8 +4127,26 @@ export type PostPushSubscribeBody = {
   contentEncoding: PostPushSubscribeBodyContentEncoding;
 };
 
+export type PostPushSubscribe200Status = typeof PostPushSubscribe200Status[keyof typeof PostPushSubscribe200Status];
+
+
+export const PostPushSubscribe200Status = {
+  subscribed: 'subscribed',
+} as const;
+
+export type PostPushSubscribe200 = {
+  status: PostPushSubscribe200Status;
+};
+
+export type PostPushSubscribe201Status = typeof PostPushSubscribe201Status[keyof typeof PostPushSubscribe201Status];
+
+
+export const PostPushSubscribe201Status = {
+  subscribed: 'subscribed',
+} as const;
+
 export type PostPushSubscribe201 = {
-  status?: string;
+  status: PostPushSubscribe201Status;
 };
 
 export type DeletePushUnsubscribeBody = {
@@ -18010,9 +18028,9 @@ export const getPostPushSubscribeUrl = () => {
 /**
  * @summary Subscribe to push notifications
  */
-export const postPushSubscribe = async (postPushSubscribeBody: PostPushSubscribeBody, options?: RequestInit): Promise<PostPushSubscribe201> => {
+export const postPushSubscribe = async (postPushSubscribeBody: PostPushSubscribeBody, options?: RequestInit): Promise<PostPushSubscribe200 | PostPushSubscribe201> => {
 
-  return customInstance<PostPushSubscribe201>(getPostPushSubscribeUrl(),
+  return customInstance<PostPushSubscribe200 | PostPushSubscribe201>(getPostPushSubscribeUrl(),
   {
     ...options,
     method: 'POST',
@@ -18024,7 +18042,7 @@ export const postPushSubscribe = async (postPushSubscribeBody: PostPushSubscribe
 
 
 
-export const getPostPushSubscribeMutationOptions = <TError = ErrorType<ValidationError>,
+export const getPostPushSubscribeMutationOptions = <TError = ErrorType<void | ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPushSubscribe>>, TError,{data: BodyType<PostPushSubscribeBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postPushSubscribe>>, TError,{data: BodyType<PostPushSubscribeBody>}, TContext> => {
 
@@ -18053,12 +18071,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostPushSubscribeMutationResult = NonNullable<Awaited<ReturnType<typeof postPushSubscribe>>>
     export type PostPushSubscribeMutationBody = BodyType<PostPushSubscribeBody>
-    export type PostPushSubscribeMutationError = ErrorType<ValidationError>
+    export type PostPushSubscribeMutationError = ErrorType<void | ApiError | ValidationError>
 
     /**
  * @summary Subscribe to push notifications
  */
-export const usePostPushSubscribe = <TError = ErrorType<ValidationError>,
+export const usePostPushSubscribe = <TError = ErrorType<void | ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPushSubscribe>>, TError,{data: BodyType<PostPushSubscribeBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postPushSubscribe>>,
@@ -18094,7 +18112,7 @@ export const deletePushUnsubscribe = async (deletePushUnsubscribeBody: DeletePus
 
 
 
-export const getDeletePushUnsubscribeMutationOptions = <TError = ErrorType<unknown>,
+export const getDeletePushUnsubscribeMutationOptions = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePushUnsubscribe>>, TError,{data: BodyType<DeletePushUnsubscribeBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof deletePushUnsubscribe>>, TError,{data: BodyType<DeletePushUnsubscribeBody>}, TContext> => {
 
@@ -18123,12 +18141,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type DeletePushUnsubscribeMutationResult = NonNullable<Awaited<ReturnType<typeof deletePushUnsubscribe>>>
     export type DeletePushUnsubscribeMutationBody = BodyType<DeletePushUnsubscribeBody>
-    export type DeletePushUnsubscribeMutationError = ErrorType<unknown>
+    export type DeletePushUnsubscribeMutationError = ErrorType<void>
 
     /**
  * @summary Unsubscribe from push notifications
  */
-export const useDeletePushUnsubscribe = <TError = ErrorType<unknown>,
+export const useDeletePushUnsubscribe = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePushUnsubscribe>>, TError,{data: BodyType<DeletePushUnsubscribeBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deletePushUnsubscribe>>,
@@ -18164,7 +18182,7 @@ export const deletePushRemoveAll = async ( options?: RequestInit): Promise<void>
 
 
 
-export const getDeletePushRemoveAllMutationOptions = <TError = ErrorType<unknown>,
+export const getDeletePushRemoveAllMutationOptions = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePushRemoveAll>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof deletePushRemoveAll>>, TError,void, TContext> => {
 
@@ -18193,12 +18211,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type DeletePushRemoveAllMutationResult = NonNullable<Awaited<ReturnType<typeof deletePushRemoveAll>>>
 
-    export type DeletePushRemoveAllMutationError = ErrorType<unknown>
+    export type DeletePushRemoveAllMutationError = ErrorType<void>
 
     /**
  * @summary Remove all push subscriptions
  */
-export const useDeletePushRemoveAll = <TError = ErrorType<unknown>,
+export const useDeletePushRemoveAll = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePushRemoveAll>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deletePushRemoveAll>>,

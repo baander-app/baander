@@ -9,16 +9,10 @@ use App\Shared\Domain\Model\Uuid;
 
 interface PushSubscriptionRepositoryInterface
 {
-    public function save(PushSubscriptionEntity $subscription): void;
-
     public function remove(PushSubscriptionEntity $subscription): void;
-
-    public function removeAllForUser(Uuid $userId): void;
 
     /**
      * @return list<PushSubscriptionEntity>
      */
     public function findByUser(Uuid $userId): array;
-
-    public function findByEndpoint(string $endpoint): ?PushSubscriptionEntity;
 }
