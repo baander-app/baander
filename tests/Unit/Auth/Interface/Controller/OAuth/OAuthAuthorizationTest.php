@@ -8,7 +8,6 @@ use App\Auth\Domain\Model\User;
 use App\Auth\Application\Port\DpopJtiCacheInterface;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface as DomainAccessTokens;
-use App\Auth\Domain\Repository\OAuth\AuthCodeRepositoryInterface as DomainAuthCodes;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface as DomainClients;
 use App\Auth\Domain\Repository\OAuth\DeviceCodeRepositoryInterface as DomainDevices;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
@@ -25,6 +24,7 @@ use League\OAuth2\Server\AuthorizationServer;
 use League\OAuth2\Server\CryptKey;
 use League\OAuth2\Server\Entities\AuthCodeEntityInterface;
 use League\OAuth2\Server\Entities\ClientEntityInterface;
+use League\OAuth2\Server\Exception\OAuthServerException;
 use League\OAuth2\Server\Grant\AuthCodeGrant;
 use League\OAuth2\Server\Repositories\AccessTokenRepositoryInterface;
 use League\OAuth2\Server\Repositories\AuthCodeRepositoryInterface;
@@ -34,6 +34,7 @@ use League\OAuth2\Server\Repositories\RefreshTokenRepositoryInterface;
 use League\OAuth2\Server\Repositories\ScopeRepositoryInterface;
 use League\OAuth2\Server\ResourceServer;
 use Nyholm\Psr7\Factory\Psr17Factory;
+use Nyholm\Psr7\ServerRequest;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bridge\PsrHttpMessage\Factory\HttpFoundationFactory;
@@ -47,6 +48,8 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 /** Exercise League's actual PKCE authorization validation, issuance and encryption. */
 final class OAuthAuthorizationTest extends TestCase
 {
+    private AuthorizationServer $authorizationServer;
+
     #[DataProvider('httpMethods')]
     public function testAuthenticatedAuthorizationIssuesCodeBoundToUserAndPkce(string $method): void
     {
@@ -99,6 +102,62 @@ final class OAuthAuthorizationTest extends TestCase
         self::assertSame(401, $controller->authorize($request)->getStatusCode());
     }
 
+    #[DataProvider('invalidVerifiers')]
+    public function testIssuedCodeRejectsMissingOrIncorrectVerifier(?string $verifier, string $expectedError): void
+    {
+        $user = User::register(Email::fromString('pkce@baander.app'), 'hashed-password', 'PKCE user');
+        $security = $this->createStub(Security::class);
+        $security->method('getUser')->willReturn(new SecurityUser(
+            $user->getId()->toString(),
+            'pkce@baander.app',
+            'hashed-password',
+        ));
+        $users = $this->createStub(UserRepositoryInterface::class);
+        $users->method('findByUuid')->willReturn($user);
+        $controller = $this->controller($security, $users, Key::createNewRandomKey(), $user->getId()->toString());
+
+        $correctVerifier = str_repeat('v', 43);
+        $challenge = rtrim(strtr(base64_encode(hash('sha256', $correctVerifier, true)), '+/', '-_'), '=');
+        $request = Request::create('https://baander.app/api/oauth/authorize?' . http_build_query([
+            'response_type' => 'code',
+            'client_id' => 'authorization-client',
+            'redirect_uri' => 'https://client.baander.app/callback',
+            'code_challenge' => $challenge,
+            'code_challenge_method' => 'S256',
+        ]));
+        $response = $controller->authorize($request);
+        self::assertSame(302, $response->getStatusCode());
+        $location = $response->headers->get('Location');
+        self::assertNotNull($location);
+        $query = parse_url($location, PHP_URL_QUERY);
+        self::assertIsString($query);
+        parse_str($query, $parameters);
+        self::assertIsString($parameters['code'] ?? null);
+
+        $exchange = new ServerRequest('POST', 'https://baander.app/api/oauth/token');
+        $exchange = $exchange->withParsedBody(array_filter([
+            'grant_type' => 'authorization_code',
+            'client_id' => 'authorization-client',
+            'redirect_uri' => 'https://client.baander.app/callback',
+            'code' => $parameters['code'],
+            'code_verifier' => $verifier,
+        ], static fn (mixed $value): bool => $value !== null));
+
+        try {
+            $this->authorizationServer->respondToAccessTokenRequest($exchange, new \Nyholm\Psr7\Response());
+            self::fail('An authorization code must reject an invalid PKCE verifier.');
+        } catch (OAuthServerException $error) {
+            self::assertSame($expectedError, $error->getErrorType());
+        }
+    }
+
+    /** @return iterable<string, array{?string, string}> */
+    public static function invalidVerifiers(): iterable
+    {
+        yield 'missing' => [null, 'invalid_request'];
+        yield 'incorrect' => [str_repeat('w', 43), 'invalid_grant'];
+    }
+
     /** @return iterable<string, array{string}> */
     public static function httpMethods(): iterable
     {
@@ -138,12 +197,13 @@ final class OAuthAuthorizationTest extends TestCase
         self::assertTrue(openssl_pkey_export($privateKey, $pem));
         $server = new AuthorizationServer($clients, $accessTokens, $scopes, new CryptKey($pem), $key);
         $server->enableGrantType(new AuthCodeGrant($authCodes, $refreshTokens, new DateInterval('PT10M')), new DateInterval('PT1H'));
+        $this->authorizationServer = $server;
         $psr17 = new Psr17Factory();
         $controller = new OAuthController(
             $security, $server, $this->createStub(ResourceServer::class),
             $accessTokens, $refreshTokens, $this->createStub(DeviceCodeRepositoryInterface::class),
             $this->createStub(DomainAccessTokens::class), $this->createStub(DomainClients::class),
-            $this->createStub(DomainDevices::class), $this->createStub(DomainAuthCodes::class), $users,
+            $this->createStub(DomainDevices::class), $users,
             new PsrHttpFactory($psr17, $psr17, $psr17, $psr17), new HttpFoundationFactory(),
             new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class)),
             new DpopNonceManager($this->createStub(RedisClientFactory::class)),

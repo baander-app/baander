@@ -9,7 +9,6 @@ use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\DeviceCode;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface as DomainAccessTokenRepository;
-use App\Auth\Domain\Repository\OAuth\AuthCodeRepositoryInterface as DomainAuthCodeRepository;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface as DomainClientRepository;
 use App\Auth\Domain\Repository\OAuth\DeviceCodeRepositoryInterface as DomainDeviceCodeRepository;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
@@ -60,7 +59,6 @@ final class OAuthController
         private readonly DomainAccessTokenRepository $domainAccessTokenRepository,
         private readonly DomainClientRepository $clientRepository,
         private readonly DomainDeviceCodeRepository $domainDeviceCodeRepository,
-        private readonly DomainAuthCodeRepository $domainAuthCodeRepository,
         private readonly UserRepositoryInterface $userRepository,
         private readonly HttpMessageFactoryInterface $psrHttpFactory,
         private readonly HttpFoundationFactoryInterface $httpFoundationFactory,
@@ -170,12 +168,6 @@ final class OAuthController
                 $separator = isset($parsed['query']) && $parsed['query'] !== '' ? '&' : '?';
                 $modifiedLocation = $location . $separator . 'iss=' . rawurlencode($this->resourceServerUri);
                 $response->headers->set('Location', $modifiedLocation);
-
-                // Persist the PKCE challenge on the issued authorization code so
-                // the domain token handler can verify the code_verifier later.
-                if ($codeChallenge !== null) {
-                    $this->persistCodeChallenge($location, $codeChallenge, $codeChallengeMethod);
-                }
             }
 
             return $response;
@@ -593,35 +585,6 @@ final class OAuthController
         } catch (\Throwable) {
             return null;
         }
-    }
-
-    private function persistCodeChallenge(string $location, string $codeChallenge, string $codeChallengeMethod): void
-    {
-        $query = parse_url($location, PHP_URL_QUERY);
-        if ($query === null || $query === '') {
-            return;
-        }
-
-        $params = [];
-        parse_str($query, $params);
-
-        $code = $params['code'] ?? null;
-        if ($code === null || $code === '') {
-            return;
-        }
-
-        try {
-            $authCode = $this->domainAuthCodeRepository->findByCodeId(TokenId::fromString($code));
-        } catch (\Throwable) {
-            return;
-        }
-
-        if ($authCode === null) {
-            return;
-        }
-
-        $authCode->setCodeChallenge($codeChallenge, $codeChallengeMethod);
-        $this->domainAuthCodeRepository->save($authCode);
     }
 
     private function validateDeviceClient(string $clientId): ?\App\Auth\Domain\Model\OAuth\Client
