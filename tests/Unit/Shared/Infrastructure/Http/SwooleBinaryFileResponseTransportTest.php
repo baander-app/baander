@@ -12,6 +12,9 @@ final class SwooleBinaryFileResponseTransportTest extends TestCase
     public function testRealSwooleEmitsPreparedFileBoundariesAndStopsCleanly(): void
     {
         $probe = new Process([PHP_BINARY, __DIR__ . '/swoole-binary-file-response-probe.php']);
+        // The native Swoole server probe runs in its own process. Xdebug
+        // coverage of that child is not merged and crashes Swoole on startup.
+        $probe->setEnv(['XDEBUG_MODE' => 'off']);
         $probe->setTimeout(20);
         $probe->run();
         self::assertTrue($probe->isSuccessful(), $probe->getOutput() . $probe->getErrorOutput());

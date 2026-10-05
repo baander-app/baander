@@ -147,16 +147,44 @@ $testCount = 0;
 
 foreach ($document->getElementsByTagName('testClass') as $class) {
     $file = $class->getAttribute('file');
+    $methodCount = $class->getElementsByTagName('testMethod')->count();
 
-    foreach ($class->getElementsByTagName('testMethod') as $method) {
-        $files[$file][] = $method->getAttribute('id');
-        $testCount++;
+    if ($methodCount > 0) {
+        $files[$file] = true;
+        $testCount += $methodCount;
     }
 }
 
 if ($testCount === 0) {
     fwrite(STDERR, 'PHPUnit discovery selected no tests.' . PHP_EOL);
     exit(1);
+}
+
+// PHPUnit 13.1 supports file lists, not test ID lists. Discovery has already
+// narrowed these files to the requested paths; keep filters and other options
+// while removing positional paths so they cannot override the shard file list.
+$runnerArguments = [];
+$selectedFiles = array_keys($files);
+
+foreach ($arguments as $argument) {
+    $candidate = realpath($argument);
+    $isTestPath = false;
+
+    if ($candidate !== false) {
+        foreach ($selectedFiles as $file) {
+            if (
+                $file === $candidate
+                || str_starts_with($file, rtrim($candidate, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR)
+            ) {
+                $isTestPath = true;
+                break;
+            }
+        }
+    }
+
+    if (!$isTestPath) {
+        $runnerArguments[] = $argument;
+    }
 }
 
 // Kernel suites accumulate container state. Give each file a fresh process;
@@ -205,10 +233,9 @@ foreach ($shards as $index => $shard) {
         count($shards),
         implode(', ', array_keys($shard)),
     ));
-    $idsFile = $temporaryDirectory . '/shard-' . $index . '.txt';
-    $ids = array_merge(...array_values($shard));
-    file_put_contents($idsFile, implode(PHP_EOL, $ids) . PHP_EOL);
-    $shardArguments = [...$arguments, '--test-id-filter-file', $idsFile, '--fail-on-empty-test-suite'];
+    $filesFile = $temporaryDirectory . '/shard-' . $index . '.txt';
+    file_put_contents($filesFile, implode(PHP_EOL, array_keys($shard)) . PHP_EOL);
+    $shardArguments = [...$runnerArguments, '--test-files-file', $filesFile, '--fail-on-empty-test-suite'];
 
     if ($coverageReports !== []) {
         $coveragePath = $temporaryDirectory . '/coverage-' . $index . '.cov';

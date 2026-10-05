@@ -555,7 +555,12 @@ RUN umask 077 && mkdir -p ${APP_HOME}/config/secrets/oauth \
     && openssl rsa -in ${APP_HOME}/config/secrets/oauth/private.key -pubout -out ${APP_HOME}/config/secrets/oauth/public.key 2>/dev/null \
     && chown -R www-data:www-data ${APP_HOME}/config/secrets
 
-# Install dev dependencies
-RUN COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interaction --no-progress
+# PHPUnit's isolated child processes read PHP ini rather than the parent's -d flags.
+# Give them the same memory ceiling as the sharded runner, and leave writable
+# cache and coverage directories for the unprivileged test process.
+RUN COMPOSER_MEMORY_LIMIT=-1 composer install --optimize-autoloader --no-interaction --no-progress \
+    && mkdir -p ${APP_HOME}/coverage \
+    && printf 'memory_limit=512M\n' > /usr/local/etc/php/conf.d/zzzz-baander-ci-memory.ini \
+    && chown -R www-data:www-data ${APP_HOME}/var ${APP_HOME}/coverage
 
 USER www-data
