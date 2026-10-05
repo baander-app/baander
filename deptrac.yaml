@@ -48,7 +48,7 @@ deptrac:
         Radio: ['Radio Domain', 'Radio Application', 'Radio Infrastructure', 'Radio Resources', 'Radio Interface']
         Scheduler: ['Scheduler Domain', 'Scheduler Application', 'Scheduler Infrastructure', 'Scheduler Resources', 'Scheduler Interface']
         Session: ['Session Domain', 'Session Application', 'Session Infrastructure', 'Session Resources', 'Session Interface']
-        QoL: ['QoL Domain', 'QoL Application', 'QoL Infrastructure', 'QoL Resources', 'QoL Interface']
+        QoL: ['QoL Encoder Profile Contract', 'QoL Domain', 'QoL Application', 'QoL Infrastructure', 'QoL Resources', 'QoL Interface']
         Command: ['Command Utility']
 
   layers:
@@ -697,10 +697,20 @@ deptrac:
         - type: classLike
           value: '^App\\QoL\\Domain\\'
 
-    - name: 'QoL Application'
+    - name: 'QoL Encoder Profile Contract'
       collectors:
         - type: classLike
-          value: '^App\\QoL\\Application\\'
+          value: '^App\\QoL\\Application\\Port\\EncoderProfileFingerprintPortInterface$'
+
+    - name: 'QoL Application'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\QoL\\Application\\'
+          must_not:
+            - type: classLike
+              value: '^App\\QoL\\Application\\Port\\EncoderProfileFingerprintPortInterface$'
 
     - name: 'QoL Infrastructure'
       collectors:
@@ -1078,6 +1088,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Transcode Infrastructure':
+      - 'QoL Encoder Profile Contract'
       - 'Shared Application'
       - 'Transcode Domain'
       - 'Transcode Application'
@@ -1267,6 +1278,7 @@ deptrac:
       - 'Shared Application'
       - 'Shared Interface'
 
+    'QoL Encoder Profile Contract': []
     'QoL Domain':
       - 'Shared Domain'
 
@@ -1276,6 +1288,7 @@ deptrac:
       - 'Shared Application'
 
     'QoL Infrastructure':
+      - 'QoL Encoder Profile Contract'
       - 'QoL Domain'
       - 'QoL Application'
       - 'Shared Domain'

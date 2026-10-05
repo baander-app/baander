@@ -7,57 +7,57 @@ namespace App\Tests\Unit\Shared\Infrastructure\Swoole;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Shared\Infrastructure\Swoole\SwooleWorkerEventBuffer;
 use App\Shared\Infrastructure\Swoole\SwooleWorkerEventSubscriber;
+use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
+use App\Shared\Infrastructure\Swoole\WebSocketPusher;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
+use Swoole\WebSocket\Server;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerStartedEvent;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerStoppedEvent;
+use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
-/**
- * Tests for the RedisClientFactory disposal wiring in SwooleWorkerEventSubscriber.
- *
- * WorkerStoppedEvent requires Swoole\Server so we test the wiring
- * and the dispose call via reflection instead of full event dispatch.
- */
+#[RunTestsInSeparateProcesses]
+#[PreserveGlobalState(false)]
 final class SwooleWorkerEventSubscriberTest extends TestCase
 {
-    public function test_subscriber_accepts_redis_client_factory(): void
+    public function testStartupRecordsTheEventAndInitializesWebSocketServices(): void
     {
         $buffer = new SwooleWorkerEventBuffer();
-        $factory = $this->createStub(RedisClientFactory::class);
+        $registry = WebSocketConnectionRegistry::create(16, 16);
+        $pusher = new WebSocketPusher($registry, new JsonEncoder());
+        $subscriber = new SwooleWorkerEventSubscriber($buffer, webSocketPusher: $pusher, webSocketRegistry: $registry);
+        $server = new Server('127.0.0.1', 0);
+        $server->worker_id = 3;
 
-        $subscriber = new SwooleWorkerEventSubscriber(
-            buffer: $buffer,
-            redisClientFactory: $factory,
-        );
+        $subscriber->onWorkerStarted(new WorkerStartedEvent($server, 3));
 
-        $ref = new \ReflectionProperty($subscriber, 'redisClientFactory');
-        $this->assertSame($factory, $ref->getValue($subscriber));
+        self::assertSame(3, $registry->getWorkerId());
+        self::assertSame($server, (new \ReflectionProperty($pusher, 'server'))->getValue($pusher));
+        self::assertSame(['started'], array_column($buffer->getAll(), 'type'));
+        self::assertSame([3], array_column($buffer->getAll(), 'workerId'));
     }
 
-    public function test_subscriber_works_without_factory(): void
-    {
-        $buffer = new SwooleWorkerEventBuffer();
-
-        $subscriber = new SwooleWorkerEventSubscriber(
-            buffer: $buffer,
-        );
-
-        $ref = new \ReflectionProperty($subscriber, 'redisClientFactory');
-        $this->assertNull($ref->getValue($subscriber));
-    }
-
-    public function test_on_worker_stopped_body_calls_dispose(): void
+    public function testWorkerStopDisposesTheRedisFactoryAndRecordsTheEvent(): void
     {
         $buffer = new SwooleWorkerEventBuffer();
         $factory = $this->createMock(RedisClientFactory::class);
-        $factory->expects($this->once())->method('dispose');
+        $factory->expects(self::once())->method('dispose');
+        $subscriber = new SwooleWorkerEventSubscriber($buffer, redisClientFactory: $factory);
 
-        $subscriber = new SwooleWorkerEventSubscriber(
-            buffer: $buffer,
-            redisClientFactory: $factory,
-        );
+        $subscriber->onWorkerStopped(new WorkerStoppedEvent(new Server('127.0.0.1', 0), 3));
 
-        // Call dispose directly to verify the factory receives it
-        // (onWorkerStopped calls $this->redisClientFactory?->dispose())
-        // We can't call onWorkerStopped due to the final WorkerStoppedEvent type hint,
-        // so we verify the dispose method itself works through the nullable operator.
-        $factory->dispose();
+        self::assertSame(['stopped'], array_column($buffer->getAll(), 'type'));
+        self::assertSame([3], array_column($buffer->getAll(), 'workerId'));
+    }
+
+    public function testWorkerStopWorksWithoutTheOptionalRedisFactory(): void
+    {
+        $buffer = new SwooleWorkerEventBuffer();
+        $subscriber = new SwooleWorkerEventSubscriber($buffer);
+
+        $subscriber->onWorkerStopped(new WorkerStoppedEvent(new Server('127.0.0.1', 0), 0));
+
+        self::assertSame(['stopped'], array_column($buffer->getAll(), 'type'));
     }
 }

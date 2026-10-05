@@ -26,9 +26,7 @@ final class SwooleWorkerEventSubscriber implements EventSubscriberInterface
         private readonly ?WebSocketConnectionRegistry $webSocketRegistry = null,
         private readonly ?RedisClientFactory $redisClientFactory = null,
         private readonly ?LoggerInterface $logger = null,
-        private readonly ?ContainerInterface $qolServicesLocator = null,
-    )
-    {
+    ) {
     }
 
     public static function getSubscribedEvents(): array
@@ -81,44 +79,6 @@ final class SwooleWorkerEventSubscriber implements EventSubscriberInterface
         $workerId = $event->getWorkerId();
         $this->buffer->push('started', $workerId);
         $this->logger?->info('Swoole worker started', ['workerId' => $workerId]);
-
-        if ($workerId === 0) {
-            // QoL Governor — start sampler and monitor on worker 0
-            try {
-                if ($this->qolServicesLocator !== null) {
-                    if ($this->qolServicesLocator->has(\App\QoL\Infrastructure\Swoole\CpuGpuSampler::class)) {
-                        $this->qolServicesLocator->get(\App\QoL\Infrastructure\Swoole\CpuGpuSampler::class)->startSampling();
-                    }
-                    if ($this->qolServicesLocator->has(\App\QoL\Infrastructure\Swoole\MidStreamMonitor::class)) {
-                        $this->qolServicesLocator->get(\App\QoL\Infrastructure\Swoole\MidStreamMonitor::class)->startMonitoring();
-                    }
-
-                    // Hardware change detection: compare EncoderProfile fingerprint
-                    $persister = $this->qolServicesLocator->get(\App\QoL\Infrastructure\Swoole\LearningDataPersister::class);
-                    $governor = $this->qolServicesLocator->get(\App\QoL\Domain\Service\StreamGovernor::class);
-                    $prober = $this->qolServicesLocator->get(\App\Transcode\Infrastructure\FFmpeg\HardwareCapabilitiesProber::class);
-
-                    $savedState = $persister->load();
-                    $currentProfile = $prober->getProfile();
-
-                    if ($savedState !== null) {
-                        $savedProfile = $savedState['encoder_profile'] ?? null;
-                        if ($savedProfile !== null && $currentProfile->getName() !== $savedProfile) {
-                            $governor->resetLearning();
-                            $persister->cleanup();
-                            $savedState = null;
-                        }
-                    }
-
-                    // Load persisted governor state (if not reset)
-                    if ($savedState !== null) {
-                        $governor->importState($savedState['governor'] ?? []);
-                    }
-                }
-            } catch (\Throwable $e) {
-                $this->logger?->error('QoL governor startup failed', ['exception' => $e]);
-            }
-        }
 
         $server = $event->getServer();
         $this->webSocketPusher?->setServer($server);

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\QoL\Infrastructure\Swoole;
 
+use App\QoL\Application\Port\EncoderProfileFingerprintPortInterface;
 use App\QoL\Domain\Service\StreamGovernor;
-use App\Transcode\Infrastructure\FFmpeg\HardwareCapabilitiesProber;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncode;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
@@ -23,13 +23,12 @@ final class LearningDataPersister
     private float $lastPersistTime = 0.0;
 
     public function __construct(
-        private readonly StreamGovernor             $governor,
-        private readonly HardwareCapabilitiesProber $prober,
-        private readonly LoggerInterface            $logger,
-        private readonly string                     $stateDir,
-        private readonly JsonEncoder                $jsonEncoder,
-    )
-    {
+        private readonly StreamGovernor $governor,
+        private readonly EncoderProfileFingerprintPortInterface $fingerprint,
+        private readonly LoggerInterface $logger,
+        private readonly string $stateDir,
+        private readonly JsonEncoder $jsonEncoder,
+    ) {
         if (!is_dir($stateDir)) {
             mkdir($stateDir, 0755, true);
         }
@@ -51,7 +50,7 @@ final class LearningDataPersister
     public function persist(): void
     {
         $data = [
-            'encoder_profile' => $this->prober->getProfile()->getName(),
+            'encoder_profile' => $this->fingerprint->getName(),
             'governor' => $this->governor->exportState(),
         ];
         $filePath = $this->stateFilePath();

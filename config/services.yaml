@@ -138,12 +138,6 @@ services:
             $cpuProcessPoolLocator: !service_locator
                 App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool: '@App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool'
             $logger: '@monolog.logger.swoole'
-            $qolServicesLocator: !service_locator
-                App\QoL\Infrastructure\Swoole\CpuGpuSampler: '@App\QoL\Infrastructure\Swoole\CpuGpuSampler'
-                App\QoL\Infrastructure\Swoole\MidStreamMonitor: '@App\QoL\Infrastructure\Swoole\MidStreamMonitor'
-                App\QoL\Infrastructure\Swoole\LearningDataPersister: '@App\QoL\Infrastructure\Swoole\LearningDataPersister'
-                App\QoL\Domain\Service\StreamGovernor: '@App\QoL\Domain\Service\StreamGovernor'
-                App\Transcode\Infrastructure\FFmpeg\HardwareCapabilitiesProber: '@App\Transcode\Infrastructure\FFmpeg\HardwareCapabilitiesProber'
         tags:
             - { name: 'kernel.event_subscriber' }
 
@@ -1189,10 +1183,21 @@ services:
         tags:
             - { name: 'swoole_bundle.bootable_service' }
 
+    App\QoL\Infrastructure\Swoole\QoLWorkerStartupSubscriber:
+        arguments:
+            $services: !service_locator
+                App\QoL\Infrastructure\Swoole\CpuGpuSampler: '@App\QoL\Infrastructure\Swoole\CpuGpuSampler'
+                App\QoL\Infrastructure\Swoole\MidStreamMonitor: '@App\QoL\Infrastructure\Swoole\MidStreamMonitor'
+                App\QoL\Infrastructure\Swoole\LearningDataPersister: '@App\QoL\Infrastructure\Swoole\LearningDataPersister'
+                App\QoL\Domain\Service\StreamGovernor: '@App\QoL\Domain\Service\StreamGovernor'
+                App\QoL\Application\Port\EncoderProfileFingerprintPortInterface: '@App\QoL\Application\Port\EncoderProfileFingerprintPortInterface'
+
+    App\QoL\Application\Port\EncoderProfileFingerprintPortInterface:
+        alias: App\Transcode\Infrastructure\FFmpeg\EncoderProfileFingerprintAdapter
+
     # QoL Learning Engine
     App\QoL\Infrastructure\Swoole\LearningDataPersister:
         arguments:
-            $prober: '@App\Transcode\Infrastructure\FFmpeg\HardwareCapabilitiesProber'
             $stateDir: '%kernel.project_dir%/var/qol_state'
             $jsonEncoder: '@json_encoder'
 
