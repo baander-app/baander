@@ -60,9 +60,10 @@ The `sanitize` mode instruments first-party targets with ASan/LSan and UBSan.
 The separate `thread` mode uses Clang, `RelWithDebInfo` and ThreadSanitizer with
 `TSAN_OPTIONS=halt_on_error=1:exitcode=66`. CI installs `clang-19` and its matching
 `libclang-rt-19-dev` runtime. It runs the units, SQL, TLS transport,
-HTTP and three-voter contracts, including a positive control that must report an
-actual data race and exit 66. The probe repeats volatile writes so its conflicting
-accesses are retained and a tiny race window does not make detection intermittent.
+HTTP, three-voter and local binary restore contracts, including a positive control
+that must report an actual data race and exit 66. The probe repeats volatile writes
+so its conflicting accesses are retained and a tiny race window does not make
+detection intermittent.
 Runtime initialization failures do not pass that control. Neither mode establishes complete third-party instrumentation.
 
 For a manual TSan build, add `-DREGISTRY_THREAD_SANITIZER=ON`,
@@ -110,8 +111,8 @@ PYTHONDONTWRITEBYTECODE=1 python3 relay/tests/run_http_contract.py \
 ```
 
 These checks establish local behavior and TLS interoperability. They do not
-qualify whole-host capacity, regional latency, physical failure or backup recovery,
-fuzzing or the 24-hour soak. Those remain release gates
+qualify whole-host capacity, regional latency, physical failure, operational backup
+recovery, fuzzing or the 24-hour soak. Those remain release gates
 in the root roadmap; regional inventory and real S3 access are not available yet.
 
 The cluster harness starts three or five native voters with HTTPS authentication
@@ -145,6 +146,31 @@ pool test replays the observed 200 error to verify next-request rotation without
 relying on that timing window. These are local emulations with TLS termination at
 the fixture forwarders, rather than certification of regional network behavior,
 physical disk/power loss or capacity.
+
+The binary restore contract writes registrations and an updated revision through
+the public API, downloads an authenticated leader SQLite backup, and checks its
+header, integrity, schema checksum, credential digests and rows. It then commits
+another revision and a sentinel registration, stops the source cluster, and loads
+the backup into a separate fresh cluster with a new CA and storage. The default
+three-voter run is included in CI; `--nodes 5` checks five-voter backup and restore.
+The registry API starts only after the load. Readiness, public metadata and saved
+revisions must match the backup; the later sentinel must be absent. A wrong owner
+must receive 403, the original owner must advance its revision, and every voter's
+local database must converge within 30 seconds.
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 relay/tests/run_restore_contract.py \
+  --rqlited /path/to/verified/rqlited \
+  --server /tmp/baander-registry-build/baander-registry
+PYTHONDONTWRITEBYTECODE=1 python3 relay/tests/run_restore_contract.py \
+  --nodes 5 --rqlited /path/to/verified/rqlited \
+  --server /tmp/baander-registry-build/baander-registry
+```
+
+This checks the local binary [backup/load API](https://rqlite.io/docs/guides/backup/)
+of the pinned rqlite 10.5.1 build. It does not qualify scheduled backups, S3 upload
+or download, regional disaster recovery, or RPO/RTO. Those operational gates remain
+pending; the disposable fixture has no production credentials or remote destination.
 
 ## Server configuration
 
@@ -348,7 +374,8 @@ membership after provisioning and upgrade one voter at a time while quorum remai
 
 API and voter limits total one CPU and 448 MiB per host (96 MiB API, 352 MiB voter).
 These are containment limits, not measured acceptance evidence: whole-host RSS/CPU,
-regional latency, physical failure, backups, restore, and soak gates remain pending.
+regional latency, physical failure, operational backups and disaster recovery,
+and soak gates remain pending.
 The old `relay_data` volume and local SQLite files are deliberately unreferenced;
 they are not opened, converted or reset. Never use `docker compose down -v` on an
 operator inventory, and never reuse that legacy volume as native rqlite storage.

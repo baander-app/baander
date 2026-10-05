@@ -67,4 +67,6 @@ python3 relay/tests/run_http_contract.py \
     --rqlited "$work/rqlite/rqlited" --server "$work/build/baander-registry"
 python3 relay/tests/run_cluster_contract.py --nodes 3 \
     --rqlited "$work/rqlite/rqlited" --server "$work/build/baander-registry"
+python3 relay/tests/run_restore_contract.py \
+    --rqlited "$work/rqlite/rqlited" --server "$work/build/baander-registry"
 echo "Registry $mode qualification passed."
