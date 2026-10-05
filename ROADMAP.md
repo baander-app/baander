@@ -649,22 +649,26 @@ release, without weakening consistency or increasing the agreed host budget.
   independent PostgreSQL connections, poison-event retry/dead-letter handling, and
   idempotent durable notification effects. External delivery remains at-least-once;
   uncertain outcomes are not represented as exactly-once.
-- [ ] Finish supervised crash tests at consumer and transport-acknowledgement
-  boundaries. Claim and mid-projection transaction crashes now verify lease expiry,
-  rollback, and downstream recovery through the current worker runtime.
+- [ ] Finish supervised crash tests at the consumer acknowledgement boundary.
+  Claim, mid-projection transaction, and Redis-send-before-delivery-ack crashes
+  verify unchanged leases, rollback where needed, natural expiry, and recovery
+  through the current worker runtime. The accepted-but-unacknowledged send is
+  replayed; external delivery remains at-least-once.
 - [x] Test storage directory-boundary comparisons, validation before mkdir,
   traversal and symlink escapes across read/write/delete/derived-file resolution.
 - [x] Test webhook DNS and connection-time destination checks, corrected link-local
   ranges, disabled redirects, empty-by-default LAN allowlist, category validation,
   and original-secret signature verification. Since there is no production install,
   remove obsolete legacy formats rather than inventing compatibility obligations.
-- [ ] Complete safe secret/key replacement, including file validation and a
-  documented recovery path. Verify JSON seeking. Cover-batch dispatch now uses
-  the durable async transport and an explicit JSON message contract; a functional
-  test verifies request dispatch only queues the batch, then worker receipt fans
-  out extraction jobs. The seek broker retains the latest pending control signal
-  per job under bursts. Track streams use the current media read scope on every
-  request, including range retries.
+- [x] Complete bounded cover extraction through the durable async transport and
+  an explicit JSON message contract. A functional test verifies request dispatch
+  only queues the batch, then worker receipt fans out extraction jobs.
+- [x] Stage and validate private OAuth key bundles before offline token
+  invalidation; document cutover and recovery. Verify JSON position/action
+  validation. The bundle/rotation integration checks pass on disposable PostgreSQL.
+  The seek broker retains the latest pending control signal per job under bursts.
+  Track streams use the current media read scope on every request; a real-firewall
+  test covers anonymous, unrelated, member, revoked member, and administrator access.
 - [ ] Reconcile documented routes, OpenAPI schemas, generated clients, and identifier
   formats together. The initial review found 24 documented paths missing from the
   checked-in specification; keep automated drift checks blocking thereafter.
