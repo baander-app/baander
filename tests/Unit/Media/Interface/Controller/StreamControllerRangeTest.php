@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Media\Interface\Controller;
 
-use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Media\Application\Port\MediaReadScopeProviderInterface;
 use App\Media\Application\Port\StreamPortInterface;
 use App\Media\Domain\Model\TrackStreamMetadata;
 use App\Media\Interface\Controller\StreamController;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
+use App\Shared\Domain\ValueObject\MediaReadScope;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -39,11 +40,12 @@ final class StreamControllerRangeTest extends TestCase
             $this->trackId->toString(), 'track.bin', $this->file, 'audio/mpeg', 10,
             null, null, null, null, null,
         ));
-        $security = $this->createStub(Security::class);
-        $security->method('getUser')->willReturn(new SecurityUser(
-            (new Uuid())->toString(), 'admin@baander.app', 'unused', ['ROLE_ADMIN'],
+        $scopes = $this->createStub(MediaReadScopeProviderInterface::class);
+        $scopes->method('current')->willReturn(MediaReadScope::authenticated(
+            new Uuid(),
+            LibraryReadScope::unrestricted(),
         ));
-        $this->controller = new StreamController($stream, $security);
+        $this->controller = new StreamController($stream, $scopes);
     }
 
     protected function tearDown(): void

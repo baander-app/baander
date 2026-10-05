@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Media\Interface\Controller;
 
-use App\Auth\Infrastructure\Security\SecurityUser;
-use App\Library\Application\Port\LibraryAccessPortInterface;
+use App\Media\Application\Port\MediaReadScopeProviderInterface;
 use App\Media\Application\Port\StreamPortInterface;
 use App\Media\Domain\Model\TrackStreamMetadata;
 use App\Media\Interface\Controller\StreamController;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\TestCase;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
+use App\Shared\Domain\ValueObject\MediaReadScope;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\Stub;
-use Symfony\Bundle\SecurityBundle\Security;
+use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -22,143 +23,197 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 /** Authentication and library authorization for the PublicId track endpoint. */
 final class StreamControllerSecurityTest extends TestCase
 {
-    private string $mediaBasePath;
+    private string $directory;
+    private string $file;
+    private PublicId $trackId;
+    private Uuid $libraryId;
     private StreamPortInterface&Stub $streamService;
-    private LibraryAccessPortInterface $libraryAccess;
-    private StreamController $controller;
 
     protected function setUp(): void
     {
-        $this->mediaBasePath = sys_get_temp_dir() . '/stream_base_' . uniqid('', true);
-        mkdir($this->mediaBasePath, 0o755, true);
-
+        $this->directory = sys_get_temp_dir() . '/baander-stream-security-' . bin2hex(random_bytes(8));
+        self::assertTrue(mkdir($this->directory, 0700));
+        $this->file = $this->directory . '/track.mp3';
+        self::assertSame(10, file_put_contents($this->file, 'audio-data'));
+        $this->trackId = new PublicId();
+        $this->libraryId = new Uuid();
         $this->streamService = $this->createStub(StreamPortInterface::class);
-        $this->libraryAccess = $this->createStub(LibraryAccessPortInterface::class);
-
-        $this->controller = $this->createStreamControllerFixture();
-    }
-
-    private function createStreamControllerFixture(): StreamController
-    {
-        $fixture = new StreamController(
-            streamService: $this->streamService,
-            security: null,
-            libraryAccess: $this->libraryAccess,
-        );
-
-        $translator = $this->createStub(TranslatorInterface::class);
-        $translator->method('trans')->willReturnArgument(0);
-        $fixture->setTranslator($translator);
-        return $fixture;
+        $this->streamService->method('getLibraryIdForTrack')->willReturn($this->libraryId);
+        $this->streamService->method('getTrackMetadata')->willReturn($this->metadata());
+        $this->streamService->method('resolveTrackPath')->willReturn($this->file);
     }
 
     protected function tearDown(): void
     {
-        $this->removeTree($this->mediaBasePath);
+        unlink($this->file);
+        rmdir($this->directory);
     }
 
-    public function testStreamByIdRequiresAuthentication(): void
+    public function testStreamByIdRequiresAuthenticationBeforeLookingUpTrack(): void
     {
-        $trackId = new PublicId();
-        $filePath = $this->mediaBasePath . '/track.mp3';
-        file_put_contents($filePath, 'audio-data');
+        $this->streamService = $this->createMock(StreamPortInterface::class);
+        $this->streamService->expects(self::never())->method('getLibraryIdForTrack');
+        $this->streamService->expects(self::never())->method('getTrackMetadata');
+        $this->streamService->expects(self::never())->method('resolveTrackPath');
+        $controller = $this->controllerWithScope(MediaReadScope::none());
 
-        $metadata = new TrackStreamMetadata(
-            publicId: $trackId->toString(),
-            filename: 'track.mp3',
-            filePath: $filePath,
-            mimeType: 'audio/mpeg',
-            size: 10,
-            codec: null,
-            bitrate: null,
-            sampleRate: null,
-            channels: null,
-            length: null,
-        );
+        $response = $controller->streamById($this->request());
 
-        $this->streamService->method('getTrackMetadata')->willReturn($metadata);
-        $this->streamService->method('resolveTrackPath')->willReturn($filePath);
-
-        $request = new Request(['id' => $trackId->toString()]);
-        $response = $this->controller->streamById($request);
-
-        $this->assertNotInstanceOf(BinaryFileResponse::class, $response);
-        $this->assertSame(Response::HTTP_UNAUTHORIZED, $response->getStatusCode());
+        self::assertNotInstanceOf(BinaryFileResponse::class, $response);
+        self::assertSame(Response::HTTP_UNAUTHORIZED, $response->getStatusCode());
     }
 
-    public function testStreamByIdRejectsMissingLibraryAccess(): void
+    #[DataProvider('deniedLibraryScopes')]
+    public function testStreamByIdRejectsLibraryOutsideScope(LibraryReadScope $libraries): void
     {
-        $this->libraryAccess = $this->createMock(LibraryAccessPortInterface::class);
-        $this->controller = $this->createStreamControllerFixture();
-
-        $trackId = new PublicId();
-        $libraryId = Uuid::fromString('550e8400-e29b-41d4-a716-446655440000');
-        $userId = Uuid::fromString('6ba7b810-9dad-11d1-80b4-00c04fd430c8');
-        $filePath = $this->mediaBasePath . '/track.mp3';
-        file_put_contents($filePath, 'audio-data');
-
-        $metadata = new TrackStreamMetadata(
-            publicId: $trackId->toString(),
-            filename: 'track.mp3',
-            filePath: $filePath,
-            mimeType: 'audio/mpeg',
-            size: 10,
-            codec: null,
-            bitrate: null,
-            sampleRate: null,
-            channels: null,
-            length: null,
-        );
-
-        $this->streamService->method('getLibraryIdForTrack')->willReturn($libraryId);
-        $this->streamService->method('getTrackMetadata')->willReturn($metadata);
-        $this->streamService->method('resolveTrackPath')->willReturn($filePath);
-
-        $this->libraryAccess
-            ->expects($this->once())
-            ->method('hasAccess')
-            ->with($userId, $libraryId)
-            ->willReturn(false);
-
-        $security = $this->createStub(Security::class);
-        $security->method('getUser')->willReturn(new SecurityUser(
-            id: $userId->toString(),
-            email: 'user@baander.app',
-            password: 'password',
+        $this->streamService = $this->createMock(StreamPortInterface::class);
+        $this->streamService
+            ->expects(self::once())
+            ->method('getLibraryIdForTrack')
+            ->willReturn($this->libraryId);
+        $this->streamService->expects(self::never())->method('getTrackMetadata');
+        $this->streamService->expects(self::never())->method('resolveTrackPath');
+        $controller = $this->controllerWithScope(MediaReadScope::authenticated(
+            new Uuid(),
+            $libraries,
         ));
 
+        $response = $controller->streamById($this->request());
+
+        self::assertNotInstanceOf(BinaryFileResponse::class, $response);
+        self::assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode());
+    }
+
+    /** @return iterable<string, array{LibraryReadScope}> */
+    public static function deniedLibraryScopes(): iterable
+    {
+        yield 'no membership' => [LibraryReadScope::none()];
+        yield 'different library' => [LibraryReadScope::restricted([new Uuid()])];
+    }
+
+    public function testStreamByIdAllowsLibraryMember(): void
+    {
+        $controller = $this->controllerWithScope(MediaReadScope::authenticated(
+            new Uuid(),
+            LibraryReadScope::restricted([$this->libraryId]),
+        ));
+
+        $this->assertStreamResponse($controller->streamById($this->request()));
+    }
+
+    public function testStreamByIdAllowsAuthenticatedAdministrator(): void
+    {
+        $controller = $this->controllerWithScope(MediaReadScope::authenticated(
+            new Uuid(),
+            LibraryReadScope::unrestricted(),
+        ));
+
+        $this->assertStreamResponse($controller->streamById($this->request()));
+    }
+
+    public function testStreamByIdReturnsNotFoundForMissingTrackAfterAuthentication(): void
+    {
+        $this->streamService = $this->createMock(StreamPortInterface::class);
+        $this->streamService->expects(self::once())->method('getLibraryIdForTrack')->willReturn(null);
+        $this->streamService->expects(self::never())->method('getTrackMetadata');
+        $this->streamService->expects(self::never())->method('resolveTrackPath');
+        $controller = $this->controllerWithScope(MediaReadScope::authenticated(
+            new Uuid(),
+            LibraryReadScope::none(),
+        ));
+
+        $response = $controller->streamById($this->request());
+
+        self::assertSame(Response::HTTP_NOT_FOUND, $response->getStatusCode());
+    }
+
+    public function testRangeRetriesUseFreshScopeAfterMembershipAndAuthenticationAreRevoked(): void
+    {
+        $actorId = new Uuid();
+        $scopes = $this->createMock(MediaReadScopeProviderInterface::class);
+        $scopes->expects(self::exactly(3))->method('current')->willReturnOnConsecutiveCalls(
+            MediaReadScope::authenticated($actorId, LibraryReadScope::restricted([$this->libraryId])),
+            MediaReadScope::authenticated($actorId, LibraryReadScope::none()),
+            MediaReadScope::none(),
+        );
+        $this->streamService = $this->createMock(StreamPortInterface::class);
+        $this->streamService
+            ->expects(self::exactly(2))
+            ->method('getLibraryIdForTrack')
+            ->willReturn($this->libraryId);
+        $this->streamService
+            ->expects(self::once())
+            ->method('getTrackMetadata')
+            ->willReturn($this->metadata());
+        $this->streamService
+            ->expects(self::once())
+            ->method('resolveTrackPath')
+            ->willReturn($this->file);
+        $controller = $this->createController($scopes);
+        $request = $this->request();
+        $request->headers->set('Range', 'bytes=0-3');
+
+        $allowed = $controller->streamById($request);
+        $allowed->prepare($request);
+        self::assertSame(Response::HTTP_PARTIAL_CONTENT, $allowed->getStatusCode());
+        self::assertSame(Response::HTTP_FORBIDDEN, $controller->streamById($request)->getStatusCode());
+        self::assertSame(Response::HTTP_UNAUTHORIZED, $controller->streamById($request)->getStatusCode());
+    }
+
+    #[DataProvider('invalidTrackIds')]
+    public function testInvalidTrackIdIsRejectedBeforeScopeOrTrackLookup(?string $id): void
+    {
+        $scopes = $this->createMock(MediaReadScopeProviderInterface::class);
+        $scopes->expects(self::never())->method('current');
+        $this->streamService = $this->createMock(StreamPortInterface::class);
+        $this->streamService->expects(self::never())->method('getLibraryIdForTrack');
+        $controller = $this->createController($scopes);
+
+        $response = $controller->streamById(new Request($id === null ? [] : ['id' => $id]));
+
+        self::assertSame(Response::HTTP_NOT_FOUND, $response->getStatusCode());
+    }
+
+    /** @return iterable<string, array{?string}> */
+    public static function invalidTrackIds(): iterable
+    {
+        yield 'missing' => [null];
+        yield 'blank' => [' '];
+        yield 'malformed' => ['invalid!'];
+    }
+
+    private function controllerWithScope(MediaReadScope $scope): StreamController
+    {
+        $scopes = $this->createStub(MediaReadScopeProviderInterface::class);
+        $scopes->method('current')->willReturn($scope);
+
+        return $this->createController($scopes);
+    }
+
+    private function createController(MediaReadScopeProviderInterface $scopes): StreamController
+    {
         $controller = new StreamController(
             streamService: $this->streamService,
-            security: $security,
-            libraryAccess: $this->libraryAccess,
+            scopes: $scopes,
         );
-
         $translator = $this->createStub(TranslatorInterface::class);
         $translator->method('trans')->willReturnArgument(0);
         $controller->setTranslator($translator);
 
-        $request = new Request(['id' => $trackId->toString()]);
-        $response = $controller->streamById($request);
-
-        $this->assertNotInstanceOf(BinaryFileResponse::class, $response);
-        $this->assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode());
+        return $controller;
     }
 
-    public function testStreamByIdAllowsAccessWhenUserHasLibraryAccess(): void
+    private function request(): Request
     {
-        $this->libraryAccess = $this->createMock(LibraryAccessPortInterface::class);
-        $this->controller = $this->createStreamControllerFixture();
+        return Request::create('https://api.baander.app/api/stream/track?id=' . $this->trackId->toString());
+    }
 
-        $trackId = new PublicId();
-        $libraryId = Uuid::fromString('550e8400-e29b-41d4-a716-446655440000');
-        $userId = Uuid::fromString('6ba7b810-9dad-11d1-80b4-00c04fd430c8');
-        $filePath = $this->mediaBasePath . '/track.mp3';
-        file_put_contents($filePath, 'audio-data');
-
-        $metadata = new TrackStreamMetadata(
-            publicId: $trackId->toString(),
+    private function metadata(): TrackStreamMetadata
+    {
+        return new TrackStreamMetadata(
+            publicId: $this->trackId->toString(),
             filename: 'track.mp3',
-            filePath: $filePath,
+            filePath: $this->file,
             mimeType: 'audio/mpeg',
             size: 10,
             codec: null,
@@ -167,61 +222,15 @@ final class StreamControllerSecurityTest extends TestCase
             channels: null,
             length: null,
         );
-
-        $this->streamService->method('getLibraryIdForTrack')->willReturn($libraryId);
-        $this->streamService->method('getTrackMetadata')->willReturn($metadata);
-        $this->streamService->method('resolveTrackPath')->willReturn($filePath);
-
-        $this->libraryAccess
-            ->expects($this->once())
-            ->method('hasAccess')
-            ->with($userId, $libraryId)
-            ->willReturn(true);
-
-        $security = $this->createStub(Security::class);
-        $security->method('getUser')->willReturn(new SecurityUser(
-            id: $userId->toString(),
-            email: 'user@baander.app',
-            password: 'password',
-        ));
-
-        $controller = new StreamController(
-            streamService: $this->streamService,
-            security: $security,
-            libraryAccess: $this->libraryAccess,
-        );
-
-        $translator = $this->createStub(TranslatorInterface::class);
-        $translator->method('trans')->willReturnArgument(0);
-        $controller->setTranslator($translator);
-
-        $request = new Request(['id' => $trackId->toString()]);
-        $response = $controller->streamById($request);
-
-        $this->assertInstanceOf(BinaryFileResponse::class, $response);
-        $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
     }
 
-    private function removeTree(string $path): void
+    private function assertStreamResponse(Response $response): void
     {
-        if (!is_dir($path)) {
-            return;
-        }
-
-        $entries = scandir($path);
-        if ($entries === false) {
-            return;
-        }
-
-        foreach ($entries as $entry) {
-            if ($entry === '.' || $entry === '..') {
-                continue;
-            }
-
-            $full = $path . '/' . $entry;
-            is_dir($full) ? $this->removeTree($full) : @unlink($full);
-        }
-
-        @rmdir($path);
+        self::assertInstanceOf(BinaryFileResponse::class, $response);
+        self::assertSame(Response::HTTP_OK, $response->getStatusCode());
+        self::assertSame('audio/mpeg', $response->headers->get('Content-Type'));
+        self::assertTrue($response->headers->hasCacheControlDirective('private'));
+        self::assertTrue($response->headers->hasCacheControlDirective('no-store'));
+        self::assertFalse($response->headers->hasCacheControlDirective('public'));
     }
 }

@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Media\Interface\Controller;
 
-use App\Auth\Infrastructure\Security\SecurityUser;
-use App\Library\Application\Port\LibraryAccessPortInterface;
+use App\Media\Application\Port\MediaReadScopeProviderInterface;
 use App\Media\Application\Port\StreamPortInterface;
 use App\Shared\Domain\Model\PublicId;
-use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use OpenApi\Attributes as OA;
@@ -17,7 +15,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\HttpFoundation\SwooleBinaryFileResponse;
-use Symfony\Bundle\SecurityBundle\Security;
 
 #[OA\Tag(name: 'Media', description: 'Media file and streaming endpoints')]
 #[Route('/api/stream', name: 'stream_')]
@@ -28,8 +25,7 @@ final class StreamController
 
     public function __construct(
         private readonly StreamPortInterface $streamService,
-        private readonly ?Security $security = null,
-        private readonly ?LibraryAccessPortInterface $libraryAccess = null,
+        private readonly MediaReadScopeProviderInterface $scopes,
     ) {
     }
 
@@ -66,7 +62,9 @@ final class StreamController
             return $this->notFound($this->trans('errors.invalid_track_id_format', domain: 'media'));
         }
 
-        if ($this->security?->getUser() === null) {
+        $scope = $this->scopes->current();
+
+        if ($scope->getActorId() === null) {
             return $this->unauthorized($this->trans('errors.authentication_required', domain: 'media'));
         }
 
@@ -75,9 +73,8 @@ final class StreamController
             return $this->notFound($this->trans('errors.track_not_found', domain: 'media'));
         }
 
-        $authResponse = $this->denyUnlessLibraryOwnerOrAdmin($libraryId);
-        if ($authResponse !== null) {
-            return $authResponse;
+        if (!$scope->getLibraries()->allows($libraryId)) {
+            return $this->forbidden($this->trans('errors.forbidden', domain: 'messages'));
         }
 
         try {
@@ -99,27 +96,4 @@ final class StreamController
 
         return $response;
     }
-
-    private function denyUnlessLibraryOwnerOrAdmin(Uuid $libraryId): ?Response
-    {
-        $user = $this->security?->getUser();
-
-        if (!$user instanceof SecurityUser) {
-            return $this->unauthorized($this->trans('errors.authentication_required', domain: 'media'));
-        }
-
-        if (in_array('ROLE_ADMIN', $user->getRoles(), true)) {
-            return null;
-        }
-
-        if ($this->libraryAccess !== null && $this->libraryAccess->hasAccess(
-            Uuid::fromString($user->getId()),
-            $libraryId,
-        )) {
-            return null;
-        }
-
-        return $this->forbidden($this->trans('errors.forbidden', domain: 'messages'));
-    }
-
 }
