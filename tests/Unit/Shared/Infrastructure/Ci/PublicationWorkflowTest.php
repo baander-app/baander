@@ -194,7 +194,7 @@ SH;
             'specification drift' => ['quality-gate', 'OpenAPI drift', 'app:export-openapi-spec --env=test --no-debug --check'],
             'client drift' => ['frontend-quality', 'Web checks', 'yarn generate:check'],
             'Deptrac' => ['quality-gate', 'Deptrac', 'vendor/bin/deptrac analyse'],
-            'backend unit' => ['quality-gate', 'PHPUnit with coverage', './vendor/bin/phpunit'],
+            'backend unit' => ['quality-gate', 'PHPUnit with coverage', 'scripts/run-phpunit-shards.php'],
             'web unit' => ['frontend-quality', 'Web checks', 'yarn test'],
             'browser auth' => ['frontend-quality', 'Native browser authentication transport', 'yarn test:browser-auth'],
             'browser audio' => ['frontend-quality', 'Native browser audio graph', 'yarn test:audio-graph'],

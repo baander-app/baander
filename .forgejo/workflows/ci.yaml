@@ -149,7 +149,9 @@ jobs:
                       -e OUTBOX_TEST_DATABASE_URL="postgresql://baander:baander@database:5432/baander_test?serverVersion=18&charset=utf8" \
                       -e REDIS_URL="redis://default:baander@redis:6379" \
                       "$CI_IMAGE" \
-                      ./vendor/bin/phpunit -c phpunit.xml.dist --no-progress --fail-on-phpunit-notice --coverage-text=coverage/report.txt --coverage-clover=coverage/clover.xml \
+                      php -d memory_limit=512M scripts/run-phpunit-shards.php \
+                      -c phpunit.xml.dist --no-progress --fail-on-phpunit-notice \
+                      --coverage-text=coverage/report.txt --coverage-clover=coverage/clover.xml \
                       || test_status=$?
                     # Docker may run in a separate VM, so copy artifacts instead of mounting a host path.
                     docker cp "$CI_TEST_CONTAINER:/var/www/html/coverage/." coverage/ || exit 1

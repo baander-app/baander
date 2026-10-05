@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 if [ "${BAANDER_FUNCTIONAL_TIMEOUT_ACTIVE:-0}" != 1 ]; then
-    exec env BAANDER_FUNCTIONAL_TIMEOUT_ACTIVE=1 timeout 300s bash "$0" "$@"
+    exec env BAANDER_FUNCTIONAL_TIMEOUT_ACTIVE=1 timeout 900s bash "$0" "$@"
 fi
 cd "$(dirname "$0")/.."
 if [ "$#" -eq 0 ]; then
@@ -35,8 +35,11 @@ if [ "$ready" != true ]; then
     exit 1
 fi
 
-archive_paths=(vendor src tests config packages migrations bin docker/general docker/dev docker/prod templates public phpunit.xml.dist
-    .env .env.test .forgejo composer.json composer.lock deptrac.yaml deptrac.baseline.yaml translations)
+archive_paths=(
+    vendor src tests config packages migrations bin scripts/run-phpunit-shards.php
+    docker/general docker/dev docker/prod templates public phpunit.xml.dist
+    .env .env.test .forgejo composer.json composer.lock deptrac.yaml deptrac.baseline.yaml translations
+)
 if [ "${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" = 1 ]; then
     archive_paths=(--files-from /dev/null)
 fi
@@ -70,6 +73,6 @@ tar --exclude='config/secrets/oauth' --exclude='config/secrets/*.decrypt.private
             php -d memory_limit=512M bin/console doctrine:migrations:migrate --no-interaction --env=test
             # A second run must recognize the completed migration history.
             php -d memory_limit=512M bin/console doctrine:migrations:migrate --no-interaction --env=test
-            exec php -d memory_limit=512M vendor/bin/phpunit -c phpunit.xml.dist --no-progress --colors=never \
+            exec php -d memory_limit=512M scripts/run-phpunit-shards.php -c phpunit.xml.dist --no-progress --colors=never \
                 --display-all-issues --fail-on-phpunit-notice --fail-on-skipped "$@"
         ' sh "$@"
