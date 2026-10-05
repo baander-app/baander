@@ -15,6 +15,14 @@ if (!is_array($arguments)) {
 }
 [$script, $mode, $namespace, $bootId] = $arguments + [null, null, null, null];
 $allowedModes = [
+    'prepare-consumer-ack',
+    'hold-consumer-ack',
+    'release-consumer-ack',
+    'verify-consumer-ack-blocked',
+    'verify-consumer-ack-contained',
+    'verify-consumer-ack-recovered',
+    'age-consumer-ack-pending',
+    'kill-consumer-before-ack',
     'hold-relay-delivery-ack',
     'release-relay-delivery-ack',
     'verify-delivery-ack-blocked',
@@ -58,6 +66,140 @@ if (!$url) {
     throw new RuntimeException('Disposable DATABASE_URL is required.');
 }
 $db = DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url));
+if ($mode === 'prepare-consumer-ack') {
+    $db->executeStatement(<<<'SQL'
+        CREATE TABLE worker_command_consumer_ack_gate (
+            id boolean PRIMARY KEY CHECK (id),
+            armed boolean NOT NULL DEFAULT false,
+            occurrence_id uuid,
+            message_id text,
+            arrivals integer NOT NULL DEFAULT 0
+        )
+        SQL);
+    $db->executeStatement('INSERT INTO worker_command_consumer_ack_gate (id) VALUES (true)');
+    exit(0);
+}
+if ($mode === 'hold-consumer-ack') {
+    $db->executeQuery('SELECT pg_advisory_lock(87365024)')->free();
+    $db->executeStatement('UPDATE worker_command_consumer_ack_gate SET armed = true WHERE id = true');
+    echo "Consumer acknowledgement gate armed.\n";
+    flush();
+    $db->executeQuery('SELECT pg_sleep(120)')->free();
+    throw new RuntimeException('Consumer acknowledgement gate exceeded its bounded lifetime.');
+}
+if ($mode === 'release-consumer-ack') {
+    $db->executeStatement('UPDATE worker_command_consumer_ack_gate SET armed = false WHERE id = true');
+    exit(0);
+}
+$consumerAckModes = [
+    'verify-consumer-ack-blocked',
+    'verify-consumer-ack-contained',
+    'verify-consumer-ack-recovered',
+    'age-consumer-ack-pending',
+    'kill-consumer-before-ack',
+];
+
+if (in_array($mode, $consumerAckModes, true)) {
+    $execution = $db->fetchAssociative(<<<'SQL'
+        SELECT o.id, e.attempt_id, e.returned_at, e.deployment_namespace,
+            e.deployment_boot_id, e.deployment_epoch, j.run_count, j.last_result
+        FROM scheduler_occurrences o
+        JOIN scheduler_occurrence_executions e ON e.occurrence_id = o.id
+        JOIN scheduled_jobs j ON j.id = o.job_id
+        WHERE o.origin = 'manual' AND o.command = 'app:transcode:cache-sweep'
+            AND o.dispatched_at IS NOT NULL AND j.last_error IS NULL
+        SQL);
+    $gate = $db->fetchAssociative('SELECT occurrence_id, message_id, arrivals FROM worker_command_consumer_ack_gate WHERE id = true');
+    if (
+        $execution === false
+        || $gate === false
+        || $execution['returned_at'] === null
+        || $execution['deployment_namespace'] !== $namespace
+        || $execution['deployment_boot_id'] !== $bootId
+        || (int) $execution['deployment_epoch'] !== 1
+        || (int) $execution['run_count'] !== 1
+        || !str_contains($execution['last_result'] ?? '', 'DRY RUN')
+        || $gate['occurrence_id'] !== $execution['id']
+        || (int) $db->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions') !== 1
+    ) {
+        throw new RuntimeException(
+            'Real scheduled effects and one returned execution receipt must be committed before Redis ACK.',
+        );
+    }
+    $redis = new Redis();
+    $redis->connect('redis', 6379, 1.0);
+    $redis->auth(['default', 'test-only']);
+    $pending = $redis->xPending('scheduler_occurrences', 'baander', '-', '+', 2);
+    $waiting = (int) $db->fetchOne(<<<'SQL'
+        SELECT count(*) FROM pg_locks
+        WHERE locktype = 'advisory' AND classid = 0 AND objid = 87365024 AND NOT granted
+        SQL);
+    if ($mode === 'verify-consumer-ack-recovered') {
+        $snapshot = json_decode($arguments[4] ?? '', true, 512, JSON_THROW_ON_ERROR);
+        if (
+            $snapshot['execution'] !== $execution
+            || $snapshot['messageId'] !== $gate['message_id']
+            || (int) $gate['arrivals'] !== 2
+            || $waiting !== 0
+            || $pending !== []
+            || $redis->xLen('scheduler_occurrences') !== 0
+            || $redis->zCard('scheduler_occurrences__queue') !== 0
+            || $redis->xLen('failed_messages') !== 0
+            || $redis->zCard('failed_messages__queue') !== 0
+        ) {
+            throw new RuntimeException(
+                'The original pending Redis entry must replay and ACK with no second execution or changed returned receipt.',
+            );
+        }
+        echo "Original Redis entry redelivered and acknowledged; committed receipt and run_count stayed unchanged.\n";
+        exit(0);
+    }
+    if (
+        !is_array($pending)
+        || count($pending) !== 1
+        || $pending[0][0] !== $gate['message_id']
+        || (int) $gate['arrivals'] !== 1
+        || $redis->xLen('scheduler_occurrences') !== 1
+    ) {
+        throw new RuntimeException(
+            'One original Redis entry must remain pending after the handler committed exactly one execution.',
+        );
+    }
+    $snapshot = ['execution' => $execution, 'messageId' => $pending[0][0], 'consumer' => $pending[0][1]];
+    if (in_array($mode, ['verify-consumer-ack-contained', 'age-consumer-ack-pending'], true)) {
+        $original = json_decode($arguments[4] ?? '', true, 512, JSON_THROW_ON_ERROR);
+        if ($waiting !== 0 || $original !== $snapshot) {
+            throw new RuntimeException(
+                'Consumer containment must preserve the original pending entry and committed execution receipt.',
+            );
+        }
+        if ($mode === 'age-consumer-ack-pending') {
+            // Advance only this disposable pending entry's idle age. The real
+            // consumer still uses the production one-hour redelivery threshold.
+            $claimed = $redis->rawCommand(
+                'XCLAIM', 'scheduler_occurrences', 'baander', $pending[0][1],
+                '0', $pending[0][0], 'IDLE', '3600001', 'JUSTID',
+            );
+            if ($claimed !== [$pending[0][0]]) {
+                throw new RuntimeException(
+                    'Could not age the exact pending fixture entry for bounded production redelivery.',
+                );
+            }
+            echo "Aged only the original disposable pending entry past the production redelivery threshold.\n";
+        } else {
+            echo "Committed handler effects and original unacknowledged Redis entry survived supervised consumer SIGKILL.\n";
+        }
+        exit(0);
+    }
+    if ($waiting !== 1) {
+        throw new RuntimeException('Consumer has not reached WorkerMessageHandledEvent before Redis XACK.');
+    }
+    if ($mode === 'verify-consumer-ack-blocked') {
+        echo json_encode($snapshot, JSON_THROW_ON_ERROR) . "\n";
+        exit(0);
+    }
+}
+
 // This gate belongs only to the disposable database. The initial claim commits
 // before the next UPDATE (renewLease) blocks, so SIGKILL cannot roll the claim back.
 if ($mode === 'hold-relay-claim') {
@@ -509,7 +651,8 @@ if (in_array($mode, ['kill-relay-claimed', 'kill-relay-projecting', 'kill-relay-
     && !posix_kill($roles['relay'], SIGKILL)) {
     throw new RuntimeException('Could not kill the direct relay child at its verified crash boundary.');
 }
-if ($mode === 'kill-consumer' && !posix_kill($roles['consumer'], SIGKILL)) {
+if (in_array($mode, ['kill-consumer', 'kill-consumer-before-ack'], true)
+    && !posix_kill($roles['consumer'], SIGKILL)) {
     throw new RuntimeException('Could not kill the disposable consumer fixture.');
 }
 if ($mode === 'kill-scheduler' && !posix_kill($roles['scheduler'], SIGKILL)) {

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 if [ "${BAANDER_WORKER_COMMAND_TIMEOUT_ACTIVE:-0}" != 1 ]; then
-    exec env BAANDER_WORKER_COMMAND_TIMEOUT_ACTIVE=1 timeout 540s bash "$0" "$@"
+    exec env BAANDER_WORKER_COMMAND_TIMEOUT_ACTIVE=1 timeout 600s bash "$0" "$@"
 fi
 cd "$(dirname "$0")/.."
 run_id="baander-worker-command-$(date +%s)-$$"
@@ -57,9 +57,11 @@ tar -cf - "${archive_paths[@]}" |
     docker run --rm --name "$run_id-prepare" "${common[@]}" -i --entrypoint sh "$app_image" -c '
         set -eu
         tar -xf -
+        cp tests/Fixtures/Worker/ConsumerAckFixture.php src/Shared/Infrastructure/Worker/ConsumerAckFixture.php
         php -d memory_limit=512M bin/console cache:clear --env=prod --no-debug
         php -d memory_limit=512M bin/console doctrine:migrations:migrate --no-interaction --env=prod
         php -d memory_limit=512M bin/console doctrine:migrations:migrate --no-interaction --env=prod
+        php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php prepare-consumer-ack baander.app:commandtest aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
         php -d memory_limit=256M tests/Fixtures/Worker/worker-command-check.php seed-outbox baander.app:commandtest aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     '
 
@@ -331,9 +333,6 @@ docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_
     -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php \
     release-relay-delivery-ack "$delivery_namespace" "$delivery_boot"
 
-docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_image" \
-    -d memory_limit=256M tests/Fixtures/Worker/worker-command-check.php seed-scheduler baander.app:commandtest aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-
 boot="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
 namespace=baander.app:commandtest
 launch "$run_id-crash" "$namespace" "$boot"
@@ -346,14 +345,78 @@ await_outbox "$run_id-crash" 350
 docker exec "$run_id-crash" php -d memory_limit=64M \
     tests/Fixtures/Worker/worker-command-check.php verify-delivery-ack-recovered \
     "$namespace" "$boot" "$delivery_snapshot"
-await_scheduler "$run_id-crash" "$namespace" "$boot"
-docker exec "$run_id-crash" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php replay-outbox "$namespace" "$boot"
+docker exec "$run_id-crash" php -d memory_limit=64M \
+    tests/Fixtures/Worker/worker-command-check.php replay-outbox "$namespace" "$boot"
 await_outbox "$run_id-crash"
-docker exec "$run_id-crash" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php replay-scheduler "$namespace" "$boot"
-await_scheduler "$run_id-crash" "$namespace" "$boot"
-docker exec "$run_id-crash" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php kill-consumer "$namespace" "$boot"
+
+# Hold WorkerMessageHandledEvent after the scheduler handler commits and returns.
+containers+=("$run_id-consumer-ack-gate")
+docker run -d --name "$run_id-consumer-ack-gate" "${common[@]}" --entrypoint php "$app_image" \
+    -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php \
+    hold-consumer-ack "$namespace" "$boot" >/dev/null
+
+gate_ready=false
+for attempt in $(seq 1 30); do
+    if docker logs "$run_id-consumer-ack-gate" 2>&1 | grep -qx 'Consumer acknowledgement gate armed.'; then
+        gate_ready=true
+        break
+    fi
+    sleep 0.2
+done
+
+if [ "$gate_ready" != true ]; then
+    docker logs "$run_id-consumer-ack-gate" >&2
+    exit 1
+fi
+
+docker exec "$run_id-crash" php -d memory_limit=256M \
+    tests/Fixtures/Worker/worker-command-check.php seed-scheduler "$namespace" "$boot"
+consumer_snapshot=""
+for attempt in $(seq 1 50); do
+    if consumer_snapshot="$(docker exec "$run_id-crash" php -d memory_limit=64M \
+        tests/Fixtures/Worker/worker-command-check.php verify-consumer-ack-blocked \
+        "$namespace" "$boot" 2>/dev/null)"; then
+        break
+    fi
+    sleep 0.2
+done
+
+if [ -z "$consumer_snapshot" ]; then
+    docker logs --tail 60 "$run_id-crash" >&2
+    echo 'Consumer did not reach the post-handler/pre-XACK boundary.' >&2
+    exit 1
+fi
+
+docker exec "$run_id-crash" php -d memory_limit=64M \
+    tests/Fixtures/Worker/worker-command-check.php kill-consumer-before-ack "$namespace" "$boot"
 await_exit "$run_id-crash" 1 3
 reserved "$namespace" "$boot"
+docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_image" \
+    -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php \
+    verify-consumer-ack-contained "$namespace" "$boot" "$consumer_snapshot"
+
+docker rm -f "$run_id-consumer-ack-gate" >/dev/null
+docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_image" \
+    -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php release-consumer-ack "$namespace" "$boot"
+docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_image" \
+    -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php \
+    age-consumer-ack-pending "$namespace" "$boot" "$consumer_snapshot"
+
+consumer_recovery_boot="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
+consumer_recovery_namespace=baander.app:commandconsumerackrecovery
+launch "$run_id-consumer-ack-recovery" "$consumer_recovery_namespace" "$consumer_recovery_boot"
+await_ready "$run_id-consumer-ack-recovery" "$consumer_recovery_namespace" "$consumer_recovery_boot"
+await_scheduler "$run_id-consumer-ack-recovery" "$namespace" "$boot"
+docker exec "$run_id-consumer-ack-recovery" php -d memory_limit=64M \
+    tests/Fixtures/Worker/worker-command-check.php verify-consumer-ack-recovered \
+    "$namespace" "$boot" "$consumer_snapshot"
+docker exec "$run_id-consumer-ack-recovery" php -d memory_limit=64M \
+    tests/Fixtures/Worker/worker-command-check.php replay-scheduler "$namespace" "$boot"
+await_scheduler "$run_id-consumer-ack-recovery" "$namespace" "$boot"
+docker exec "$run_id-consumer-ack-recovery" php -d memory_limit=64M \
+    tests/Fixtures/Worker/worker-command-check.php kill-consumer "$consumer_recovery_namespace" "$consumer_recovery_boot"
+await_exit "$run_id-consumer-ack-recovery" 1 3
+reserved "$consumer_recovery_namespace" "$consumer_recovery_boot"
 
 # An active predecessor reservation denies even its original boot; admission has no retry shortcut.
 launch "$run_id-denied" "$namespace" "$boot"
@@ -384,4 +447,4 @@ docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_
 # Allow the renewal schedule plus its bounded 35-second drain and harness headroom.
 await_exit "$run_id-expiry" 1 3 60
 reserved "$expiry_namespace" "$expiry_boot"
-echo 'Real app:worker claim, projection, and transport handoff crash recovery, replay, and lifecycle acceptance passed.'
+echo 'Real app:worker claim, projection, and transport handoff and pre-XACK consumer crash recovery, replay, and lifecycle acceptance passed.'
