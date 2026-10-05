@@ -1,6 +1,6 @@
 # app:oauth:generate-keys
 
-Generate an RSA key pair (2048-bit) for OAuth2 JWT signing. Writes the private and public keys to the configured paths and restricts both files to mode `0600`.
+Initialize an RSA key pair (2048-bit) for OAuth2 JWT signing when neither configured key file exists. Both files are created with mode `0600`.
 
 ## Quick start
 
@@ -10,21 +10,21 @@ make exec cmd="php bin/console app:oauth:generate-keys"
 
 ## Details
 
-The command has no arguments or options. Key paths come from the container parameters `oauth_keys.private_key_path` and `oauth_keys.public_key_path`; the private key's parent directory is created if it does not exist.
+The command has no arguments or options. Key paths come from the container parameters `oauth_keys.private_key_path` and `oauth_keys.public_key_path`. Missing parent directories are created for both targets.
 
-If the private key already exists, the command prompts for confirmation before overwriting. Answering no aborts with success and leaves the existing keys untouched. In non-interactive mode (e.g., when invoked by `app:dev:setup`), the overwrite prompt is skipped.
+The command refuses either existing target, including a symlink, and does not prompt or overwrite in interactive or non-interactive mode. It also refuses identical private and public paths. To replace a key pair, use the [staged offline rotation procedure](app-auth-rotate-secrets.md). Pass `--skip-keys` to `app:dev:setup` when reusing initialized keys.
 
-Both the private and public key files are written with permission mode `0600`.
+The pair is generated and checked before either file is written. Each target is created exclusively with mode `0600`. If a write fails, the command removes only files it can identify as created by that invocation; inspect the paths before retrying.
 
 ## Exit codes
 
 | Code | Meaning |
 |------|---------|
-| 0 | Keys generated (or overwrite declined / aborted by user) |
-| 1 | Failure — private key directory could not be created, key generation failed, or a key file could not be written |
+| 0 | New key pair generated |
+| 1 | Existing or unsafe target, key generation or validation failure, or file write failure |
 
 ## Tips
 
 - Run this once during initial setup. The keys are reused across restarts.
 - Never commit the generated private key to version control.
-- Re-running in interactive mode asks before overwriting; in non-interactive mode it overwrites without prompting.
+- Re-running this command fails without changing existing keys. Use `app:auth:rotate-secrets` for replacement.

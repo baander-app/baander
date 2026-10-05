@@ -79,6 +79,15 @@ worker's single projection receipt after the original 60-second lease expires.
 The full worker drill passes. Consumer and transport-acknowledgement crash points
 remain separate acceptance work.
 
+OAuth key initialization now refuses existing files, symlinks and path aliases,
+validates a generated pair before exclusive 0600 writes, and removes only its own
+partial files on failure. Qualified regressions cover write failures and path
+replacement races. The `APP_SECRET` guide and environment templates now require
+one literal value and an offline webhook rekey with matched database/secret
+recovery. Full Unit/StaticAnalysisRules pass 4,580 tests (19,323 assertions), and
+the full PHPStan scan reports zero errors. A development-setup subprocess can still
+log failure while reporting overall success; that follow-up remains open.
+
 Deptrac resource layers now enforce the documented resource-to-model exception
 without allowing controllers to depend on domain models. A real Deptrac fixture
 tests both sides. Removed 23 obsolete resource baseline pairs and the removed

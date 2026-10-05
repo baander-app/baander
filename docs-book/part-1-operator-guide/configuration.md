@@ -7,7 +7,7 @@ All configuration in Baander is done through environment variables. They're defi
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `APP_ENV` | `dev` | Symfony environment: `dev`, `prod`, or `test`. Controls debugging, caching, and error handling. |
-| `APP_SECRET` | — | Cryptographic secret used for signing cookies and CSRF tokens. Generate a unique value for each deployment. |
+| `APP_SECRET` | — | One cryptographic secret for Symfony security components and encrypted webhook signing secrets. Generate a unique value for each deployment; use the [offline rotation procedure](security.md#rotating-app_secret) to change it. |
 | `APP_URL` | `https://localhost` | Canonical URL of the application. Used for CORS configuration and URL generation. |
 | `APP_DOMAIN` | `localhost` | Domain name displayed or used in API responses. |
 | `APP_NAME` | `Bånder` | Human-readable application name. Used in notification emails and TOTP issuer display. |

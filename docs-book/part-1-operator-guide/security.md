@@ -4,39 +4,33 @@ Guidance for operators on rotating secrets, recovering from a breach, and harden
 
 ## Rotating APP_SECRET
 
-`APP_SECRET` is used to sign session cookies, CSRF tokens, and other Symfony security components. Rotating it invalidates all existing sessions and CSRF tokens — all users will be logged out.
+`APP_SECRET` is one literal value used by Symfony security components and to encrypt stored webhook signing secrets. Changing it invalidates existing sessions and CSRF tokens. Webhook delivery cannot decrypt its stored secrets until each webhook is rotated under the new value or the matching old value is restored. Comma-separated values are not a rotation mechanism in this application.
 
 ### Step-by-step
 
-1. **Generate a new secret:**
+1. **Prepare recovery and stop delivery.** Back up the database together with the current `APP_SECRET`. Drain traffic and stop web and worker instances so no webhook is delivered during the change. Keep the old value available for recovery.
+
+2. **Generate a new secret:**
 
 ```bash
 php -r 'echo bin2hex(random_bytes(32));'
 ```
 
-2. **Support rotation (zero downtime):**
-
-Symfony supports comma-separated secrets for live rotation. The first value is used for signing; the rest are used only for verification.
-
-```env
-APP_SECRET=new_secret_here,old_secret_here
-```
-
-This lets existing sessions remain valid while new sessions use the new secret.
-
-3. **Remove the old secret after sessions expire:**
-
-Wait for the old sessions to naturally expire (or clear the Redis session store), then remove the old value:
+3. **Install one new value on every instance.** Keep workers stopped. Start one web instance and sign in as an administrator with a new session.
 
 ```env
 APP_SECRET=new_secret_here
 ```
 
-4. **Restart the application:**
+4. **Rekey every configured webhook.** Call `POST /api/webhooks/{id}/rotate-secret` for each webhook and install its returned secret at the receiver. Each response shows the new secret only once. Keep workers stopped until all receivers are ready.
+
+5. **Resume and verify.** Restart every instance with the same new `APP_SECRET`, resume worker delivery, and check fresh authentication and webhook verification.
 
 ```bash
 make stop && make start
 ```
+
+If rekeying fails, keep workers stopped. Restore the database backup and its matching old `APP_SECRET` together, then restore receiver secrets changed during this attempt before resuming delivery. Restoring only the old value cannot decrypt webhook rows already rekeyed under the new value. If the old value is unavailable, rotate affected webhooks under the new value and update their receivers before starting workers.
 
 ### When to rotate
 
@@ -164,20 +158,18 @@ Check which secrets an attacker may have accessed:
 
 There is no shortcut — rotate everything:
 
+First follow the [offline `APP_SECRET` procedure](#rotating-app_secret), keeping
+workers stopped through webhook rekeying. Then follow the staged OAuth rotation
+runbook linked above; keep every instance stopped through invalidation and
+configuration replacement. Rotate the remaining secrets as needed:
+
 ```bash
-# 1. Generate new APP_SECRET
-NEW_SECRET=$(php -r 'echo bin2hex(random_bytes(32));')
-echo "Rotate APP_SECRET to: $NEW_SECRET"
-
-# 2. Follow the staged offline OAuth rotation runbook linked above.
-# Keep every instance stopped through invalidation and configuration replacement.
-
-# 3. Generate new VAPID keys
+# Generate new VAPID keys
 make exec cmd="php bin/console app:generate-vapid-keys"
 
-# 4. Generate new Redis password and update docker-compose.yml
+# Generate new Redis password and update docker-compose.yml
 
-# 5. Generate new database password (see section above)
+# Generate new database password (see section above)
 ```
 
 ### 3. Invalidate all sessions and tokens
@@ -254,10 +246,10 @@ After recovery, review the [hardening checklist](#hardening-checklist) before br
 ```env
 APP_ENV=prod
 APP_SECRET=<generate with: php -r 'echo bin2hex(random_bytes(32));'>
-APP_URL=https://baander.example.com
-APP_DOMAIN=baander.example.com
+APP_URL=https://baander.app
+APP_DOMAIN=baander.app
 APP_NAME=Bånder
-DEFAULT_URI=https://baander.example.com
+DEFAULT_URI=https://baander.app
 
 DATABASE_URL="postgresql://baander:<strong_password>@database:5432/baander?serverVersion=18&charset=utf8"
 
@@ -266,7 +258,7 @@ REDIS_URL=redis://default:<strong_password>@redis:6379
 MESSENGER_TRANSPORT_DSN=redis://default:<strong_password>@redis:6379/messages
 MESSENGER_CONSUMER_NAME=${HOSTNAME:-worker}
 
-MAILER_DSN=smtp://user:pass@smtp.example.com:587
+MAILER_DSN=smtp://user:pass@smtp.baander.app:587
 
 VAPID_PUBLIC_KEY=<from app:generate-vapid-keys>
 VAPID_PRIVATE_KEY=<from app:generate-vapid-keys>
