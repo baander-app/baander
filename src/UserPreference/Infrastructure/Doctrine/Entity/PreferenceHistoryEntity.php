@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Infrastructure\Doctrine\Entity;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -18,9 +17,8 @@ class PreferenceHistoryEntity
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
 
-    #[ORM\ManyToOne(targetEntity: UserEntity::class)]
-    #[ORM\JoinColumn(name: 'user_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
-    private UserEntity $user;
+    #[ORM\Column(name: 'user_id', type: 'uuid')]
+    private Uuid $userId;
 
     #[ORM\Column(type: 'text')]
     private string $preferenceType;
@@ -48,17 +46,12 @@ class PreferenceHistoryEntity
 
     public function getUserId(): Uuid
     {
-        return $this->user->getId();
+        return $this->userId;
     }
 
-    public function getUser(): UserEntity
+    public function setUserId(Uuid $userId): void
     {
-        return $this->user;
-    }
-
-    public function setUser(UserEntity $user): void
-    {
-        $this->user = $user;
+        $this->userId = $userId;
     }
 
     public function getPreferenceType(): string

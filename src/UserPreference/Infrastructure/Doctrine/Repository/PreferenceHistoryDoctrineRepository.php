@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Infrastructure\Doctrine\Repository;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Uuid;
 use App\UserPreference\Domain\Model\PreferenceHistory;
 use App\UserPreference\Domain\Model\PreferenceHistoryState;
@@ -27,7 +26,7 @@ final class PreferenceHistoryDoctrineRepository implements PreferenceHistoryRepo
         $entities = $this->entityManager
             ->getRepository(PreferenceHistoryEntity::class)
             ->findBy(
-                ['user' => $userId, 'preferenceType' => $preferenceType],
+                ['userId' => $userId, 'preferenceType' => $preferenceType],
                 ['version' => 'DESC'],
                 $limit,
             );
@@ -40,7 +39,7 @@ final class PreferenceHistoryDoctrineRepository implements PreferenceHistoryRepo
         $entity = $this->entityManager
             ->getRepository(PreferenceHistoryEntity::class)
             ->findOneBy([
-                'user' => $userId,
+                'userId' => $userId,
                 'preferenceType' => $preferenceType,
                 'version' => $version,
             ]);
@@ -85,7 +84,7 @@ final class PreferenceHistoryDoctrineRepository implements PreferenceHistoryRepo
 
     private function syncToEntity(PreferenceHistory $model, PreferenceHistoryEntity $entity): void
     {
-        $entity->setUser($this->entityManager->getReference(UserEntity::class, $model->getUserId()));
+        $entity->setUserId($model->getUserId());
         $entity->setPreferenceType($model->getPreferenceType());
         $entity->setVersion($model->getVersion());
         $entity->setPayload($model->getPayload());

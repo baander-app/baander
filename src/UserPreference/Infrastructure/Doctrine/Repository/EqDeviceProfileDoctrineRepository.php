@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Infrastructure\Doctrine\Repository;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Uuid;
 use App\UserPreference\Domain\Model\EqDeviceProfile;
 use App\UserPreference\Domain\Model\EqDeviceProfileState;
@@ -26,7 +25,7 @@ final class EqDeviceProfileDoctrineRepository implements EqDeviceProfileReposito
     {
         $entities = $this->entityManager
             ->getRepository(EqDeviceProfileEntity::class)
-            ->findBy(['user' => $userId], ['sortOrder' => 'ASC']);
+            ->findBy(['userId' => $userId], ['sortOrder' => 'ASC']);
 
         return array_map(fn (EqDeviceProfileEntity $entity) => $this->toDomain($entity), $entities);
     }
@@ -44,7 +43,7 @@ final class EqDeviceProfileDoctrineRepository implements EqDeviceProfileReposito
     {
         $entity = $this->entityManager
             ->getRepository(EqDeviceProfileEntity::class)
-            ->findOneBy(['user' => $userId, 'isDefault' => true]);
+            ->findOneBy(['userId' => $userId, 'isDefault' => true]);
 
         return $entity !== null ? $this->toDomain($entity) : null;
     }
@@ -53,7 +52,7 @@ final class EqDeviceProfileDoctrineRepository implements EqDeviceProfileReposito
     {
         $entity = $this->entityManager
             ->getRepository(EqDeviceProfileEntity::class)
-            ->findOneBy(['user' => $userId, 'deviceId' => $deviceId]);
+            ->findOneBy(['userId' => $userId, 'deviceId' => $deviceId]);
 
         return $entity !== null ? $this->toDomain($entity) : null;
     }
@@ -112,7 +111,7 @@ final class EqDeviceProfileDoctrineRepository implements EqDeviceProfileReposito
 
     private function syncToEntity(EqDeviceProfile $model, EqDeviceProfileEntity $entity): void
     {
-        $entity->setUser($this->entityManager->getReference(UserEntity::class, $model->getUserId()));
+        $entity->setUserId($model->getUserId());
         $entity->setName($model->getName());
         $entity->setIcon($model->getIcon());
         $entity->setDeviceId($model->getDeviceId());

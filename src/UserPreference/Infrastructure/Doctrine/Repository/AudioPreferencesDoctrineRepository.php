@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Infrastructure\Doctrine\Repository;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Uuid;
 use App\UserPreference\Domain\Model\AudioPreferences;
 use App\UserPreference\Domain\Model\AudioPreferencesState;
@@ -23,7 +22,7 @@ final class AudioPreferencesDoctrineRepository implements AudioPreferencesReposi
     {
         $entity = $this->entityManager
             ->getRepository(AudioPreferencesEntity::class)
-            ->findOneBy(['user' => $userId]);
+            ->findOneBy(['userId' => $userId]);
 
         if ($entity === null) {
             return null;
@@ -72,7 +71,7 @@ final class AudioPreferencesDoctrineRepository implements AudioPreferencesReposi
 
     private function syncToEntity(AudioPreferences $model, AudioPreferencesEntity $entity): void
     {
-        $entity->setUser($this->entityManager->getReference(UserEntity::class, $model->getUserId()));
+        $entity->setUserId($model->getUserId());
         $entity->setPayload($model->getPayload());
         $entity->setVersion($model->getVersion());
     }

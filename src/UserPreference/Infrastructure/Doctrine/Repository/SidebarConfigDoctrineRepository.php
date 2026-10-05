@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Infrastructure\Doctrine\Repository;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Uuid;
 use App\UserPreference\Domain\Model\SidebarConfig;
 use App\UserPreference\Domain\Model\SidebarConfigState;
@@ -32,7 +31,7 @@ final class SidebarConfigDoctrineRepository implements SidebarConfigRepositoryIn
         }
 
         $entity = new SidebarConfigEntity($config->getId());
-        $entity->setUser($this->entityManager->getReference(UserEntity::class, $config->getUserId()));
+        $entity->setUserId($config->getUserId());
         $entity->setMediaType($config->getMediaType());
         $entity->setItems($this->itemsToArray($config->getItems()));
 
@@ -65,7 +64,7 @@ final class SidebarConfigDoctrineRepository implements SidebarConfigRepositoryIn
     {
         return $this->entityManager
             ->getRepository(SidebarConfigEntity::class)
-            ->findOneBy(['user' => $userId, 'mediaType' => $mediaType]);
+            ->findOneBy(['userId' => $userId, 'mediaType' => $mediaType]);
     }
 
     private function toDomain(SidebarConfigEntity $entity): SidebarConfig

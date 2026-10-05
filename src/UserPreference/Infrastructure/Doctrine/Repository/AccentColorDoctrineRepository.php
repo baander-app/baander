@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Infrastructure\Doctrine\Repository;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Uuid;
 use App\UserPreference\Domain\Repository\AccentColorRepositoryInterface;
 use App\UserPreference\Infrastructure\Doctrine\Entity\UserAccentColorEntity;
@@ -21,7 +20,7 @@ final class AccentColorDoctrineRepository implements AccentColorRepositoryInterf
     {
         $entity = $this->entityManager
             ->getRepository(UserAccentColorEntity::class)
-            ->findOneBy(['user' => $userId]);
+            ->findOneBy(['userId' => $userId]);
 
         return $entity?->getAccentColor();
     }
@@ -30,7 +29,7 @@ final class AccentColorDoctrineRepository implements AccentColorRepositoryInterf
     {
         $existing = $this->entityManager
             ->getRepository(UserAccentColorEntity::class)
-            ->findOneBy(['user' => $userId]);
+            ->findOneBy(['userId' => $userId]);
 
         if ($existing !== null) {
             $existing->setAccentColor($color);
@@ -40,7 +39,7 @@ final class AccentColorDoctrineRepository implements AccentColorRepositoryInterf
         }
 
         $entity = new UserAccentColorEntity(Uuid::generate());
-        $entity->setUser($this->entityManager->getReference(UserEntity::class, $userId));
+        $entity->setUserId($userId);
         $entity->setAccentColor($color);
 
         $this->entityManager->persist($entity);

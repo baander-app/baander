@@ -185,6 +185,9 @@ services:
     App\Shared\Infrastructure\Doctrine\EventListener\GeneratePublicIdListener:
         tags: [ { name: 'doctrine.event_listener', event: 'prePersist' } ]
 
+    App\Shared\Infrastructure\Doctrine\EventListener\PreferenceOwnershipSchemaListener:
+        tags: [ { name: 'doctrine.event_listener', event: 'postGenerateSchema' } ]
+
     # --- Doctrine Platform Extensions ---
 
     # --- PSR-7 / HTTP Message Bridge ---
