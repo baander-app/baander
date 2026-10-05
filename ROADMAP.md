@@ -10,6 +10,19 @@ Continue local implementation and emulated acceptance; actual regional deploymen
 regional measurements, and backup-destination restore qualification remain pending.
 React Native and Android work is deferred at the user's request (2026-10-05).
 
+## Current quality-gate checkpoint
+
+Fresh-process PHPUnit sharding keeps the 512 MiB PHP limit and completes the full
+Unit/StaticAnalysisRules (4,603 tests, 19,444 assertions), Functional (1,020 tests,
+8,030 assertions), and Integration (736 tests, 8,487 assertions) suites. The CI
+image now includes nginx; real development and production config syntax checks
+pass and reject malformed config or a missing binary. The startup-unavailable 503
+OpenAPI responses match the shared error envelope, the generated web client is
+updated, specification drift and web typechecking pass, and full PHPStan has zero
+errors. Deptrac still has 282 active violations, so release quality gates are not
+fully green. Local coverage-merging checks pass; the full instrumented CI coverage
+run remains unverified on this host.
+
 ## Latest verified backend batches
 
 Push registration now atomically creates or rotates an owned endpoint. Unrelated
@@ -581,6 +594,19 @@ losing acknowledged metadata or revisions. These local tests do not qualify
 regional latency, constrained capacity, soak or backup restoration. The C++
 container deployment path now replaces the obsolete PHP registry source/config;
 local SQLite files and existing volumes remain untouched.
+The live contract also stops a majority including the leader: two of three and
+three of five voters. Running APIs reject authoritative lookup, registration, and
+readiness checks with 503 and `Retry-After: 1` while liveness stays healthy. Both
+clusters recover persisted acknowledged records and revisions within 30 seconds
+after voter restart. The three-node release gate and explicit three/five-node
+ThreadSanitizer runs pass; regional failure and capacity gates remain open.
+An authenticated binary backup now restores into separate fresh voter storage
+with a new CA before the API starts. The fixture checks SQLite integrity,
+schema checksum, credential digests, ownership, saved revisions, an absent
+post-backup sentinel, and convergence on each voter. The release recipe's
+three-voter run and an explicit five-voter restore pass. Scheduled encrypted
+and versioned S3 backups, their destination restore, five-minute RPO, 30-minute
+RTO, and resource-constrained backup operation remain unqualified.
 Clean release and ASan/LeakSanitizer/UBSan builds now pass through
 `scripts/test-registry.sh`, which verifies downloaded rqlite/OpenSSL checksums and
 isolates OpenSSL dependency discovery. Both CI matrix variants are required before
@@ -682,9 +708,11 @@ release, without weakening consistency or increasing the agreed host budget.
   No blanket suppressions or inflated baselines. Verify the
   correct Symfony/Vite artifacts, Composer extensions, isolated CI networks,
   matching Redis credentials, and explicitly failing readiness timeouts.
-  Removing the ineffective PKCE lookup lowered active violations to 284, with
-  zero configuration errors; League exchange tests reject missing and incorrect
-  verifiers from codes issued by the controller.
+  Removing the ineffective PKCE lookup lowered active violations to 284; the
+  lyrics bulk-fetch role check lowered them to 282 without changing the
+  superadmin-only firewall behavior. League exchange tests reject missing and
+  incorrect verifiers from codes issued by the controller. Deptrac still reports
+  zero configuration errors.
 
 ### Worker architecture and resource control
 
