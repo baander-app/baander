@@ -14,7 +14,7 @@ if (!is_array($arguments)) {
     throw new RuntimeException('Invalid isolated worker command arguments.');
 }
 [$script, $mode, $namespace, $bootId] = $arguments + [null, null, null, null];
-if (!in_array($mode, ['ready', 'kill-consumer', 'kill-scheduler', 'reserved', 'expire', 'seed-outbox', 'verify-outbox', 'replay-outbox', 'seed-scheduler', 'verify-scheduler', 'replay-scheduler'], true)
+if (!in_array($mode, ['hold-relay-claim', 'release-relay-claim', 'verify-claim-blocked', 'verify-claim-contained', 'verify-claim-recovered', 'kill-relay-claimed', 'ready', 'kill-consumer', 'kill-scheduler', 'reserved', 'expire', 'seed-outbox', 'verify-outbox', 'replay-outbox', 'seed-scheduler', 'verify-scheduler', 'replay-scheduler'], true)
     || !is_string($namespace) || !is_string($bootId)) {
     throw new RuntimeException('Invalid isolated worker check request.');
 }
@@ -24,6 +24,81 @@ if (!$url) {
     throw new RuntimeException('Disposable DATABASE_URL is required.');
 }
 $db = DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url));
+// This gate belongs only to the disposable database. The initial claim commits
+// before the next UPDATE (renewLease) blocks, so SIGKILL cannot roll the claim back.
+if ($mode === 'hold-relay-claim') {
+    $db->executeQuery('SELECT pg_advisory_lock(87365021)')->free();
+    $db->executeStatement(<<<'SQL'
+        CREATE FUNCTION worker_command_claim_gate() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            IF OLD.lease_token IS NOT NULL AND NEW.lease_token = OLD.lease_token AND NEW.relayed_at IS NULL THEN
+                PERFORM pg_advisory_xact_lock(87365021);
+            END IF;
+            RETURN NEW;
+        END;
+        $$
+        SQL);
+    $db->executeStatement('CREATE TRIGGER worker_command_claim_gate BEFORE UPDATE ON domain_event_outbox FOR EACH ROW EXECUTE FUNCTION worker_command_claim_gate()');
+    echo "Claim gate armed.\n";
+    flush();
+    $db->executeQuery('SELECT pg_sleep(120)')->free();
+    throw new RuntimeException('Claim gate exceeded its bounded lifetime.');
+}
+if ($mode === 'release-relay-claim') {
+    $db->executeStatement('DROP TRIGGER worker_command_claim_gate ON domain_event_outbox');
+    $db->executeStatement('DROP FUNCTION worker_command_claim_gate()');
+    echo "Disposable claim gate removed.\n";
+    exit(0);
+}
+$claimedEvent = null;
+if (in_array($mode, ['verify-claim-blocked', 'verify-claim-contained', 'kill-relay-claimed'], true)) {
+    $claimedEvent = $db->fetchAssociative(<<<'SQL'
+        SELECT id, lease_token, lease_until FROM domain_event_outbox
+        WHERE event_name = 'user.registered' AND payload->>'email' = :email
+            AND lease_token IS NOT NULL AND lease_until > clock_timestamp()
+            AND relayed_at IS NULL AND attempts = 0 AND next_attempt_at IS NULL AND dead_lettered_at IS NULL
+        SQL, ['email' => 'worker-command@baander.app']);
+    if ($claimedEvent === false || (int) $db->fetchOne('SELECT count(*) FROM notifications') !== 0
+        || (int) $db->fetchOne('SELECT count(*) FROM domain_event_outbox_receipt') !== 0
+        || (int) $db->fetchOne('SELECT count(*) FROM domain_event_outbox_delivery') !== 0) {
+        throw new RuntimeException('Claim must be committed and unexpired with zero projection, receipt, delivery or failure effects.');
+    }
+    $blocked = (int) $db->fetchOne(<<<'SQL'
+        SELECT count(*) FROM pg_locks l JOIN pg_stat_activity a ON a.pid = l.pid
+        WHERE l.locktype = 'advisory' AND l.classid = 0 AND l.objid = 87365021
+            AND NOT l.granted AND a.query LIKE 'UPDATE domain_event_outbox SET lease_until%'
+        SQL);
+    if ($mode === 'verify-claim-contained') {
+        if ($blocked !== 0 || ($arguments[4] ?? null) !== $claimedEvent['lease_token']
+            || ($arguments[5] ?? null) !== $claimedEvent['lease_until']) {
+            throw new RuntimeException('Contained relay must leave the same committed claim with no blocked backend: ' . json_encode(['blocked' => $blocked, 'sameToken' => ($arguments[4] ?? null) === $claimedEvent['lease_token'], 'sameExpiry' => ($arguments[5] ?? null) === $claimedEvent['lease_until']], JSON_THROW_ON_ERROR));
+        }
+        echo "Contained relay left its original unexpired claim and zero effects.\n";
+        exit(0);
+    }
+    if ($blocked !== 1) {
+        throw new RuntimeException('Relay has not reached the committed-claim renewal boundary.');
+    }
+    if ($mode === 'verify-claim-blocked') {
+        echo json_encode($claimedEvent, JSON_THROW_ON_ERROR) . "\n";
+        exit(0);
+    }
+}
+if ($mode === 'verify-claim-recovered') {
+    $originalExpiry = $arguments[4] ?? null;
+    if (!is_string($originalExpiry) || $originalExpiry === ''
+        || (int) $db->fetchOne(<<<'SQL'
+            SELECT count(*) FROM domain_event_outbox_receipt r
+            JOIN domain_event_outbox o ON o.id = r.outbox_id
+            WHERE o.event_name = 'user.registered' AND o.payload->>'email' = :email
+                AND o.relayed_at IS NOT NULL AND o.lease_token IS NULL AND o.lease_until IS NULL
+                AND r.consumer = 'notifications.v1' AND r.processed_at >= CAST(:originalExpiry AS timestamptz)
+            SQL, ['email' => 'worker-command@baander.app', 'originalExpiry' => $originalExpiry]) !== 1) {
+        throw new RuntimeException('The single projection receipt must be committed after the original claim naturally expires.');
+    }
+    echo "Projection receipt committed after the unchanged original claim expiry.\n";
+    exit(0);
+}
 if ($mode === 'seed-scheduler') {
     $job = App\Shared\Domain\Model\Uuid::v7();
     $request = App\Shared\Domain\Model\Uuid::v7();
@@ -206,6 +281,9 @@ $consumers = $redis->xInfo('CONSUMERS', 'messages', 'baander');
 $expected = 'worker-' . substr(hash('sha256', $namespace), 0, 16) . '-' . $bootId . '-consumer-1';
 if (!is_array($consumers) || !in_array($expected, array_column($consumers, 'name'), true)) {
     throw new RuntimeException('Expected Redis consumer ' . $expected . '; observed ' . json_encode($consumers, JSON_THROW_ON_ERROR));
+}
+if ($mode === 'kill-relay-claimed' && !posix_kill($roles['relay'], SIGKILL)) {
+    throw new RuntimeException('Could not kill the direct relay child at its committed claim boundary.');
 }
 if ($mode === 'kill-consumer' && !posix_kill($roles['consumer'], SIGKILL)) {
     throw new RuntimeException('Could not kill the disposable consumer fixture.');

@@ -72,6 +72,13 @@ attempts the pinned local destination even with a proxy configured. The 76 webho
 units, 18 functional controller tests, and full PHPStan scan pass. The notification
 runbook now describes the sole encrypted original-secret format.
 
+The current supervised `app:worker` Docker drill now kills the direct outbox relay
+after a committed claim and before projection. It proves child containment,
+unchanged claim token and expiry, zero pre-recovery effects, and a replacement
+worker's single projection receipt after the original 60-second lease expires.
+The full worker drill passes. Consumer and transport-acknowledgement crash points
+remain separate acceptance work.
+
 Deptrac resource layers now enforce the documented resource-to-model exception
 without allowing controllers to depend on domain models. A real Deptrac fixture
 tests both sides. Removed 23 obsolete resource baseline pairs and the removed

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 if [ "${BAANDER_WORKER_COMMAND_TIMEOUT_ACTIVE:-0}" != 1 ]; then
-    exec env BAANDER_WORKER_COMMAND_TIMEOUT_ACTIVE=1 timeout 240s bash "$0" "$@"
+    exec env BAANDER_WORKER_COMMAND_TIMEOUT_ACTIVE=1 timeout 300s bash "$0" "$@"
 fi
 cd "$(dirname "$0")/.."
 run_id="baander-worker-command-$(date +%s)-$$"
@@ -17,9 +17,11 @@ docker network create --internal "$run_id" >/dev/null
 docker volume create "$run_id-workspace" >/dev/null
 docker run -d --name "$run_id-redis" --network "$run_id" --network-alias redis \
     -e REDIS_ARGS='--requirepass test-only' redis/redis-stack-server:edge >/dev/null
+# The test gate blocks a query; promptly detect the killed client while it waits.
 docker run -d --name "$run_id-postgres" --network "$run_id" --network-alias postgres \
     -e POSTGRES_USER=baander -e POSTGRES_PASSWORD=test-only -e POSTGRES_DB=worker_command_test \
-    "${BAANDER_TEST_POSTGRES_IMAGE:-baander-database:latest}" >/dev/null
+    "${BAANDER_TEST_POSTGRES_IMAGE:-baander-database:latest}" \
+    postgres -c client_connection_check_interval=100ms >/dev/null
 ready=false
 for attempt in $(seq 1 30); do
     if docker exec "$run_id-postgres" pg_isready -h 127.0.0.1 -U baander -d worker_command_test >/dev/null 2>&1 &&
@@ -59,7 +61,6 @@ tar -cf - "${archive_paths[@]}" |
         php -d memory_limit=512M bin/console doctrine:migrations:migrate --no-interaction --env=prod
         php -d memory_limit=512M bin/console doctrine:migrations:migrate --no-interaction --env=prod
         php -d memory_limit=256M tests/Fixtures/Worker/worker-command-check.php seed-outbox baander.app:commandtest aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-        php -d memory_limit=256M tests/Fixtures/Worker/worker-command-check.php seed-scheduler baander.app:commandtest aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     '
 
 launch() {
@@ -127,8 +128,8 @@ PYSUMMARY
     test "$(docker inspect --format '{{.State.Pid}}' "$container")" = 0
 }
 await_outbox() {
-    local container="$1"
-    for attempt in $(seq 1 30); do
+    local container="$1" attempts="${2:-30}"
+    for attempt in $(seq 1 "$attempts"); do
         if docker exec "$container" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php verify-outbox baander.app:commandtest aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa > "/tmp/$container-outbox" 2>&1; then
             cat "/tmp/$container-outbox"
             rm -f "/tmp/$container-outbox"
@@ -163,11 +164,55 @@ reserved() {
         -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php reserved "$1" "$2"
 }
 
+# Block only the first renewal, after the event claim's autocommit boundary.
+claim_boot="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
+claim_namespace=baander.app:commandclaimcrash
+containers+=("$run_id-claim-gate")
+docker run -d --name "$run_id-claim-gate" "${common[@]}" --entrypoint php "$app_image" \
+    -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php hold-relay-claim "$claim_namespace" "$claim_boot" >/dev/null
+gate_ready=false
+for attempt in $(seq 1 30); do
+    if docker logs "$run_id-claim-gate" 2>&1 | grep -qx 'Claim gate armed.'; then
+        gate_ready=true
+        break
+    fi
+    sleep 0.2
+done
+if [ "$gate_ready" != true ]; then
+    docker logs "$run_id-claim-gate" >&2
+    exit 1
+fi
+launch "$run_id-claim-crash" "$claim_namespace" "$claim_boot"
+await_ready "$run_id-claim-crash" "$claim_namespace" "$claim_boot"
+claim_snapshot=""
+for attempt in $(seq 1 30); do
+    if claim_snapshot="$(docker exec "$run_id-claim-crash" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php verify-claim-blocked "$claim_namespace" "$claim_boot" 2>/dev/null)"; then
+        break
+    fi
+    sleep 0.2
+done
+claim_token="$(python3 -c 'import json, sys; print(json.loads(sys.argv[1])["lease_token"])' "$claim_snapshot")"
+claim_until="$(python3 -c 'import json, sys; print(json.loads(sys.argv[1])["lease_until"])' "$claim_snapshot")"
+[[ "$claim_token" =~ ^[a-f0-9]{64}$ ]]
+docker exec "$run_id-claim-crash" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php kill-relay-claimed "$claim_namespace" "$claim_boot"
+await_exit "$run_id-claim-crash" 1 3
+reserved "$claim_namespace" "$claim_boot"
+docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_image" \
+    -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php verify-claim-contained "$claim_namespace" "$claim_boot" "$claim_token" "$claim_until"
+docker rm -f "$run_id-claim-gate" >/dev/null
+docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_image" \
+    -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php release-relay-claim "$claim_namespace" "$claim_boot"
+docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_image" \
+    -d memory_limit=256M tests/Fixtures/Worker/worker-command-check.php seed-scheduler baander.app:commandtest aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
 boot="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
 namespace=baander.app:commandtest
 launch "$run_id-crash" "$namespace" "$boot"
 await_ready "$run_id-crash" "$namespace" "$boot"
-await_outbox "$run_id-crash"
+docker exec "$run_id-crash" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php verify-claim-contained "$namespace" "$boot" "$claim_token" "$claim_until"
+# No lease rewrite: the supervised relay must wait for natural 60-second claim expiry.
+await_outbox "$run_id-crash" 350
+docker exec "$run_id-crash" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php verify-claim-recovered "$namespace" "$boot" "$claim_until"
 await_scheduler "$run_id-crash" "$namespace" "$boot"
 docker exec "$run_id-crash" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php replay-outbox "$namespace" "$boot"
 await_outbox "$run_id-crash"
@@ -206,4 +251,4 @@ docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_
 # Allow the renewal schedule plus its bounded 35-second drain and harness headroom.
 await_exit "$run_id-expiry" 1 3 60
 reserved "$expiry_namespace" "$expiry_boot"
-echo 'Real app:worker manual occurrence/replay, consumer/scheduler crash, TERM, same-boot denial, and renewal loss acceptance passed; reservations remain active.'
+echo 'Real app:worker committed-claim relay SIGKILL/natural expiry recovery, manual occurrence/replay, consumer/scheduler crash, TERM, same-boot denial, and renewal loss acceptance passed; reservations remain active.'
