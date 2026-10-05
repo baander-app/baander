@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional;
 
+use App\Catalog\Application\Command\BatchExtractCoversCommand;
 use App\Library\Application\Command\ScanLibraryCommand;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Media\Application\Command\PruneMissingImagesCommand;
@@ -29,6 +30,7 @@ final class MessagingCodecWiringTest extends KernelTestCase
         $standalone = MessageCodecFactory::create();
         $id = Uuid::generate();
         $messages = [
+            new BatchExtractCoversCommand(),
             new ScanLibraryCommand(new LibrarySlug('music'), true),
             new PruneMissingImagesCommand(),
             new ExtractAlbumCoverCommand($id),

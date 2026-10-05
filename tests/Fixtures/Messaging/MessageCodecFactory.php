@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Fixtures\Messaging;
 
+use App\Catalog\Infrastructure\Messaging\CatalogMessagePayloadCodec;
 use App\Library\Infrastructure\Messaging\LibraryMessagePayloadCodec;
 use App\Media\Infrastructure\Messaging\MediaMessagePayloadCodec;
 use App\Metadata\Infrastructure\Messaging\MetadataMessagePayloadCodec;
@@ -20,6 +21,7 @@ final class MessageCodecFactory
     public static function create(int $maxPayloadSize = 1_048_576): JsonMessageCodec
     {
         return new JsonMessageCodec([
+            new CatalogMessagePayloadCodec(),
             new LibraryMessagePayloadCodec(),
             new MediaMessagePayloadCodec(),
             new MetadataMessagePayloadCodec(),

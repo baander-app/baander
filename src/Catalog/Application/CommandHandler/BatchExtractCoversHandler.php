@@ -20,7 +20,7 @@ final class BatchExtractCoversHandler
     ) {
     }
 
-    #[AsMessageHandler(fromTransport: 'swoole_task')]
+    #[AsMessageHandler(fromTransport: 'async')]
     public function __invoke(BatchExtractCoversCommand $command): int
     {
         $limit = 500;

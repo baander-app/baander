@@ -54,6 +54,9 @@ framework:
         failure_transport: failed
 
         routing:
+            # Catalog
+            'App\Catalog\Application\Command\BatchExtractCoversCommand': async
+
             # Library
             'App\Library\Application\Command\ScanLibraryCommand': swoole_task
             'App\Library\Application\Message\FilesDiscovered': async
