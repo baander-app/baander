@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Docker;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Filesystem\Filesystem;
 
 /**
  * Validates both nginx configs: the dev template (envsubst) and the
@@ -69,7 +70,7 @@ final class NginxTemplateTest extends TestCase
      */
     public function testSubstitutionWithComplexDomain(): void
     {
-        $domain = 'my-app.staging.example.co.uk';
+        $domain = 'my-app.staging.baander.app';
         $config = $this->substitute($domain);
 
         $this->assertStringNotContainsString('${SERVER_NAME}', $config);
@@ -77,14 +78,14 @@ final class NginxTemplateTest extends TestCase
     }
 
     /**
-     * Substitution with localhost works (dev scenario).
+     * Substitution with the literal loopback address works (dev scenario).
      */
     public function testSubstitutionWithLocalhost(): void
     {
-        $config = $this->substitute('localhost');
+        $config = $this->substitute('127.0.0.1');
 
         $this->assertStringNotContainsString('${SERVER_NAME}', $config);
-        $this->assertStringContainsString('server_name localhost;', $config);
+        $this->assertStringContainsString('server_name 127.0.0.1;', $config);
     }
 
     /**
@@ -105,7 +106,7 @@ final class NginxTemplateTest extends TestCase
      */
     public function testSubstitutedConfigContainsAllLocationBlocks(): void
     {
-        $config = $this->substitute('baander.test');
+        $config = $this->substitute('baander.app');
 
         $expectedLocations = [
             'location ~ ^/api/stream/.+\.m4s$',
@@ -126,7 +127,7 @@ final class NginxTemplateTest extends TestCase
      */
     public function testSubstitutedConfigHasBothServerBlocks(): void
     {
-        $config = $this->substitute('baander.test');
+        $config = $this->substitute('baander.app');
 
         preg_match_all('/^server\s*\{/m', $config, $matches);
         $this->assertCount(2, $matches[0], 'Config must have exactly 2 server blocks (HTTP redirect + HTTPS).');
@@ -137,7 +138,7 @@ final class NginxTemplateTest extends TestCase
      */
     public function testHttpsServerBlockHasSslDirectives(): void
     {
-        $config = $this->substitute('baander.test');
+        $config = $this->substitute('baander.app');
 
         $this->assertStringContainsString('listen 443 ssl;', $config);
         $this->assertStringContainsString('ssl_certificate', $config);
@@ -149,7 +150,7 @@ final class NginxTemplateTest extends TestCase
      */
     public function testUpstreamHasKeepalive(): void
     {
-        $config = $this->substitute('baander.test');
+        $config = $this->substitute('baander.app');
 
         $this->assertStringContainsString('keepalive 64;', $config);
     }
@@ -159,7 +160,7 @@ final class NginxTemplateTest extends TestCase
      */
     public function testNoTrailingSlashInTryFiles(): void
     {
-        $config = $this->substitute('baander.test');
+        $config = $this->substitute('baander.app');
 
         $this->assertStringNotContainsString('$uri/', $config);
     }
@@ -169,7 +170,7 @@ final class NginxTemplateTest extends TestCase
      */
     public function testClientMaxBodySize100m(): void
     {
-        $config = $this->substitute('baander.test');
+        $config = $this->substitute('baander.app');
 
         $this->assertStringContainsString('client_max_body_size 100m;', $config);
     }
@@ -179,7 +180,7 @@ final class NginxTemplateTest extends TestCase
      */
     public function testUsesLimitExceptNotIf(): void
     {
-        $config = $this->substitute('baander.test');
+        $config = $this->substitute('baander.app');
 
         $this->assertStringContainsString('limit_except GET POST HEAD OPTIONS PUT DELETE PATCH', $config);
         $this->assertStringNotContainsString('if ($request_method', $config);
@@ -190,7 +191,7 @@ final class NginxTemplateTest extends TestCase
      */
     public function testGzipIsEnabled(): void
     {
-        $config = $this->substitute('baander.test');
+        $config = $this->substitute('baander.app');
 
         $this->assertStringContainsString('gzip on;', $config);
         $this->assertStringContainsString('gzip_vary on;', $config);
@@ -212,7 +213,7 @@ final class NginxTemplateTest extends TestCase
      */
     public function testSslProtocolsModern(): void
     {
-        $config = $this->substitute('baander.test');
+        $config = $this->substitute('baander.app');
 
         $this->assertStringContainsString('ssl_protocols TLSv1.2 TLSv1.3;', $config);
         $this->assertStringNotContainsString('TLSv1;', $config);
@@ -224,7 +225,7 @@ final class NginxTemplateTest extends TestCase
      */
     public function testSslSessionCache(): void
     {
-        $config = $this->substitute('baander.test');
+        $config = $this->substitute('baander.app');
 
         $this->assertStringContainsString('ssl_session_cache shared:SSL:10m;', $config);
         $this->assertStringContainsString('ssl_session_timeout 1d;', $config);
@@ -235,7 +236,7 @@ final class NginxTemplateTest extends TestCase
      */
     public function testSecurityHeaders(): void
     {
-        $config = $this->substitute('baander.test');
+        $config = $this->substitute('baander.app');
 
         $this->assertStringContainsString('X-Content-Type-Options nosniff', $config);
         $this->assertStringContainsString('Strict-Transport-Security', $config);
@@ -243,35 +244,83 @@ final class NginxTemplateTest extends TestCase
     }
 
     /**
-     * If nginx is available, validate the substituted config syntax.
+     * Validate the substituted development config with a real nginx process.
      */
     public function testNginxSyntaxValidation(): void
     {
+        $this->assertNginxConfigValid($this->substitute('syntax.baander.app'));
+    }
+
+    public function testProdNginxSyntaxValidation(): void
+    {
+        $this->assertNginxConfigValid($this->readProdConfig());
+    }
+
+    private function assertNginxConfigValid(string $config): void
+    {
         $nginxPath = $this->findNginxBinary();
-        if ($nginxPath === null) {
-            $this->markTestSkipped('nginx binary not found — syntax validation requires nginx to be installed.');
-        }
+        $this->assertNotNull($nginxPath, 'nginx must be installed to validate configuration syntax.');
 
-        $config = $this->substitute('baander.test');
-
-        $tmpFile = tempnam(sys_get_temp_dir(), 'nginx_test_');
-        file_put_contents($tmpFile, $config);
+        $directory = sys_get_temp_dir() . '/baander-nginx-' . bin2hex(random_bytes(8));
+        $filesystem = new Filesystem();
+        $filesystem->mkdir($directory, 0700);
 
         try {
-            exec("{$nginxPath} -t -c {$tmpFile} 2>&1", $output, $exitCode);
-            $outputStr = implode("\n", $output);
-
-            if (str_contains($outputStr, 'syntax error') || str_contains($outputStr, 'unexpected')) {
-                $this->fail("nginx syntax error: {$outputStr}");
+            if (str_contains($config, 'ssl_certificate ')) {
+                $this->writeTestCertificate($directory);
             }
 
-            $this->assertTrue(
-                str_contains($outputStr, 'test is successful') || str_contains($outputStr, 'syntax is ok') || $exitCode !== 0,
-                "nginx -t output: {$outputStr}",
+            // These files are http-context fragments. Replace only deployment
+            // dependencies so nginx can validate them without DNS or shared paths.
+            $config = str_replace([
+                'server app:9501;',
+                '/etc/nginx/certificates/cert.pem',
+                '/etc/nginx/certificates/key.pem',
+                '/var/log/nginx/access.log',
+                '/var/log/nginx/error.log',
+            ], [
+                'server 127.0.0.1:9501;',
+                $directory . '/cert.pem',
+                $directory . '/key.pem',
+                $directory . '/access.log',
+                $directory . '/error.log',
+            ], $config);
+
+            $wrapper = "pid {$directory}/nginx.pid;\n"
+                . "error_log {$directory}/error.log;\n"
+                . "events {}\nhttp {\n"
+                . "client_body_temp_path {$directory}/client-body;\n"
+                . "proxy_temp_path {$directory}/proxy;\n"
+                . "fastcgi_temp_path {$directory}/fastcgi;\n"
+                . "uwsgi_temp_path {$directory}/uwsgi;\n"
+                . "scgi_temp_path {$directory}/scgi;\n"
+                . $config . "\n}\n";
+            $configPath = $directory . '/nginx.conf';
+            $this->assertNotFalse(file_put_contents($configPath, $wrapper));
+
+            exec(
+                escapeshellarg($nginxPath) . ' -t -p ' . escapeshellarg($directory . '/')
+                . ' -e ' . escapeshellarg($directory . '/error.log')
+                . ' -c ' . escapeshellarg($configPath) . ' 2>&1',
+                $output,
+                $exitCode,
             );
+            $this->assertSame(0, $exitCode, "nginx -t failed:\n" . implode("\n", $output));
         } finally {
-            @unlink($tmpFile);
+            $filesystem->remove($directory);
         }
+    }
+
+    private function writeTestCertificate(string $directory): void
+    {
+        $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+        $this->assertNotFalse($key, 'Could not generate the nginx test private key.');
+        $request = openssl_csr_new(['commonName' => 'syntax.baander.app'], $key);
+        $this->assertNotFalse($request, 'Could not generate the nginx test certificate request.');
+        $certificate = openssl_csr_sign($request, null, $key, 1);
+        $this->assertNotFalse($certificate, 'Could not sign the nginx test certificate.');
+        $this->assertTrue(openssl_pkey_export_to_file($key, $directory . '/key.pem'));
+        $this->assertTrue(openssl_x509_export_to_file($certificate, $directory . '/cert.pem'));
     }
 
     // =========================================================================
@@ -418,11 +467,14 @@ final class NginxTemplateTest extends TestCase
 
     private function findNginxBinary(): ?string
     {
-        $candidates = ['nginx', '/usr/sbin/nginx', '/usr/local/sbin/nginx'];
-        foreach ($candidates as $path) {
-            exec("which {$path} 2>/dev/null", $output, $exit);
-            if ($exit === 0 && !empty($output)) {
-                return trim($output[0]);
+        $directories = explode(PATH_SEPARATOR, getenv('PATH') ?: '');
+        $directories[] = '/usr/sbin';
+        $directories[] = '/usr/local/sbin';
+
+        foreach (array_unique($directories) as $directory) {
+            $path = $directory . '/nginx';
+            if (is_file($path) && is_executable($path)) {
+                return $path;
             }
         }
 

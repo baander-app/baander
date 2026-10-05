@@ -538,6 +538,11 @@ FROM dev AS ci
 
 USER root
 
+# Validate both nginx configurations with the real binary in integration tests.
+RUN apt-get update -qq \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -yqq --no-install-recommends nginx \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy PHP config with higher memory limit for CI
 COPY ./docker/dev/php.ini /usr/local/etc/php/conf.d/zzz-baander.ini
 
