@@ -72,9 +72,7 @@ final class TranscodeSessionController
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
             new OA\Response(response: '503', description: 'Transcode startup is temporarily unavailable', headers: [
                 new OA\Header(header: 'Retry-After', schema: new OA\Schema(type: 'integer', example: 2)),
-            ], content: new OA\JsonContent(required: ['error'], properties: [
-                new OA\Property(property: 'error', ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
-            ])),
+            ], content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/', name: 'create', methods: ['POST'])]

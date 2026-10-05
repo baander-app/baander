@@ -45,12 +45,12 @@ final class TranscodeStartupUnavailableTest extends TestCase
                 self::assertSame('integer', $responseSchema['headers']['Retry-After']['schema']['type']);
                 self::assertSame(2, $responseSchema['headers']['Retry-After']['schema']['example']);
                 $schema = $responseSchema['content']['application/json']['schema'];
-                self::assertSame('object', $schema['type']);
-                self::assertContains('error', $schema['required']);
-                self::assertSame('#/components/schemas/ApiError', $schema['properties']['error']['$ref']);
+                self::assertSame('#/components/schemas/ApiError', $schema['$ref']);
             }
-            self::assertSame('string', $spec['components']['schemas']['ApiError']['properties']['message']['type']);
-            self::assertSame('integer', $spec['components']['schemas']['ApiError']['properties']['code']['type']);
+
+            $errorSchema = $spec['components']['schemas']['ApiError']['properties']['error'];
+            self::assertSame('string', $errorSchema['properties']['message']['type']);
+            self::assertSame('integer', $errorSchema['properties']['code']['type']);
             $bus = $container->get('transcode.startup.bus');
             self::assertInstanceOf(MessageBusInterface::class, $bus);
             try {

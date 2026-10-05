@@ -16288,15 +16288,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "required": [
-                                        "error"
-                                    ],
-                                    "properties": {
-                                        "error": {
-                                            "$ref": "#/components/schemas/ApiError"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -16643,15 +16635,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "required": [
-                                        "error"
-                                    ],
-                                    "properties": {
-                                        "error": {
-                                            "$ref": "#/components/schemas/ApiError"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
