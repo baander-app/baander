@@ -658,8 +658,13 @@ release, without weakening consistency or increasing the agreed host budget.
   ranges, disabled redirects, empty-by-default LAN allowlist, category validation,
   and original-secret signature verification. Since there is no production install,
   remove obsolete legacy formats rather than inventing compatibility obligations.
-- [ ] Complete bounded cover-extraction dispatch and safe secret/key replacement,
-  including file validation and a documented recovery path. Verify JSON seeking.
+- [ ] Complete safe secret/key replacement, including file validation and a
+  documented recovery path. Verify JSON seeking. Cover-batch dispatch now uses
+  the durable async transport and an explicit JSON message contract; a functional
+  test verifies request dispatch only queues the batch, then worker receipt fans
+  out extraction jobs. The seek broker retains the latest pending control signal
+  per job under bursts. Track streams use the current media read scope on every
+  request, including range retries.
 - [ ] Reconcile documented routes, OpenAPI schemas, generated clients, and identifier
   formats together. The initial review found 24 documented paths missing from the
   checked-in specification; keep automated drift checks blocking thereafter.
