@@ -644,16 +644,20 @@ release, without weakening consistency or increasing the agreed host budget.
   rollback recoverability on persistence/signing failure, and replay detection.
   Exercise expiry, logout, multiple tabs, concurrent requests, service-worker
   restart, nonce challenges, and foreign-origin credential exclusion together.
+  The real PostgreSQL/League transaction suite passes seven tests and 107
+  assertions; the combined browser/session qualification remains open.
 - [x] Verify actual Messenger middleware/Redis delivery when Swoole dispatch fails,
   concrete outbox consumers without replay re-enqueue, expiring leases across
   independent PostgreSQL connections, poison-event retry/dead-letter handling, and
   idempotent durable notification effects. External delivery remains at-least-once;
   uncertain outcomes are not represented as exactly-once.
-- [ ] Finish supervised crash tests at the consumer acknowledgement boundary.
+- [x] Finish supervised crash tests at the consumer acknowledgement boundary.
   Claim, mid-projection transaction, and Redis-send-before-delivery-ack crashes
   verify unchanged leases, rollback where needed, natural expiry, and recovery
   through the current worker runtime. The accepted-but-unacknowledged send is
-  replayed; external delivery remains at-least-once.
+  replayed. A consumer killed after handler return but before Redis XACK preserves
+  its committed receipt and run count when the exact pending entry is redelivered.
+  External delivery remains at-least-once.
 - [x] Test storage directory-boundary comparisons, validation before mkdir,
   traversal and symlink escapes across read/write/delete/derived-file resolution.
 - [x] Test webhook DNS and connection-time destination checks, corrected link-local
@@ -678,6 +682,9 @@ release, without weakening consistency or increasing the agreed host budget.
   No blanket suppressions or inflated baselines. Verify the
   correct Symfony/Vite artifacts, Composer extensions, isolated CI networks,
   matching Redis credentials, and explicitly failing readiness timeouts.
+  Removing the ineffective PKCE lookup lowered active violations to 284, with
+  zero configuration errors; League exchange tests reject missing and incorrect
+  verifiers from codes issued by the controller.
 
 ### Worker architecture and resource control
 
