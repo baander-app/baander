@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 if [ "${BAANDER_WORKER_COMMAND_TIMEOUT_ACTIVE:-0}" != 1 ]; then
-    exec env BAANDER_WORKER_COMMAND_TIMEOUT_ACTIVE=1 timeout 420s bash "$0" "$@"
+    exec env BAANDER_WORKER_COMMAND_TIMEOUT_ACTIVE=1 timeout 540s bash "$0" "$@"
 fi
 cd "$(dirname "$0")/.."
 run_id="baander-worker-command-$(date +%s)-$$"
@@ -268,6 +268,69 @@ docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_
     -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php \
     release-relay-projection "$projection_namespace" "$projection_boot"
 
+# Interrupt the first Redis handoff after acceptance, before the intent ACK.
+delivery_boot="$(python3 -c 'import secrets; print(secrets.token_hex(16))')"
+delivery_namespace=baander.app:commanddeliveryackcrash
+containers+=("$run_id-delivery-ack-gate")
+
+docker run -d --name "$run_id-delivery-ack-gate" "${common[@]}" --entrypoint php "$app_image" \
+    -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php \
+    hold-relay-delivery-ack "$delivery_namespace" "$delivery_boot" >/dev/null
+
+gate_ready=false
+for attempt in $(seq 1 30); do
+    if docker logs "$run_id-delivery-ack-gate" 2>&1 | grep -qx 'Delivery acknowledgement gate armed.'; then
+        gate_ready=true
+        break
+    fi
+    sleep 0.2
+done
+
+if [ "$gate_ready" != true ]; then
+    docker logs "$run_id-delivery-ack-gate" >&2
+    exit 1
+fi
+
+launch "$run_id-delivery-ack-crash" "$delivery_namespace" "$delivery_boot"
+await_ready "$run_id-delivery-ack-crash" "$delivery_namespace" "$delivery_boot"
+docker exec "$run_id-delivery-ack-crash" php -d memory_limit=64M \
+    tests/Fixtures/Worker/worker-command-check.php verify-projection-contained \
+    "$delivery_namespace" "$delivery_boot" "$projection_token" "$projection_until"
+
+delivery_snapshot=""
+for attempt in $(seq 1 350); do
+    if delivery_snapshot="$(docker exec "$run_id-delivery-ack-crash" php -d memory_limit=64M \
+        tests/Fixtures/Worker/worker-command-check.php verify-delivery-ack-blocked \
+        "$delivery_namespace" "$delivery_boot" 2>/dev/null)"; then
+        break
+    fi
+    sleep 0.2
+done
+
+if [ -z "$delivery_snapshot" ]; then
+    docker logs --tail 60 "$run_id-delivery-ack-crash" >&2
+    echo 'Relay did not reach the post-send delivery acknowledgement boundary.' >&2
+    exit 1
+fi
+
+docker exec "$run_id-delivery-ack-crash" php -d memory_limit=64M \
+    tests/Fixtures/Worker/worker-command-check.php verify-claim-recovered \
+    "$delivery_namespace" "$delivery_boot" "$projection_until"
+docker exec "$run_id-delivery-ack-crash" php -d memory_limit=64M \
+    tests/Fixtures/Worker/worker-command-check.php kill-relay-after-send \
+    "$delivery_namespace" "$delivery_boot"
+await_exit "$run_id-delivery-ack-crash" 1 3
+reserved "$delivery_namespace" "$delivery_boot"
+
+docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_image" \
+    -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php \
+    verify-delivery-ack-contained "$delivery_namespace" "$delivery_boot" "$delivery_snapshot"
+
+docker rm -f "$run_id-delivery-ack-gate" >/dev/null
+docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_image" \
+    -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php \
+    release-relay-delivery-ack "$delivery_namespace" "$delivery_boot"
+
 docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_image" \
     -d memory_limit=256M tests/Fixtures/Worker/worker-command-check.php seed-scheduler baander.app:commandtest aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
@@ -276,13 +339,13 @@ namespace=baander.app:commandtest
 launch "$run_id-crash" "$namespace" "$boot"
 await_ready "$run_id-crash" "$namespace" "$boot"
 docker exec "$run_id-crash" php -d memory_limit=64M \
-    tests/Fixtures/Worker/worker-command-check.php verify-projection-contained \
-    "$namespace" "$boot" "$projection_token" "$projection_until"
-# No lease rewrite: the supervised relay must wait for natural 60-second claim expiry.
+    tests/Fixtures/Worker/worker-command-check.php verify-delivery-ack-contained \
+    "$namespace" "$boot" "$delivery_snapshot"
+# No lease rewrite: both delivery intent claims must expire naturally.
 await_outbox "$run_id-crash" 350
 docker exec "$run_id-crash" php -d memory_limit=64M \
-    tests/Fixtures/Worker/worker-command-check.php verify-claim-recovered \
-    "$namespace" "$boot" "$projection_until"
+    tests/Fixtures/Worker/worker-command-check.php verify-delivery-ack-recovered \
+    "$namespace" "$boot" "$delivery_snapshot"
 await_scheduler "$run_id-crash" "$namespace" "$boot"
 docker exec "$run_id-crash" php -d memory_limit=64M tests/Fixtures/Worker/worker-command-check.php replay-outbox "$namespace" "$boot"
 await_outbox "$run_id-crash"
@@ -321,4 +384,4 @@ docker run --rm --name "$run_id-observer" "${common[@]}" --entrypoint php "$app_
 # Allow the renewal schedule plus its bounded 35-second drain and harness headroom.
 await_exit "$run_id-expiry" 1 3 60
 reserved "$expiry_namespace" "$expiry_boot"
-echo 'Real app:worker claim and projection crash recovery, replay, and lifecycle acceptance passed.'
+echo 'Real app:worker claim, projection, and transport handoff crash recovery, replay, and lifecycle acceptance passed.'

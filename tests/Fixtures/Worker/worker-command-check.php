@@ -15,6 +15,12 @@ if (!is_array($arguments)) {
 }
 [$script, $mode, $namespace, $bootId] = $arguments + [null, null, null, null];
 $allowedModes = [
+    'hold-relay-delivery-ack',
+    'release-relay-delivery-ack',
+    'verify-delivery-ack-blocked',
+    'verify-delivery-ack-contained',
+    'verify-delivery-ack-recovered',
+    'kill-relay-after-send',
     'hold-relay-projection',
     'release-relay-projection',
     'verify-projection-blocked',
@@ -77,6 +83,115 @@ if ($mode === 'release-relay-claim') {
     $db->executeStatement('DROP FUNCTION worker_command_claim_gate()');
     echo "Disposable claim gate removed.\n";
     exit(0);
+}
+
+// Redis accepts the message before markRelayed updates the delivery intent.
+// Freeze only that acknowledgement, leaving accepted transport work durable.
+if ($mode === 'hold-relay-delivery-ack') {
+    $db->executeQuery('SELECT pg_advisory_lock(87365023)')->free();
+    $db->executeStatement(<<<'SQL'
+        CREATE FUNCTION worker_command_delivery_ack_gate() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN
+            IF OLD.relayed_at IS NULL AND NEW.relayed_at IS NOT NULL THEN
+                PERFORM pg_advisory_xact_lock(87365023);
+            END IF;
+            RETURN NEW;
+        END;
+        $$
+        SQL);
+    $db->executeStatement(<<<'SQL'
+        CREATE TRIGGER worker_command_delivery_ack_gate
+        BEFORE UPDATE ON domain_event_outbox_delivery
+        FOR EACH ROW EXECUTE FUNCTION worker_command_delivery_ack_gate()
+        SQL);
+    echo "Delivery acknowledgement gate armed.\n";
+    flush();
+    $db->executeQuery('SELECT pg_sleep(120)')->free();
+    throw new RuntimeException('Delivery acknowledgement gate exceeded its bounded lifetime.');
+}
+if ($mode === 'release-relay-delivery-ack') {
+    $db->executeStatement('DROP TRIGGER worker_command_delivery_ack_gate ON domain_event_outbox_delivery');
+    $db->executeStatement('DROP FUNCTION worker_command_delivery_ack_gate()');
+    echo "Disposable delivery acknowledgement gate removed.\n";
+    exit(0);
+}
+$deliveryAckModes = [
+    'verify-delivery-ack-blocked',
+    'verify-delivery-ack-contained',
+    'verify-delivery-ack-recovered',
+    'kill-relay-after-send',
+];
+
+if (in_array($mode, $deliveryAckModes, true)) {
+    $deliveryClaims = $db->fetchAllAssociative(<<<'SQL'
+        SELECT id, lease_token, lease_until FROM domain_event_outbox_delivery
+        WHERE relayed_at IS NULL AND lease_token IS NOT NULL AND lease_until > clock_timestamp()
+            AND attempts = 0 AND next_attempt_at IS NULL AND dead_lettered_at IS NULL
+        ORDER BY id
+        SQL);
+    $redis = new Redis();
+    $redis->connect('redis', 6379, 1.0);
+    $redis->auth(['default', 'test-only']);
+    $stream = $redis->xInfo('STREAM', 'messages');
+    $entriesAdded = is_array($stream) ? ($stream['entries-added'] ?? null) : null;
+    if ($mode === 'verify-delivery-ack-recovered') {
+        $originalClaims = json_decode($arguments[4] ?? '', true, 512, JSON_THROW_ON_ERROR);
+        if (
+            !is_array($originalClaims)
+            || count($originalClaims) !== 2
+            || $entriesAdded !== 3
+        ) {
+            throw new RuntimeException(
+                'Recovery must accept three Redis envelopes for two intents, including the uncertain-send replay.',
+            );
+        }
+        foreach ($originalClaims as $claim) {
+            $recovered = (int) $db->fetchOne(<<<'SQL'
+                SELECT count(*) FROM domain_event_outbox_delivery
+                WHERE id = :id AND relayed_at >= CAST(:expiry AS timestamptz)
+                    AND lease_token IS NULL AND lease_until IS NULL
+                    AND attempts = 0 AND dead_lettered_at IS NULL
+                SQL, ['id' => $claim['id'], 'expiry' => $claim['lease_until']]);
+            if ($recovered !== 1) {
+                throw new RuntimeException(
+                    'Every interrupted delivery intent must recover after its unchanged lease naturally expires.',
+                );
+            }
+        }
+        echo "Recovered two intents after natural expiry; Redis accepted the uncertain handoff again (three envelopes total).\n";
+        exit(0);
+    }
+    if (
+        count($deliveryClaims) !== 2
+        || $entriesAdded !== 1
+        || (int) $db->fetchOne('SELECT count(*) FROM notifications') !== 1
+        || (int) $db->fetchOne('SELECT count(*) FROM domain_event_outbox_receipt') !== 1
+        || (int) $db->fetchOne('SELECT count(*) FROM domain_event_outbox WHERE relayed_at IS NOT NULL') !== 1
+    ) {
+        throw new RuntimeException(
+            'One Redis handoff must be accepted while two claimed intents remain unacknowledged and projections stay committed.',
+        );
+    }
+    $acknowledging = (int) $db->fetchOne(<<<'SQL'
+        SELECT count(*) FROM pg_locks l JOIN pg_stat_activity a ON a.pid = l.pid
+        WHERE l.locktype = 'advisory' AND l.classid = 0 AND l.objid = 87365023
+            AND NOT l.granted AND a.query LIKE 'UPDATE domain_event_outbox_delivery SET relayed_at%'
+        SQL);
+    if ($mode === 'verify-delivery-ack-contained') {
+        $originalClaims = json_decode($arguments[4] ?? '', true, 512, JSON_THROW_ON_ERROR);
+        if ($acknowledging !== 0 || $originalClaims !== $deliveryClaims) {
+            throw new RuntimeException('Contained relay must preserve both delivery leases and the accepted Redis handoff.');
+        }
+        echo "Accepted Redis handoff survived relay containment; both original intent leases remain unchanged.\n";
+        exit(0);
+    }
+    if ($acknowledging !== 1) {
+        throw new RuntimeException('Relay has not reached the post-send delivery acknowledgement boundary.');
+    }
+    if ($mode === 'verify-delivery-ack-blocked') {
+        echo json_encode($deliveryClaims, JSON_THROW_ON_ERROR) . "\n";
+        exit(0);
+    }
 }
 
 // Block the ORM flush inside the receipt/projection transaction. A killed relay
@@ -390,7 +505,7 @@ $expected = 'worker-' . substr(hash('sha256', $namespace), 0, 16) . '-' . $bootI
 if (!is_array($consumers) || !in_array($expected, array_column($consumers, 'name'), true)) {
     throw new RuntimeException('Expected Redis consumer ' . $expected . '; observed ' . json_encode($consumers, JSON_THROW_ON_ERROR));
 }
-if (in_array($mode, ['kill-relay-claimed', 'kill-relay-projecting'], true)
+if (in_array($mode, ['kill-relay-claimed', 'kill-relay-projecting', 'kill-relay-after-send'], true)
     && !posix_kill($roles['relay'], SIGKILL)) {
     throw new RuntimeException('Could not kill the direct relay child at its verified crash boundary.');
 }
