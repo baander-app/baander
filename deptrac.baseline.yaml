@@ -116,10 +116,6 @@ deptrac:
     App\Catalog\Interface\Console\ExtractAlbumCoversCommand:
       - App\Catalog\Domain\Repository\AlbumRepositoryInterface
       - App\Metadata\Application\Command\ExtractAlbumCoverCommand
-    App\Catalog\Interface\Controller\AdminAlbumController:
-      - App\Playlist\Domain\Repository\PlaylistRepositoryInterface
-    App\Catalog\Interface\Controller\AdminSongController:
-      - App\Playlist\Domain\Repository\PlaylistRepositoryInterface
     App\Catalog\Interface\Controller\AlbumController:
       - App\Catalog\Domain\Model\Album
       - App\Media\Application\Port\ImagePortInterface

@@ -6,7 +6,7 @@ namespace App\Catalog\Interface\Controller;
 
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
-use App\Playlist\Domain\Repository\PlaylistRepositoryInterface;
+use App\Playlist\Application\Port\PlaylistDeletionPreviewPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
@@ -28,7 +28,7 @@ final class AdminSongController
     public function __construct(
         private readonly SongPortInterface $songPort,
         private readonly AlbumPortInterface $albumPort,
-        private readonly PlaylistRepositoryInterface $playlistRepo,
+        private readonly PlaylistDeletionPreviewPortInterface $playlistPreview,
     ) {
     }
 
@@ -85,8 +85,8 @@ final class AdminSongController
 
         $album = $this->albumPort->findByUuid($song->getAlbumId());
 
-        $playlists = $this->playlistRepo->findPlaylistNamesContainingSong($song->getId());
-        $playlistNames = array_map(fn($p) => $p['name'], $playlists);
+        $playlists = $this->playlistPreview->findContainingSongs([$song->getId()]);
+        $playlistNames = array_column($playlists, 'name');
 
         return $this->successResponse([
             'song' => [
@@ -103,7 +103,7 @@ final class AdminSongController
             ],
             'affected' => [
                 'playlists' => count($playlists),
-                'playlistNames' => array_values($playlistNames),
+                'playlistNames' => $playlistNames,
             ],
         ]);
     }

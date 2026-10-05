@@ -39,7 +39,7 @@ deptrac:
         Metadata: ['Metadata Domain', 'Metadata Application', 'Metadata Infrastructure', 'Metadata Interface']
         Notification: ['Notification Domain', 'Notification Application', 'Notification Infrastructure', 'Notification Resources', 'Notification Interface']
         Party: ['Party Domain', 'Party Application', 'Party Infrastructure', 'Party Resources', 'Party Interface']
-        Playlist: ['Playlist Domain', 'Playlist Application', 'Playlist Infrastructure', 'Playlist Resources', 'Playlist Interface']
+        Playlist: ['Playlist Deletion Preview Contract', 'Playlist Domain', 'Playlist Application', 'Playlist Infrastructure', 'Playlist Resources', 'Playlist Interface']
         Recommendation: ['Recommendation Domain', 'Recommendation Application', 'Recommendation Infrastructure', 'Recommendation Resources', 'Recommendation Interface']
         Transcode: ['Transcode Domain', 'Transcode Application', 'Transcode Infrastructure', 'Transcode Resources', 'Transcode Interface']
         UserPreference: ['UserPreference Domain', 'UserPreference Application', 'UserPreference Infrastructure', 'UserPreference Resources', 'UserPreference Interface']
@@ -394,10 +394,20 @@ deptrac:
         - type: classLike
           value: '^App\\Playlist\\Domain\\'
 
-    - name: 'Playlist Application'
+    - name: 'Playlist Deletion Preview Contract'
       collectors:
         - type: classLike
-          value: '^App\\Playlist\\Application\\'
+          value: '^App\\Playlist\\Application\\Port\\PlaylistDeletionPreviewPortInterface$'
+
+    - name: 'Playlist Application'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Playlist\\Application\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Playlist\\Application\\Port\\PlaylistDeletionPreviewPortInterface$'
 
     - name: 'Playlist Infrastructure'
       collectors:
@@ -838,6 +848,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Catalog Interface':
+      - 'Playlist Deletion Preview Contract'
       - 'Library Read Scope Contract'
       - 'Catalog Resources'
       - 'Catalog Application'
@@ -1002,6 +1013,8 @@ deptrac:
       - 'Shared Interface'
 
     # --- Playlist ---
+    'Playlist Deletion Preview Contract':
+      - 'Shared Domain'
     'Playlist Domain':
       - 'Shared Domain'
     'Playlist Application':
@@ -1009,6 +1022,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Playlist Infrastructure':
+      - 'Playlist Deletion Preview Contract'
       - 'Shared Application'
       - 'Playlist Domain'
       - 'Playlist Application'

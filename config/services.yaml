@@ -591,6 +591,9 @@ services:
     App\Playlist\Application\Port\PlaylistPortInterface:
         alias: App\Playlist\Infrastructure\PlaylistService
 
+    App\Playlist\Application\Port\PlaylistDeletionPreviewPortInterface:
+        alias: App\Playlist\Infrastructure\PlaylistService
+
     # --- Notification Domain Repository Aliases ---
     App\Notification\Domain\Repository\NotificationRepositoryInterface:
         alias: App\Notification\Infrastructure\Doctrine\Repository\NotificationRepository

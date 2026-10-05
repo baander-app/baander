@@ -6,7 +6,7 @@ namespace App\Catalog\Interface\Controller;
 
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
-use App\Playlist\Domain\Repository\PlaylistRepositoryInterface;
+use App\Playlist\Application\Port\PlaylistDeletionPreviewPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
@@ -29,7 +29,7 @@ final class AdminAlbumController
     public function __construct(
         private readonly AlbumPortInterface $albumPort,
         private readonly SongPortInterface $songPort,
-        private readonly PlaylistRepositoryInterface $playlistRepo,
+        private readonly PlaylistDeletionPreviewPortInterface $playlistPreview,
     ) {
     }
 
@@ -87,7 +87,9 @@ final class AdminAlbumController
         $songs = $this->songPort->findByAlbum($album->getId(), limit: 1000);
         $totalSize = array_sum(array_map(fn($s) => $s->getSize(), $songs));
 
-        $playlistData = $this->getPlaylistDataForSongs(array_map(static fn ($song): Uuid => $song->getId(), $songs));
+        $playlists = $this->playlistPreview->findContainingSongs(
+            array_map(static fn ($song): Uuid => $song->getId(), $songs),
+        );
 
         $coverImageData = $album->getCoverImageId() !== null
             ? ['id' => $album->getCoverImageId()->toString()]
@@ -105,8 +107,8 @@ final class AdminAlbumController
             ],
             'coverImage' => $coverImageData,
             'affected' => [
-                'playlists' => $playlistData['count'],
-                'playlistNames' => $playlistData['names'],
+                'playlists' => count($playlists),
+                'playlistNames' => array_column($playlists, 'name'),
             ],
         ]);
     }
@@ -155,26 +157,5 @@ final class AdminAlbumController
         } catch (\Throwable) {
             return null;
         }
-    }
-
-    /**
-     * @param Uuid[] $songIds
-     * @return array{count: int, names: list<string>}
-     */
-    private function getPlaylistDataForSongs(array $songIds): array
-    {
-        $allPlaylistNames = [];
-        foreach ($songIds as $songId) {
-            $playlists = $this->playlistRepo->findPlaylistNamesContainingSong($songId);
-            $allPlaylistNames = array_merge($allPlaylistNames, $playlists);
-        }
-
-        $uniqueNames = array_unique($allPlaylistNames, SORT_REGULAR);
-        $nameOnly = array_map(fn($p) => $p['name'], $uniqueNames);
-
-        return [
-            'count' => count($uniqueNames),
-            'names' => array_values($nameOnly),
-        ];
     }
 }
