@@ -21349,7 +21349,6 @@
                     "publicId",
                     "serverUrl",
                     "name",
-                    "apiKey",
                     "version",
                     "status",
                     "createdAt"
@@ -21372,10 +21371,6 @@
                     },
                     "name": {
                         "description": "Server display name",
-                        "type": "string"
-                    },
-                    "apiKey": {
-                        "description": "Server API key (returned on registration only)",
                         "type": "string"
                     },
                     "version": {

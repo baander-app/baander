@@ -63,6 +63,7 @@ final class DiscoveryController
         ],
     )]
     #[Route('/register', name: 'register', methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function register(#[MapRequestPayload] RegisterServerRequest $payload): JsonResponse
     {
         $envelope = $this->commandBus->dispatch(new RegisterServerCommand(

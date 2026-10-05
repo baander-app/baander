@@ -1364,8 +1364,6 @@ export interface ServerInstanceResource {
   serverUrl: string;
   /** Server display name */
   name: string;
-  /** Server API key (returned on registration only) */
-  apiKey: string;
   /** Server version */
   version: string;
   /** Server status */
