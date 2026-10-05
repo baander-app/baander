@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Lyrics\Interface\Controller;
 
-use App\Auth\Infrastructure\Security\Voter\AdminVoter;
 use App\Lyrics\Application\Port\LyricsAdminPortInterface;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use OpenApi\Attributes as OA;
@@ -80,7 +79,7 @@ final class LyricsAdminController
         ],
     )]
     #[Route('/bulk-fetch', name: 'bulk_fetch', methods: ['POST'])]
-    #[IsGranted(AdminVoter::USER_MANAGEMENT)]
+    #[IsGranted('ROLE_SUPER_ADMIN')]
     public function bulkFetch(Request $request): JsonResponse
     {
         $body = json_decode($request->getContent(), true, 512, JSON_THROW_ON_ERROR) ?? [];
