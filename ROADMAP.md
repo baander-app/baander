@@ -85,8 +85,12 @@ partial files on failure. Qualified regressions cover write failures and path
 replacement races. The `APP_SECRET` guide and environment templates now require
 one literal value and an offline webhook rekey with matched database/secret
 recovery. Full Unit/StaticAnalysisRules pass 4,580 tests (19,323 assertions), and
-the full PHPStan scan reports zero errors. A development-setup subprocess can still
-log failure while reporting overall success; that follow-up remains open.
+the full PHPStan scan reports zero errors.
+
+Development setup now stops at the first failed subprocess, returns a failure exit
+code, and withholds the success banner and later stages. A fake `bin/console`
+regression reproduces failures at fresh schema drop, migration, OAuth key setup,
+OAuth client setup, and dev-user creation; all five now pass.
 
 Baander-defined HTTP headers now use the `X-Baander-` prefix across backend,
 web, Android, Electron, webhook delivery, and test authentication. A shared

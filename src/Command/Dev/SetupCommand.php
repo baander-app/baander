@@ -48,23 +48,33 @@ final class SetupCommand extends Command
             $io->section('Fresh Install');
             $io->text('Dropping tables and clearing cache...');
 
-            $this->runConsole($io, ['doctrine:schema:drop', '--force', '--full-database']);
+            if (!$this->runConsole($io, ['doctrine:schema:drop', '--force', '--full-database'])) {
+                return Command::FAILURE;
+            }
             $this->clearCache($io);
         }
 
         $io->section('Database Migrations');
-        $this->runConsole($io, ['doctrine:migrations:migrate', '--no-interaction']);
+        if (!$this->runConsole($io, ['doctrine:migrations:migrate', '--no-interaction'])) {
+            return Command::FAILURE;
+        }
 
         if (!$skipKeys) {
             $io->section('OAuth Keys');
-            $this->runConsole($io, ['app:oauth:generate-keys', '--no-interaction']);
+            if (!$this->runConsole($io, ['app:oauth:generate-keys', '--no-interaction'])) {
+                return Command::FAILURE;
+            }
         }
 
         $io->section('OAuth Clients');
-        $this->runConsole($io, ['app:auth:setup-clients', '--no-interaction']);
+        if (!$this->runConsole($io, ['app:auth:setup-clients', '--no-interaction'])) {
+            return Command::FAILURE;
+        }
 
         $io->section('Dev Users');
-        $this->runConsole($io, ['app:dev:create-users', '--no-interaction']);
+        if (!$this->runConsole($io, ['app:dev:create-users', '--no-interaction'])) {
+            return Command::FAILURE;
+        }
 
         $io->success('Development environment setup complete!');
         $io->text([
@@ -84,7 +94,7 @@ final class SetupCommand extends Command
      * parent process has already loaded.
      * @param list<string> $args
      */
-    private function runConsole(SymfonyStyle $io, array $args): void
+    private function runConsole(SymfonyStyle $io, array $args): bool
     {
         $process = new Process(['php', 'bin/console', ...$args], $this->projectDir);
         $process->run();
@@ -93,10 +103,12 @@ final class SetupCommand extends Command
             $io->error(sprintf('Command failed: %s', implode(' ', $args)));
             $io->text($process->getErrorOutput() ?: $process->getOutput());
 
-            return;
+            return false;
         }
 
         $io->text(sprintf('<info>✓</info> %s', implode(' ', $args)));
+
+        return true;
     }
 
     private function clearCache(SymfonyStyle $io): void

@@ -31,7 +31,10 @@ The command runs these steps in order, each as a separate `php bin/console` subp
 4. `app:auth:setup-clients --no-interaction`
 5. `app:dev:create-users --no-interaction`
 
-Subprocesses boot a fresh kernel, so they survive the cache clear performed by `--fresh` (which deletes compiled container classes the parent process has already loaded). A failed subprocess prints its error output but does not stop the overall run.
+Subprocesses boot a fresh kernel, so they survive the cache clear performed by
+`--fresh` (which deletes compiled container classes the parent process has already
+loaded). A failed subprocess prints its error output, stops setup before later
+steps, and returns a failure exit code.
 
 On success the command prints the dev account credentials (`admin@baander.test` / `admin`, `user@baander.test` / `user`).
 
