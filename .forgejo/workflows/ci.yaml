@@ -417,9 +417,32 @@ jobs:
             -   name: Build and qualify registry containers
                 run: bash scripts/test-registry-container.sh
 
+    registry-thread-quality:
+        runs-on: docker-cli
+        timeout-minutes: 30
+        container:
+            image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
+        steps:
+            -   name: Checkout
+                run: |
+                    git init -q
+                    git remote add origin ${{ forgejo.event.repository.clone_url }}
+                    git -c http.extraHeader="Authorization: token ${{ secrets.GITHUB_TOKEN }}" fetch -q origin "${{ forgejo.sha }}"
+                    git checkout -q --detach "${{ forgejo.sha }}"
+                    test "$(git rev-parse HEAD)" = "${{ forgejo.sha }}"
+            -   name: Install thread sanitizer toolchain
+                run: |
+                    apt-get update
+                    apt-get install -y --no-install-recommends python3 openssl clang-19 libclang-rt-19-dev ninja-build
+            -   name: Build and qualify registry threads
+                env:
+                    CC: clang-19
+                    CXX: clang++-19
+                run: bash scripts/test-registry.sh thread
+
     build-and-push:
         runs-on: docker-cli
-        needs: [ quality-gate, frontend-quality, dsp-quality, registry-quality, registry-container-quality ]
+        needs: [ quality-gate, frontend-quality, dsp-quality, registry-quality, registry-container-quality, registry-thread-quality ]
         container:
             image: ${{ vars.REGISTRY_URL }}/${{ vars.REGISTRY_OWNER }}/baander-runner:latest
         steps:

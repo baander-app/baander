@@ -492,6 +492,17 @@ the user explicitly announces the first production release.
 
 ## C++ registry
 
+The separate ThreadSanitizer gate now passes the full `thread` runner in a Debian
+trixie container with Clang 19, its matching sanitizer runtime and pinned static
+OpenSSL 3.5.3, under default Docker restrictions. Seventeen CTest tests, cleanup,
+SQL/TLS transport, concurrent HTTP ownership/shutdown, and three-voter partition,
+crash and rejoin contracts pass. A deliberate sustained race must produce an
+actual TSan warning and exit 66; missed detection and runtime failure fail the
+gate. Concurrent producers submit to the single event loop; this does not assert
+that the pool supports direct calls from multiple threads. The separate CI job
+blocks publication; 20 workflow regressions pass. Third-party instrumentation,
+optimized resource limits, longer soak and regional qualification remain distinct.
+
 Production container qualification now builds pinned C++/rqlite images and checks
 five TLS voters, nonroot read-only API operation, acknowledged registration across
 rolling restarts, explicit replacement joining, and graceful shutdown. Startup
@@ -516,8 +527,8 @@ local SQLite files and existing volumes remain untouched.
 Clean release and ASan/LeakSanitizer/UBSan builds now pass through
 `scripts/test-registry.sh`, which verifies downloaded rqlite/OpenSSL checksums and
 isolates OpenSSL dependency discovery. Both CI matrix variants are required before
-publication. Nineteen workflow tests verify event-commit checkouts and failure
-propagation, including both registry variants and the container qualification job. ThreadSanitizer, static analysis,
+publication. Twenty workflow tests verify event-commit checkouts and failure
+propagation, including all registry modes and the container qualification job. Static analysis,
 automated license checks and performance/soak gates remain outstanding.
 
 The cluster tests exposed rqlite's HTTP-200 leadership-loss response and an API

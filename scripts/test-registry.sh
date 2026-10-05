@@ -4,8 +4,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 mode="${1:-release}"
-if [[ $# -gt 1 || ( "$mode" != release && "$mode" != sanitize ) ]]; then
-    echo "Usage: $0 [release|sanitize]" >&2
+if [[ $# -gt 1 || ( "$mode" != release && "$mode" != sanitize && "$mode" != thread ) ]]; then
+    echo "Usage: $0 [release|sanitize|thread]" >&2
     exit 2
 fi
 if [[ "$(uname -s)-$(uname -m)" != Linux-x86_64 ]]; then
@@ -15,6 +15,12 @@ fi
 for command in cmake ninja c++ make perl curl openssl python3 sha256sum pkg-config; do
     command -v "$command" >/dev/null
 done
+
+if [[ "$mode" == thread ]]; then
+    export CC="${CC:-clang}" CXX="${CXX:-clang++}"
+    command -v "$CC" >/dev/null
+    command -v "$CXX" >/dev/null
+fi
 
 work="$(mktemp -d /tmp/baander-registry-ci.XXXXXXXX)"
 trap 'rm -rf "$work"' EXIT
@@ -42,6 +48,9 @@ if [[ "$mode" == sanitize ]]; then
     options=(-DCMAKE_BUILD_TYPE=Debug -DREGISTRY_SANITIZERS=ON)
     export ASAN_OPTIONS=detect_leaks=1:halt_on_error=1
     export UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1
+elif [[ "$mode" == thread ]]; then
+    options=(-DCMAKE_BUILD_TYPE=RelWithDebInfo -DREGISTRY_SANITIZERS=OFF -DREGISTRY_THREAD_SANITIZER=ON)
+    export TSAN_OPTIONS=halt_on_error=1:exitcode=66
 fi
 PKG_CONFIG_PATH="$work/openssl/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" \
 cmake -S relay -B "$work/build" -G Ninja \

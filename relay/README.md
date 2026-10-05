@@ -50,13 +50,29 @@ The CI entrypoint builds pinned dependencies in a disposable directory:
 ```sh
 bash scripts/test-registry.sh release
 bash scripts/test-registry.sh sanitize
+bash scripts/test-registry.sh thread
 ```
 
 It compiles OpenSSL 3.5.3 into an isolated prefix and checks its source archive
 against the official release SHA-256
 `c9489d2abcf943cdc8329a57092331c598a402938054dc3a22218aea8a8ec3bf`.
-The sanitizer mode instruments first-party targets with ASan/LSan and UBSan;
-it does not establish complete third-party instrumentation or TSan acceptance.
+The `sanitize` mode instruments first-party targets with ASan/LSan and UBSan.
+The separate `thread` mode uses Clang, `RelWithDebInfo` and ThreadSanitizer with
+`TSAN_OPTIONS=halt_on_error=1:exitcode=66`. CI installs `clang-19` and its matching
+`libclang-rt-19-dev` runtime. It runs the units, SQL, TLS transport,
+HTTP and three-voter contracts, including a positive control that must report an
+actual data race and exit 66. The probe repeats volatile writes so its conflicting
+accesses are retained and a tiny race window does not make detection intermittent.
+Runtime initialization failures do not pass that control. Neither mode establishes complete third-party instrumentation.
+
+For a manual TSan build, add `-DREGISTRY_THREAD_SANITIZER=ON`,
+`-DCMAKE_CXX_COMPILER=clang++` and `-DCMAKE_BUILD_TYPE=RelWithDebInfo` to CMake.
+This option is mutually exclusive with `REGISTRY_SANITIZERS`. A runner must allow
+the TSan runtime to reserve its address space; failures fail qualification and
+must be resolved in the runner environment without suppressions. The pool is
+confined to one event-loop thread. The concurrent transport fixture uses producer
+threads to post work to that loop; it does not qualify calls directly from
+multiple threads or multiple concurrent event-loop runners.
 The manual commands below also work with an appropriately pinned environment.
 Dependencies are fetched from versioned archives and verified with SHA-256 in
 CMake. OpenSSL 3.5.3 must be supplied by the build environment; CMake verifies its

@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "registry/transport.hpp"
 #include <boost/asio.hpp>
+#include <atomic>
 #include <fstream>
 #include <iostream>
+#include <thread>
 
 int main(int argc, char **argv) {
     if (argc != 3)
@@ -24,8 +26,10 @@ int main(int argc, char **argv) {
         database.connections = 1;
         registry::DatabasePool pool(context, database);
         const auto count = std::stoi(argv[2]);
+        if (count == 0 || count < -64 || count > 64)
+            return 2;
         const auto rotation = config.value("rotateOnError", false);
-        for (int i = 0; i < (count < 0 ? 1 : count); ++i) {
+        const auto launch = [&] {
             boost::asio::co_spawn(
                 context,
                 [&pool, &context, count, rotation]() -> boost::asio::awaitable<void> {
@@ -73,8 +77,29 @@ int main(int argc, char **argv) {
                     if (error)
                         std::cout << "fixture-error\n";
                 });
+        };
+        if (count > 1) {
+            // Producers submit concurrently, then join before the sole pool runner.
+            std::atomic<bool> failed{false};
+            {
+                std::vector<std::jthread> producers;
+                for (int i = 0; i < count; ++i)
+                    producers.emplace_back([&] {
+                        try {
+                            boost::asio::post(context, launch);
+                        } catch (const std::exception &) {
+                            failed.store(true, std::memory_order_relaxed);
+                        }
+                    });
+            }
+            if (failed.load(std::memory_order_relaxed))
+                return 2;
+            context.run();
+        } else {
+            for (int i = 0; i < (count < 0 ? 1 : count); ++i)
+                launch();
+            context.run();
         }
-        context.run();
         return 0;
     } catch (const std::exception &) {
         std::cerr << "Invalid transport fixture configuration.\n";
