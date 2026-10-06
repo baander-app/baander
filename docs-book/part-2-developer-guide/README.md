@@ -19,6 +19,7 @@ Understand the architecture, write code following project conventions, and contr
 | [Coding Conventions](coding-conventions.md) | Domain models, value objects, repositories, CQRS, ports, and anti-corruption |
 | [CQRS and Messaging](cqrs-and-messaging.md) | Commands, handlers, domain events, and async processing |
 | [Search](search.md) | PGroonga full-text search, making a context searchable |
+| [Database Naming](database-naming.md) | Index, unique-constraint and foreign-key names in migrations and mappings |
 | [Testing](testing.md) | PHPUnit suites, conventions, and code examples |
 | [Frontend Development](frontend-development.md) | React + TypeScript + Vite + styled-components |
 

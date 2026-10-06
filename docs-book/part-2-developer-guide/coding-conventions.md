@@ -215,6 +215,7 @@ Extends `AbstractResource` with a static `from()` method that transforms domain 
 - **Primary keys**: Always UUID v7 via the `Uuid` domain model
 - **String columns**: Always `TEXT`, never `VARCHAR(n)` — length validation belongs in the application layer
 - **JSON columns**: Always `JSONB`
+- **Index and constraint names**: Follow [Database Naming](database-naming.md)
 
 ## See Also
 

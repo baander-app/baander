@@ -17,6 +17,8 @@ index options, and version requirements. The database image currently requests
 PGroonga package `4.0.5-1`; inspect `pg_extension.extversion` on the target database
 rather than assuming the running installation matches the image source.
 
+Name PGroonga indexes `idx_<table>_<columns>_pgroonga`, as described in [Database Naming](database-naming.md).
+
 ## Making a Context Searchable
 
 ### 1. Implement the `Searchable` interface
