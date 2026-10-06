@@ -81,6 +81,10 @@ python3 relay/tests/run_cluster_contract.py --nodes 3 \
     --rqlited "$work/rqlite/rqlited" --server "$work/build/baander-registry"
 python3 relay/tests/run_restore_contract.py \
     --rqlited "$work/rqlite/rqlited" --server "$work/build/baander-registry"
+if [[ "$mode" == release ]]; then
+    python3 relay/tests/run_load_smoke.py \
+        --rqlited "$work/rqlite/rqlited" --server "$work/build/baander-registry"
+fi
 if [[ "$mode" == fuzz ]]; then
     # Mutations stay in temporary storage; committed seeds remain reproducible.
     mkdir "$work/corpus" "$work/artifacts"

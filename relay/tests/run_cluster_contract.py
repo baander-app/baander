@@ -16,7 +16,7 @@ from run_http_contract import LocalHTTPS, port
 
 
 class Api:
-    def __init__(self, cluster, server, name, endpoints):
+    def __init__(self, cluster, server, name, endpoints, database_connections=1):
         self.cluster = cluster
         self.port = port()
         directory = cluster.directory
@@ -41,7 +41,7 @@ class Api:
                 "key": str(cluster.client_key),
                 "username": "registry",
                 "passwordFile": str(directory / "password"),
-                "connections": 1,
+                "connections": database_connections,
                 "deadlineMs": 2000,
             },
         }

@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-10-05. This is the working delivery record for the remediation,
+Updated: 2026-10-06. This is the working delivery record for the remediation,
 registry, and web-state plans. Update it when scope changes or a stage is verified.
 Completed code is not proof of production or performance qualification.
 
@@ -20,7 +20,8 @@ pass and reject malformed config or a missing binary. The startup-unavailable 50
 OpenAPI responses match the shared error envelope, the generated web client is
 updated, specification drift and web typechecking pass, and full PHPStan has zero
 errors at the last full scan. Subsequent focused PHPStan checks for the QoL
-boundary pass. Deptrac is down to 224 active violations, so release quality gates
+boundary pass. The hardware diagnostics console extraction lowered Deptrac to 213
+active violations without baseline changes, so release quality gates
 are not fully green. The locked CI image completed all 143 full-suite PHPUnit
 shards with Xdebug coverage and a merged report: 6,368 discovered tests and no
 failed shards. The final 512 MiB child-process image separately passed its Shared
@@ -232,6 +233,13 @@ active artist sequential scans. No global JIT setting or schema change was made.
 Locked-dependency authorization/persistence tests pass 23 tests (600 assertions),
 and scoped PHPStan reports zero errors. The fixture is a selective-library plan
 regression, not a representative production capacity benchmark.
+
+The hardware transcoding debug command now renders an Application diagnostics
+report; an Infrastructure adapter owns probing, decoder selection, and sample
+FFmpeg construction. A parity check kept the console output identical across
+software, NVENC, QSV, VAAPI, AMF, and VideoToolbox profiles without probing a GPU.
+Focused container tests pass four tests and 56 assertions, targeted PHPStan and
+container wiring pass, and Deptrac falls from 224 to 213 active violations.
 
 ## Delivery horizons
 
@@ -637,6 +645,15 @@ asymmetric enrollment design replaces that operational trust boundary.
 The sanitizer-backed parser fuzz gate passed its bounded run and its deliberate
 ASan failure control after the enrollment parser was added to the fuzz target.
 The separate ThreadSanitizer qualification also passed with enrollment enabled.
+
+The optimized release recipe now runs a bounded three-voter, three-API load smoke:
+100 registrations, 20 lookups/s and 100/60 heartbeats/s for ten seconds, then
+fivefold rates for ten seconds. It fails on request errors, backlog, missed pacing,
+normal p95/p99 above one/two seconds, burst p99 above three seconds, or sampled API
+RSS above 64 MiB. One local run passed with normal lookup p99 4.34 ms, burst
+lookup p99 4.09 ms, and peak sampled API RSS 11.89 MiB. This is not the agreed
+five-host resource, global-network, five-minute burst, or fixed-runner regression
+qualification; those gates remain open.
 
 A harmless EICAR repository canary is detected by ClamAV locally and excluded
 from deployment images. External scanner visibility depends on publication; it
