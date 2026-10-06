@@ -20,7 +20,7 @@ final class LibraryControllerTest extends TestCase
 
     public function testStoreCreatesLibrary(): void
     {
-        $user = $this->createTestUser();
+        $user = $this->createAdminUser();
         $uniqueSuffix = bin2hex(random_bytes(4));
 
         $response = $this->authenticatedRequest('POST', '/api/libraries', $user, [
@@ -35,7 +35,7 @@ final class LibraryControllerTest extends TestCase
 
     public function testStoreRejectsInvalidType(): void
     {
-        $user = $this->createTestUser();
+        $user = $this->createAdminUser();
 
         $response = $this->authenticatedRequest('POST', '/api/libraries', $user, [
             'name' => 'Bad Library',
@@ -48,7 +48,7 @@ final class LibraryControllerTest extends TestCase
 
     public function testStoreRejectsRelativePath(): void
     {
-        $user = $this->createTestUser();
+        $user = $this->createAdminUser();
 
         $response = $this->authenticatedRequest('POST', '/api/libraries', $user, [
             'name' => 'Bad Library',
@@ -61,7 +61,7 @@ final class LibraryControllerTest extends TestCase
 
     public function testStoreGrantsCreatorAccess(): void
     {
-        $user = $this->createTestUser();
+        $user = $this->createAdminUser();
         $uniqueSuffix = bin2hex(random_bytes(4));
 
         $response = $this->authenticatedRequest('POST', '/api/libraries', $user, [
@@ -77,5 +77,52 @@ final class LibraryControllerTest extends TestCase
         $libraryAccess = static::getContainer()->get(\App\Library\Application\Port\LibraryAccessPortInterface::class);
 
         $this->assertTrue($libraryAccess->hasAccess($userId, $libraryId));
+    }
+
+    public function testStoreIsForbiddenForNonAdmin(): void
+    {
+        $user = $this->createTestUser();
+        $slug = 'root-' . bin2hex(random_bytes(4));
+
+        $response = $this->authenticatedRequest('POST', '/api/libraries', $user, [
+            'name' => 'Server Config',
+            'slug' => $slug,
+            'path' => '/etc',
+            'type' => 'music',
+        ]);
+
+        $this->assertJsonResponse($response, 403);
+        $libraries = static::getContainer()->get(\App\Library\Application\Port\LibraryPortInterface::class);
+        $this->assertNull($libraries->findBySlug(new \App\Library\Domain\ValueObject\LibrarySlug($slug)));
+    }
+
+    public function testValidatePathIsForbiddenForNonAdmin(): void
+    {
+        $user = $this->createTestUser();
+
+        $response = $this->authenticatedRequest('POST', '/api/libraries/validate-path', $user, [
+            'path' => '/etc',
+        ]);
+
+        $data = $this->assertJsonResponse($response, 403);
+        $this->assertArrayNotHasKey('data', $data);
+        foreach (['valid', 'exists', 'readable', 'resolvedPath'] as $field) {
+            $this->assertStringNotContainsString('"' . $field . '"', (string) $response->getContent());
+        }
+    }
+
+    public function testValidatePathReportsResultForAdmin(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $response = $this->authenticatedRequest('POST', '/api/libraries/validate-path', $admin, [
+            'path' => '/etc',
+        ]);
+
+        $data = $this->assertJsonResponse($response, 200, 'data');
+        $this->assertTrue($data['data']['exists']);
+        $this->assertSame('/etc', $data['data']['resolvedPath']);
+        $this->assertArrayHasKey('valid', $data['data']);
+        $this->assertArrayHasKey('readable', $data['data']);
     }
 }

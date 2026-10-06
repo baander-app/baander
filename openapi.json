@@ -6746,7 +6746,7 @@
                 "tags": [
                     "Library"
                 ],
-                "summary": "Create a new library",
+                "summary": "Create a new library (admin)",
                 "operationId": "post_library_store",
                 "requestBody": {
                     "required": true,
@@ -6809,6 +6809,16 @@
                     },
                     "400": {
                         "description": "Bad request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Administrator role required",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -7211,8 +7221,8 @@
                 "tags": [
                     "Library"
                 ],
-                "summary": "Validate a library path",
-                "description": "Checks whether a filesystem path exists and is readable. Use before creating a library.",
+                "summary": "Validate a library path (admin)",
+                "description": "Checks whether a filesystem path exists and is readable. Use before creating a library. Requires the administrator role.",
                 "operationId": "post_library_validate_path",
                 "requestBody": {
                     "required": true,
@@ -7270,6 +7280,16 @@
                     },
                     "401": {
                         "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Administrator role required",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -11738,6 +11758,16 @@
                             }
                         }
                     },
+                    "403": {
+                        "description": "Administrator role required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "Validation error",
                         "content": {
@@ -15707,7 +15737,7 @@
                         }
                     },
                     "503": {
-                        "description": "Redis unavailable",
+                        "description": "Failure transport unavailable",
                         "content": {
                             "application/json": {
                                 "schema": {

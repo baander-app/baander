@@ -10,6 +10,9 @@ use Nelmio\ApiDocBundle\Attribute\Model;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\Exception\MessageDecodingFailedException;
+use Symfony\Component\Messenger\Exception\TransportException;
+use Symfony\Component\Messenger\Transport\Receiver\ReceiverInterface;
 use Symfony\Component\Process\Process;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -25,6 +28,7 @@ final class TransportController
     public function __construct(
         private readonly RedisClientFactory $redisClientFactory,
         private readonly string $consumerName,
+        private readonly ReceiverInterface $failureTransport,
     )
     {
     }
@@ -128,7 +132,7 @@ final class TransportController
                 ),
             ),
             new OA\Response(response: '422', description: 'Missing confirm parameter', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
-            new OA\Response(response: '503', description: 'Redis unavailable', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '503', description: 'Failure transport unavailable', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/failed/flush', name: 'failed_flush', methods: ['POST'])]
@@ -141,23 +145,33 @@ final class TransportController
             );
         }
 
-        // Use Symfony's messenger:failed:flush command to handle this properly
-        // regardless of the underlying failed transport implementation.
-        $process = new Process(['php', 'bin/console', 'messenger:failed:flush', '--no-interaction']);
-        $process->run();
-
-        if (!$process->isSuccessful()) {
-            return $process->getErrorOutput()
-                    |> trim(...)
-                    |> (fn($x) => sprintf('Failed to flush failed messages: %s', $x))
-                    |> (fn($x) => $this->errorResponse($x, Response::HTTP_INTERNAL_SERVER_ERROR));
+        // Symfony has no messenger:failed:flush command, and messenger:failed:remove --all
+        // needs a listable receiver, which the Redis failure transport is not. Draining the
+        // receiver works for every transport and reports an exact count.
+        $flushed = 0;
+        try {
+            do {
+                $removed = 0;
+                try {
+                    foreach ($this->failureTransport->get() as $envelope) {
+                        $this->failureTransport->reject($envelope);
+                        $removed++;
+                    }
+                } catch (MessageDecodingFailedException) {
+                    // Receivers reject an undecodable message before throwing.
+                    $removed++;
+                }
+                $flushed += $removed;
+            } while ($removed > 0);
+        } catch (TransportException $e) {
+            return $this->errorResponse(
+                sprintf('Failure transport unavailable: %s', $e->getMessage()),
+                Response::HTTP_SERVICE_UNAVAILABLE,
+            );
         }
 
-        // The command output contains the count of flushed messages
-        $output = trim($process->getOutput());
-
         return $this->successResponse([
-            'flushed' => $output,
+            'flushed' => $flushed,
         ]);
     }
 
@@ -189,11 +203,14 @@ final class TransportController
     #[Route('/failed/{id}/retry', name: 'failed_retry', methods: ['POST'])]
     public function retryFailed(string $id): JsonResponse
     {
-        $process = new Process(['php', 'bin/console', 'messenger:failed:retry', $id]);
+        // An HTTP-triggered process has no terminal: without --force the per-message
+        // prompt reads EOF and aborts the retry. --no-interaction disables any other prompt.
+        $process = new Process(['php', 'bin/console', 'messenger:failed:retry', $id, '--force', '--no-interaction']);
         $process->run();
 
         if (!$process->isSuccessful()) {
-            return $process->getOutput()
+            // Console renders command errors on stderr.
+            return $process->getErrorOutput()
                     |> trim(...)
                     |> (fn($x) => sprintf('Failed to retry message: %s', $x))
                     |> (fn($x) => $this->errorResponse($x, Response::HTTP_INTERNAL_SERVER_ERROR));

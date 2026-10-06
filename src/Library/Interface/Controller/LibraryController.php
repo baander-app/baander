@@ -31,6 +31,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[OA\Tag(name: 'Library', description: 'Media library management endpoints')]
 #[Route('/api/libraries', name: 'library_')]
@@ -85,7 +86,7 @@ final class LibraryController
 
     #[OA\Post(
         path: '/api/libraries',
-        summary: 'Create a new library',
+        summary: 'Create a new library (admin)',
         requestBody: new OA\RequestBody(required: true, content: new OA\MediaType(mediaType: 'application/json', schema: new OA\Schema(
                 required: ['name', 'path', 'type'],
                 properties: [
@@ -102,11 +103,13 @@ final class LibraryController
             )),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '400', description: 'Bad request', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '409', description: 'Slug already exists', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
     #[Route('', name: 'store', methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function store(#[MapRequestPayload] CreateLibraryRequest $payload): JsonResponse
     {
         $user = $this->security?->getUser();
@@ -392,8 +395,8 @@ final class LibraryController
 
     #[OA\Post(
         path: '/api/libraries/validate-path',
-        summary: 'Validate a library path',
-        description: 'Checks whether a filesystem path exists and is readable. Use before creating a library.',
+        summary: 'Validate a library path (admin)',
+        description: 'Checks whether a filesystem path exists and is readable. Use before creating a library. Requires the administrator role.',
         requestBody: new OA\RequestBody(required: true, content: new OA\MediaType(mediaType: 'application/json', schema: new OA\Schema(
                 required: ['path'],
                 properties: [
@@ -413,9 +416,11 @@ final class LibraryController
                 ], type: 'object',
             )),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/validate-path', name: 'validate_path', methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function validatePath(Request $request): JsonResponse
     {
         $path = $request->getPayload()->get('path');

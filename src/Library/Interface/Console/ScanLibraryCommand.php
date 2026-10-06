@@ -14,7 +14,9 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
+use Symfony\Component\Messenger\Stamp\ReceivedStamp;
 
 #[AsCommand(
     name: 'app:library:scan',
@@ -47,8 +49,13 @@ final class ScanLibraryCommand extends Command
         }
 
         try {
-            $envelope = $this->commandBus->dispatch(new ScanLibraryCommandMessage(
-                librarySlug: $librarySlug,
+            // ScanLibraryCommand is routed to the Swoole task transport. Outside the Swoole
+            // server that send falls back to the Redis queue and returns no result. Marking
+            // the envelope as received handles it in this process, as Messenger's sync
+            // transport does, so the command runs the scan and reports its outcome.
+            $envelope = $this->commandBus->dispatch(new Envelope(
+                new ScanLibraryCommandMessage(librarySlug: $librarySlug),
+                [new ReceivedStamp('sync')],
             ));
 
             $library = $envelope->last(HandledStamp::class)?->getResult();

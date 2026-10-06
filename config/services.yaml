@@ -246,6 +246,7 @@ services:
         arguments:
             $redisClientFactory: '@App\Shared\Infrastructure\Redis\RedisClientFactory'
             $consumerName: '%env(MESSENGER_CONSUMER_NAME)%'
+            $failureTransport: '@messenger.transport.failed'
 
     # --- Rate Limiter Monitoring ---
     App\Shared\Interface\Controller\RateLimiterMonitorController:

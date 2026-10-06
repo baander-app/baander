@@ -14541,7 +14541,7 @@ export const getPostLibraryStoreUrl = () => {
 }
 
 /**
- * @summary Create a new library
+ * @summary Create a new library (admin)
  */
 export const postLibraryStore = async (postLibraryStoreBody: PostLibraryStoreBody, options?: RequestInit): Promise<PostLibraryStore201> => {
 
@@ -14589,7 +14589,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostLibraryStoreMutationError = ErrorType<ApiError | ValidationError>
 
     /**
- * @summary Create a new library
+ * @summary Create a new library (admin)
  */
 export const usePostLibraryStore = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postLibraryStore>>, TError,{data: BodyType<PostLibraryStoreBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -15025,8 +15025,8 @@ export const getPostLibraryValidatePathUrl = () => {
 }
 
 /**
- * Checks whether a filesystem path exists and is readable. Use before creating a library.
- * @summary Validate a library path
+ * Checks whether a filesystem path exists and is readable. Use before creating a library. Requires the administrator role.
+ * @summary Validate a library path (admin)
  */
 export const postLibraryValidatePath = async (postLibraryValidatePathBody: PostLibraryValidatePathBody, options?: RequestInit): Promise<PostLibraryValidatePath200> => {
 
@@ -15074,7 +15074,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostLibraryValidatePathMutationError = ErrorType<ApiError>
 
     /**
- * @summary Validate a library path
+ * @summary Validate a library path (admin)
  */
 export const usePostLibraryValidatePath = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postLibraryValidatePath>>, TError,{data: BodyType<PostLibraryValidatePathBody>}, TContext>, request?: SecondParameter<typeof customInstance>}

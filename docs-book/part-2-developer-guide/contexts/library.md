@@ -49,7 +49,8 @@ All endpoints are prefixed with `/api` and served by `LibraryController`.
 | Method | Path | Purpose |
 |--------|------|---------|
 | `GET` | `/api/libraries` | List libraries the authenticated user has access to |
-| `POST` | `/api/libraries` | Create a new library |
+| `POST` | `/api/libraries` | Create a new library (administrators only) |
+| `POST` | `/api/libraries/validate-path` | Check that a server path exists and is readable (administrators only) |
 | `GET` | `/api/libraries/{id}` | Get a single library by ID |
 | `PATCH` | `/api/libraries/{id}` | Update library metadata (name, path) |
 | `DELETE` | `/api/libraries/{id}` | Delete a library and its membership records |

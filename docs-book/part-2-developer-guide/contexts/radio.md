@@ -83,7 +83,7 @@ All endpoints are prefixed with `/api`.
 | Method | Path | Purpose |
 |--------|------|---------|
 | GET | `/api/radio/sources` | List radio sources |
-| POST | `/api/radio/sources` | Create a radio source |
+| POST | `/api/radio/sources` | Create a radio source (administrators only) |
 
 ### Stations
 
