@@ -104,4 +104,107 @@ SOURCE);
             $files->remove($directory);
         }
     }
+
+    public function testTranscodeReachesQoLOnlyThroughPublishedContracts(): void
+    {
+        $report = $this->analyse(<<<'SOURCE'
+<?php
+namespace App\QoL\Domain\Port;
+interface QualityLadderPortInterface {}
+namespace App\QoL\Domain\Service;
+final class InternalDomainService {}
+final class BoundaryGovernor {
+    public function ladder(\App\QoL\Domain\Port\QualityLadderPortInterface $ladder): void {}
+}
+namespace App\QoL\Application\Port;
+interface StreamAdmissionPortInterface {
+    public function admit(\App\Shared\Domain\Model\Uuid $jobId): void;
+}
+interface AllowedQualityTiersPortInterface {}
+interface BudgetGuardInterface {
+    public function guardDispatch(\App\Shared\Domain\Model\Uuid $jobId): void;
+}
+namespace App\QoL\Application;
+final class InternalApplicationService {}
+namespace App\QoL\Infrastructure;
+final class BoundaryAdmission implements \App\QoL\Application\Port\StreamAdmissionPortInterface {
+    public function admit(\App\Shared\Domain\Model\Uuid $jobId): void {}
+}
+final class BoundaryAllowedTiers implements \App\QoL\Application\Port\AllowedQualityTiersPortInterface {}
+final class BoundaryBudgetGuard implements \App\QoL\Application\Port\BudgetGuardInterface {
+    public function guardDispatch(\App\Shared\Domain\Model\Uuid $jobId): void {}
+}
+namespace App\Transcode\Infrastructure\QoL;
+final class BoundaryLadder implements \App\QoL\Domain\Port\QualityLadderPortInterface {}
+final class BoundaryListener {
+    public function admit(
+        \App\QoL\Application\Port\StreamAdmissionPortInterface $admission,
+        \App\QoL\Application\Port\AllowedQualityTiersPortInterface $tiers,
+    ): void {}
+}
+final class BoundaryViolation {
+    public function internal(
+        \App\QoL\Domain\Service\InternalDomainService $governor,
+        \App\QoL\Application\InternalApplicationService $service,
+    ): void {}
+}
+namespace App\Transcode\Application;
+final class BoundaryViolation {
+    public function contracts(
+        \App\QoL\Application\Port\BudgetGuardInterface $guard,
+        \App\QoL\Application\Port\StreamAdmissionPortInterface $admission,
+    ): void {}
+}
+SOURCE);
+
+        self::assertSame(0, $report['Report']['Errors']);
+        self::assertSame(0, $report['Report']['Uncovered']);
+        self::assertGreaterThan(0, $report['Report']['Allowed']);
+        $violations = [];
+        foreach ($report['files'] as $file) {
+            foreach ($file['messages'] as $message) {
+                $violations[] = $message['message'];
+            }
+        }
+        sort($violations);
+        self::assertSame([
+            'App\Transcode\Application\BoundaryViolation must not depend on App\QoL\Application\Port\BudgetGuardInterface (Transcode Application on QoL Budget Guard Contract)',
+            'App\Transcode\Application\BoundaryViolation must not depend on App\QoL\Application\Port\StreamAdmissionPortInterface (Transcode Application on QoL Stream Admission Contract)',
+            'App\Transcode\Infrastructure\QoL\BoundaryViolation must not depend on App\QoL\Application\InternalApplicationService (Transcode Infrastructure on QoL Application)',
+            'App\Transcode\Infrastructure\QoL\BoundaryViolation must not depend on App\QoL\Domain\Service\InternalDomainService (Transcode Infrastructure on QoL Domain)',
+        ], $violations);
+    }
+
+    /** @return array{Report: array<string, int>, files: array<string, array{messages: list<array{message: string}>}>} */
+    private function analyse(string $source): array
+    {
+        $root = dirname(__DIR__, 4);
+        $directory = sys_get_temp_dir() . '/baander-boundary-' . bin2hex(random_bytes(8));
+        $files = new Filesystem();
+        $files->mkdir($directory);
+
+        try {
+            $files->dumpFile($directory . '/Fixture.php', $source);
+            $config = Yaml::parseFile($root . '/deptrac.yaml');
+            unset($config['imports']);
+            $config['deptrac']['paths'] = [$directory];
+            $files->dumpFile($directory . '/deptrac.yaml', Yaml::dump($config, 12));
+            $process = new Process([
+                PHP_BINARY,
+                $root . '/vendor/bin/deptrac',
+                'analyse',
+                '--config-file=' . $directory . '/deptrac.yaml',
+                '--no-cache',
+                '--no-progress',
+                '--formatter=json',
+            ], $root);
+            $process->setTimeout(30);
+            $process->run();
+            self::assertJson($process->getOutput(), $process->getErrorOutput() . $process->getOutput());
+
+            return json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
+        } finally {
+            $files->remove($directory);
+        }
+    }
 }

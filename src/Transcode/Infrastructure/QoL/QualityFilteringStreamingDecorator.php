@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\QoL\Infrastructure\Swoole;
+namespace App\Transcode\Infrastructure\QoL;
 
-use App\QoL\Domain\Service\StreamGovernor;
+use App\QoL\Application\Port\AllowedQualityTiersPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
@@ -12,7 +12,7 @@ use App\Transcode\Domain\Service\QualityLadder;
 use Psr\Log\LoggerInterface;
 
 /**
- * Decorator that filters manifests based on governor's allowed tiers.
+ * Decorator that filters manifests to the tiers QoL currently allows.
  *
  * Chain position: alias → CachedTranscodeStreamingService → THIS → TranscodeStreamingService
  * decoration_priority: -1 (closer to core than cache).
@@ -23,9 +23,9 @@ use Psr\Log\LoggerInterface;
 final readonly class QualityFilteringStreamingDecorator implements TranscodeStreamingPortInterface
 {
     public function __construct(
-        private TranscodeStreamingPortInterface $inner,
-        private StreamGovernor                  $governor,
-        private LoggerInterface                 $logger,
+        private TranscodeStreamingPortInterface  $inner,
+        private AllowedQualityTiersPortInterface $allowedTiers,
+        private LoggerInterface                  $logger,
     )
     {
     }
@@ -49,7 +49,7 @@ final readonly class QualityFilteringStreamingDecorator implements TranscodeStre
      */
     private function filterHlsManifest(string $manifest): string
     {
-        $allowed = $this->governor->getAllowedTiers();
+        $allowed = $this->allowedTiers->allowedTierNames();
 
         // During learning, all tiers are allowed — no filtering needed
         if (count($allowed) === count(QualityLadder::defaultTiers())) {
@@ -138,7 +138,7 @@ final readonly class QualityFilteringStreamingDecorator implements TranscodeStre
      */
     private function filterDashManifest(string $manifest): string
     {
-        $allowed = $this->governor->getAllowedTiers();
+        $allowed = $this->allowedTiers->allowedTierNames();
 
         // During learning, all tiers are allowed — no filtering needed
         if (count($allowed) === count(QualityLadder::defaultTiers())) {

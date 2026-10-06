@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Transcode\Infrastructure\Transcode;
 
-use App\Transcode\Application\Port\QualityLadderPortInterface;
+use App\QoL\Domain\Port\QualityLadderPortInterface;
 use App\Transcode\Domain\Service\QualityLadder;
 
 /**
- * Primitives-only adapter over the Transcode Domain quality ladder.
+ * Primitives-only adapter over the Transcode Domain quality ladder, implementing
+ * QoL's quality-ladder contract.
  */
 final class QualityLadderPort implements QualityLadderPortInterface
 {

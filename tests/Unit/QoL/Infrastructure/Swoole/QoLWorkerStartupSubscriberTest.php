@@ -17,7 +17,7 @@ use App\QoL\Infrastructure\Swoole\QoLWorkerStartupSubscriber;
 use App\Shared\Infrastructure\Swoole\SwooleWorkerEventBuffer;
 use App\Shared\Infrastructure\Swoole\SwooleWorkerEventSubscriber;
 use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
-use App\Transcode\Application\Port\QualityLadderPortInterface;
+use App\QoL\Domain\Port\QualityLadderPortInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;

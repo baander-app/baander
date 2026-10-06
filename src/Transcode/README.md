@@ -37,15 +37,16 @@ Key infrastructure:
 | Event | Category | Consumers |
 |-------|----------|-----------|
 | `TranscodeJobCreated` | — | none |
-| `TranscodeJobCompleted` | — | none |
+| `TranscodeJobCompleted` | — | `StreamCompletionListener` (reports completion to QoL) |
 | `TranscodeJobFailed` | — | none |
-| `TranscodeSessionAttached` | — | none |
+| `TranscodeSessionAttached` | — | `StreamAdmissionListener` (QoL stream-budget veto, priority 1) |
 | `PlaybackPositionChanged` | — | Party (for sync) |
 
 ## Interactions
 
 - **Catalog** — `TranscodeSessionSubscriber` looks up `VideoRepositoryInterface` to resolve video metadata
 - **Party** — consumes `PlaybackPositionChanged` for synchronized playback
+- **QoL** — Transcode Infrastructure calls QoL's stream-admission and allowed-tier contracts and implements its quality-ladder and encoder-profile contracts
 
 ---
 

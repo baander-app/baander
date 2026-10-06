@@ -833,8 +833,6 @@ services:
         alias: App\Transcode\Infrastructure\Storage\TranscodeFileStorage
     App\Transcode\Application\Port\SegmentCachePortInterface:
         alias: App\Transcode\Infrastructure\Cache\InMemorySegmentCache
-    App\Transcode\Application\Port\QualityLadderPortInterface:
-        alias: App\Transcode\Infrastructure\Transcode\QualityLadderPort
     App\Transcode\Application\Port\SegmentAvailabilityInterface:
         alias: App\Transcode\Infrastructure\Swoole\SegmentAvailabilityTable
 
@@ -865,7 +863,7 @@ services:
 
     # --- Transcode Cache Decorator ---
     App\Transcode\Infrastructure\Transcode\CachedTranscodeStreamingService:
-        decorates: App\QoL\Infrastructure\Swoole\QualityFilteringStreamingDecorator
+        decorates: App\Transcode\Infrastructure\QoL\QualityFilteringStreamingDecorator
         arguments:
             $inner: '@.inner'
 
@@ -1215,20 +1213,29 @@ services:
             $stateDir: '%kernel.project_dir%/var/qol_state'
             $jsonEncoder: '@json_encoder'
 
-    App\QoL\Infrastructure\Swoole\LearningEngineSubscriber: ~
+    # QoL contracts implemented by Transcode Infrastructure
+    App\QoL\Domain\Port\QualityLadderPortInterface:
+        alias: App\Transcode\Infrastructure\Transcode\QualityLadderPort
 
-    # QoL Capacity Enforcement
-    App\QoL\Infrastructure\Swoole\SessionBudgetSubscriber: ~
+    # QoL stream admission and completion. Transcode Infrastructure listeners call it:
+    # StreamAdmissionListener (TranscodeSessionAttached, priority 1, synchronous veto)
+    # and StreamCompletionListener (TranscodeJobCompleted, CoWrapper offload).
+    App\QoL\Application\Port\StreamAdmissionPortInterface:
+        alias: App\QoL\Infrastructure\StreamAdmissionService
 
-    # BudgetGuard injected into TranscodeSessionSubscriber via autowiring
-    App\Transcode\Application\Port\BudgetGuardInterface:
+    App\QoL\Application\Port\AllowedQualityTiersPortInterface:
+        alias: App\QoL\Infrastructure\AllowedQualityTiersService
+
+    # Mid-stream budget guard. It has had no caller since long FFmpeg streams
+    # replaced per-segment dispatch; wiring it into long streams is an open question.
+    App\QoL\Application\Port\BudgetGuardInterface:
         alias: App\QoL\Infrastructure\Transcode\BudgetGuard
 
     App\QoL\Infrastructure\Transcode\BudgetGuard: ~
 
-    # QoL Manifest Filtering Decorator
+    # Transcode manifest filtering by QoL's allowed tiers
     # Chain: alias → CachedTranscodeStreamingService → QualityFilteringStreamingDecorator → TranscodeStreamingService
-    App\QoL\Infrastructure\Swoole\QualityFilteringStreamingDecorator:
+    App\Transcode\Infrastructure\QoL\QualityFilteringStreamingDecorator:
         decorates: App\Transcode\Infrastructure\Transcode\TranscodeStreamingService
         decoration_priority: -1
         arguments:

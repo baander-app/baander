@@ -26,6 +26,11 @@ The QoL ("quality of life") context is a stream-governance layer over the Transc
 | Port | Purpose |
 |------|---------|
 | `QoLAdminPortInterface` | Admin read/write surface over `StreamGovernor`: status, active streams, profile switching, learning reset |
+| `QualityLadderPortInterface` | Domain contract for the default quality ladder as primitives; consumed by `StreamGovernor`, implemented by Transcode |
+| `StreamAdmissionPortInterface` | Synchronous stream admission (budget veto) and completion (learning sample and stream release) |
+| `AllowedQualityTiersPortInterface` | Tier names the budget currently allows, used for manifest filtering |
+| `BudgetGuardInterface` | Mid-stream capacity check against sampled CPU; registered, with no caller since long FFmpeg streams replaced per-segment dispatch |
+| `EncoderProfileFingerprintPortInterface` | Encoder configuration name stored with persisted learning state; implemented by Transcode |
 
 ## API Endpoints
 
@@ -43,20 +48,18 @@ All endpoints are prefixed with `/api/admin/qol` and require admin roles.
 | Direction | Context | Details |
 |-----------|---------|---------|
 | Depends on | Shared | `Uuid`, `PublicId` |
-| Depends on | Transcode | `QualityLadderPortInterface`, `TranscodeJobPortInterface`, `TranscodeStreamingPortInterface`, `BudgetGuardInterface`, `QualityLadder`, `HardwareCapabilitiesProber`, and the `TranscodeJobCompleted` / `TranscodeSessionAttached` events |
-| Depended on by | Transcode | `BudgetGuard` and `QualityFilteringStreamingDecorator` are wired into the transcode streaming chain |
+| Depended on by | Transcode | Transcode Infrastructure implements the quality-ladder and encoder-profile contracts and calls the stream-admission and allowed-tier contracts. QoL references no Transcode class. |
 
 ## Infrastructure
 
 | Component | Type | Purpose |
 |-----------|------|---------|
 | `QoLAdminService` | Port implementation | Backs `QoLAdminPortInterface`, delegates to the `StreamGovernor` singleton |
-| `SessionBudgetSubscriber` | Event subscriber | Intercepts `TranscodeSessionAttached` (priority 1), evaluates budget, vetoes via `StreamBudgetExhausted` |
-| `LearningEngineSubscriber` | Event subscriber | Records `UtilizationSample`s from `TranscodeJobCompleted` events |
+| `StreamAdmissionService` | Port implementation | Backs `StreamAdmissionPortInterface`: evaluates the budget and allocates the stream (throws `StreamBudgetExhausted` to veto), records completion samples and releases streams |
+| `AllowedQualityTiersService` | Port implementation | Backs `AllowedQualityTiersPortInterface` from the governor's allowed tiers |
 | `LearningDataPersister` | Persister | Persists governor learning state to JSON files (dual-throttled writes) |
 | `CpuGpuSampler` | Swoole bootable | Samples CPU/GPU utilization every second into a `Swoole\Table` (no pooled services in timer) |
 | `MidStreamMonitor` | Swoole timer | Polls utilization every 5s; triggers emergency stream release on sustained over-budget |
-| `QualityFilteringStreamingDecorator` | Streaming decorator | Filters DASH/master manifests to the governor's allowed tiers (decoration priority -1) |
-| `BudgetGuard` | Transcode guard | Mid-segment capacity check before each segment dispatch (implements `BudgetGuardInterface`) |
+| `BudgetGuard` | Port implementation | Mid-stream capacity check against sampled CPU (implements `BudgetGuardInterface`) |
 
 See the [Architecture](../architecture.md#communication-between-contexts) page for details on cross-context event flow, and the [Anti-Corruption Layer](../architecture.md#anti-corruption-layer) page for the streaming-decorator chain.

@@ -48,7 +48,7 @@ deptrac:
         Radio: ['Radio Domain', 'Radio Application', 'Radio Infrastructure', 'Radio Resources', 'Radio Interface']
         Scheduler: ['Scheduler Schedulable Contract', 'Scheduler Domain', 'Scheduler Application', 'Scheduler Infrastructure', 'Scheduler Resources', 'Scheduler Interface']
         Session: ['Session Domain', 'Session Application', 'Session Infrastructure', 'Session Resources', 'Session Interface']
-        QoL: ['QoL Encoder Profile Contract', 'QoL Domain', 'QoL Application', 'QoL Infrastructure', 'QoL Resources', 'QoL Interface']
+        QoL: ['QoL Encoder Profile Contract', 'QoL Quality Ladder Contract', 'QoL Stream Admission Contract', 'QoL Allowed Tiers Contract', 'QoL Budget Guard Contract', 'QoL Domain', 'QoL Application', 'QoL Infrastructure', 'QoL Resources', 'QoL Interface']
         Command: ['Command Utility']
 
   layers:
@@ -718,13 +718,38 @@ deptrac:
 
     - name: 'QoL Domain'
       collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\QoL\\Domain\\'
+          must_not:
+            - type: classLike
+              value: '^App\\QoL\\Domain\\Port\\QualityLadderPortInterface$'
+
+    - name: 'QoL Quality Ladder Contract'
+      collectors:
         - type: classLike
-          value: '^App\\QoL\\Domain\\'
+          value: '^App\\QoL\\Domain\\Port\\QualityLadderPortInterface$'
 
     - name: 'QoL Encoder Profile Contract'
       collectors:
         - type: classLike
           value: '^App\\QoL\\Application\\Port\\EncoderProfileFingerprintPortInterface$'
+
+    - name: 'QoL Stream Admission Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\QoL\\Application\\Port\\StreamAdmissionPortInterface$'
+
+    - name: 'QoL Allowed Tiers Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\QoL\\Application\\Port\\AllowedQualityTiersPortInterface$'
+
+    - name: 'QoL Budget Guard Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\QoL\\Application\\Port\\BudgetGuardInterface$'
 
     - name: 'QoL Application'
       collectors:
@@ -735,6 +760,12 @@ deptrac:
           must_not:
             - type: classLike
               value: '^App\\QoL\\Application\\Port\\EncoderProfileFingerprintPortInterface$'
+            - type: classLike
+              value: '^App\\QoL\\Application\\Port\\StreamAdmissionPortInterface$'
+            - type: classLike
+              value: '^App\\QoL\\Application\\Port\\AllowedQualityTiersPortInterface$'
+            - type: classLike
+              value: '^App\\QoL\\Application\\Port\\BudgetGuardInterface$'
 
     - name: 'QoL Infrastructure'
       collectors:
@@ -1125,6 +1156,9 @@ deptrac:
       - 'Shared Application'
     'Transcode Infrastructure':
       - 'QoL Encoder Profile Contract'
+      - 'QoL Quality Ladder Contract'
+      - 'QoL Stream Admission Contract'
+      - 'QoL Allowed Tiers Contract'
       - 'Shared Application'
       - 'Transcode Domain'
       - 'Transcode Application'
@@ -1319,7 +1353,14 @@ deptrac:
       - 'Shared Interface'
 
     'QoL Encoder Profile Contract': []
+    'QoL Quality Ladder Contract': []
+    'QoL Stream Admission Contract':
+      - 'Shared Domain'
+    'QoL Allowed Tiers Contract': []
+    'QoL Budget Guard Contract':
+      - 'Shared Domain'
     'QoL Domain':
+      - 'QoL Quality Ladder Contract'
       - 'Shared Domain'
 
     'QoL Application':
@@ -1329,6 +1370,9 @@ deptrac:
 
     'QoL Infrastructure':
       - 'QoL Encoder Profile Contract'
+      - 'QoL Stream Admission Contract'
+      - 'QoL Allowed Tiers Contract'
+      - 'QoL Budget Guard Contract'
       - 'QoL Domain'
       - 'QoL Application'
       - 'Shared Domain'

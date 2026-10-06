@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace App\Transcode\Application\Port;
+namespace App\QoL\Domain\Port;
 
 /**
  * Read access to the transcode quality ladder as primitives.
  *
- * Implemented by Transcode Infrastructure so that other contexts' Domain
- * layers can query the ladder without importing the Transcode Domain.
+ * QoL publishes this contract for StreamGovernor; Transcode Infrastructure
+ * implements it over its own ladder, so QoL never imports Transcode types.
  */
 interface QualityLadderPortInterface
 {

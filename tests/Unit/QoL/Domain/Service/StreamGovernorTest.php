@@ -11,7 +11,7 @@ use App\QoL\Domain\Service\StreamGovernor;
 use App\QoL\Domain\ValueObject\AlgorithmProfile;
 use App\QoL\Domain\ValueObject\UtilizationSample;
 use App\Shared\Domain\Model\Uuid;
-use App\Transcode\Application\Port\QualityLadderPortInterface;
+use App\QoL\Domain\Port\QualityLadderPortInterface;
 use App\Transcode\Domain\Service\QualityLadder;
 use App\Transcode\Infrastructure\Transcode\QualityLadderPort;
 use PHPUnit\Framework\TestCase;

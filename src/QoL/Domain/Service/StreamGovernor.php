@@ -6,11 +6,11 @@ namespace App\QoL\Domain\Service;
 
 use App\QoL\Domain\Exception\StreamBudgetExhausted;
 use App\QoL\Domain\Model\GovernorState;
+use App\QoL\Domain\Port\QualityLadderPortInterface;
 use App\QoL\Domain\ValueObject\AlgorithmProfile;
 use App\QoL\Domain\ValueObject\StreamAllocation;
 use App\QoL\Domain\ValueObject\UtilizationSample;
 use App\Shared\Domain\Model\Uuid;
-use App\Transcode\Application\Port\QualityLadderPortInterface;
 
 /**
  * Core domain service for adaptive stream governance.

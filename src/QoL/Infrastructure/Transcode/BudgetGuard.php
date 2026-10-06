@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace App\QoL\Infrastructure\Transcode;
 
+use App\QoL\Application\Port\BudgetGuardInterface;
 use App\QoL\Domain\Exception\StreamBudgetExhausted;
 use App\QoL\Domain\Model\GovernorState;
 use App\QoL\Domain\Service\StreamGovernor;
 use App\QoL\Infrastructure\Swoole\CpuGpuSampler;
 use App\Shared\Domain\Model\Uuid;
-use App\Transcode\Application\Port\BudgetGuardInterface;
 
 /**
  * Implements the mid-stream capacity guard.
- * Checks real-time CPU utilization against budget cap before each segment dispatch.
+ * Checks real-time CPU utilization against the profile's budget cap.
  */
 final class BudgetGuard implements BudgetGuardInterface
 {

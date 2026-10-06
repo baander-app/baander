@@ -45,7 +45,7 @@
 
 ## Ports
 
-This context defines nine port interfaces, making it the most port-heavy in the codebase:
+This context defines the following port interfaces, among others:
 
 | Port | Purpose |
 |------|---------|
@@ -55,8 +55,6 @@ This context defines nine port interfaces, making it the most port-heavy in the 
 | `SegmentCachePortInterface` | In-memory caching of encoded segments |
 | `TranscodeStoragePortInterface` | Persistent storage of segment files |
 | `TranscodeStreamingPortInterface` | Streaming segment delivery to clients |
-| `BudgetGuardInterface` | Resource/encoding budget enforcement |
-| `QualityLadderPortInterface` | Quality ladder lookups |
 | `StreamAuthPortInterface` | Stream signing/authentication |
 
 ## Domain Events
@@ -116,6 +114,7 @@ Endpoints are split between session management and streaming delivery.
 | Depends on | Shared | `Uuid`, `PublicId`, `ProcessPool`, `Async`, `JobMonitoringMiddleware` |
 | Depended on by | Party | References transcode jobs for synchronized playback |
 | Depended on by | Notification | Listens to transcode domain events for user notifications |
+| Depends on | QoL | QoL contracts only. `StreamAdmissionListener` (on `TranscodeSessionAttached`, priority 1) and `StreamCompletionListener` (on `TranscodeJobCompleted`) call the stream-admission contract; `QualityFilteringStreamingDecorator` filters manifests by the allowed-tier contract (decoration priority -1, below the cache decorator); `QualityLadderPort` and `EncoderProfileFingerprintAdapter` implement QoL contracts |
 
 ## Infrastructure
 
