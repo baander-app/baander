@@ -19,3 +19,10 @@ Two Symfony console commands:
 <!-- Everything below this line is hand-written. Edit freely. -->
 
 ## Notes
+
+The Command Utility layer may depend only on Shared Domain. Commands that use a
+context's application code live in that context's `Interface/Console/`:
+
+- `app:dev:create-users` is `src/Auth/Interface/Console/CreateUsersCommand.php`.
+  `app:dev:setup` stays here and runs it as a subprocess.
+- `app:e2e:ingest-video` is `src/Catalog/Interface/Console/IngestTestVideoCommand.php`.

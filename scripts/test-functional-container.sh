@@ -36,7 +36,7 @@ if [ "$ready" != true ]; then
 fi
 
 archive_paths=(
-    vendor src tests config packages migrations bin scripts/run-phpunit-shards.php
+    vendor src tests config packages migrations bin scripts/run-phpunit-shards.php scripts/e2e-ingest-video.php
     docker/general docker/dev docker/prod templates public phpunit.xml.dist
     .env .env.test .forgejo composer.json composer.lock deptrac.yaml deptrac.baseline.yaml translations
 )

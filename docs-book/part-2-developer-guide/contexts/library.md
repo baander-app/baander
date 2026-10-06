@@ -34,6 +34,7 @@ The Library context manages media libraries -- collections of media files organi
 | `CoverArtExtractorPortInterface` | Extracts embedded cover art from media files (e.g., ID3 tags in MP3s) | `CoverArtExtractor` |
 | `LibraryMembershipQueryPort` | Queries which users belong to which libraries | Doctrine repository |
 | `LibraryContentStatsInterface` | Per-library song, album, artist, genre, size and duration totals | Catalog `CatalogStatsQuery` (published as the Library Content Stats Contract) |
+| `LibraryProvisioningInterface` | Finds or creates a local movie library, scans it synchronously and returns `FilesDiscovered` messages for worker-free developer ingest | `LibraryProvisioner` (published as the Library Provisioning Contract; used by Catalog's `app:e2e:ingest-video`) |
 
 ## Domain Events
 

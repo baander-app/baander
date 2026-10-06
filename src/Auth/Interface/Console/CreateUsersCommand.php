@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Command\Dev;
+namespace App\Auth\Interface\Console;
 
 use App\Auth\Application\Command\User\CreateUserCommand;
 use App\Shared\Domain\Model\Email;

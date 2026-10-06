@@ -478,6 +478,10 @@ services:
     App\Catalog\Application\Port\AlbumMergePortInterface:
         alias: App\Catalog\Infrastructure\AlbumMergeService
 
+    # Resolved directly by scripts/e2e-ingest-video.php; its handlers stay private.
+    App\Catalog\Application\Service\MovieLibraryIngest:
+        public: true
+
     # --- Library Domain Repository Aliases ---
     App\Library\Domain\Repository\LibraryRepositoryInterface:
         alias: App\Library\Infrastructure\Doctrine\Repository\LibraryRepository
@@ -492,6 +496,10 @@ services:
 
     App\Library\Application\Port\LibraryReadScopeProviderInterface:
         alias: App\Library\Infrastructure\LibraryReadScopeProvider
+
+    App\Library\Application\Port\LibraryProvisioningInterface:
+        alias: App\Library\Application\LibraryProvisioner
+
     App\Library\Application\Port\DirectoryScannerPortInterface:
         alias: App\Library\Infrastructure\Scanner\DirectoryScanner
 

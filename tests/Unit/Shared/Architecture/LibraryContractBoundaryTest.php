@@ -35,4 +35,35 @@ SOURCE);
             $violations,
         );
     }
+
+    public function testCatalogApplicationMayUseTheProvisioningContractButNotOtherLibraryApplicationClasses(): void
+    {
+        $violations = self::deptracViolations(<<<'SOURCE'
+<?php
+namespace App\Library\Application\Message;
+final class FilesDiscovered {}
+namespace App\Library\Application\Port;
+interface LibraryProvisioningInterface {
+    public function provisionMovieLibrary(string $name, string $slug, string $path): ProvisionedLibraryScan;
+}
+final class ProvisionedLibraryScan {
+    public function __construct(public \App\Library\Application\Message\FilesDiscovered $discovery) {}
+}
+namespace App\Library\Application;
+final class InternalProvisioningHandler {}
+final class BoundaryProvisioner implements \App\Library\Application\Port\LibraryProvisioningInterface {
+    public function provisionMovieLibrary(string $name, string $slug, string $path): \App\Library\Application\Port\ProvisionedLibraryScan {}
+}
+namespace App\Catalog\Application\Service;
+final class BoundaryIngest {
+    public function ingest(\App\Library\Application\Port\LibraryProvisioningInterface $provisioning): \App\Library\Application\Port\ProvisionedLibraryScan {}
+    public function internal(\App\Library\Application\InternalProvisioningHandler $handler): void {}
+}
+SOURCE);
+
+        self::assertSame(
+            ['App\Catalog\Application\Service\BoundaryIngest must not depend on App\Library\Application\InternalProvisioningHandler'],
+            $violations,
+        );
+    }
 }
