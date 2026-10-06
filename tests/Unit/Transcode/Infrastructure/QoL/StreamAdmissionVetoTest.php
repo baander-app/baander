@@ -13,6 +13,7 @@ use App\QoL\Infrastructure\EventListener\StreamBudgetExceptionListener;
 use App\QoL\Infrastructure\StreamAdmissionService;
 use App\QoL\Infrastructure\Swoole\CpuGpuSampler;
 use App\QoL\Infrastructure\Swoole\LearningDataPersister;
+use App\Shared\Application\Port\SleeperInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
@@ -87,7 +88,7 @@ final class StreamAdmissionVetoTest extends TestCase
         $lock->method('acquire')->willReturn($lease);
         $starter = $this->createMock(TranscodeLoopStarterInterface::class);
         $starter->expects(self::never())->method('start');
-        $handler = new CreateTranscodeSessionHandler($jobs, $sessions, $storage, $this->dispatcher($governor), $lock, $starter);
+        $handler = new CreateTranscodeSessionHandler($jobs, $sessions, $storage, $this->dispatcher($governor), $lock, $starter, $this->createStub(SleeperInterface::class));
 
         $veto = $this->expectVeto(static fn (): TranscodeSession => $handler(
             new CreateTranscodeSessionCommand($userId, $videoId, $tier, $audio),

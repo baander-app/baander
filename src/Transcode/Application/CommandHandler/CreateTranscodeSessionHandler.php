@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Transcode\Application\CommandHandler;
 
+use App\Shared\Application\Port\SleeperInterface;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\Exception\TranscodeStartupUnavailableException;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
@@ -15,7 +16,6 @@ use App\Transcode\Domain\Event\TranscodeSessionAttached;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\ValueObject\SessionState;
 use App\Transcode\Domain\ValueObject\TranscodeStatus;
-use App\Shared\Infrastructure\Swoole\Async;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
@@ -32,6 +32,7 @@ final class CreateTranscodeSessionHandler
         private readonly EventDispatcherInterface $eventDispatcher,
         private readonly TranscodeLoopLockInterface $loopLock,
         private readonly TranscodeLoopStarterInterface $loopStarter,
+        private readonly SleeperInterface $sleeper,
     )
     {
     }
@@ -162,10 +163,10 @@ final class CreateTranscodeSessionHandler
 
     private function waitForLiveSession(\App\Shared\Domain\Model\Uuid $jobId): ?TranscodeSession
     {
-        $elapsed = 0.0;
-        while ($elapsed < self::LOCK_WAIT_TIMEOUT_SECONDS) {
-            Async::sleep(self::LOCK_WAIT_INTERVAL_SECONDS);
-            $elapsed += self::LOCK_WAIT_INTERVAL_SECONDS;
+        // Count polls as integers: summing 0.1 in floating point stays below 5.0 after 50 steps.
+        $polls = (int) round(self::LOCK_WAIT_TIMEOUT_SECONDS / self::LOCK_WAIT_INTERVAL_SECONDS);
+        for ($poll = 0; $poll < $polls; $poll++) {
+            $this->sleeper->sleep(self::LOCK_WAIT_INTERVAL_SECONDS);
 
             $live = $this->findLiveSession($jobId);
             if ($live !== null) {

@@ -1189,6 +1189,8 @@ services:
         tags: [{ name: baander.notification_replay_listeners, priority: 10 }]
     App\Auth\Infrastructure\Event\AdminAlertSubscriber:
         tags: [{ name: baander.notification_replay_listeners, priority: 0 }]
+    App\Shared\Application\Port\SleeperInterface:
+        alias: App\Shared\Infrastructure\Swoole\AsyncSleeper
     App\Shared\Application\Port\DeliveryIntentResolverInterface:
         alias: App\Notification\Infrastructure\Messaging\NotificationDeliveryIntentResolver
     App\Notification\Application\Handler\CreateNotificationHandler:

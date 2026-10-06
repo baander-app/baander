@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Transcode\Interface\Controller;
 
+use App\Shared\Application\Port\SleeperInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Infrastructure\Swoole\Async;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
 use App\Transcode\Application\Port\PlaybackPortInterface;
@@ -27,6 +27,7 @@ final class StreamManifestController
         private readonly TranscodeStreamingPortInterface $streamingService,
         private readonly SignedStreamRequest $signedRequest,
         private readonly PlaybackPortInterface $playback,
+        private readonly SleeperInterface $sleeper,
     ) {
     }
 
@@ -78,7 +79,7 @@ final class StreamManifestController
             if (str_contains($manifest, '#EXTINF:')) {
                 break;
             }
-            Async::sleep(0.5);
+            $this->sleeper->sleep(0.5);
             $elapsed += 0.5;
         }
 

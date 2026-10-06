@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Application\CommandHandler;
 
+use App\Shared\Application\Port\SleeperInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\CommandHandler\CreateTranscodeSessionHandler;
@@ -36,6 +37,8 @@ final class CreateTranscodeSessionHandlerLockTest extends TestCase
     private TranscodeSession $session;
     private CreateTranscodeSessionCommand $command;
     private CreateTranscodeSessionHandler $handler;
+    /** @var list<float> */
+    private array $sleeps = [];
 
     protected function setUp(): void
     {
@@ -56,7 +59,11 @@ final class CreateTranscodeSessionHandlerLockTest extends TestCase
         $storage->expects(self::once())->method('resolveJobDirectory')->with($videoId, $tier)->willReturn('/tmp/baander-transcode');
         $this->jobs->expects(self::once())->method('getOrCreateJob')
             ->with($videoId, $tier, '/tmp/baander-transcode', ['en'])->willReturn($this->job);
-        $this->handler = new CreateTranscodeSessionHandler($this->jobs, $this->sessions, $storage, $this->events, $this->lock, $this->starter);
+        $sleeper = $this->createStub(SleeperInterface::class);
+        $sleeper->method('sleep')->willReturnCallback(function (float $seconds): void {
+            $this->sleeps[] = $seconds;
+        });
+        $this->handler = new CreateTranscodeSessionHandler($this->jobs, $this->sessions, $storage, $this->events, $this->lock, $this->starter, $sleeper);
     }
 
     public function testDeniedLockWithoutLiveSessionFailsWithoutWritesOrRelease(): void
@@ -72,6 +79,8 @@ final class CreateTranscodeSessionHandlerLockTest extends TestCase
             ($this->handler)($this->command);
         } finally {
             self::assertEquals($before, $this->job->getState());
+            // Polls for a live session every 0.1 s for the 5 s lock-wait window.
+            self::assertSame(array_fill(0, 50, 0.1), $this->sleeps);
         }
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Interface\Controller;
 
+use App\Shared\Application\Port\SleeperInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\Port\PlaybackPortInterface;
@@ -46,7 +47,7 @@ final class StreamManifestSecurityTest extends TestCase
         $streaming->expects($valid ? $this->once() : $this->never())->method($serviceMethod)->willReturn('#EXTINF:10');
         $playback = $this->createMock(PlaybackPortInterface::class);
         $playback->expects($this->never())->method('start');
-        $controller = new StreamManifestController($streaming, new SignedStreamRequest($signer), $playback);
+        $controller = new StreamManifestController($streaming, new SignedStreamRequest($signer), $playback, $this->createStub(SleeperInterface::class));
         if (!$valid) {
             $this->expectException(AccessDeniedHttpException::class);
         }
@@ -57,6 +58,24 @@ final class StreamManifestSecurityTest extends TestCase
             default => $controller->$method($videoId, $request),
         };
         self::assertSame(200, $response->getStatusCode());
+    }
+
+    public function testMediaManifestWaitsThroughTheSleeperUntilSegmentsAreListed(): void
+    {
+        $jobId = (new PublicId())->toString();
+        $signer = new HmacStreamAuthAdapter('test-secret');
+        $streaming = $this->createMock(TranscodeStreamingPortInterface::class);
+        $streaming->expects($this->exactly(2))->method('getMediaManifest')
+            ->willReturnOnConsecutiveCalls('#EXTM3U', "#EXTM3U\n#EXTINF:10");
+        $sleeper = $this->createMock(SleeperInterface::class);
+        $sleeper->expects($this->once())->method('sleep')->with(0.5);
+        $controller = new StreamManifestController($streaming, new SignedStreamRequest($signer), $this->createStub(PlaybackPortInterface::class), $sleeper);
+
+        $response = $controller->mediaManifest($jobId, Request::create($signer->signUrl("/api/transcode/$jobId/media.m3u8")['url']));
+        ob_start();
+        $response->sendContent();
+
+        self::assertSame("#EXTM3U\n#EXTINF:10", ob_get_clean());
     }
 
     /** @return iterable<string, array{string, string}> */

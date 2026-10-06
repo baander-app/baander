@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Transcode\Interface\Controller;
 
 use App\Shared\Infrastructure\Swoole\Async;
+use App\Shared\Infrastructure\Swoole\AsyncSleeper;
 use App\Transcode\Interface\Controller\StreamSegmentController;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -24,6 +25,8 @@ final class StreamSegmentControllerFileStabilityTest extends TestCase
         file_put_contents($this->path, '0123456789');
         clearstatcache(true, $this->path);
         $this->controller = (new \ReflectionClass(StreamSegmentController::class))->newInstanceWithoutConstructor();
+        // The stability checks must really pause so the external writer can change the file.
+        (new \ReflectionProperty(StreamSegmentController::class, 'sleeper'))->setValue($this->controller, new AsyncSleeper());
         // Load the async primitive before caching file stats; autoloading must
         // not accidentally invalidate the stale-cache reproduction.
         Async::inCoroutine();

@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Transcode\Interface\Controller;
 
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Swoole\AsyncSleeper;
 use App\Transcode\Application\Port\SegmentAvailabilityInterface;
 use App\Transcode\Application\Port\StreamAuthPortInterface;
 use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
@@ -61,7 +62,7 @@ final class StreamSegmentControllerAvailabilityTest extends TestCase
                 'matching' => $this->expectedPath,
                 default => null,
             });
-        $controller = new StreamSegmentController($streaming, new SignedStreamRequest($auth), $availability);
+        $controller = new StreamSegmentController($streaming, new SignedStreamRequest($auth), $availability, new AsyncSleeper());
         $request = Request::create('https://baander.app/api/transcode/' . $publicId . '/segment?index=7&sig=valid-signature&exp=2000000000');
 
         $response = $controller->segment($publicId->toString(), $request);
@@ -97,6 +98,7 @@ final class StreamSegmentControllerAvailabilityTest extends TestCase
             $this->createStub(TranscodeStreamingPortInterface::class),
             new SignedStreamRequest($this->createStub(StreamAuthPortInterface::class)),
             $availability,
+            new AsyncSleeper(),
         );
 
         $wait = new \ReflectionMethod(StreamSegmentController::class, 'waitForSegment');

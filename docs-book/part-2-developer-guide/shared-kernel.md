@@ -51,13 +51,17 @@ Repositories that support search implement the `Searchable` domain interface fro
 
 ### Async Sleep
 
-Use `App\Shared\Infrastructure\Swoole\Async::sleep()` for all sleeping. It auto-detects coroutine context and routes to `Swoole\Coroutine::sleep()` or `usleep()` accordingly:
+`App\Shared\Infrastructure\Swoole\Async::sleep()` auto-detects coroutine context and routes to `Swoole\Coroutine::sleep()` or `usleep()` accordingly. Application and Interface code must not depend on Shared Infrastructure, so they inject `App\Shared\Application\Port\SleeperInterface`, which `AsyncSleeper` implements with `Async::sleep()`:
 
 ```php
-use App\Shared\Infrastructure\Swoole\Async;
+use App\Shared\Application\Port\SleeperInterface;
 
-Async::sleep(1.0); // works in both coroutine and non-coroutine context
+public function __construct(private readonly SleeperInterface $sleeper) {}
+
+$this->sleeper->sleep(1.0); // works in both coroutine and non-coroutine context
 ```
+
+Infrastructure code may call `Async::sleep()` directly.
 
 Never call `sleep()`, `usleep()`, or `Swoole\Coroutine::sleep()` directly.
 

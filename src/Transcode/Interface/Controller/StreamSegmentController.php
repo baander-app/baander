@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Transcode\Interface\Controller;
 
+use App\Shared\Application\Port\SleeperInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Infrastructure\Swoole\Async;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Transcode\Application\Port\SegmentAvailabilityInterface;
 use App\Transcode\Interface\Security\SignedStreamRequest;
@@ -30,6 +30,7 @@ final class StreamSegmentController
         private readonly TranscodeStreamingPortInterface $streamingService,
         private readonly SignedStreamRequest $signedRequest,
         private readonly SegmentAvailabilityInterface $segmentAvailability,
+        private readonly SleeperInterface $sleeper,
     ) {
     }
 
@@ -195,7 +196,7 @@ final class StreamSegmentController
             return null;
         }
 
-        Async::sleep(0.25);
+        $this->sleeper->sleep(0.25);
         return $this->readFileSnapshot($path) === $first ? $path : null;
     }
 
@@ -226,7 +227,7 @@ final class StreamSegmentController
             if ($remaining <= 0) {
                 break;
             }
-            Async::sleep(min(0.25, $remaining));
+            $this->sleeper->sleep(min(0.25, $remaining));
         }
 
         return null;

@@ -57,8 +57,9 @@ Domain writes and their outbox insertion share a connection and commit boundary.
 Do not add a blanket transaction around the whole Messenger bus or outbox relay.
 Cache writes and external sends require deliberate commit/failure semantics.
 
-Prefer `App\Shared\Infrastructure\Swoole\Async::sleep()` in shared application
-runtime paths. Prevent process work from blocking the request/coroutine event loop:
+Sleep through `App\Shared\Application\Port\SleeperInterface` in Application and
+Interface code; Infrastructure may call `App\Shared\Infrastructure\Swoole\Async::sleep()`
+directly. Prevent process work from blocking the request/coroutine event loop:
 use the established CPU process pool or a verified coroutine-aware adapter there.
 CLI commands and isolated child processes may use blocking process APIs deliberately.
 Native coroutine execution still needs bounded execution and cleanup; do not infer
