@@ -10,8 +10,8 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'server_instances')]
-#[ORM\UniqueConstraint(name: 'server_instances_public_id_key', columns: ['public_id'])]
-#[ORM\UniqueConstraint(name: 'server_instances_server_url_key', columns: ['server_url'])]
+#[ORM\UniqueConstraint(name: 'uniq_server_instances_public_id', columns: ['public_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_server_instances_server_url', columns: ['server_url'])]
 class ServerInstanceEntity
 {
     #[ORM\Id]

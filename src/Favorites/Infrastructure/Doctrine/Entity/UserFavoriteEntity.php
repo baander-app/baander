@@ -10,9 +10,9 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'user_favorites')]
-#[ORM\UniqueConstraint(name: 'user_favorites_public_id_key', columns: ['public_id'])]
-#[ORM\UniqueConstraint(name: 'user_favorites_user_entity_key', columns: ['user_id', 'entity_type', 'entity_public_id'])]
-#[ORM\Index(name: 'user_favorites_user_id_idx', columns: ['user_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_user_favorites_public_id', columns: ['public_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_user_favorites_user_id_entity_type_entity_public_id', columns: ['user_id', 'entity_type', 'entity_public_id'])]
+#[ORM\Index(name: 'idx_user_favorites_user_id', columns: ['user_id'])]
 class UserFavoriteEntity
 {
     #[ORM\Id]

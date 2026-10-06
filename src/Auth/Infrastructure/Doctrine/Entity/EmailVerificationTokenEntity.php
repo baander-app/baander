@@ -10,7 +10,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity]
 #[ORM\Table(name: 'email_verification_tokens')]
 #[ORM\Index(name: 'idx_email_verification_tokens_user_id', columns: ['user_id'])]
-#[ORM\UniqueConstraint(name: 'email_verification_tokens_token_unique', columns: ['token'])]
+#[ORM\UniqueConstraint(name: 'uniq_email_verification_tokens_token', columns: ['token'])]
 class EmailVerificationTokenEntity
 {
     #[ORM\Id]

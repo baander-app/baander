@@ -14,6 +14,6 @@ final class NotificationForeignKeys implements ForeignKeyDeclarationProviderInte
     {
         yield new ForeignKeyDeclaration('fk_notifications_user_id', 'notifications', 'user_id', 'users', 'id', 'CASCADE');
         yield new ForeignKeyDeclaration('fk_notification_preferences_user_id', 'notification_preferences', 'user_id', 'users', 'id', 'CASCADE');
-        yield new ForeignKeyDeclaration('_fkpush_subscriptions_user_id', 'push_subscriptions', 'user_id', 'users', 'id', 'CASCADE');
+        yield new ForeignKeyDeclaration('fk_push_subscriptions_user_id', 'push_subscriptions', 'user_id', 'users', 'id', 'CASCADE');
     }
 }

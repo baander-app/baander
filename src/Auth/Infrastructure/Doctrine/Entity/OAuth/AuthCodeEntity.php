@@ -13,7 +13,7 @@ use League\OAuth2\Server\Entities\ScopeEntityInterface;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'oauth_auth_codes')]
-#[ORM\UniqueConstraint(name: 'oauth_auth_codes_code_id_unique', columns: ['code_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_oauth_auth_codes_code_id', columns: ['code_id'])]
 class AuthCodeEntity implements AuthCodeEntityInterface
 {
     #[ORM\Id]

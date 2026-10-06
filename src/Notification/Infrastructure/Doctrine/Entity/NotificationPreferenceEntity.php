@@ -9,7 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'notification_preferences')]
-#[ORM\UniqueConstraint(name: 'notification_preferences_user_id_category_channel_key', columns: ['user_id', 'category', 'channel'])]
+#[ORM\UniqueConstraint(name: 'uniq_notification_preferences_user_id_category_channel', columns: ['user_id', 'category', 'channel'])]
 class NotificationPreferenceEntity
 {
     #[ORM\Id]

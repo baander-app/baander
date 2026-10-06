@@ -13,7 +13,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(name: 'idx_transcode_sessions_job_id', columns: ['job_id'])]
 #[ORM\Index(name: 'idx_transcode_sessions_state', columns: ['state'])]
 #[ORM\Index(name: 'idx_transcode_sessions_user_id', columns: ['user_id'])]
-#[ORM\UniqueConstraint(name: 'transcode_sessions_public_id_key', columns: ['public_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_transcode_sessions_public_id', columns: ['public_id'])]
 class TranscodeSessionEntity
 {
     #[ORM\Id]

@@ -34,7 +34,7 @@ final class NotificationOwnershipPersistenceTest extends TestCase
     private const ENTITIES = [
         'notifications' => [NotificationEntity::class, 'fk_notifications_user_id'],
         'notification_preferences' => [NotificationPreferenceEntity::class, 'fk_notification_preferences_user_id'],
-        'push_subscriptions' => [PushSubscriptionEntity::class, '_fkpush_subscriptions_user_id'],
+        'push_subscriptions' => [PushSubscriptionEntity::class, 'fk_push_subscriptions_user_id'],
     ];
 
     private Kernel $kernel;

@@ -10,8 +10,8 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'users')]
-#[ORM\UniqueConstraint(name: 'users_public_id_unique', columns: ['public_id'])]
-#[ORM\UniqueConstraint(name: 'users_email_unique', columns: ['email'])]
+#[ORM\UniqueConstraint(name: 'uniq_users_public_id', columns: ['public_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_users_email', columns: ['email'])]
 class UserEntity
 {
     #[ORM\Id]

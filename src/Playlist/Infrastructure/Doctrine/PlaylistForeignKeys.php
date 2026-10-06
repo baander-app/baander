@@ -12,6 +12,6 @@ final class PlaylistForeignKeys implements ForeignKeyDeclarationProviderInterfac
 {
     public function foreignKeys(): iterable
     {
-        yield new ForeignKeyDeclaration('playlist_song_song_id_fkey', 'playlist_song', 'song_id', 'songs', 'id', 'CASCADE');
+        yield new ForeignKeyDeclaration('fk_playlist_song_song_id', 'playlist_song', 'song_id', 'songs', 'id', 'CASCADE');
     }
 }

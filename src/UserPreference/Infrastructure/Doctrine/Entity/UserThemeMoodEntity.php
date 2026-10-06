@@ -9,7 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'user_theme_moods')]
-#[ORM\UniqueConstraint(name: 'user_theme_moods_user_id_key', columns: ['user_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_user_theme_moods_user_id', columns: ['user_id'])]
 class UserThemeMoodEntity
 {
     #[ORM\Id]

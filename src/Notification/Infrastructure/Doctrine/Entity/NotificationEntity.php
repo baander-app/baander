@@ -10,9 +10,9 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'notifications')]
-#[ORM\Index(name: 'idx_notifications_user_created', columns: ['user_id', 'created_at'])]
-#[ORM\Index(name: 'idx_notifications_user_read', columns: ['user_id', 'is_read'])]
-#[ORM\UniqueConstraint(name: 'notifications_public_id_key', columns: ['public_id'])]
+#[ORM\Index(name: 'idx_notifications_user_id_created_at', columns: ['user_id', 'created_at'])]
+#[ORM\Index(name: 'idx_notifications_user_id_is_read', columns: ['user_id', 'is_read'])]
+#[ORM\UniqueConstraint(name: 'uniq_notifications_public_id', columns: ['public_id'])]
 class NotificationEntity
 {
     #[ORM\Id]

@@ -12,6 +12,6 @@ final class LyricsForeignKeys implements ForeignKeyDeclarationProviderInterface
 {
     public function foreignKeys(): iterable
     {
-        yield new ForeignKeyDeclaration('lyrics_song_id_fkey', 'lyrics', 'song_id', 'songs', 'id', 'CASCADE');
+        yield new ForeignKeyDeclaration('fk_lyrics_song_id', 'lyrics', 'song_id', 'songs', 'id', 'CASCADE');
     }
 }

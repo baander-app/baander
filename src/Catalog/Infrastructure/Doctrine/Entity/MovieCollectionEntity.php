@@ -9,7 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'movie_collections')]
-#[ORM\UniqueConstraint(name: 'tmdb_collection_id_unique', columns: ['tmdb_collection_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_movie_collections_tmdb_collection_id', columns: ['tmdb_collection_id'])]
 class MovieCollectionEntity
 {
     #[ORM\Id]

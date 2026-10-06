@@ -10,8 +10,8 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'videos')]
-#[ORM\UniqueConstraint(name: 'videos_public_id_unique', columns: ['public_id'])]
-#[ORM\UniqueConstraint(name: 'videos_hash_unique', columns: ['hash'])]
+#[ORM\UniqueConstraint(name: 'uniq_videos_public_id', columns: ['public_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_videos_hash', columns: ['hash'])]
 class VideoEntity
 {
     #[ORM\Id]

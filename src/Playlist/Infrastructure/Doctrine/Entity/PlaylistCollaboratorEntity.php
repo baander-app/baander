@@ -10,7 +10,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'playlist_collaborators')]
-#[ORM\UniqueConstraint(name: 'playlist_user_unique', columns: ['playlist_id', 'user_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_playlist_collaborators_playlist_id_user_id', columns: ['playlist_id', 'user_id'])]
 class PlaylistCollaboratorEntity
 {
     #[ORM\Id]

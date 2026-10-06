@@ -11,7 +11,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity]
 #[ORM\Table(name: 'third_party_credentials')]
 #[ORM\Index(name: 'idx_third_party_credentials_user_id', columns: ['user_id'])]
-#[ORM\UniqueConstraint(name: 'third_party_credentials_public_id_unique', columns: ['public_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_third_party_credentials_public_id', columns: ['public_id'])]
 class ThirdPartyCredentialEntity
 {
     #[ORM\Id]

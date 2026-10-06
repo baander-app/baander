@@ -10,7 +10,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'party_sessions')]
-#[ORM\UniqueConstraint(name: 'party_sessions_public_id_key', columns: ['public_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_party_sessions_public_id', columns: ['public_id'])]
 #[ORM\Index(name: 'idx_party_sessions_is_active', columns: ['is_active'])]
 #[ORM\Index(name: 'idx_party_sessions_video_id', columns: ['video_id'])]
 #[ORM\Index(name: 'idx_party_sessions_host_user_id', columns: ['host_user_id'])]

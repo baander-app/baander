@@ -11,7 +11,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'movies')]
-#[ORM\UniqueConstraint(name: 'movies_public_id_unique', columns: ['public_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_movies_public_id', columns: ['public_id'])]
 #[ORM\Index(name: 'idx_movies_library_id', columns: ['library_id'])]
 #[ORM\Index(name: 'idx_movies_title_pgroonga', columns: ['title'], flags: ['pgroonga'], options: ['with' => "plugins='token_filters/stem', tokenizer='TokenNgram', normalizer='NormalizerAuto', token_filters='TokenFilterStem'"])]
 class MovieEntity

@@ -66,12 +66,16 @@ final class SchedulerRecoveryPollerTest extends TestCase
                 $this->writer->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
             }
         }
-        foreach (['Version20261002230000', 'Version20261003010000'] as $version) {
+        foreach (['Version20261002230000', 'Version20261003010000', 'Version20261006230000'] as $version) {
             require_once dirname(__DIR__, 2) . '/migrations/' . $version . '.php';
             $class = 'DoctrineMigrations\\' . $version;
             $migration = new $class($this->writer, new NullLogger());
             $migration->up(new Schema());
             foreach ($migration->getSql() as $query) {
+                // The naming migration renames objects across the schema; this fixture has only scheduled_jobs.
+                if ($version === 'Version20261006230000' && !str_contains($query->getStatement(), 'scheduled_jobs')) {
+                    continue;
+                }
                 $this->writer->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
             }
         }
@@ -293,7 +297,7 @@ final class SchedulerRecoveryPollerTest extends TestCase
         $schemaManager = $this->configuredManager->getConnection()->createSchemaManager();
         $actual = $schemaManager->introspectTable($this->schema . '.scheduled_jobs');
         $expected = (new SchemaTool($this->configuredManager))->getSchemaFromMetadata([$this->configuredManager->getClassMetadata(ScheduledJobEntity::class)])->getTable('scheduled_jobs');
-        $name = 'idx_scheduled_jobs_recovery_after';
+        $name = 'idx_scheduled_jobs_recovery_after_id';
         self::assertSame(['recovery_after', 'id'], $actual->getIndex($name)->getColumns());
         self::assertSame("(status = 'active'::text)", $this->observer->fetchOne('SELECT pg_get_expr(i.indpred, i.indrelid) FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = :schema AND c.relname = :name', ['schema' => $this->schema, 'name' => $name]));
         $difference = $schemaManager->createComparator()->compareTables($actual, $expected);

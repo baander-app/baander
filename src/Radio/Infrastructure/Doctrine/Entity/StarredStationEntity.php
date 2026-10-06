@@ -9,8 +9,8 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'starred_stations')]
-#[ORM\UniqueConstraint(name: 'starred_stations_user_id_station_id_key', columns: ['user_id', 'station_id'])]
-#[ORM\Index(name: 'idx_starred_stations_user', columns: ['user_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_starred_stations_user_id_station_id', columns: ['user_id', 'station_id'])]
+#[ORM\Index(name: 'idx_starred_stations_user_id', columns: ['user_id'])]
 class StarredStationEntity
 {
     #[ORM\Id]

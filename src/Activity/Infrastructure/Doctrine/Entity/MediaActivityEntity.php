@@ -20,8 +20,8 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(name: 'idx_media_activities_album_id', columns: ['album_id'])]
 #[ORM\Index(name: 'idx_media_activities_artist_id', columns: ['artist_id'])]
 #[ORM\Index(name: 'idx_media_activities_movie_id', columns: ['movie_id'])]
-#[ORM\UniqueConstraint(name: 'media_activities_public_id_unique', columns: ['public_id'])]
-#[ORM\Index(name: 'idx_media_activities_type_user', columns: ['activity_type', 'user_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_media_activities_public_id', columns: ['public_id'])]
+#[ORM\Index(name: 'idx_media_activities_activity_type_user_id', columns: ['activity_type', 'user_id'])]
 class MediaActivityEntity
 {
     #[ORM\Id]

@@ -11,7 +11,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'playlist_song')]
 #[ORM\Index(name: 'idx_playlist_song_playlist_id', columns: ['playlist_id'])]
 #[ORM\Index(name: 'idx_playlist_song_song_id', columns: ['song_id'])]
-#[ORM\UniqueConstraint(name: 'playlist_song_unique', columns: ['playlist_id', 'song_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_playlist_song_playlist_id_song_id', columns: ['playlist_id', 'song_id'])]
 class PlaylistSongEntity
 {
     #[ORM\Id]
@@ -23,7 +23,7 @@ class PlaylistSongEntity
     #[ORM\JoinColumn(name: 'playlist_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private PlaylistEntity $playlist;
 
-    /** Constraint playlist_song_song_id_fkey (ON DELETE CASCADE) is declared by PlaylistForeignKeys. */
+    /** Constraint fk_playlist_song_song_id (ON DELETE CASCADE) is declared by PlaylistForeignKeys. */
     #[ORM\Column(name: 'song_id', type: 'uuid')]
     private Uuid $songId;
 

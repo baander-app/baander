@@ -16,7 +16,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(name: 'idx_images_album_id', columns: ['album_id'])]
 #[ORM\Index(name: 'idx_images_artist_id', columns: ['artist_id'])]
 #[ORM\Index(name: 'idx_images_playlist_id', columns: ['playlist_id'])]
-#[ORM\UniqueConstraint(name: 'images_public_id_unique', columns: ['public_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_images_public_id', columns: ['public_id'])]
 class ImageEntity
 {
     #[ORM\Id]

@@ -9,8 +9,8 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'lyrics')]
-#[ORM\UniqueConstraint(name: 'lyrics_song_id_unique', columns: ['song_id'])]
-#[ORM\UniqueConstraint(name: 'lyrics_lrclib_id_unique', columns: ['lrclib_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_lyrics_song_id', columns: ['song_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_lyrics_lrclib_id', columns: ['lrclib_id'])]
 class LyricsEntity
 {
     #[ORM\Id]
@@ -18,7 +18,7 @@ class LyricsEntity
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
 
-    /** Constraint lyrics_song_id_fkey (ON DELETE CASCADE) is declared by LyricsForeignKeys. */
+    /** Constraint fk_lyrics_song_id (ON DELETE CASCADE) is declared by LyricsForeignKeys. */
     #[ORM\Column(name: 'song_id', type: 'uuid')]
     private Uuid $songId;
 

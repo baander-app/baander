@@ -12,7 +12,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'songs')]
-#[ORM\UniqueConstraint(name: 'songs_public_id_unique', columns: ['public_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_songs_public_id', columns: ['public_id'])]
 #[ORM\Index(name: 'idx_songs_album_id', columns: ['album_id'])]
 #[ORM\Index(name: 'idx_songs_title_pgroonga', columns: ['title'], flags: ['pgroonga'], options: ['with' => "plugins='token_filters/stem', tokenizer='TokenNgram', normalizer='NormalizerAuto', token_filters='TokenFilterStem'"])]
 #[ORM\Index(name: 'idx_songs_title', columns: ['title'])]

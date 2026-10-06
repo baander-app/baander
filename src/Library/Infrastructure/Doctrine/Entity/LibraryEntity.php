@@ -9,7 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'libraries')]
-#[ORM\UniqueConstraint(name: 'libraries_slug_unique', columns: ['slug'])]
+#[ORM\UniqueConstraint(name: 'uniq_libraries_slug', columns: ['slug'])]
 class LibraryEntity
 {
     #[ORM\Id]

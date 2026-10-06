@@ -12,7 +12,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'scheduled_jobs')]
 #[ORM\Index(name: 'idx_scheduled_jobs_status', columns: ['status'])]
 #[ORM\Index(name: 'idx_scheduled_jobs_next_run_at', columns: ['next_run_at'])]
-#[ORM\Index(name: 'idx_scheduled_jobs_recovery_after', columns: ['recovery_after', 'id'], options: ['where' => "(status = 'active'::text)"])]
+#[ORM\Index(name: 'idx_scheduled_jobs_recovery_after_id', columns: ['recovery_after', 'id'], options: ['where' => "(status = 'active'::text)"])]
 class ScheduledJobEntity
 {
     #[ORM\Id]

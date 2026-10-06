@@ -9,7 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'audio_preferences')]
-#[ORM\UniqueConstraint(name: 'audio_preferences_user_id_key', columns: ['user_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_audio_preferences_user_id', columns: ['user_id'])]
 class AudioPreferencesEntity
 {
     #[ORM\Id]

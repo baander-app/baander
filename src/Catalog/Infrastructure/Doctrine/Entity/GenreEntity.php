@@ -9,7 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'genres')]
-#[ORM\UniqueConstraint(name: 'genres_slug_unique', columns: ['slug'])]
+#[ORM\UniqueConstraint(name: 'uniq_genres_slug', columns: ['slug'])]
 #[ORM\Index(name: 'idx_genres_name_pgroonga', columns: ['name'], flags: ['pgroonga'], options: ['with' => "plugins='token_filters/stem', tokenizer='TokenNgram', normalizer='NormalizerAuto', token_filters='TokenFilterStem'"])]
 class GenreEntity
 {

@@ -9,7 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'genre_movie')]
-#[ORM\UniqueConstraint(name: 'genre_movie_unique', columns: ['genre_id', 'movie_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_genre_movie_genre_id_movie_id', columns: ['genre_id', 'movie_id'])]
 #[ORM\Index(name: 'idx_genre_movie_genre_id', columns: ['genre_id'])]
 #[ORM\Index(name: 'idx_genre_movie_movie_id', columns: ['movie_id'])]
 class GenreMovieEntity

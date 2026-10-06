@@ -12,7 +12,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'albums')]
-#[ORM\UniqueConstraint(name: 'albums_public_id_unique', columns: ['public_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_albums_public_id', columns: ['public_id'])]
 #[ORM\Index(name: 'idx_albums_library_id', columns: ['library_id'])]
 #[ORM\Index(name: 'idx_albums_title', columns: ['title'])]
 #[ORM\Index(

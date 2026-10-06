@@ -28,8 +28,8 @@ final class SongReferencePersistenceTest extends TestCase
 {
     /** @var array<string, array{class-string, string}> table => [entity, migration-defined FK name] */
     private const ENTITIES = [
-        'lyrics' => [LyricsEntity::class, 'lyrics_song_id_fkey'],
-        'playlist_song' => [PlaylistSongEntity::class, 'playlist_song_song_id_fkey'],
+        'lyrics' => [LyricsEntity::class, 'fk_lyrics_song_id'],
+        'playlist_song' => [PlaylistSongEntity::class, 'fk_playlist_song_song_id'],
     ];
 
     private Kernel $kernel;

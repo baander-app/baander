@@ -8,14 +8,16 @@ PostgreSQL index and constraint names in Baander follow one scheme: a type prefi
 |--------|------|---------|
 | Index | `idx_<table>_<columns>` | `idx_party_sessions_host_user_id` |
 | Unique index or unique constraint | `uniq_<table>_<columns>` | `uniq_users_email` |
-| Foreign key | `fk_<table>_<column>` | `fk_notifications_user_id` |
+| Foreign key | `fk_<table>_<columns>` | `fk_notifications_user_id` |
 | Index with a non-B-tree access method or an extension operator class | `idx_<table>_<columns>_<suffix>` | `idx_songs_title_pgroonga`, `idx_songs_public_id_trgm` |
-| Migration-only partial, expression or polymorphic index | `idx_<table>_<purpose>` | `idx_albums_cover_image_null`, `idx_images_imageable` |
+| Migration-only partial, expression or polymorphic index | `idx_<table>_<purpose>`, or `uniq_<table>_<purpose>` when unique | `idx_albums_cover_image_null`, `idx_images_imageable`, `uniq_genres_name_lower` |
 | Primary key | `<table>_pkey` (PostgreSQL default) | `songs_pkey` |
 
 - List columns in index order, separated by underscores: `idx_notifications_user_id_created_at`.
 - A B-tree index takes no suffix. The suffixes for other indexes are defined in [Extension Indexes](#extension-indexes).
-- PostgreSQL truncates identifiers longer than 63 bytes. When a name would exceed that, shorten the column part consistently instead of letting PostgreSQL cut the name.
+- A partial index declared on an entity with `options: ['where' => ...]` is not migration-only and takes the column name: `idx_scheduled_jobs_recovery_after_id`.
+- Renaming a unique constraint also renames the index that backs it, so both carry the `uniq_` name.
+- PostgreSQL truncates identifiers longer than 63 bytes. When a name would exceed that, shorten the column part consistently instead of letting PostgreSQL cut the name. Collapse each polymorphic `<x>_type`, `<x>_id` pair to `<x>`: the unique index on `recommendations (source_type, source_id, target_type, target_id, name, user_id)` is `uniq_recommendations_source_target_name_user_id`.
 
 ## Extension Indexes
 
@@ -58,6 +60,10 @@ The database image installs PGroonga package `4.0.5-1`. The operator classes and
 - **Migrations** name every index and constraint explicitly. Do not rely on PostgreSQL's generated names (`<table>_<column>_key`, `<table>_<column>_fkey`) or on Doctrine's hashed names (`IDX_…`, `FK_…`).
 - **Doctrine mappings** name indexes and unique constraints with the same value as the migration (`#[ORM\Index(name: 'idx_…')]`, `#[ORM\UniqueConstraint(name: 'uniq_…')]`). Schema comparison matches indexes by name. A mapping that omits the migration's name therefore makes `doctrine:schema:validate` and migration diffs report a rename.
 - **Cross-context foreign keys** on scalar UUID columns are not visible to Doctrine. Their owning context declares each one in a `ForeignKeyDeclarationProviderInterface` service with the constraint's real name, so schema comparison keeps the database FK. See `src/Notification/Infrastructure/Doctrine/NotificationForeignKeys.php`.
+- **Association foreign keys** cannot be named in a mapping. DBAL matches foreign keys by definition, so a migration-chosen `fk_` name does not show up as drift.
+- **Implicit foreign-key indexes.** For every mapped or declared foreign key, DBAL adds an index named `IDX_<hash>` unless an index on exactly the same columns already exists. When the migration keeps such an index, declare it on the entity with its `idx_` name, as `SidebarConfigEntity` does.
+
+`tests/Integration/DatabaseNamingConventionTest.php` reads the migrated catalog and fails on any foreign key, unique constraint or index whose name breaks these rules. It also checks that schema comparison is clean.
 
 ## See Also
 

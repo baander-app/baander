@@ -134,7 +134,7 @@ final class LibraryFileIndexPersistenceTest extends TestCase
 
         self::assertSame([
             'library_file_index_pkey' => 'CREATE UNIQUE INDEX library_file_index_pkey ON public.library_file_index USING btree (id)',
-            'library_file_path_unique' => 'CREATE UNIQUE INDEX library_file_path_unique ON public.library_file_index USING btree (library_id, path)',
+            'uniq_library_file_index_library_id_path' => 'CREATE UNIQUE INDEX uniq_library_file_index_library_id_path ON public.library_file_index USING btree (library_id, path)',
         ], $indexes());
 
         require_once dirname(__DIR__, 2) . '/migrations/Version20261006201000.php';
@@ -145,7 +145,7 @@ final class LibraryFileIndexPersistenceTest extends TestCase
                 $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
             }
             self::assertSame($direction === 'down', array_key_exists('idx_library_file_index_library_id', $indexes()), $direction);
-            self::assertArrayHasKey('library_file_path_unique', $indexes(), $direction);
+            self::assertArrayHasKey('uniq_library_file_index_library_id_path', $indexes(), $direction);
         }
     }
 

@@ -21,7 +21,7 @@ use League\OAuth2\Server\CryptKeyInterface;
 #[ORM\Index(name: 'idx_oauth_access_tokens_user_id', columns: ['user_id'])]
 #[ORM\Index(name: 'idx_oauth_access_tokens_client_id', columns: ['client_id'])]
 #[ORM\Index(name: 'idx_oauth_access_tokens_chain_id', columns: ['chain_id'])]
-#[ORM\UniqueConstraint(name: 'oauth_access_tokens_token_id_unique', columns: ['token_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_oauth_access_tokens_token_id', columns: ['token_id'])]
 class AccessTokenEntity implements AccessTokenEntityInterface
 {
     #[ORM\Id]

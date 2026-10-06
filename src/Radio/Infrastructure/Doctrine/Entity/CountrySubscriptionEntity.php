@@ -9,7 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'country_subscriptions')]
-#[ORM\UniqueConstraint(name: 'country_subscriptions_user_id_source_id_country_code_key', columns: ['user_id', 'source_id', 'country_code'])]
+#[ORM\UniqueConstraint(name: 'uniq_country_subscriptions_user_id_source_id_country_code', columns: ['user_id', 'source_id', 'country_code'])]
 class CountrySubscriptionEntity
 {
     #[ORM\Id]

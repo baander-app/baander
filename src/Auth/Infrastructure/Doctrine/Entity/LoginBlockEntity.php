@@ -12,7 +12,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity]
 #[ORM\Table(name: 'login_blocks')]
 #[ORM\Index(name: 'idx_login_blocks_email', columns: ['email'])]
-#[ORM\Index(name: 'idx_login_blocks_ip_created', columns: ['ip_address', 'created_at'])]
+#[ORM\Index(name: 'idx_login_blocks_ip_address_created_at', columns: ['ip_address', 'created_at'])]
 class LoginBlockEntity
 {
     #[ORM\Id]

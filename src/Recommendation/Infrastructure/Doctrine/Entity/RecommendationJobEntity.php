@@ -10,9 +10,9 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'recommendation_jobs')]
-#[ORM\UniqueConstraint(name: 'recommendation_jobs_public_id_idx', columns: ['public_id'])]
-#[ORM\Index(name: 'recommendation_jobs_status_idx', columns: ['status'])]
-#[ORM\Index(name: 'recommendation_jobs_user_id_idx', columns: ['user_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_recommendation_jobs_public_id', columns: ['public_id'])]
+#[ORM\Index(name: 'idx_recommendation_jobs_status', columns: ['status'])]
+#[ORM\Index(name: 'idx_recommendation_jobs_user_id', columns: ['user_id'])]
 #[ORM\HasLifecycleCallbacks]
 class RecommendationJobEntity
 {

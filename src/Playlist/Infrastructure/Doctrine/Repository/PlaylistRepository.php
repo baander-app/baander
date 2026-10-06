@@ -343,7 +343,7 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
             }
         }
 
-        // Insert newly added songs; playlist_song_song_id_fkey rejects unknown songs.
+        // Insert newly added songs; fk_playlist_song_song_id rejects unknown songs.
         foreach (array_diff_key($desired, $existingBySong) as $songIdStr => $position) {
             $this->entityManager->persist(new PlaylistSongEntity($entity, Uuid::fromString((string) $songIdStr), $position));
         }

@@ -9,7 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'oauth_token_metadata')]
-#[ORM\UniqueConstraint(name: 'oauth_token_metadata_token_id_unique', columns: ['token_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_oauth_token_metadata_token_id', columns: ['token_id'])]
 class TokenMetadataEntity
 {
     #[ORM\Id]

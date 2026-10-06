@@ -12,7 +12,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity]
 #[ORM\Table(name: 'playlists')]
 #[ORM\Index(name: 'idx_playlists_user_id', columns: ['user_id'])]
-#[ORM\UniqueConstraint(name: 'playlists_public_id_unique', columns: ['public_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_playlists_public_id', columns: ['public_id'])]
 class PlaylistEntity
 {
     #[ORM\Id]

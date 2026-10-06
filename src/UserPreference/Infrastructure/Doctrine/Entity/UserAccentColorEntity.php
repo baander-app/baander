@@ -9,7 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'user_accent_colors')]
-#[ORM\UniqueConstraint(name: 'user_accent_colors_user_id_key', columns: ['user_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_user_accent_colors_user_id', columns: ['user_id'])]
 class UserAccentColorEntity
 {
     #[ORM\Id]

@@ -10,7 +10,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity]
 #[ORM\Table(name: 'passkeys')]
 #[ORM\Index(name: 'idx_passkeys_user_id', columns: ['user_id'])]
-#[ORM\UniqueConstraint(name: 'passkeys_credential_id_unique', columns: ['credential_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_passkeys_credential_id', columns: ['credential_id'])]
 class PasskeyEntity
 {
     #[ORM\Id]

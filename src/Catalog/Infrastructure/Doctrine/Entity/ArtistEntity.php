@@ -11,7 +11,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'artists')]
-#[ORM\UniqueConstraint(name: 'artists_public_id_unique', columns: ['public_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_artists_public_id', columns: ['public_id'])]
 #[ORM\Index(name: 'idx_artists_name', columns: ['name'])]
 #[ORM\Index(
     name: 'idx_artists_name_pgroonga',

@@ -76,13 +76,13 @@ final class LibraryAccessOwnershipPersistenceTest extends TestCase
         $schema = $tool->getSchemaFromMetadata($this->manager->getMetadataFactory()->getAllMetadata());
         $catalog = $this->manager->getConnection()->createSchemaManager()->introspectTable('user_library_access');
 
-        $expected = $schema->getTable('user_library_access')->getForeignKey('fk_user_library_access_user');
+        $expected = $schema->getTable('user_library_access')->getForeignKey('fk_user_library_access_user_id');
         self::assertSame(['user_id'], $expected->getLocalColumns());
         self::assertSame('users', $expected->getForeignTableName());
         self::assertSame(['id'], $expected->getForeignColumns());
         self::assertSame('CASCADE', $expected->onDelete());
 
-        $actual = $catalog->getForeignKey('fk_user_library_access_user');
+        $actual = $catalog->getForeignKey('fk_user_library_access_user_id');
         self::assertSame($actual->getLocalColumns(), $expected->getLocalColumns());
         self::assertSame($actual->getForeignTableName(), $expected->getForeignTableName());
         self::assertSame($actual->getForeignColumns(), $expected->getForeignColumns());

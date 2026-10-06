@@ -9,7 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'layout_preferences')]
-#[ORM\UniqueConstraint(name: 'layout_preferences_user_id_key', columns: ['user_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_layout_preferences_user_id', columns: ['user_id'])]
 class LayoutPreferencesEntity
 {
     #[ORM\Id]

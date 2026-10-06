@@ -10,7 +10,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity]
 #[ORM\Table(name: 'push_subscriptions')]
 #[ORM\Index(name: 'idx_push_subscriptions_user_id', columns: ['user_id'])]
-#[ORM\UniqueConstraint(name: 'idx_push_subscriptions_endpoint', columns: ['endpoint'])]
+#[ORM\UniqueConstraint(name: 'uniq_push_subscriptions_endpoint', columns: ['endpoint'])]
 class PushSubscriptionEntity
 {
     #[ORM\Id]

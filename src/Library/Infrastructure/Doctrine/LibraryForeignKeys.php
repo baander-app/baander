@@ -15,7 +15,7 @@ final class LibraryForeignKeys implements ForeignKeyDeclarationProviderInterface
 {
     public function foreignKeys(): iterable
     {
-        yield new ForeignKeyDeclaration('fk_user_library_access_user', 'user_library_access', 'user_id', 'users', 'id', 'CASCADE');
+        yield new ForeignKeyDeclaration('fk_user_library_access_user_id', 'user_library_access', 'user_id', 'users', 'id', 'CASCADE');
         yield new ForeignKeyDeclaration('fk_library_file_index_library_id', 'library_file_index', 'library_id', 'libraries', 'id', 'CASCADE');
     }
 }

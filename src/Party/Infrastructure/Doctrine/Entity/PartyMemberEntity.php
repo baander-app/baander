@@ -10,8 +10,8 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'party_members')]
-#[ORM\UniqueConstraint(name: 'party_members_public_id_key', columns: ['public_id'])]
-#[ORM\UniqueConstraint(name: 'party_members_user_id_session_id_key', columns: ['user_id', 'session_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_party_members_public_id', columns: ['public_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_party_members_user_id_session_id', columns: ['user_id', 'session_id'])]
 #[ORM\Index(name: 'idx_party_members_user_id', columns: ['user_id'])]
 #[ORM\Index(name: 'idx_party_members_session_id', columns: ['session_id'])]
 class PartyMemberEntity
