@@ -678,15 +678,30 @@ final class SongRepository implements SongRepositoryInterface
         };
     }
 
+    /**
+     * Sorts by the artist the song list displays: the alphabetically first
+     * primary artist (getArtistNameForSong), or '' for a song without one.
+     * The key must equal the cursor value from buildValueExtractor, and it must
+     * be a plain row expression: the keyset condition is a WHERE clause, so an
+     * aggregate with GROUP BY cannot be used.
+     */
     private function joinArtistForSort(\Doctrine\ORM\QueryBuilder $qb): string
     {
-        $qb->leftJoin(ArtistSongEntity::class, 'ass_sort', 'WITH', 'ass_sort.song = s.id')
-            ->leftJoin(ArtistEntity::class, 'ar_sort', 'WITH', 'ar_sort.id = ass_sort.artist');
+        $qb->leftJoin(ArtistSongEntity::class, 'ass_sort', 'WITH', "ass_sort.song = s.id AND ass_sort.role = 'primary'")
+            ->leftJoin(ArtistEntity::class, 'ar_sort', 'WITH', 'ar_sort.id = ass_sort.artist')
+            // Keep one joined row per song: the first primary artist by (name, id).
+            ->andWhere(<<<'DQL'
+                ar_sort.id IS NULL OR NOT EXISTS (
+                    SELECT ass_first.id
+                    FROM App\Catalog\Infrastructure\Doctrine\Entity\ArtistSongEntity ass_first
+                    JOIN ass_first.artist ar_first
+                    WHERE ass_first.song = s.id AND ass_first.role = 'primary'
+                        AND (ar_first.name < ar_sort.name OR (ar_first.name = ar_sort.name AND ar_first.id < ar_sort.id))
+                )
+                DQL);
 
-        // Prevent duplicate rows when a song has multiple artists
-        $qb->groupBy('s.id');
-
-        return 'MIN(ar_sort.name)';
+        // CASE rather than COALESCE: DQL accepts CASE in ORDER BY.
+        return "CASE WHEN ar_sort.id IS NULL THEN '' ELSE ar_sort.name END";
     }
 
     private function joinAlbumForSort(\Doctrine\ORM\QueryBuilder $qb): string

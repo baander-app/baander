@@ -56,7 +56,7 @@ graph TD
     Party -->|"PlaybackPositionChanged"| Transcode
     Transcode -->|"VideoRepositoryInterface"| Catalog
 
-    Lyrics -->|"SongPortInterface, AlbumPortInterface"| Catalog
+    Lyrics -->|"SongLookupInterface"| Catalog
 
     Notification -.->|"consumes events"| Auth
     Notification -.->|"consumes events"| Library
@@ -418,10 +418,10 @@ graph TD
 - **What:** `MusicScanner` and `CoverArtExtractor` use Catalog port interfaces (`AlbumPortInterface`, `ArtistPortInterface`, etc.)
 - **Why:** Library scans discover media files and create/populate Catalog entities. Tight coupling that could benefit from a more event-driven approach.
 
-### Lyrics -> Catalog (Application + Infrastructure layer)
+### Lyrics -> Catalog (Application + Infrastructure + Interface layer)
 
-- **What:** `FetchLyricsHandler` and `LyricsService` use `SongPortInterface` (song title, duration, artist name) and `AlbumPortInterface` (album title) for LRCLIB signature lookup
-- **Why:** LRCLIB requires track name, artist name, album name, and duration to find matching lyrics. These are resolved from Catalog's song and album models.
+- **What:** Lyrics uses Catalog's `SongLookupInterface` contract. `FetchLyricsHandler` and `LyricsService` call `findLyricSignature()`, which returns a `SongLyricSignature` (title, artist name, album title, duration). `BulkFetchLyricsHandler` walks song IDs with `songIdsAfter()`, and `LyricsController` resolves a visible song with `findVisibleSongId()`.
+- **Why:** LRCLIB requires track name, artist name, album name, and duration to find matching lyrics. Catalog resolves them from its song and album data and passes only the signature across the boundary.
 
 ### Notification -> Auth (Infrastructure layer)
 

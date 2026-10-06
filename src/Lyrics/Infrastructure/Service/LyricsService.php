@@ -15,8 +15,9 @@ use Psr\Log\LoggerInterface;
 /**
  * Infrastructure implementation of LyricsPortInterface.
  *
- * Delegates fetch operations to FetchLyricsHandler and provides
- * direct access to cached lyrics and LRCLIB search.
+ * Reads cached lyrics, fetches missing lyrics from LRCLIB using the song
+ * signature from Catalog's SongLookupInterface, searches LRCLIB, and stores
+ * a chosen search result for a song.
  */
 final class LyricsService implements LyricsPortInterface
 {
