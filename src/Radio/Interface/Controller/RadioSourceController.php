@@ -12,6 +12,7 @@ use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -104,7 +105,7 @@ final class RadioSourceController
             syncSchedule: $payload->syncSchedule,
         );
 
-        return $this->created($result);
+        return $this->successResponse($result, Response::HTTP_CREATED);
     }
 
     private function getCurrentSecurityUser(): ?AuthenticatedUserIdentityInterface

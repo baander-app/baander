@@ -15333,15 +15333,36 @@
                                                 "limiters": {
                                                     "description": "Map of rate limiter name to configuration",
                                                     "type": "object",
-                                                    "additionalProperties": true
+                                                    "additionalProperties": {
+                                                        "properties": {
+                                                            "policy": {
+                                                                "type": "string",
+                                                                "example": "fixed_window"
+                                                            },
+                                                            "limit": {
+                                                                "type": "integer"
+                                                            },
+                                                            "interval": {
+                                                                "type": "string",
+                                                                "example": "60 seconds",
+                                                                "nullable": true
+                                                            },
+                                                            "description": {
+                                                                "type": "string",
+                                                                "nullable": true
+                                                            },
+                                                            "cachePool": {
+                                                                "description": "Cache pool holding only this limiter's state",
+                                                                "type": "string",
+                                                                "example": "cache.rate_limiter.auth_login_ip"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
                                                 },
                                                 "count": {
                                                     "description": "Total number of configured rate limiters",
                                                     "type": "integer"
-                                                },
-                                                "cachePool": {
-                                                    "type": "string",
-                                                    "example": "cache.rate_limiter"
                                                 }
                                             },
                                             "type": "object"
@@ -15355,19 +15376,91 @@
                 }
             }
         },
-        "/api/monitor/rate-limiters/{name}/clear": {
+        "/api/monitor/rate-limiters/clear": {
             "delete": {
                 "tags": [
                     "System"
                 ],
                 "summary": "Clear all rate limiter state",
-                "description": "Clears ALL rate limiter state from Redis. Since all limiters share the same cache pool, this resets every limiter. Requires ?confirm=true.",
+                "description": "Clears the stored state of every configured rate limiter. Requires ?confirm=true.",
+                "operationId": "delete_monitor_ratelimiters_clear_all",
+                "parameters": [
+                    {
+                        "name": "confirm",
+                        "in": "query",
+                        "description": "Must be \"true\" to confirm",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "true"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "All rate limiter state cleared",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "properties": {
+                                                "cleared": {
+                                                    "type": "boolean"
+                                                },
+                                                "limiters": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Missing confirm parameter",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "A cache pool could not be cleared",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/monitor/rate-limiters/{name}/clear": {
+            "delete": {
+                "tags": [
+                    "System"
+                ],
+                "summary": "Clear one rate limiter's state",
+                "description": "Clears the stored state of the named rate limiter only. Other limiters keep their state. Requires ?confirm=true.",
                 "operationId": "delete_monitor_ratelimiters_clear",
                 "parameters": [
                     {
                         "name": "name",
                         "in": "path",
-                        "description": "Rate limiter name (for audit purposes)",
+                        "description": "Rate limiter name",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -15400,9 +15493,6 @@
                                                     "type": "boolean"
                                                 },
                                                 "limiter": {
-                                                    "type": "string"
-                                                },
-                                                "pool": {
                                                     "type": "string"
                                                 }
                                             },

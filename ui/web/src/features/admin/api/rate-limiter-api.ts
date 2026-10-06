@@ -5,20 +5,19 @@ import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 export interface RateLimiterConfig {
   policy: string
   limit: number
-  interval: string
-  description: string
+  interval: string | null
+  description: string | null
+  cachePool: string
 }
 
 export interface RateLimitersResponse {
   limiters: Record<string, RateLimiterConfig>
   count: number
-  cachePool: string
 }
 
-export interface ClearRateLimitersResponse {
+export interface ClearAllRateLimitersResponse {
   cleared: boolean
-  limiter: string
-  pool: string
+  limiters: string[]
 }
 
 // API Functions
@@ -28,8 +27,8 @@ export async function getRateLimiters(): Promise<RateLimitersResponse> {
   return data.data
 }
 
-export async function clearRateLimiters(name: string): Promise<ClearRateLimitersResponse> {
-  const { data } = await AXIOS_INSTANCE.delete(`/api/monitor/rate-limiters/${name}/clear`, {
+export async function clearAllRateLimiters(): Promise<ClearAllRateLimitersResponse> {
+  const { data } = await AXIOS_INSTANCE.delete('/api/monitor/rate-limiters/clear', {
     params: { confirm: 'true' },
   })
   return data.data

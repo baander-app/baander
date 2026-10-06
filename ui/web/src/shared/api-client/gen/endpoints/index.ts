@@ -5440,18 +5440,49 @@ export type PostMonitorJobsCancel200 = {
 /**
  * Map of rate limiter name to configuration
  */
-export type GetMonitorRatelimitersList200DataLimiters = { [key: string]: unknown };
+export type GetMonitorRatelimitersList200DataLimiters = {[key: string]: {
+  policy?: string;
+  limit?: number;
+  /** @nullable */
+  interval?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** Cache pool holding only this limiter's state */
+  cachePool?: string;
+}};
 
 export type GetMonitorRatelimitersList200Data = {
   /** Map of rate limiter name to configuration */
   limiters?: GetMonitorRatelimitersList200DataLimiters;
   /** Total number of configured rate limiters */
   count?: number;
-  cachePool?: string;
 };
 
 export type GetMonitorRatelimitersList200 = {
   data?: GetMonitorRatelimitersList200Data;
+};
+
+export type DeleteMonitorRatelimitersClearAllParams = {
+/**
+ * Must be "true" to confirm
+ */
+confirm: DeleteMonitorRatelimitersClearAllConfirm;
+};
+
+export type DeleteMonitorRatelimitersClearAllConfirm = typeof DeleteMonitorRatelimitersClearAllConfirm[keyof typeof DeleteMonitorRatelimitersClearAllConfirm];
+
+
+export const DeleteMonitorRatelimitersClearAllConfirm = {
+  true: 'true',
+} as const;
+
+export type DeleteMonitorRatelimitersClearAll200Data = {
+  cleared?: boolean;
+  limiters?: string[];
+};
+
+export type DeleteMonitorRatelimitersClearAll200 = {
+  data?: DeleteMonitorRatelimitersClearAll200Data;
 };
 
 export type DeleteMonitorRatelimitersClearParams = {
@@ -5471,7 +5502,6 @@ export const DeleteMonitorRatelimitersClearConfirm = {
 export type DeleteMonitorRatelimitersClear200Data = {
   cleared?: boolean;
   limiter?: string;
-  pool?: string;
 };
 
 export type DeleteMonitorRatelimitersClear200 = {
@@ -25580,6 +25610,84 @@ export function useGetMonitorRatelimitersList<TData = Awaited<ReturnType<typeof 
 
 
 
+export const getDeleteMonitorRatelimitersClearAllUrl = (params: DeleteMonitorRatelimitersClearAllParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/monitor/rate-limiters/clear?${stringifiedParams}` : `/api/monitor/rate-limiters/clear`
+}
+
+/**
+ * Clears the stored state of every configured rate limiter. Requires ?confirm=true.
+ * @summary Clear all rate limiter state
+ */
+export const deleteMonitorRatelimitersClearAll = async (params: DeleteMonitorRatelimitersClearAllParams, options?: RequestInit): Promise<DeleteMonitorRatelimitersClearAll200> => {
+
+  return customInstance<DeleteMonitorRatelimitersClearAll200>(getDeleteMonitorRatelimitersClearAllUrl(params),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteMonitorRatelimitersClearAllMutationOptions = <TError = ErrorType<ValidationError | ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMonitorRatelimitersClearAll>>, TError,{params: DeleteMonitorRatelimitersClearAllParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteMonitorRatelimitersClearAll>>, TError,{params: DeleteMonitorRatelimitersClearAllParams}, TContext> => {
+
+const mutationKey = ['deleteMonitorRatelimitersClearAll'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteMonitorRatelimitersClearAll>>, {params: DeleteMonitorRatelimitersClearAllParams}> = (props) => {
+          const {params} = props ?? {};
+
+          return  deleteMonitorRatelimitersClearAll(params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteMonitorRatelimitersClearAllMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMonitorRatelimitersClearAll>>>
+
+    export type DeleteMonitorRatelimitersClearAllMutationError = ErrorType<ValidationError | ApiError>
+
+    /**
+ * @summary Clear all rate limiter state
+ */
+export const useDeleteMonitorRatelimitersClearAll = <TError = ErrorType<ValidationError | ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMonitorRatelimitersClearAll>>, TError,{params: DeleteMonitorRatelimitersClearAllParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteMonitorRatelimitersClearAll>>,
+        TError,
+        {params: DeleteMonitorRatelimitersClearAllParams},
+        TContext
+      > => {
+      return useMutation(getDeleteMonitorRatelimitersClearAllMutationOptions(options), queryClient);
+    }
+
 export const getDeleteMonitorRatelimitersClearUrl = (name: string,
     params: DeleteMonitorRatelimitersClearParams,) => {
   const normalizedParams = new URLSearchParams();
@@ -25597,8 +25705,8 @@ export const getDeleteMonitorRatelimitersClearUrl = (name: string,
 }
 
 /**
- * Clears ALL rate limiter state from Redis. Since all limiters share the same cache pool, this resets every limiter. Requires ?confirm=true.
- * @summary Clear all rate limiter state
+ * Clears the stored state of the named rate limiter only. Other limiters keep their state. Requires ?confirm=true.
+ * @summary Clear one rate limiter's state
  */
 export const deleteMonitorRatelimitersClear = async (name: string,
     params: DeleteMonitorRatelimitersClearParams, options?: RequestInit): Promise<DeleteMonitorRatelimitersClear200> => {
@@ -25647,7 +25755,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteMonitorRatelimitersClearMutationError = ErrorType<ApiError | ValidationError>
 
     /**
- * @summary Clear all rate limiter state
+ * @summary Clear one rate limiter's state
  */
 export const useDeleteMonitorRatelimitersClear = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMonitorRatelimitersClear>>, TError,{name: string;params: DeleteMonitorRatelimitersClearParams}, TContext>, request?: SecondParameter<typeof customInstance>}

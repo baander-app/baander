@@ -6,6 +6,7 @@ use App\Shared\Domain\Event\Outbox\OutboxSubscriberPass;
 use App\Shared\Infrastructure\Doctrine\Type\CustomTypesRegistrar;
 use App\Shared\Infrastructure\Logging\BoundedContextLoggerPass;
 use App\Shared\Infrastructure\Logging\MonologHandlerResetterPass;
+use App\Shared\Infrastructure\RateLimiter\RateLimiterCatalogPass;
 use App\Shared\Infrastructure\Swoole\DBAL\DBALAliveKeeperCompilerPass;
 use App\Shared\Infrastructure\Swoole\ServeCommandPass;
 use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
@@ -46,6 +47,7 @@ class Kernel extends BaseKernel
         $container->addCompilerPass(new DBALAliveKeeperCompilerPass());
         $container->addCompilerPass(new MonologHandlerResetterPass());
         $container->addCompilerPass(new OutboxSubscriberPass());
+        $container->addCompilerPass(new RateLimiterCatalogPass());
         $container->addCompilerPass(new ServeCommandPass(), PassConfig::TYPE_BEFORE_REMOVING, 10);
     }
 

@@ -248,10 +248,10 @@ services:
             $consumerName: '%env(MESSENGER_CONSUMER_NAME)%'
             $failureTransport: '@messenger.transport.failed'
 
-    # --- Rate Limiter Monitoring ---
-    App\Shared\Interface\Controller\RateLimiterMonitorController:
-        arguments:
-            $rateLimiterCache: '@cache.rate_limiter'
+    # --- Rate Limiter Administration ---
+    # Arguments are filled from framework.rate_limiter by RateLimiterCatalogPass.
+    App\Shared\Application\Port\RateLimiterAdministrationInterface:
+        alias: App\Shared\Infrastructure\RateLimiter\CachePoolRateLimiterAdministration
 
     # --- TOTP ---
     App\Auth\Infrastructure\Security\Totp\TotpService:

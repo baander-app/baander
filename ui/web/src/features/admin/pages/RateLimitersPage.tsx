@@ -208,7 +208,7 @@ export function RateLimitersPage() {
           <ButtonRow>
             <ConfirmDanger
               onClick={() => {
-                clearMutation.mutate('all', {
+                clearMutation.mutate(undefined, {
                   onSuccess: () => setShowClearConfirm(false),
                 })
               }}

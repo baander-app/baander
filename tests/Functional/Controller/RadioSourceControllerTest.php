@@ -34,7 +34,7 @@ final class RadioSourceControllerTest extends TestCase
         ]);
 
         $data = $this->assertJsonResponse($response, 201);
-        self::assertSame($name, $data['name']);
+        self::assertSame($name, $data['data']['name']);
         self::assertContains($name, array_column($this->sources()->listSources(), 'name'));
     }
 

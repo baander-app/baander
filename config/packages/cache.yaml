@@ -8,11 +8,25 @@ framework:
         system: cache.adapter.redis
 
         pools:
-            # Existing rate limiter pool
+            # Redis settings shared by the per-limiter pools below. No limiter stores
+            # state here directly: each pool that uses it as adapter gets its own
+            # namespace, so clearing one limiter's pool leaves the others intact.
             cache.rate_limiter:
                 adapter: cache.adapter.redis
                 provider: 'redis://default:%env(REDIS_PASSWORD)%@redis:6379'
                 default_lifetime: 3600
+            cache.rate_limiter.anonymous_api: { adapter: cache.rate_limiter }
+            cache.rate_limiter.authenticated_api: { adapter: cache.rate_limiter }
+            cache.rate_limiter.oauth_token: { adapter: cache.rate_limiter }
+            cache.rate_limiter.password_reset: { adapter: cache.rate_limiter }
+            cache.rate_limiter.auth_login_ip: { adapter: cache.rate_limiter }
+            cache.rate_limiter.auth_login_ip_email: { adapter: cache.rate_limiter }
+            cache.rate_limiter.auth_register_ip: { adapter: cache.rate_limiter }
+            cache.rate_limiter.auth_password_reset_ip: { adapter: cache.rate_limiter }
+            cache.rate_limiter.auth_refresh_client: { adapter: cache.rate_limiter }
+            cache.rate_limiter.config_check: { adapter: cache.rate_limiter }
+            cache.rate_limiter.batch_cover_extract: { adapter: cache.rate_limiter }
+            cache.rate_limiter.discovery_endpoint_ip: { adapter: cache.rate_limiter }
 
             # Doctrine system cache (metadata, query) — indefinite, cleared on deploy
             doctrine.system_cache_pool:

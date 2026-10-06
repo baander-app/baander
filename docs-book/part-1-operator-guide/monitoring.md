@@ -206,18 +206,29 @@ Inspect and manage configured rate limiters. Requires `ROLE_ADMIN`.
 curl -s -H "Authorization: Bearer $TOKEN" https://baander.test/api/monitor/rate-limiters | jq .
 ```
 
-This returns the full catalog of configured rate limiters with their policy, limit, interval, and description. It reads from a static catalog that must be kept in sync with `config/packages/framework.yaml`.
+This returns every limiter configured under `framework.rate_limiter` in `config/packages/framework.yaml`, with its effective policy, limit, interval, description, and cache pool. The CLI equivalent is:
+
+```bash
+make exec cmd="php bin/console app:rate-limiter:list"
+```
 
 ### Clear rate limiter state
 
-To unblock rate-limited users (for example, after a configuration change or during an incident), clear the shared rate limiter cache pool:
+To unblock rate-limited users (for example, after a configuration change or during an incident), clear one limiter's state:
 
 ```bash
 curl -X DELETE -s -H "Authorization: Bearer $TOKEN" \
   "https://baander.test/api/monitor/rate-limiters/auth_login_ip/clear?confirm=true" | jq .
 ```
 
-Since all rate limiters share the same Redis-backed cache pool, this clears state for every limiter, not just the named one.
+Each limiter keeps its state in its own Redis-backed cache pool (`cache.rate_limiter.<name>`), so this clears only the named limiter. An unknown name returns 404. To clear every limiter, call `DELETE /api/monitor/rate-limiters/clear?confirm=true`, or use the **Clear All** button on the admin Rate Limits tab.
+
+The CLI equivalents call the same application service:
+
+```bash
+make exec cmd="php bin/console app:rate-limiter:clear auth_login_ip"
+make exec cmd="php bin/console app:rate-limiter:clear --all"
+```
 
 ## Configuration Check
 
@@ -333,6 +344,8 @@ make exec cmd="tail -100 /var/log/nginx/access.log"
 | `GET /api/monitor/analytics/timing` | Job timing analytics (admin) |
 | `GET /api/monitor/analytics/failures` | Job failure analytics (admin) |
 | `GET /api/monitor/rate-limiters` | Rate limiter catalog (admin) |
+| `DELETE /api/monitor/rate-limiters/clear` | Clear every rate limiter (admin) |
+| `DELETE /api/monitor/rate-limiters/{name}/clear` | Clear one rate limiter (admin) |
 | `DELETE /api/monitor/rate-limiters/{name}/clear?confirm=true` | Clear rate limiter state (admin) |
 | `make exec cmd="php bin/console app:health:check"` | CLI health check |
 | `make exec cmd="php bin/console app:config:validate"` | CLI configuration validation |

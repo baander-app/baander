@@ -1,4 +1,21 @@
 # see https://symfony.com/doc/current/reference/configuration/framework.html
+parameters:
+    # Shown by the admin panel and app:rate-limiter:list next to each limiter
+    # configured under framework.rate_limiter below.
+    app.rate_limiter.descriptions:
+        anonymous_api: 'Anonymous API requests'
+        authenticated_api: 'Authenticated API requests'
+        oauth_token: 'OAuth2 token issuance'
+        password_reset: 'Password reset token requests'
+        auth_login_ip: 'Login attempts per IP (brute-force protection)'
+        auth_login_ip_email: 'Login attempts per IP+email (distributed brute-force protection)'
+        auth_register_ip: 'Registration attempts per IP'
+        auth_password_reset_ip: 'Password reset requests per IP'
+        auth_refresh_client: 'Token refresh per client'
+        config_check: 'Admin configuration check'
+        batch_cover_extract: 'Album cover batch extraction'
+        discovery_endpoint_ip: 'Discovery registration and pairing requests per IP'
+
 framework:
     secret: '%env(APP_SECRET)%'
     http_method_override: false
@@ -28,74 +45,75 @@ framework:
     assets:
         version_strategy: 'Pentatrion\ViteBundle\Asset\ViteAssetVersionStrategy'
 
-    # Rate limiting (uses Redis via cache)
+    # Rate limiting. Each limiter has its own Redis-backed pool (config/packages/cache.yaml)
+    # so the admin panel and app:rate-limiter:clear can reset one limiter without the others.
     rate_limiter:
         anonymous_api:
             policy: sliding_window
             limit: 360
             interval: '60 seconds'
-            cache_pool: cache.rate_limiter
+            cache_pool: cache.rate_limiter.anonymous_api
         authenticated_api:
             policy: sliding_window
             limit: 1800
             interval: '60 seconds'
-            cache_pool: cache.rate_limiter
+            cache_pool: cache.rate_limiter.authenticated_api
         oauth_token:
             policy: fixed_window
             limit: 60
             interval: '60 seconds'
-            cache_pool: cache.rate_limiter
+            cache_pool: cache.rate_limiter.oauth_token
         password_reset:
             policy: fixed_window
             limit: 10
             interval: '15 minutes'
-            cache_pool: cache.rate_limiter
+            cache_pool: cache.rate_limiter.password_reset
 
         # Auth endpoint-specific rate limiters (brute-force protection)
         auth_login_ip:
             policy: fixed_window
             limit: '%auth.rate_limit.login.max_attempts%'
             interval: '%auth.rate_limit.login.window% seconds'
-            cache_pool: cache.rate_limiter
+            cache_pool: cache.rate_limiter.auth_login_ip
         auth_login_ip_email:
             policy: fixed_window
             limit: '%auth.rate_limit.login_per_email.max_attempts%'
             interval: '%auth.rate_limit.login.window% seconds'
-            cache_pool: cache.rate_limiter
+            cache_pool: cache.rate_limiter.auth_login_ip_email
         auth_register_ip:
             policy: fixed_window
             limit: '%auth.rate_limit.register.max_attempts%'
             interval: '%auth.rate_limit.register.window% seconds'
-            cache_pool: cache.rate_limiter
+            cache_pool: cache.rate_limiter.auth_register_ip
         auth_password_reset_ip:
             policy: fixed_window
             limit: '%auth.rate_limit.password_reset.max_attempts%'
             interval: '%auth.rate_limit.password_reset.window% seconds'
-            cache_pool: cache.rate_limiter
+            cache_pool: cache.rate_limiter.auth_password_reset_ip
         auth_refresh_client:
             policy: fixed_window
             limit: '%auth.rate_limit.refresh.max_attempts%'
             interval: '%auth.rate_limit.refresh.window% seconds'
-            cache_pool: cache.rate_limiter
+            cache_pool: cache.rate_limiter.auth_refresh_client
 
         # Admin endpoint-specific rate limiters
         config_check:
             policy: fixed_window
             limit: 10
             interval: '60 seconds'
-            cache_pool: cache.rate_limiter
+            cache_pool: cache.rate_limiter.config_check
         batch_cover_extract:
             policy: sliding_window
             limit: 10
             interval: '60 seconds'
-            cache_pool: cache.rate_limiter
+            cache_pool: cache.rate_limiter.batch_cover_extract
 
         # Discovery endpoint rate limiter (public registration/pairing endpoints)
         discovery_endpoint_ip:
             policy: fixed_window
             limit: 30
             interval: '60 seconds'
-            cache_pool: cache.rate_limiter
+            cache_pool: cache.rate_limiter.discovery_endpoint_ip
 
 when@test:
     framework:
