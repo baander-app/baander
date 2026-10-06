@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Controller;
 
+use App\Auth\Application\Command\User\CreateUserCommand;
 use App\Auth\Application\Port\PasswordHasherInterface;
 use App\Auth\Application\Port\UserPortInterface;
 use App\Auth\Domain\Model\User;
@@ -22,6 +23,8 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -34,6 +37,7 @@ final class AdminUserController
 
     public function __construct(
         private readonly UserPortInterface $userService,
+        private readonly MessageBusInterface $commandBus,
     ) {
     }
 
@@ -103,7 +107,6 @@ final class AdminUserController
     #[IsGranted('ROLE_SUPER_ADMIN')]
     public function create(
         #[MapRequestPayload] AdminCreateUserRequest $request,
-        PasswordHasherInterface $passwordHasher,
     ): JsonResponse {
         $email = new Email($request->email);
 
@@ -111,14 +114,16 @@ final class AdminUserController
             return $this->errorResponse('This email address is already in use.', Response::HTTP_CONFLICT);
         }
 
-        $user = User::createByOperator(
+        // The same use case as app:user:create, so both seed default preferences and announce the user.
+        $user = $this->commandBus->dispatch(new CreateUserCommand(
             email: $email,
-            hashedPassword: $passwordHasher->hash($request->password),
             name: $request->name,
+            plainPassword: $request->password,
             roles: $request->roles,
-        );
-
-        $this->userService->save($user);
+        ))->last(HandledStamp::class)?->getResult();
+        if (!$user instanceof User) {
+            throw new \LogicException('CreateUserCommand did not return the created user.');
+        }
 
         return $this->successResponse(AdminUserResource::from($user), Response::HTTP_CREATED);
     }

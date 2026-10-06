@@ -74,6 +74,30 @@ final class AdminUserControllerTest extends TestCase
         $this->assertContains('ROLE_USER', $data['data']['roles']);
     }
 
+    public function testCreatedUserReceivesTheDefaultNotificationPreferences(): void
+    {
+        $superAdmin = $this->createSuperAdminUser();
+
+        $response = $this->authenticatedRequest('POST', '/api/admin/users', $superAdmin, [
+            'email' => 'seeded@baander.app',
+            'password' => 'securePassword123',
+            'name' => 'Seeded User',
+        ]);
+        $this->assertJsonResponse($response, 201, 'data');
+
+        // Without seeded rows every channel would default to enabled, so an operator-created
+        // user would get email and push for background jobs and media changes.
+        $rows = $this->entityManager->getConnection()->fetchAllKeyValue(
+            "SELECT p.category || '/' || p.channel, p.enabled FROM notification_preferences p JOIN users u ON u.id = p.user_id WHERE u.email = ?",
+            ['seeded@baander.app'],
+        );
+        $this->assertCount(12, $rows);
+        $this->assertTrue($rows['security/email']);
+        $this->assertFalse($rows['background_jobs/email']);
+        $this->assertFalse($rows['media_changes/push']);
+        $this->assertTrue($rows['media_changes/in_app']);
+    }
+
     public function testSuperAdminCanCreateUserWithRoles(): void
     {
         $superAdmin = $this->createSuperAdminUser();
