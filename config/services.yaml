@@ -170,17 +170,6 @@ services:
             $decorated: null
 
     # --- Shared Kernel ---
-    App\Shared\Infrastructure\Doctrine\Type\CitextType:
-        tags: [ 'doctrine.dbal.type' ]
-    App\Shared\Infrastructure\Doctrine\Type\JobStatusType:
-        tags: [ 'doctrine.dbal.type' ]
-    App\Recommendation\Infrastructure\Doctrine\Type\RecommendationJobStatusType:
-        tags: [ 'doctrine.dbal.type' ]
-    App\Shared\Infrastructure\Doctrine\Type\PublicIdType:
-        tags: [ 'doctrine.dbal.type' ]
-    App\Shared\Infrastructure\Doctrine\Type\UuidType:
-        tags: [ 'doctrine.dbal.type' ]
-
     App\Shared\Infrastructure\Doctrine\EventListener\GeneratePublicIdListener:
         tags: [ { name: 'doctrine.event_listener', event: 'prePersist' } ]
 
