@@ -202,7 +202,14 @@ final class FilesystemBoundaryTest extends TestCase
         try {
             $this->runInCoroutine($operation);
         } catch (Throwable $error) {
-            self::assertInstanceOf(InvalidArgumentException::class, $error);
+            // Report the unexpected error in full: an intermittent TypeError seen only in
+            // full-suite runs could not be reproduced in isolation or under I/O load.
+            self::assertInstanceOf(InvalidArgumentException::class, $error, sprintf(
+                "Expected a boundary rejection, got %s: %s\n%s",
+                $error::class,
+                $error->getMessage(),
+                $error->getTraceAsString(),
+            ));
             return;
         }
         self::fail('The filesystem operation accepted a path outside its configured root.');
