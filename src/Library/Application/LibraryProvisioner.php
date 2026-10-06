@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace App\Library\Application;
 
 use App\Library\Application\Command\CreateLibraryCommand;
-use App\Library\Application\Command\ScanLibraryCommand;
 use App\Library\Application\CommandHandler\CreateLibraryHandler;
-use App\Library\Application\CommandHandler\ScanLibraryHandler;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Application\Port\LibraryProvisioningInterface;
 use App\Library\Application\Port\ProvisionedLibraryScan;
@@ -22,7 +20,7 @@ final class LibraryProvisioner implements LibraryProvisioningInterface
     public function __construct(
         private readonly LibraryRepositoryInterface $libraryRepository,
         private readonly CreateLibraryHandler $createLibraryHandler,
-        private readonly ScanLibraryHandler $scanLibraryHandler,
+        private readonly LibraryDiscovery $discovery,
         private readonly MovieScanner $movieScanner,
     ) {
     }
@@ -59,10 +57,14 @@ final class LibraryProvisioner implements LibraryProvisioningInterface
 
     private function scan(LibrarySlug $slug, bool $created): ProvisionedLibraryScan
     {
+        $library = $this->libraryRepository->findBySlug($slug)
+            ?? throw new \RuntimeException(sprintf('Library with slug "%s" not found.', $slug->toString()));
+
         // The regular scan keeps the library status, file index and scan event
-        // current. Its FilesDiscovered messages go to the async transport, so a
-        // forced rescan collects the same directories for synchronous handling.
-        $library = ($this->scanLibraryHandler)(new ScanLibraryCommand(librarySlug: $slug));
+        // current without publishing FilesDiscovered, so workers never ingest the
+        // same files. A forced rescan then collects every directory, including
+        // unchanged files, for synchronous handling.
+        $this->discovery->discover($library, false);
         $scanResult = $this->movieScanner->scan($library, true);
 
         $discoveries = [];

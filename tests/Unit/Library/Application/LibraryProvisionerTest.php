@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Library\Application;
 
 use App\Library\Application\CommandHandler\CreateLibraryHandler;
-use App\Library\Application\CommandHandler\ScanLibraryHandler;
+use App\Library\Application\LibraryDiscovery;
 use App\Library\Application\LibraryProvisioner;
 use App\Library\Application\MovieScanner;
 use App\Library\Application\MusicScanner;
@@ -20,8 +20,6 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\Messenger\Envelope;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 final class LibraryProvisionerTest extends TestCase
 {
@@ -103,15 +101,13 @@ final class LibraryProvisionerTest extends TestCase
         $fileIndex = $this->createStub(LibraryFileIndexRepositoryInterface::class);
         $logger = new NullLogger();
         $movieScanner = new MovieScanner($directoryScanner, $fileIndex, $logger);
-        $bus = $this->createStub(MessageBusInterface::class);
-        $bus->method('dispatch')->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
         $events = $this->createStub(EventDispatcherInterface::class);
         $events->method('dispatch')->willReturnArgument(0);
 
         return new LibraryProvisioner(
             $libraries,
             new CreateLibraryHandler($libraries),
-            new ScanLibraryHandler($libraries, new MusicScanner($directoryScanner, $fileIndex, $logger), $movieScanner, $events, $bus, $logger),
+            new LibraryDiscovery($libraries, new MusicScanner($directoryScanner, $fileIndex, $logger), $movieScanner, $events, $logger),
             $movieScanner,
         );
     }
