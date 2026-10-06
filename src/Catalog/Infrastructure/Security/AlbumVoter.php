@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Auth\Infrastructure\Security\Voter;
+namespace App\Catalog\Infrastructure\Security;
 
-use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
@@ -32,7 +32,7 @@ final class AlbumVoter extends Voter
     protected function voteOnAttribute(string $attribute, mixed $subject, TokenInterface $token, ?Vote $vote = null): bool
     {
         $user = $token->getUser();
-        if (!$user instanceof SecurityUser) {
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
             return false;
         }
 

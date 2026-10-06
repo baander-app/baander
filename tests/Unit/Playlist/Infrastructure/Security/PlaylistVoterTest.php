@@ -2,19 +2,20 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Unit\Auth\Infrastructure\Security\Voter;
+namespace App\Tests\Unit\Playlist\Infrastructure\Security;
 
-use App\Auth\Infrastructure\Security\Voter\PlaylistVoter;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Playlist\Domain\Model\Playlist;
 use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistEntity;
-use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Playlist\Infrastructure\Security\PlaylistVoter;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\VoterInterface;
+use Symfony\Component\Security\Core\User\UserInterface;
 
 final class PlaylistVoterTest extends TestCase
 {
@@ -78,12 +79,15 @@ final class PlaylistVoterTest extends TestCase
         self::assertSame(VoterInterface::ACCESS_ABSTAIN, $this->voter()->vote($this->token(Uuid::generate(), ['ROLE_ADMIN']), 'playlist', ['UNKNOWN']));
     }
 
-    public function testNonSecurityUserIsDeniedForSupportedSubject(): void
+    public function testPrincipalWithoutIdentityContractIsDeniedEvenWithAdminRole(): void
     {
-        $token = $this->createStub(TokenInterface::class);
-        $token->method('getUser')->willReturn(null);
+        foreach ([null, $this->createStub(UserInterface::class)] as $principal) {
+            $token = $this->createStub(TokenInterface::class);
+            $token->method('getUser')->willReturn($principal);
+            $token->method('getRoleNames')->willReturn(['ROLE_ADMIN']);
 
-        self::assertSame(VoterInterface::ACCESS_DENIED, $this->voter()->vote($token, 'playlist', ['VIEW']));
+            self::assertSame(VoterInterface::ACCESS_DENIED, $this->voter()->vote($token, 'playlist', ['VIEW']));
+        }
     }
 
     private function voter(): PlaylistVoter
@@ -104,7 +108,10 @@ final class PlaylistVoterTest extends TestCase
     private function token(Uuid $userId, array $roles): TokenInterface
     {
         $token = $this->createStub(TokenInterface::class);
-        $token->method('getUser')->willReturn(new SecurityUser($userId->toString(), 'user@baander.app', 'hashed', $roles));
+        $user = $this->createStubForIntersectionOfInterfaces([UserInterface::class, AuthenticatedUserIdentityInterface::class]);
+        $user->method('getId')->willReturn($userId->toString());
+        $user->method('getRoles')->willReturn(['ROLE_USER']);
+        $token->method('getUser')->willReturn($user);
         $token->method('getRoleNames')->willReturn($roles);
         return $token;
     }

@@ -923,6 +923,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Catalog Infrastructure':
+      - 'Auth Identity Contract'
       - 'Catalog Song Lookup Contract'
       - 'Library Content Stats Contract'
       - 'Shared Application'
@@ -1125,6 +1126,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Playlist Infrastructure':
+      - 'Auth Identity Contract'
       - 'Catalog Song Lookup Contract'
       - 'Playlist Deletion Preview Contract'
       - 'Shared Application'
