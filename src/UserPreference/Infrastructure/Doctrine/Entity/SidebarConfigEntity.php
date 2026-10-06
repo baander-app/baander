@@ -10,7 +10,6 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity]
 #[ORM\Table(name: 'user_sidebar_configs')]
 #[ORM\UniqueConstraint(name: 'uniq_user_sidebar_configs_user_id_media_type', columns: ['user_id', 'media_type'])]
-#[ORM\Index(name: 'idx_user_sidebar_configs_user_id', columns: ['user_id'])]
 class SidebarConfigEntity
 {
     #[ORM\Id]

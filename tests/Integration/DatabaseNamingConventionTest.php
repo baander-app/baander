@@ -7,7 +7,6 @@ namespace App\Tests\Integration;
 use App\Shared\Infrastructure\Doctrine\Platform\UnmanagedCustomIndex;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\ORM\Tools\SchemaTool;
-use DoctrineMigrations\Version20261006230000;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -89,10 +88,13 @@ final class DatabaseNamingConventionTest extends TestCase
 
     public function testRenameMigrationRoundTripChangesOnlyNames(): void
     {
+        $latest = array_column($this->objects(), 'name');
+        // A later migration dropped one of the renamed indexes; restore it so the rename can be reversed.
+        $this->runMigration('Version20261006240000', 'down');
         $before = $this->objects();
         $definitions = $this->definitions($before);
 
-        $this->runMigration('down');
+        $this->runMigration('Version20261006230000', 'down');
         $restored = $this->objects();
         self::assertSame($definitions, $this->definitions($restored));
         $restoredNames = array_column($restored, 'name');
@@ -100,17 +102,21 @@ final class DatabaseNamingConventionTest extends TestCase
             self::assertContains($legacy, $restoredNames);
         }
 
-        $this->runMigration('up');
+        $this->runMigration('Version20261006230000', 'up');
         $after = $this->objects();
         self::assertSame($definitions, $this->definitions($after));
         self::assertSame(array_column($before, 'name'), array_column($after, 'name'));
+
+        $this->runMigration('Version20261006240000', 'up');
+        self::assertSame($latest, array_column($this->objects(), 'name'));
     }
 
-    private function runMigration(string $direction): void
+    private function runMigration(string $version, string $direction): void
     {
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261006230000.php';
+        require_once dirname(__DIR__, 2) . '/migrations/' . $version . '.php';
+        $class = 'DoctrineMigrations\\' . $version;
         $connection = $this->manager->getConnection();
-        $migration = new Version20261006230000($connection, new NullLogger());
+        $migration = new $class($connection, new NullLogger());
         $migration->{$direction}(new Schema());
         foreach ($migration->getSql() as $query) {
             $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
