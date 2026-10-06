@@ -98,22 +98,3 @@ When installed, use `/skill:pi-intercom` to coordinate relevant parallel or rela
 sessions. Prefer `send`; use `ask` only when blocked. Skip unrelated work,
 trivial questions, and tasks you can proceed with independently.
 
-<!-- gitnexus:start -->
-## GitNexus
-
-Repository: `baander`. Refresh with `node .gitnexus/run.cjs analyze --index-only`.
-Use the [GitNexus skill](.agents/skills/gitnexus/SKILL.md) for runner fallback and
-CLI equivalents. Index-only refresh preserves maintained instructions and skills.
-
-- Before editing any function, class, or method, **must** run
-  `impact({target: "symbolName", direction: "upstream"})`. Report callers,
-  affected processes, and risk; warn before HIGH/CRITICAL changes. Never ignore
-  these warnings.
-- Before committing, **must** run `detect_changes()` and verify expected scope.
-  For regression review: `detect_changes({scope: "compare", base_ref: "master"})`.
-- Explore unfamiliar flows with `query({search_query: "concept"})`; use
-  `context({name: "symbolName"})` for callers/callees. For security review use
-  `explain({target: "fileOrSymbol"})` (requires `analyze --pdg`).
-- Rename symbols with `rename`, never find-and-replace.
-
-<!-- gitnexus:end -->
