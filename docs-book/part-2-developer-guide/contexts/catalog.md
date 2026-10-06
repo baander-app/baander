@@ -38,7 +38,6 @@ The Catalog context manages the core media catalog: artists, albums, songs, movi
 | `AlbumDuplicatePortInterface` | Duplicate album detection and grouping |
 | `AlbumMergePortInterface` | Album merge operations |
 | `ArtistPortInterface` | Artist CRUD operations |
-| `CatalogStatsQueryPortInterface` | Catalog statistics queries |
 | `GenrePortInterface` | Genre CRUD operations |
 | `MetadataContentReaderPortInterface` | Read metadata content for catalog entities |
 | `MoviePortInterface` | Movie CRUD operations |

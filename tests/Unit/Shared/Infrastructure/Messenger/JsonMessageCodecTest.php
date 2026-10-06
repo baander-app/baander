@@ -8,7 +8,7 @@ use App\Catalog\Application\Command\BatchExtractCoversCommand;
 use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Library\Application\Command\ScanLibraryCommand;
 use App\Library\Application\Message\FilesDiscovered;
-use App\Library\Domain\Model\DiscoveredFile;
+use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Media\Application\Command\PruneMissingImagesCommand;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;

@@ -33,6 +33,7 @@ The Library context manages media libraries -- collections of media files organi
 | `DirectoryScannerPortInterface` | Walks a filesystem directory tree and returns discovered media files | `DirectoryScanner` |
 | `CoverArtExtractorPortInterface` | Extracts embedded cover art from media files (e.g., ID3 tags in MP3s) | `CoverArtExtractor` |
 | `LibraryMembershipQueryPort` | Queries which users belong to which libraries | Doctrine repository |
+| `LibraryContentStatsInterface` | Per-library song, album, artist, genre, size and duration totals | Catalog `CatalogStatsQuery` (published as the Library Content Stats Contract) |
 
 ## Domain Events
 

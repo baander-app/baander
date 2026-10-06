@@ -5,21 +5,14 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Architecture;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\Process\Process;
-use Symfony\Component\Yaml\Yaml;
 
 final class SchedulerContractBoundaryTest extends TestCase
 {
+    use AnalysesDeptracFixtures;
+
     public function testOtherContextsMayImplementSchedulerContractsButNotUseSchedulerInternals(): void
     {
-        $root = dirname(__DIR__, 4);
-        $directory = sys_get_temp_dir() . '/baander-scheduler-boundary-' . bin2hex(random_bytes(8));
-        $files = new Filesystem();
-        $files->mkdir($directory);
-
-        try {
-            $files->dumpFile($directory . '/Fixture.php', <<<'SOURCE'
+        $violations = self::deptracViolations(<<<'SOURCE'
 <?php
 namespace App\Scheduler\Domain\Model;
 interface SchedulableCommandInterface {}
@@ -45,41 +38,10 @@ final class BoundaryScheduledCommand implements \App\Scheduler\Domain\Model\Sche
 namespace App\Transcode\Interface\Console;
 final class BoundaryScheduledConsoleCommand implements \App\Scheduler\Domain\Model\SchedulableConsoleCommandInterface {}
 SOURCE);
-            $config = Yaml::parseFile($root . '/deptrac.yaml');
-            unset($config['imports']);
-            $config['deptrac']['paths'] = [$directory];
-            $files->dumpFile($directory . '/deptrac.yaml', Yaml::dump($config, 12));
-            $process = new Process([
-                PHP_BINARY,
-                $root . '/vendor/bin/deptrac',
-                'analyse',
-                '--config-file=' . $directory . '/deptrac.yaml',
-                '--no-cache',
-                '--no-progress',
-                '--formatter=json',
-            ], $root);
-            $process->setTimeout(30);
-            $process->run();
-            self::assertJson($process->getOutput(), $process->getErrorOutput() . $process->getOutput());
-            $report = json_decode($process->getOutput(), true, 512, JSON_THROW_ON_ERROR);
 
-            self::assertSame(0, $report['Report']['Errors']);
-            $violations = [];
-            foreach ($report['files'] as $file) {
-                foreach ($file['messages'] as $message) {
-                    $violations[] = $message['message'];
-                }
-            }
-
-            self::assertSame(
-                ['App\Catalog\Application\Command\BoundaryScheduledCommand must not depend on App\Scheduler\Domain\Model\InternalSchedulerModel'],
-                array_values(array_unique(array_map(
-                    static fn (string $message): string => explode(' (', $message, 2)[0],
-                    $violations,
-                ))),
-            );
-        } finally {
-            $files->remove($directory);
-        }
+        self::assertSame(
+            ['App\Catalog\Application\Command\BoundaryScheduledCommand must not depend on App\Scheduler\Domain\Model\InternalSchedulerModel'],
+            $violations,
+        );
     }
 }

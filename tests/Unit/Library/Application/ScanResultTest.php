@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Library\Application;
 
 use App\Library\Application\ScanResult;
-use App\Library\Domain\Model\DiscoveredFile;
+use App\Library\Application\Message\DiscoveredFile;
 use PHPUnit\Framework\TestCase;
 
 final class ScanResultTest extends TestCase

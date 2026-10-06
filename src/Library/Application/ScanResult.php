@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Library\Application;
 
-use App\Library\Domain\Model\DiscoveredFile;
+use App\Library\Application\Message\DiscoveredFile;
 
 final readonly class ScanResult
 {

@@ -301,6 +301,11 @@ final class CatalogReadFirewallTest extends TestCase
                 $response = $this->request($route);
                 self::assertSame($allowed ? 200 : 404, $response->getStatusCode(), (string) $response->getContent());
             }
+            if ($allowed) {
+                $stats = json_decode((string) $this->request($path . '/stats')->getContent(), true, flags: JSON_THROW_ON_ERROR);
+                self::assertSame(1, $stats['data']['songs']);
+                self::assertSame(1, $stats['data']['albums']);
+            }
         }
     }
 

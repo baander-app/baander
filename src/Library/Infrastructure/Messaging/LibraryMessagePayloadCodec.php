@@ -6,7 +6,7 @@ namespace App\Library\Infrastructure\Messaging;
 
 use App\Library\Application\Command\ScanLibraryCommand;
 use App\Library\Application\Message\FilesDiscovered;
-use App\Library\Domain\Model\DiscoveredFile;
+use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Shared\Application\Messaging\MessagePayloadCodecInterface;
 use App\Shared\Application\Messaging\PayloadSchema;

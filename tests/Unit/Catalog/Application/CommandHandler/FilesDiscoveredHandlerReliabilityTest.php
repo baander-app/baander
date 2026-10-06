@@ -14,7 +14,7 @@ use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Library\Application\Message\FilesDiscovered;
-use App\Library\Domain\Model\DiscoveredFile;
+use App\Library\Application\Message\DiscoveredFile;
 use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Shared\Domain\Model\Uuid;

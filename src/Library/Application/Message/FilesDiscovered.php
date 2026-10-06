@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Library\Application\Message;
 
-use App\Library\Domain\Model\DiscoveredFile;
 use App\Shared\Domain\Model\Uuid;
 
 /**

@@ -495,13 +495,10 @@ services:
         alias: App\Library\Infrastructure\Doctrine\Repository\LibraryFileIndexRepository
 
     App\Library\Application\Port\LibraryContentStatsInterface:
-        alias: App\Library\Infrastructure\Doctrine\Query\CatalogContentStatsAdapter
+        alias: App\Catalog\Infrastructure\Doctrine\Query\CatalogStatsQuery
 
     App\Catalog\Application\Port\MetadataContentReaderPortInterface:
         alias: App\Metadata\Infrastructure\Reader\MetadataContentReader
-
-    App\Catalog\Application\Port\CatalogStatsQueryPortInterface:
-        alias: App\Catalog\Infrastructure\Doctrine\Query\CatalogStatsQuery
 
     # --- Library Cross-Context Queries ---
     App\Library\Application\Query\LibraryMembershipQueryPort:

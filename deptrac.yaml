@@ -33,7 +33,7 @@ deptrac:
         Auth: ['Auth Domain', 'Auth Identity Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
         Catalog: ['Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Resources', 'Catalog Interface']
         Filesystem: ['Filesystem Infrastructure', 'Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
-        Library: ['Library Read Scope Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
+        Library: ['Library Read Scope Contract', 'Library Content Stats Contract', 'Library Files Discovered Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
         Lyrics: ['Lyrics Domain', 'Lyrics Application', 'Lyrics Infrastructure', 'Lyrics Resources', 'Lyrics Interface']
         Media: ['Media Domain', 'Media Application', 'Media Infrastructure', 'Media Resources', 'Media Interface']
         Metadata: ['Metadata Domain', 'Metadata Application', 'Metadata Infrastructure', 'Metadata Interface']
@@ -221,6 +221,16 @@ deptrac:
         - type: classLike
           value: '^App\\Library\\Application\\Port\\LibraryReadScopeProviderInterface$'
 
+    - name: 'Library Content Stats Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Library\\Application\\Port\\LibraryContentStatsInterface$'
+
+    - name: 'Library Files Discovered Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Library\\Application\\Message\\(FilesDiscovered|DiscoveredFile)$'
+
     - name: 'Library Application'
       collectors:
         - type: bool
@@ -230,6 +240,10 @@ deptrac:
           must_not:
             - type: classLike
               value: '^App\\Library\\Application\\Port\\LibraryReadScopeProviderInterface$'
+            - type: classLike
+              value: '^App\\Library\\Application\\Port\\LibraryContentStatsInterface$'
+            - type: classLike
+              value: '^App\\Library\\Application\\Message\\(FilesDiscovered|DiscoveredFile)$'
 
     - name: 'Library Infrastructure'
       collectors:
@@ -852,11 +866,13 @@ deptrac:
     'Catalog Domain':
       - 'Shared Domain'
     'Catalog Application':
+      - 'Library Files Discovered Contract'
       - 'Scheduler Schedulable Contract'
       - 'Catalog Domain'
       - 'Shared Domain'
       - 'Shared Application'
     'Catalog Infrastructure':
+      - 'Library Content Stats Contract'
       - 'Shared Application'
       - 'Catalog Domain'
       - 'Catalog Application'
@@ -892,14 +908,21 @@ deptrac:
     # --- Library ---
     'Library Read Scope Contract':
       - 'Shared Domain'
+    'Library Content Stats Contract':
+      - 'Shared Domain'
+    'Library Files Discovered Contract':
+      - 'Shared Domain'
     'Library Domain':
       - 'Shared Domain'
     'Library Application':
+      - 'Library Files Discovered Contract'
       - 'Library Read Scope Contract'
       - 'Library Domain'
       - 'Shared Domain'
       - 'Shared Application'
     'Library Infrastructure':
+      - 'Library Files Discovered Contract'
+      - 'Library Content Stats Contract'
       - 'Auth Identity Contract'
       - 'Library Read Scope Contract'
       - 'Shared Application'

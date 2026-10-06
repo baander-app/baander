@@ -85,7 +85,6 @@ deptrac:
     App\Catalog\Application\CommandHandler\BatchExtractCoversHandler:
       - App\Metadata\Application\Command\ExtractAlbumCoverCommand
     App\Catalog\Application\CommandHandler\FilesDiscoveredHandler:
-      - App\Library\Application\Message\FilesDiscovered
       - App\Metadata\Application\Command\ExtractAlbumCoverCommand
       - App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter
     App\Catalog\Application\Port\MetadataContentReaderPortInterface:

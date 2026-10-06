@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Library\Application;
 
 use App\Library\Application\Port\DirectoryScannerPortInterface;
-use App\Library\Domain\Model\DiscoveredFile;
+use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\Repository\LibraryFileIndexRepositoryInterface;
 use App\Library\Infrastructure\Scanner\MediaFile;

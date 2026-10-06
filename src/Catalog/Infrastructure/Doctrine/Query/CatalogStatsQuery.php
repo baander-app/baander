@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Catalog\Infrastructure\Doctrine\Query;
 
-use App\Catalog\Application\Port\CatalogStatsQueryPortInterface;
+use App\Library\Application\Port\LibraryContentStatsInterface;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Connection;
 
-final class CatalogStatsQuery implements CatalogStatsQueryPortInterface
+final class CatalogStatsQuery implements LibraryContentStatsInterface
 {
     public function __construct(
         private readonly Connection $connection,

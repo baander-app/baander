@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Library\Domain\Model;
+namespace App\Library\Application\Message;
 
 /**
  * Value object representing a discovered file on disk.

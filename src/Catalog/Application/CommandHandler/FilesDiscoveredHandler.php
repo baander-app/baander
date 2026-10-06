@@ -229,7 +229,7 @@ final class FilesDiscoveredHandler
     }
 
     /**
-     * @param array<\App\Library\Domain\Model\DiscoveredFile> $files
+     * @param array<\App\Library\Application\Message\DiscoveredFile> $files
      * @return array{Album|null, bool}
      */
     private function resolveAlbum(Uuid $libraryId, string $directory, array $files): array

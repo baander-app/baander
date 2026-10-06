@@ -7,7 +7,6 @@ namespace App\Metadata\Application\CommandHandler;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\MetadataContentReaderPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
-use App\Catalog\Domain\Model\Album;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Domain\Model\Image;
@@ -60,7 +59,7 @@ final class ExtractAlbumCoverHandler
             return;
         }
 
-        $coverArt = $this->extractCover($album);
+        $coverArt = $this->extractCover($album->getId());
 
         if ($coverArt === null) {
             return;
@@ -181,10 +180,10 @@ final class ExtractAlbumCoverHandler
         ]);
     }
 
-    private function extractCover(Album $album): ?CoverArt
+    private function extractCover(Uuid $albumId): ?CoverArt
     {
         try {
-            $songs = $this->songService->findByAlbum($album->getId(), limit: 1);
+            $songs = $this->songService->findByAlbum($albumId, limit: 1);
             if ($songs === []) {
                 return null;
             }
@@ -203,7 +202,7 @@ final class ExtractAlbumCoverHandler
             return $metadata->getFrontCover();
         } catch (\Throwable $e) {
             $this->log('warning', 'Failed to extract cover for album', [
-                'album_id' => $album->getId()->toString(),
+                'album_id' => $albumId->toString(),
                 'error' => $e->getMessage(),
             ]);
             throw $e;
