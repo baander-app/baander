@@ -10,7 +10,6 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'job_monitors')]
-#[ORM\Index(name: 'idx_job_monitors_status', columns: ['status'])]
 #[ORM\Index(name: 'idx_job_monitors_queue_created_at', columns: ['queue', 'created_at'])]
 #[ORM\Index(name: 'idx_job_monitors_name_created_at', columns: ['name', 'created_at'])]
 #[ORM\Index(name: 'idx_job_monitors_job_id', columns: ['job_id'])]

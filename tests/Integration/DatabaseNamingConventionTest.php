@@ -89,7 +89,8 @@ final class DatabaseNamingConventionTest extends TestCase
     public function testRenameMigrationRoundTripChangesOnlyNames(): void
     {
         $latest = array_column($this->objects(), 'name');
-        // A later migration dropped one of the renamed indexes; restore it so the rename can be reversed.
+        // Later migrations dropped some of the renamed indexes; restore them so the rename can be reversed.
+        $this->runMigration('Version20261006260000', 'down');
         $this->runMigration('Version20261006240000', 'down');
         $before = $this->objects();
         $definitions = $this->definitions($before);
@@ -108,6 +109,7 @@ final class DatabaseNamingConventionTest extends TestCase
         self::assertSame(array_column($before, 'name'), array_column($after, 'name'));
 
         $this->runMigration('Version20261006240000', 'up');
+        $this->runMigration('Version20261006260000', 'up');
         self::assertSame($latest, array_column($this->objects(), 'name'));
     }
 

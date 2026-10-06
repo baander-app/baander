@@ -11,7 +11,6 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity]
 #[ORM\Table(name: 'recommendations')]
 #[ORM\Index(name: 'idx_recommendations_user_id', columns: ['user_id'])]
-#[ORM\Index(name: 'idx_recommendations_source_type_source_id', columns: ['source_type', 'source_id'])]
 #[ORM\Index(name: 'idx_recommendations_target_type_target_id', columns: ['target_type', 'target_id'])]
 #[ORM\UniqueConstraint(
     name: 'uniq_recommendations_source_target_name_user_id',

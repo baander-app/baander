@@ -10,7 +10,6 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity]
 #[ORM\Table(name: 'artist_song')]
 #[ORM\UniqueConstraint(name: 'uniq_artist_song_artist_id_song_id_role', columns: ['artist_id', 'song_id', 'role'])]
-#[ORM\Index(name: 'idx_artist_song_artist_id', columns: ['artist_id'])]
 #[ORM\Index(name: 'idx_artist_song_song_id', columns: ['song_id'])]
 class ArtistSongEntity
 {

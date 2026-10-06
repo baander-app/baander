@@ -12,7 +12,6 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'user_favorites')]
 #[ORM\UniqueConstraint(name: 'uniq_user_favorites_public_id', columns: ['public_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_user_favorites_user_id_entity_type_entity_public_id', columns: ['user_id', 'entity_type', 'entity_public_id'])]
-#[ORM\Index(name: 'idx_user_favorites_user_id', columns: ['user_id'])]
 class UserFavoriteEntity
 {
     #[ORM\Id]

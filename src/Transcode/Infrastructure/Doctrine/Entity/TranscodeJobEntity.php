@@ -13,7 +13,6 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\UniqueConstraint(name: 'uniq_transcode_jobs_public_id', columns: ['public_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_transcode_jobs_video_id_quality_tier_name', columns: ['video_id', 'quality_tier_name'])]
 #[ORM\Index(name: 'idx_transcode_jobs_status', columns: ['status'])]
-#[ORM\Index(name: 'idx_transcode_jobs_video_id', columns: ['video_id'])]
 class TranscodeJobEntity
 {
     #[ORM\Id]

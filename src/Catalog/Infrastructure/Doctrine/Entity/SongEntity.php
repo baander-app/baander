@@ -15,7 +15,6 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\UniqueConstraint(name: 'uniq_songs_public_id', columns: ['public_id'])]
 #[ORM\Index(name: 'idx_songs_album_id', columns: ['album_id'])]
 #[ORM\Index(name: 'idx_songs_title_pgroonga', columns: ['title'], flags: ['pgroonga'], options: ['with' => "plugins='token_filters/stem', tokenizer='TokenNgram', normalizer='NormalizerAuto', token_filters='TokenFilterStem'"])]
-#[ORM\Index(name: 'idx_songs_title', columns: ['title'])]
 #[ORM\Index(name: 'idx_songs_title_id', columns: ['title', 'id'])]
 #[ORM\Index(name: 'idx_songs_hash', columns: ['hash'])]
 class SongEntity

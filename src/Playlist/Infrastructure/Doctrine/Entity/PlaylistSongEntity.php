@@ -9,7 +9,6 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'playlist_song')]
-#[ORM\Index(name: 'idx_playlist_song_playlist_id', columns: ['playlist_id'])]
 #[ORM\Index(name: 'idx_playlist_song_song_id', columns: ['song_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_playlist_song_playlist_id_song_id', columns: ['playlist_id', 'song_id'])]
 class PlaylistSongEntity
