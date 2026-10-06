@@ -146,7 +146,7 @@ final class TrackStreamFirewallTest extends TestCase
             }
         }
         $this->manager->persist(new UserLibraryAccessEntity(
-            $this->member,
+            $this->member->getId(),
             $this->allowedLibrary,
             new \DateTimeImmutable(),
         ));

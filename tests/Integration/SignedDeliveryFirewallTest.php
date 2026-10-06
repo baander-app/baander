@@ -297,7 +297,7 @@ final class SignedDeliveryFirewallTest extends TestCase
         $this->persist($video);
         $this->persist(new MovieVideoEntity($movie, $video));
         if ($grant) {
-            $this->persist(new UserLibraryAccessEntity($this->actor, $library, new \DateTimeImmutable()));
+            $this->persist(new UserLibraryAccessEntity($this->actor->getId(), $library, new \DateTimeImmutable()));
         }
         $this->manager->flush();
 

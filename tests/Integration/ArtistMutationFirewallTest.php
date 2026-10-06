@@ -243,7 +243,7 @@ final class ArtistMutationFirewallTest extends TestCase
             $token->setDpopJkt($proof->thumbprint());
             $library = $this->manager->find(LibraryEntity::class, $this->library->getId());
             self::assertInstanceOf(LibraryEntity::class, $library);
-            $this->manager->persist(new UserLibraryAccessEntity($entity, $library, new \DateTimeImmutable()));
+            $this->manager->persist(new UserLibraryAccessEntity($entity->getId(), $library, new \DateTimeImmutable()));
             $this->manager->persist($client);
             $this->manager->persist($token);
             $this->manager->flush();

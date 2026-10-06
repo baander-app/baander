@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Library\Infrastructure\Doctrine\Repository;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Library\Infrastructure\Doctrine\Entity\UserLibraryAccessEntity;
@@ -26,7 +25,7 @@ final class LibraryAccessRepository implements LibraryAccessPortInterface
         }
 
         $entity = new UserLibraryAccessEntity(
-            user: $this->entityManager->getReference(UserEntity::class, $userId),
+            userId: $userId,
             library: $this->entityManager->getReference(LibraryEntity::class, $libraryId),
             grantedAt: new \DateTimeImmutable(),
         );
@@ -48,7 +47,7 @@ final class LibraryAccessRepository implements LibraryAccessPortInterface
             static function (EntityManagerInterface $em) use ($existing, $userId, $libraryId): void {
                 $em->createQueryBuilder()
                     ->delete(UserLibraryAccessEntity::class, 'access')
-                    ->where('access.user = :userId')
+                    ->where('access.userId = :userId')
                     ->andWhere('access.library = :libraryId')
                     ->setParameter('userId', $userId, 'uuid')
                     ->setParameter('libraryId', $libraryId, 'uuid')
@@ -66,7 +65,7 @@ final class LibraryAccessRepository implements LibraryAccessPortInterface
     {
         $results = $this->entityManager
             ->getRepository(UserLibraryAccessEntity::class)
-            ->findBy(['user' => $userId]);
+            ->findBy(['userId' => $userId]);
 
         return array_map(
             static fn(UserLibraryAccessEntity $e) => $e->getLibraryId()->toString(),
@@ -83,6 +82,6 @@ final class LibraryAccessRepository implements LibraryAccessPortInterface
     {
         return $this->entityManager
             ->getRepository(UserLibraryAccessEntity::class)
-            ->findOneBy(['user' => $userId, 'library' => $libraryId]);
+            ->findOneBy(['userId' => $userId, 'library' => $libraryId]);
     }
 }

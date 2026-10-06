@@ -287,7 +287,7 @@ final class GenreControllerTest extends TestCase
         $album = new AlbumEntity(new PublicId(), $library, 'Genre fixture album', 'album');
         $this->entityManager->persist($library);
         $this->entityManager->persist($album);
-        $this->entityManager->persist(new UserLibraryAccessEntity($entity, $library, new \DateTimeImmutable()));
+        $this->entityManager->persist(new UserLibraryAccessEntity($entity->getId(), $library, new \DateTimeImmutable()));
 
         foreach ($slugs as $slug) {
             $genre = $this->entityManager->getRepository(GenreEntity::class)->findOneBy(['slug' => $slug]);

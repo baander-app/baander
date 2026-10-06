@@ -107,7 +107,7 @@ final class PlaylistReadFirewallTest extends TestCase
             if ($visibility === 'allowed') {
                 $this->allowedLibrary = $library;
                 $this->allowedSong = $song;
-                $this->manager->persist(new UserLibraryAccessEntity($this->owner, $library, new \DateTimeImmutable()));
+                $this->manager->persist(new UserLibraryAccessEntity($this->owner->getId(), $library, new \DateTimeImmutable()));
             } else {
                 $this->deniedSong = $song;
             }

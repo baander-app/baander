@@ -492,7 +492,7 @@ final class CatalogReadFirewallTest extends TestCase
         $token = new AccessTokenEntity((new Uuid())->toString(), $client, $entity, scopes: ['library'], expiresAt: new \DateTimeImmutable('+1 hour'));
         $token->setDpopJkt($this->proof->thumbprint());
         if ($actor === 'member') {
-            $this->manager->persist(new UserLibraryAccessEntity($entity, $this->catalog['allowed']['library'], new \DateTimeImmutable()));
+            $this->manager->persist(new UserLibraryAccessEntity($entity->getId(), $this->catalog['allowed']['library'], new \DateTimeImmutable()));
         }
         $this->persistFixture($entity, $entity->getId());
         $this->persistFixture($client, $client->getId());

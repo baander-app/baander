@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Library\Infrastructure\Doctrine\Entity;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -12,11 +11,14 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'user_library_access')]
 class UserLibraryAccessEntity
 {
+    /**
+     * The user is an Auth-owned row referenced by ID; LibraryForeignKeys keeps its
+     * migration-defined cascade visible to schema comparison.
+     */
     public function __construct(
         #[ORM\Id]
-        #[ORM\ManyToOne(targetEntity: UserEntity::class)]
-        #[ORM\JoinColumn(name: 'user_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
-        private UserEntity $user,
+        #[ORM\Column(name: 'user_id', type: 'uuid')]
+        private Uuid $userId,
 
         #[ORM\Id]
         #[ORM\ManyToOne(targetEntity: LibraryEntity::class)]
@@ -30,7 +32,7 @@ class UserLibraryAccessEntity
 
     public function getUserId(): Uuid
     {
-        return $this->user->getId();
+        return $this->userId;
     }
 
     public function getLibraryId(): Uuid

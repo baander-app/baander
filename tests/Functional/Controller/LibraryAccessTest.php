@@ -111,7 +111,7 @@ final class LibraryAccessTest extends TestCase
         $this->libraryAccess->grant($userId, $libraryId);
         $this->libraryEm->clear();
         $membership = $this->libraryEm->getRepository(UserLibraryAccessEntity::class)
-            ->findOneBy(['user' => $userId, 'library' => $libraryId]);
+            ->findOneBy(['userId' => $userId, 'library' => $libraryId]);
         $this->assertNotNull($membership);
         $this->assertTrue($this->libraryEm->contains($membership));
 
