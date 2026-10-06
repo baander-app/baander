@@ -7,7 +7,9 @@ phpDocumentor.phar
 docs/html/
 .rpiv
 .pi
-.claude
+/.claude/*
+!/.claude/skills
+!/.claude/agents
 
 ###> symfony/framework-bundle ###
 /.env.local

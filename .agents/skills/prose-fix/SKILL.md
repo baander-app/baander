@@ -11,7 +11,7 @@ Keep effective passages rather than rewriting them for novelty.
 
 ## Scope and context
 
-For a rewrite request, edit the requested files in the current Codex workspace.
+For a rewrite request, edit the requested files in the current workspace.
 For a review or rating request, report findings without editing. If the user supplies
 only text, return the revised text or review in the response.
 
