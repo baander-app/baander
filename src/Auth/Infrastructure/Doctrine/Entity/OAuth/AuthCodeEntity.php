@@ -51,7 +51,7 @@ class AuthCodeEntity implements AuthCodeEntityInterface
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $codeChallenge = null;
 
-    #[ORM\Column(type: 'string', length: 20, nullable: true)]
+    #[ORM\Column(type: 'text', nullable: true)]
     private ?string $codeChallengeMethod = null;
 
     private ?string $redirectUri = null;

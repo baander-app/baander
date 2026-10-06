@@ -19,7 +19,7 @@ final class JobStatusType extends Type
 
     public function getSQLDeclaration(array $column, AbstractPlatform $platform): string
     {
-        return $platform->getStringTypeDeclarationSQL($column);
+        return $platform->getClobTypeDeclarationSQL($column);
     }
 
     public function convertToPHPValue(mixed $value, AbstractPlatform $platform): ?JobStatus

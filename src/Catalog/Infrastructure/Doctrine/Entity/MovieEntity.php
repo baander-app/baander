@@ -40,19 +40,19 @@ class MovieEntity
     #[ORM\Column(type: 'integer', nullable: true)]
     private ?int $tmdbId = null;
 
-    #[ORM\Column(type: 'string', nullable: true)]
+    #[ORM\Column(type: 'text', nullable: true)]
     private ?string $imdbId = null;
 
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $overview = null;
 
-    #[ORM\Column(type: 'string', nullable: true)]
+    #[ORM\Column(type: 'text', nullable: true)]
     private ?string $tagline = null;
 
-    #[ORM\Column(type: 'string', nullable: true)]
+    #[ORM\Column(type: 'text', nullable: true)]
     private ?string $posterUrl = null;
 
-    #[ORM\Column(type: 'string', nullable: true)]
+    #[ORM\Column(type: 'text', nullable: true)]
     private ?string $backdropUrl = null;
 
     #[ORM\Column(type: 'integer', nullable: true)]
@@ -61,13 +61,13 @@ class MovieEntity
     #[ORM\Column(type: 'float', nullable: true)]
     private ?float $rating = null;
 
-    #[ORM\Column(type: 'string', nullable: true)]
+    #[ORM\Column(type: 'text', nullable: true)]
     private ?string $originalLanguage = null;
 
     #[ORM\Column(type: 'integer', nullable: true)]
     private ?int $tmdbCollectionId = null;
 
-    #[ORM\Column(type: 'string', nullable: true)]
+    #[ORM\Column(type: 'text', nullable: true)]
     private ?string $collectionName = null;
 
     #[ORM\Column(type: 'datetime_immutable')]

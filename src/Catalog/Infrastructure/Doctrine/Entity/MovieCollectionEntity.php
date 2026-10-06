@@ -20,16 +20,16 @@ class MovieCollectionEntity
     #[ORM\Column(type: 'integer', unique: true)]
     private int $tmdbCollectionId;
 
-    #[ORM\Column(type: 'string')]
+    #[ORM\Column(type: 'text')]
     private string $name;
 
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $overview = null;
 
-    #[ORM\Column(type: 'string', nullable: true)]
+    #[ORM\Column(type: 'text', nullable: true)]
     private ?string $posterPath = null;
 
-    #[ORM\Column(type: 'string', nullable: true)]
+    #[ORM\Column(type: 'text', nullable: true)]
     private ?string $backdropPath = null;
 
     public function __construct(int $tmdbCollectionId, string $name, ?Uuid $id = null)
