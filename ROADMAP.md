@@ -684,6 +684,14 @@ a bounded response reserve. Failure-injection tests verify test-harness process 
 listener cleanup even when readiness or teardown fails. The blocking CI recipe now
 also runs the three-voter partition/failover gate.
 
+The public HTTP contract now forces a real committed registration to lose its
+response after rqlite acknowledges the write. The API returns 503 and
+`Retry-After: 1` without replaying or exposing credentials; a database read sees
+revision one, the same owner retries to revision two without enrollment, and an
+enrolled wrong owner remains forbidden. Fresh optimized release and
+ASan/LeakSanitizer/UBSan gates pass all 31 CTests and real-rqlite contracts. This
+qualifies local uncertain-commit recovery, not regional partitions or host limits.
+
 First-claim registration now requires an operator-issued enrollment capability
 valid for at most five minutes and bound to the public ID and credential digest.
 Matching owners can retry and heartbeat without it. The single rqlite transaction

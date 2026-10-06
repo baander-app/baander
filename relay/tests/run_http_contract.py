@@ -3,6 +3,7 @@
 """Public TLS API against a disposable authenticated native rqlite instance."""
 import argparse
 import base64
+import hashlib
 import http.server
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -108,6 +109,13 @@ def main():
             "waitFor": 1,
             "lock": threading.Lock(),
         }
+        lost_response = {
+            "publicId": "lost-response-committed",
+            "armed": False,
+            "writes": 0,
+            "completed": threading.Event(),
+            "error": None,
+        }
 
         class ProxyHandler(http.server.BaseHTTPRequestHandler):
             def log_message(self, *_):
@@ -115,6 +123,14 @@ def main():
 
             def do_POST(self):
                 body = self.rfile.read(int(self.headers["Content-Length"]))
+                drop_response = False
+                if b"INSERT INTO registries" in body:
+                    statements = json.loads(body)
+                    if statements[1][1]["public_id"] == lost_response["publicId"]:
+                        with gate["lock"]:
+                            lost_response["writes"] += 1
+                            drop_response = lost_response["armed"]
+                            lost_response["armed"] = False
                 if b"INSERT INTO registries" in body and gate["delay"]:
                     with gate["lock"]:
                         gate["arrivals"] += 1
@@ -136,6 +152,21 @@ def main():
                     )
                     response = connection.getresponse()
                     payload = response.read()
+                    if drop_response:
+                        # Lose only the acknowledgement, after the real database committed.
+                        try:
+                            committed = json.loads(payload)
+                            assert response.status == 200 and "error" not in committed
+                            assert len(committed["results"]) == 3
+                            assert all("error" not in item for item in committed["results"])
+                            assert committed["results"][1]["rows_affected"] == 1
+                            assert committed["results"][2]["rows"][0]["revision"] == 1
+                        except (AssertionError, KeyError, ValueError, TypeError) as error:
+                            lost_response["error"] = repr(error)
+                        self.close_connection = True
+                        self.connection.shutdown(socket.SHUT_RDWR)
+                        self.connection.close()
+                        return
                     if gate["malformedReadiness"] and b"FROM registries WHERE 0" in body:
                         corrupted = json.loads(payload)
                         corrupted["results"][1] = {"types": {"public_id": "text"}}
@@ -148,6 +179,8 @@ def main():
                     pass  # Expected when deadline/shutdown cancels the request.
                 finally:
                     connection.close()
+                    if drop_response:
+                        lost_response["completed"].set()
 
         class ProxyServer(http.server.ThreadingHTTPServer):
             daemon_threads = True
@@ -472,6 +505,73 @@ def main():
                     return result
                 finally:
                     connection.close()
+
+            uncertain_registration = dict(
+                owned_registration,
+                publicId=lost_response["publicId"],
+                apiKey="ef" * 32,
+                url="https://uncertain.baander.app",
+                name="Committed without acknowledgement",
+            )
+            uncertain_digest = hashlib.sha256(
+                uncertain_registration["apiKey"].encode("ascii")
+            ).hexdigest()
+            uncertain_row = [
+                "SELECT public_id, credential_digest, url, name, version, created_ms, "
+                "updated_ms, last_seen_ms, revision FROM registries WHERE public_id=?",
+                uncertain_registration["publicId"],
+            ]
+            with gate["lock"]:
+                lost_response["armed"] = True
+            try:
+                status, body, headers = request(
+                    "POST", "/api/servers/register", json.dumps(uncertain_registration)
+                )
+                assert lost_response["completed"].wait(2), "Lost-response fault did not complete."
+                assert lost_response["error"] is None, lost_response["error"]
+                assert status == 503 and headers.get("Retry-After") == "1"
+                public_response = json.dumps(body) + json.dumps(headers)
+                assert uncertain_registration["apiKey"] not in public_response
+                assert uncertain_digest not in public_response
+                assert "credential_digest" not in public_response and "apiKey" not in public_response
+                committed_row = database_request([uncertain_row], True)["results"][0]["rows"][0]
+                assert committed_row["credential_digest"] == uncertain_digest
+                assert committed_row["revision"] == 1
+                assert committed_row["url"] == uncertain_registration["url"]
+                assert request("GET", "/ready")[0] == 200
+                status, lookup, _ = request(
+                    "GET", "/api/servers/" + uncertain_registration["publicId"]
+                )
+                assert status == 200 and lookup["data"]["revision"] == 1
+                assert lookup["data"]["url"] == uncertain_registration["url"]
+                assert uncertain_digest not in json.dumps(lookup)
+                with gate["lock"]:
+                    assert lost_response["writes"] == 1, "Registry replayed an uncertain write."
+                status, body, _ = request(
+                    "POST", "/api/servers/register", json.dumps(uncertain_registration),
+                    enrollment=False,
+                )
+                assert status == 200 and body["data"]["revision"] == 2
+                retried_row = database_request([uncertain_row], True)["results"][0]["rows"][0]
+                assert retried_row["credential_digest"] == uncertain_digest
+                assert retried_row["revision"] == 2
+                hostile_claim = dict(
+                    uncertain_registration, apiKey="12" * 32,
+                    url="https://hostile-uncertain.baander.app", name="Hostile claim",
+                )
+                assert request(
+                    "POST", "/api/servers/register", json.dumps(hostile_claim)
+                )[0] == 403
+                assert database_request([uncertain_row], True)["results"][0]["rows"][0] == retried_row
+                assert request("GET", "/ready")[0] == 200
+                assert request(
+                    "GET", "/api/servers/" + uncertain_registration["publicId"]
+                )[1]["data"]["revision"] == 2
+                with gate["lock"]:
+                    assert lost_response["writes"] == 3
+            finally:
+                with gate["lock"]:
+                    lost_response["armed"] = False
 
             owned_row = [
                 "SELECT public_id, credential_digest, url, name, version, created_ms, "
