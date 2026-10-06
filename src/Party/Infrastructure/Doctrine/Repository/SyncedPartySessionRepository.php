@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Party\Infrastructure\Doctrine\Repository;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Party\Domain\Model\SyncedPartySession;
 use App\Party\Domain\Model\SyncedPartySessionState;
 use App\Party\Domain\Repository\SyncedPartySessionRepositoryInterface;
@@ -103,7 +102,7 @@ final class SyncedPartySessionRepository implements SyncedPartySessionRepository
 
         return new SyncedPartySessionEntity(
             $session->getPublicId(),
-            $this->entityManager->getReference(UserEntity::class, $session->getHostUserId()),
+            $session->getHostUserId(),
             $session->getVideoId(),
             $session->getTranscodeJobId(),
             $session->getMaxMembers(),
@@ -133,7 +132,7 @@ final class SyncedPartySessionRepository implements SyncedPartySessionRepository
     private function syncToEntity(SyncedPartySession $session, SyncedPartySessionEntity $entity): void
     {
         $state = $session->getState();
-        $entity->setHostUser($this->entityManager->getReference(UserEntity::class, $state->hostUserId));
+        $entity->setHostUserId($state->hostUserId);
         $entity->setPlaybackState($state->playbackState->value);
         $entity->setWallClockPosition($state->wallClockPosition);
         $entity->setPlaybackStartedAt($state->playbackStartedAt);

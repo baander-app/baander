@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Party\Infrastructure\Doctrine\Entity;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\Mapping as ORM;
@@ -14,6 +13,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\UniqueConstraint(name: 'party_sessions_public_id_key', columns: ['public_id'])]
 #[ORM\Index(name: 'idx_party_sessions_is_active', columns: ['is_active'])]
 #[ORM\Index(name: 'idx_party_sessions_video_id', columns: ['video_id'])]
+#[ORM\Index(name: 'idx_party_sessions_host_user_id', columns: ['host_user_id'])]
 class SyncedPartySessionEntity
 {
     #[ORM\Id]
@@ -24,9 +24,8 @@ class SyncedPartySessionEntity
     #[ORM\Column(type: 'public_id')]
     private PublicId $publicId;
 
-    #[ORM\ManyToOne(targetEntity: UserEntity::class)]
-    #[ORM\JoinColumn(name: 'host_user_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
-    private UserEntity $hostUser;
+    #[ORM\Column(name: 'host_user_id', type: 'uuid')]
+    private Uuid $hostUserId;
 
     #[ORM\Column(type: 'uuid')]
     private Uuid $videoId;
@@ -60,7 +59,7 @@ class SyncedPartySessionEntity
 
     public function __construct(
         PublicId $publicId,
-        UserEntity $hostUser,
+        Uuid $hostUserId,
         Uuid $videoId,
         Uuid $transcodeJobId,
         int $maxMembers = 10,
@@ -68,7 +67,7 @@ class SyncedPartySessionEntity
     ) {
         $this->id = $id ?? new Uuid();
         $this->publicId = $publicId;
-        $this->hostUser = $hostUser;
+        $this->hostUserId = $hostUserId;
         $this->videoId = $videoId;
         $this->transcodeJobId = $transcodeJobId;
         $this->maxMembers = $maxMembers;
@@ -83,7 +82,7 @@ class SyncedPartySessionEntity
 
     public function getId(): Uuid { return $this->id; }
     public function getPublicId(): PublicId { return $this->publicId; }
-    public function getHostUserId(): Uuid { return $this->hostUser->getId(); }
+    public function getHostUserId(): Uuid { return $this->hostUserId; }
     public function getVideoId(): Uuid { return $this->videoId; }
     public function getTranscodeJobId(): Uuid { return $this->transcodeJobId; }
     public function getMaxMembers(): int { return $this->maxMembers; }
@@ -95,7 +94,7 @@ class SyncedPartySessionEntity
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
     public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
 
-    public function setHostUser(UserEntity $hostUser): void { $this->hostUser = $hostUser; $this->updatedAt = new \DateTimeImmutable(); }
+    public function setHostUserId(Uuid $hostUserId): void { $this->hostUserId = $hostUserId; $this->updatedAt = new \DateTimeImmutable(); }
     public function setPlaybackState(string $state): void { $this->playbackState = $state; $this->updatedAt = new \DateTimeImmutable(); }
     public function setWallClockPosition(float $position): void { $this->wallClockPosition = $position; $this->updatedAt = new \DateTimeImmutable(); }
     public function setPlaybackStartedAt(?\DateTimeImmutable $at): void { $this->playbackStartedAt = $at; $this->updatedAt = new \DateTimeImmutable(); }

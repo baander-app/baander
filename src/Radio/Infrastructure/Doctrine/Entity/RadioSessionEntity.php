@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Radio\Infrastructure\Doctrine\Entity;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -18,9 +17,8 @@ class RadioSessionEntity
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
 
-    #[ORM\ManyToOne(targetEntity: UserEntity::class)]
-    #[ORM\JoinColumn(name: 'user_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
-    private UserEntity $user;
+    #[ORM\Column(name: 'user_id', type: 'uuid')]
+    private Uuid $userId;
 
     #[ORM\ManyToOne(targetEntity: RadioStationEntity::class)]
     #[ORM\JoinColumn(name: 'active_station_id', referencedColumnName: 'id', nullable: true)]
@@ -40,10 +38,10 @@ class RadioSessionEntity
 
     public function __construct(
         Uuid $id,
-        UserEntity $user,
+        Uuid $userId,
     ) {
         $this->id = $id;
-        $this->user = $user;
+        $this->userId = $userId;
         $this->state = 'stopped';
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
@@ -56,7 +54,7 @@ class RadioSessionEntity
 
     public function getUserId(): Uuid
     {
-        return $this->user->getId();
+        return $this->userId;
     }
 
     public function getActiveStationId(): ?Uuid

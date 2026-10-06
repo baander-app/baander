@@ -8,7 +8,6 @@ use App\Party\Domain\Model\PartyMember;
 use App\Party\Domain\Model\PartyMemberState;
 use App\Party\Domain\Repository\PartyMemberRepositoryInterface;
 use App\Party\Domain\ValueObject\MemberRole;
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Party\Infrastructure\Doctrine\Entity\PartyMemberEntity;
 use App\Party\Infrastructure\Doctrine\Entity\SyncedPartySessionEntity;
 use App\Shared\Domain\Model\Uuid;
@@ -42,7 +41,7 @@ final class PartyMemberRepository implements PartyMemberRepositoryInterface
     {
         $entity = $this->entityManager
             ->getRepository(PartyMemberEntity::class)
-            ->findOneBy(['user' => $userId, 'session' => $sessionId]);
+            ->findOneBy(['userId' => $userId, 'session' => $sessionId]);
 
         return $entity !== null ? $this->toDomain($entity) : null;
     }
@@ -88,7 +87,7 @@ final class PartyMemberRepository implements PartyMemberRepositoryInterface
 
         return new PartyMemberEntity(
             $member->getPublicId(),
-            $this->entityManager->getReference(UserEntity::class, $member->getUserId()),
+            $member->getUserId(),
             $this->entityManager->getReference(SyncedPartySessionEntity::class, $member->getSessionId()),
             $member->getRole()->value,
             id: $member->getId(),

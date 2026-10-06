@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Radio\Infrastructure\Doctrine\Repository;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Radio\Domain\Model\StarredStation\StarredStation;
 use App\Radio\Domain\Model\StarredStation\StarredStationState;
 use App\Radio\Domain\Repository\StarredStation\StarredStationRepositoryInterface;
@@ -32,7 +31,7 @@ final class StarredStationDoctrineRepository implements StarredStationRepository
     {
         $entities = $this->entityManager
             ->getRepository(StarredStationEntity::class)
-            ->findBy(['user' => $userId]);
+            ->findBy(['userId' => $userId]);
 
         return array_map($this->toDomain(...), $entities);
     }
@@ -41,7 +40,7 @@ final class StarredStationDoctrineRepository implements StarredStationRepository
     {
         $entity = $this->entityManager
             ->getRepository(StarredStationEntity::class)
-            ->findOneBy(['user' => $userId, 'station' => $stationId]);
+            ->findOneBy(['userId' => $userId, 'station' => $stationId]);
 
         return $entity !== null ? $this->toDomain($entity) : null;
     }
@@ -73,7 +72,7 @@ final class StarredStationDoctrineRepository implements StarredStationRepository
 
         return new StarredStationEntity(
             id: $starred->getId(),
-            user: $this->entityManager->getReference(UserEntity::class, $starred->getUserId()),
+            userId: $starred->getUserId(),
             station: $this->entityManager->getReference(RadioStationEntity::class, $starred->getStationId()),
         );
     }

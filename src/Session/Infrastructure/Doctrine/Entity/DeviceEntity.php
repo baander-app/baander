@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Session\Infrastructure\Doctrine\Entity;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -18,9 +17,8 @@ class DeviceEntity
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
 
-    #[ORM\ManyToOne(targetEntity: UserEntity::class)]
-    #[ORM\JoinColumn(name: 'user_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
-    private UserEntity $user;
+    #[ORM\Column(name: 'user_id', type: 'uuid')]
+    private Uuid $userId;
 
     #[ORM\Column(type: 'uuid')]
     private Uuid $deviceId;
@@ -35,18 +33,18 @@ class DeviceEntity
     private \DateTimeImmutable $createdAt;
 
     public function __construct(
-        UserEntity $user,
+        Uuid $userId,
         Uuid $deviceId,
         ?Uuid $id = null,
     ) {
         $this->id = $id ?? new Uuid();
-        $this->user = $user;
+        $this->userId = $userId;
         $this->deviceId = $deviceId;
         $this->createdAt = new \DateTimeImmutable();
     }
 
     public function getId(): Uuid { return $this->id; }
-    public function getUserId(): Uuid { return $this->user->getId(); }
+    public function getUserId(): Uuid { return $this->userId; }
     public function getDeviceId(): Uuid { return $this->deviceId; }
     public function getName(): ?string { return $this->name; }
     public function setName(?string $name): void { $this->name = $name; }

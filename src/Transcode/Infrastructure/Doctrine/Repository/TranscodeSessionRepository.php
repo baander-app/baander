@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Transcode\Infrastructure\Doctrine\Repository;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Domain\Model\TranscodeSession;
@@ -67,7 +66,7 @@ final class TranscodeSessionRepository implements TranscodeSessionRepositoryInte
     {
         $entities = $this->entityManager
             ->getRepository(TranscodeSessionEntity::class)
-            ->findBy(['user' => $userId]);
+            ->findBy(['userId' => $userId]);
 
         return array_map(fn(TranscodeSessionEntity $e) => $this->toDomain($e), $entities);
     }
@@ -96,7 +95,7 @@ final class TranscodeSessionRepository implements TranscodeSessionRepositoryInte
         $entities = $this->entityManager
             ->getRepository(TranscodeSessionEntity::class)
             ->findBy([
-                'user' => $userId,
+                'userId' => $userId,
                 'state' => [SessionState::Pending->value, SessionState::Preparing->value, SessionState::Active->value, SessionState::Paused->value],
             ]);
 
@@ -147,7 +146,7 @@ final class TranscodeSessionRepository implements TranscodeSessionRepositoryInte
 
         return new TranscodeSessionEntity(
             $session->getPublicId(),
-            $this->entityManager->getReference(UserEntity::class, $session->getUserId()),
+            $session->getUserId(),
             $jobEntity,
             $session->getVideoId(),
             $session->getSessionState()->value,

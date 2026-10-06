@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Party\Infrastructure\Doctrine\Entity;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\Mapping as ORM;
@@ -25,9 +24,8 @@ class PartyMemberEntity
     #[ORM\Column(type: 'public_id')]
     private PublicId $publicId;
 
-    #[ORM\ManyToOne(targetEntity: UserEntity::class)]
-    #[ORM\JoinColumn(name: 'user_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
-    private UserEntity $user;
+    #[ORM\Column(name: 'user_id', type: 'uuid')]
+    private Uuid $userId;
 
     #[ORM\ManyToOne(targetEntity: SyncedPartySessionEntity::class)]
     #[ORM\JoinColumn(name: 'session_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
@@ -62,14 +60,14 @@ class PartyMemberEntity
 
     public function __construct(
         PublicId $publicId,
-        UserEntity $user,
+        Uuid $userId,
         SyncedPartySessionEntity $session,
         string $role = 'member',
         ?Uuid $id = null,
     ) {
         $this->id = $id ?? new Uuid();
         $this->publicId = $publicId;
-        $this->user = $user;
+        $this->userId = $userId;
         $this->session = $session;
         $this->role = $role;
         $this->audioProfileId = null;
@@ -84,7 +82,7 @@ class PartyMemberEntity
 
     public function getId(): Uuid { return $this->id; }
     public function getPublicId(): PublicId { return $this->publicId; }
-    public function getUserId(): Uuid { return $this->user->getId(); }
+    public function getUserId(): Uuid { return $this->userId; }
     public function getSessionId(): Uuid { return $this->session->getId(); }
     public function getRole(): string { return $this->role; }
     public function getAudioProfileId(): ?string { return $this->audioProfileId; }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Transcode\Infrastructure\Doctrine\Entity;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\Mapping as ORM;
@@ -25,9 +24,8 @@ class TranscodeSessionEntity
     #[ORM\Column(type: 'public_id')]
     private PublicId $publicId;
 
-    #[ORM\ManyToOne(targetEntity: UserEntity::class)]
-    #[ORM\JoinColumn(name: 'user_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
-    private UserEntity $user;
+    #[ORM\Column(name: 'user_id', type: 'uuid')]
+    private Uuid $userId;
 
     #[ORM\Column(type: 'uuid')]
     private Uuid $videoId;
@@ -71,7 +69,7 @@ class TranscodeSessionEntity
      */
     public function __construct(
         PublicId $publicId,
-        UserEntity $user,
+        Uuid $userId,
         TranscodeJobEntity $job,
         Uuid $videoId,
         string $state = 'pending',
@@ -81,7 +79,7 @@ class TranscodeSessionEntity
     ) {
         $this->id = $id ?? new Uuid();
         $this->publicId = $publicId;
-        $this->user = $user;
+        $this->userId = $userId;
         $this->job = $job;
         $this->videoId = $videoId;
         $this->state = $state;
@@ -96,7 +94,7 @@ class TranscodeSessionEntity
 
     public function getId(): Uuid { return $this->id; }
     public function getPublicId(): PublicId { return $this->publicId; }
-    public function getUserId(): Uuid { return $this->user->getId(); }
+    public function getUserId(): Uuid { return $this->userId; }
     public function getJobId(): ?Uuid { return $this->job?->getId(); }
     public function getVideoId(): Uuid { return $this->videoId; }
     public function getState(): string { return $this->state; }

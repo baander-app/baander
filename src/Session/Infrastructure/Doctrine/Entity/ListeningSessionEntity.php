@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Session\Infrastructure\Doctrine\Entity;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -18,9 +17,8 @@ class ListeningSessionEntity
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
 
-    #[ORM\ManyToOne(targetEntity: UserEntity::class)]
-    #[ORM\JoinColumn(name: 'user_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
-    private UserEntity $user;
+    #[ORM\Column(name: 'user_id', type: 'uuid')]
+    private Uuid $userId;
 
     #[ORM\Column(type: 'uuid', nullable: true)]
     private ?Uuid $activeDeviceId = null;
@@ -53,14 +51,14 @@ class ListeningSessionEntity
      * @param array<array-key, mixed> $queue
      */
     public function __construct(
-        UserEntity $user,
+        Uuid $userId,
         array $queue = [],
         int $currentTrackIndex = 0,
         float $position = 0.0,
         ?Uuid $id = null,
     ) {
         $this->id = $id ?? new Uuid();
-        $this->user = $user;
+        $this->userId = $userId;
         $this->queue = $queue;
         $this->currentTrackIndex = $currentTrackIndex;
         $this->position = $position;
@@ -76,7 +74,7 @@ class ListeningSessionEntity
 
     public function getUserId(): Uuid
     {
-        return $this->user->getId();
+        return $this->userId;
     }
 
     public function getActiveDeviceId(): ?Uuid

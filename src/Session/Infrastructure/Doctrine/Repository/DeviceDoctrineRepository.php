@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Session\Infrastructure\Doctrine\Repository;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Session\Domain\Model\Device\Device;
 use App\Session\Domain\Model\Device\DeviceState;
 use App\Session\Domain\Repository\Device\DeviceRepositoryInterface;
@@ -23,7 +22,7 @@ final class DeviceDoctrineRepository implements DeviceRepositoryInterface
     {
         $entities = $this->entityManager
             ->getRepository(DeviceEntity::class)
-            ->findBy(['user' => $userId], ['lastSeenAt' => 'DESC']);
+            ->findBy(['userId' => $userId], ['lastSeenAt' => 'DESC']);
 
         return array_map(fn (DeviceEntity $e) => $this->toDomain($e), $entities);
     }
@@ -32,7 +31,7 @@ final class DeviceDoctrineRepository implements DeviceRepositoryInterface
     {
         $entity = $this->entityManager
             ->getRepository(DeviceEntity::class)
-            ->findOneBy(['user' => $userId, 'deviceId' => $deviceId]);
+            ->findOneBy(['userId' => $userId, 'deviceId' => $deviceId]);
 
         return $entity !== null ? $this->toDomain($entity) : null;
     }
@@ -68,7 +67,7 @@ final class DeviceDoctrineRepository implements DeviceRepositoryInterface
         }
 
         return new DeviceEntity(
-            user: $this->entityManager->getReference(UserEntity::class, $device->getUserId()),
+            userId: $device->getUserId(),
             deviceId: $device->getDeviceId(),
             id: $device->getId(),
         );

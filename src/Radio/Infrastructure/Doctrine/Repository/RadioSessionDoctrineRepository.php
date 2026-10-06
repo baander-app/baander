@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Radio\Infrastructure\Doctrine\Repository;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Radio\Domain\Model\RadioSession\RadioSession;
 use App\Radio\Domain\Model\RadioSession\RadioSessionState;
 use App\Radio\Domain\Repository\RadioSession\RadioSessionRepositoryInterface;
@@ -31,7 +30,7 @@ final class RadioSessionDoctrineRepository implements RadioSessionRepositoryInte
     {
         $entity = $this->entityManager
             ->getRepository(RadioSessionEntity::class)
-            ->findOneBy(['user' => $userId]);
+            ->findOneBy(['userId' => $userId]);
 
         return $entity !== null ? $this->toDomain($entity) : null;
     }
@@ -64,7 +63,7 @@ final class RadioSessionDoctrineRepository implements RadioSessionRepositoryInte
 
         return new RadioSessionEntity(
             id: $session->getId(),
-            user: $this->entityManager->getReference(UserEntity::class, $session->getUserId()),
+            userId: $session->getUserId(),
         );
     }
 

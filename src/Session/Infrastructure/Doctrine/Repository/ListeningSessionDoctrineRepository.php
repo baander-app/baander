@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Session\Infrastructure\Doctrine\Repository;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Session\Domain\Model\ListeningSession\ListeningSession;
 use App\Session\Domain\Model\ListeningSession\ListeningSessionState;
 use App\Session\Domain\Repository\ListeningSession\ListeningSessionRepositoryInterface;
@@ -23,7 +22,7 @@ final class ListeningSessionDoctrineRepository implements ListeningSessionReposi
     {
         $entity = $this->entityManager
             ->getRepository(ListeningSessionEntity::class)
-            ->findOneBy(['user' => $userId]);
+            ->findOneBy(['userId' => $userId]);
 
         return $entity !== null ? $this->toDomain($entity) : null;
     }
@@ -59,7 +58,7 @@ final class ListeningSessionDoctrineRepository implements ListeningSessionReposi
         }
 
         return new ListeningSessionEntity(
-            user: $this->entityManager->getReference(UserEntity::class, $session->getUserId()),
+            userId: $session->getUserId(),
             queue: $session->getQueue(),
             currentTrackIndex: $session->getCurrentTrackIndex(),
             position: $session->getPosition(),

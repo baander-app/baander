@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Radio\Infrastructure\Doctrine\Entity;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -19,9 +18,8 @@ class StarredStationEntity
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
 
-    #[ORM\ManyToOne(targetEntity: UserEntity::class)]
-    #[ORM\JoinColumn(name: 'user_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
-    private UserEntity $user;
+    #[ORM\Column(name: 'user_id', type: 'uuid')]
+    private Uuid $userId;
 
     #[ORM\ManyToOne(targetEntity: RadioStationEntity::class)]
     #[ORM\JoinColumn(name: 'station_id', referencedColumnName: 'id', nullable: false)]
@@ -32,11 +30,11 @@ class StarredStationEntity
 
     public function __construct(
         Uuid $id,
-        UserEntity $user,
+        Uuid $userId,
         RadioStationEntity $station,
     ) {
         $this->id = $id;
-        $this->user = $user;
+        $this->userId = $userId;
         $this->station = $station;
         $this->starredAt = new \DateTimeImmutable();
     }
@@ -48,7 +46,7 @@ class StarredStationEntity
 
     public function getUserId(): Uuid
     {
-        return $this->user->getId();
+        return $this->userId;
     }
 
     public function getStationId(): Uuid

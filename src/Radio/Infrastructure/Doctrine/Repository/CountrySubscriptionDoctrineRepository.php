@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Radio\Infrastructure\Doctrine\Repository;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Radio\Domain\Model\CountrySubscription\CountrySubscription;
 use App\Radio\Domain\Model\CountrySubscription\CountrySubscriptionState;
 use App\Radio\Domain\Repository\CountrySubscription\CountrySubscriptionRepositoryInterface;
@@ -32,7 +31,7 @@ final class CountrySubscriptionDoctrineRepository implements CountrySubscription
     {
         $entities = $this->entityManager
             ->getRepository(CountrySubscriptionEntity::class)
-            ->findBy(['user' => $userId]);
+            ->findBy(['userId' => $userId]);
 
         return array_map($this->toDomain(...), $entities);
     }
@@ -41,7 +40,7 @@ final class CountrySubscriptionDoctrineRepository implements CountrySubscription
     {
         $entity = $this->entityManager
             ->getRepository(CountrySubscriptionEntity::class)
-            ->findOneBy(['user' => $userId, 'source' => $sourceId, 'countryCode' => $countryCode]);
+            ->findOneBy(['userId' => $userId, 'source' => $sourceId, 'countryCode' => $countryCode]);
 
         return $entity !== null ? $this->toDomain($entity) : null;
     }
@@ -74,7 +73,7 @@ final class CountrySubscriptionDoctrineRepository implements CountrySubscription
 
         return new CountrySubscriptionEntity(
             id: $subscription->getId(),
-            user: $this->entityManager->getReference(UserEntity::class, $subscription->getUserId()),
+            userId: $subscription->getUserId(),
             source: $this->entityManager->getReference(RadioSourceEntity::class, $subscription->getSourceId()),
             countryCode: $subscription->getCountryCode(),
         );
