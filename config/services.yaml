@@ -1059,6 +1059,8 @@ services:
         alias: App\Scheduler\Infrastructure\Doctrine\Repository\ScheduledJobRepository
 
     # --- Scheduler Application Port Aliases ---
+    App\Scheduler\Application\Port\ScheduledJobAdministrationInterface:
+        alias: App\Scheduler\Infrastructure\Service\ScheduledJobService
     App\Scheduler\Application\Port\ScheduledJobPortInterface:
         alias: App\Scheduler\Infrastructure\Service\ScheduledJobService
 

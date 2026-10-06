@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Scheduler\Interface\EventListener;
 
-use App\Scheduler\Domain\Exception\ScheduledJobConflict;
+use App\Scheduler\Application\Exception\ScheduledJobConflict;
 use App\Shared\Interface\DTO\ApiError;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\JsonResponse;

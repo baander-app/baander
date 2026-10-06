@@ -20,8 +20,8 @@ pass and reject malformed config or a missing binary. The startup-unavailable 50
 OpenAPI responses match the shared error envelope, the generated web client is
 updated, specification drift and web typechecking pass, and full PHPStan has zero
 errors at the last full scan. Subsequent focused PHPStan checks for the QoL
-boundary pass. The hardware diagnostics console extraction lowered Deptrac to 213
-active violations without baseline changes, so release quality gates
+boundary pass. Hardware diagnostics and Scheduler administration extraction lowered
+Deptrac to 206 active violations without baseline changes, so release quality gates
 are not fully green. The locked CI image completed all 143 full-suite PHPUnit
 shards with Xdebug coverage and a merged report: 6,368 discovered tests and no
 failed shards. The final 512 MiB child-process image separately passed its Shared
@@ -240,6 +240,14 @@ FFmpeg construction. A parity check kept the console output identical across
 software, NVENC, QSV, VAAPI, AMF, and VideoToolbox profiles without probing a GPU.
 Focused container tests pass four tests and 56 assertions, targeted PHPStan and
 container wiring pass, and Deptrac falls from 224 to 213 active violations.
+
+Scheduler administration now uses an Application port for create, update, delete,
+lifecycle changes, and command catalog reads. The service validates job type,
+cron, command registration, and parameter schemas before update mutation and maps
+optimistic-write conflicts to an Application exception at the HTTP boundary.
+The 192 Scheduler unit tests pass with 757 assertions; targeted PHPStan and
+container wiring pass. Deptrac falls from 213 to 206 active violations with no
+new baseline entries. Manual occurrence triggering remains on its existing port.
 
 ## Delivery horizons
 

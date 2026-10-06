@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace App\Scheduler\Interface\Controller;
 
+use App\Scheduler\Application\DTO\ScheduledJobInput;
 use App\Scheduler\Application\Exception\SchedulerOccurrenceConflict;
-
+use App\Scheduler\Application\Port\ScheduledJobAdministrationInterface;
 use App\Scheduler\Application\Port\SchedulerManualOccurrenceRecorderInterface;
-use App\Scheduler\Application\Port\ScheduledJobPortInterface;
-use App\Scheduler\Domain\Service\SchedulerRegistry;
-use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Interface\Request\CreateScheduledJobRequest;
 use App\Scheduler\Interface\Request\UpdateScheduledJobRequest;
 use App\Scheduler\Interface\Resource\ScheduledJobResource;
@@ -18,9 +16,9 @@ use App\Shared\Interface\Controller\ApiResponsesTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -32,8 +30,7 @@ final class AdminScheduledJobController
     use ApiResponsesTrait;
 
     public function __construct(
-        private readonly ScheduledJobPortInterface $scheduledJobService,
-        private readonly SchedulerRegistry $registry,
+        private readonly ScheduledJobAdministrationInterface $scheduledJobService,
         private readonly SchedulerManualOccurrenceRecorderInterface $manualOccurrences,
     ) {
     }
@@ -100,14 +97,14 @@ final class AdminScheduledJobController
     #[Route('', name: 'create', methods: ['POST'])]
     public function create(#[MapRequestPayload] CreateScheduledJobRequest $request): JsonResponse
     {
-        $job = $this->scheduledJobService->create(
+        $job = $this->scheduledJobService->createJob(new ScheduledJobInput(
             name: $request->name,
             expression: $request->expression,
-            jobType: JobType::from($request->jobType),
+            jobType: $request->jobType,
             command: $request->command,
             description: $request->description,
             parameters: $request->parameters,
-        );
+        ));
 
         return $this->successResponse(ScheduledJobResource::from($job), Response::HTTP_CREATED);
     }
@@ -130,21 +127,17 @@ final class AdminScheduledJobController
     #[Route('/{id}', name: 'update', methods: ['PUT'])]
     public function update(string $id, #[MapRequestPayload] UpdateScheduledJobRequest $request): JsonResponse
     {
-        $job = $this->scheduledJobService->getById(Uuid::fromString($id));
-        if ($job === null) {
-            return $this->notFound('Scheduled job not found.');
-        }
-
-        $job->update(
+        $job = $this->scheduledJobService->updateJob(Uuid::fromString($id), new ScheduledJobInput(
             name: $request->name,
             expression: $request->expression,
-            jobType: JobType::from($request->jobType),
+            jobType: $request->jobType,
             command: $request->command,
             description: $request->description,
             parameters: $request->parameters,
-        );
-
-        $this->scheduledJobService->save($job);
+        ));
+        if ($job === null) {
+            return $this->notFound('Scheduled job not found.');
+        }
 
         return $this->successResponse(ScheduledJobResource::from($job));
     }
@@ -161,12 +154,9 @@ final class AdminScheduledJobController
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
     public function delete(string $id): JsonResponse
     {
-        $job = $this->scheduledJobService->getById(Uuid::fromString($id));
-        if ($job === null) {
+        if (!$this->scheduledJobService->deleteById(Uuid::fromString($id))) {
             return $this->notFound('Scheduled job not found.');
         }
-
-        $this->scheduledJobService->delete($job);
 
         return $this->noContent();
     }
@@ -185,13 +175,10 @@ final class AdminScheduledJobController
     #[Route('/{id}/pause', name: 'pause', methods: ['POST'])]
     public function pause(string $id): JsonResponse
     {
-        $job = $this->scheduledJobService->getById(Uuid::fromString($id));
+        $job = $this->scheduledJobService->pause(Uuid::fromString($id));
         if ($job === null) {
             return $this->notFound('Scheduled job not found.');
         }
-
-        $job->pause();
-        $this->scheduledJobService->save($job);
 
         return $this->successResponse(ScheduledJobResource::from($job));
     }
@@ -210,13 +197,10 @@ final class AdminScheduledJobController
     #[Route('/{id}/resume', name: 'resume', methods: ['POST'])]
     public function resume(string $id): JsonResponse
     {
-        $job = $this->scheduledJobService->getById(Uuid::fromString($id));
+        $job = $this->scheduledJobService->resume(Uuid::fromString($id));
         if ($job === null) {
             return $this->notFound('Scheduled job not found.');
         }
-
-        $job->resume();
-        $this->scheduledJobService->save($job);
 
         return $this->successResponse(ScheduledJobResource::from($job));
     }
@@ -283,13 +267,10 @@ final class AdminScheduledJobController
     #[Route('/{id}/enable', name: 'enable', methods: ['POST'])]
     public function enable(string $id): JsonResponse
     {
-        $job = $this->scheduledJobService->getById(Uuid::fromString($id));
+        $job = $this->scheduledJobService->enable(Uuid::fromString($id));
         if ($job === null) {
             return $this->notFound('Scheduled job not found.');
         }
-
-        $job->enable();
-        $this->scheduledJobService->save($job);
 
         return $this->successResponse(ScheduledJobResource::from($job));
     }
@@ -308,13 +289,10 @@ final class AdminScheduledJobController
     #[Route('/{id}/disable', name: 'disable', methods: ['POST'])]
     public function disable(string $id): JsonResponse
     {
-        $job = $this->scheduledJobService->getById(Uuid::fromString($id));
+        $job = $this->scheduledJobService->disable(Uuid::fromString($id));
         if ($job === null) {
             return $this->notFound('Scheduled job not found.');
         }
-
-        $job->disable();
-        $this->scheduledJobService->save($job);
 
         return $this->successResponse(ScheduledJobResource::from($job));
     }
@@ -334,9 +312,6 @@ final class AdminScheduledJobController
     #[Route('/commands', name: 'commands', methods: ['GET'])]
     public function commands(): JsonResponse
     {
-        return $this->successResponse([
-            'messenger' => $this->registry->getMessengerCommands(),
-            'console' => $this->registry->getConsoleCommands(),
-        ]);
+        return $this->successResponse($this->scheduledJobService->availableCommands());
     }
 }
