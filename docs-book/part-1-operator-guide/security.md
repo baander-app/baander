@@ -51,7 +51,7 @@ stop every issuer, resource server, and background worker before running
 
 The command deletes OAuth grants and metadata in one PostgreSQL transaction, then
 clears the token cache. Keep all instances stopped through retries and installation
-of the bundle's three `OAUTH_*` configuration values. Restart and verify fresh
+of the bundle's two `OAUTH_*` configuration values. Restart and verify fresh
 authentication before resuming traffic. Never retry invalidation after resuming.
 
 The command retains active files unchanged and prints no new secret. Preserve the
@@ -232,7 +232,6 @@ After recovery, review the [hardening checklist](#hardening-checklist) before br
 - [ ] **Unique `APP_SECRET`** — never use the default `change_me_in_production`
 - [ ] **Strong Redis password** — not the default `baander`
 - [ ] **Strong database password** — not the default `baander`
-- [ ] **OAuth encryption key set** — required for multi-worker setups
 - [ ] **`APP_ENV=prod`** in production — disables debug mode, verbose errors, and the profiler
 - [ ] **HTTPS in production** — set `DEFAULT_URI` and `APP_URL` to `https://`
 - [ ] **Reverse proxy configured** — Nginx terminates TLS and sets `X-Forwarded-*` headers (already configured in `swoole.yaml` with `trusted_proxies: ['*']`)

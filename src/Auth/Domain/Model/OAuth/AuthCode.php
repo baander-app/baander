@@ -34,8 +34,6 @@ final class AuthCode
         Client $client,
         array $scopes = [],
         ?DateInterval $ttl = null,
-        ?string $codeChallenge = null,
-        ?string $codeChallengeMethod = null,
     ): self {
         $expiresAt = null;
         if ($ttl !== null) {
@@ -51,8 +49,6 @@ final class AuthCode
             expiresAt: $expiresAt,
             createdAt: new DateTimeImmutable(),
             updatedAt: new DateTimeImmutable(),
-            codeChallenge: $codeChallenge,
-            codeChallengeMethod: $codeChallengeMethod,
         ));
     }
 
@@ -144,22 +140,5 @@ final class AuthCode
     public function getState(): AuthCodeState
     {
         return $this->state;
-    }
-
-    public function getCodeChallenge(): ?string
-    {
-        return $this->state->codeChallenge;
-    }
-
-    public function getCodeChallengeMethod(): ?string
-    {
-        return $this->state->codeChallengeMethod;
-    }
-
-    public function setCodeChallenge(string $codeChallenge, string $codeChallengeMethod): void
-    {
-        $this->state->codeChallenge = $codeChallenge;
-        $this->state->codeChallengeMethod = $codeChallengeMethod;
-        $this->state->updatedAt = new DateTimeImmutable();
     }
 }

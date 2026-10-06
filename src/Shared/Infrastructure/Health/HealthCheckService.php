@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Health;
 
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
-use Defuse\Crypto\Key;
 use Doctrine\DBAL\Connection;
 use Swoole\Server;
 use Throwable;
@@ -23,7 +22,6 @@ final class HealthCheckService
         private readonly string $appEnv,
         private readonly string $appSecret,
         private readonly string $appUrl,
-        private readonly string $oauthEncryptionKey,
         private readonly string $oauthPrivateKeyPath,
         private readonly string $oauthPublicKeyPath,
         private readonly string $vapidPublicKey,
@@ -110,7 +108,6 @@ final class HealthCheckService
             ...$this->checkEnvVarFormats(),
             $this->checkAppSecret(),
             $this->checkOAuthKeyFiles(),
-            $this->checkOAuthEncryptionKey(),
             ...$this->checkFrameworkConfig(),
             ...$this->checkExternalApiKeys(),
         ];
@@ -439,53 +436,6 @@ final class HealthCheckService
                 'messages' => $issues,
                 'suggestion' => 'Set OAUTH_PRIVATE_KEY_PATH and OAUTH_PUBLIC_KEY_PATH in .env and ensure key files exist.',
             ],
-        );
-    }
-
-    private function checkOAuthEncryptionKey(): HealthCheckResult
-    {
-        if ($this->appEnv !== 'prod') {
-            return new HealthCheckResult(
-                component: 'oauth_encryption_key',
-                status: HealthStatus::Healthy,
-                responseTimeMs: 0.0,
-                details: ['severity' => 'ok'],
-            );
-        }
-
-        if ($this->oauthEncryptionKey === '') {
-            return new HealthCheckResult(
-                component: 'oauth_encryption_key',
-                status: HealthStatus::Unhealthy,
-                responseTimeMs: 0.0,
-                details: [
-                    'severity' => 'error',
-                    'message' => 'OAUTH_ENCRYPTION_KEY (auth.encryption_key) is required in production for OAuth token encryption.',
-                    'suggestion' => 'Generate a key with: php -r \'require "vendor/autoload.php"; echo Defuse\\Crypto\\Key::createNewRandomKey()->saveToAsciiSafeString();\' and set OAUTH_ENCRYPTION_KEY in your environment provider.',
-                ],
-            );
-        }
-
-        try {
-            Key::loadFromAsciiSafeString($this->oauthEncryptionKey);
-        } catch (Throwable) {
-            return new HealthCheckResult(
-                component: 'oauth_encryption_key',
-                status: HealthStatus::Unhealthy,
-                responseTimeMs: 0.0,
-                details: [
-                    'severity' => 'error',
-                    'message' => 'OAUTH_ENCRYPTION_KEY is not a valid defuse/php-encryption ASCII-safe string.',
-                    'suggestion' => 'Regenerate the key and set OAUTH_ENCRYPTION_KEY in your environment provider.',
-                ],
-            );
-        }
-
-        return new HealthCheckResult(
-            component: 'oauth_encryption_key',
-            status: HealthStatus::Healthy,
-            responseTimeMs: 0.0,
-            details: ['severity' => 'ok'],
         );
     }
 

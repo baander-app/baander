@@ -244,8 +244,6 @@ final class OpenApiSpecTest extends KernelTestCase
             'WebAuthnOptionsRequest',
             'VerifyPasskeyChallengeRequest',
             'RevokeTokenRequest',
-            'DeviceAuthorizeRequest',
-            'DeviceApproveRequest',
             // Auth resources
             'UserResource',
             'TokenResource',
@@ -426,9 +424,6 @@ final class OpenApiSpecTest extends KernelTestCase
             '/api/auth/login/passkey' => 'POST',
             '/api/auth/password/reset-request' => 'POST',
             '/api/auth/email/verify' => 'POST',
-            '/api/oauth/authorize' => 'GET',
-            '/api/oauth/device/authorize' => 'POST',
-            '/api/oauth/device/verify' => 'GET',
         ];
 
         foreach ($publicPaths as $path => $method) {

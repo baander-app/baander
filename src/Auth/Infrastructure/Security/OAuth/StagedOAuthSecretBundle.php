@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Auth\Infrastructure\Security\OAuth;
 
 use App\Auth\Application\Port\OAuthSecretBundleInterface;
-use Defuse\Crypto\Key;
 use RuntimeException;
 use SensitiveParameter;
 use stdClass;
@@ -14,7 +13,7 @@ use Throwable;
 /** Separate filesystem preparation from database invalidation and operator cutover. */
 final readonly class StagedOAuthSecretBundle implements OAuthSecretBundleInterface
 {
-    private const array FILES = ['private.key', 'public.key', 'encryption.key', 'oauth.env'];
+    private const array FILES = ['private.key', 'public.key', 'oauth.env'];
     private const int MAX_BYTES = 8192;
 
     public function prepare(string $directory, int $keySize): void
@@ -43,12 +42,11 @@ final readonly class StagedOAuthSecretBundle implements OAuthSecretBundleInterfa
             if ($details === false) {
                 throw new RuntimeException();
             }
-            $encryption = Key::createNewRandomKey()->saveToAsciiSafeString();
             $files = [
                 'private.key' => $private, 'public.key' => $details['key'],
-                'encryption.key' => $encryption . "\n", 'oauth.env' => $this->environment($directory, $encryption),
+                'oauth.env' => $this->environment($directory),
             ];
-            $this->keys($files['private.key'], $files['public.key'], $files['encryption.key']);
+            $this->keys($files['private.key'], $files['public.key']);
             $hashes = [];
             foreach ($files as $name => $contents) {
                 $this->write($directory, $name, $contents);
@@ -91,8 +89,8 @@ final readonly class StagedOAuthSecretBundle implements OAuthSecretBundleInterfa
                 }
                 $files[$name] = $contents;
             }
-            $encryption = $this->keys($files['private.key'], $files['public.key'], $files['encryption.key']);
-            if ($files['oauth.env'] !== $this->environment($directory, $encryption)) {
+            $this->keys($files['private.key'], $files['public.key']);
+            if ($files['oauth.env'] !== $this->environment($directory)) {
                 throw new RuntimeException();
             }
             $this->directory($directory);
@@ -215,7 +213,7 @@ final readonly class StagedOAuthSecretBundle implements OAuthSecretBundleInterfa
         return $left['dev'] === $right['dev'] && $left['ino'] === $right['ino'];
     }
 
-    private function keys(#[SensitiveParameter] string $private, string $public, #[SensitiveParameter] string $encryption): string
+    private function keys(#[SensitiveParameter] string $private, string $public): void
     {
         $privateKey = @openssl_pkey_get_private($private);
         $publicKey = @openssl_pkey_get_public($public);
@@ -227,21 +225,14 @@ final readonly class StagedOAuthSecretBundle implements OAuthSecretBundleInterfa
         if ($details === false || $details['type'] !== OPENSSL_KEYTYPE_RSA || !in_array($details['bits'], [2048, 4096], true)
             || !@openssl_sign($challenge, $signature, $privateKey, OPENSSL_ALGO_SHA256)
             || @openssl_verify($challenge, $signature, $publicKey, OPENSSL_ALGO_SHA256) !== 1
-            || !str_ends_with($encryption, "\n")
         ) {
             throw new RuntimeException();
         }
-        $value = substr($encryption, 0, -1);
-        if (Key::loadFromAsciiSafeString($value)->saveToAsciiSafeString() !== $value) {
-            throw new RuntimeException();
-        }
-        return $value;
     }
 
-    private function environment(string $directory, #[SensitiveParameter] string $encryption): string
+    private function environment(string $directory): string
     {
         return 'OAUTH_PRIVATE_KEY_PATH=' . $directory . "/private.key\n"
-            . 'OAUTH_PUBLIC_KEY_PATH=' . $directory . "/public.key\n"
-            . 'OAUTH_ENCRYPTION_KEY=' . $encryption . "\n";
+            . 'OAUTH_PUBLIC_KEY_PATH=' . $directory . "/public.key\n";
     }
 }

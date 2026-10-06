@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Auth\Infrastructure\Adapter\OAuth;
 
 use App\Auth\Domain\Model\OAuth\Client;
-use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
-use App\Auth\Infrastructure\Adapter\OAuth\ClientRepository as LeagueClients;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Repository\OAuth\ClientRepository as DoctrineClients;
 use App\Shared\Domain\Model\Uuid;
@@ -17,17 +15,6 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class ClientIdentityTest extends TestCase
 {
-    public function testLeagueAdapterPreservesPersistedClientIdentity(): void
-    {
-        $client = Client::createPersonalAccess('Player', Uuid::generate());
-        $repository = $this->createMock(ClientRepositoryInterface::class);
-        $repository->expects(self::once())->method('findClientByPublicId')->with($client->getPublicId())->willReturn($client);
-        $entity = new LeagueClients($repository, new JsonEncoder())->getClientEntity($client->getPublicId()->toString());
-        self::assertInstanceOf(ClientEntity::class, $entity);
-        self::assertTrue($client->getId()->equals($entity->getId()));
-        self::assertSame($client->getPublicId()->toString(), $entity->getIdentifier());
-    }
-
     public function testNewClientPersistenceUsesTheDomainIdentifierAndOwner(): void
     {
         $owner = Uuid::generate();

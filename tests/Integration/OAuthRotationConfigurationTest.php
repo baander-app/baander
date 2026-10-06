@@ -49,16 +49,22 @@ final class OAuthRotationConfigurationTest extends TestCase
             self::assertSame(0700, fileperms($bundle) & 07777);
             $configuration = file_get_contents($bundle . '/oauth.env');
             self::assertIsString($configuration);
-            self::assertMatchesRegularExpression('/\AOAUTH_PRIVATE_KEY_PATH=.*\nOAUTH_PUBLIC_KEY_PATH=.*\nOAUTH_ENCRYPTION_KEY=([^\n]+)\n\z/D', $configuration);
-            $secret = file_get_contents($bundle . '/encryption.key');
-            self::assertIsString($secret);
-            self::assertStringNotContainsString(trim($secret), $tester->getDisplay());
+            self::assertSame(
+                'OAUTH_PRIVATE_KEY_PATH=' . $bundle . "/private.key\n" . 'OAUTH_PUBLIC_KEY_PATH=' . $bundle . "/public.key\n",
+                $configuration,
+            );
+            $privateKey = file_get_contents($bundle . '/private.key');
+            self::assertIsString($privateKey);
+            // The first base64 line of the PEM body stands in for the private key material.
+            $secret = explode("\n", $privateKey)[1] ?? '';
+            self::assertNotSame('', $secret);
+            self::assertStringNotContainsString($secret, $tester->getDisplay());
             self::assertStringContainsString($bundle . '/oauth.env', $tester->getDisplay());
 
             self::assertSame(Command::SUCCESS, $tester->execute([
                 'action' => 'validate', '--directory' => $bundle,
             ], ['interactive' => false]));
-            self::assertStringNotContainsString(trim($secret), $tester->getDisplay());
+            self::assertStringNotContainsString($secret, $tester->getDisplay());
         } finally {
             $kernel->shutdown();
             (new Filesystem())->remove($directory);

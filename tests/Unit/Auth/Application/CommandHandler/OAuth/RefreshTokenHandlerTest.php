@@ -12,11 +12,13 @@ use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
 use App\Auth\Domain\Model\OAuth\RefreshTokenState;
 use App\Auth\Domain\Model\OAuth\TokenId;
+use App\Auth\Domain\Model\OAuth\TokenMetadata;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
+use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Domain\Service\TokenChainValidator;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
@@ -41,6 +43,9 @@ final class RefreshTokenHandlerTest extends TestCase
     private TokenChainValidator $chainValidator;
     private EntityManagerInterface&Stub $entityManager;
     private JwtGeneratorInterface&Stub $jwtGenerator;
+    private TokenMetadataRepositoryInterface&Stub $tokenMetadataRepository;
+    /** @var list<TokenMetadata> */
+    private array $savedMetadata = [];
     private RefreshTokenHandler $handler;
 
     protected function setUp(): void
@@ -85,12 +90,18 @@ final class RefreshTokenHandlerTest extends TestCase
                 return $token;
             });
 
+        $this->tokenMetadataRepository = $this->createStub(TokenMetadataRepositoryInterface::class);
+        $this->tokenMetadataRepository->method('save')->willReturnCallback(function (TokenMetadata $metadata): void {
+            $this->savedMetadata[] = $metadata;
+        });
+
         $this->handler = new RefreshTokenHandler(
             $this->accessTokenRepository,
             $this->refreshTokenRepository,
             $this->chainValidator,
             $this->entityManager,
             $this->jwtGenerator,
+            $this->tokenMetadataRepository,
             accessTokenTtl: 3600,
             refreshTokenTtl: 2592000,
         );
@@ -140,6 +151,33 @@ final class RefreshTokenHandlerTest extends TestCase
         self::assertSame($oldAccessToken, $this->savedAccessTokens[0]);
         self::assertNotSame($oldRefreshToken, $this->savedRefreshTokens[1]);
         self::assertNotSame($oldAccessToken, $this->savedAccessTokens[1]);
+    }
+
+    public function testReplacementKeepsTheClientFingerprintBinding(): void
+    {
+        $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');
+        $chainId = ChainId::generate();
+        $oldAccessToken = AccessToken::issue($this->createConfidentialClient(), $user, [new Scope('profile')], null, new \DateInterval('PT3600S'), $chainId, dpopJkt: self::JKT);
+        $oldRefreshToken = RefreshToken::issue($oldAccessToken, $chainId, new \DateInterval('PT2592000S'));
+        $this->refreshTokenRepository->method('findByTokenId')->willReturn($oldRefreshToken);
+        $this->tokenMetadataRepository->method('findByTokenId')->willReturnCallback(
+            static fn (TokenId $tokenId): ?TokenMetadata => $tokenId->equals($oldAccessToken->getTokenId())
+                ? TokenMetadata::create($oldAccessToken->getId(), clientFingerprint: 'bound-fingerprint')
+                : null,
+        );
+
+        ($this->handler)(new RefreshTokenCommand(
+            refreshTokenId: $oldRefreshToken->getTokenId()->toString(),
+            ipAddress: '127.0.0.2',
+            userAgent: 'PHPUnit/13',
+            dpopJkt: self::JKT,
+        ));
+
+        self::assertCount(1, $this->savedMetadata);
+        self::assertTrue($this->savedMetadata[0]->getTokenId()->equals($this->savedAccessTokens[1]->getId()));
+        self::assertSame('bound-fingerprint', $this->savedMetadata[0]->getClientFingerprint());
+        self::assertSame('127.0.0.2', $this->savedMetadata[0]->getIpAddress());
+        self::assertSame('PHPUnit/13', $this->savedMetadata[0]->getUserAgent());
     }
 
     public function testOldAccessTokenIsRevoked(): void
@@ -621,6 +659,7 @@ final class RefreshTokenHandlerTest extends TestCase
             $this->chainValidator,
             $entityManager,
             $jwtGenerator,
+            $this->createStub(TokenMetadataRepositoryInterface::class),
             accessTokenTtl: 3600,
             refreshTokenTtl: 2592000,
         );

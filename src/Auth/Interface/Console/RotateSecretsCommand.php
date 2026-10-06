@@ -84,7 +84,7 @@ final class RotateSecretsCommand extends Command
         }
 
         $io->success(sprintf('Invalidated %d OAuth rows and cleared the token cache.', $affected));
-        $io->text('While every instance remains offline, install all three OAUTH_* values from the private oauth.env in your configuration provider.');
+        $io->text('While every instance remains offline, install both OAUTH_* values from the private oauth.env in your configuration provider.');
         $io->text('Restart all instances with that same bundle, verify authentication, and then resume traffic. Do not repeat invalidate after service resumes.');
         return Command::SUCCESS;
     }

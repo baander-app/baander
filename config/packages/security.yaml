@@ -26,6 +26,7 @@ security:
             stateless: true
             custom_authenticators:
                 - App\Auth\Infrastructure\Security\User\PasswordAuthenticator
+                - App\Auth\Infrastructure\Security\Passkey\PasskeyAuthenticator
                 - App\Auth\Infrastructure\Security\OAuth\OAuth2Authenticator
             provider: app_user_provider
 

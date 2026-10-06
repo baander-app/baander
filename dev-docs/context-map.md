@@ -71,13 +71,13 @@ graph TD
 
 | Attribute | Detail |
 |-----------|--------|
-| **Responsibility** | User identity, OAuth 2.0 authorization server, authentication mechanisms (password, passkey, TOTP), DPoP token binding |
+| **Responsibility** | User identity, first-party login (password, passkey, TOTP), DPoP-bound token issuance and refresh, access token validation |
 | **Namespace** | `App\Auth` |
 | **Aggregates** | `User` |
 | **Repositories** | `UserRepositoryInterface` |
-| **Ports** | `UserPortInterface`, `PasswordHasherInterface`, `JwtGeneratorInterface`, `TotpVerifierInterface`, `DpopJtiCacheInterface`, `PasskeyVerifierInterface`, `PasswordResetTokenRepositoryInterface` |
+| **Ports** | `UserPortInterface`, `AuthenticatedUserIdentityInterface`, `PasswordHasherInterface`, `JwtGeneratorInterface`, `TotpVerifierInterface`, `DpopJtiCacheInterface`, `PasskeyVerifierInterface`, `PasswordResetTokenRepositoryInterface`, `EmailVerificationTokenRepositoryInterface`, `OAuthSecretBundleInterface`, `OAuthTokenInvalidatorInterface` |
 | **Events** | `UserRegistered`, `UserCreatedByOperator`, `EmailVerified`, `PasswordChanged`, `TokenIssued`, `TokenRevoked`, `DeviceCodeApproved`, `PasskeyRegistered`, `PasskeyDeleted` |
-| **Tech** | League OAuth2 Server (anti-corruption layer), WebAuthn (web-auth/webauthn-lib), OTPHP (TOTP), Redis (DPoP JTI cache, cached access tokens) |
+| **Tech** | League OAuth2 Server resource server (anti-corruption layer), WebAuthn (web-auth/webauthn-lib), OTPHP (TOTP), Redis (DPoP JTI cache, cached access tokens) |
 
 ### Catalog
 
@@ -460,7 +460,7 @@ graph TD
 ```mermaid
 graph TD
     subgraph "Auth ACL"
-        League["League OAuth2 Server<br/><small>Repositories &amp; Entities</small>"]
+        League["League OAuth2 Server<br/><small>ResourceServer &amp; repository interfaces</small>"]
         LeagueAdapters["Auth\\Infrastructure\\Adapter\\OAuth\\*"]
         League -->|"services.yaml alias"| LeagueAdapters
     end
@@ -495,9 +495,9 @@ graph TD
     end
 ```
 
-### OAuth 2.0 Server (Auth Context)
+### OAuth 2.0 Resource Server (Auth Context)
 
-The League OAuth2 Server library defines its own repository interfaces. These are mapped to internal implementations via aliases in `config/services.yaml`. The adapter layer translates between League's data structures and Bander's domain models, preventing the external library's concepts from leaking into the domain layer.
+Auth uses the League OAuth2 Server library only for its `ResourceServer`, which validates access tokens; Auth issues tokens itself at login and refresh. `config/services.yaml` aliases League's access token and refresh token repository interfaces to the adapters in `Auth\Infrastructure\Adapter\OAuth`. The adapters translate between League's data structures and Baander's domain models, preventing the external library's concepts from leaking into the domain layer.
 
 ### External API Adapters (Metadata Context)
 
@@ -575,7 +575,7 @@ graph TD
 
 | Context | Layer Completeness | Aggregate Pattern | Notes |
 |---------|-------------------|------------------|-------|
-| Auth | Full 4-layer + features | State object | Most mature. Complex OAuth ACL. 9 domain events. |
+| Auth | Full 4-layer + features | State object | Most mature. OAuth resource-server ACL. 9 domain events. |
 | Catalog | Full 4-layer | State objects | Core domain. PGroonga search on `SongRepository`. 6 aggregates. |
 | Library | Full 4-layer | No state object | Orchestrates scanning pipeline. Heaviest cross-context coupling. |
 | Media | Full 4-layer | No state object | Storage/streaming abstraction. |

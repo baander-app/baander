@@ -609,22 +609,13 @@ through retries and configuration installation. Cache failures and uncertain
 commits require offline recovery; there is no automatic global fence or online
 atomic cutover. See the operator rotation runbook for installation and recovery.
 
-The active `/api/oauth/token` refresh path now uses a top-level transaction through
-response signing and serialization. It locks the original refresh/access rows,
-requires the original DPoP key binding, and conditionally consumes the refresh token
-before issuing its replacement. Replay retains League's reject-only policy; it does
-not revoke a winner's replacement family. Lock and statement timeouts bound database
-contention. Failure clears aborted ORM state and closes the captured connection.
-Transport delivery and uncertain commit acknowledgments remain outside that guarantee.
-
-PostgreSQL regressions exercise concurrent independent issuers, replacement persistence
-and signing failures, reusable replacements, missing/wrong DPoP bindings, persisted
-user identity, and client UUID round-trips. The returned JWT is validated through the
-resource-server factory. These tests supply the already-validated proof attribute;
-full firewall, cryptographic proof/replay, browser retry and logout acceptance remain
-open. Issuance also now preserves client/user UUIDs and DPoP bindings, signs access
-JWTs, and emits a complete DPoP JSON response without stale trailing stream bytes.
-Non-refresh grants are not covered by the new transaction boundary.
+Refresh runs only through `/api/auth/refresh` (`RefreshTokenHandler`); the League
+token endpoint and its grants are removed. The handler requires the original DPoP key
+binding, then consumes the refresh token and persists its replacement in one
+transaction. A replayed refresh token revokes its chain. Failure rolls back the
+transaction and clears aborted ORM state. `OAuthGrantPathAcceptanceTest` covers
+password login, passkey login, refresh rotation, replay and proof-key binding
+through the production firewall with PostgreSQL and Redis.
 
 The browser API client now fences requests, responses, nonce updates and refresh
 queues by the current DPoP key-pair identity. Delayed requests from a replaced

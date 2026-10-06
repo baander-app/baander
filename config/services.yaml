@@ -215,7 +215,6 @@ services:
             $appEnv: '%kernel.environment%'
             $appSecret: '%env(APP_SECRET)%'
             $appUrl: '%env(APP_URL)%'
-            $oauthEncryptionKey: '%auth.encryption_key%'
             $oauthPrivateKeyPath: '%auth.private_key_path%'
             $oauthPublicKeyPath: '%auth.public_key_path%'
             $vapidPublicKey: '%env(VAPID_PUBLIC_KEY)%'
@@ -295,10 +294,6 @@ services:
         arguments:
             $cache: '@cache.tags'
 
-    App\Auth\Interface\Controller\OAuth\AuthorizationServerMetadataController:
-        arguments:
-            $issuer: '%auth.oauth.issuer%'
-
     App\Auth\Interface\Controller\OAuth\JwksController:
         arguments:
             $publicKeyPath: '%auth.public_key_path%'
@@ -330,18 +325,7 @@ services:
             $discoveryLimiter: '@limiter.discovery_endpoint_ip'
             $environment: '%kernel.environment%'
 
-    # --- OAuth 2.0 Servers ---
-    App\Auth\Infrastructure\Security\OAuth\AuthorizationServerFactory:
-        arguments:
-            $privateKeyPath: '%auth.private_key_path%'
-            $encryptionKey: '%auth.encryption_key%'
-            $environment: '%kernel.environment%'
-            $verificationUri: '%auth.device.verification_uri%'
-            $accessTokenTtl: '%auth.access_token.ttl%'
-            $refreshTokenTtl: '%auth.refresh_token.ttl%'
-            $authCodeTtl: '%auth.auth_code.ttl%'
-            $deviceCodeTtl: '%auth.device_code.ttl%'
-
+    # --- OAuth 2.0 Resource Server ---
     App\Auth\Infrastructure\Security\OAuth\ResourceServerFactory:
         arguments:
             $publicKeyPath: '%auth.public_key_path%'
@@ -360,8 +344,7 @@ services:
     # --- Scope Allowlist ---
     App\Auth\Application\ScopeAllowlist:
         arguments:
-            $userGrants: '%auth.scopes.user_grants%'
-            $clientCredentials: '%auth.scopes.client_credentials%'
+            $scopes: '%auth.scopes.login%'
 
     # --- JWT Generation ---
     App\Auth\Application\Port\JwtGeneratorInterface:
@@ -399,19 +382,8 @@ services:
         alias: App\Auth\Infrastructure\Adapter\OAuth\AccessTokenRepository
     League\OAuth2\Server\Repositories\RefreshTokenRepositoryInterface:
         alias: App\Auth\Infrastructure\Adapter\OAuth\RefreshTokenRepository
-    League\OAuth2\Server\Repositories\AuthCodeRepositoryInterface:
-        alias: App\Auth\Infrastructure\Adapter\OAuth\AuthCodeRepository
-    League\OAuth2\Server\Repositories\ClientRepositoryInterface:
-        alias: App\Auth\Infrastructure\Adapter\OAuth\ClientRepository
-    League\OAuth2\Server\Repositories\DeviceCodeRepositoryInterface:
-        alias: App\Auth\Infrastructure\Adapter\OAuth\DeviceCodeRepository
-    League\OAuth2\Server\Repositories\ScopeRepositoryInterface:
-        alias: App\Auth\Infrastructure\Adapter\OAuth\ScopeRepository
 
-    # --- OAuth Servers (shared singletons, built once per Swoole worker) ---
-    League\OAuth2\Server\AuthorizationServer:
-        factory: [ '@App\Auth\Infrastructure\Security\OAuth\AuthorizationServerFactory', 'create' ]
-
+    # --- OAuth Resource Server (shared singleton, built once per Swoole worker) ---
     League\OAuth2\Server\ResourceServer:
         factory: [ '@App\Auth\Infrastructure\Security\OAuth\ResourceServerFactory', 'create' ]
 

@@ -5,14 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Auth\Application\CommandHandler\OAuth;
 
 use App\Auth\Application\Command\OAuth\RefreshTokenCommand;
-use App\Auth\Application\Command\OAuth\IssueTokenCommand;
-use App\Auth\Application\CommandHandler\OAuth\IssueTokenHandler;
-use App\Auth\Application\ScopeAllowlist;
-use App\Auth\Domain\Repository\OAuth\AuthCodeRepositoryInterface;
-use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
-use App\Auth\Domain\Repository\OAuth\DeviceCodeRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
-use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Application\CommandHandler\OAuth\RefreshTokenHandler;
 use App\Auth\Application\Port\JwtGeneratorInterface;
 use App\Auth\Domain\Model\OAuth\AccessToken;
@@ -30,13 +23,13 @@ use RuntimeException;
 final class RefreshTokenTransactionTest extends TestCase
 {
     #[DataProvider('failureStages')]
-    public function testFailureRollsBackConsumptionAndReplacement(string $stage, bool $oauth): void
+    public function testFailureRollsBackConsumptionAndReplacement(string $stage): void
     {
         $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
         $connection->executeStatement('CREATE TABLE token_state (used INTEGER NOT NULL)');
         $connection->insert('token_state', ['used' => 0]);
         $connection->executeStatement('CREATE TABLE replacement_tokens (id INTEGER PRIMARY KEY)');
-        $client = Client::create('test', ['https://example.test'], secret: 'secret', confidential: true, firstParty: true);
+        $client = Client::create('test', ['https://app.baander.app'], secret: 'secret', confidential: true, firstParty: true);
         $token = RefreshToken::issue(AccessToken::issue($client, null, [], null, dpopJkt: 'bound-proof-key-thumbprint'), null);
         $refresh = $this->createMock(RefreshTokenRepositoryInterface::class);
         $refresh->method('findByTokenId')->willReturn($token);
@@ -57,20 +50,8 @@ final class RefreshTokenTransactionTest extends TestCase
         });
         $jwt = $this->createStub(JwtGeneratorInterface::class);
         $jwt->method('generate')->willThrowException(new RuntimeException('sign failed'));
-        $handler = new RefreshTokenHandler($access, $refresh, new TokenChainValidator($access, $refresh), $manager, $jwt, 3600, 86400);
+        $handler = new RefreshTokenHandler($access, $refresh, new TokenChainValidator($access, $refresh), $manager, $jwt, $this->createStub(TokenMetadataRepositoryInterface::class), 3600, 86400);
         $command = new RefreshTokenCommand($token->getTokenId()->toString(), dpopJkt: 'bound-proof-key-thumbprint');
-        if ($oauth) {
-            $clients = $this->createStub(ClientRepositoryInterface::class);
-            $clients->method('findClientByUuid')->willReturn($client);
-            $handler = new IssueTokenHandler(
-                $access, $refresh, $this->createStub(AuthCodeRepositoryInterface::class),
-                $this->createStub(DeviceCodeRepositoryInterface::class), $clients,
-                $this->createStub(UserRepositoryInterface::class), new TokenChainValidator($access, $refresh),
-                new ScopeAllowlist(['profile'], []), $manager, $jwt,
-                $this->createStub(TokenMetadataRepositoryInterface::class), 3600, 86400,
-            );
-            $command = new IssueTokenCommand('refresh_token', clientId: $client->getId(), clientSecret: 'secret', code: $token->getTokenId()->toString());
-        }
         try {
             $handler($command);
             self::fail('Expected rotation to fail');
@@ -83,12 +64,10 @@ final class RefreshTokenTransactionTest extends TestCase
         $connection->close();
     }
 
-    /** @return iterable<array{string, bool}> */
+    /** @return iterable<array{string}> */
     public static function failureStages(): iterable
     {
-        yield ['persist', false];
-        yield ['sign', false];
-        yield ['persist', true];
-        yield ['sign', true];
+        yield ['persist'];
+        yield ['sign'];
     }
 }

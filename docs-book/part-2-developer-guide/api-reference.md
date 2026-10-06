@@ -156,72 +156,98 @@ Validation errors include a `details` key with field-level messages:
 
 ## Authentication
 
-Baander supports three authentication flows, all backed by OAuth 2.0. All flows return the same token response format.
+Baander issues tokens only to its own clients. Three endpoints issue tokens: password login, passkey login, and refresh. All three require a DPoP proof and return the same token response. There is no authorization code, device, or client credentials flow.
 
 ### Token Response
 
-Regardless of which flow is used, a successful authentication returns:
+A successful login or refresh returns:
 
 ```json
 {
-  "token_type": "Bearer",
-  "expires_in": 3600,
-  "access_token": "eyJ...",
-  "refresh_token": "def50200..."
+  "data": {
+    "accessToken": "eyJ...",
+    "tokenType": "DPoP",
+    "expiresIn": 3600,
+    "refreshToken": "..."
+  }
 }
 ```
 
+Login responses also include a `user` object inside `data`.
+
 | Field | Description |
 |-------|-------------|
-| `token_type` | Always `Bearer` |
-| `expires_in` | Access token lifetime in seconds (default: 3600 / 1 hour) |
-| `access_token` | JWT used in the `Authorization: Bearer` header for API requests |
-| `refresh_token` | Opaque token used to obtain a new access token without re-authenticating |
+| `accessToken` | JWT bound to the client's DPoP key |
+| `tokenType` | Always `DPoP` |
+| `expiresIn` | Access token lifetime in seconds (default: 3600 / 1 hour) |
+| `refreshToken` | Opaque token used to obtain a new token pair without signing in again |
 
 Token lifetimes are configured in `config/packages/auth.yaml`:
 - **Access token**: 3600 seconds (1 hour) — `auth.access_token.ttl`
 - **Refresh token**: 2592000 seconds (30 days) — `auth.refresh_token.ttl`
-- **Auth code**: 600 seconds (10 minutes) — `auth.auth_code.ttl`
 
-To refresh an expired access token, send a refresh grant to the same token endpoint:
+### DPoP Proofs
+
+Every token request carries a `DPoP` header with a proof JWT (RFC 9449) signed by the client's key. The proof must include a nonce the server issued:
+
+1. Send the request with a proof that has no nonce. The server answers `400` with `{"error": "use_dpop_nonce", "error_description": "..."}` and a `DPoP-Nonce` header.
+2. Repeat the request with a new proof whose `nonce` claim is that value.
+
+Each nonce works once and expires after `auth.dpop.nonce_ttl` seconds (default 300). Successful token responses include a `DPoP-Nonce` header for the client's next proof. A request without a `DPoP` header gets a `400` `ApiError`.
+
+Issued tokens are bound to the proof key: the access token carries `cnf.jkt`. API requests send `Authorization: DPoP <accessToken>` with a `DPoP` proof from the same key that includes the access token hash (`ath`). Signed stream delivery URLs do not need a proof.
+
+### Password Login
 
 ```
-POST /api/auth/token
-Content-Type: application/x-www-form-urlencoded
+POST /api/auth/login
+Content-Type: application/json
+DPoP: <proof>
 
-grant_type=refresh_token&refresh_token=def50200...&client_id=<client_id>
+{"email": "user@baander.app", "password": "secret", "totpCode": "123456"}
 ```
 
-### Password Grant
+`totpCode` is required only when the account has TOTP enabled; without it, the response is `401` with code `AUTH_TOTP_REQUIRED`.
 
-The simplest flow for first-party clients. Send a `POST` request to `/api/auth/token` with form-encoded parameters:
+### Passkey Login
+
+Passkey login uses the browser's WebAuthn API:
+
+1. `POST /api/auth/passkey/authenticate/options` (optionally with `userId`) returns `{challengeKey, options}`.
+2. The client calls `navigator.credentials.get()` with `options`.
+3. The client sends the assertion with a `DPoP` header:
 
 ```
-POST /api/auth/token
-Content-Type: application/x-www-form-urlencoded
+POST /api/auth/login/passkey
+Content-Type: application/json
+DPoP: <proof>
 
-grant_type=password&client_id=<client_id>&username=user@example.com&password=secret
+{"challengeKey": "...", "response": { ... }, "userId": "..."}
 ```
 
-### Passkey (WebAuthn)
+`userId` is optional. The server checks the DPoP proof before the assertion, so a nonce challenge leaves the assertion valid for the retry. Disabled accounts cannot sign in.
 
-Passkey authentication uses the browser's built-in WebAuthn API. The flow is browser-mediated:
+To register a passkey, an authenticated user calls `POST /api/auth/passkey/options` and passes the browser's credential to `POST /api/auth/passkey/register`.
 
-1. **Registration**: The frontend calls `/api/auth/passkey/register/options` to retrieve a challenge, then passes the browser's credential to `/api/auth/passkey/register`.
-2. **Authentication**: The frontend calls `/api/auth/passkey/authenticate/options` to retrieve a challenge, then passes the browser's assertion to `/api/auth/passkey/authenticate`.
+### Refresh
 
-The server issues OAuth tokens upon successful authentication, just like the password grant.
+```
+POST /api/auth/refresh
+Content-Type: application/json
+DPoP: <proof>
 
-### PKCE (Authorization Code Flow)
+{"refreshToken": "..."}
+```
 
-For third-party or public clients where a client secret cannot be stored securely. This implements OAuth 2.0 with PKCE (Proof Key for Code Exchange):
+The proof must be signed by the key the token pair was issued to. Each refresh token works once; the response contains a new pair with the same key binding. Reusing a consumed refresh token revokes its whole rotation chain.
 
-1. The client generates a `code_verifier` and derives a `code_challenge` from it.
-2. The user is redirected to the authorization endpoint with the `code_challenge`.
-3. After the user approves, the client receives an authorization code.
-4. The client exchanges the code (along with the `code_verifier`) for tokens at the token endpoint.
+### Client Fingerprint Binding
 
-This is the recommended flow for mobile apps, SPAs, and any client running on an untrusted environment.
+Password and passkey login accept an optional `X-Baander-Client-Fingerprint` header. If it is sent, the access token is bound to that value, and every API request with the token must send the same header or get `401` (`AUTH_INVALID_TOKEN`). Refresh keeps the binding. Tokens issued without the header ignore it. WebSocket connections authenticated with a query token do not check it.
+
+### Revocation and Introspection
+
+`POST /api/auth/logout` revokes the current access token. The two OAuth endpoints require an authenticated request: `POST /api/oauth/revoke` (RFC 7009) revokes an access or refresh token and always returns `200`, and `POST /api/oauth/introspect` (RFC 7662) reports whether an access token is active. Access tokens can be verified with the keys at `GET /.well-known/jwks.json`.
 
 ## Resource Pattern
 

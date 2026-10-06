@@ -17,6 +17,7 @@ use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
+use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Domain\Service\TokenChainValidator;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
@@ -71,6 +72,7 @@ final class RefreshTokenHandlerConcurrencyTest extends TestCase
             $chainValidator,
             $this->entityManager,
             $jwtGenerator,
+            $this->createStub(TokenMetadataRepositoryInterface::class),
             accessTokenTtl: 3600,
             refreshTokenTtl: 2592000,
         );

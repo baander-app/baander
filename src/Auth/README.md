@@ -3,18 +3,18 @@
 
 # Auth
 
-OAuth 2.0 authorization server with passkey, TOTP, and password authentication. Wraps League OAuth2 Server behind an anti-corruption layer (`services.yaml` aliases map League's repository interfaces to internal adapters). The `User` aggregate is the sole domain root.
+First-party authentication: password login (with optional TOTP), passkey login, and refresh issue DPoP-bound token pairs to Baander's own clients. League OAuth2 Server is used only to validate access tokens, behind an anti-corruption layer (`services.yaml` aliases League's access token and refresh token repository interfaces to internal adapters). The `User` aggregate is the sole domain root.
 
 ## Concepts
 
 The context is organized into four feature areas within each layer:
 
 - **User** — registration, login, profile management, password reset
-- **OAuth** — authorization code, client credentials, device code flows; token lifecycle (issue, revoke, introspect). DPoP token binding prevents token replay.
+- **OAuth** — token lifecycle: issue at password or passkey login, rotate at refresh, revoke, introspect. Every request that issues tokens needs a DPoP proof with a server-issued nonce, and tokens are bound to the proof key. An optional `X-Baander-Client-Fingerprint` header at login also binds the access token to that fingerprint.
 - **Passkey** — WebAuthn registration and authentication via `web-auth/webauthn-lib`
 - **Totp** — time-based one-time password setup and verification via `otphp`
 
-Every model that participates in OAuth flows (AccessToken, AuthCode, Client, RefreshToken, DeviceCode) has its own state object and repository. The aggregate pattern is `User` only — the rest are OAuth primitives managed through their repositories.
+Every OAuth model (AccessToken, AuthCode, Client, RefreshToken, DeviceCode) has its own state object and repository. The aggregate pattern is `User` only — the rest are OAuth primitives managed through their repositories. AuthCode and DeviceCode are retained persistence for the `oauth_auth_codes` and `oauth_device_codes` tables; no flow creates them.
 
 ## Ports
 
@@ -27,6 +27,10 @@ Every model that participates in OAuth flows (AccessToken, AuthCode, Client, Ref
 | `PasskeyVerifierInterface` | WebAuthn passkey verification |
 | `DpopJtiCacheInterface` | DPoP JTI replay protection (backed by Redis) |
 | `PasswordResetTokenRepositoryInterface` | Password reset token persistence |
+| `EmailVerificationTokenRepositoryInterface` | Email verification token persistence |
+| `AuthenticatedUserIdentityInterface` | Identity of the user a login authenticator verified |
+| `OAuthSecretBundleInterface` | Key bundle preparation and validation for secret rotation |
+| `OAuthTokenInvalidatorInterface` | Token deletion during offline secret rotation |
 
 ## Events
 
@@ -36,11 +40,11 @@ Every model that participates in OAuth flows (AccessToken, AuthCode, Client, Ref
 | `UserCreatedByOperator` | Security | Notification |
 | `PasswordChanged` | Security | Notification |
 | `TokenRevoked` | Security | Notification |
-| `DeviceCodeApproved` | Security | Notification |
+| `DeviceCodeApproved` | Security | Notification (no endpoint raises it) |
 | `PasskeyRegistered` | Security | Notification |
 | `PasskeyDeleted` | Security | Notification |
 | `EmailVerified` | — | none |
-| `TokenIssued` | — | excluded (too noisy) |
+| `TokenIssued` | — | excluded (too noisy); not dispatched |
 
 ---
 

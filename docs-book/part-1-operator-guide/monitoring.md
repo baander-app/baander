@@ -255,12 +255,11 @@ The endpoint validates environment variables, key file existence, secret strengt
 | Check | Severity when failing |
 |-------|----------------------|
 | Required env vars (`DATABASE_URL`, `REDIS_URL`, `APP_SECRET`, `APP_URL`, `APP_DOMAIN`) | Error |
-| Production-only vars (`REDIS_PASSWORD`, `OAUTH_ENCRYPTION_KEY`) | Error (prod only) |
+| `REDIS_PASSWORD` is set | Error (prod only) |
 | `DATABASE_URL` and `REDIS_URL` format | Error |
 | `APP_URL` uses HTTPS | Error (prod only) |
 | `APP_SECRET` is not the default placeholder | Error (prod only) |
 | OAuth key file existence | Warning (dev) / Error (prod) |
-| OAuth encryption key validity | Error (prod only) |
 | VAPID key pair consistency | Warning |
 | External API key lengths | Warning |
 

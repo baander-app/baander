@@ -198,7 +198,7 @@ App\Auth\Application\Port\TotpVerifierInterface:
 
 ## Anti-Corruption Layer
 
-League OAuth2 Server interfaces are aliased to internal adapter implementations in `services.yaml`. This prevents the library's interfaces from leaking into the domain layer.
+Baander uses League OAuth2 Server only to validate access tokens through its `ResourceServer`. The League access token and refresh token repository interfaces are aliased to internal adapters in `services.yaml`, so the library's interfaces stay out of the domain layer.
 
 ## Request DTOs and Resources
 

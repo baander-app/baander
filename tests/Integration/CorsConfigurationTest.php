@@ -159,18 +159,16 @@ final class CorsConfigurationTest extends TestCase
         yield 'foreign host' => ['https://foreign.baander.app'];
     }
 
-    public function testAuthorizationEndpointAndNonApiPathHaveNoCors(): void
+    public function testNonApiPathHasNoCors(): void
     {
-        foreach (['/api/oauth/authorize', '/api/oauth/%61uthorize', '/api/oauth/authorize/', '/api/oauth/%61uthorize%2f', '/unmatched'] as $path) {
-            self::assertFalse($this->preflight($path, 'GET', 'Authorization')->headers->has('Access-Control-Allow-Origin'));
-            self::assertFalse($this->actual($path, self::ORIGIN, new Response())->headers->has('Access-Control-Allow-Origin'));
-        }
+        self::assertFalse($this->preflight('/unmatched', 'GET', 'Authorization')->headers->has('Access-Control-Allow-Origin'));
+        self::assertFalse($this->actual('/unmatched', self::ORIGIN, new Response())->headers->has('Access-Control-Allow-Origin'));
     }
 
-    public function testPublicMetadataStillAllowsForeignOrigins(): void
+    public function testPublicJwksStillAllowsForeignOrigins(): void
     {
         $origin = 'https://foreign.baander.app';
-        self::assertSame($origin, $this->actual('/.well-known/oauth-authorization-server', $origin, new Response())
+        self::assertSame($origin, $this->actual('/.well-known/jwks.json', $origin, new Response())
             ->headers->get('Access-Control-Allow-Origin'));
     }
 

@@ -6,14 +6,13 @@ namespace App\Auth\Interface\Controller\User;
 
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Application\Command\OAuth\IssueTokenCommand;
-use App\Auth\Application\DTO\TokenResponseDTO;
-use App\Auth\Domain\Model\OAuth\ValueObject\DpopValidationResult;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Security\OAuth\DpopNonceManager;
 use App\Auth\Infrastructure\Security\OAuth\DpopProofValidator;
 use App\Auth\Interface\Resource\TokenResource;
 use App\Auth\Interface\Resource\UserResource;
+use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -102,19 +101,20 @@ final class LoginController
         }
 
         $result = $this->dpopProofValidator->validate($dpopHeader, $request);
-        if (!$result->isValid()) {
+        $proofKey = $result->getJkt();
+        if (!$result->isValid() || $proofKey === null) {
             return $this->dpopNonceManager->createChallengeResponse(
                 $result->getErrorDescription() ?? $result->getError() ?? 'DPoP proof validation failed.',
             );
         }
 
         $envelope = $this->bus->dispatch(new IssueTokenCommand(
-            grantType: 'direct_grant',
             clientId: $client->getId(),
             userId: $user->getId(),
             ipAddress: $request->getClientIp(),
             userAgent: $request->headers->get('User-Agent'),
-            dpopJkt: $result->getJkt(),
+            clientFingerprint: $request->headers->get(BaanderHeader::ClientFingerprint->value),
+            dpopJkt: $proofKey,
         ));
 
         $tokenResponse = $envelope->last(HandledStamp::class)?->getResult();

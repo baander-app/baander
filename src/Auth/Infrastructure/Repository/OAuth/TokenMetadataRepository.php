@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Auth\Infrastructure\Repository\OAuth;
 
+use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\TokenMetadata;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\TokenMetadataEntity;
-use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class TokenMetadataRepository implements TokenMetadataRepositoryInterface
@@ -54,27 +54,16 @@ final class TokenMetadataRepository implements TokenMetadataRepositoryInterface
         $this->entityManager->flush();
     }
 
-    public function findByTokenId(Uuid $tokenId): ?TokenMetadata
+    public function findByTokenId(TokenId $tokenId): ?TokenMetadata
     {
-        $tokenEntity = $this->entityManager
-            ->getRepository(AccessTokenEntity::class)
-            ->findOneBy(['tokenId' => $tokenId->toString()]);
-
-        if ($tokenEntity === null) {
-            return null;
-        }
-
-        $entity = $this->entityManager
-            ->getRepository(TokenMetadataEntity::class)
-            ->findOneBy(['token' => $tokenEntity]);
-
+        $entity = $this->findEntityByTokenId($tokenId);
         if ($entity === null) {
             return null;
         }
 
         return TokenMetadata::reconstitute(
             id: $entity->getId(),
-            tokenId: $tokenEntity->getId(),
+            tokenId: $entity->getToken()->getId(),
             userAgent: $entity->getUserAgent(),
             deviceOperatingSystem: $entity->getDeviceOperatingSystem(),
             deviceName: $entity->getDeviceName(),
@@ -90,23 +79,27 @@ final class TokenMetadataRepository implements TokenMetadataRepositoryInterface
         );
     }
 
-    public function deleteByTokenId(Uuid $tokenId): void
+    public function deleteByTokenId(TokenId $tokenId): void
     {
-        $tokenEntity = $this->entityManager
-            ->getRepository(AccessTokenEntity::class)
-            ->findOneBy(['tokenId' => $tokenId->toString()]);
-
-        if ($tokenEntity === null) {
-            return;
-        }
-
-        $entity = $this->entityManager
-            ->getRepository(TokenMetadataEntity::class)
-            ->findOneBy(['token' => $tokenEntity]);
-
+        $entity = $this->findEntityByTokenId($tokenId);
         if ($entity !== null) {
             $this->entityManager->remove($entity);
             $this->entityManager->flush();
         }
+    }
+
+    /** The public token identifier lives on the access token; metadata references the token's primary key. */
+    private function findEntityByTokenId(TokenId $tokenId): ?TokenMetadataEntity
+    {
+        $entity = $this->entityManager->createQueryBuilder()
+            ->select('metadata', 'token')
+            ->from(TokenMetadataEntity::class, 'metadata')
+            ->innerJoin('metadata.token', 'token')
+            ->where('token.tokenId = :tokenId')
+            ->setParameter('tokenId', $tokenId->toString())
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $entity instanceof TokenMetadataEntity ? $entity : null;
     }
 }

@@ -5,20 +5,17 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Auth\Domain\Model\User;
+use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
+use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Tests\Fixtures\Auth\GrantPathOAuthKernel;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
-use Defuse\Crypto\Crypto;
-use Defuse\Crypto\Key;
+use App\Tests\Fixtures\Auth\WebAuthnTestCredential;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
-use League\OAuth2\Server\AuthorizationServer;
-use League\OAuth2\Server\Exception\OAuthServerException;
-use Nyholm\Psr7\Response as Psr7Response;
-use Nyholm\Psr7\ServerRequest;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
@@ -28,9 +25,8 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Token-minting entry points through the production firewall, with real PostgreSQL and Redis.
  *
- * Login and refresh run through IssueTokenHandler (direct_grant) and RefreshTokenHandler.
- * Every other grant is League's; its token endpoint sits behind the authenticated `^/api/`
- * access rule, so redemption checks are exercised on League's server directly.
+ * Password login, passkey login, and refresh are the only first-party ways to mint tokens.
+ * Passkey login signs a real WebAuthn assertion with an ES256 test authenticator.
  */
 final class OAuthGrantPathAcceptanceTest extends TestCase
 {
@@ -43,7 +39,6 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
     private EntityManagerInterface $manager;
     private Connection $connection;
     private User $user;
-    private ClientEntity $thirdPartyClient;
     private string $ip;
 
     public static function tearDownAfterClass(): void
@@ -106,19 +101,14 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
                 firstParty: true,
             ));
         }
-        $this->thirdPartyClient = new ClientEntity(new PublicId(), 'Grant path third party', json_encode([self::REDIRECT], JSON_THROW_ON_ERROR));
-        $this->manager->persist($this->thirdPartyClient);
         $this->manager->flush();
     }
 
     protected function tearDown(): void
     {
         if (isset($this->connection, $this->user)) {
-            // Refresh tokens and token metadata cascade from access tokens; auth codes cascade from the user.
+            // Refresh tokens and token metadata cascade from access tokens; passkeys cascade from the user.
             $this->connection->executeStatement('DELETE FROM oauth_access_tokens WHERE user_id = ?', [$this->user->getId()->toString()]);
-            if (isset($this->thirdPartyClient)) {
-                $this->connection->executeStatement('DELETE FROM oauth_clients WHERE id = ?', [$this->thirdPartyClient->getId()->toString()]);
-            }
             $this->connection->executeStatement('DELETE FROM users WHERE id = ?', [$this->user->getId()->toString()]);
         }
         if (isset($this->manager) && $this->manager->isOpen()) {
@@ -185,145 +175,175 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertSame(401, $response->getStatusCode(), (string) $response->getContent());
     }
 
-    /**
-     * PasskeyAuthenticator is not registered on the production firewall, so the passkey
-     * login controller only sees callers who already present an access token. Its token
-     * pair carries no proof-key binding, so neither token can be used or refreshed.
-     */
-    public function testPasskeyLoginMintsOnlyUnusableTokensForExistingSessions(): void
+    public function testPasskeyLoginIssuesProofBoundTokensUsableOnTheApiAndRefreshableWithTheSameKey(): void
     {
-        $assertion = ['challengeKey' => 'grant-path-challenge', 'response' => ['id' => 'grant-path-credential']];
-        $anonymous = $this->send('POST', '/api/auth/login/passkey', json: $assertion);
-        self::assertSame(401, $anonymous->getStatusCode(), (string) $anonymous->getContent());
-
         $key = new SignedDpopProof();
-        $login = $this->login($key);
-        $response = $this->send('POST', '/api/auth/login/passkey', json: $assertion, headers: [
-            'Authorization' => 'DPoP ' . $login['accessToken'],
-            'DPoP' => $key->create('POST', self::ORIGIN . '/api/auth/login/passkey', $login['accessToken']),
-        ]);
+        $credential = $this->registerPasskey();
+        $assertion = $this->passkeyAssertion($credential);
+
+        // The proof is checked before the ceremony, so the nonce challenge leaves the assertion redeemable.
+        $challenge = $this->passkeyLogin($assertion, $key->create('POST', self::ORIGIN . '/api/auth/login/passkey', 'no-access-token'));
+        self::assertSame(400, $challenge->getStatusCode(), (string) $challenge->getContent());
+        self::assertSame('use_dpop_nonce', json_decode((string) $challenge->getContent(), true, flags: JSON_THROW_ON_ERROR)['error']);
+        $nonce = $challenge->headers->get('DPoP-Nonce');
+        self::assertIsString($nonce);
+
+        $response = $this->passkeyLogin($assertion, $key->createWithNonce('POST', self::ORIGIN . '/api/auth/login/passkey', $nonce));
         self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
         $data = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
+        self::assertSame($this->user->getEmail(), $data['user']['email']);
         $claims = self::claims($data['accessToken']);
-        self::assertArrayNotHasKey('cnf', $claims);
-        self::assertNull($this->storedBinding($claims['jti']));
+        self::assertSame(['jkt' => $key->thumbprint()], $claims['cnf'] ?? null);
+        self::assertSame($key->thumbprint(), $this->storedBinding($claims['jti']));
 
-        $refresh = $this->refresh($data['refreshToken'], $key, $login['nonce']);
-        self::assertSame(401, $refresh->getStatusCode(), (string) $refresh->getContent());
+        $me = $this->me($data['accessToken'], $key);
+        self::assertSame(200, $me->getStatusCode(), (string) $me->getContent());
+        self::assertSame($this->user->getEmail(), json_decode((string) $me->getContent(), true, flags: JSON_THROW_ON_ERROR)['data']['email']);
+
+        $loginNonce = $response->headers->get('DPoP-Nonce');
+        self::assertIsString($loginNonce);
+        $refresh = $this->refresh($data['refreshToken'], $key, $loginNonce);
+        self::assertSame(200, $refresh->getStatusCode(), (string) $refresh->getContent());
+        $rotated = json_decode((string) $refresh->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
+        self::assertSame(200, $this->me($rotated['accessToken'], $key)->getStatusCode());
     }
 
     /** @return iterable<string, array{string}> */
-    public static function leagueGrants(): iterable
+    public static function rejectedPasskeyProofs(): iterable
     {
-        yield 'authorization code' => ['authorization_code'];
-        yield 'client credentials' => ['client_credentials'];
-        yield 'refresh token' => ['refresh_token'];
-        yield 'device code' => ['urn:ietf:params:oauth:grant-type:device_code'];
+        yield 'missing proof' => ['missing'];
+        yield 'proof without nonce' => ['nonce-less'];
+        yield 'unissued nonce' => ['unissued-nonce'];
+        yield 'proof for another endpoint' => ['wrong-uri'];
     }
 
-    #[DataProvider('leagueGrants')]
-    public function testTokenEndpointRejectsAnonymousCallersForEveryLeagueGrant(string $grantType): void
+    #[DataProvider('rejectedPasskeyProofs')]
+    public function testPasskeyLoginRejectsAMissingOrInvalidProofWithoutIssuingTokens(string $kind): void
     {
         $key = new SignedDpopProof();
-        $response = $this->send('POST', '/api/oauth/token', form: [
-            'grant_type' => $grantType,
-            'client_id' => $this->thirdPartyClient->getIdentifier(),
-        ], headers: ['DPoP' => $key->createWithNonce('POST', self::ORIGIN . '/api/oauth/token', $this->nonce())]);
+        $assertion = $this->passkeyAssertion($this->registerPasskey());
+        $uri = self::ORIGIN . '/api/auth/login/passkey';
+        $proof = match ($kind) {
+            'missing' => null,
+            'nonce-less' => $key->create('POST', $uri, 'no-access-token'),
+            'unissued-nonce' => $key->createWithNonce('POST', $uri, bin2hex(random_bytes(32))),
+            default => $key->createWithNonce('POST', self::ORIGIN . '/api/auth/login', $this->nonce()),
+        };
 
-        self::assertSame(401, $response->getStatusCode(), (string) $response->getContent());
+        $response = $this->passkeyLogin($assertion, $proof);
+
+        self::assertSame(400, $response->getStatusCode(), (string) $response->getContent());
+        self::assertArrayNotHasKey('data', json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR));
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM oauth_access_tokens WHERE user_id = ?', [$this->user->getId()->toString()]));
     }
 
-    /** Characterizes the gate: the firewall's DPoP check stores the proof jti, so the endpoint sees a replay. */
-    public function testTokenEndpointRejectsAuthenticatedCallersBecauseTheFirewallConsumesTheProof(): void
+    public function testPasskeyRefreshRejectsAProofSignedByAnotherKey(): void
+    {
+        $key = new SignedDpopProof();
+        $assertion = $this->passkeyAssertion($this->registerPasskey());
+        $response = $this->passkeyLogin($assertion, $key->createWithNonce('POST', self::ORIGIN . '/api/auth/login/passkey', $this->nonce()));
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+        $data = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
+
+        $stolen = $this->refresh($data['refreshToken'], new SignedDpopProof(), $this->nonce());
+        self::assertSame(401, $stolen->getStatusCode(), (string) $stolen->getContent());
+
+        $owner = $this->refresh($data['refreshToken'], $key, $this->nonce());
+        self::assertSame(200, $owner->getStatusCode(), (string) $owner->getContent());
+    }
+
+    /** An existing session cannot stand in for the passkey ceremony. */
+    public function testPasskeyLoginRequiresAVerifiedAssertionEvenWithAnAccessToken(): void
     {
         $key = new SignedDpopProof();
         $login = $this->login($key);
-        $uri = self::ORIGIN . '/api/oauth/token';
+        $uri = self::ORIGIN . '/api/auth/login/passkey';
 
-        $response = $this->send('POST', '/api/oauth/token', form: [
-            'grant_type' => 'client_credentials',
-            'client_id' => $this->thirdPartyClient->getIdentifier(),
+        $response = $this->send('POST', '/api/auth/login/passkey', json: [
+            'challengeKey' => 'grant-path-challenge',
+            'response' => ['id' => 'grant-path-credential'],
         ], headers: [
             'Authorization' => 'DPoP ' . $login['accessToken'],
             'DPoP' => $key->createWithNonce('POST', $uri, $login['nonce'], $login['accessToken']),
         ]);
 
-        self::assertSame(400, $response->getStatusCode(), (string) $response->getContent());
-        $body = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame('use_dpop_nonce', $body['error']);
-        self::assertStringContainsString('"jti" has been reused', $body['error_description']);
+        self::assertSame(401, $response->getStatusCode(), (string) $response->getContent());
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM oauth_access_tokens WHERE user_id = ?', [$this->user->getId()->toString()]));
     }
 
-    /** @return iterable<string, array{array<string, string>}> */
-    public static function nonS256Challenges(): iterable
+    public function testFingerprintBoundTokenAuthenticatesOnlyWithTheMatchingFingerprint(): void
     {
-        yield 'missing challenge' => [[]];
-        yield 'explicit plain' => [['code_challenge' => self::challenge(self::verifier()), 'code_challenge_method' => 'plain']];
-        yield 'empty method' => [['code_challenge' => self::challenge(self::verifier()), 'code_challenge_method' => '']];
+        $key = new SignedDpopProof();
+        $fingerprint = hash('sha256', 'grant-path-device');
+        $login = $this->login($key, $fingerprint);
+
+        self::assertSame(200, $this->me($login['accessToken'], $key, $fingerprint)->getStatusCode());
+        self::assertSame(401, $this->me($login['accessToken'], $key, hash('sha256', 'other-device'))->getStatusCode());
+        self::assertSame(401, $this->me($login['accessToken'], $key)->getStatusCode());
+
+        // Rotation keeps the binding.
+        $refresh = $this->refresh($login['refreshToken'], $key, $login['nonce']);
+        self::assertSame(200, $refresh->getStatusCode(), (string) $refresh->getContent());
+        $rotated = json_decode((string) $refresh->getContent(), true, flags: JSON_THROW_ON_ERROR)['data']['accessToken'];
+        self::assertSame(200, $this->me($rotated, $key, $fingerprint)->getStatusCode());
+        self::assertSame(401, $this->me($rotated, $key, hash('sha256', 'other-device'))->getStatusCode());
     }
 
-    /** @param array<string, string> $pkce */
-    #[DataProvider('nonS256Challenges')]
-    public function testAuthorizeRejectsRequestsWithoutAnS256Challenge(array $pkce): void
+    /** First-party clients do not send a fingerprint today; their tokens stay usable. */
+    public function testTokenIssuedWithoutAFingerprintIgnoresTheFingerprintHeader(): void
     {
         $key = new SignedDpopProof();
         $login = $this->login($key);
 
-        $response = $this->authorize($key, $login['accessToken'], $pkce);
-
-        self::assertSame(400, $response->getStatusCode(), (string) $response->getContent());
-        self::assertNull($response->headers->get('Location'));
+        self::assertSame(200, $this->me($login['accessToken'], $key)->getStatusCode());
+        self::assertSame(200, $this->me($login['accessToken'], $key, hash('sha256', 'any-device'))->getStatusCode());
     }
 
-    public function testAuthorizationCodeRedemptionEnforcesTheS256VerifierFromTheEncryptedPayload(): void
+    /** @return iterable<string, array{string, string}> */
+    public static function removedOAuthEndpoints(): iterable
+    {
+        yield 'token' => ['POST', '/api/oauth/token'];
+        yield 'authorize' => ['GET', '/api/oauth/authorize'];
+        yield 'device authorization' => ['POST', '/api/oauth/device/authorize'];
+        yield 'device verification' => ['GET', '/api/oauth/device/verify'];
+        yield 'device approval' => ['POST', '/api/oauth/device/approve'];
+    }
+
+    /** The RFC 8414 document advertised the removed endpoints; the path now falls through to the SPA. */
+    public function testAuthorizationServerMetadataIsNotServed(): void
+    {
+        $response = $this->send('GET', '/.well-known/oauth-authorization-server');
+
+        self::assertStringNotContainsString('application/json', (string) $response->headers->get('Content-Type'));
+        self::assertStringNotContainsString('token_endpoint', (string) $response->getContent());
+    }
+
+    /** Only first-party login and refresh mint tokens; the third-party OAuth endpoints are gone. */
+    #[DataProvider('removedOAuthEndpoints')]
+    public function testThirdPartyOAuthEndpointsAreNotRouted(string $method, string $path): void
     {
         $key = new SignedDpopProof();
         $login = $this->login($key);
-        $verifier = self::verifier();
-        $code = $this->authorizationCode($key, $login['accessToken'], [
-            'code_challenge' => self::challenge($verifier),
-            'code_challenge_method' => 'S256',
+
+        self::assertSame(404, $this->send($method, $path)->getStatusCode());
+        $authenticated = $this->send($method, $path, headers: [
+            'Authorization' => 'DPoP ' . $login['accessToken'],
+            'DPoP' => $key->create($method, self::ORIGIN . $path, $login['accessToken']),
         ]);
-
-        // League keeps the challenge only in the encrypted code; the persisted row never receives it.
-        $payload = $this->decryptCode($code);
-        self::assertSame(['S256', self::challenge($verifier)], [$payload['code_challenge_method'], $payload['code_challenge']]);
-        self::assertSame(
-            ['code_challenge' => null, 'code_challenge_method' => null],
-            $this->connection->fetchAssociative(
-                'SELECT code_challenge, code_challenge_method FROM oauth_auth_codes WHERE code_id = ?',
-                [$payload['auth_code_id']],
-            ),
-        );
-
-        self::assertSame('invalid_request', $this->redemptionError($code, null));
-        self::assertSame('invalid_grant', $this->redemptionError($code, self::verifier()));
-        self::assertNull($this->redemptionError($code, $verifier));
-        self::assertSame('invalid_grant', $this->redemptionError($code, $verifier), 'A redeemed code is single-use.');
-    }
-
-    /**
-     * Characterizes a latent downgrade: the controller defaults an absent method to S256,
-     * while League defaults it to `plain` and accepts the challenge itself as the verifier.
-     */
-    public function testAuthorizeWithoutAChallengeMethodIssuesAPlainPkceCode(): void
-    {
-        $key = new SignedDpopProof();
-        $login = $this->login($key);
-        $challenge = self::challenge(self::verifier());
-        $code = $this->authorizationCode($key, $login['accessToken'], ['code_challenge' => $challenge]);
-
-        self::assertSame('plain', $this->decryptCode($code)['code_challenge_method']);
-        self::assertNull($this->redemptionError($code, $challenge));
+        self::assertSame(404, $authenticated->getStatusCode(), (string) $authenticated->getContent());
     }
 
     /** @return array{accessToken: string, refreshToken: string, nonce: string} */
-    private function login(SignedDpopProof $key): array
+    private function login(SignedDpopProof $key, ?string $fingerprint = null): array
     {
+        $headers = ['DPoP' => $key->createWithNonce('POST', self::ORIGIN . '/api/auth/login', $this->nonce())];
+        if ($fingerprint !== null) {
+            $headers[BaanderHeader::ClientFingerprint->value] = $fingerprint;
+        }
         $response = $this->send('POST', '/api/auth/login', json: [
             'email' => $this->user->getEmail(),
             'password' => self::PASSWORD,
-        ], headers: ['DPoP' => $key->createWithNonce('POST', self::ORIGIN . '/api/auth/login', $this->nonce())]);
+        ], headers: $headers);
         self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
         $data = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
         $nonce = $response->headers->get('DPoP-Nonce');
@@ -353,73 +373,45 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         return $nonce;
     }
 
-    /** @param array<string, string> $pkce */
-    private function authorize(SignedDpopProof $key, string $accessToken, array $pkce): Response
+    private function me(string $accessToken, SignedDpopProof $key, ?string $fingerprint = null): Response
     {
-        return $this->send('GET', '/api/oauth/authorize', query: [
-            'response_type' => 'code',
-            'client_id' => $this->thirdPartyClient->getIdentifier(),
-            'redirect_uri' => self::REDIRECT,
-            'scope' => 'profile',
-            'state' => 'grant-path-state',
-            ...$pkce,
-        ], headers: [
+        $headers = [
             'Authorization' => 'DPoP ' . $accessToken,
-            'DPoP' => $key->create('GET', self::ORIGIN . '/api/oauth/authorize', $accessToken),
-        ]);
-    }
-
-    /** @param array<string, string> $pkce */
-    private function authorizationCode(SignedDpopProof $key, string $accessToken, array $pkce): string
-    {
-        $response = $this->authorize($key, $accessToken, $pkce);
-        self::assertSame(302, $response->getStatusCode(), (string) $response->getContent());
-        $location = $response->headers->get('Location');
-        self::assertIsString($location);
-        self::assertStringStartsWith(self::REDIRECT . '?', $location);
-        parse_str((string) parse_url($location, PHP_URL_QUERY), $query);
-        self::assertIsString($query['code'] ?? null);
-
-        return $query['code'];
-    }
-
-    /** @return array<string, mixed> */
-    private function decryptCode(string $code): array
-    {
-        $encryptionKey = $this->kernel->getContainer()->getParameter('auth.encryption_key');
-        self::assertIsString($encryptionKey);
-
-        return json_decode(Crypto::decrypt($code, Key::loadFromAsciiSafeString($encryptionKey)), true, flags: JSON_THROW_ON_ERROR);
-    }
-
-    /** Redeems on League's server behind the firewall gate; returns the OAuth error code, or null on success. */
-    private function redemptionError(string $code, ?string $verifier): ?string
-    {
-        $server = $this->kernel->getContainer()->get('oauth.acceptance.authorization_server');
-        self::assertInstanceOf(AuthorizationServer::class, $server);
-        $body = [
-            'grant_type' => 'authorization_code',
-            'client_id' => $this->thirdPartyClient->getIdentifier(),
-            'redirect_uri' => self::REDIRECT,
-            'code' => $code,
+            'DPoP' => $key->create('GET', self::ORIGIN . '/api/auth/me', $accessToken),
         ];
-        if ($verifier !== null) {
-            $body['code_verifier'] = $verifier;
+        if ($fingerprint !== null) {
+            $headers[BaanderHeader::ClientFingerprint->value] = $fingerprint;
         }
 
-        try {
-            $response = $server->respondToAccessTokenRequest(
-                (new ServerRequest('POST', self::ORIGIN . '/api/oauth/token'))->withParsedBody($body),
-                new Psr7Response(),
-            );
-        } catch (OAuthServerException $exception) {
-            return $exception->getErrorType();
-        } finally {
-            $this->manager->clear();
-        }
-        self::assertSame(200, $response->getStatusCode());
+        return $this->send('GET', '/api/auth/me', headers: $headers);
+    }
 
-        return null;
+    private function registerPasskey(): WebAuthnTestCredential
+    {
+        $credential = new WebAuthnTestCredential($this->user->getId()->toString(), GrantPathOAuthKernel::RELYING_PARTY);
+        $passkeys = $this->kernel->getContainer()->get('oauth.acceptance.passkeys');
+        self::assertInstanceOf(PasskeyRepositoryInterface::class, $passkeys);
+        $passkeys->save($credential->passkey(), $this->user->getId());
+
+        return $credential;
+    }
+
+    /** @return array{challengeKey: string, response: array<string, mixed>} */
+    private function passkeyAssertion(WebAuthnTestCredential $credential): array
+    {
+        $options = $this->send('POST', '/api/auth/passkey/authenticate/options', json: ['userId' => $this->user->getId()->toString()]);
+        self::assertSame(200, $options->getStatusCode(), (string) $options->getContent());
+        $data = json_decode((string) $options->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
+        self::assertIsString($data['challengeKey']);
+        self::assertIsString($data['options']['challenge']);
+
+        return ['challengeKey' => $data['challengeKey'], 'response' => $credential->assert($data['options']['challenge'], self::ORIGIN)];
+    }
+
+    /** @param array{challengeKey: string, response: array<string, mixed>} $assertion */
+    private function passkeyLogin(array $assertion, ?string $proof): Response
+    {
+        return $this->send('POST', '/api/auth/login/passkey', json: $assertion, headers: $proof === null ? [] : ['DPoP' => $proof]);
     }
 
     private function storedBinding(string $tokenId): ?string
@@ -465,15 +457,5 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertCount(3, $parts);
 
         return json_decode((string) base64_decode(strtr($parts[1], '-_', '+/'), true), true, flags: JSON_THROW_ON_ERROR);
-    }
-
-    private static function verifier(): string
-    {
-        return SignedDpopProof::encode(random_bytes(32));
-    }
-
-    private static function challenge(string $verifier): string
-    {
-        return SignedDpopProof::encode(hash('sha256', $verifier, true));
     }
 }

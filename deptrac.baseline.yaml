@@ -51,16 +51,8 @@ deptrac:
       - App\Auth\Infrastructure\Security\SecurityUser
     App\Auth\Interface\Controller\OAuth\OAuthController:
       - App\Auth\Domain\Model\OAuth\AccessToken
-      - App\Auth\Domain\Model\OAuth\Client
-      - App\Auth\Domain\Model\OAuth\DeviceCode
       - App\Auth\Domain\Model\OAuth\TokenId
-      - App\Auth\Domain\Model\OAuth\ValueObject\Scope
       - App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface
-      - App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface
-      - App\Auth\Domain\Repository\OAuth\DeviceCodeRepositoryInterface
-      - App\Auth\Domain\Repository\UserRepositoryInterface
-      - App\Auth\Infrastructure\Security\OAuth\DpopNonceManager
-      - App\Auth\Infrastructure\Security\OAuth\DpopProofValidator
     App\Auth\Interface\Controller\Passkey\PasskeyController:
       - App\Auth\Domain\Model\Passkey\Passkey
       - App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface
@@ -77,7 +69,6 @@ deptrac:
       - App\Auth\Infrastructure\Security\OAuth\DpopProofValidator
       - App\Auth\Infrastructure\Security\Passkey\PasskeyService
     App\Auth\Interface\Controller\User\LoginController:
-      - App\Auth\Domain\Model\OAuth\ValueObject\DpopValidationResult
       - App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface
       - App\Auth\Domain\Repository\UserRepositoryInterface
       - App\Auth\Infrastructure\Security\OAuth\DpopNonceManager

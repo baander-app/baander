@@ -4,17 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
-use App\Auth\Infrastructure\Security\OAuth\AuthorizationServerFactory;
 use App\Auth\Infrastructure\Security\OAuth\ResourceServerFactory;
 use App\Kernel;
-use Defuse\Crypto\Key;
-use League\OAuth2\Server\AuthorizationServer;
-use League\OAuth2\Server\Grant\RefreshTokenGrant;
-use League\OAuth2\Server\Repositories\RefreshTokenRepositoryInterface;
 use League\OAuth2\Server\ResourceServer;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\Filesystem\Filesystem;
 
@@ -40,7 +33,6 @@ final class OAuthProductionConfigurationTest extends TestCase
         self::assertTrue(chmod($this->directory . '/public.pem', 0600));
         $this->environment('OAUTH_PRIVATE_KEY_PATH', $this->directory . '/private.pem');
         $this->environment('OAUTH_PUBLIC_KEY_PATH', $this->directory . '/public.pem');
-        $this->environment('OAUTH_ENCRYPTION_KEY', Key::createNewRandomKey()->saveToAsciiSafeString());
         // Kernel environment, rather than this ambient value, must govern admission.
         $this->environment('APP_ENV', 'test');
         $this->environment('DATABASE_URL', 'postgresql://worker:private@db.baander.app/unused?serverVersion=18&charset=utf8');
@@ -69,7 +61,7 @@ final class OAuthProductionConfigurationTest extends TestCase
         (new Filesystem())->remove($this->directory);
     }
 
-    public function testIndependentProductionContainersShareEncryptionAndResolveExternalKeyPaths(): void
+    public function testIndependentProductionContainersResolveExternalKeyPaths(): void
     {
         $first = $this->kernel();
         $second = $this->kernel();
@@ -84,37 +76,6 @@ final class OAuthProductionConfigurationTest extends TestCase
             self::assertInstanceOf(ResourceServerFactory::class, $resourceFactory);
             self::assertInstanceOf(ResourceServer::class, $resourceFactory->create());
         }
-        $firstGrant = $this->grant($first);
-        $secondGrant = $this->grant($second);
-        $plaintext = '{"client_id":"production.baander.app","refresh_token_id":"test-only"}';
-        $ciphertext = $firstGrant->encryptForTest($plaintext);
-        self::assertNotSame($plaintext, $ciphertext);
-        self::assertSame($plaintext, $secondGrant->decryptForTest($ciphertext));
-        self::assertSame($plaintext, $firstGrant->decryptForTest($secondGrant->encryptForTest($plaintext)));
-    }
-
-    #[DataProvider('invalidEncryptionKeys')]
-    public function testProductionRejectsInvalidEncryptionEvenWithAmbientTestEnvironment(string $key, string $message): void
-    {
-        $this->environment('OAUTH_ENCRYPTION_KEY', $key);
-        $factory = $this->kernel()->getContainer()->get('oauth.production.factory');
-        self::assertInstanceOf(AuthorizationServerFactory::class, $factory);
-        try {
-            $factory->create();
-            self::fail('Production must reject an invalid OAuth encryption key.');
-        } catch (RuntimeException $error) {
-            self::assertStringContainsString($message, $error->getMessage());
-            self::assertStringNotContainsString('malformed-private-secret', $error->getMessage());
-            self::assertNull($error->getPrevious());
-            self::assertSame('test', $_SERVER['APP_ENV']);
-        }
-    }
-
-    /** @return iterable<string,array{string,string}> */
-    public static function invalidEncryptionKeys(): iterable
-    {
-        yield 'empty' => ['', 'OAUTH_ENCRYPTION_KEY must be configured in production'];
-        yield 'malformed' => ['malformed-private-secret', 'OAUTH_ENCRYPTION_KEY must be a valid Defuse'];
     }
 
     public function testAbsentPathEnvironmentPreservesProjectDefaultsWithoutOpeningRealKeys(): void
@@ -133,18 +94,6 @@ final class OAuthProductionConfigurationTest extends TestCase
         $this->kernels[] = $kernel;
         $kernel->boot();
         return $kernel;
-    }
-
-    private function grant(OAuthProductionConfigurationKernel $kernel): OAuthProductionEncryptionGrant
-    {
-        $factory = $kernel->getContainer()->get('oauth.production.factory');
-        self::assertInstanceOf(AuthorizationServerFactory::class, $factory);
-        $server = $factory->create();
-        self::assertInstanceOf(AuthorizationServer::class, $server);
-        $grant = new OAuthProductionEncryptionGrant($this->createStub(RefreshTokenRepositoryInterface::class));
-        // Public League wiring supplies the real factory key; no repository query.
-        $server->enableGrantType($grant);
-        return $grant;
     }
 
     private function environment(string $name, ?string $value): void
@@ -191,21 +140,6 @@ final class OAuthProductionConfigurationKernel extends Kernel
     protected function build(ContainerBuilder $container): void
     {
         parent::build($container);
-        $container->setAlias('oauth.production.factory', AuthorizationServerFactory::class)->setPublic(true);
         $container->setAlias('oauth.production.resource_factory', ResourceServerFactory::class)->setPublic(true);
-    }
-}
-
-/** Expose League's real refresh-token encryption through a public test seam. */
-final class OAuthProductionEncryptionGrant extends RefreshTokenGrant
-{
-    public function encryptForTest(string $value): string
-    {
-        return $this->encrypt($value);
-    }
-
-    public function decryptForTest(string $value): string
-    {
-        return $this->decrypt($value);
     }
 }

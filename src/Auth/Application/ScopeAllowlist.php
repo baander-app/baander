@@ -5,38 +5,29 @@ declare(strict_types=1);
 namespace App\Auth\Application;
 
 /**
- * Enforces scope allowlists per grant type to prevent privilege escalation.
+ * Scopes that password and passkey login may grant.
  *
- * User grant types (authorization_code, device_code, refresh_token) are restricted
- * to a safe set of scopes. The client_credentials grant has its own allowlist that
- * can include privileged scopes like 'admin'.
+ * Requested scopes outside the allowlist are dropped, so a login request
+ * cannot escalate its token's privileges.
  */
 final readonly class ScopeAllowlist
 {
     /**
-     * @param string[] $userGrants     Scopes allowed for user-bound grant types
-     * @param string[] $clientCredentials Scopes allowed for client_credentials grant
+     * @param string[] $scopes Scopes login may grant
      */
     public function __construct(
-        private array $userGrants,
-        private array $clientCredentials,
+        private array $scopes,
     ) {
     }
 
     /**
-     * Filter scopes against the allowlist for the given grant type.
+     * @param string[] $requestedScopes
      *
-     * Silently drops any scopes not present in the allowlist.
-     *
-     * @param string[] $requestedScopes Scopes to filter
-     * @param string $grantType        OAuth 2.0 grant type identifier
-     *
-     * @return string[] Only the scopes present in the allowlist, preserving order
+     * @return string[] Only the allowed scopes, preserving order
      */
-    public function filter(array $requestedScopes, string $grantType): array
+    public function filter(array $requestedScopes): array
     {
-        $allowlist = $this->getAllowlistForGrantType($grantType);
-        $set = array_flip($allowlist);
+        $set = array_flip($this->scopes);
 
         return array_values(array_filter(
             $requestedScopes,
@@ -45,31 +36,10 @@ final readonly class ScopeAllowlist
     }
 
     /**
-     * Get the allowlist for a specific grant type.
-     *
      * @return string[]
      */
-    public function getAllowlistForGrantType(string $grantType): array
+    public function getScopes(): array
     {
-        return match ($grantType) {
-            'client_credentials' => $this->clientCredentials,
-            default => $this->userGrants,
-        };
-    }
-
-    /**
-     * @return string[]
-     */
-    public function getUserGrants(): array
-    {
-        return $this->userGrants;
-    }
-
-    /**
-     * @return string[]
-     */
-    public function getClientCredentials(): array
-    {
-        return $this->clientCredentials;
+        return $this->scopes;
     }
 }

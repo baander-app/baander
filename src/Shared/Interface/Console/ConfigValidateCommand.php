@@ -109,7 +109,7 @@ final class ConfigValidateCommand extends Command
             ],
             'framework' => array_filter(
                 $this->healthCheckService->checkConfiguration(),
-                fn (HealthCheckResult $r) => !str_starts_with($r->component, 'env') && $r->component !== 'app_secret' && $r->component !== 'oauth_keys' && $r->component !== 'oauth_encryption_key' && $r->component !== 'api_keys',
+                fn (HealthCheckResult $r) => !str_starts_with($r->component, 'env') && $r->component !== 'app_secret' && $r->component !== 'oauth_keys' && $r->component !== 'api_keys',
             ),
             default => [
                 ...$this->healthCheckService->checkConfiguration(),

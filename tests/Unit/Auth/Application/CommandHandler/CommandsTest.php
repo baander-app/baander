@@ -57,31 +57,31 @@ final class CommandsTest extends TestCase
     public function testIssueTokenCommandGetters(): void
     {
         $clientId = Uuid::v4();
+        $userId = Uuid::v4();
         $cmd = new IssueTokenCommand(
-            grantType: 'authorization_code',
             clientId: $clientId,
-            clientSecret: 'secret',
-            code: 'code-123',
-            redirectUri: 'http://localhost/callback',
-            codeVerifier: 'verifier',
+            userId: $userId,
+            dpopJkt: 'thumbprint',
+            ipAddress: '127.0.0.1',
+            userAgent: 'PHPUnit',
+            clientFingerprint: 'fingerprint',
         );
 
-        $this->assertSame('authorization_code', $cmd->getGrantType());
         $this->assertSame($clientId, $cmd->getClientId());
-        $this->assertSame('secret', $cmd->getClientSecret());
-        $this->assertSame('code-123', $cmd->getCode());
-        $this->assertSame('http://localhost/callback', $cmd->getRedirectUri());
-        $this->assertSame('verifier', $cmd->getCodeVerifier());
+        $this->assertSame($userId, $cmd->getUserId());
+        $this->assertSame('thumbprint', $cmd->getDpopJkt());
+        $this->assertSame('127.0.0.1', $cmd->getIpAddress());
+        $this->assertSame('PHPUnit', $cmd->getUserAgent());
+        $this->assertSame('fingerprint', $cmd->getClientFingerprint());
     }
 
     public function testIssueTokenCommandDefaults(): void
     {
-        $cmd = new IssueTokenCommand(grantType: 'client_credentials');
+        $cmd = new IssueTokenCommand(Uuid::v4(), Uuid::v4(), 'thumbprint');
 
-        $this->assertNull($cmd->getClientId());
-        $this->assertNull($cmd->getClientSecret());
-        $this->assertNull($cmd->getCode());
         $this->assertEmpty($cmd->getScopes());
+        $this->assertNull($cmd->getTokenName());
+        $this->assertNull($cmd->getClientFingerprint());
     }
 
     public function testAuthenticatePasskeyCommandGetters(): void

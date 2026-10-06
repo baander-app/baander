@@ -32,8 +32,6 @@ final class AuthCodeState
         public readonly DateTimeImmutable $createdAt,
         public DateTimeImmutable $updatedAt,
         public bool $revoked = false,
-        public ?string $codeChallenge = null,
-        public ?string $codeChallengeMethod = null,
     ) {
         $this->scopes = $scopes;
     }

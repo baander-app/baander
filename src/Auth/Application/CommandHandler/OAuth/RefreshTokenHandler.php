@@ -10,8 +10,10 @@ use App\Auth\Application\Port\JwtGeneratorInterface;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
 use App\Auth\Domain\Model\OAuth\TokenId;
+use App\Auth\Domain\Model\OAuth\TokenMetadata;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
+use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Domain\Service\TokenChainValidator;
 use DateInterval;
 use Doctrine\ORM\EntityManagerInterface;
@@ -35,6 +37,7 @@ final class RefreshTokenHandler
         private readonly TokenChainValidator $chainValidator,
         private readonly EntityManagerInterface $entityManager,
         private readonly JwtGeneratorInterface $jwtGenerator,
+        private readonly TokenMetadataRepositoryInterface $tokenMetadataRepository,
         int $accessTokenTtl,
         int $refreshTokenTtl,
     ) {
@@ -119,6 +122,15 @@ final class RefreshTokenHandler
                 $this->accessTokenRepository->save($newAccessToken, false);
                 $this->refreshTokenRepository->save($newRefreshToken, false);
                 $this->entityManager->flush();
+
+                // The replacement keeps the client fingerprint binding of the token it rotates.
+                $previous = $this->tokenMetadataRepository->findByTokenId($oldAccessToken->getTokenId());
+                $this->tokenMetadataRepository->save(TokenMetadata::create(
+                    tokenId: $newAccessToken->getId(),
+                    userAgent: $command->getUserAgent(),
+                    clientFingerprint: $previous?->getClientFingerprint(),
+                    ipAddress: $command->getIpAddress(),
+                ));
 
                 return new TokenResponseDTO(
                     accessToken: $this->jwtGenerator->generate($newAccessToken, $command->getDpopJkt()),

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Auth\Infrastructure\Security\OAuth;
 
 use App\Auth\Infrastructure\Security\OAuth\StagedOAuthSecretBundle;
-use Defuse\Crypto\Key;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -37,7 +36,7 @@ final class StagedOAuthSecretBundleTest extends TestCase
         self::assertSame('active-key-marker', file_get_contents($active));
         self::assertSame(0700, fileperms($bundle) & 07777);
         self::assertSame(posix_geteuid(), fileowner($bundle));
-        foreach (['private.key', 'public.key', 'encryption.key', 'oauth.env', 'manifest.json'] as $name) {
+        foreach (['private.key', 'public.key', 'oauth.env', 'manifest.json'] as $name) {
             self::assertSame(0600, fileperms($bundle . '/' . $name) & 07777);
             self::assertSame(posix_geteuid(), fileowner($bundle . '/' . $name));
         }
@@ -47,12 +46,9 @@ final class StagedOAuthSecretBundleTest extends TestCase
         self::assertIsArray($details);
         self::assertSame($size, $details['bits']);
         self::assertSame($details['key'], $this->read($bundle . '/public.key'));
-        $key = substr($this->read($bundle . '/encryption.key'), 0, -1);
-        self::assertSame($key, Key::loadFromAsciiSafeString($key)->saveToAsciiSafeString());
         self::assertSame(
             'OAUTH_PRIVATE_KEY_PATH=' . $bundle . "/private.key\n"
-            . 'OAUTH_PUBLIC_KEY_PATH=' . $bundle . "/public.key\n"
-            . 'OAUTH_ENCRYPTION_KEY=' . $key . "\n",
+            . 'OAUTH_PUBLIC_KEY_PATH=' . $bundle . "/public.key\n",
             $this->read($bundle . '/oauth.env'),
         );
         $this->bundles->validate($bundle);
@@ -99,7 +95,7 @@ final class StagedOAuthSecretBundleTest extends TestCase
         yield 'duplicate slash' => ['/bundle'];
         yield 'trailing slash' => ['bundle/'];
         yield 'space' => ['bundle with space'];
-        yield 'dotenv injection' => ["bundle\nOAUTH_ENCRYPTION_KEY=private-secret"];
+        yield 'dotenv injection' => ["bundle\nAPP_SECRET=private-secret"];
         yield 'NUL' => ["bundle\0"];
         yield 'oversized' => [str_repeat('b', 1025)];
         yield 'missing parent' => ['missing/bundle'];
@@ -144,7 +140,7 @@ final class StagedOAuthSecretBundleTest extends TestCase
     public static function permissionChanges(): iterable
     {
         yield 'readable directory' => ['', 0755];
-        foreach (['private.key', 'public.key', 'encryption.key', 'oauth.env', 'manifest.json'] as $name) {
+        foreach (['private.key', 'public.key', 'oauth.env', 'manifest.json'] as $name) {
             yield $name . ' readable' => [$name, 0644];
             yield $name . ' executable' => [$name, 0700];
         }
@@ -154,7 +150,7 @@ final class StagedOAuthSecretBundleTest extends TestCase
     {
         $bundle = $this->prepare();
         if (posix_geteuid() === 0) {
-            self::assertTrue(chown($bundle . '/encryption.key', 12345));
+            self::assertTrue(chown($bundle . '/private.key', 12345));
             $this->assertRejected(fn () => $this->bundles->validate($bundle));
         } else {
             // /tmp is deliberately owned by another user and cannot be a prepare parent.
@@ -196,7 +192,7 @@ final class StagedOAuthSecretBundleTest extends TestCase
             $this->assertRejected(fn () => $this->bundles->validate($first));
         }
         $this->replaceAndRehash($first, 'oauth.env', $originalEnvironment);
-        $this->replaceAndRehash($first, 'encryption.key', "private-secret\n");
+        $this->replaceAndRehash($first, 'private.key', "private-secret\n");
         $this->assertRejected(fn () => $this->bundles->validate($first));
     }
 

@@ -6,7 +6,6 @@ namespace App\Tests\Fixtures\Auth;
 
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Kernel;
-use Defuse\Crypto\Key;
 use Doctrine\ORM\EntityManagerInterface;
 use Monolog\Handler\NullHandler;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
@@ -52,7 +51,6 @@ class ProductionOAuthKernel extends Kernel
                 }
                 $container->setParameter('auth.private_key_path', $this->directory . '/private.pem');
                 $container->setParameter('auth.public_key_path', $this->directory . '/public.pem');
-                $container->setParameter('auth.encryption_key', Key::createNewRandomKey()->saveToAsciiSafeString());
                 $container->setParameter('auth.oauth.issuer', 'https://baander.app');
                 $container->setParameter('env(DATABASE_URL)', $this->databaseUrl);
             }

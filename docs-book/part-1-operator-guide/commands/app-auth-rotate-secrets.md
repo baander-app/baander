@@ -17,15 +17,14 @@ php bin/console app:auth:rotate-secrets validate --directory=/srv/baander/secret
 ```
 
 The supported RSA sizes are 2048 (default) and 4096 bits. The command creates a
-private directory containing `private.key`, `public.key`, `encryption.key`,
-`oauth.env`, and a versioned checksum manifest. Validation checks file ownership,
-permissions, file types, checksums, the RSA pair, the encryption key, and the exact
-configuration entries. It prints the configuration path, never secret values.
+private directory containing `private.key`, `public.key`, `oauth.env`, and a
+versioned checksum manifest. Validation checks file ownership, permissions, file
+types, checksums, the RSA pair, and the exact configuration entries. It prints the configuration path, never secret values.
 The bundle is never overwritten by this command; a failed preparation requires a
 new directory. Keep any incomplete bundle private while investigating.
 
-`oauth.env` contains `OAUTH_PRIVATE_KEY_PATH`, `OAUTH_PUBLIC_KEY_PATH`, and
-`OAUTH_ENCRYPTION_KEY`. Provision these values through the deployment's secret
+`oauth.env` contains `OAUTH_PRIVATE_KEY_PATH` and `OAUTH_PUBLIC_KEY_PATH`.
+Provision these values through the deployment's secret
 provider. The paths must resolve to the same validated files in every application
 instance; container deployments must mount them at those paths. Preserve the old
 configuration and files securely before changing anything.
@@ -48,7 +47,7 @@ configuration and files securely before changing anything.
    codes, and token metadata in one database transaction, then invalidates the
    token cache. The reported count includes metadata rows. Clients, scopes, and
    users are preserved.
-3. After success, install all three values from `oauth.env` while applications
+3. After success, install both values from `oauth.env` while applications
    remain stopped. Deploy the same bundle to every instance.
 4. Restart every instance, verify fresh authentication and protected API access,
    then resume traffic. Existing clients must authenticate again. Never repeat

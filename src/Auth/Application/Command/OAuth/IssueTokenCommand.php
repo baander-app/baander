@@ -7,56 +7,43 @@ namespace App\Auth\Application\Command\OAuth;
 use App\Shared\Domain\Model\Uuid;
 
 /**
- * Command DTO for issuing an OAuth 2.0 token.
+ * Issues a first-party token pair to a user that a login authenticator verified.
  *
- * Supports all configured grant types: authorization_code, client_credentials,
- * refresh_token, direct_grant, and urn:ietf:params:oauth:grant-type:device_code.
+ * Password and passkey login are the only callers. The pair is bound to the
+ * DPoP key that signed the login request.
  */
 final readonly class IssueTokenCommand
 {
+    /**
+     * @param string[] $scopes
+     * @param string $dpopJkt Thumbprint of the DPoP key the tokens are bound to (RFC 9449)
+     * @param string|null $clientFingerprint Device fingerprint the access token is bound to, when the client sent one
+     */
     public function __construct(
-        private string $grantType,
-        private ?Uuid $clientId = null,
-        private ?string $clientSecret = null,
-        private ?Uuid $userId = null,
-        /** @var string[] */
+        private Uuid $clientId,
+        private Uuid $userId,
+        private string $dpopJkt,
         private array $scopes = [],
-        // Authorization Code + PKCE
-        private ?string $code = null,
-        private ?string $redirectUri = null,
-        private ?string $codeVerifier = null,
-        // Direct grant
-        private ?string $username = null,
-        private ?string $password = null,
-        // Device Code grant
-        private ?string $deviceCode = null,
-        // Token metadata
         private ?string $tokenName = null,
         private ?string $ipAddress = null,
         private ?string $userAgent = null,
         private ?string $clientFingerprint = null,
-        private ?string $dpopJkt = null,
     ) {
     }
 
-    public function getGrantType(): string
-    {
-        return $this->grantType;
-    }
-
-    public function getClientId(): ?Uuid
+    public function getClientId(): Uuid
     {
         return $this->clientId;
     }
 
-    public function getClientSecret(): ?string
-    {
-        return $this->clientSecret;
-    }
-
-    public function getUserId(): ?Uuid
+    public function getUserId(): Uuid
     {
         return $this->userId;
+    }
+
+    public function getDpopJkt(): string
+    {
+        return $this->dpopJkt;
     }
 
     /**
@@ -65,36 +52,6 @@ final readonly class IssueTokenCommand
     public function getScopes(): array
     {
         return $this->scopes;
-    }
-
-    public function getCode(): ?string
-    {
-        return $this->code;
-    }
-
-    public function getRedirectUri(): ?string
-    {
-        return $this->redirectUri;
-    }
-
-    public function getCodeVerifier(): ?string
-    {
-        return $this->codeVerifier;
-    }
-
-    public function getUsername(): ?string
-    {
-        return $this->username;
-    }
-
-    public function getPassword(): ?string
-    {
-        return $this->password;
-    }
-
-    public function getDeviceCode(): ?string
-    {
-        return $this->deviceCode;
     }
 
     public function getTokenName(): ?string
@@ -115,10 +72,5 @@ final readonly class IssueTokenCommand
     public function getClientFingerprint(): ?string
     {
         return $this->clientFingerprint;
-    }
-
-    public function getDpopJkt(): ?string
-    {
-        return $this->dpopJkt;
     }
 }

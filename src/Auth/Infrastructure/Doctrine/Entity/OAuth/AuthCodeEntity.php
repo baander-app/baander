@@ -48,12 +48,6 @@ class AuthCodeEntity implements AuthCodeEntityInterface
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $updatedAt;
 
-    #[ORM\Column(type: 'text', nullable: true)]
-    private ?string $codeChallenge = null;
-
-    #[ORM\Column(type: 'text', nullable: true)]
-    private ?string $codeChallengeMethod = null;
-
     private ?string $redirectUri = null;
 
     private ?string $userIdentifier = null;
@@ -66,8 +60,6 @@ class AuthCodeEntity implements AuthCodeEntityInterface
         ?array $scopes = null,
         ?\DateTimeImmutable $expiresAt = null,
         ?Uuid $id = null,
-        ?string $codeChallenge = null,
-        ?string $codeChallengeMethod = null,
     ) {
         $this->id = $id ?? new Uuid();
         $this->codeId = $codeId;
@@ -75,8 +67,6 @@ class AuthCodeEntity implements AuthCodeEntityInterface
         $this->client = $client;
         $this->scopes = $scopes;
         $this->expiresAt = $expiresAt;
-        $this->codeChallenge = $codeChallenge;
-        $this->codeChallengeMethod = $codeChallengeMethod;
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
     }
@@ -232,27 +222,5 @@ class AuthCodeEntity implements AuthCodeEntityInterface
     public function getUpdatedAt(): \DateTimeImmutable
     {
         return $this->updatedAt;
-    }
-
-    public function getCodeChallenge(): ?string
-    {
-        return $this->codeChallenge;
-    }
-
-    public function setCodeChallenge(?string $codeChallenge): void
-    {
-        $this->codeChallenge = $codeChallenge;
-        $this->updatedAt = new \DateTimeImmutable();
-    }
-
-    public function getCodeChallengeMethod(): ?string
-    {
-        return $this->codeChallengeMethod;
-    }
-
-    public function setCodeChallengeMethod(?string $codeChallengeMethod): void
-    {
-        $this->codeChallengeMethod = $codeChallengeMethod;
-        $this->updatedAt = new \DateTimeImmutable();
     }
 }

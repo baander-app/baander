@@ -11,15 +11,7 @@ nelmio_api_doc:
                     type: http
                     scheme: bearer
                     bearerFormat: JWT
-                    description: 'OAuth 2.0 access token (JWT). Obtain via `/api/auth/refresh` or the OAuth 2.0 authorize flow.'
-                oauth2AuthCode:
-                    type: oauth2
-                    description: 'OAuth 2.0 Authorization Code flow'
-                    flows:
-                        authorizationCode:
-                            authorizationUrl: /api/oauth/authorize
-                            tokenUrl: /api/oauth/token
-                            scopes: {}
+                    description: 'DPoP-bound access token (JWT), sent as `Authorization: DPoP <token>` with a DPoP proof. Obtain via `/api/auth/login`, `/api/auth/login/passkey` or `/api/auth/refresh`.'
             parameters:
                 Accept-Language:
                     name: Accept-Language

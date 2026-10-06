@@ -11,6 +11,7 @@ use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\DependencyFactory;
 use Doctrine\Migrations\Version\Version;
 use DoctrineMigrations\Version20261006210000;
+use DoctrineMigrations\Version20261006270000;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -28,9 +29,12 @@ final class TextColumnMigrationTest extends TestCase
         'domain_event_outbox_receipt' => ['consumer'],
     ];
 
+    /** Converted columns that Version20261006270000 later dropped. */
+    private const DROPPED = ['oauth_auth_codes.code_challenge_method'];
+
     public function testApplicationStringColumnsAreText(): void
     {
-        self::assertSame(array_fill_keys($this->convertedColumns(), 'text'), $this->columnTypes());
+        self::assertSame(array_fill_keys($this->currentColumns(), 'text'), $this->columnTypes());
         // Doctrine Migrations owns its metadata table; every application column is TEXT.
         self::assertSame(['doctrine_migration_versions.version'], $this->manager->getConnection()->fetchFirstColumn(
             "SELECT table_name || '.' || column_name FROM information_schema.columns
@@ -57,15 +61,18 @@ final class TextColumnMigrationTest extends TestCase
         self::assertCount(0, $migrations->getMigrationStatusCalculator()->getNewMigrations());
 
         require_once dirname(__DIR__, 2) . '/migrations/Version20261006210000.php';
-        $run = static function (string $direction) use ($connection): void {
-            $migration = new Version20261006210000($connection, new NullLogger());
+        require_once dirname(__DIR__, 2) . '/migrations/Version20261006270000.php';
+        $run = static function (string $direction, string $class = Version20261006210000::class) use ($connection): void {
+            $migration = new $class($connection, new NullLogger());
             $migration->{$direction}(new Schema());
             foreach ($migration->getSql() as $query) {
                 $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
             }
         };
 
-        // Recreate the VARCHAR columns and store values that fit their former limits.
+        // Restore the dropped PKCE columns, then recreate the VARCHAR columns and store values
+        // that fit their former limits.
+        $run('down', Version20261006270000::class);
         $run('down');
         self::assertSame('character varying', $this->columnTypes()['movies.tagline']);
         $rows = $this->insertRows();
@@ -85,6 +92,15 @@ final class TextColumnMigrationTest extends TestCase
         $tagline = str_repeat('t', 300);
         $connection->executeStatement('UPDATE movies SET tagline = :tagline WHERE id = :id', ['tagline' => $tagline, 'id' => $rows['movies'][1]]);
         self::assertSame($tagline, $connection->fetchOne('SELECT tagline FROM movies WHERE id = :id', ['id' => $rows['movies'][1]]));
+
+        // Dropping the PKCE columns returns the schema to its current state and keeps the auth code row.
+        $run('up', Version20261006270000::class);
+        self::assertSame(array_fill_keys($this->currentColumns(), 'text'), $this->columnTypes());
+        self::assertSame([], $connection->fetchFirstColumn(
+            "SELECT column_name FROM information_schema.columns
+              WHERE table_schema = current_schema() AND table_name = 'oauth_auth_codes' AND column_name LIKE 'code_challenge%'",
+        ));
+        self::assertSame(1, (int) $connection->fetchOne('SELECT COUNT(*) FROM oauth_auth_codes WHERE id = :id', ['id' => $rows['oauth_auth_codes'][1]]));
     }
 
     /** @return array<string, array{string, string|int, array<string, string|int>}> table => [key column, key, stored values] */
@@ -163,6 +179,12 @@ final class TextColumnMigrationTest extends TestCase
         sort($columns);
 
         return $columns;
+    }
+
+    /** @return list<string> */
+    private function currentColumns(): array
+    {
+        return array_values(array_diff($this->convertedColumns(), self::DROPPED));
     }
 
     /** @return array<string, string> */

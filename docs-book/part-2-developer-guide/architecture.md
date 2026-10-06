@@ -13,7 +13,7 @@ Baander has 21 bounded contexts plus a Shared kernel. Most contexts follow the f
 | Context | Responsibility | Layers |
 |---------|---------------|--------|
 | Activity | Listen history tracking | Full |
-| Auth | OAuth 2.0 server, passkeys, TOTP | Full |
+| Auth | First-party login and DPoP-bound tokens, passkeys, TOTP | Full |
 | Catalog | Artists, albums, songs, movies, videos, genres | Full |
 | Command | CLI commands (OpenAPI export) | Interface only — no domain logic, just thin wrappers around other contexts |
 | Discovery | LAN server discovery and device pairing | Full |
@@ -124,20 +124,19 @@ See the [Shared Kernel](shared-kernel.md) page for detailed documentation.
 
 ## Anti-Corruption Layer
 
-Baander uses League OAuth2 Server for its OAuth implementation. The league library defines its own interfaces (e.g., `League\OAuth2\Server\Repositories\AccessTokenRepositoryInterface`) that the framework calls internally. Without an anti-corruption layer, the Auth domain would depend directly on League interfaces, coupling business logic to a third-party library.
+Baander uses League OAuth2 Server only for its `ResourceServer`, which validates access tokens. Auth issues tokens itself through the login and refresh endpoints; it runs no League authorization server. League defines its own repository interfaces (e.g., `League\OAuth2\Server\Repositories\AccessTokenRepositoryInterface`) that the resource server calls internally. Without an anti-corruption layer, the Auth domain would depend directly on League interfaces, coupling business logic to a third-party library.
 
 Instead, `config/services.yaml` aliases League's interfaces to internal adapter implementations:
 
 ```yaml
-# Anti-Corruption Layer — League interfaces → internal adapters
+# OAuth League Interface Aliases (Anti-Corruption Layer)
 League\OAuth2\Server\Repositories\AccessTokenRepositoryInterface:
     alias: App\Auth\Infrastructure\Adapter\OAuth\AccessTokenRepository
-
-League\OAuth2\Server\Repositories\AuthCodeRepositoryInterface:
-    alias: App\Auth\Infrastructure\Adapter\OAuth\AuthCodeRepository
+League\OAuth2\Server\Repositories\RefreshTokenRepositoryInterface:
+    alias: App\Auth\Infrastructure\Adapter\OAuth\RefreshTokenRepository
 ```
 
-The domain layer only knows about `App\Auth\Domain\Repository\AccessTokenRepositoryInterface` — never the League class. This means the OAuth library can be swapped without touching domain code. See `config/services.yaml` for the full set of aliases.
+`ResourceServerFactory` builds the `ResourceServer` with `DpopAwareBearerTokenValidator`, which also checks the token's audience. `OAuth2Authenticator` (API requests), `WsQueryTokenAuthenticator` (WebSocket query tokens), and the introspection endpoint call it. The revocation endpoint uses the two aliased repositories. The domain layer only knows about `App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface` — never the League class.
 
 ## Communication Between Contexts
 

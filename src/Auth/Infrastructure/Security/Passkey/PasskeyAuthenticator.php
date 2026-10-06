@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Auth\Infrastructure\Security\Passkey;
 
 use App\Auth\Application\Command\Passkey\AuthenticatePasskeyCommand;
+use App\Auth\Application\DTO\VerifiedPasskeyLogin;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
+use App\Auth\Infrastructure\Security\OAuth\DpopTokenRequestVerifier;
 use App\Auth\Infrastructure\Security\SecurityUser;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -17,12 +19,21 @@ use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Security\Core\Exception\AuthenticationException;
 use Symfony\Component\Security\Core\Exception\BadCredentialsException;
+use Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException;
 use Symfony\Component\Security\Http\Authenticator\AbstractAuthenticator;
 use Symfony\Component\Security\Http\Authenticator\Passport\Badge\UserBadge;
 use Symfony\Component\Security\Http\Authenticator\Passport\Passport;
 use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPassport;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
+/**
+ * Authenticates passkey login (WebAuthn assertion) on the API firewall.
+ *
+ * The DPoP proof is checked before the ceremony, so a nonce challenge does not
+ * consume the WebAuthn challenge or the authenticator's signature counter.
+ * On success it stores a VerifiedPasskeyLogin on the request; the login
+ * controller issues tokens only from it.
+ */
 final class PasskeyAuthenticator extends AbstractAuthenticator
 {
     public function __construct(
@@ -30,6 +41,7 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
         private readonly UserRepositoryInterface $userRepository,
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
+        private readonly DpopTokenRequestVerifier $dpopVerifier,
     ) {
     }
 
@@ -41,6 +53,11 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
 
     public function authenticate(Request $request): Passport
     {
+        $proofKey = $this->dpopVerifier->verify($request);
+        if ($proofKey instanceof JsonResponse) {
+            throw new DpopProofRejectedException($proofKey);
+        }
+
         try {
             $data = $this->jsonEncoder->decode((string) $request->getContent(), 'json');
         } catch (\Throwable) {
@@ -76,6 +93,12 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
             throw new BadCredentialsException('Invalid credentials.', 0, $e);
         }
 
+        $request->attributes->set(VerifiedPasskeyLogin::class, new VerifiedPasskeyLogin(
+            $uuid,
+            $proofKey,
+            $this->dpopVerifier->issueNonce(),
+        ));
+
         // The handler returns a user ID UUID string; use a custom loader that resolves
         // via UUID instead of going through UserProvider (which expects an email).
         return new SelfValidatingPassport(
@@ -83,6 +106,10 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
                 $user = $this->userRepository->findByUuid($uuid);
                 if ($user === null) {
                     throw new BadCredentialsException('Invalid credentials.');
+                }
+                // Same rule as password login: a disabled account cannot sign in.
+                if ($user->isDisabled()) {
+                    throw new CustomUserMessageAuthenticationException('This account has been disabled.');
                 }
                 return new SecurityUser(
                     $user->getId()->toString(),
@@ -101,6 +128,10 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
 
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): Response
     {
+        if ($exception instanceof DpopProofRejectedException) {
+            return $exception->response;
+        }
+
         return new JsonResponse([
             'error' => [
                 'message' => $exception->getMessageKey(),

@@ -4,18 +4,21 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Infrastructure\Security;
 
+use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\TokenMetadata;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Infrastructure\Security\OAuth\OAuth2Authenticator;
 use App\Shared\Domain\Model\Uuid;
 use League\OAuth2\Server\Exception\OAuthServerException;
 use League\OAuth2\Server\ResourceServer;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Bridge\PsrHttpMessage\HttpMessageFactoryInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException;
 use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPassport;
 use Nyholm\Psr7\ServerRequest as Psr7Request;
 
@@ -109,55 +112,53 @@ final class OAuth2AuthenticatorTest extends TestCase
         $this->assertSame('AUTH_INVALID_TOKEN', $data['error']['code']);
     }
 
-    public function testAuthenticateAllowsRequestWhenFingerprintMatches(): void
+    /** @return iterable<string, array{?string, ?string, bool}> stored fingerprint, request fingerprint, accepted */
+    public static function fingerprintBindings(): iterable
     {
-        $userId = Uuid::generate()->toString();
-        $accessTokenId = Uuid::generate()->toString();
-
-        $this->setupSuccessfulResourceServerValidation($accessTokenId, $userId);
-
-        $tokenMetadataRepository = $this->createConfiguredStub(TokenMetadataRepositoryInterface::class, [
-            'findByTokenId' => TokenMetadata::create(
-                Uuid::fromString($accessTokenId),
-                clientFingerprint: 'matching-fingerprint',
-            ),
-        ]);
-
-        $authenticator = $this->createAuthenticator($tokenMetadataRepository);
-
-        $request = Request::create('/');
-        $request->headers->set('Authorization', 'Bearer token123');
-        $request->headers->set('X-Baander-Client-Fingerprint', 'matching-fingerprint');
-
-        $passport = $authenticator->authenticate($request);
-
-        $this->assertInstanceOf(SelfValidatingPassport::class, $passport);
+        yield 'bound, matching' => ['matching-fingerprint', 'matching-fingerprint', true];
+        yield 'bound, different' => ['stored-fingerprint', 'different-fingerprint', false];
+        yield 'bound, header missing' => ['stored-fingerprint', null, false];
+        yield 'unbound, header missing' => [null, null, true];
+        yield 'unbound, any header' => [null, 'any-fingerprint', true];
     }
 
-    public function testAuthenticateRejectsRequestWhenFingerprintMismatches(): void
+    #[DataProvider('fingerprintBindings')]
+    public function testAuthenticateEnforcesTheFingerprintOfBoundTokens(?string $stored, ?string $sent, bool $accepted): void
     {
-        $userId = Uuid::generate()->toString();
-        $accessTokenId = Uuid::generate()->toString();
+        // League exposes the JWT jti, the access token's public identifier.
+        $accessTokenId = TokenId::generate();
+        $this->setupSuccessfulResourceServerValidation($accessTokenId->toString(), Uuid::generate()->toString());
 
-        $this->setupSuccessfulResourceServerValidation($accessTokenId, $userId);
-
-        $tokenMetadataRepository = $this->createConfiguredStub(TokenMetadataRepositoryInterface::class, [
-            'findByTokenId' => TokenMetadata::create(
-                Uuid::fromString($accessTokenId),
-                clientFingerprint: 'stored-fingerprint',
-            ),
-        ]);
-
-        $authenticator = $this->createAuthenticator($tokenMetadataRepository);
+        $tokenMetadataRepository = $this->createMock(TokenMetadataRepositoryInterface::class);
+        $tokenMetadataRepository->expects($this->once())->method('findByTokenId')
+            ->with($this->callback(static fn (TokenId $id): bool => $id->equals($accessTokenId)))
+            ->willReturn(TokenMetadata::create(Uuid::generate(), clientFingerprint: $stored));
 
         $request = Request::create('/');
         $request->headers->set('Authorization', 'Bearer token123');
-        $request->headers->set('X-Baander-Client-Fingerprint', 'different-fingerprint');
+        if ($sent !== null) {
+            $request->headers->set('X-Baander-Client-Fingerprint', $sent);
+        }
 
-        $this->expectException(\Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException::class);
-        $this->expectExceptionMessage('Invalid or expired token.');
+        if (!$accepted) {
+            $this->expectException(CustomUserMessageAuthenticationException::class);
+            $this->expectExceptionMessage('Invalid or expired token.');
+        }
 
-        $authenticator->authenticate($request);
+        $this->assertInstanceOf(SelfValidatingPassport::class, $this->createAuthenticator($tokenMetadataRepository)->authenticate($request));
+    }
+
+    public function testAuthenticateFailsClosedWhenTheBindingCannotBeLoaded(): void
+    {
+        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), Uuid::generate()->toString());
+        $tokenMetadataRepository = $this->createStub(TokenMetadataRepositoryInterface::class);
+        $tokenMetadataRepository->method('findByTokenId')->willThrowException(new \RuntimeException('database unavailable'));
+
+        $request = Request::create('/');
+        $request->headers->set('Authorization', 'Bearer token123');
+
+        $this->expectException(CustomUserMessageAuthenticationException::class);
+        $this->createAuthenticator($tokenMetadataRepository)->authenticate($request);
     }
 
     private function setupSuccessfulResourceServerValidation(string $accessTokenId, string $userId): void

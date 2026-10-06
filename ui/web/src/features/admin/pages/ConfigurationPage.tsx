@@ -113,7 +113,7 @@ function groupByCategory(results: ConfigCheckResult[]): { category: string; resu
   const groups: Record<string, ConfigCheckResult[]> = {}
 
   for (const r of results) {
-    const category = r.component.startsWith('env') || r.component === 'app_secret' || r.component === 'oauth_encryption_key' || r.component === 'oauth_keys' || r.component === 'api_keys'
+    const category = r.component.startsWith('env') || r.component === 'app_secret' || r.component === 'oauth_keys' || r.component === 'api_keys'
       ? 'Environment Variables'
       : 'Framework Config'
     if (!groups[category]) groups[category] = []

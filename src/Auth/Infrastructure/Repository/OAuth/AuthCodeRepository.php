@@ -77,8 +77,6 @@ final class AuthCodeRepository implements AuthCodeRepositoryInterface
             $authCode->getScopes() !== [] ? $authCode->getScopeIdentifiers() : null,
             $authCode->getExpiresAt(),
             id: $authCode->getId(),
-            codeChallenge: $authCode->getCodeChallenge(),
-            codeChallengeMethod: $authCode->getCodeChallengeMethod(),
         );
     }
 
@@ -97,8 +95,6 @@ final class AuthCodeRepository implements AuthCodeRepositoryInterface
             createdAt: $entity->getCreatedAt(),
             updatedAt: $entity->getUpdatedAt(),
             revoked: $entity->isRevoked(),
-            codeChallenge: $entity->getCodeChallenge(),
-            codeChallengeMethod: $entity->getCodeChallengeMethod(),
         ));
     }
 
@@ -106,14 +102,6 @@ final class AuthCodeRepository implements AuthCodeRepositoryInterface
     {
         if ($authCode->isRevoked()) {
             $entity->revoke();
-        }
-
-        if ($authCode->getCodeChallenge() !== $entity->getCodeChallenge()) {
-            $entity->setCodeChallenge($authCode->getCodeChallenge());
-        }
-
-        if ($authCode->getCodeChallengeMethod() !== $entity->getCodeChallengeMethod()) {
-            $entity->setCodeChallengeMethod($authCode->getCodeChallengeMethod());
         }
     }
 

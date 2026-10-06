@@ -5,19 +5,15 @@
 # or via environment variables (e.g. AUTH_ACCESS_TOKEN_TTL=7200).
 
 parameters:
-    # --- OAuth 2.0 Scope Allowlists ---
+    # --- OAuth 2.0 Scope Allowlist ---
 
-    # Scopes allowed for user grant types (authorization_code, device_code, refresh_token, direct_grant).
+    # Scopes allowed for tokens issued by password and passkey login.
     # Requested scopes outside this list are silently dropped.
-    auth.scopes.user_grants:
+    auth.scopes.login:
         - profile
         - email
         - library
         - playlist
-
-    # Scopes allowed for the client_credentials grant type.
-    auth.scopes.client_credentials:
-        - admin
 
     # --- OAuth 2.0 Token Lifetimes (seconds) ---
 
@@ -27,26 +23,19 @@ parameters:
     # Refresh token time-to-live. Default: 30 days.
     auth.refresh_token.ttl: 2592000
 
-    # Authorization code time-to-live (used in auth code + PKCE flow). Default: 10 minutes.
-    auth.auth_code.ttl: 600
-
-    # Device code time-to-live (RFC 8628). Default: 15 minutes.
-    auth.device_code.ttl: 900
-
     # Email verification token time-to-live. Default: 24 hours.
     auth.email_verification_token.ttl: 86400
 
-    # --- OAuth 2.0 Direct Grant Clients ---
-    # Public IDs of pre-registered clients for direct login flows.
+    # --- First-Party Login Clients ---
+    # Public IDs of the pre-registered clients that login issues tokens to.
     # Run `php bin/console app:auth:setup-clients` to create them.
     auth.spa_client_id: '%env(AUTH_SPA_CLIENT_ID)%'
     auth.electron_client_id: '%env(AUTH_ELECTRON_CLIENT_ID)%'
 
-    # --- OAuth 2.0 Authorization Server Metadata (RFC 8414) ---
+    # --- Token Issuer ---
 
-    # Canonical issuer URI for the authorization server.
-    # Used in Authorization Server Metadata, RFC 9207 iss parameter,
-    # and as the basis for the resource server audience claim.
+    # Canonical issuer URI. Access tokens carry it as their audience, and the
+    # resource server accepts only tokens issued for it.
     auth.oauth.issuer: '%env(APP_URL)%'
 
     # --- OAuth 2.0 Key Paths ---
@@ -58,16 +47,6 @@ parameters:
     # Path to the public key used for verifying JWT access tokens.
     env(OAUTH_PUBLIC_KEY_PATH): '%kernel.project_dir%/config/secrets/oauth/public.key'
     auth.public_key_path: '%env(resolve:OAUTH_PUBLIC_KEY_PATH)%'
-
-    # Encryption key for authorization codes (defuse/php-encryption ASCII-safe string).
-    # Required in production; share one stable secret across all web workers.
-    env(OAUTH_ENCRYPTION_KEY): ''
-    auth.encryption_key: '%env(OAUTH_ENCRYPTION_KEY)%'
-
-    # --- Device Authorization (RFC 8628) ---
-
-    # URI shown to the user for device code verification.
-    auth.device.verification_uri: '/device/verify'
 
     # --- WebAuthn / Passkeys ---
 

@@ -7,7 +7,7 @@ Terms used throughout the developer documentation.
 | Term | Definition |
 |------|-----------|
 | **Aggregate Root** | An entity that serves as the entry point to a cluster of related objects. It has a repository interface and enforces invariants across its children. Example: `Album` is an aggregate root — it manages its own fields and rules. |
-| **Anti-Corruption Layer** | A set of adapters that isolate domain code from external libraries. Baander uses this for League OAuth2 Server — the domain only knows internal interfaces, not League's. |
+| **Anti-Corruption Layer** | A set of adapters that isolate domain code from external libraries. Baander applies it to League OAuth2 Server, which only validates access tokens. The domain only knows internal interfaces, not League's. |
 | **Bounded Context** | A distinct area of the codebase that models a specific business capability with its own domain language, rules, and data. Example: the Playlist context knows nothing about Transcoding. |
 | **Command** | A CQRS write operation — a DTO that carries input data to a handler. Commands are immutable (`final readonly class`). Example: `CreatePlaylistCommand`. |
 | **Domain Event** | A signal that something happened in the domain. Events are dispatched by handlers and listened to by other contexts. Example: `TranscodeJobCompleted`. |

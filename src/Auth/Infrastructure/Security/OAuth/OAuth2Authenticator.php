@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Infrastructure\Security\OAuth;
 
+use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Security\SecurityUser;
@@ -88,7 +89,7 @@ final class OAuth2Authenticator extends AbstractAuthenticator
             $request->attributes->set('oauth_access_token_id', $accessTokenId);
         }
 
-        // Enforce device fingerprint binding when a fingerprint was captured at issuance.
+        // Enforce the client fingerprint binding of tokens issued with a fingerprint.
         $this->verifyTokenBinding($accessTokenId, $request);
 
         $badge = new UserBadge(
@@ -126,12 +127,11 @@ final class OAuth2Authenticator extends AbstractAuthenticator
     }
 
     /**
-     * Verify token-to-device binding.
+     * Enforce the token's client fingerprint binding.
      *
-     * If the access token was issued with a device fingerprint and the current
-     * request supplies a different fingerprint, authentication is rejected.
-     * Missing fingerprint on either side is tolerated so existing clients are
-     * not broken.
+     * A token is bound when its login request sent the X-Baander-Client-Fingerprint
+     * header. Every request with a bound token must send the same fingerprint.
+     * Tokens issued without a fingerprint are unbound and ignore the header.
      */
     private function verifyTokenBinding(?string $accessTokenId, Request $request): void
     {
@@ -140,33 +140,27 @@ final class OAuth2Authenticator extends AbstractAuthenticator
         }
 
         try {
-            $metadata = $this->tokenMetadataRepository->findByTokenId(
-                Uuid::fromString($accessTokenId),
-            );
+            // The JWT jti is the access token's public identifier.
+            $metadata = $this->tokenMetadataRepository->findByTokenId(TokenId::fromString($accessTokenId));
         } catch (\Throwable $e) {
             $this->logger->warning('Failed to load token metadata for binding check.', [
                 'exception' => $e,
             ]);
 
-            return;
+            throw new CustomUserMessageAuthenticationException(
+                'Invalid or expired token.',
+                ['error_code' => 'AUTH_INVALID_TOKEN'],
+            );
         }
 
-        if ($metadata === null) {
-            return;
-        }
-
-        $storedFingerprint = $metadata->getClientFingerprint();
+        $storedFingerprint = $metadata?->getClientFingerprint();
         if ($storedFingerprint === null || $storedFingerprint === '') {
             return;
         }
 
-        $requestFingerprint = $request->headers->get(BaanderHeader::ClientFingerprint->value, '');
-        if ($requestFingerprint === '') {
-            return;
-        }
-
+        $requestFingerprint = (string) $request->headers->get(BaanderHeader::ClientFingerprint->value, '');
         if (!hash_equals($storedFingerprint, $requestFingerprint)) {
-            $this->logger->warning('Token device fingerprint mismatch.', [
+            $this->logger->warning('Token client fingerprint mismatch.', [
                 'access_token_id' => $accessTokenId,
             ]);
 

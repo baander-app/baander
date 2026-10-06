@@ -13,92 +13,36 @@ final class ScopeAllowlistTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->allowlist = new ScopeAllowlist(
-            userGrants: ['profile', 'email', 'library', 'playlist'],
-            clientCredentials: ['admin'],
-        );
+        $this->allowlist = new ScopeAllowlist(['profile', 'email', 'library', 'playlist']);
     }
 
-    public function testFilterKeepsAllowedUserScopes(): void
+    public function testFilterKeepsAllowedScopes(): void
     {
-        $result = $this->allowlist->filter(['profile', 'email', 'library'], 'authorization_code');
-
-        $this->assertSame(['profile', 'email', 'library'], $result);
+        $this->assertSame(['profile', 'email', 'library'], $this->allowlist->filter(['profile', 'email', 'library']));
     }
 
-    public function testFilterDropsDisallowedScopesFromUserGrant(): void
+    public function testFilterDropsDisallowedScopes(): void
     {
-        $result = $this->allowlist->filter(['profile', 'admin', 'nonexistent'], 'authorization_code');
-
-        $this->assertSame(['profile'], $result);
-    }
-
-    public function testFilterKeepsAdminForClientCredentials(): void
-    {
-        $result = $this->allowlist->filter(['admin'], 'client_credentials');
-
-        $this->assertSame(['admin'], $result);
-    }
-
-    public function testFilterDropsUserScopesFromClientCredentials(): void
-    {
-        $result = $this->allowlist->filter(['admin', 'profile', 'email'], 'client_credentials');
-
-        $this->assertSame(['admin'], $result);
+        $this->assertSame(['profile'], $this->allowlist->filter(['profile', 'admin', 'nonexistent']));
     }
 
     public function testFilterReturnsEmptyWhenNoScopesMatch(): void
     {
-        $result = $this->allowlist->filter(['admin', 'nonexistent'], 'authorization_code');
-
-        $this->assertSame([], $result);
+        $this->assertSame([], $this->allowlist->filter(['admin', 'nonexistent']));
     }
 
     public function testFilterPreservesOrder(): void
     {
-        $result = $this->allowlist->filter(['playlist', 'email', 'profile'], 'authorization_code');
-
-        $this->assertSame(['playlist', 'email', 'profile'], $result);
+        $this->assertSame(['playlist', 'email', 'profile'], $this->allowlist->filter(['playlist', 'email', 'profile']));
     }
 
     public function testFilterHandlesEmptyArray(): void
     {
-        $result = $this->allowlist->filter([], 'authorization_code');
-
-        $this->assertSame([], $result);
+        $this->assertSame([], $this->allowlist->filter([]));
     }
 
-    public function testGetAllowlistForGrantTypeReturnsUserGrantsByDefault(): void
+    public function testGetScopesReturnsTheAllowlist(): void
     {
-        $result = $this->allowlist->getAllowlistForGrantType('authorization_code');
-
-        $this->assertSame(['profile', 'email', 'library', 'playlist'], $result);
-    }
-
-    public function testGetAllowlistForGrantTypeReturnsUserGrantsForRefreshToken(): void
-    {
-        $result = $this->allowlist->getAllowlistForGrantType('refresh_token');
-
-        $this->assertSame(['profile', 'email', 'library', 'playlist'], $result);
-    }
-
-    public function testGetAllowlistForGrantTypeReturnsUserGrantsForDeviceCode(): void
-    {
-        $result = $this->allowlist->getAllowlistForGrantType('urn:ietf:params:oauth:grant-type:device_code');
-
-        $this->assertSame(['profile', 'email', 'library', 'playlist'], $result);
-    }
-
-    public function testGetAllowlistForGrantTypeReturnsClientCredentialsForClientCredentials(): void
-    {
-        $result = $this->allowlist->getAllowlistForGrantType('client_credentials');
-
-        $this->assertSame(['admin'], $result);
-    }
-
-    public function testGettersReturnConfiguredValues(): void
-    {
-        $this->assertSame(['profile', 'email', 'library', 'playlist'], $this->allowlist->getUserGrants());
-        $this->assertSame(['admin'], $this->allowlist->getClientCredentials());
+        $this->assertSame(['profile', 'email', 'library', 'playlist'], $this->allowlist->getScopes());
     }
 }
