@@ -13,13 +13,21 @@ final class CursorPaginator
     /**
      * Paginate a Doctrine query using keyset (cursor) pagination.
      *
-     * @param QueryBuilder $qb            QueryBuilder with base filters already applied (not modified in place)
-     * @param string       $sortColumn    DQL field expression for sort (e.g. 's.title')
-     * @param string       $idColumn      DQL field expression for tiebreaker (e.g. 's.id')
-     * @param Cursor|null  $cursor        Cursor from the previous page, or null for the first page
-     * @param int          $limit         Number of items per page (must be >= 1)
+     * Ascending order is (sort, id). With $nullableSort it is (sort IS NOT NULL,
+     * sort, id): rows without a sort key come before every keyed row. Descending
+     * order is the exact reverse. Items are returned in the requested order; a
+     * Next cursor continues after the last item and a Prev cursor ends before
+     * the first one.
+     *
+     * @param QueryBuilder $qb             QueryBuilder with base filters already applied (not modified in place)
+     * @param string       $sortColumn     DQL field expression for sort (e.g. 's.title'); a path expression when $nullableSort
+     * @param string       $idColumn       DQL field expression for tiebreaker (e.g. 's.id')
+     * @param Cursor|null  $cursor         Cursor from the previous page, or null for the first page
+     * @param int          $limit          Number of items per page (must be >= 1)
      * @param callable     $valueExtractor Callable taking an item and returning ['sort' => mixed, 'id' => mixed]
-     * @param bool         $withCount     Whether to execute the COUNT query. When false, total will be 0.
+     * @param bool         $withCount      Whether to execute the COUNT query. When false, total will be 0.
+     * @param bool         $descending     Whether pages run from the highest key to the lowest
+     * @param bool         $nullableSort   Whether the sort expression can be NULL; the extractor then returns null for it
      *
      * @throws \InvalidArgumentException if $limit < 1
      */
@@ -31,87 +39,55 @@ final class CursorPaginator
         int $limit,
         callable $valueExtractor,
         bool $withCount = true,
+        bool $descending = false,
+        bool $nullableSort = false,
     ): CursorResult {
         if ($limit < 1) {
             throw new \InvalidArgumentException(sprintf('Limit must be at least 1, got %d.', $limit));
         }
 
-        $direction = $cursor?->getDirection();
-        $cursorValues = $cursor?->getValues() ?? [];
-
-        // Step 0: COUNT query (skippable for performance)
         $total = $withCount ? $this->executeCount($qb) : 0;
 
-        // Determine pagination mode
-        if ($direction === CursorDirection::Prev) {
-            return $this->paginateBackward($qb, $sortColumn, $idColumn, $cursor, $cursorValues, $limit, $valueExtractor, $total);
-        }
+        $backward = $cursor?->getDirection() === CursorDirection::Prev;
+        // A backward page is read in reverse and flipped back afterwards.
+        $scanDescending = $descending !== $backward;
 
-        return $this->paginateForward($qb, $sortColumn, $idColumn, $cursor, $cursorValues, $limit, $valueExtractor, $total);
-    }
-
-    /** @param array<string, mixed> $cursorValues */
-    private function paginateForward(
-        QueryBuilder $qb,
-        string $sortColumn,
-        string $idColumn,
-        ?Cursor $cursor,
-        array $cursorValues,
-        int $limit,
-        callable $valueExtractor,
-        int $total,
-    ): CursorResult {
-        // Build a fresh QB copy to avoid mutating the caller's query
         $pageQb = clone $qb;
-
-        // Apply keyset WHERE if cursor exists
-        if ($cursor !== null && isset($cursorValues['sort'], $cursorValues['id'])) {
-            $this->applyKeysetCondition(
-                $pageQb,
-                $sortColumn,
-                $idColumn,
-                (string) $cursorValues['sort'],
-                (string) $cursorValues['id'],
-                'gt',
-            );
+        $position = $cursor !== null ? $this->cursorPosition($cursor, $nullableSort) : null;
+        if ($position !== null) {
+            $this->applyKeysetCondition($pageQb, $sortColumn, $idColumn, $position['sort'], $position['id'], !$scanDescending, $nullableSort);
         }
 
-        // ORDER BY sort ASC, id ASC
-        $pageQb->orderBy($sortColumn, 'ASC')
-            ->addOrderBy($idColumn, 'ASC')
+        $order = $scanDescending ? 'DESC' : 'ASC';
+        $pageQb->resetDQLPart('orderBy');
+        if ($nullableSort) {
+            $pageQb->addOrderBy(sprintf('CASE WHEN %s IS NULL THEN 0 ELSE 1 END', $sortColumn), $order);
+        }
+        $pageQb->addOrderBy($sortColumn, $order)
+            ->addOrderBy($idColumn, $order)
             ->setMaxResults($limit + 1)
             ->setFirstResult(0);
 
         /** @var array<mixed> $results */
         $results = $pageQb->getQuery()->getResult();
 
-        $hasNextPage = count($results) > $limit;
-        $hasPreviousPage = $cursor !== null;
-
-        // Trim to limit
+        $hasMore = count($results) > $limit;
         $items = array_slice($results, 0, $limit);
-        $staleCursor = $cursor !== null && count($results) === 0;
-
-        // Encode cursors
-        $nextCursor = null;
-        $prevCursor = null;
-
-        if ($hasNextPage && !empty($items)) {
-            $lastItem = $items[array_key_last($items)];
-            $lastValues = $valueExtractor($lastItem);
-            $nextCursor = Cursor::create(CursorDirection::Next, [
-                'sort' => $lastValues['sort'],
-                'id' => $lastValues['id'],
-            ]);
+        if ($backward) {
+            $items = array_values(array_reverse($items));
         }
 
-        if ($hasPreviousPage && !empty($items)) {
-            $firstItem = $items[array_key_first($items)];
-            $firstValues = $valueExtractor($firstItem);
-            $prevCursor = Cursor::create(CursorDirection::Prev, [
-                'sort' => $firstValues['sort'],
-                'id' => $firstValues['id'],
-            ]);
+        // A backward page ends where the page that supplied its cursor began.
+        $hasNextPage = $backward || $hasMore;
+        $hasPreviousPage = $backward ? $hasMore : $cursor !== null;
+
+        $nextCursor = null;
+        $prevCursor = null;
+        if ($hasNextPage && $items !== []) {
+            $nextCursor = $this->cursorAt($items[array_key_last($items)], CursorDirection::Next, $valueExtractor);
+        }
+        if ($hasPreviousPage && $items !== []) {
+            $prevCursor = $this->cursorAt($items[array_key_first($items)], CursorDirection::Prev, $valueExtractor);
         }
 
         return new CursorResult(
@@ -121,89 +97,37 @@ final class CursorPaginator
             hasNextPage: $hasNextPage,
             hasPreviousPage: $hasPreviousPage,
             total: $total,
-            staleCursor: $staleCursor,
+            staleCursor: $cursor !== null && $results === [],
             perPage: $limit,
         );
     }
 
-    /** @param array<string, mixed> $cursorValues */
-    private function paginateBackward(
-        QueryBuilder $qb,
-        string $sortColumn,
-        string $idColumn,
-        ?Cursor $cursor,
-        array $cursorValues,
-        int $limit,
-        callable $valueExtractor,
-        int $total,
-    ): CursorResult {
-        $pageQb = clone $qb;
+    private function cursorAt(mixed $item, CursorDirection $direction, callable $valueExtractor): Cursor
+    {
+        $values = $valueExtractor($item);
 
-        // Apply reversed keyset WHERE if cursor exists
-        if ($cursor !== null && isset($cursorValues['sort'], $cursorValues['id'])) {
-            $this->applyKeysetCondition(
-                $pageQb,
-                $sortColumn,
-                $idColumn,
-                (string) $cursorValues['sort'],
-                (string) $cursorValues['id'],
-                'lt',
-            );
+        return Cursor::create($direction, [
+            'sort' => $values['sort'],
+            'id' => $values['id'],
+        ]);
+    }
+
+    /**
+     * The cursor row's key, or null when the cursor carries no usable position.
+     *
+     * @return array{sort: string|null, id: string}|null
+     */
+    private function cursorPosition(Cursor $cursor, bool $nullableSort): ?array
+    {
+        $values = $cursor->getValues();
+        if (!array_key_exists('sort', $values) || !isset($values['id'])) {
+            return null;
+        }
+        if ($values['sort'] === null) {
+            return $nullableSort ? ['sort' => null, 'id' => (string) $values['id']] : null;
         }
 
-        // ORDER BY sort DESC, id DESC (reversed for backward seek)
-        $pageQb->orderBy($sortColumn, 'DESC')
-            ->addOrderBy($idColumn, 'DESC')
-            ->setMaxResults($limit + 1)
-            ->setFirstResult(0);
-
-        /** @var array<mixed> $results */
-        $results = $pageQb->getQuery()->getResult();
-
-        $hasMorePrev = count($results) > $limit;
-
-        // Trim to limit
-        $items = array_slice($results, 0, $limit);
-
-        // Reverse back to ASC order
-        $items = array_values(array_reverse($items));
-
-        $hasNextPage = $cursor !== null;
-        $hasPreviousPage = $hasMorePrev;
-        $staleCursor = $cursor !== null && count($results) === 0;
-
-        // Encode cursors from the now-ASC-ordered array
-        $nextCursor = null;
-        $prevCursor = null;
-
-        if ($hasNextPage && !empty($items)) {
-            $lastItem = $items[array_key_last($items)];
-            $lastValues = $valueExtractor($lastItem);
-            $nextCursor = Cursor::create(CursorDirection::Next, [
-                'sort' => $lastValues['sort'],
-                'id' => $lastValues['id'],
-            ]);
-        }
-
-        if ($hasPreviousPage && !empty($items)) {
-            $firstItem = $items[array_key_first($items)];
-            $firstValues = $valueExtractor($firstItem);
-            $prevCursor = Cursor::create(CursorDirection::Prev, [
-                'sort' => $firstValues['sort'],
-                'id' => $firstValues['id'],
-            ]);
-        }
-
-        return new CursorResult(
-            items: $items,
-            nextCursor: $nextCursor,
-            prevCursor: $prevCursor,
-            hasNextPage: $hasNextPage,
-            hasPreviousPage: $hasPreviousPage,
-            total: $total,
-            staleCursor: $staleCursor,
-            perPage: $limit,
-        );
+        return ['sort' => (string) $values['sort'], 'id' => (string) $values['id']];
     }
 
     /**
@@ -228,41 +152,41 @@ final class CursorPaginator
     }
 
     /**
-     * Apply keyset (seek) condition to the QueryBuilder.
-     *
-     * Builds: WHERE (sort OP :cursor_sort_val) OR (sort = :cursor_sort_val AND id OP :cursor_id_val)
-     *
-     * @param 'gt'|'lt' $operator Comparison operator: 'gt' for forward, 'lt' for backward
+     * Keep the rows after the cursor row in ascending order ($greater) or the
+     * rows before it, using the order documented on paginate().
      */
     private function applyKeysetCondition(
         QueryBuilder $qb,
         string $sortColumn,
         string $idColumn,
-        string $sortValue,
+        ?string $sortValue,
         string $idValue,
-        string $operator,
+        bool $greater,
+        bool $nullableSort,
     ): void {
         $expr = $qb->expr();
+        $idCompare = $greater ? $expr->gt($idColumn, ':cursor_id_val') : $expr->lt($idColumn, ':cursor_id_val');
+        $qb->setParameter('cursor_id_val', $idValue);
 
-        if ($operator === 'lt') {
-            $sortCompare = $expr->lt($sortColumn, ':cursor_sort_val');
-            $idCompare = $expr->lt($idColumn, ':cursor_id_val');
-        } else {
-            $sortCompare = $expr->gt($sortColumn, ':cursor_sort_val');
-            $idCompare = $expr->gt($idColumn, ':cursor_id_val');
+        if ($sortValue === null) {
+            // Keyless rows come first, so only a keyless row can precede this one.
+            $qb->andWhere($greater
+                ? $expr->orX($expr->isNotNull($sortColumn), $idCompare)
+                : $expr->andX($expr->isNull($sortColumn), $idCompare));
+
+            return;
         }
 
-        $qb->andWhere(
-            $expr->orX(
-                $sortCompare,
-                $expr->andX(
-                    $expr->eq($sortColumn, ':cursor_sort_val'),
-                    $idCompare,
-                ),
-            ),
+        $condition = $expr->orX(
+            $greater ? $expr->gt($sortColumn, ':cursor_sort_val') : $expr->lt($sortColumn, ':cursor_sort_val'),
+            $expr->andX($expr->eq($sortColumn, ':cursor_sort_val'), $idCompare),
         );
+        if ($nullableSort && !$greater) {
+            // A comparison with NULL is never true; keyless rows precede every keyed row.
+            $condition = $expr->orX($expr->isNull($sortColumn), $condition);
+        }
 
+        $qb->andWhere($condition);
         $qb->setParameter('cursor_sort_val', $sortValue);
-        $qb->setParameter('cursor_id_val', $idValue);
     }
 }

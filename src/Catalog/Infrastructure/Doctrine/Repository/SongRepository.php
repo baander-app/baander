@@ -12,8 +12,6 @@ use App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistSongEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Catalog\Infrastructure\Doctrine\Query\CatalogReadScopeQuery;
-use App\Shared\Domain\Model\Cursor;
-use App\Shared\Domain\Model\CursorDirection;
 use App\Shared\Domain\Model\CursorPage;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
@@ -399,38 +397,17 @@ final class SongRepository implements SongRepositoryInterface
 
         $valueExtractor = $this->buildValueExtractor($sortField);
 
-        // The cursor paginator always sorts ASC internally. For DESC sort,
-        // reverse the cursor direction and swap result cursors.
-        $isDesc = $options->hasSort() && strtoupper($options->getSortOrder()) === 'DESC';
-
-        if ($isDesc) {
-            $effectiveCursor = null;
-            if ($options->getCursor() !== null) {
-                $cursor = $options->getCursor();
-                $reversedDirection = ($cursor->getDirection() === CursorDirection::Next)
-                    ? CursorDirection::Prev
-                    : CursorDirection::Next;
-                $effectiveCursor = Cursor::create($reversedDirection, $cursor->getValues());
-            }
-
-            $result = $this->cursorPaginator->paginate($qb, $sortColumn, 's.id', $effectiveCursor, $options->getLimit(), $valueExtractor);
-
-            // Reverse items to present DESC order and swap cursors.
-            $domainItems = array_map(fn(SongEntity $e) => self::entityToDomain($e), array_reverse($result->items));
-
-            return new CursorPage(
-                items: $domainItems,
-                nextCursor: $result->prevCursor !== null ? $this->cursorCodec->encode($result->prevCursor) : null,
-                prevCursor: $result->nextCursor !== null ? $this->cursorCodec->encode($result->nextCursor) : null,
-                hasNextPage: $result->hasPreviousPage,
-                hasPreviousPage: $result->hasNextPage,
-                total: $result->total,
-                staleCursor: $result->staleCursor,
-                perPage: $result->perPage,
-            );
-        }
-
-        $result = $this->cursorPaginator->paginate($qb, $sortColumn, 's.id', $options->getCursor(), $options->getLimit(), $valueExtractor);
+        $result = $this->cursorPaginator->paginate(
+            $qb,
+            $sortColumn,
+            's.id',
+            $options->getCursor(),
+            $options->getLimit(),
+            $valueExtractor,
+            descending: $options->hasSort() && strtolower($options->getSortOrder()) === 'desc',
+            // Albums without a year sort before every year.
+            nullableSort: $sortField === 'year',
+        );
 
         $domainItems = array_map(fn(SongEntity $e) => self::entityToDomain($e), $result->items);
 
@@ -718,7 +695,7 @@ final class SongRepository implements SongRepositoryInterface
                 return ['sort' => $artistName, 'id' => $e->getId()->toString()];
             },
             'album' => fn (SongEntity $e): array => ['sort' => $e->getAlbum()->getTitle(), 'id' => $e->getId()->toString()],
-            'year' => fn (SongEntity $e): array => ['sort' => (string) ($e->getAlbum()->getYear() ?? ''), 'id' => $e->getId()->toString()],
+            'year' => fn (SongEntity $e): array => ['sort' => $e->getAlbum()->getYear(), 'id' => $e->getId()->toString()],
             'added' => fn (SongEntity $e): array => ['sort' => $e->getCreatedAt()->format('c'), 'id' => $e->getId()->toString()],
             default => fn (SongEntity $e): array => ['sort' => $e->getTitle(), 'id' => $e->getId()->toString()],
         };
