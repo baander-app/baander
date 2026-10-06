@@ -1,7 +1,6 @@
 
 /home/
 
-phpdoc.dist.xml
 phpDocumentor.phar
 .phpdoc
 docs/html/
@@ -102,3 +101,4 @@ bin/baander
 ui/web/playwright-report
 ui/web/tests/e2e/__screenshots__
 .context/compound-engineering/
+/build
