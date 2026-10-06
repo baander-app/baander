@@ -8,7 +8,7 @@ use App\Catalog\Application\Port\SongLookupInterface;
 use App\Lyrics\Application\Command\BulkFetchLyricsCommand;
 use App\Lyrics\Application\Command\FetchLyricsCommand;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
-use App\Shared\Infrastructure\Swoole\Async;
+use App\Shared\Application\Port\SleeperInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -30,6 +30,7 @@ final class BulkFetchLyricsHandler
         private readonly LyricsRepositoryInterface $lyricsRepository,
         private readonly MessageBusInterface $bus,
         private readonly LoggerInterface $logger,
+        private readonly SleeperInterface $sleeper,
     ) {
     }
 
@@ -67,7 +68,7 @@ final class BulkFetchLyricsHandler
                     ++$dispatched;
 
                     if ($delayMs > 0) {
-                        Async::sleep($delayMs / 1000);
+                        $this->sleeper->sleep($delayMs / 1000);
                     }
                 } catch (\Throwable $e) {
                     $this->logger->warning('Failed to dispatch lyrics fetch for song', [

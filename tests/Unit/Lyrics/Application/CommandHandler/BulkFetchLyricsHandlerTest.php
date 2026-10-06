@@ -10,6 +10,7 @@ use App\Lyrics\Application\Command\FetchLyricsCommand;
 use App\Lyrics\Application\CommandHandler\BulkFetchLyricsHandler;
 use App\Lyrics\Domain\Model\Lyrics;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
+use App\Shared\Application\Port\SleeperInterface;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -47,7 +48,7 @@ final class BulkFetchLyricsHandlerTest extends TestCase
 
             return new Envelope($command);
         });
-        $handler = new BulkFetchLyricsHandler($songs, $lyrics, $bus, new NullLogger());
+        $handler = new BulkFetchLyricsHandler($songs, $lyrics, $bus, new NullLogger(), $this->createStub(SleeperInterface::class));
 
         self::assertSame(99, $handler(new BulkFetchLyricsCommand(delayMs: 0)));
         self::assertSame([
@@ -73,8 +74,23 @@ final class BulkFetchLyricsHandlerTest extends TestCase
         $bus->expects($this->exactly(2))->method('dispatch')->willReturnCallback(
             static fn (FetchLyricsCommand $command): Envelope => new Envelope($command),
         );
-        $handler = new BulkFetchLyricsHandler($songs, $lyrics, $bus, new NullLogger());
+        $handler = new BulkFetchLyricsHandler($songs, $lyrics, $bus, new NullLogger(), $this->createStub(SleeperInterface::class));
 
         self::assertSame(2, $handler(new BulkFetchLyricsCommand(limit: 3, delayMs: 0)));
+    }
+
+    public function testPausesThroughTheSleeperAfterEachDispatch(): void
+    {
+        $songs = $this->createStub(SongLookupInterface::class);
+        $songs->method('songIdsAfter')->willReturn([Uuid::v7(), Uuid::v7()]);
+        $lyrics = $this->createStub(LyricsRepositoryInterface::class);
+        $lyrics->method('findBySongId')->willReturn(null);
+        $bus = $this->createStub(MessageBusInterface::class);
+        $bus->method('dispatch')->willReturnCallback(static fn (FetchLyricsCommand $command): Envelope => new Envelope($command));
+        $sleeper = $this->createMock(SleeperInterface::class);
+        $sleeper->expects($this->exactly(2))->method('sleep')->with(0.25);
+        $handler = new BulkFetchLyricsHandler($songs, $lyrics, $bus, new NullLogger(), $sleeper);
+
+        self::assertSame(2, $handler(new BulkFetchLyricsCommand(limit: 2, delayMs: 250)));
     }
 }
