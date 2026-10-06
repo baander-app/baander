@@ -6,21 +6,22 @@ namespace App\Tests\Integration;
 
 use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Auth\Domain\Event\UserRegistered;
+use App\Auth\Infrastructure\Event\AdminAlertSubscriber;
 use App\Notification\Application\DTO\CreateNotificationCommand;
 use App\Notification\Application\DTO\SendEmailCommand;
 use App\Notification\Application\DTO\SendPushCommand;
 use App\Notification\Application\DTO\SendWebhookCommand;
 use App\Notification\Domain\Service\EventCategoryResolver;
 use App\Notification\Domain\ValueObject\NotificationCategory;
+use App\Notification\Infrastructure\Event\NotificationBridgeSubscriber;
 use App\Notification\Infrastructure\Messaging\NotificationDeliveryIntentResolver;
 use App\Shared\Application\Port\AdminAlertPortInterface;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Infrastructure\Event\AdminAlertSubscriber;
-use App\Shared\Infrastructure\Event\NotificationBridgeSubscriber;
 use App\Shared\Infrastructure\Event\NotificationDeliveryBus;
 use App\Shared\Infrastructure\Event\NotificationDeliveryRepository;
+use App\Shared\Infrastructure\Event\NotificationReplayDispatcher;
 use App\Shared\Infrastructure\Event\OutboxEventDispatcher;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
@@ -254,11 +255,7 @@ final class OutboxNotificationReplayTest extends TestCase
         };
         $bridge = new NotificationBridgeSubscriber(new EventCategoryResolver(), $bus, new NullLogger());
         $admin = new AdminAlertSubscriber($adminPort, new NullLogger());
-        $listeners = new EventDispatcher();
-        $listeners->addListener(UserRegistered::class, $bridge);
-        $listeners->addListener(UserRegistered::class, [$admin, 'onUserRegistered']);
-
-        return $listeners;
+        return new NotificationReplayDispatcher([$bridge, $admin]);
     }
 
     private function replayer(Connection $connection, EventDispatcher $listeners, bool $expectsRollback = false): OutboxEventDispatcher

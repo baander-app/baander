@@ -3,7 +3,7 @@
 
 # Notification
 
-Multi-channel notification delivery. The `NotificationBridgeSubscriber` in Shared intercepts all domain events and routes mapped ones here via Messenger. Supports email, push (Web Push/VAPID), and webhooks (Slack, Discord).
+Multi-channel notification delivery. During outbox replay, Notification Infrastructure's `NotificationBridgeSubscriber` receives mapped domain events from Shared's replay dispatcher and routes them here via Messenger. Supports email, push (Web Push/VAPID), and webhooks (Slack, Discord).
 
 ## Concepts
 
@@ -31,7 +31,7 @@ None. Notification is a pure consumer — it receives events and dispatches deli
 
 ## Interactions
 
-- **Shared** — `NotificationBridgeSubscriber` forwards mapped events here
+- **Shared** — the outbox replay dispatcher calls `NotificationBridgeSubscriber`, which registers itself as a replay listener provider
 - **Auth** — `SecurityUser` for authorization; `User` model in `CreateNotificationHandler`
 - **Library** — `LibraryMembershipQueryPort` to resolve who to notify about scan results
 

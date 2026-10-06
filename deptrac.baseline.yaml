@@ -333,11 +333,6 @@ deptrac:
       - App\Notification\Domain\Model\Notification
       - App\Notification\Domain\Repository\NotificationRepositoryInterface
       - App\Notification\Domain\ValueObject\NotificationCategory
-    App\Shared\Infrastructure\Event\AdminAlertSubscriber:
-      - App\Auth\Domain\Event\UserRegistered
-    App\Shared\Infrastructure\Event\NotificationBridgeSubscriber:
-      - App\Notification\Application\DTO\CreateNotificationCommand
-      - App\Notification\Domain\Service\EventCategoryResolver
     App\Shared\Infrastructure\Messenger\Stamp\LibraryResultStamp:
       - App\Library\Domain\Model\Library
     App\Shared\Infrastructure\Messenger\Stamp\MediaActivityResultStamp:

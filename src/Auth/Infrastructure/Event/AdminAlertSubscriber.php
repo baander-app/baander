@@ -2,10 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Shared\Infrastructure\Event;
+namespace App\Auth\Infrastructure\Event;
 
 use App\Auth\Domain\Event\UserRegistered;
 use App\Shared\Application\Port\AdminAlertPortInterface;
+use App\Shared\Infrastructure\Event\ReplayListenerProviderInterface;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -14,12 +15,17 @@ use Psr\Log\LoggerInterface;
  * Admin alerts bypass the normal notification pipeline — they directly
  * create AdminOperations notifications for all admin users.
  */
-final class AdminAlertSubscriber
+final class AdminAlertSubscriber implements ReplayListenerProviderInterface
 {
     public function __construct(
         private readonly AdminAlertPortInterface $adminAlertPort,
         private readonly LoggerInterface $logger,
     ) {
+    }
+
+    public function replayListeners(): iterable
+    {
+        yield [UserRegistered::class, $this->onUserRegistered(...)];
     }
 
     public function onUserRegistered(UserRegistered $event): void

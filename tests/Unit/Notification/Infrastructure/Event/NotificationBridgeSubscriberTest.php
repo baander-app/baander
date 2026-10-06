@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Unit\Shared\Infrastructure\Event;
+namespace App\Tests\Unit\Notification\Infrastructure\Event;
 
 use App\Auth\Domain\Event\PasswordChanged;
 use App\Auth\Domain\Event\OAuth\TokenIssued;
 use App\Catalog\Domain\Event\AlbumCreated;
 use App\Notification\Application\DTO\CreateNotificationCommand;
 use App\Notification\Domain\Service\EventCategoryResolver;
+use App\Notification\Infrastructure\Event\NotificationBridgeSubscriber;
 use App\Shared\Domain\Event\AbstractDomainEvent;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Infrastructure\Event\NotificationBridgeSubscriber;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;

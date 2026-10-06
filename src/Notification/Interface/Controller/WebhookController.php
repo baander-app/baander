@@ -7,7 +7,7 @@ namespace App\Notification\Interface\Controller;
 use App\Notification\Infrastructure\Doctrine\Entity\WebhookEntity;
 use App\Notification\Application\Port\WebhookDestinationPortInterface;
 use App\Notification\Application\Port\WebhookSecretPortInterface;
-use App\Notification\Domain\ValueObject\NotificationCategory;
+use App\Notification\Application\Service\NotificationCategoryFilter;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use Doctrine\ORM\EntityManagerInterface;
@@ -104,7 +104,7 @@ final class WebhookController
         }
 
         $categoryFilter = $data['category_filter'] ?? null;
-        if (!$this->validCategoryFilter($categoryFilter)) {
+        if (!NotificationCategoryFilter::isValid($categoryFilter)) {
             return $this->errorResponse('category_filter must contain supported notification categories.', 422);
         }
 
@@ -166,7 +166,7 @@ final class WebhookController
 
         $data = $request->toArray();
 
-        if (array_key_exists('category_filter', $data) && !$this->validCategoryFilter($data['category_filter'])) {
+        if (array_key_exists('category_filter', $data) && !NotificationCategoryFilter::isValid($data['category_filter'])) {
             return $this->errorResponse('category_filter must contain supported notification categories.', 422);
         }
 
@@ -259,22 +259,6 @@ final class WebhookController
         $this->entityManager->flush();
 
         return $this->successResponse(['id' => $id, 'secret' => $secret, 'signing_version' => 2]);
-    }
-
-    private function validCategoryFilter(mixed $filter): bool
-    {
-        if ($filter === null) {
-            return true;
-        }
-        if (!is_array($filter) || !array_is_list($filter)) {
-            return false;
-        }
-        foreach ($filter as $category) {
-            if (!is_string($category) || NotificationCategory::tryFrom($category) === null) {
-                return false;
-            }
-        }
-        return true;
     }
 
     private function findWebhook(string $id): ?WebhookEntity

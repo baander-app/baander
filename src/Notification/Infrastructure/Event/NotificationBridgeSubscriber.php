@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Shared\Infrastructure\Event;
+namespace App\Notification\Infrastructure\Event;
 
 use App\Notification\Application\DTO\CreateNotificationCommand;
 use App\Notification\Domain\Service\EventCategoryResolver;
 use App\Shared\Domain\Event\AbstractDomainEvent;
+use App\Shared\Infrastructure\Event\ReplayListenerProviderInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 
@@ -16,13 +17,20 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * Only forwards events that have a notification category mapping.
  * Unmapped events are silently dropped.
  */
-final class NotificationBridgeSubscriber
+final class NotificationBridgeSubscriber implements ReplayListenerProviderInterface
 {
     public function __construct(
         private readonly EventCategoryResolver $categoryResolver,
         private readonly MessageBusInterface $bus,
         private readonly LoggerInterface $logger,
     ) {
+    }
+
+    public function replayListeners(): iterable
+    {
+        foreach ($this->categoryResolver->getMappedEventClasses() as $eventClass) {
+            yield [$eventClass, $this];
+        }
     }
 
     public function __invoke(AbstractDomainEvent $event): void

@@ -1171,6 +1171,14 @@ services:
     App\Shared\Infrastructure\Event\OutboxEventDispatcher:
         arguments:
             $dispatcher: '@App\Shared\Infrastructure\Event\NotificationReplayDispatcher'
+    App\Shared\Infrastructure\Event\NotificationReplayDispatcher:
+        arguments:
+            $providers: !tagged_iterator baander.notification_replay_listeners
+    # Replay registers notification projection before admin alerts.
+    App\Notification\Infrastructure\Event\NotificationBridgeSubscriber:
+        tags: [{ name: baander.notification_replay_listeners, priority: 10 }]
+    App\Auth\Infrastructure\Event\AdminAlertSubscriber:
+        tags: [{ name: baander.notification_replay_listeners, priority: 0 }]
     App\Shared\Application\Port\DeliveryIntentResolverInterface:
         alias: App\Notification\Infrastructure\Messaging\NotificationDeliveryIntentResolver
     App\Notification\Application\Handler\CreateNotificationHandler:
