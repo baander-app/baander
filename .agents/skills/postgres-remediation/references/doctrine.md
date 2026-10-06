@@ -70,6 +70,14 @@ every partial index unsupported or add unrelated objects to the exclusion list.
 Check SchemaTool's actual unique-index deduplication when indexes share columns.
 See [extension checks](extensions.md) before accepting index deletion/recreation.
 
+DBAL 4.4.3 does not model generated columns. PostgreSQL stores their expressions
+in `pg_attrdef`, which DBAL would read as column defaults, so the platform's
+`getDefaultColumnValueSQLSnippet()` excludes rows with `attgenerated <> ''`. Map
+a stored generated column with `columnDefinition` (ignored by `columnsEqual`),
+`insertable: false`, `updatable: false` and no default, as
+`JobMonitorEntity::$durationMicroseconds` does. Schema comparison does not check
+the generation expression; compare it in the catalog directly.
+
 ## Migrations and disposable verification
 
 [MigrationVersionComparator](../../../../src/Shared/Infrastructure/Doctrine/MigrationVersionComparator.php)
