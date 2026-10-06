@@ -38,6 +38,7 @@ final class PublicationWorkflowTest extends TestCase
             'registry-container-quality',
             'registry-thread-quality',
             'registry-fuzz-quality',
+            'registry-static-quality',
         ], $publisher['needs']);
         self::assertSame(['release', 'sanitize'], $jobs['registry-quality']['strategy']['matrix']['mode']);
         self::assertArrayNotHasKey('continue-on-error', $publisher);
@@ -207,6 +208,7 @@ SH;
             'registry thread' => ['registry-thread-quality', 'Build and qualify registry threads', 'bash scripts/test-registry.sh thread'],
             'registry container' => ['registry-container-quality', 'Build and qualify registry containers', 'bash scripts/test-registry-container.sh'],
             'registry fuzz' => ['registry-fuzz-quality', 'Fuzz registry parser and registration validation', 'bash scripts/test-registry.sh fuzz'],
+            'registry static' => ['registry-static-quality', 'Analyze registry and verify direct dependency licenses', 'bash scripts/test-registry-static.sh'],
         ];
     }
 
