@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<phpdocumentor
+    configVersion="3"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns="https://www.phpdoc.org"
+    xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/phpDocumentor/phpDocumentor/master/data/xsd/phpdoc.xsd"
+>
+    <title>Baander</title>
+    <paths>
+        <output>docs/html/.phpdoc/build</output>
+        <cache>build/phpdoc/cache</cache>
+    </paths>
+
+    <version number="latest">
+        <api>
+            <source dsn=".">
+                <path>.</path>
+            </source>
+            <ignore hidden="true" symlinks="true">
+                <path>**/.claude/**/*</path>
+                <path>**/.agents/**/*</path>
+                <path>**/.codex/**/*</path>
+                <path>**/.git/**/*</path>
+                <path>**/.gitnexus/**/*</path>
+                <path>**/.idea/**/*</path>
+                <path>**/.phpdoc/**/*</path>
+                <path>**/.reli/**/*</path>
+                <path>**/.yarn/**/*</path>
+                <path>**/vendor/**/*</path>
+                <path>**/node_modules/**/*</path>
+                <path>var/**/*</path>
+                <path>storage/**/*</path>
+                <path>reports/**/*</path>
+                <path>build/**/*</path>
+            </ignore>
+        </api>
+    </version>
+
+</phpdocumentor>
+
+
+
+
