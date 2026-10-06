@@ -7,6 +7,7 @@ namespace App\Tests\Integration;
 use App\Radio\Domain\Model\CountrySubscription\CountrySubscription;
 use App\Radio\Domain\Model\CountrySubscription\CountrySubscriptionState;
 use App\Radio\Domain\Model\RadioSession\RadioSession;
+use App\Radio\Domain\Model\RadioSession\RadioSessionState;
 use App\Radio\Domain\Model\StarredStation\StarredStation;
 use App\Radio\Domain\Model\StarredStation\StarredStationState;
 use App\Radio\Infrastructure\Doctrine\Entity\CountrySubscriptionEntity;
@@ -160,6 +161,38 @@ final class RadioOwnershipPersistenceTest extends TestCase
         self::assertNotNull($loadedSubscription);
         self::assertSame($starredAt->getTimestamp(), $loadedStar->getStarredAt()->getTimestamp());
         self::assertSame($createdAt->getTimestamp(), $loadedSubscription->getCreatedAt()->getTimestamp());
+    }
+
+    public function testRadioSessionsPersistTheAggregatesTimestamps(): void
+    {
+        $owner = $this->createUser();
+        [, $station] = $this->createStations();
+        $createdAt = new \DateTimeImmutable('2023-11-05 01:02:03');
+        $updatedAt = new \DateTimeImmutable('2024-02-29 13:14:15');
+        $session = RadioSession::reconstitute(new RadioSessionState(
+            Uuid::generate(),
+            $owner,
+            $station,
+            'https://radio.baander.app/stream',
+            'playing',
+            $createdAt,
+            $updatedAt,
+        ));
+        $repository = new RadioSessionDoctrineRepository($this->manager);
+
+        $repository->save($session);
+        $this->manager->clear();
+        $loaded = $repository->find($session->getId());
+        self::assertNotNull($loaded);
+        self::assertSame($createdAt->getTimestamp(), $loaded->getCreatedAt()->getTimestamp());
+        self::assertSame($updatedAt->getTimestamp(), $loaded->getUpdatedAt()->getTimestamp());
+
+        $repository->save($loaded);
+        $this->manager->clear();
+        $reloaded = $repository->find($session->getId());
+        self::assertNotNull($reloaded);
+        self::assertSame($createdAt->getTimestamp(), $reloaded->getCreatedAt()->getTimestamp());
+        self::assertSame($updatedAt->getTimestamp(), $reloaded->getUpdatedAt()->getTimestamp());
     }
 
     /** @return iterable<string, array{string}> */

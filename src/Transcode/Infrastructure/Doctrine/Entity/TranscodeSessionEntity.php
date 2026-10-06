@@ -61,8 +61,8 @@ class TranscodeSessionEntity
     private \DateTimeImmutable $updatedAt;
 
     #[ORM\ManyToOne(targetEntity: TranscodeJobEntity::class)]
-    #[ORM\JoinColumn(name: 'job_id', referencedColumnName: 'id', onDelete: 'CASCADE', nullable: true)]
-    private ?TranscodeJobEntity $job = null;
+    #[ORM\JoinColumn(name: 'job_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
+    private TranscodeJobEntity $job;
 
     /**
      * @param array<string, mixed> $audioProfile
@@ -72,9 +72,11 @@ class TranscodeSessionEntity
         Uuid $userId,
         TranscodeJobEntity $job,
         Uuid $videoId,
-        string $state = 'pending',
-        string $priority = 'normal',
-        array $audioProfile = [],
+        string $state,
+        string $priority,
+        array $audioProfile,
+        \DateTimeImmutable $createdAt,
+        \DateTimeImmutable $updatedAt,
         ?Uuid $id = null,
     ) {
         $this->id = $id ?? new Uuid();
@@ -88,14 +90,14 @@ class TranscodeSessionEntity
         $this->currentSegmentIndex = 0;
         $this->wallClockOffset = 0.0;
         $this->metrics = [];
-        $this->createdAt = new \DateTimeImmutable();
-        $this->updatedAt = new \DateTimeImmutable();
+        $this->createdAt = $createdAt;
+        $this->updatedAt = $updatedAt;
     }
 
     public function getId(): Uuid { return $this->id; }
     public function getPublicId(): PublicId { return $this->publicId; }
     public function getUserId(): Uuid { return $this->userId; }
-    public function getJobId(): ?Uuid { return $this->job?->getId(); }
+    public function getJobId(): Uuid { return $this->job->getId(); }
     public function getVideoId(): Uuid { return $this->videoId; }
     public function getState(): string { return $this->state; }
     public function getPriority(): string { return $this->priority; }
@@ -117,18 +119,16 @@ class TranscodeSessionEntity
     }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
     public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
-    public function getJob(): ?TranscodeJobEntity { return $this->job; }
+    public function getJob(): TranscodeJobEntity { return $this->job; }
 
     public function setState(string $state): void
     {
         $this->state = $state;
-        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function setPriority(string $priority): void
     {
         $this->priority = $priority;
-        $this->updatedAt = new \DateTimeImmutable();
     }
 
     /**
@@ -137,19 +137,16 @@ class TranscodeSessionEntity
     public function setAudioProfile(array $profile): void
     {
         $this->audioProfile = $profile;
-        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function setCurrentSegmentIndex(int $index): void
     {
         $this->currentSegmentIndex = $index;
-        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function setWallClockOffset(float $offset): void
     {
         $this->wallClockOffset = $offset;
-        $this->updatedAt = new \DateTimeImmutable();
     }
 
     /**
@@ -158,6 +155,10 @@ class TranscodeSessionEntity
     public function setMetrics(array $metrics): void
     {
         $this->metrics = $metrics;
-        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function setUpdatedAt(\DateTimeImmutable $updatedAt): void
+    {
+        $this->updatedAt = $updatedAt;
     }
 }

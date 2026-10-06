@@ -152,6 +152,8 @@ final class TranscodeSessionRepository implements TranscodeSessionRepositoryInte
             $session->getSessionState()->value,
             $session->getPriority()->value,
             $session->getAudioProfile()->jsonSerialize(),
+            $session->getCreatedAt(),
+            $session->getUpdatedAt(),
             id: $session->getId(),
         );
     }
@@ -187,5 +189,6 @@ final class TranscodeSessionRepository implements TranscodeSessionRepositoryInte
         $entity->setCurrentSegmentIndex($session->getCurrentSegmentIndex());
         $entity->setWallClockOffset($session->getWallClockOffset());
         $entity->setMetrics($session->getMetrics());
+        $entity->setUpdatedAt($session->getUpdatedAt());
     }
 }

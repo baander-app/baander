@@ -7,12 +7,22 @@ namespace App\Tests\Integration;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Domain\Model\TranscodeSession;
+use App\Transcode\Domain\Model\TranscodeSessionState;
 use App\Transcode\Domain\ValueObject\AudioProfile;
+use App\Transcode\Domain\ValueObject\SessionPriority;
+use App\Transcode\Domain\ValueObject\SessionState;
 use App\Transcode\Infrastructure\Doctrine\Entity\TranscodeJobEntity;
 use App\Transcode\Infrastructure\Doctrine\Entity\TranscodeSessionEntity;
 use App\Transcode\Infrastructure\Doctrine\Repository\TranscodeSessionRepository;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
+use Doctrine\DBAL\Exception\NotNullConstraintViolationException;
+use Doctrine\DBAL\Schema\Schema;
+use Doctrine\Migrations\DependencyFactory;
+use Doctrine\Migrations\Version\Version;
+use Doctrine\ORM\Tools\SchemaTool;
+use DoctrineMigrations\Version20261006200000;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 final class TranscodeSessionOwnershipPersistenceTest extends TestCase
 {
@@ -101,6 +111,109 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         $this->expectException(ForeignKeyConstraintViolationException::class);
 
         (new TranscodeSessionRepository($this->manager))->save($this->session(Uuid::generate(), $job));
+    }
+
+    public function testJobIsRequiredByMappingAndCatalog(): void
+    {
+        $mapped = (new SchemaTool($this->manager))->getSchemaFromMetadata($this->manager->getMetadataFactory()->getAllMetadata());
+        self::assertTrue($mapped->getTable('transcode_sessions')->getColumn('job_id')->getNotnull());
+        self::assertTrue($this->manager->getConnection()->createSchemaManager()->introspectTable('transcode_sessions')->getColumn('job_id')->getNotnull());
+
+        $this->expectException(NotNullConstraintViolationException::class);
+
+        $this->insertSessionRow($this->createUser(), null);
+    }
+
+    public function testNewAndUnchangedSessionsPersistTheAggregatesTimestamps(): void
+    {
+        $createdAt = new \DateTimeImmutable('2023-11-05 01:02:03+00:00');
+        $updatedAt = new \DateTimeImmutable('2024-02-29 13:14:15+00:00');
+        $session = TranscodeSession::reconstitute(new TranscodeSessionState(
+            id: Uuid::generate(),
+            publicId: new PublicId(),
+            userId: $this->createUser(),
+            jobId: $this->createJob(),
+            videoId: Uuid::generate(),
+            state: SessionState::Active,
+            priority: SessionPriority::Normal,
+            audioProfile: AudioProfile::streamingStereo(),
+            currentSegmentIndex: 3,
+            wallClockOffset: 1.5,
+            metrics: [],
+            createdAt: $createdAt,
+            updatedAt: $updatedAt,
+        ));
+        $repository = new TranscodeSessionRepository($this->manager);
+
+        $repository->save($session);
+        $this->manager->clear();
+        $loaded = $repository->findByUuid($session->getId());
+        self::assertNotNull($loaded);
+        self::assertSame($createdAt->getTimestamp(), $loaded->getCreatedAt()->getTimestamp());
+        self::assertSame($updatedAt->getTimestamp(), $loaded->getUpdatedAt()->getTimestamp());
+
+        // Saving the unchanged aggregate through the managed entity keeps its timestamps.
+        $repository->save($loaded);
+        $this->manager->clear();
+        $reloaded = $repository->findByUuid($session->getId());
+        self::assertNotNull($reloaded);
+        self::assertSame($createdAt->getTimestamp(), $reloaded->getCreatedAt()->getTimestamp());
+        self::assertSame($updatedAt->getTimestamp(), $reloaded->getUpdatedAt()->getTimestamp());
+    }
+
+    public function testMigrationRemovesJoblessSessionsBeforeRequiringAJobAndIsRecorded(): void
+    {
+        $connection = $this->manager->getConnection();
+        $migrations = $this->kernel->getContainer()->get('test.service_container')->get('doctrine.migrations.dependency_factory');
+        self::assertInstanceOf(DependencyFactory::class, $migrations);
+        self::assertTrue($migrations->getMetadataStorage()->getExecutedMigrations()->hasMigration(
+            new Version(Version20261006200000::class),
+        ));
+        self::assertCount(0, $migrations->getMigrationStatusCalculator()->getNewMigrations());
+
+        require_once dirname(__DIR__, 2) . '/migrations/Version20261006200000.php';
+        $run = static function (string $direction) use ($connection): void {
+            $migration = new Version20261006200000($connection, new NullLogger());
+            $migration->{$direction}(new Schema());
+            foreach ($migration->getSql() as $query) {
+                $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
+            }
+        };
+        $notNull = static fn (): bool => (bool) $connection->fetchOne(
+            'SELECT attnotnull FROM pg_attribute WHERE attrelid = \'transcode_sessions\'::regclass AND attname = \'job_id\'',
+        );
+
+        // Recreate the pre-migration state: nullable column with a jobless row next to a valid one.
+        $run('down');
+        self::assertFalse($notNull());
+        $owner = $this->createUser();
+        $kept = $this->insertSessionRow($owner, $this->createJob());
+        $jobless = $this->insertSessionRow($owner, null);
+
+        $run('up');
+
+        self::assertTrue($notNull());
+        $remaining = $connection->fetchFirstColumn(
+            'SELECT id FROM transcode_sessions WHERE id IN (:kept, :jobless)',
+            ['kept' => $kept->toString(), 'jobless' => $jobless->toString()],
+        );
+        self::assertSame([$kept->toString()], $remaining);
+    }
+
+    private function insertSessionRow(Uuid $owner, ?Uuid $job): Uuid
+    {
+        $id = Uuid::generate();
+        $this->manager->getConnection()->insert('transcode_sessions', [
+            'id' => $id->toString(),
+            'public_id' => (new PublicId())->toString(),
+            'user_id' => $owner->toString(),
+            'job_id' => $job?->toString(),
+            'video_id' => Uuid::generate()->toString(),
+            'created_at' => '2026-10-06 12:00:00+00',
+            'updated_at' => '2026-10-06 12:00:00+00',
+        ]);
+
+        return $id;
     }
 
     private function createJob(): Uuid

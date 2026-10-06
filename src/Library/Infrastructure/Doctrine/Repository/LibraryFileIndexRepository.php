@@ -59,12 +59,4 @@ final class LibraryFileIndexRepository implements LibraryFileIndexRepositoryInte
             $this->entityManager->remove($existing);
         }
     }
-
-    public function removeAllForLibrary(Uuid $libraryId): void
-    {
-        $this->entityManager->getConnection()->executeStatement(
-            'DELETE FROM library_file_index WHERE library_id = :libraryId',
-            ['libraryId' => $libraryId->toString()],
-        );
-    }
 }

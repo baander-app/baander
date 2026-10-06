@@ -10,7 +10,6 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity]
 #[ORM\Table(name: 'library_file_index')]
 #[ORM\UniqueConstraint(name: 'library_file_path_unique', columns: ['library_id', 'path'])]
-#[ORM\Index(name: 'idx_library_file_index_library_id', columns: ['library_id'])]
 class LibraryFileIndexEntity
 {
     public function __construct(

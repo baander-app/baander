@@ -39,12 +39,14 @@ class RadioSessionEntity
     public function __construct(
         Uuid $id,
         Uuid $userId,
+        \DateTimeImmutable $createdAt,
+        \DateTimeImmutable $updatedAt,
     ) {
         $this->id = $id;
         $this->userId = $userId;
         $this->state = 'stopped';
-        $this->createdAt = new \DateTimeImmutable();
-        $this->updatedAt = new \DateTimeImmutable();
+        $this->createdAt = $createdAt;
+        $this->updatedAt = $updatedAt;
     }
 
     public function getId(): Uuid
@@ -65,7 +67,6 @@ class RadioSessionEntity
     public function setActiveStation(?RadioStationEntity $station): void
     {
         $this->activeStation = $station;
-        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function getActiveStreamUrl(): ?string
@@ -76,7 +77,6 @@ class RadioSessionEntity
     public function setActiveStreamUrl(?string $streamUrl): void
     {
         $this->activeStreamUrl = $streamUrl;
-        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function getState(): string
@@ -87,7 +87,6 @@ class RadioSessionEntity
     public function setState(string $state): void
     {
         $this->state = $state;
-        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function getCreatedAt(): \DateTimeImmutable

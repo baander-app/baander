@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Pagination;
 
-use App\Shared\Application\Port\CursorDecoderInterface;
 use App\Shared\Domain\Model\Cursor;
 use App\Shared\Domain\Model\CursorDirection;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Serializer\Exception\NotEncodableValueException;
 
-final readonly class CursorCodec implements CursorDecoderInterface
+final readonly class CursorCodec
 {
     public function __construct(
         private readonly JsonEncoder $jsonEncoder,

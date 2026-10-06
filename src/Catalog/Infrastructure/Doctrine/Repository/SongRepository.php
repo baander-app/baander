@@ -507,6 +507,7 @@ final class SongRepository implements SongRepositoryInterface
         $this->entityManager->persist($artistSong);
     }
 
+    /** A song can have several primary artists; the alphabetically first one is returned. */
     public function getArtistNameForSong(Uuid $songId): ?string
     {
         $result = $this->entityManager->createQuery(
@@ -516,9 +517,11 @@ final class SongRepository implements SongRepositoryInterface
                 JOIN ass.artist a
                 JOIN ass.song s
                 WHERE s.id = :songId AND ass.role = 'primary'
+                ORDER BY a.name ASC, a.id ASC
                 DQL,
         )
             ->setParameter('songId', $songId)
+            ->setMaxResults(1)
             ->getOneOrNullResult();
 
         return $result['name'] ?? null;
@@ -537,14 +540,16 @@ final class SongRepository implements SongRepositoryInterface
                 JOIN ass.artist a
                 JOIN ass.song s
                 WHERE s.id IN (:songIds) AND ass.role = 'primary'
+                ORDER BY a.name ASC, a.id ASC
                 DQL,
         )
             ->setParameter('songIds', $songIds)
             ->getResult();
 
+        // Same choice as getArtistNameForSong when a song has several primary artists.
         $map = [];
         foreach ($results as $row) {
-            $map[$row['songId']->toString()] = $row['artistName'];
+            $map[$row['songId']->toString()] ??= $row['artistName'];
         }
 
         return $map;

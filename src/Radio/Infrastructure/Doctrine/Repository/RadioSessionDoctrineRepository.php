@@ -64,6 +64,8 @@ final class RadioSessionDoctrineRepository implements RadioSessionRepositoryInte
         return new RadioSessionEntity(
             id: $session->getId(),
             userId: $session->getUserId(),
+            createdAt: $session->getCreatedAt(),
+            updatedAt: $session->getUpdatedAt(),
         );
     }
 

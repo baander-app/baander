@@ -18,6 +18,7 @@ use Doctrine\Migrations\DependencyFactory;
 use Doctrine\Migrations\Version\Version;
 use Doctrine\ORM\Tools\SchemaTool;
 use DoctrineMigrations\Version20261006190000;
+use DoctrineMigrations\Version20261006201000;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -122,6 +123,30 @@ final class LibraryFileIndexPersistenceTest extends TestCase
         self::assertSame(0, $this->countIndexRows($orphan));
         self::assertSame(1, $this->countIndexRows($library->getId()));
         self::assertSame('FOREIGN KEY (library_id) REFERENCES libraries(id) ON DELETE CASCADE', $constraint());
+    }
+
+    public function testTheUniquePathIndexAloneCoversLibraryLookups(): void
+    {
+        $connection = $this->manager->getConnection();
+        $indexes = static fn (): array => $connection->fetchAllKeyValue(
+            'SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = current_schema() AND tablename = \'library_file_index\' ORDER BY indexname',
+        );
+
+        self::assertSame([
+            'library_file_index_pkey' => 'CREATE UNIQUE INDEX library_file_index_pkey ON public.library_file_index USING btree (id)',
+            'library_file_path_unique' => 'CREATE UNIQUE INDEX library_file_path_unique ON public.library_file_index USING btree (library_id, path)',
+        ], $indexes());
+
+        require_once dirname(__DIR__, 2) . '/migrations/Version20261006201000.php';
+        foreach (['down', 'up'] as $direction) {
+            $migration = new Version20261006201000($connection, new NullLogger());
+            $migration->{$direction}(new Schema());
+            foreach ($migration->getSql() as $query) {
+                $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
+            }
+            self::assertSame($direction === 'down', array_key_exists('idx_library_file_index_library_id', $indexes()), $direction);
+            self::assertArrayHasKey('library_file_path_unique', $indexes(), $direction);
+        }
     }
 
     private function createLibrary(): Library
