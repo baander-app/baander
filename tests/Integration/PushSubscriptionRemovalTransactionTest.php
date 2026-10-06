@@ -73,7 +73,7 @@ final class PushSubscriptionRemovalTransactionTest extends TestCase
     public function testOuterRollbackRestoresDeletedRowAndSubsequentOrmReadUsesFreshIdentity(): void
     {
         $owner = new UserEntity(new PublicId(), 'Owner', 'push-transaction@baander.app', 'test-only', '');
-        $target = new PushSubscriptionEntity($owner, 'https://push.baander.app/transaction', 'pk', 'ak', 'aes128gcm');
+        $target = new PushSubscriptionEntity($owner->getId(), 'https://push.baander.app/transaction', 'pk', 'ak', 'aes128gcm');
         $this->manager->persist($owner);
         $this->manager->persist($target);
         $this->manager->flush();
@@ -104,7 +104,7 @@ final class PushSubscriptionRemovalTransactionTest extends TestCase
     public function testCommittedRemovalDetachesLazyReferenceWithoutInitializingDeletedRow(): void
     {
         $owner = new UserEntity(new PublicId(), 'Owner', 'push-lazy@baander.app', 'test-only', '');
-        $target = new PushSubscriptionEntity($owner, 'https://push.baander.app/lazy', 'pk', 'ak', 'aes128gcm');
+        $target = new PushSubscriptionEntity($owner->getId(), 'https://push.baander.app/lazy', 'pk', 'ak', 'aes128gcm');
         $this->manager->persist($owner);
         $this->manager->persist($target);
         $this->manager->flush();
@@ -133,7 +133,7 @@ final class PushSubscriptionRemovalTransactionTest extends TestCase
     public function testRotationPreservesIdentityPendingWorkAndRollback(bool $lazy): void
     {
         $owner = new UserEntity(new PublicId(), 'Stored name', 'push-rotation@baander.app', 'test-only', '');
-        $target = new PushSubscriptionEntity($owner, 'https://push.baander.app/rotation', 'old-public', 'old-auth', 'aes128gcm', 'old-agent');
+        $target = new PushSubscriptionEntity($owner->getId(), 'https://push.baander.app/rotation', 'old-public', 'old-auth', 'aes128gcm', 'old-agent');
         $this->manager->persist($owner);
         $this->manager->persist($target);
         $this->manager->flush();
@@ -182,8 +182,8 @@ final class PushSubscriptionRemovalTransactionTest extends TestCase
     {
         $owner = new UserEntity(new PublicId(), 'Owner', 'push-all-owner@baander.app', 'test-only', '');
         $other = new UserEntity(new PublicId(), 'Other', 'push-all-other@baander.app', 'test-only', '');
-        $target = new PushSubscriptionEntity($owner, 'https://push.baander.app/all', 'pk', 'ak', 'aes128gcm');
-        $foreign = new PushSubscriptionEntity($other, 'https://push.baander.app/foreign', 'pk', 'ak', 'aes128gcm');
+        $target = new PushSubscriptionEntity($owner->getId(), 'https://push.baander.app/all', 'pk', 'ak', 'aes128gcm');
+        $foreign = new PushSubscriptionEntity($other->getId(), 'https://push.baander.app/foreign', 'pk', 'ak', 'aes128gcm');
         foreach ([$owner, $other, $target, $foreign] as $entity) {
             $this->manager->persist($entity);
         }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Notification\Infrastructure\Push;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Notification\Infrastructure\Doctrine\Entity\PushSubscriptionEntity;
 use App\Notification\Infrastructure\Push\PushSubscriptionRepository;
 use App\Shared\Domain\Model\Uuid;
@@ -29,7 +28,7 @@ final class PushSubscriptionRepositoryTest extends TestCase
     public function testRemoveDeletesAndFlushes(): void
     {
         $subscription = new PushSubscriptionEntity(
-            user: $this->createStub(UserEntity::class),
+            userId: new Uuid(),
             endpoint: 'https://push.baander.app/test',
             publicKey: 'pk',
             authKey: 'ak',
@@ -52,7 +51,7 @@ final class PushSubscriptionRepositoryTest extends TestCase
             ->willReturn($repo);
 
         $repo->expects($this->once())->method('findBy')
-            ->with(['user' => $userId]);
+            ->with(['userId' => $userId]);
 
         $this->createRepository()->findByUser($userId);
     }

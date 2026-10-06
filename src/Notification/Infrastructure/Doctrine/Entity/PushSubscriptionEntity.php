@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Notification\Infrastructure\Doctrine\Entity;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -19,9 +18,8 @@ class PushSubscriptionEntity
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
 
-    #[ORM\ManyToOne(targetEntity: UserEntity::class)]
-    #[ORM\JoinColumn(name: 'user_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
-    private UserEntity $user;
+    #[ORM\Column(name: 'user_id', type: 'uuid')]
+    private Uuid $userId;
 
     #[ORM\Column(type: 'text')]
     private string $endpoint;
@@ -38,11 +36,11 @@ class PushSubscriptionEntity
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $userAgent = null;
 
-    #[ORM\Column]
+    #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
     public function __construct(
-        UserEntity $user,
+        Uuid $userId,
         string $endpoint,
         string $publicKey,
         string $authKey,
@@ -50,7 +48,7 @@ class PushSubscriptionEntity
         ?string $userAgent = null,
     ) {
         $this->id = new Uuid();
-        $this->user = $user;
+        $this->userId = $userId;
         $this->endpoint = $endpoint;
         $this->publicKey = $publicKey;
         $this->authKey = $authKey;
@@ -66,7 +64,7 @@ class PushSubscriptionEntity
 
     public function getUserId(): Uuid
     {
-        return $this->user->getId();
+        return $this->userId;
     }
 
     public function getEndpoint(): string

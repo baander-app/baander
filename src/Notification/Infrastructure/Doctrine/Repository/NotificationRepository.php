@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Notification\Infrastructure\Doctrine\Repository;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Notification\Domain\Model\Notification;
 use App\Notification\Domain\Repository\NotificationRepositoryInterface;
 use App\Notification\Domain\ValueObject\NotificationCategory;
@@ -31,9 +30,7 @@ final class NotificationRepository implements NotificationRepositoryInterface
     {
         $entity = new NotificationEntity($notification->getId());
         $entity->setPublicId($notification->getPublicId());
-        $entity->setUser(
-            $this->entityManager->getReference(UserEntity::class, $notification->getUserId()),
-        );
+        $entity->setUserId($notification->getUserId());
         $entity->setCategory($notification->getCategory()->value);
         $entity->setEventType($notification->getEventType());
         $entity->setTitle($notification->getTitle());
@@ -68,8 +65,8 @@ final class NotificationRepository implements NotificationRepositoryInterface
         $qb = $this->entityManager->createQueryBuilder();
         $qb->select('e')
             ->from(NotificationEntity::class, 'e')
-            ->where('e.user = :userId')
-            ->setParameter('userId', $userId)
+            ->where('e.userId = :userId')
+            ->setParameter('userId', $userId, 'uuid')
             ->orderBy('e.id', $direction === 'asc' ? 'ASC' : 'DESC');
 
         if ($since !== null) {
@@ -114,9 +111,9 @@ final class NotificationRepository implements NotificationRepositoryInterface
         return (int) $this->entityManager->createQueryBuilder()
             ->select('COUNT(e.id)')
             ->from(NotificationEntity::class, 'e')
-            ->where('e.user = :userId')
+            ->where('e.userId = :userId')
             ->andWhere('e.isRead = false')
-            ->setParameter('userId', $userId)
+            ->setParameter('userId', $userId, 'uuid')
             ->getQuery()
             ->getSingleScalarResult();
     }
@@ -135,9 +132,9 @@ final class NotificationRepository implements NotificationRepositoryInterface
         $this->entityManager->createQueryBuilder()
             ->update(NotificationEntity::class, 'e')
             ->set('e.isRead', 'true')
-            ->where('e.user = :userId')
+            ->where('e.userId = :userId')
             ->andWhere('e.isRead = false')
-            ->setParameter('userId', $userId)
+            ->setParameter('userId', $userId, 'uuid')
             ->getQuery()
             ->execute();
     }
@@ -156,9 +153,9 @@ final class NotificationRepository implements NotificationRepositoryInterface
         $entities = $this->entityManager->createQueryBuilder()
             ->select('e')
             ->from(NotificationEntity::class, 'e')
-            ->where('e.user = :userId')
+            ->where('e.userId = :userId')
             ->andWhere('e.id > :afterId')
-            ->setParameter('userId', $userId)
+            ->setParameter('userId', $userId, 'uuid')
             ->setParameter('afterId', $afterId->toString())
             ->orderBy('e.id', 'ASC')
             ->getQuery()

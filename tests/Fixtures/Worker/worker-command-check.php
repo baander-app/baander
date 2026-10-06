@@ -525,7 +525,7 @@ if ($mode === 'seed-outbox') {
     $em->persist($user); // Unverified: CreateNotificationHandler does not enqueue email.
     foreach (['email', 'push', 'webhook'] as $channel) {
         $preference = new App\Notification\Infrastructure\Doctrine\Entity\NotificationPreferenceEntity(App\Shared\Domain\Model\Uuid::v7());
-        $preference->setUser($user);
+        $preference->setUserId($user->getId());
         $preference->setCategory('security');
         $preference->setChannel($channel);
         $preference->setEnabled(false);

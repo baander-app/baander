@@ -85,7 +85,7 @@ final class PushSubscriptionRepository implements PushSubscriptionRepositoryInte
     {
         return $this->entityManager
             ->getRepository(PushSubscriptionEntity::class)
-            ->findBy(['user' => $userId]);
+            ->findBy(['userId' => $userId]);
     }
 
     private function detachIdentity(string $id): void

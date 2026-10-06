@@ -87,6 +87,8 @@ services:
             tags: ['scheduler.messenger_command']
         App\Scheduler\Domain\Model\SchedulableConsoleCommandInterface:
             tags: ['scheduler.console_command']
+        App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclarationProviderInterface:
+            tags: ['baander.doctrine.foreign_key_declarations']
 
     # --- Swoole DBAL Alive Keepers ---
     # Replaces swoole-bundle/resetter-bundle. Wired by DBALAliveKeeperCompilerPass
@@ -182,7 +184,9 @@ services:
     App\Shared\Infrastructure\Doctrine\EventListener\GeneratePublicIdListener:
         tags: [ { name: 'doctrine.event_listener', event: 'prePersist' } ]
 
-    App\Shared\Infrastructure\Doctrine\EventListener\PreferenceOwnershipSchemaListener:
+    App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclarationSchemaListener:
+        arguments:
+            $providers: !tagged_iterator baander.doctrine.foreign_key_declarations
         tags: [ { name: 'doctrine.event_listener', event: 'postGenerateSchema' } ]
 
     # --- Doctrine Platform Extensions ---

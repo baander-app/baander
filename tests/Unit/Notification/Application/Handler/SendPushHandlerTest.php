@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Notification\Application\Handler;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Notification\Application\DTO\SendPushCommand;
 use App\Notification\Application\Handler\SendPushHandler;
 use App\Notification\Domain\Repository\NotificationPreferenceRepositoryInterface;
@@ -154,7 +153,7 @@ final class SendPushHandlerTest extends TestCase
 
     private function subscription(string $name): PushSubscriptionEntity
     {
-        return new PushSubscriptionEntity($this->createStub(UserEntity::class), 'https://push.baander.app/'.$name, 'public-key', 'auth-key', 'aes128gcm');
+        return new PushSubscriptionEntity(new Uuid(), 'https://push.baander.app/'.$name, 'public-key', 'auth-key', 'aes128gcm');
     }
 
     private function command(): SendPushCommand

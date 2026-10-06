@@ -16,9 +16,9 @@ final class PushSubscriptionRemovalRepositoryTest extends TestCase
     {
         $owner = new UserEntity(new PublicId(), 'Stored name', 'push-owner@baander.app', 'test-only', '');
         $other = new UserEntity(new PublicId(), 'Other', 'push-other@baander.app', 'test-only', '');
-        $target = new PushSubscriptionEntity($owner, 'https://push.baander.app/target', 'pk', 'ak', 'aes128gcm');
-        $retained = new PushSubscriptionEntity($owner, 'https://push.baander.app/retained', 'pk', 'ak', 'aes128gcm');
-        $foreign = new PushSubscriptionEntity($other, 'https://push.baander.app/foreign', 'pk', 'ak', 'aes128gcm');
+        $target = new PushSubscriptionEntity($owner->getId(), 'https://push.baander.app/target', 'pk', 'ak', 'aes128gcm');
+        $retained = new PushSubscriptionEntity($owner->getId(), 'https://push.baander.app/retained', 'pk', 'ak', 'aes128gcm');
+        $foreign = new PushSubscriptionEntity($other->getId(), 'https://push.baander.app/foreign', 'pk', 'ak', 'aes128gcm');
         foreach ([$owner, $other, $target, $retained, $foreign] as $entity) {
             $this->entityManager->persist($entity);
         }

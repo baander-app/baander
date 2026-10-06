@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Notification\Infrastructure\Doctrine\Repository;
 
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Notification\Domain\Model\NotificationPreference;
 use App\Notification\Domain\Repository\NotificationPreferenceRepositoryInterface;
 use App\Notification\Domain\ValueObject\NotificationCategory;
@@ -29,7 +28,7 @@ final class NotificationPreferenceRepository implements NotificationPreferenceRe
     public function save(NotificationPreference $preference): void
     {
         $existing = $this->getEntityRepository()->findOneBy([
-            'user' => $preference->getUserId(),
+            'userId' => $preference->getUserId(),
             'category' => $preference->getCategory()->value,
             'channel' => $preference->getChannel()->value,
         ]);
@@ -42,9 +41,7 @@ final class NotificationPreferenceRepository implements NotificationPreferenceRe
         }
 
         $entity = new NotificationPreferenceEntity($preference->getId());
-        $entity->setUser(
-            $this->entityManager->getReference(UserEntity::class, $preference->getUserId()),
-        );
+        $entity->setUserId($preference->getUserId());
         $entity->setCategory($preference->getCategory()->value);
         $entity->setChannel($preference->getChannel()->value);
         $entity->setEnabled($preference->isEnabled());
@@ -59,7 +56,7 @@ final class NotificationPreferenceRepository implements NotificationPreferenceRe
         NotificationChannel $channel,
     ): ?NotificationPreference {
         $entity = $this->getEntityRepository()->findOneBy([
-            'user' => $userId,
+            'userId' => $userId,
             'category' => $category->value,
             'channel' => $channel->value,
         ]);
@@ -74,7 +71,7 @@ final class NotificationPreferenceRepository implements NotificationPreferenceRe
     public function findByUserId(Uuid $userId): array
     {
         $entities = $this->getEntityRepository()->findBy([
-            'user' => $userId,
+            'userId' => $userId,
         ]);
 
         return array_map(fn (NotificationPreferenceEntity $e) => $this->toDomain($e), $entities);

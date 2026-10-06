@@ -118,7 +118,7 @@ final class PushUnsubscribeFirewallTest extends TestCase
     {
         $owner = $this->createUser('owner');
         $endpoint = 'https://push.baander.app/owner-' . bin2hex(random_bytes(8));
-        $subscription = new PushSubscriptionEntity($owner, $endpoint, 'public-key', 'auth-key', 'aes128gcm');
+        $subscription = new PushSubscriptionEntity($owner->getId(), $endpoint, 'public-key', 'auth-key', 'aes128gcm');
         $this->manager->persist($subscription);
         $this->entities[] = $subscription;
         $jwt = null;
@@ -189,7 +189,7 @@ final class PushUnsubscribeFirewallTest extends TestCase
         $owner = $this->createUser('owner');
         $endpoint = 'https://push.baander.app/registration-' . bin2hex(random_bytes(8));
         if ($existing) {
-            $subscription = new PushSubscriptionEntity($owner, $endpoint, 'old-public', 'old-auth', 'aes128gcm', 'old-agent');
+            $subscription = new PushSubscriptionEntity($owner->getId(), $endpoint, 'old-public', 'old-auth', 'aes128gcm', 'old-agent');
             $this->manager->persist($subscription);
             $this->entities[] = $subscription;
         }
