@@ -12,7 +12,6 @@ use App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistSongEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Catalog\Infrastructure\Doctrine\Query\CatalogReadScopeQuery;
-use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Shared\Domain\Model\Cursor;
 use App\Shared\Domain\Model\CursorDirection;
 use App\Shared\Domain\Model\CursorPage;
@@ -154,22 +153,18 @@ final class SongRepository implements SongRepositoryInterface
     public function getLibraryIdByPublicId(PublicId $publicId): ?Uuid
     {
         try {
-            $library = $this->entityManager->createQuery(
+            $libraryId = $this->entityManager->createQuery(
                 <<<'DQL'
-                    SELECT a.library
+                    SELECT IDENTITY(a.library)
                     FROM App\Catalog\Infrastructure\Doctrine\Entity\SongEntity s
                     JOIN s.album a
                     WHERE s.publicId = :publicId
                     DQL,
             )
                 ->setParameter('publicId', $publicId)
-                ->getOneOrNullResult();
+                ->getSingleScalarResult();
 
-            if (!$library instanceof LibraryEntity) {
-                return null;
-            }
-
-            return $library->getId();
+            return new Uuid((string) $libraryId);
         } catch (NoResultException|NonUniqueResultException) {
             return null;
         }

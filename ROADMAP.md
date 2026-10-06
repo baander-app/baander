@@ -21,8 +21,8 @@ OpenAPI responses match the shared error envelope, the generated web client is
 updated, specification drift and web typechecking pass, and full PHPStan has zero
 errors at the last full scan. Subsequent focused PHPStan checks for the QoL
 boundary pass. Hardware diagnostics, Scheduler administration, and notification
-delivery-intent extraction lowered Deptrac to 200 active violations without
-baseline changes, so release quality gates
+delivery-intent extraction lowered Deptrac to 200 active violations; the subsequent
+song lookup repair lowered it to 198 without baseline changes, so release quality gates
 are not fully green. The locked CI image completed all 143 full-suite PHPUnit
 shards with Xdebug coverage and a merged report: 6,368 discovered tests and no
 failed shards. The final 512 MiB child-process image separately passed its Shared
@@ -256,6 +256,15 @@ relay retain the original JSON message, transactional insert, lease fencing, and
 transport handoff. Focused unit tests pass 26 cases and 243 assertions; isolated
 PostgreSQL replay passes five cases and 58 assertions. Targeted PHPStan and
 container wiring pass; Deptrac falls from 206 to 200 active violations.
+
+A production OAuth/DPoP direct-track test now exercises anonymous, unrelated,
+member, and administrator access through real song/library repositories. Its first
+run exposed a Doctrine association selection that returned HTTP 500 for authorized
+tracks. The repository now selects the associated library ID as a scalar; focused
+PostgreSQL lookup and the 16-case firewall/range suite pass. Revoked access and
+replayed proofs fail before media path resolution. Removing the invalid entity
+selection also removes two Deptrac violations, leaving 198 active. The wider browser
+and session qualification remains open.
 
 ## Delivery horizons
 
