@@ -5,20 +5,19 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Controller;
 
 use App\Party\Application\Command\JoinPartySessionCommand;
-use App\Transcode\Application\Command\UpdateTranscodePositionCommand;
-use App\Session\Application\Command\SessionJoinCommand;
-use App\Session\Application\Command\SessionPlaybackCommand;
 use App\Party\Application\Command\LeavePartySessionCommand;
 use App\Party\Application\Command\PausePlaybackCommand;
 use App\Party\Application\Command\SeekPlaybackCommand;
 use App\Party\Application\Command\StartPlaybackCommand;
 use App\Party\Application\Command\SyncPlaybackCommand;
 use App\Party\Domain\ValueObject\PlaybackAction;
+use App\Shared\Application\Port\ListeningSessionInteractionInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Messenger\Stamp\PartyMemberResultStamp;
 use App\Shared\Infrastructure\Swoole\ReconnectionTokenService;
 use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
-use App\Shared\Infrastructure\Messenger\Stamp\PartyMemberResultStamp;
 use App\Shared\Infrastructure\Swoole\WebSocketPusher;
+use App\Transcode\Application\Command\UpdateTranscodePositionCommand;
 use InvalidArgumentException;
 use Psr\Log\LoggerInterface;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\HttpKernel\AbstractWebSocketController;
@@ -46,6 +45,7 @@ final class WebSocketController extends AbstractWebSocketController
         private readonly WebSocketPusher $pusher,
         private readonly MessageBusInterface $bus,
         private readonly JsonEncoder $jsonEncoder,
+        private readonly ListeningSessionInteractionInterface $listeningSessions,
         private readonly ?ReconnectionTokenService $reconnectionTokens = null,
         private readonly ?LoggerInterface $logger = null,
     )
@@ -564,11 +564,7 @@ final class WebSocketController extends AbstractWebSocketController
         }
 
         try {
-            $envelope = $this->bus->dispatch(
-                new SessionJoinCommand($userUuid, $deviceUuid),
-            );
-            $handledStamp = $envelope->last(\Symfony\Component\Messenger\Stamp\HandledStamp::class);
-            $result = $handledStamp?->getResult() ?? [];
+            $result = $this->listeningSessions->join($userUuid, $deviceUuid);
         } catch (Throwable) {
             $this->pusher->pushToConnection($fd, ['type' => 'error', 'message' => 'Failed to join session']);
 
@@ -606,7 +602,7 @@ final class WebSocketController extends AbstractWebSocketController
         }
 
         try {
-            $envelope = $this->bus->dispatch(new SessionPlaybackCommand(
+            $result = $this->listeningSessions->playback(
                 userId: $userUuid,
                 deviceId: $deviceUuid,
                 action: $action,
@@ -614,9 +610,7 @@ final class WebSocketController extends AbstractWebSocketController
                 queue: $payload['queue'] ?? null,
                 currentTrackIndex: isset($payload['currentTrackIndex']) ? (int) $payload['currentTrackIndex'] : null,
                 playbackState: $payload['playbackState'] ?? null,
-            ));
-            $handledStamp = $envelope->last(\Symfony\Component\Messenger\Stamp\HandledStamp::class);
-            $result = $handledStamp?->getResult() ?? [];
+            );
         } catch (Throwable) {
             $this->pusher->pushToConnection($fd, ['type' => 'error', 'message' => 'Playback action failed']);
 
@@ -653,17 +647,14 @@ final class WebSocketController extends AbstractWebSocketController
         }
 
         try {
-            // Reuse existing SyncSessionCommand (same fields, same handler)
-            $envelope = $this->bus->dispatch(new \App\Session\Application\Command\SyncSessionCommand(
+            $result = $this->listeningSessions->sync(
                 userId: $userUuid,
                 deviceId: $deviceUuid,
                 queue: $payload['queue'] ?? [],
                 currentTrackIndex: (int) ($payload['currentTrackIndex'] ?? 0),
                 position: (float) ($payload['position'] ?? 0.0),
                 playbackState: $payload['playbackState'] ?? 'paused',
-            ));
-            $handledStamp = $envelope->last(\Symfony\Component\Messenger\Stamp\HandledStamp::class);
-            $result = $handledStamp?->getResult() ?? [];
+            );
         } catch (Throwable) {
             $this->pusher->pushToConnection($fd, ['type' => 'error', 'message' => 'Sync failed']);
 

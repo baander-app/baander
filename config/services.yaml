@@ -107,6 +107,9 @@ services:
         arguments:
             $logger: '@monolog.logger.swoole'
 
+    App\Shared\Application\Port\ListeningSessionInteractionInterface:
+        alias: App\Session\Infrastructure\Messaging\ListeningSessionInteractionAdapter
+
     App\Shared\Interface\Controller\WebSocketController:
         tags:
             - { name: 'monolog.logger', channel: 'swoole' }

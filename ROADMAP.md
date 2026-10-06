@@ -22,12 +22,13 @@ updated, specification drift and web typechecking pass, and full PHPStan has zer
 errors at the last full scan. Subsequent focused PHPStan checks for the QoL
 boundary pass. Hardware diagnostics, Scheduler administration, and notification
 delivery-intent extraction lowered Deptrac to 200 active violations; the subsequent
-song lookup repair and Library voter extraction lowered it to 194 without baseline
-changes, so release quality gates are not fully green. The locked CI image completed
+song lookup repair, Library voter extraction, and WebSocket Session boundary lowered
+it to 189 without baseline changes, so release quality gates are not fully green.
+The locked CI image completed
 all 143 full-suite PHPUnit shards with Xdebug coverage and a merged report:
 6,368 tests were discovered, and no shard failed. The final 512 MiB child-process
-image separately passed its Shared
-unit coverage run; the entire suite has not yet been rerun in that final image.
+image separately passed its Shared unit coverage run; the entire suite has not yet
+been rerun in that final image.
 
 ## Latest verified backend batches
 
@@ -272,6 +273,13 @@ authenticated identity contract. The voter still grants administrators, denies
 ordinary principals for its supported subjects, and abstains on unrelated subjects.
 The 247 focused voter tests pass with 289 assertions; targeted PHPStan, container
 wiring, and service tag discovery pass. Deptrac falls from 198 to 194 active violations.
+
+WebSocket listening-session join, playback, and sync now call a Shared Application
+port implemented by a Session Messenger adapter. The adapter preserves command
+inputs, synchronous handler results, falsy values, and the no-result fallback;
+the controller keeps its JSON response and error mapping. Seventy focused tests
+pass with 254 assertions, full PHPStan and container lint pass, and Deptrac falls
+from 194 to 189 active violations without baseline changes.
 
 ## Delivery horizons
 
