@@ -32,11 +32,12 @@ class StarredStationEntity
         Uuid $id,
         Uuid $userId,
         RadioStationEntity $station,
+        \DateTimeImmutable $starredAt,
     ) {
         $this->id = $id;
         $this->userId = $userId;
         $this->station = $station;
-        $this->starredAt = new \DateTimeImmutable();
+        $this->starredAt = $starredAt;
     }
 
     public function getId(): Uuid

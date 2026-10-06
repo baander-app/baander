@@ -38,12 +38,13 @@ class CountrySubscriptionEntity
         Uuid $userId,
         RadioSourceEntity $source,
         string $countryCode,
+        \DateTimeImmutable $createdAt,
     ) {
         $this->id = $id;
         $this->userId = $userId;
         $this->source = $source;
         $this->countryCode = $countryCode;
-        $this->createdAt = new \DateTimeImmutable();
+        $this->createdAt = $createdAt;
     }
 
     public function getId(): Uuid

@@ -76,6 +76,7 @@ final class CountrySubscriptionDoctrineRepository implements CountrySubscription
             userId: $subscription->getUserId(),
             source: $this->entityManager->getReference(RadioSourceEntity::class, $subscription->getSourceId()),
             countryCode: $subscription->getCountryCode(),
+            createdAt: $subscription->getCreatedAt(),
         );
     }
 

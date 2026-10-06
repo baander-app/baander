@@ -74,6 +74,7 @@ final class StarredStationDoctrineRepository implements StarredStationRepository
             id: $starred->getId(),
             userId: $starred->getUserId(),
             station: $this->entityManager->getReference(RadioStationEntity::class, $starred->getStationId()),
+            starredAt: $starred->getStarredAt(),
         );
     }
 

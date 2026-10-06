@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Radio\Domain\Model\CountrySubscription\CountrySubscription;
+use App\Radio\Domain\Model\CountrySubscription\CountrySubscriptionState;
 use App\Radio\Domain\Model\RadioSession\RadioSession;
 use App\Radio\Domain\Model\StarredStation\StarredStation;
+use App\Radio\Domain\Model\StarredStation\StarredStationState;
 use App\Radio\Infrastructure\Doctrine\Entity\CountrySubscriptionEntity;
 use App\Radio\Infrastructure\Doctrine\Entity\RadioSessionEntity;
 use App\Radio\Infrastructure\Doctrine\Entity\RadioSourceEntity;
@@ -137,6 +139,27 @@ final class RadioOwnershipPersistenceTest extends TestCase
             self::assertSame(0, $this->countOwnedRows($table, 'user_id', $first), $table);
             self::assertSame(1, $this->countOwnedRows($table, 'user_id', $second), $table);
         }
+    }
+
+    public function testNewRowsPersistTheAggregatesTimestamps(): void
+    {
+        $owner = $this->createUser();
+        [$source, $station] = $this->createStations();
+        $starredAt = new \DateTimeImmutable('2024-02-29 13:14:15');
+        $createdAt = new \DateTimeImmutable('2023-11-05 01:02:03');
+        $star = StarredStation::reconstitute(new StarredStationState(Uuid::generate(), $owner, $station, $starredAt));
+        $subscription = CountrySubscription::reconstitute(new CountrySubscriptionState(Uuid::generate(), $owner, $source, 'DK', null, $createdAt));
+
+        (new StarredStationDoctrineRepository($this->manager))->save($star);
+        (new CountrySubscriptionDoctrineRepository($this->manager))->save($subscription);
+        $this->manager->clear();
+
+        $loadedStar = (new StarredStationDoctrineRepository($this->manager))->find($star->getId());
+        $loadedSubscription = (new CountrySubscriptionDoctrineRepository($this->manager))->find($subscription->getId());
+        self::assertNotNull($loadedStar);
+        self::assertNotNull($loadedSubscription);
+        self::assertSame($starredAt->getTimestamp(), $loadedStar->getStarredAt()->getTimestamp());
+        self::assertSame($createdAt->getTimestamp(), $loadedSubscription->getCreatedAt()->getTimestamp());
     }
 
     /** @return iterable<string, array{string}> */

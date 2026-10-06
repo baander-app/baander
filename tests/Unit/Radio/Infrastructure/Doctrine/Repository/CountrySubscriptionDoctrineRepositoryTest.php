@@ -31,7 +31,8 @@ final class CountrySubscriptionDoctrineRepositoryTest extends TestCase
                 && $entity->getUserId()->equals($userId)
                 && $entity->getSourceId()->equals($source->getId())
                 && $entity->getCountryCode() === 'DK'
-                && $entity->getLastSyncedAt() === $synced,
+                && $entity->getLastSyncedAt() === $synced
+                && $entity->getCreatedAt() === $subscription->getCreatedAt(),
         ));
         $manager->expects($this->once())->method('flush');
         (new CountrySubscriptionDoctrineRepository($manager))->save($subscription);
