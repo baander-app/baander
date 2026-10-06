@@ -12,6 +12,7 @@ use App\Notification\Application\DTO\SendPushCommand;
 use App\Notification\Application\DTO\SendWebhookCommand;
 use App\Notification\Domain\Service\EventCategoryResolver;
 use App\Notification\Domain\ValueObject\NotificationCategory;
+use App\Notification\Infrastructure\Messaging\NotificationDeliveryIntentResolver;
 use App\Shared\Application\Port\AdminAlertPortInterface;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
@@ -224,7 +225,7 @@ final class OutboxNotificationReplayTest extends TestCase
 
     private function notificationListeners(Connection $connection): EventDispatcher
     {
-        $deliveryBus = new NotificationDeliveryBus(new NotificationDeliveryRepository($connection), MessageCodecFactory::create());
+        $deliveryBus = new NotificationDeliveryBus(new NotificationDeliveryRepository($connection), MessageCodecFactory::create(), new NotificationDeliveryIntentResolver());
         $createNotification = static function (CreateNotificationCommand $command) use ($connection, $deliveryBus): void {
             $notificationId = 'aaaaaaaaaaaaaaaaaaaaa';
             $connection->insert('replay_notifications', ['id' => $notificationId, 'kind' => $command->eventName]);

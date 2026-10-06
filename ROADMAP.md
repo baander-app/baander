@@ -20,8 +20,9 @@ pass and reject malformed config or a missing binary. The startup-unavailable 50
 OpenAPI responses match the shared error envelope, the generated web client is
 updated, specification drift and web typechecking pass, and full PHPStan has zero
 errors at the last full scan. Subsequent focused PHPStan checks for the QoL
-boundary pass. Hardware diagnostics and Scheduler administration extraction lowered
-Deptrac to 206 active violations without baseline changes, so release quality gates
+boundary pass. Hardware diagnostics, Scheduler administration, and notification
+delivery-intent extraction lowered Deptrac to 200 active violations without
+baseline changes, so release quality gates
 are not fully green. The locked CI image completed all 143 full-suite PHPUnit
 shards with Xdebug coverage and a merged report: 6,368 discovered tests and no
 failed shards. The final 512 MiB child-process image separately passed its Shared
@@ -248,6 +249,13 @@ optimistic-write conflicts to an Application exception at the HTTP boundary.
 The 192 Scheduler unit tests pass with 757 assertions; targeted PHPStan and
 container wiring pass. Deptrac falls from 213 to 206 active violations with no
 new baseline entries. Manual occurrence triggering remains on its existing port.
+
+Notification delivery channel and identity recognition now sits behind a Shared
+Application port implemented in Notification Infrastructure. The durable bus and
+relay retain the original JSON message, transactional insert, lease fencing, and
+transport handoff. Focused unit tests pass 26 cases and 243 assertions; isolated
+PostgreSQL replay passes five cases and 58 assertions. Targeted PHPStan and
+container wiring pass; Deptrac falls from 206 to 200 active violations.
 
 ## Delivery horizons
 

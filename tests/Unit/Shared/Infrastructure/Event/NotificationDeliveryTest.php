@@ -9,6 +9,7 @@ use App\Notification\Application\DTO\SendEmailCommand;
 use App\Notification\Application\DTO\SendPushCommand;
 use App\Notification\Application\DTO\SendWebhookCommand;
 use App\Notification\Domain\ValueObject\NotificationCategory;
+use App\Notification\Infrastructure\Messaging\NotificationDeliveryIntentResolver;
 use App\Shared\Domain\Event\Outbox\OutboxRelayException;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Event\NotificationDeliveryBus;
@@ -37,7 +38,7 @@ final class NotificationDeliveryTest extends TestCase
             ->with($this->callback(static fn (string $sql): bool => str_contains($sql, 'ON CONFLICT (channel, notification_id) DO NOTHING')),
                 ['channel' => $channel, 'notificationId' => 'notification-1', 'payload' => $codec->encode($message)])
             ->willReturn(1);
-        $bus = new NotificationDeliveryBus(new NotificationDeliveryRepository($connection), $codec);
+        $bus = new NotificationDeliveryBus(new NotificationDeliveryRepository($connection), $codec, new NotificationDeliveryIntentResolver());
 
         self::assertSame($message, $bus->dispatch($message)->getMessage());
     }
@@ -55,10 +56,12 @@ final class NotificationDeliveryTest extends TestCase
     {
         $connection = $this->createMock(Connection::class);
         $connection->expects($this->never())->method('executeStatement');
-        $bus = new NotificationDeliveryBus(new NotificationDeliveryRepository($connection), MessageCodecFactory::create());
+        $bus = new NotificationDeliveryBus(new NotificationDeliveryRepository($connection), MessageCodecFactory::create(), new NotificationDeliveryIntentResolver());
         $message = match ($case) {
             'unsupported' => new \stdClass(),
             'envelope stamps' => new Envelope(self::message('push'), [new DelayStamp(100)]),
+            'blank ID' => new SendPushCommand(Uuid::v4(), NotificationCategory::Security, 'title', 'body', '   '),
+            'overlong ID' => new SendWebhookCommand(Uuid::v4(), NotificationCategory::Security, 'title', 'body', str_repeat('x', 65)),
             'missing ID' => new SendEmailCommand(Uuid::v4(), 'user@baander.app', NotificationCategory::Security, 'title', 'body', new \DateTimeImmutable()),
             default => self::message('push'),
         };
@@ -73,6 +76,8 @@ final class NotificationDeliveryTest extends TestCase
         yield ['envelope stamps'];
         yield ['argument stamps'];
         yield ['missing ID'];
+        yield ['blank ID'];
+        yield ['overlong ID'];
     }
 
     public function testClaimsUseSkipLockedAndBoundedLease(): void
@@ -113,6 +118,9 @@ final class NotificationDeliveryTest extends TestCase
         $payload = match ($failure) {
             'malformed' => '{',
             'wrong channel' => $codec->encode(self::message('email')),
+            'wrong ID' => $codec->encode(new SendPushCommand(Uuid::v4(), NotificationCategory::Security, 'title', 'body', 'notification-2')),
+            'missing ID' => $codec->encode(new SendEmailCommand(Uuid::v4(), 'user@baander.app', NotificationCategory::Security, 'title', 'body', new \DateTimeImmutable())),
+            'unsupported' => $codec->encode(new \App\Shared\Domain\Event\Outbox\RelayOutboxCommand()),
             default => $codec->encode($message),
         };
         $rows = [
@@ -147,7 +155,7 @@ final class NotificationDeliveryTest extends TestCase
                 }
                 return new Envelope($sent);
             });
-        $handler = new RelayNotificationDeliveriesHandler(new NotificationDeliveryRepository($connection), $bus, $codec, new NullLogger());
+        $handler = new RelayNotificationDeliveriesHandler(new NotificationDeliveryRepository($connection), $bus, $codec, new NullLogger(), new NotificationDeliveryIntentResolver());
         try {
             $handler();
             $this->fail('Failed delivery must be reported.');
@@ -164,16 +172,20 @@ final class NotificationDeliveryTest extends TestCase
         yield ['transport', 4];
         yield ['malformed', 0];
         yield ['wrong channel', 0];
+        yield ['wrong ID', 0];
+        yield ['missing ID', 0];
+        yield ['unsupported', 0];
     }
 
+    /** @param 'email'|'push'|'webhook' $channel */
     #[DataProvider('acknowledgements')]
-    public function testDurableHandoffPrecedesFencedAcknowledgement(bool $acknowledged): void
+    public function testDurableHandoffPrecedesFencedAcknowledgement(bool $acknowledged, string $channel): void
     {
-        $message = self::message('webhook');
+        $message = self::message($channel);
         $codec = MessageCodecFactory::create();
         $result = $this->createMock(Result::class);
         $result->expects($this->once())->method('fetchAllAssociative')->willReturn([
-            ['id' => 7, 'channel' => 'webhook', 'notification_id' => 'notification-1',
+            ['id' => 7, 'channel' => $channel, 'notification_id' => 'notification-1',
                 'payload' => $codec->encode($message), 'attempts' => 0, 'lease_token' => 'lease'],
         ]);
         $connection = $this->createMock(Connection::class);
@@ -201,18 +213,20 @@ final class NotificationDeliveryTest extends TestCase
                 $handoff->sent = true;
                 return new Envelope($message);
             });
-        $handler = new RelayNotificationDeliveriesHandler(new NotificationDeliveryRepository($connection), $bus, $codec, new NullLogger());
+        $handler = new RelayNotificationDeliveriesHandler(new NotificationDeliveryRepository($connection), $bus, $codec, new NullLogger(), new NotificationDeliveryIntentResolver());
         if (!$acknowledged) {
             $this->expectException(OutboxRelayException::class);
         }
         self::assertSame(1, $handler());
     }
 
-    /** @return iterable<string, array{bool}> */
+    /** @return iterable<string, array{bool, 'email'|'push'|'webhook'}> */
     public static function acknowledgements(): iterable
     {
-        yield 'successful acknowledgement' => [true];
-        yield 'expired acknowledgement' => [false];
+        foreach (['email', 'push', 'webhook'] as $channel) {
+            yield $channel.' successful acknowledgement' => [true, $channel];
+            yield $channel.' expired acknowledgement' => [false, $channel];
+        }
     }
 
     public function testLostLeaseIsNotDispatched(): void
@@ -226,7 +240,7 @@ final class NotificationDeliveryTest extends TestCase
         $connection->expects($this->once())->method('executeStatement')->willReturn(0);
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($this->never())->method('dispatch');
-        $handler = new RelayNotificationDeliveriesHandler(new NotificationDeliveryRepository($connection), $bus, MessageCodecFactory::create(), new NullLogger());
+        $handler = new RelayNotificationDeliveriesHandler(new NotificationDeliveryRepository($connection), $bus, MessageCodecFactory::create(), new NullLogger(), new NotificationDeliveryIntentResolver());
         self::assertSame(0, $handler());
     }
 

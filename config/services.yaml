@@ -1171,6 +1171,8 @@ services:
     App\Shared\Infrastructure\Event\OutboxEventDispatcher:
         arguments:
             $dispatcher: '@App\Shared\Infrastructure\Event\NotificationReplayDispatcher'
+    App\Shared\Application\Port\DeliveryIntentResolverInterface:
+        alias: App\Notification\Infrastructure\Messaging\NotificationDeliveryIntentResolver
     App\Notification\Application\Handler\CreateNotificationHandler:
         arguments:
             $bus: '@App\Shared\Infrastructure\Event\NotificationDeliveryBus'

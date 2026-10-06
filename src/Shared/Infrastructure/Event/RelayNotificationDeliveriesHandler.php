@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Event;
 
+use App\Shared\Application\Port\DeliveryIntentResolverInterface;
 use App\Shared\Domain\Event\Outbox\OutboxRelayException;
 use App\Shared\Infrastructure\Messaging\JsonMessageCodec;
 use Psr\Log\LoggerInterface;
@@ -20,6 +21,7 @@ final readonly class RelayNotificationDeliveriesHandler
         private MessageBusInterface $messageBus,
         private JsonMessageCodec $codec,
         private LoggerInterface $logger,
+        private DeliveryIntentResolverInterface $intentResolver,
     ) {
     }
 
@@ -36,8 +38,9 @@ final readonly class RelayNotificationDeliveriesHandler
             try {
                 $decoded = $this->codec->decode($row['payload']);
                 $message = $decoded->message;
-                if ($decoded->metadata !== [] || NotificationDeliveryBus::channel($message) !== $row['channel']
-                    || $message->notificationPublicId !== $row['notification_id']) {
+                $intent = $this->intentResolver->resolve($message);
+                if ($decoded->metadata !== [] || $intent->channel !== $row['channel']
+                    || $intent->notificationId !== $row['notification_id']) {
                     throw new \UnexpectedValueException('Notification delivery payload does not match its stored intent.');
                 }
                 $this->messageBus->dispatch($message, [new TransportNamesStamp(['async'])]);
