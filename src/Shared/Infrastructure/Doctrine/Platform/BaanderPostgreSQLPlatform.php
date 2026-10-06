@@ -70,6 +70,22 @@ class BaanderPostgreSQLPlatform extends PostgreSQLPlatform
     }
 
     /**
+     * pg_attrdef also stores the expression of a generated column, which DBAL would
+     * introspect as a column default. DBAL does not model generated columns: an entity
+     * maps one with columnDefinition, which schema comparison ignores, and no default.
+     */
+    public function getDefaultColumnValueSQLSnippet(): string
+    {
+        return <<<'SQL'
+             SELECT pg_get_expr(adbin, adrelid)
+             FROM pg_attrdef
+             WHERE c.oid = pg_attrdef.adrelid
+                AND pg_attrdef.adnum=a.attnum
+                AND a.attgenerated = ''
+        SQL;
+    }
+
+    /**
      * @param list<string> $flags
      */
     private function extractUsingMethod(array $flags): ?string

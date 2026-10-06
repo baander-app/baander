@@ -167,15 +167,12 @@ final class JobMonitorService
                 ->setParameter('queue', $filter->queue);
         }
 
-        // Map sort parameter to DQL field.
-        // Note: 'duration' is a computed field (finishedAt - startedAt). Doctrine DQL does not
-        // support arithmetic on datetime columns directly. Mapping to j.finishedAt as a pragmatic
-        // approximation -- jobs that finished later tend to have longer durations in a batch setting.
+        // Duration is the database-generated finished_at - started_at in microseconds.
         $sortColumn = match ($sort) {
             'createdAt' => 'j.createdAt',
             'startedAt' => 'j.startedAt',
             'finishedAt' => 'j.finishedAt',
-            'duration' => 'j.finishedAt',
+            'duration' => 'j.durationMicroseconds',
             default => 'j.createdAt',
         };
 
@@ -576,7 +573,8 @@ final class JobMonitorService
     {
         return match ($sort) {
             'startedAt' => $entity->getStartedAt()?->format(\DateTimeInterface::ATOM),
-            'finishedAt', 'duration' => $entity->getFinishedAt()?->format(\DateTimeInterface::ATOM),
+            'finishedAt' => $entity->getFinishedAt()?->format(\DateTimeInterface::ATOM),
+            'duration' => $entity->getDurationMicroseconds() === null ? null : (string) $entity->getDurationMicroseconds(),
             default => $entity->getCreatedAt()->format(\DateTimeInterface::ATOM),
         };
     }
