@@ -23,8 +23,8 @@ errors at the last full scan. Subsequent focused PHPStan checks for the QoL
 boundary pass. Hardware diagnostics, Scheduler administration, and notification
 delivery-intent extraction lowered Deptrac to 200 active violations; the subsequent
 song lookup repair, Library voter extraction, WebSocket Session boundary, and email
-verification exception placement lowered it to 187 without baseline changes, so
-release quality gates are not fully green.
+verification exception placement and QoL budget-listener extraction lowered it to
+185 without baseline changes. Release quality gates are not fully green.
 The locked CI image completed
 all 143 full-suite PHPUnit shards with Xdebug coverage and a merged report:
 6,368 tests were discovered, and no shard failed. The final 512 MiB child-process
@@ -287,6 +287,12 @@ use case constructs them. Direct and Messenger-wrapped failures retain HTTP 400 
 the same generic error without revealing token details. The focused handler and
 controller suite passes 16 tests with 67 assertions; targeted PHPStan passes, and
 Deptrac falls from 189 to 187 active violations.
+
+The QoL stream-budget 503 response now belongs to a QoL exception listener that
+runs before Shared's generic error logger. The exact JSON body and four-decimal
+budget value remain unchanged; unrelated failures still reach the generic 500
+handler. Twenty-one focused listener/value-object tests pass with 101 assertions,
+targeted PHPStan passes, and Deptrac falls from 187 to 185 active violations.
 
 ## Delivery horizons
 

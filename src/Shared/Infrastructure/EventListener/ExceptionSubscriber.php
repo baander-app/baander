@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\EventListener;
 
-use App\QoL\Domain\Exception\StreamBudgetExhausted;
 use App\Shared\Interface\DTO\ApiError;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
@@ -27,14 +26,6 @@ final class ExceptionSubscriber
     public function __invoke(ExceptionEvent $event): void
     {
         $exception = $event->getThrowable();
-
-        if ($exception instanceof StreamBudgetExhausted) {
-            $event->setResponse(new JsonResponse(
-                $exception->toResponseData(),
-                Response::HTTP_SERVICE_UNAVAILABLE,
-            ));
-            return;
-        }
 
         if ($exception instanceof HttpExceptionInterface) {
             $status = $exception->getStatusCode();
