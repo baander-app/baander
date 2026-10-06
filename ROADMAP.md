@@ -630,8 +630,12 @@ Clean release and ASan/LeakSanitizer/UBSan builds now pass through
 `scripts/test-registry.sh`, which verifies downloaded rqlite/OpenSSL checksums and
 isolates OpenSSL dependency discovery. Both CI matrix variants are required before
 publication. Twenty workflow tests verify event-commit checkouts and failure
-propagation, including all registry modes and the container qualification job. Static analysis,
-automated license checks and performance/soak gates remain outstanding.
+propagation, including all registry modes and the container qualification job.
+The registry CI gate now runs Clang 19 analysis of production C++ and checks
+first-party SPDX declarations plus the five pinned direct dependency notices
+against upstream. Its first-party diagnostic controls fail as expected. A
+transitive dependency/license inventory and the constrained five-host,
+fixed-runner regression, and long-soak gates remain outstanding.
 
 The cluster tests exposed rqlite's HTTP-200 leadership-loss response and an API
 deadline that could expire before a database failure became a 503 response.
