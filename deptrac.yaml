@@ -46,7 +46,7 @@ deptrac:
         Discovery: ['Discovery Domain', 'Discovery Application', 'Discovery Infrastructure', 'Discovery Resources', 'Discovery Interface']
         Favorites: ['Favorites Domain', 'Favorites Application', 'Favorites Infrastructure', 'Favorites Resources', 'Favorites Interface']
         Radio: ['Radio Domain', 'Radio Application', 'Radio Infrastructure', 'Radio Resources', 'Radio Interface']
-        Scheduler: ['Scheduler Domain', 'Scheduler Application', 'Scheduler Infrastructure', 'Scheduler Resources', 'Scheduler Interface']
+        Scheduler: ['Scheduler Schedulable Contract', 'Scheduler Domain', 'Scheduler Application', 'Scheduler Infrastructure', 'Scheduler Resources', 'Scheduler Interface']
         Session: ['Session Domain', 'Session Application', 'Session Infrastructure', 'Session Resources', 'Session Interface']
         QoL: ['QoL Encoder Profile Contract', 'QoL Domain', 'QoL Application', 'QoL Infrastructure', 'QoL Resources', 'QoL Interface']
         Command: ['Command Utility']
@@ -632,10 +632,20 @@ deptrac:
             - type: classLike
               value: '^App\\Radio\\Interface\\Resource\\'
 
-    - name: 'Scheduler Domain'
+    - name: 'Scheduler Schedulable Contract'
       collectors:
         - type: classLike
-          value: '^App\\Scheduler\\Domain\\'
+          value: '^App\\Scheduler\\Domain\\Model\\(SchedulableCommandInterface|SchedulableConsoleCommandInterface|SchedulerParameterSchema)$'
+
+    - name: 'Scheduler Domain'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Scheduler\\Domain\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Scheduler\\Domain\\Model\\(SchedulableCommandInterface|SchedulableConsoleCommandInterface|SchedulerParameterSchema)$'
 
     - name: 'Scheduler Application'
       collectors:
@@ -842,6 +852,7 @@ deptrac:
     'Catalog Domain':
       - 'Shared Domain'
     'Catalog Application':
+      - 'Scheduler Schedulable Contract'
       - 'Catalog Domain'
       - 'Shared Domain'
       - 'Shared Application'
@@ -925,6 +936,7 @@ deptrac:
     'Media Domain':
       - 'Shared Domain'
     'Media Application':
+      - 'Scheduler Schedulable Contract'
       - 'Media Domain'
       - 'Shared Domain'
       - 'Shared Application'
@@ -1084,6 +1096,7 @@ deptrac:
     'Transcode Domain':
       - 'Shared Domain'
     'Transcode Application':
+      - 'Scheduler Schedulable Contract'
       - 'Transcode Domain'
       - 'Shared Domain'
       - 'Shared Application'
@@ -1101,6 +1114,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Transcode Interface':
+      - 'Scheduler Schedulable Contract'
       - 'Transcode Resources'
       - 'Auth Identity Contract'
       - 'Transcode Application'
@@ -1219,7 +1233,10 @@ deptrac:
       - 'Shared Application'
       - 'Shared Interface'
 
+    'Scheduler Schedulable Contract': []
+
     'Scheduler Domain':
+      - 'Scheduler Schedulable Contract'
       - 'Shared Domain'
 
     'Scheduler Application':
@@ -1310,6 +1327,7 @@ deptrac:
       - 'Shared Interface'
 
     'Lyrics Application':
+      - 'Scheduler Schedulable Contract'
       - 'Lyrics Domain'
       - 'Shared Domain'
       - 'Shared Application'
