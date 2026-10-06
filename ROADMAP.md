@@ -22,8 +22,9 @@ updated, specification drift and web typechecking pass, and full PHPStan has zer
 errors at the last full scan. Subsequent focused PHPStan checks for the QoL
 boundary pass. Hardware diagnostics, Scheduler administration, and notification
 delivery-intent extraction lowered Deptrac to 200 active violations; the subsequent
-song lookup repair, Library voter extraction, and WebSocket Session boundary lowered
-it to 189 without baseline changes, so release quality gates are not fully green.
+song lookup repair, Library voter extraction, WebSocket Session boundary, and email
+verification exception placement lowered it to 187 without baseline changes, so
+release quality gates are not fully green.
 The locked CI image completed
 all 143 full-suite PHPUnit shards with Xdebug coverage and a merged report:
 6,368 tests were discovered, and no shard failed. The final 512 MiB child-process
@@ -280,6 +281,12 @@ inputs, synchronous handler results, falsy values, and the no-result fallback;
 the controller keeps its JSON response and error mapping. Seventy focused tests
 pass with 254 assertions, full PHPStan and container lint pass, and Deptrac falls
 from 194 to 189 active violations without baseline changes.
+
+Email verification failures now live in Auth Application, where the token-verification
+use case constructs them. Direct and Messenger-wrapped failures retain HTTP 400 and
+the same generic error without revealing token details. The focused handler and
+controller suite passes 16 tests with 67 assertions; targeted PHPStan passes, and
+Deptrac falls from 189 to 187 active violations.
 
 ## Delivery horizons
 

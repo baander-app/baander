@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Interface\Controller;
 
+use App\Auth\Application\Exception\EmailVerificationException;
 use App\Auth\Application\Port\DpopJtiCacheInterface;
 use App\Auth\Application\Port\UserPortInterface;
 use App\Auth\Infrastructure\Security\OAuth\DpopNonceManager;
@@ -12,6 +13,7 @@ use App\Auth\Infrastructure\Security\Passkey\PasskeyService;
 use App\Auth\Interface\Controller\User\AuthController;
 use App\Auth\Interface\Request\User\VerifyEmailRequest;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
@@ -22,17 +24,14 @@ use Psr\Log\NullLogger;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Contracts\Translation\TranslatorInterface;
 use Webauthn\Counter\CounterChecker;
 
-/**
- * Validation test: POST /api/auth/email/verify must actually verify the email
- * token (lookup token, check expiry, mark user verified). The current
- * implementation is a TODO stub that always returns a placeholder message.
- */
+/** Verifies the HTTP contract for successful and rejected email tokens. */
 final class AuthControllerVerifyEmailTest extends TestCase
 {
     private Security&Stub $security;
@@ -113,5 +112,44 @@ final class AuthControllerVerifyEmailTest extends TestCase
         $this->assertSame(Response::HTTP_OK, $response->getStatusCode());
         $this->assertStringContainsStringIgnoringCase('verified', $data['data']['message']);
         $this->assertStringNotContainsStringIgnoringCase('not yet implemented', $data['data']['message']);
+    }
+
+    /** @return iterable<string, array{string, bool}> */
+    public static function verificationFailures(): iterable
+    {
+        foreach (['missing', 'invalid', 'expired', 'alreadyUsed'] as $reason) {
+            yield $reason . ' direct' => [$reason, false];
+            yield $reason . ' Messenger-wrapped' => [$reason, true];
+        }
+    }
+
+    #[DataProvider('verificationFailures')]
+    public function testVerifyEmailMapsUseCaseFailuresWithoutLeakingDetails(string $reason, bool $wrapped): void
+    {
+        $failure = match ($reason) {
+            'missing' => EmailVerificationException::missing(),
+            'invalid' => EmailVerificationException::invalid(),
+            'expired' => EmailVerificationException::expired(),
+            'alreadyUsed' => EmailVerificationException::alreadyUsed(),
+            default => throw new \InvalidArgumentException('Unknown verification failure.'),
+        };
+        $this->commandBus
+            ->expects($this->once())
+            ->method('dispatch')
+            ->willReturnCallback(static function (object $command) use ($failure, $wrapped): never {
+                if ($wrapped) {
+                    throw new HandlerFailedException(new Envelope($command), [$failure]);
+                }
+
+                throw $failure;
+            });
+
+        $response = $this->controller->verifyEmail(new VerifyEmailRequest(token: 'invalid-token'));
+        $body = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame(Response::HTTP_BAD_REQUEST, $response->getStatusCode());
+        self::assertSame(Response::HTTP_BAD_REQUEST, $body['error']['code']);
+        self::assertSame('errors.email_verification_failed', $body['error']['message']);
+        self::assertStringNotContainsString($failure->getMessage(), (string) $response->getContent());
     }
 }

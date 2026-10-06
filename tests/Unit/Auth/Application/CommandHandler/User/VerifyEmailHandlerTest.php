@@ -7,7 +7,7 @@ namespace App\Tests\Unit\Auth\Application\CommandHandler\User;
 use App\Auth\Application\Command\User\VerifyEmailCommand;
 use App\Auth\Application\CommandHandler\User\VerifyEmailHandler;
 use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
-use App\Auth\Domain\Exception\EmailVerificationException;
+use App\Auth\Application\Exception\EmailVerificationException;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Application\DTO\EmailVerificationTokenDTO;
 use App\Shared\Application\Port\TransactionPortInterface;

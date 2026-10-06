@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Auth\Application\CommandHandler\User;
 
 use App\Auth\Application\Command\User\VerifyEmailCommand;
+use App\Auth\Application\Exception\EmailVerificationException;
 use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
 use App\Auth\Domain\Event\EmailVerified;
-use App\Auth\Domain\Exception\EmailVerificationException;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
