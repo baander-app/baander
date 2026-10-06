@@ -25,8 +25,8 @@ interface FailedMessageAdministrationInterface
 
     /**
      * Handles the message again through messenger:failed:retry. A message that fails
-     * again goes back to the failure transport under a new id, until the failure
-     * transport's retry strategy (three retries) is exhausted and the worker discards it.
+     * again goes back to the failure transport under a new id with its retry count
+     * increased; it stays there until it succeeds or an operator removes it.
      *
      * @return bool false when no failed message has this id
      *

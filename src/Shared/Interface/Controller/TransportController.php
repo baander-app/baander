@@ -253,7 +253,7 @@ final class TransportController
      */
     #[OA\Post(
         path: '/api/monitor/transport/failed/{id}/retry',
-        description: 'Handles a failed message again by running messenger:failed:retry {id} --force. A message that fails again returns to the failure transport under a new ID; the fourth failed retry, or an unrecoverable failure, discards it.',
+        description: 'Handles a failed message again by running messenger:failed:retry {id} --force. A message that fails again returns to the failure transport under a new ID with its retry count increased, and stays listed until it succeeds or is removed.',
         summary: 'Retry a failed message',
         parameters: [
             new OA\Parameter(name: 'id', description: 'Failed message ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[1-9][0-9]{0,17}$')),

@@ -126,7 +126,7 @@ curl -X POST -s -H "Authorization: Bearer $TOKEN" \
 | `DELETE /api/monitor/transport/failed/{id}` | `messenger:failed:remove <id> --force` |
 | `POST /api/monitor/transport/failed/flush?confirm=true` | `messenger:failed:remove --all --force` |
 
-Retrying runs `messenger:failed:retry` in a child process, which handles the message before the request returns. A message that fails again goes back to the failure transport under a new ID with its retry count increased. The failure transport allows three such retries, Symfony's default retry strategy: when a message with retry count 3 fails again, or a retry fails with an unrecoverable exception, the message is discarded. Record its details before a fourth retry if you still need them. The list and flush endpoints include messages waiting out a retry delay; `messenger:failed:show` without an ID and `messenger:failed:remove --all` skip them until the delay ends. `GET /api/monitor/transport/status` reports the number of failed messages as `failedQueueDepth`.
+Retrying runs `messenger:failed:retry` in a child process, which handles the message before the request returns. A message that fails again goes back to the failure transport under a new ID with its retry count increased, including after an unrecoverable exception. It stays listed until a retry succeeds or you remove it. The list and flush endpoints include messages waiting out a retry delay; `messenger:failed:show` without an ID and `messenger:failed:remove --all` skip them until the delay ends. `GET /api/monitor/transport/status` reports the number of failed messages as `failedQueueDepth`.
 
 ## Job Analytics
 

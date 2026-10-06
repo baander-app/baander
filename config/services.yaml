@@ -253,6 +253,11 @@ services:
             $queueName: '%app.messenger.failure_queue%'
             $projectDir: '%kernel.project_dir%'
 
+    App\Shared\Infrastructure\Messenger\RelistFailedRetrySubscriber:
+        arguments:
+            $failureSender: '@messenger.transport.failed'
+            $failureTransportName: failed
+
     # --- Rate Limiter Administration ---
     # Arguments are filled from framework.rate_limiter by RateLimiterCatalogPass.
     App\Shared\Application\Port\RateLimiterAdministrationInterface:

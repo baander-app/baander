@@ -170,7 +170,7 @@ Messages that exhaust their retries land in the failure transport, a PostgreSQL 
 | Command | Description |
 |---------|-------------|
 | `messenger:failed:show` | List failed messages, or show one with `messenger:failed:show <id>` |
-| `messenger:failed:retry <id> --force` | Handle a failed message again; one that fails again returns under a new ID, and the fourth failed retry discards it |
+| `messenger:failed:retry <id> --force` | Handle a failed message again; one that fails again returns under a new ID and stays listed |
 | `messenger:failed:remove <id> --force` | Remove a failed message; `--all` removes every message the transport can deliver now |
 
 ## Development & Docs

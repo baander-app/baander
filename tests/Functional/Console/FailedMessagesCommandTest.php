@@ -110,25 +110,42 @@ final class FailedMessagesCommandTest extends KernelTestCase
     }
 
     /**
-     * Symfony's documented semantics: a retry from the failure transport that fails
-     * again is re-sent under the failure transport's retry strategy (three retries by
-     * default), and the worker then discards it.
+     * Symfony's default strategy would discard the message after its third failed
+     * retry; RelistFailedRetrySubscriber keeps it listed instead.
      */
-    public function testTheFourthFailedRetryDiscardsTheMessage(): void
+    public function testRepeatedFailedRetriesKeepTheMessageListed(): void
     {
-        $this->expectOutputString(str_repeat(self::RESET_NOTICE, 4));
+        $this->expectOutputString(str_repeat(self::RESET_NOTICE, 5));
         $this->sendFailed('exhausted');
 
         $retryCounts = [];
-        for ($attempt = 1; $attempt <= 4; ++$attempt) {
+        for ($attempt = 1; $attempt <= 5; ++$attempt) {
             [$id] = $this->storedIds();
             $tester = $this->runCommand('messenger:failed:retry', ['id' => [$id], '--force' => true]);
             self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
             $remaining = $this->storedIds();
-            $retryCounts[] = $remaining === [] ? null : static::getContainer()->get(FailedMessageAdministrationInterface::class)->find($remaining[0])?->retryCount;
+            self::assertCount(1, $remaining);
+            $retryCounts[] = static::getContainer()->get(FailedMessageAdministrationInterface::class)->find($remaining[0])?->retryCount;
         }
 
-        self::assertSame([1, 2, 3, null], $retryCounts);
+        self::assertSame([1, 2, 3, 4, 5], $retryCounts);
+    }
+
+    public function testUnrecoverableFailureOnRetryKeepsTheMessageListed(): void
+    {
+        $this->expectOutputString(self::RESET_NOTICE);
+        $id = $this->sendFailed('unrecoverable probe');
+
+        $tester = $this->runCommand('messenger:failed:retry', ['id' => [$id], '--force' => true]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
+        $ids = $this->storedIds();
+        self::assertCount(1, $ids);
+        self::assertNotSame($id, $ids[0]);
+        $message = static::getContainer()->get(FailedMessageAdministrationInterface::class)->find($ids[0]);
+        self::assertNotNull($message);
+        self::assertSame(1, $message->retryCount);
+        self::assertSame('Probe "unrecoverable probe" failed.', $message->errorMessage);
     }
 
     /** @param array<string, mixed> $input */

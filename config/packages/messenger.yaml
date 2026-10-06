@@ -62,6 +62,12 @@ framework:
                     queue_name: '%app.messenger.failure_queue%'
                     auto_setup: false
                     use_notify: false
+                # A retry that fails again goes straight back to this table through
+                # RelistFailedRetrySubscriber; Symfony's default strategy would discard
+                # the message after its third failed retry.
+                retry_strategy:
+                    max_retries: 0
+                    delay: 0
 
         failure_transport: failed
 
