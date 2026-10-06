@@ -10,6 +10,31 @@ Continue local implementation and emulated acceptance; actual regional deploymen
 regional measurements, and backup-destination restore qualification remain pending.
 React Native and Android work is deferred at the user's request (2026-10-05).
 
+## Resume here
+
+Read [AGENTS.md](AGENTS.md) for working rules and the
+[testing guide](docs-book/part-2-developer-guide/testing.md) for runners. This
+roadmap records scope and acceptance; the linked design documents, current source,
+and CI workflow are the executable detail. Measurements in later historical
+batches describe their own checkpoints; the current gate below takes precedence.
+
+The web-store refactor and first debugger are locally complete. Continue with a
+bounded backend release-gate package: reproduce the current Deptrac report, remove
+violations through application ports, and run its affected behavior tests without
+baseline expansion. Also rerun the *whole* sharded PHPUnit/coverage gate on the
+final 512 MiB CI image: use the `PHPUnit with coverage` step in
+[the CI workflow](.forgejo/workflows/ci.yaml), with its disposable PostgreSQL and
+Redis services and `scripts/run-phpunit-shards.php`. Record the checkout commit,
+image digest, command, merged report, shard count, and any failures. The previous
+143-shard pass and later Shared-only pass do not establish that final-image gate.
+Verify that an intentionally failing test blocks the publication job.
+
+Other local work can proceed independently: finish the browser credential/session
+integration below; qualify the registry's remaining failure, fixed-runner load,
+resource, and soak gates. Regional hosts and the S3 destination remain external
+blockers. Do not mark deployment or restore acceptance complete from local cluster
+tests. React Native and Android remain deferred.
+
 ## Current quality-gate checkpoint
 
 Fresh-process PHPUnit sharding keeps the 512 MiB PHP limit and completes the full
@@ -99,7 +124,8 @@ committed claim and again during notification insertion inside the projection
 transaction. It proves child containment, rollback with zero visible effects,
 unchanged claim tokens and expiry, and a replacement worker's single projection
 receipt after each natural 60-second lease expiry. The full worker drill passes.
-Consumer and transport-acknowledgement crash points remain separate acceptance work.
+Consumer and transport-acknowledgement crash points were qualified later; see the
+completed crash gate under application security and reliability.
 
 Radio source initialization now uses the existing application port instead of
 creating and persisting an aggregate from the console boundary. Focused command
@@ -298,12 +324,13 @@ targeted PHPStan passes, and Deptrac falls from 187 to 185 active violations.
 
 The destination is a reliable private self-hosted backend/web application, a small
 strongly consistent global registry, and secondary clients whose native media paths
-are qualified. The current store refactor is one stage in that programme, not a
+are qualified. The completed store refactor is one stage in that programme, not a
 replacement for it. Horizons express dependencies, not promised calendar dates.
 
 | Horizon | Deliverable | Exit condition |
 | --- | --- | --- |
-| Now | Web-state architecture, render/persistence budgets, optional developer tracing | Behavior and performance regressions pass; disabled tracing has no runtime instrumentation |
+| Current local work | Remaining backend boundaries, final-image quality gates, browser auth qualification, and registry failure/resource tests | Deptrac reaches zero; full final-image checks and the relevant integrated acceptance pass |
+| Completed foundation | Web-state architecture, render/persistence budgets, optional developer tracing | Local behavior and performance regressions passed; release-wide qualification remains separate |
 | Before application release | Backend/web security, asynchronous recovery, complete contracts and enforceable gates | Fresh install and critical workflows pass real integration tests; deliberately failing checks block publication |
 | Before registry rollout | C++ registry and five-voter deployment qualification | Consistency, constrained capacity, partition/failover, leak and restore gates pass |
 | Before secondary-client certification | Shared/mobile/desktop correctness and reproducible native media | Affected client CI and native reference-vector/browser tests pass |
@@ -314,7 +341,7 @@ delivery and recovery precede new workflow expansion or more ambitious autoscali
 No milestone is complete merely because a command, schema, test, or deployment file
 exists; its stated acceptance checks must have evidence.
 
-## Current work: web stores and developer tooling
+## Completed foundation: web stores and developer tooling
 
 - [x] Refactor web stores into cohesive modules with explicit, typed public actions.
   Use slices for substantial shared state; keep small feature stores simple.
@@ -342,9 +369,10 @@ exists; its stated acceptance checks must have evidence.
 - [x] Verify unit/integration tests, render and persistence budgets, TypeScript,
   lint, production build, and disposable-browser workflows before completion.
 
-The lead owns shared persistence/debugger infrastructure, developer UI, integration,
-and this roadmap. One worker owns player/session state; another owns the remaining
-feature stores and consumers. Workers do not commit or refresh the shared index.
+The completed implementation split assigned the lead shared persistence, debugger
+UI, integration, and this roadmap; separate workers owned player/session and other
+feature stores. These are historical assignments, not work reserved for future
+agents.
 
 Verified on 2026-10-04: 1,588 web tests, 46 native audio browser tests,
 11 browser authentication tests, and the HTTPS store-debugger browser workflow.
@@ -724,9 +752,21 @@ A harmless EICAR repository canary is detected by ClamAV locally and excluded
 from deployment images. External scanner visibility depends on publication; it
 has not been demonstrated for a public Baander endpoint.
 
-- [ ] Complete/verify C++20 registry with Beast/Asio, OpenSSL, nlohmann/json,
+The public routes are `POST /api/servers/register`,
+`GET /api/servers/{publicId}`, `GET /health`, and `GET /ready`. Health reports
+process liveness; readiness requires recent successful authoritative database
+access and a compatible schema. Lookup uses an explicit linearizable read;
+registration is acknowledged only after its rqlite commit. SQLite access belongs
+exclusively to rqlite. Keep sockets, timers, buffers, and requests RAII-managed;
+do not introduce detached threads, unbounded queues, or custom JSON/crypto code.
+The database/admin endpoints stay private behind authenticated TLS.
+
+- [x] Implement the C++20 registry with Beast/Asio, OpenSSL, nlohmann/json,
   pinned dependencies, CMake/Ninja, GoogleTest, and bounded async rqlite pools.
-  Replace the PHP registry; no Symfony serialization, Redis, Sentinel, or Electric.
+  The PHP registry is replaced; no Symfony serialization, Redis, Sentinel, or
+  Electric is used. Local build, sanitizer, and cluster evidence is recorded above.
+- [ ] Finish release qualification of that implementation on constrained hosts,
+  full failure injection, fixed-runner performance, and the actual regional network.
 - [ ] Verify atomic credential-owned registration, digest-only credentials,
   idempotent uncertain-commit retries, reserved offline identities, revisioning,
   parameterized SQL and statement errors, bounded input/rate limits, private TLS
@@ -753,9 +793,11 @@ Acceptance budget: each whole host gets 1 CPU and 512 MiB; total used memory mus
 stay at or below 448 MiB, API peak RSS at or below 64 MiB, and normal busiest-host
 CPU at or below 70%. Load: 100 servers, 60-second staggered heartbeats, 20 lookups/s;
 fivefold bursts for five minutes. Normal p95/p99 must be <=1s/2s; burst p99 <=3s.
-Test 200ms inter-node RTT, 25ms jitter, 0.1% loss, <=30s leader-loss recovery, and
-no acknowledged registration loss after any two voter failures. Failed gates block
-release, without weakening consistency or increasing the agreed host budget.
+Run the load generator outside the host budgets; require no swap, OOM, or unbounded
+backlog during the burst. Test 200ms inter-node RTT, 25ms jitter, 0.1% loss, <=30s
+leader-loss recovery, and no acknowledged registration loss after any two voter
+failures. Failed gates block release, without weakening consistency or increasing
+the agreed host budget.
 
 ## Long-horizon acceptance backlog
 
@@ -772,6 +814,9 @@ release, without weakening consistency or increasing the agreed host budget.
   rollback recoverability on persistence/signing failure, and replay detection.
   Exercise expiry, logout, multiple tabs, concurrent requests, service-worker
   restart, nonce challenges, and foreign-origin credential exclusion together.
+  Bound retry attempts for both initiating and queued Axios requests. Bind each
+  signing request to its requesting browser client, and close MessageChannels and
+  timers on success, timeout, cancellation, logout, and service-worker restart.
   The real PostgreSQL/League transaction suite passes seven tests and 107
   assertions; the combined browser/session qualification remains open.
 - [x] Verify actual Messenger middleware/Redis delivery when Swoole dispatch fails,
@@ -779,6 +824,9 @@ release, without weakening consistency or increasing the agreed host budget.
   independent PostgreSQL connections, poison-event retry/dead-letter handling, and
   idempotent durable notification effects. External delivery remains at-least-once;
   uncertain outcomes are not represented as exactly-once.
+- [ ] Exercise the Messenger/Redis fallback in a qualified runtime without the
+  Swoole extension. The completed dispatch-failure test alone does not demonstrate
+  extension-unavailable operation.
 - [x] Finish supervised crash tests at the consumer acknowledgement boundary.
   Claim, mid-projection transaction, and Redis-send-before-delivery-ack crashes
   verify unchanged leases, rollback where needed, natural expiry, and recovery
@@ -809,12 +857,15 @@ release, without weakening consistency or increasing the agreed host budget.
 - [ ] Eliminate remaining Deptrac boundary violations using application ports.
   No blanket suppressions or inflated baselines. Verify the
   correct Symfony/Vite artifacts, Composer extensions, isolated CI networks,
-  matching Redis credentials, and explicitly failing readiness timeouts.
-  Removing the ineffective PKCE lookup lowered active violations to 284; the
-  lyrics bulk-fetch role check lowered them to 282 without changing the
-  superadmin-only firewall behavior. League exchange tests reject missing and
-  incorrect verifiers from codes issued by the controller. Deptrac still reports
-  zero configuration errors.
+  matching Redis credentials, and explicitly failing readiness timeouts. Use the
+  current Deptrac count at the top of this document; lower counts recorded in older
+  batches are historical measurements. League exchange tests reject missing and
+  incorrect PKCE verifiers from codes issued by the controller.
+- [ ] Build a truthful application and registry threat model, then run focused
+  penetration-defense regressions for credential leakage, replay, cross-tenant
+  access, malformed HTTP/JSON, rate-limit abuse, SSRF, TLS failures, and quorum
+  downgrade. Record observed findings and remediation. The EICAR scanner canary
+  is only a scanner check, not evidence of penetration resistance.
 
 ### Worker architecture and resource control
 
