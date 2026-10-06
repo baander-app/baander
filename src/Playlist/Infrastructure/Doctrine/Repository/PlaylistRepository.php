@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Playlist\Infrastructure\Doctrine\Repository;
 
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
-use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
+use App\Catalog\Application\Port\SongLookupInterface;
 use App\Playlist\Domain\Model\Playlist;
 use App\Playlist\Domain\Model\PlaylistSong;
 use App\Playlist\Domain\ReadModel\PlaylistReadView;
@@ -15,13 +15,13 @@ use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistSongEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
-use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class PlaylistRepository implements PlaylistRepositoryInterface
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
+        private readonly SongLookupInterface $songs,
     ) {
     }
 
@@ -75,30 +75,17 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
                 'p.id, p.publicId, IDENTITY(p.user) AS userId',
                 'p.name, p.description, p.isPublic, p.isCollaborative, p.isSmart',
                 'p.smartRules, p.createdAt, p.updatedAt',
-                'COUNT(read_song.id) AS songCount',
             )
             ->from(PlaylistEntity::class, 'p')
-            ->leftJoin(PlaylistSongEntity::class, 'membership', 'WITH', 'membership.playlist = p.id')
             ->where('IDENTITY(p.user) = :ownerId')
             ->setParameter('ownerId', $ownerId, 'uuid')
-            ->groupBy('p.id')
             ->orderBy('p.name', 'ASC')
             ->addOrderBy('p.id', 'ASC');
 
         if ($scope->isUnrestricted()) {
-            $query->leftJoin('membership.song', 'read_song');
-        } elseif ($scope->getLibraryIds() === []) {
-            $query->leftJoin('membership.song', 'read_song', 'WITH', '1 = 0');
-        } else {
-            $visibleAlbum = <<<'DQL'
-                read_song.album IN (
-                    SELECT scoped_album.id
-                    FROM App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity scoped_album
-                    WHERE IDENTITY(scoped_album.library) IN (:libraryIds)
-                )
-                DQL;
-            $query->leftJoin('membership.song', 'read_song', 'WITH', $visibleAlbum)
-                ->setParameter('libraryIds', $scope->getLibraryIds(), ArrayParameterType::STRING);
+            $query->addSelect('COUNT(membership.id) AS songCount')
+                ->leftJoin(PlaylistSongEntity::class, 'membership', 'WITH', 'membership.playlist = p.id')
+                ->groupBy('p.id');
         }
 
         /**
@@ -106,10 +93,17 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
          *     id: Uuid, publicId: PublicId, userId: string, name: string,
          *     description: ?string, isPublic: bool, isCollaborative: bool, isSmart: bool,
          *     smartRules: array<array-key, mixed>, createdAt: \DateTimeImmutable,
-         *     updatedAt: \DateTimeImmutable, songCount: int|string
+         *     updatedAt: \DateTimeImmutable, songCount?: int|string
          * }> $rows
          */
         $rows = $query->getQuery()->getArrayResult();
+        if (!$scope->isUnrestricted()) {
+            $visibleCounts = $rows === [] ? [] : $this->countVisibleSongsByPlaylist($ownerId, $scope);
+            foreach ($rows as $index => $row) {
+                $rows[$index]['songCount'] = $visibleCounts[$row['id']->toString()] ?? 0;
+            }
+        }
+
         return array_map(static fn (array $row): PlaylistReadView => new PlaylistReadView(
             id: $row['id'],
             publicId: $row['publicId'],
@@ -124,6 +118,49 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
             updatedAt: $row['updatedAt'],
             songCount: (int) $row['songCount'],
         ), $rows);
+    }
+
+    /**
+     * Counts each owned playlist's entries whose songs Catalog reports visible under the scope.
+     *
+     * @return array<string, int> playlist UUID => visible entry count; playlists without one are absent
+     */
+    private function countVisibleSongsByPlaylist(Uuid $ownerId, LibraryReadScope $scope): array
+    {
+        if ($scope->getLibraryIds() === []) {
+            return [];
+        }
+
+        /** @var list<array{playlistId: string, songId: Uuid}> $memberships */
+        $memberships = $this->entityManager->createQueryBuilder()
+            ->select('IDENTITY(membership.playlist) AS playlistId', 'membership.songId')
+            ->from(PlaylistSongEntity::class, 'membership')
+            ->innerJoin('membership.playlist', 'p')
+            ->where('IDENTITY(p.user) = :ownerId')
+            ->setParameter('ownerId', $ownerId, 'uuid')
+            ->getQuery()
+            ->getArrayResult();
+        if ($memberships === []) {
+            return [];
+        }
+
+        $songIds = [];
+        foreach ($memberships as $membership) {
+            $songIds[$membership['songId']->toString()] = $membership['songId'];
+        }
+        $visible = [];
+        foreach ($this->songs->visibleSongIds(array_values($songIds), $scope) as $songId) {
+            $visible[$songId->toString()] = true;
+        }
+
+        $counts = [];
+        foreach ($memberships as $membership) {
+            if (isset($visible[$membership['songId']->toString()])) {
+                $counts[$membership['playlistId']] = ($counts[$membership['playlistId']] ?? 0) + 1;
+            }
+        }
+
+        return $counts;
     }
 
     public function findWithSongs(Uuid $id): ?Playlist
@@ -141,9 +178,8 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
             ->getRepository(PlaylistSongEntity::class)
             ->createQueryBuilder('ps')
             ->innerJoin('ps.playlist', 'p')
-            ->innerJoin('ps.song', 's')
-            ->where('s.id = :songId')
-            ->setParameter('songId', $songId)
+            ->where('ps.songId = :songId')
+            ->setParameter('songId', $songId, 'uuid')
             ->getQuery()
             ->getResult();
 
@@ -246,7 +282,6 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
         $songEntities = $this->entityManager
             ->getRepository(PlaylistSongEntity::class)
             ->createQueryBuilder('ps')
-            ->innerJoin('ps.song', 's')
             ->where('ps.playlist = :playlist')
             ->setParameter('playlist', $entity)
             ->orderBy('ps.position', 'ASC')
@@ -254,7 +289,7 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
             ->getResult();
 
         return array_map(
-            static fn(PlaylistSongEntity $ps): PlaylistSong => new PlaylistSong($ps->getSong()->getId(), $ps->getPosition()),
+            static fn(PlaylistSongEntity $ps): PlaylistSong => new PlaylistSong($ps->getSongId(), $ps->getPosition()),
             $songEntities,
         );
     }
@@ -296,7 +331,7 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
         /** @var array<string, PlaylistSongEntity> $existingBySong */
         $existingBySong = [];
         foreach ($existing as $psEntity) {
-            $existingBySong[$psEntity->getSong()->getId()->toString()] = $psEntity;
+            $existingBySong[$psEntity->getSongId()->toString()] = $psEntity;
         }
 
         // Remove dropped songs; update positions of retained songs.
@@ -308,10 +343,9 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
             }
         }
 
-        // Insert newly added songs (a reference is enough to set the FK).
+        // Insert newly added songs; playlist_song_song_id_fkey rejects unknown songs.
         foreach (array_diff_key($desired, $existingBySong) as $songIdStr => $position) {
-            $songEntity = $this->entityManager->getReference(SongEntity::class, Uuid::fromString($songIdStr));
-            $this->entityManager->persist(new PlaylistSongEntity($entity, $songEntity, $position));
+            $this->entityManager->persist(new PlaylistSongEntity($entity, Uuid::fromString((string) $songIdStr), $position));
         }
     }
 }

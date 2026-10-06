@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Playlist\Infrastructure\Doctrine\Entity;
 
-use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -24,9 +23,9 @@ class PlaylistSongEntity
     #[ORM\JoinColumn(name: 'playlist_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private PlaylistEntity $playlist;
 
-    #[ORM\ManyToOne(targetEntity: SongEntity::class)]
-    #[ORM\JoinColumn(name: 'song_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
-    private SongEntity $song;
+    /** Constraint playlist_song_song_id_fkey (ON DELETE CASCADE) is declared by PlaylistForeignKeys. */
+    #[ORM\Column(name: 'song_id', type: 'uuid')]
+    private Uuid $songId;
 
     #[ORM\Column(type: 'integer', options: ['default' => 0])]
     private int $position = 0;
@@ -39,12 +38,12 @@ class PlaylistSongEntity
 
     public function __construct(
         PlaylistEntity $playlist,
-        SongEntity $song,
+        Uuid $songId,
         int $position = 0,
     ) {
         $this->id = new Uuid();
         $this->playlist = $playlist;
-        $this->song = $song;
+        $this->songId = $songId;
         $this->position = $position;
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
@@ -60,9 +59,9 @@ class PlaylistSongEntity
         return $this->playlist;
     }
 
-    public function getSong(): SongEntity
+    public function getSongId(): Uuid
     {
-        return $this->song;
+        return $this->songId;
     }
 
     public function getPosition(): int

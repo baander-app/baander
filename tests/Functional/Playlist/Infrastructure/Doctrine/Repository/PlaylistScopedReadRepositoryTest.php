@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Playlist\Infrastructure\Doctrine\Repository;
 
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Catalog\Application\Port\SongLookupInterface;
+use App\Catalog\Application\Port\SongLyricSignature;
 use App\Catalog\Domain\Repository\SongRepositoryInterface;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
@@ -12,6 +14,7 @@ use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Playlist\Domain\Repository\PlaylistRepositoryInterface;
 use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistEntity;
 use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistSongEntity;
+use App\Playlist\Infrastructure\Doctrine\Repository\PlaylistRepository;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
@@ -46,10 +49,10 @@ final class PlaylistScopedReadRepositoryTest extends TestCase
             $this->owner, $other, $allowedLibrary, $deniedLibrary, $allowedAlbum,
             $this->deniedAlbum, $this->allowedSong, $this->deniedSong,
             $this->mixed, $empty, $denied, $foreign,
-            new PlaylistSongEntity($this->mixed, $this->allowedSong, 3),
-            new PlaylistSongEntity($this->mixed, $this->deniedSong, 7),
-            new PlaylistSongEntity($denied, $this->deniedSong),
-            new PlaylistSongEntity($foreign, $this->allowedSong),
+            new PlaylistSongEntity($this->mixed, $this->allowedSong->getId(), 3),
+            new PlaylistSongEntity($this->mixed, $this->deniedSong->getId(), 7),
+            new PlaylistSongEntity($denied, $this->deniedSong->getId()),
+            new PlaylistSongEntity($foreign, $this->allowedSong->getId()),
         ] as $entity) {
             $this->entityManager->persist($entity);
         }
@@ -76,6 +79,52 @@ final class PlaylistScopedReadRepositoryTest extends TestCase
         $this->assertNotNull($stored);
         $this->assertSame('Pending name', $stored->getName());
         $this->assertSame([3, 7], array_map(static fn ($song) => $song->getPosition(), $stored->getSongs()));
+    }
+
+    public function testOnlyRestrictedScopesAskCatalogForTheVisibleSubsetOfOwnedSongs(): void
+    {
+        $lookup = new class (static::getContainer()->get(SongLookupInterface::class)) implements SongLookupInterface {
+            /** @var list<list<string>> */
+            public array $subsetRequests = [];
+
+            public function __construct(private readonly SongLookupInterface $inner)
+            {
+            }
+
+            public function findVisibleSongId(PublicId $publicId, LibraryReadScope $scope): ?Uuid
+            {
+                throw new \LogicException('Not used by playlist reads.');
+            }
+
+            public function findLyricSignature(Uuid $songId): ?SongLyricSignature
+            {
+                throw new \LogicException('Not used by playlist reads.');
+            }
+
+            public function songIdsAfter(?Uuid $after, int $limit): array
+            {
+                throw new \LogicException('Not used by playlist reads.');
+            }
+
+            public function visibleSongIds(array $songIds, LibraryReadScope $scope): array
+            {
+                $requested = array_map(static fn (Uuid $id): string => $id->toString(), $songIds);
+                sort($requested);
+                $this->subsetRequests[] = $requested;
+
+                return $this->inner->visibleSongIds($songIds, $scope);
+            }
+        };
+        $repository = new PlaylistRepository($this->entityManager, $lookup);
+
+        $this->assertSame([2, 0, 1], array_map(static fn ($view) => $view->getSongCount(), $repository->findReadByUser($this->owner->getId(), LibraryReadScope::unrestricted())));
+        $this->assertSame([0, 0, 0], array_map(static fn ($view) => $view->getSongCount(), $repository->findReadByUser($this->owner->getId(), LibraryReadScope::none())));
+        $this->assertSame([], $lookup->subsetRequests);
+
+        $this->assertSame([1, 0, 0], array_map(static fn ($view) => $view->getSongCount(), $repository->findReadByUser($this->owner->getId(), $this->scope)));
+        $owned = [$this->allowedSong->getId()->toString(), $this->deniedSong->getId()->toString()];
+        sort($owned);
+        $this->assertSame([$owned], $lookup->subsetRequests);
     }
 
     public function testBulkSongReadsAreKeyedScopedSnapshotsIndependentOfManagedDirtyEntities(): void

@@ -175,6 +175,65 @@ SOURCE);
         ], $violations);
     }
 
+    public function testLyricsAndPlaylistReachCatalogSongsOnlyThroughTheSongLookupContract(): void
+    {
+        $report = $this->analyse(<<<'SOURCE'
+<?php
+namespace App\Catalog\Application\Port;
+interface SongLookupInterface {
+    public function findLyricSignature(\App\Shared\Domain\Model\Uuid $songId): ?SongLyricSignature;
+}
+final class SongLyricSignature {}
+interface SongPortInterface {}
+namespace App\Catalog\Infrastructure;
+final class BoundarySongLookup implements \App\Catalog\Application\Port\SongLookupInterface {
+    public function findLyricSignature(\App\Shared\Domain\Model\Uuid $songId): ?\App\Catalog\Application\Port\SongLyricSignature { return null; }
+}
+namespace App\Lyrics\Application;
+final class BoundaryHandler {
+    public function contract(\App\Catalog\Application\Port\SongLookupInterface $songs, \App\Catalog\Application\Port\SongLyricSignature $signature): void {}
+    public function internal(\App\Catalog\Application\Port\SongPortInterface $songs): void {}
+}
+namespace App\Lyrics\Interface\Controller;
+final class BoundaryController {
+    public function contract(\App\Catalog\Application\Port\SongLookupInterface $songs): void {}
+    public function internal(\App\Catalog\Application\Port\SongPortInterface $songs): void {}
+}
+namespace App\Lyrics\Infrastructure;
+final class BoundaryService {
+    public function contract(\App\Catalog\Application\Port\SongLookupInterface $songs): void {}
+    public function internal(\App\Catalog\Application\Port\SongPortInterface $songs): void {}
+}
+namespace App\Playlist\Infrastructure;
+final class BoundaryRepository {
+    public function contract(\App\Catalog\Application\Port\SongLookupInterface $songs): void {}
+    public function internal(\App\Catalog\Application\Port\SongPortInterface $songs): void {}
+}
+namespace App\Playlist\Application;
+final class BoundaryViolation {
+    public function contract(\App\Catalog\Application\Port\SongLookupInterface $songs): void {}
+}
+SOURCE);
+
+        self::assertSame(0, $report['Report']['Errors']);
+        self::assertSame(0, $report['Report']['Uncovered']);
+        self::assertGreaterThan(0, $report['Report']['Allowed']);
+        $violations = [];
+        foreach ($report['files'] as $file) {
+            foreach ($file['messages'] as $message) {
+                $violations[] = $message['message'];
+            }
+        }
+        sort($violations);
+        self::assertSame([
+            'App\Lyrics\Application\BoundaryHandler must not depend on App\Catalog\Application\Port\SongPortInterface (Lyrics Application on Catalog Application)',
+            'App\Lyrics\Infrastructure\BoundaryService must not depend on App\Catalog\Application\Port\SongPortInterface (Lyrics Infrastructure on Catalog Application)',
+            'App\Lyrics\Interface\Controller\BoundaryController must not depend on App\Catalog\Application\Port\SongPortInterface (Lyrics Interface on Catalog Application)',
+            'App\Playlist\Application\BoundaryViolation must not depend on App\Catalog\Application\Port\SongLookupInterface (Playlist Application on Catalog Song Lookup Contract)',
+            'App\Playlist\Infrastructure\BoundaryRepository must not depend on App\Catalog\Application\Port\SongPortInterface (Playlist Infrastructure on Catalog Application)',
+        ], $violations);
+    }
+
     /** @return array{Report: array<string, int>, files: array<string, array{messages: list<array{message: string}>}>} */
     private function analyse(string $source): array
     {

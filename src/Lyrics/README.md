@@ -48,8 +48,9 @@ No domain events published yet.
 
 | Dependency | Layer | Purpose |
 |------------|-------|---------|
-| `Catalog\Application\Port\SongPortInterface` | Application, Interface | Song metadata (title, duration, artist name) for LRCLIB signature lookup |
-| `Catalog\Application\Port\AlbumPortInterface` | Application, Infrastructure | Album name for LRCLIB signature lookup |
+| `Catalog\Application\Port\SongLookupInterface` | Application, Interface, Infrastructure | Visible song ID by public ID and library scope; song-ID pages for the bulk scan; the LRCLIB signature (title, artist name, album title, duration) as `SongLyricSignature` |
+
+`LyricsEntity` stores a scalar `song_id`. `LyricsForeignKeys` declares the `lyrics_song_id_fkey` constraint (`ON DELETE CASCADE`), so deleting a song still deletes its lyrics.
 
 ### Anti-Corruption Layer
 

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Lyrics\Infrastructure\Doctrine\Repository;
 
-use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Lyrics\Domain\Model\Lyrics;
 use App\Lyrics\Domain\Model\LyricsState;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
@@ -34,7 +33,7 @@ final class LyricsRepository implements LyricsRepositoryInterface
     {
         $entity = $this->entityManager
             ->getRepository(LyricsEntity::class)
-            ->findOneBy(['song' => $songId]);
+            ->findOneBy(['songId' => $songId]);
 
         return $entity !== null ? $this->toDomain($entity) : null;
     }
@@ -90,7 +89,7 @@ final class LyricsRepository implements LyricsRepositoryInterface
 
         return new LyricsEntity(
             id: $lyrics->getId(),
-            song: $this->entityManager->getReference(SongEntity::class, $lyrics->getSongId()),
+            songId: $lyrics->getSongId(),
             source: $lyrics->getSource(),
         );
     }

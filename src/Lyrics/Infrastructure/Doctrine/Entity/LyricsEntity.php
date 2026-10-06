@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Lyrics\Infrastructure\Doctrine\Entity;
 
-use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -19,9 +18,9 @@ class LyricsEntity
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
 
-    #[ORM\ManyToOne(targetEntity: SongEntity::class)]
-    #[ORM\JoinColumn(name: 'song_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
-    private SongEntity $song;
+    /** Constraint lyrics_song_id_fkey (ON DELETE CASCADE) is declared by LyricsForeignKeys. */
+    #[ORM\Column(name: 'song_id', type: 'uuid')]
+    private Uuid $songId;
 
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $plainLyrics = null;
@@ -49,12 +48,12 @@ class LyricsEntity
 
     public function __construct(
         Uuid $id,
-        SongEntity $song,
+        Uuid $songId,
         string $source,
         ?Uuid $existingId = null,
     ) {
         $this->id = $existingId ?? $id;
-        $this->song = $song;
+        $this->songId = $songId;
         $this->source = $source;
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
@@ -67,7 +66,7 @@ class LyricsEntity
 
     public function getSongId(): Uuid
     {
-        return $this->song->getId();
+        return $this->songId;
     }
 
     public function getPlainLyrics(): ?string

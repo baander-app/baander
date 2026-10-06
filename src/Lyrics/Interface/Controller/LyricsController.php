@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace App\Lyrics\Interface\Controller;
 
-use App\Catalog\Application\Port\SongPortInterface;
-use App\Catalog\Domain\Model\Song;
+use App\Catalog\Application\Port\SongLookupInterface;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Lyrics\Application\Port\LyricsPortInterface;
 use App\Lyrics\Interface\Request\ApplyLyricsRequest;
@@ -13,6 +12,7 @@ use App\Lyrics\Interface\Request\SearchLyricsRequest;
 use App\Lyrics\Interface\Resource\LyricsResource;
 use App\Lyrics\Interface\Resource\LrclibSearchResource;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -32,7 +32,7 @@ final class LyricsController
 
     public function __construct(
         private readonly LyricsPortInterface $lyricsPort,
-        private readonly SongPortInterface $songPort,
+        private readonly SongLookupInterface $songs,
         private readonly LibraryReadScopeProviderInterface $libraryReadScope,
     ) {
     }
@@ -60,13 +60,13 @@ final class LyricsController
     #[Route('/songs/{publicId}/lyrics', name: 'song_lyrics', methods: ['GET'])]
     public function show(string $publicId): JsonResponse
     {
-        $song = $this->resolveSong($publicId);
+        $songId = $this->resolveSongId($publicId);
 
-        if ($song === null) {
+        if ($songId === null) {
             return $this->notFound();
         }
 
-        $lyrics = $this->lyricsPort->findBySongId($song->getId());
+        $lyrics = $this->lyricsPort->findBySongId($songId);
 
         if ($lyrics === null) {
             return $this->successResponse([]);
@@ -100,13 +100,13 @@ final class LyricsController
     #[IsGranted('ROLE_ADMIN')]
     public function fetch(string $publicId): JsonResponse
     {
-        $song = $this->resolveSong($publicId);
+        $songId = $this->resolveSongId($publicId);
 
-        if ($song === null) {
+        if ($songId === null) {
             return $this->notFound();
         }
 
-        $lyrics = $this->lyricsPort->fetchAndStore($song->getId());
+        $lyrics = $this->lyricsPort->fetchAndStore($songId);
 
         if ($lyrics === null) {
             return $this->successResponse([]);
@@ -170,13 +170,13 @@ final class LyricsController
             return $this->errorResponse($this->trans('errors.invalid_public_id'));
         }
 
-        $song = $this->songPort->findVisibleByPublicId($publicId, $this->libraryReadScope->current());
+        $songId = $this->songs->findVisibleSongId($publicId, $this->libraryReadScope->current());
 
-        if ($song === null) {
+        if ($songId === null) {
             return $this->notFound();
         }
 
-        $lyrics = $this->lyricsPort->applySearchResult($resultId, $song->getId());
+        $lyrics = $this->lyricsPort->applySearchResult($resultId, $songId);
 
         if ($lyrics === null) {
             return $this->notFound();
@@ -185,7 +185,7 @@ final class LyricsController
         return $this->successResponse(LyricsResource::from($lyrics));
     }
 
-    private function resolveSong(string $publicId): ?Song
+    private function resolveSongId(string $publicId): ?Uuid
     {
         try {
             $resolvedPublicId = PublicId::fromString($publicId);
@@ -193,6 +193,6 @@ final class LyricsController
             return null;
         }
 
-        return $this->songPort->findVisibleByPublicId($resolvedPublicId, $this->libraryReadScope->current());
+        return $this->songs->findVisibleSongId($resolvedPublicId, $this->libraryReadScope->current());
     }
 }

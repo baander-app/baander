@@ -4,27 +4,26 @@ declare(strict_types=1);
 
 namespace App\Lyrics\Application\CommandHandler;
 
-use App\Catalog\Application\Port\AlbumPortInterface;
-use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Port\SongLookupInterface;
 use App\Lyrics\Application\Command\FetchLyricsCommand;
 use App\Lyrics\Application\DTO\LrclibResult;
 use App\Lyrics\Application\Port\LrclibClientInterface;
 use App\Lyrics\Domain\Model\Lyrics;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
+use App\Shared\Domain\Model\Uuid;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
  * Handles FetchLyricsCommand.
  *
- * Orchestrates: check local cache → resolve song metadata → fetch from LRCLIB → persist.
+ * Orchestrates: resolve song signature → check local cache → fetch from LRCLIB → persist.
  */
 #[AsMessageHandler]
 final class FetchLyricsHandler
 {
     public function __construct(
-        private readonly SongPortInterface $songPort,
-        private readonly AlbumPortInterface $albumPort,
+        private readonly SongLookupInterface $songs,
         private readonly LrclibClientInterface $lrclibClient,
         private readonly LyricsRepositoryInterface $lyricsRepository,
         private readonly LoggerInterface $logger,
@@ -36,8 +35,8 @@ final class FetchLyricsHandler
         $songId = $command->getSongId();
 
         // 1. Find song
-        $song = $this->songPort->findByUuid($songId);
-        if ($song === null) {
+        $signature = $this->songs->findLyricSignature($songId);
+        if ($signature === null) {
             $this->logger->warning('Song not found for lyrics fetch, skipping', [
                 'song_id' => $songId->toString(),
             ]);
@@ -55,8 +54,8 @@ final class FetchLyricsHandler
             return $existing;
         }
 
-        // 3. Resolve artist name
-        $artistName = $this->songPort->getArtistNameForSong($songId);
+        // 3. Require an artist name
+        $artistName = $signature->artistName;
         if ($artistName === null || trim($artistName) === '') {
             $this->logger->debug('No artist name found for song, cannot perform signature lookup', [
                 'song_id' => $songId->toString(),
@@ -65,12 +64,11 @@ final class FetchLyricsHandler
             return null;
         }
 
-        // 4. Resolve album name
-        $album = $this->albumPort->findByUuid($song->getAlbumId());
-        $albumName = $album?->getTitle() ?? '';
+        // 4. Album name is optional
+        $albumName = $signature->albumTitle ?? '';
 
         // 5. Check duration — required for LRCLIB signature lookup (±2 seconds tolerance)
-        $duration = $song->getLength();
+        $duration = $signature->duration;
         if ($duration === null) {
             $this->logger->debug('Song has no duration, cannot perform signature lookup', [
                 'song_id' => $songId->toString(),
@@ -81,7 +79,7 @@ final class FetchLyricsHandler
 
         // 6. Try cached endpoint first, then full endpoint
         $result = $this->lrclibClient->getBySignatureCached(
-            $song->getTitle(),
+            $signature->title,
             $artistName,
             $albumName,
             $duration,
@@ -89,7 +87,7 @@ final class FetchLyricsHandler
 
         if ($result === null) {
             $result = $this->lrclibClient->getBySignature(
-                $song->getTitle(),
+                $signature->title,
                 $artistName,
                 $albumName,
                 $duration,
@@ -100,7 +98,7 @@ final class FetchLyricsHandler
         if ($result === null) {
             $this->logger->info('No lyrics found on LRCLIB for song', [
                 'song_id' => $songId->toString(),
-                'title' => $song->getTitle(),
+                'title' => $signature->title,
                 'artist' => $artistName,
             ]);
 
@@ -121,7 +119,7 @@ final class FetchLyricsHandler
         return $lyrics;
     }
 
-    private function createLyricsFromResult(LrclibResult $result, \App\Shared\Domain\Model\Uuid $songId): Lyrics
+    private function createLyricsFromResult(LrclibResult $result, Uuid $songId): Lyrics
     {
         return Lyrics::create(
             songId: $songId,

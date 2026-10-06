@@ -469,6 +469,8 @@ services:
         alias: App\Catalog\Infrastructure\AlbumService
     App\Catalog\Application\Port\SongPortInterface:
         alias: App\Catalog\Infrastructure\SongService
+    App\Catalog\Application\Port\SongLookupInterface:
+        alias: App\Catalog\Infrastructure\SongLookupService
     App\Catalog\Application\Port\GenrePortInterface:
         alias: App\Catalog\Infrastructure\GenreService
     App\Catalog\Application\Port\MoviePortInterface:

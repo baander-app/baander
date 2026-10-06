@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace App\Lyrics\Application\CommandHandler;
 
-use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Port\SongLookupInterface;
 use App\Lyrics\Application\Command\BulkFetchLyricsCommand;
 use App\Lyrics\Application\Command\FetchLyricsCommand;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
-use App\Shared\Application\Port\CursorDecoderInterface;
-use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Infrastructure\Swoole\Async;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -18,7 +16,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
 /**
  * Handles BulkFetchLyricsCommand.
  *
- * Iterates songs and dispatches individual FetchLyricsCommand instances
+ * Walks song IDs and dispatches individual FetchLyricsCommand instances
  * for those without lyrics. Applies a configurable delay between dispatches
  * for respectful crawling.
  */
@@ -28,11 +26,10 @@ final class BulkFetchLyricsHandler
     private const int BATCH_SIZE = 50;
 
     public function __construct(
-        private readonly SongPortInterface $songPort,
+        private readonly SongLookupInterface $songs,
         private readonly LyricsRepositoryInterface $lyricsRepository,
         private readonly MessageBusInterface $bus,
         private readonly LoggerInterface $logger,
-        private readonly CursorDecoderInterface $cursorDecoder,
     ) {
     }
 
@@ -41,7 +38,7 @@ final class BulkFetchLyricsHandler
         $limit = $command->getLimit();
         $delayMs = $command->getDelayMs() ?? 500;
         $dispatched = 0;
-        $cursor = null;
+        $after = null;
 
         while (true) {
             if ($limit !== null && $dispatched >= $limit) {
@@ -49,25 +46,24 @@ final class BulkFetchLyricsHandler
             }
 
             $remaining = $limit !== null ? min(self::BATCH_SIZE, $limit - $dispatched) : self::BATCH_SIZE;
-            $options = SearchOptions::create('*', $remaining, 0)->withCursor($cursor);
-            $page = $this->songPort->searchWithCursor($options);
+            $songIds = $this->songs->songIdsAfter($after, $remaining);
 
-            if ($page->getItems() === []) {
+            if ($songIds === []) {
                 break;
             }
 
-            foreach ($page->getItems() as $song) {
+            foreach ($songIds as $songId) {
                 if ($limit !== null && $dispatched >= $limit) {
                     break 2;
                 }
 
-                $existing = $this->lyricsRepository->findBySongId($song->getId());
+                $existing = $this->lyricsRepository->findBySongId($songId);
                 if ($existing !== null) {
                     continue;
                 }
 
                 try {
-                    $this->bus->dispatch(new FetchLyricsCommand($song->getId()));
+                    $this->bus->dispatch(new FetchLyricsCommand($songId));
                     ++$dispatched;
 
                     if ($delayMs > 0) {
@@ -75,21 +71,17 @@ final class BulkFetchLyricsHandler
                     }
                 } catch (\Throwable $e) {
                     $this->logger->warning('Failed to dispatch lyrics fetch for song', [
-                        'song_id' => $song->getId()->toString(),
+                        'song_id' => $songId->toString(),
                         'error' => $e->getMessage(),
                         'dispatched' => $dispatched,
                     ]);
                 }
             }
 
-            $nextCursor = $page->getNextCursor();
-            if ($nextCursor === null) {
+            if (count($songIds) < $remaining) {
                 break;
             }
-            $cursor = $this->cursorDecoder->decode($nextCursor);
-            if ($cursor === null) {
-                throw new \UnexpectedValueException('Song pagination returned an invalid continuation cursor.');
-            }
+            $after = $songIds[array_key_last($songIds)];
         }
 
         $this->logger->info('Bulk lyrics fetch completed', [

@@ -251,7 +251,7 @@ final class LyricsFirewallTest extends TestCase
         self::assertSame(200, $response->getStatusCode());
         self::assertSame('Provider lyrics', json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR)['data']['plainLyrics']);
         $this->manager->clear();
-        $stored = $this->manager->getRepository(LyricsEntity::class)->findOneBy(['song' => $song->getId()]);
+        $stored = $this->manager->getRepository(LyricsEntity::class)->findOneBy(['songId' => $song->getId()]);
         self::assertInstanceOf(LyricsEntity::class, $stored);
         self::assertSame('Provider lyrics', $stored->getPlainLyrics());
         self::assertSame(912345, $stored->getLrclibId());
@@ -280,7 +280,7 @@ final class LyricsFirewallTest extends TestCase
 
     private function cacheLyrics(SongEntity $song): void
     {
-        $lyrics = new LyricsEntity(new Uuid(), $song, 'embedded');
+        $lyrics = new LyricsEntity(new Uuid(), $song->getId(), 'embedded');
         $lyrics->setPlainLyrics('Cached lyrics');
         $lyrics->setSyncedLyrics('[00:01.00] Cached lyrics');
         $this->persist($lyrics);
@@ -290,7 +290,7 @@ final class LyricsFirewallTest extends TestCase
     private function assertLyricsCount(int $expected): void
     {
         $this->manager->clear();
-        self::assertSame($expected, $this->manager->getRepository(LyricsEntity::class)->count(['song' => [$this->allowedSong->getId(), $this->deniedSong->getId()]]));
+        self::assertSame($expected, $this->manager->getRepository(LyricsEntity::class)->count(['songId' => [$this->allowedSong->getId(), $this->deniedSong->getId()]]));
     }
 
     private function mutation(SongEntity $song, string $operation): Response

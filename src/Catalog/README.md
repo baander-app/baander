@@ -27,6 +27,7 @@ Most CRUD flows bypass CQRS handlers and go straight through port interfaces. Th
 | `ArtistPortInterface` | Artist CRUD |
 | `GenrePortInterface` | Genre CRUD |
 | `MoviePortInterface` | Movie CRUD |
+| `SongLookupInterface` | Published contract for Lyrics and Playlist: visible song ID by public ID, lyric signature (`SongLyricSignature`), song-ID pages, and the visible subset of a song-ID set (one `uuid[]` parameter) |
 
 ## Events
 
@@ -41,7 +42,8 @@ Most CRUD flows bypass CQRS handlers and go straight through port interfaces. Th
 - **Library** populates Catalog during scans via port interfaces
 - **Metadata** enriches Catalog data via port interfaces after external API lookups
 - **Media** provides cover art for albums and artists
-- **Playlist, Activity, Recommendation** reference Catalog entities via Doctrine FKs
+- **Activity, Recommendation** reference Catalog entities via Doctrine FKs
+- **Lyrics, Playlist** store scalar song IDs (constraints declared by their own FK providers) and read songs through `SongLookupInterface`
 - **Transcode** looks up `VideoRepositoryInterface` in `TranscodeSessionSubscriber`
 - **Filesystem** provides MIME detection for cover uploads
 

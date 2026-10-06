@@ -171,9 +171,6 @@ deptrac:
       - App\Library\Domain\ValueObject\LibraryPath
       - App\Library\Domain\ValueObject\LibrarySlug
       - App\Library\Domain\ValueObject\LibraryType
-    App\Lyrics\Infrastructure\Service\LyricsService:
-      - App\Catalog\Application\Port\AlbumPortInterface
-      - App\Catalog\Application\Port\SongPortInterface
     App\Media\Infrastructure\Doctrine\Entity\ImageEntity:
       - App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity
       - App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity
@@ -291,8 +288,6 @@ deptrac:
       - App\Auth\Infrastructure\Doctrine\Entity\UserEntity
     App\Playlist\Infrastructure\Doctrine\Entity\PlaylistEntity:
       - App\Auth\Infrastructure\Doctrine\Entity\UserEntity
-    App\Playlist\Infrastructure\Doctrine\Entity\PlaylistSongEntity:
-      - App\Catalog\Infrastructure\Doctrine\Entity\SongEntity
     App\Playlist\Infrastructure\Doctrine\Repository\PlaylistRepository:
       - App\Auth\Infrastructure\Doctrine\Entity\UserEntity
     App\Playlist\Interface\Controller\PlaylistController:

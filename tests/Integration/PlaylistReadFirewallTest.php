@@ -118,8 +118,8 @@ final class PlaylistReadFirewallTest extends TestCase
             $playlist->setCollaborative($kind === 'collaborative');
             $this->playlists[$kind] = $playlist;
             $this->persist($playlist);
-            $this->manager->persist(new PlaylistSongEntity($playlist, $this->allowedSong, 0));
-            $this->manager->persist(new PlaylistSongEntity($playlist, $this->deniedSong, 1));
+            $this->manager->persist(new PlaylistSongEntity($playlist, $this->allowedSong->getId(), 0));
+            $this->manager->persist(new PlaylistSongEntity($playlist, $this->deniedSong->getId(), 1));
         }
         $this->manager->flush();
     }
@@ -219,8 +219,8 @@ final class PlaylistReadFirewallTest extends TestCase
         $empty = new PlaylistEntity(new PublicId(), $this->actor, 'Admin empty');
         $this->persist($withSongs);
         $this->persist($empty);
-        $this->manager->persist(new PlaylistSongEntity($withSongs, $this->allowedSong, 0));
-        $this->manager->persist(new PlaylistSongEntity($withSongs, $this->deniedSong, 1));
+        $this->manager->persist(new PlaylistSongEntity($withSongs, $this->allowedSong->getId(), 0));
+        $this->manager->persist(new PlaylistSongEntity($withSongs, $this->deniedSong->getId(), 1));
         $this->manager->flush();
 
         $response = $this->request('/api/playlists/');

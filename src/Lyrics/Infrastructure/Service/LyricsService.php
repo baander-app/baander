@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace App\Lyrics\Infrastructure\Service;
 
-use App\Catalog\Application\Port\AlbumPortInterface;
-use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Port\SongLookupInterface;
 use App\Lyrics\Application\Port\LrclibClientInterface;
 use App\Lyrics\Application\Port\LyricsPortInterface;
 use App\Lyrics\Domain\Model\Lyrics;
@@ -25,8 +24,7 @@ final class LyricsService implements LyricsPortInterface
         private readonly LoggerInterface $logger,
         private readonly LyricsRepositoryInterface $lyricsRepository,
         private readonly LrclibClientInterface $lrclibClient,
-        private readonly SongPortInterface $songPort,
-        private readonly AlbumPortInterface $albumPort,
+        private readonly SongLookupInterface $songs,
     ) {
     }
 
@@ -56,8 +54,8 @@ final class LyricsService implements LyricsPortInterface
         }
 
         // Resolve song metadata
-        $song = $this->songPort->findByUuid($songId);
-        if ($song === null) {
+        $signature = $this->songs->findLyricSignature($songId);
+        if ($signature === null) {
             $this->logger->warning('Song not found for lyrics fetch', [
                 'song_id' => $songId->toString(),
             ]);
@@ -65,7 +63,7 @@ final class LyricsService implements LyricsPortInterface
             return null;
         }
 
-        $artistName = $this->songPort->getArtistNameForSong($songId);
+        $artistName = $signature->artistName;
         if ($artistName === null || trim($artistName) === '') {
             $this->logger->debug('No artist name for song, cannot fetch lyrics', [
                 'song_id' => $songId->toString(),
@@ -74,7 +72,7 @@ final class LyricsService implements LyricsPortInterface
             return null;
         }
 
-        $duration = $song->getLength();
+        $duration = $signature->duration;
         if ($duration === null) {
             $this->logger->debug('Song has no duration, cannot fetch lyrics', [
                 'song_id' => $songId->toString(),
@@ -83,12 +81,11 @@ final class LyricsService implements LyricsPortInterface
             return null;
         }
 
-        $album = $this->albumPort->findByUuid($song->getAlbumId());
-        $albumName = $album?->getTitle() ?? '';
+        $albumName = $signature->albumTitle ?? '';
 
         // Cached-first strategy
         $result = $this->lrclibClient->getBySignatureCached(
-            $song->getTitle(),
+            $signature->title,
             $artistName,
             $albumName,
             $duration,
@@ -96,7 +93,7 @@ final class LyricsService implements LyricsPortInterface
 
         if ($result === null) {
             $result = $this->lrclibClient->getBySignature(
-                $song->getTitle(),
+                $signature->title,
                 $artistName,
                 $albumName,
                 $duration,
@@ -106,7 +103,7 @@ final class LyricsService implements LyricsPortInterface
         if ($result === null) {
             $this->logger->info('No lyrics found on LRCLIB', [
                 'song_id' => $songId->toString(),
-                'title' => $song->getTitle(),
+                'title' => $signature->title,
                 'artist' => $artistName,
             ]);
 
