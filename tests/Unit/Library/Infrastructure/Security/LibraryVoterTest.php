@@ -2,21 +2,22 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Unit\Auth\Infrastructure\Security\Voter;
+namespace App\Tests\Unit\Library\Infrastructure\Security;
 
-use App\Auth\Infrastructure\Security\Voter\LibraryVoter;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
-use App\Shared\Domain\ValueObject\FilesystemType;
-use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Library\Infrastructure\Security\LibraryVoter;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\FilesystemType;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\VoterInterface;
+use Symfony\Component\Security\Core\User\UserInterface;
 
 final class LibraryVoterTest extends TestCase
 {
@@ -79,12 +80,29 @@ final class LibraryVoterTest extends TestCase
         self::assertSame(VoterInterface::ACCESS_ABSTAIN, $this->voter()->vote($this->token(Uuid::generate(), ['ROLE_ADMIN']), 'library', ['UNKNOWN']));
     }
 
-    public function testNonSecurityUserIsDeniedForSupportedSubject(): void
+    /** @return iterable<string, array{string, string, bool}> */
+    public static function unsupportedPrincipals(): iterable
+    {
+        foreach (['domain', 'orm', 'string'] as $kind) {
+            foreach (['VIEW', 'EDIT', 'DELETE'] as $attribute) {
+                foreach ([false, true] as $authenticated) {
+                    yield "$kind $attribute " . ($authenticated ? 'noncontract' : 'anonymous') => [$kind, $attribute, $authenticated];
+                }
+            }
+        }
+    }
+
+    #[DataProvider('unsupportedPrincipals')]
+    public function testPrincipalWithoutIdentityContractIsDeniedEvenWithAdminRole(string $kind, string $attribute, bool $authenticated): void
     {
         $token = $this->createStub(TokenInterface::class);
-        $token->method('getUser')->willReturn(null);
+        $token->method('getUser')->willReturn($authenticated ? $this->createStub(UserInterface::class) : null);
+        $token->method('getRoleNames')->willReturn(['ROLE_ADMIN']);
 
-        self::assertSame(VoterInterface::ACCESS_DENIED, $this->voter()->vote($token, 'library', ['VIEW']));
+        self::assertSame(
+            VoterInterface::ACCESS_DENIED,
+            $this->voter()->vote($token, $this->subject($kind), [$attribute]),
+        );
     }
 
     private function voter(): LibraryVoter
@@ -105,7 +123,10 @@ final class LibraryVoterTest extends TestCase
     private function token(Uuid $userId, array $roles): TokenInterface
     {
         $token = $this->createStub(TokenInterface::class);
-        $token->method('getUser')->willReturn(new SecurityUser($userId->toString(), 'user@baander.app', 'hashed', $roles));
+        $user = $this->createStubForIntersectionOfInterfaces([UserInterface::class, AuthenticatedUserIdentityInterface::class]);
+        $user->method('getId')->willReturn($userId->toString());
+        $user->method('getRoles')->willReturn(['ROLE_USER']);
+        $token->method('getUser')->willReturn($user);
         $token->method('getRoleNames')->willReturn($roles);
         return $token;
     }

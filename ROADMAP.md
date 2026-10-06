@@ -22,10 +22,11 @@ updated, specification drift and web typechecking pass, and full PHPStan has zer
 errors at the last full scan. Subsequent focused PHPStan checks for the QoL
 boundary pass. Hardware diagnostics, Scheduler administration, and notification
 delivery-intent extraction lowered Deptrac to 200 active violations; the subsequent
-song lookup repair lowered it to 198 without baseline changes, so release quality gates
-are not fully green. The locked CI image completed all 143 full-suite PHPUnit
-shards with Xdebug coverage and a merged report: 6,368 discovered tests and no
-failed shards. The final 512 MiB child-process image separately passed its Shared
+song lookup repair and Library voter extraction lowered it to 194 without baseline
+changes, so release quality gates are not fully green. The locked CI image completed
+all 143 full-suite PHPUnit shards with Xdebug coverage and a merged report:
+6,368 tests were discovered, and no shard failed. The final 512 MiB child-process
+image separately passed its Shared
 unit coverage run; the entire suite has not yet been rerun in that final image.
 
 ## Latest verified backend batches
@@ -265,6 +266,12 @@ PostgreSQL lookup and the 16-case firewall/range suite pass. Revoked access and
 replayed proofs fail before media path resolution. Removing the invalid entity
 selection also removes two Deptrac violations, leaving 198 active. The wider browser
 and session qualification remains open.
+
+Library authorization voting now lives in Library Infrastructure and depends on the
+authenticated identity contract. The voter still grants administrators, denies
+ordinary principals for its supported subjects, and abstains on unrelated subjects.
+The 247 focused voter tests pass with 289 assertions; targeted PHPStan, container
+wiring, and service tag discovery pass. Deptrac falls from 198 to 194 active violations.
 
 ## Delivery horizons
 

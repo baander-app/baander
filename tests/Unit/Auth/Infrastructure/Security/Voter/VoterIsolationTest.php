@@ -4,16 +4,18 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Infrastructure\Security\Voter;
 
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Auth\Infrastructure\Security\Voter\AdminVoter;
 use App\Auth\Infrastructure\Security\Voter\AlbumVoter;
-use App\Auth\Infrastructure\Security\Voter\LibraryVoter;
 use App\Auth\Infrastructure\Security\Voter\PlaylistVoter;
 use App\Auth\Infrastructure\Security\Voter\SongVoter;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
+use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
+use App\Library\Infrastructure\Security\LibraryVoter;
 use App\Notification\Domain\Model\Notification;
 use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Notification\Infrastructure\Security\NotificationVoter;
@@ -24,6 +26,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Security\Core\Authentication\Token\UsernamePasswordToken;
 use Symfony\Component\Security\Core\Authorization\AccessDecisionManager;
+use Symfony\Component\Security\Core\User\UserInterface;
 
 /** Exercises the real affirmative strategy, where one unrelated grant can override a denial. */
 final class VoterIsolationTest extends TestCase
@@ -83,6 +86,38 @@ final class VoterIsolationTest extends TestCase
 
         foreach (['VIEW', 'EDIT', 'DELETE'] as $attribute) {
             $this->assertTrue($this->manager()->decide($this->token(Uuid::v4(), admin: true), [$attribute], $library));
+        }
+    }
+
+    #[DataProvider('librarySubjectsAndRoles')]
+    public function testLibraryIdentityContractWorksWithAllVotersPresent(string $kind, bool $admin): void
+    {
+        $subject = match ($kind) {
+            'domain' => Library::create(
+                'Library', new LibrarySlug('library'), new LibraryPath('/music'),
+                LibraryType::Music, FilesystemType::Local,
+            ),
+            'orm' => new LibraryEntity('Library', 'library', '/music', 'music', 'local'),
+            default => 'library',
+        };
+        $principal = $this->createStubForIntersectionOfInterfaces([UserInterface::class, AuthenticatedUserIdentityInterface::class]);
+        $principal->method('getId')->willReturn(Uuid::v4()->toString());
+        $principal->method('getRoles')->willReturn(['ROLE_USER']);
+        self::assertInstanceOf(UserInterface::class, $principal);
+        $token = new UsernamePasswordToken($principal, 'api', $admin ? ['ROLE_ADMIN'] : ['ROLE_USER']);
+
+        foreach (['VIEW', 'EDIT', 'DELETE'] as $attribute) {
+            self::assertSame($admin, $this->manager()->decide($token, [$attribute], $subject));
+        }
+    }
+
+    /** @return iterable<string, array{string, bool}> */
+    public static function librarySubjectsAndRoles(): iterable
+    {
+        foreach (['domain', 'orm', 'string'] as $kind) {
+            foreach ([false, true] as $admin) {
+                yield $kind . ($admin ? ' admin' : ' ordinary') => [$kind, $admin];
+            }
         }
     }
 
