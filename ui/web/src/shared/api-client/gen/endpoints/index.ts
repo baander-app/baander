@@ -1769,6 +1769,41 @@ export interface ScheduledJobResource {
   updatedAt: string;
 }
 
+export interface FailedMessageResource {
+  /**
+     * Failure transport message id
+     * @pattern ^[1-9][0-9]{0,17}$
+     */
+  id: string;
+  /** Message class name */
+  messageClass: string;
+  /**
+     * Transport the message failed on
+     * @nullable
+     */
+  originalTransport: string | null;
+  /**
+     * Exception class of the last failure
+     * @nullable
+     */
+  errorClass: string | null;
+  /**
+     * Exception message of the last failure
+     * @nullable
+     */
+  errorMessage: string | null;
+  /**
+     * Time of the last failure
+     * @nullable
+     */
+  failedAt: string | null;
+  /**
+     * Retries from the failure transport that failed again
+     * @minimum 0
+     */
+  retryCount: number;
+}
+
 export interface TranscodeMetricsResource {
   /** Job UUID */
   uuid: string;
@@ -5412,7 +5447,7 @@ export type PatchAdminSettingsUpdate200 = {
 export type GetMonitorTransportStatus200Data = {
   /** Number of pending messages in the async stream */
   asyncQueueDepth?: number;
-  /** Number of messages in the failed queue */
+  /** Number of messages held by the failure transport */
   failedQueueDepth?: number;
   /** Configured consumer identifier */
   consumerName?: string;
@@ -5426,6 +5461,45 @@ export type GetMonitorTransportStatus200 = {
 
 export type GetMonitorTransportStatus503 = {
   message?: string;
+};
+
+export type GetMonitorTransportFailedListParams = {
+/**
+ * Page number
+ * @minimum 1
+ */
+page?: number;
+/**
+ * Messages per page
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+};
+
+export type GetMonitorTransportFailedList200Meta = {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+};
+
+export type GetMonitorTransportFailedList200 = {
+  data?: FailedMessageResource[];
+  meta?: GetMonitorTransportFailedList200Meta;
+};
+
+export type GetMonitorTransportFailedShow200 = {
+  data?: FailedMessageResource;
+};
+
+export type DeleteMonitorTransportFailedRemove200Data = {
+  /** The ID of the removed message */
+  removed?: string;
+};
+
+export type DeleteMonitorTransportFailedRemove200 = {
+  data?: DeleteMonitorTransportFailedRemove200Data;
 };
 
 export type PostMonitorTransportFailedFlushParams = {
@@ -25677,6 +25751,288 @@ export function useGetMonitorTransportStatus<TData = Awaited<ReturnType<typeof g
 
 
 
+export const getGetMonitorTransportFailedListUrl = (params?: GetMonitorTransportFailedListParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/monitor/transport/failed?${stringifiedParams}` : `/api/monitor/transport/failed`
+}
+
+/**
+ * Lists the messages held by the failure transport, newest first. CLI counterpart: messenger:failed:show.
+ * @summary List failed messages
+ */
+export const getMonitorTransportFailedList = async (params?: GetMonitorTransportFailedListParams, options?: RequestInit): Promise<GetMonitorTransportFailedList200> => {
+
+  return customInstance<GetMonitorTransportFailedList200>(getGetMonitorTransportFailedListUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMonitorTransportFailedListQueryKey = (params?: GetMonitorTransportFailedListParams,) => {
+    return [
+    `/api/monitor/transport/failed`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetMonitorTransportFailedListQueryOptions = <TData = Awaited<ReturnType<typeof getMonitorTransportFailedList>>, TError = ErrorType<ApiError>>(params?: GetMonitorTransportFailedListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportFailedList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMonitorTransportFailedListQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMonitorTransportFailedList>>> = ({ signal }) => getMonitorTransportFailedList(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportFailedList>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetMonitorTransportFailedListQueryResult = NonNullable<Awaited<ReturnType<typeof getMonitorTransportFailedList>>>
+export type GetMonitorTransportFailedListQueryError = ErrorType<ApiError>
+
+
+export function useGetMonitorTransportFailedList<TData = Awaited<ReturnType<typeof getMonitorTransportFailedList>>, TError = ErrorType<ApiError>>(
+ params: undefined |  GetMonitorTransportFailedListParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportFailedList>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMonitorTransportFailedList>>,
+          TError,
+          Awaited<ReturnType<typeof getMonitorTransportFailedList>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMonitorTransportFailedList<TData = Awaited<ReturnType<typeof getMonitorTransportFailedList>>, TError = ErrorType<ApiError>>(
+ params?: GetMonitorTransportFailedListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportFailedList>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMonitorTransportFailedList>>,
+          TError,
+          Awaited<ReturnType<typeof getMonitorTransportFailedList>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMonitorTransportFailedList<TData = Awaited<ReturnType<typeof getMonitorTransportFailedList>>, TError = ErrorType<ApiError>>(
+ params?: GetMonitorTransportFailedListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportFailedList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List failed messages
+ */
+
+export function useGetMonitorTransportFailedList<TData = Awaited<ReturnType<typeof getMonitorTransportFailedList>>, TError = ErrorType<ApiError>>(
+ params?: GetMonitorTransportFailedListParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportFailedList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetMonitorTransportFailedListQueryOptions(params,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetMonitorTransportFailedShowUrl = (id: string,) => {
+
+
+
+
+  return `/api/monitor/transport/failed/${id}`
+}
+
+/**
+ * Returns one message held by the failure transport. CLI counterpart: messenger:failed:show {id}.
+ * @summary Show a failed message
+ */
+export const getMonitorTransportFailedShow = async (id: string, options?: RequestInit): Promise<GetMonitorTransportFailedShow200> => {
+
+  return customInstance<GetMonitorTransportFailedShow200>(getGetMonitorTransportFailedShowUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetMonitorTransportFailedShowQueryKey = (id: string,) => {
+    return [
+    `/api/monitor/transport/failed/${id}`
+    ] as const;
+    }
+
+
+export const getGetMonitorTransportFailedShowQueryOptions = <TData = Awaited<ReturnType<typeof getMonitorTransportFailedShow>>, TError = ErrorType<ApiError>>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportFailedShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetMonitorTransportFailedShowQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getMonitorTransportFailedShow>>> = ({ signal }) => getMonitorTransportFailedShow(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportFailedShow>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetMonitorTransportFailedShowQueryResult = NonNullable<Awaited<ReturnType<typeof getMonitorTransportFailedShow>>>
+export type GetMonitorTransportFailedShowQueryError = ErrorType<ApiError>
+
+
+export function useGetMonitorTransportFailedShow<TData = Awaited<ReturnType<typeof getMonitorTransportFailedShow>>, TError = ErrorType<ApiError>>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportFailedShow>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMonitorTransportFailedShow>>,
+          TError,
+          Awaited<ReturnType<typeof getMonitorTransportFailedShow>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMonitorTransportFailedShow<TData = Awaited<ReturnType<typeof getMonitorTransportFailedShow>>, TError = ErrorType<ApiError>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportFailedShow>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getMonitorTransportFailedShow>>,
+          TError,
+          Awaited<ReturnType<typeof getMonitorTransportFailedShow>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetMonitorTransportFailedShow<TData = Awaited<ReturnType<typeof getMonitorTransportFailedShow>>, TError = ErrorType<ApiError>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportFailedShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Show a failed message
+ */
+
+export function useGetMonitorTransportFailedShow<TData = Awaited<ReturnType<typeof getMonitorTransportFailedShow>>, TError = ErrorType<ApiError>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorTransportFailedShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetMonitorTransportFailedShowQueryOptions(id,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getDeleteMonitorTransportFailedRemoveUrl = (id: string,) => {
+
+
+
+
+  return `/api/monitor/transport/failed/${id}`
+}
+
+/**
+ * Removes one message from the failure transport. CLI counterpart: messenger:failed:remove {id} --force.
+ * @summary Remove a failed message
+ */
+export const deleteMonitorTransportFailedRemove = async (id: string, options?: RequestInit): Promise<DeleteMonitorTransportFailedRemove200> => {
+
+  return customInstance<DeleteMonitorTransportFailedRemove200>(getDeleteMonitorTransportFailedRemoveUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteMonitorTransportFailedRemoveMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMonitorTransportFailedRemove>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteMonitorTransportFailedRemove>>, TError,{id: string}, TContext> => {
+
+const mutationKey = ['deleteMonitorTransportFailedRemove'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteMonitorTransportFailedRemove>>, {id: string}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteMonitorTransportFailedRemove(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteMonitorTransportFailedRemoveMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMonitorTransportFailedRemove>>>
+
+    export type DeleteMonitorTransportFailedRemoveMutationError = ErrorType<ApiError>
+
+    /**
+ * @summary Remove a failed message
+ */
+export const useDeleteMonitorTransportFailedRemove = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMonitorTransportFailedRemove>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteMonitorTransportFailedRemove>>,
+        TError,
+        {id: string},
+        TContext
+      > => {
+      return useMutation(getDeleteMonitorTransportFailedRemoveMutationOptions(options), queryClient);
+    }
+
 export const getPostMonitorTransportFailedFlushUrl = (params: PostMonitorTransportFailedFlushParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -25693,7 +26049,7 @@ export const getPostMonitorTransportFailedFlushUrl = (params: PostMonitorTranspo
 }
 
 /**
- * Removes all messages from the failed transport. Requires ?confirm=true query parameter.
+ * Removes all messages from the failed transport. Requires ?confirm=true query parameter. CLI counterpart: messenger:failed:remove --all --force.
  * @summary Flush all failed messages
  */
 export const postMonitorTransportFailedFlush = async (params: PostMonitorTransportFailedFlushParams, options?: RequestInit): Promise<PostMonitorTransportFailedFlush200> => {
@@ -25764,7 +26120,7 @@ export const getPostMonitorTransportFailedRetryUrl = (id: string,) => {
 }
 
 /**
- * Re-dispatches a specific failed message through the messenger worker.
+ * Handles a failed message again by running messenger:failed:retry {id} --force. A message that fails again returns to the failure transport under a new ID; the fourth failed retry, or an unrecoverable failure, discards it.
  * @summary Retry a failed message
  */
 export const postMonitorTransportFailedRetry = async (id: string, options?: RequestInit): Promise<PostMonitorTransportFailedRetry200> => {

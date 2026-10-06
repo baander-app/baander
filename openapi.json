@@ -15270,7 +15270,7 @@
                                                     "type": "integer"
                                                 },
                                                 "failedQueueDepth": {
-                                                    "description": "Number of messages in the failed queue",
+                                                    "description": "Number of messages held by the failure transport",
                                                     "type": "integer"
                                                 },
                                                 "consumerName": {
@@ -15291,7 +15291,7 @@
                         }
                     },
                     "503": {
-                        "description": "Redis unavailable",
+                        "description": "Redis or the failure transport is unavailable",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -15308,13 +15308,223 @@
                 }
             }
         },
+        "/api/monitor/transport/failed": {
+            "get": {
+                "tags": [
+                    "System"
+                ],
+                "summary": "List failed messages",
+                "description": "Lists the messages held by the failure transport, newest first. CLI counterpart: messenger:failed:show.",
+                "operationId": "get_monitor_transport_failed_list",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1,
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "description": "Messages per page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 50,
+                            "maximum": 100,
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated failed messages",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/FailedMessageResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "required": [
+                                                "current_page",
+                                                "last_page",
+                                                "per_page",
+                                                "total"
+                                            ],
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer"
+                                                },
+                                                "last_page": {
+                                                    "type": "integer"
+                                                },
+                                                "per_page": {
+                                                    "type": "integer"
+                                                },
+                                                "total": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Failure transport unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/monitor/transport/failed/{id}": {
+            "get": {
+                "tags": [
+                    "System"
+                ],
+                "summary": "Show a failed message",
+                "description": "Returns one message held by the failure transport. CLI counterpart: messenger:failed:show {id}.",
+                "operationId": "get_monitor_transport_failed_show",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Failed message ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]{0,17}$"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Failed message",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/FailedMessageResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Message not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Failure transport unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "System"
+                ],
+                "summary": "Remove a failed message",
+                "description": "Removes one message from the failure transport. CLI counterpart: messenger:failed:remove {id} --force.",
+                "operationId": "delete_monitor_transport_failed_remove",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Failed message ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]{0,17}$"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Message removed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "properties": {
+                                                "removed": {
+                                                    "description": "The ID of the removed message",
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Message not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Failure transport unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/monitor/transport/failed/flush": {
             "post": {
                 "tags": [
                     "System"
                 ],
                 "summary": "Flush all failed messages",
-                "description": "Removes all messages from the failed transport. Requires ?confirm=true query parameter.",
+                "description": "Removes all messages from the failed transport. Requires ?confirm=true query parameter. CLI counterpart: messenger:failed:remove --all --force.",
                 "operationId": "post_monitor_transport_failed_flush",
                 "parameters": [
                     {
@@ -15381,7 +15591,7 @@
                     "System"
                 ],
                 "summary": "Retry a failed message",
-                "description": "Re-dispatches a specific failed message through the messenger worker.",
+                "description": "Handles a failed message again by running messenger:failed:retry {id} --force. A message that fails again returns to the failure transport under a new ID; the fourth failed retry, or an unrecoverable failure, discards it.",
                 "operationId": "post_monitor_transport_failed_retry",
                 "parameters": [
                     {
@@ -15390,7 +15600,8 @@
                         "description": "Failed message ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[1-9][0-9]{0,17}$"
                         }
                     }
                 ],
@@ -15428,6 +15639,16 @@
                     },
                     "500": {
                         "description": "Retry failed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Failure transport unavailable",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -21635,6 +21856,55 @@
                         "description": "Last update timestamp",
                         "type": "string",
                         "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "FailedMessageResource": {
+                "required": [
+                    "id",
+                    "messageClass",
+                    "originalTransport",
+                    "errorClass",
+                    "errorMessage",
+                    "failedAt",
+                    "retryCount"
+                ],
+                "properties": {
+                    "id": {
+                        "description": "Failure transport message id",
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]{0,17}$"
+                    },
+                    "messageClass": {
+                        "description": "Message class name",
+                        "type": "string"
+                    },
+                    "originalTransport": {
+                        "description": "Transport the message failed on",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "errorClass": {
+                        "description": "Exception class of the last failure",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "errorMessage": {
+                        "description": "Exception message of the last failure",
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "failedAt": {
+                        "description": "Time of the last failure",
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "retryCount": {
+                        "description": "Retries from the failure transport that failed again",
+                        "type": "integer",
+                        "minimum": 0
                     }
                 },
                 "type": "object"

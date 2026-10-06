@@ -2,7 +2,7 @@ doctrine:
     dbal:
         url: '%env(DATABASE_URL)%'
         # Migration/DBAL-owned runtime tables must not be dropped by ORM schema diffs.
-        schema_filter: '/^(?!domain_event_outbox|worker_deployment_leases$|worker_deployment_containers$|worker_deployment_creations$|worker_deployment_retirements$|scheduler_occurrences$|scheduler_occurrence_executions$).*$/'
+        schema_filter: '/^(?!domain_event_outbox|worker_deployment_leases$|worker_deployment_containers$|worker_deployment_creations$|worker_deployment_retirements$|scheduler_occurrences$|scheduler_occurrence_executions$|failed_messages$).*$/'
         schema_manager_factory: App\Shared\Infrastructure\Doctrine\Platform\BaanderSchemaManagerFactory
         types:
             citext: App\Shared\Infrastructure\Doctrine\Type\CitextType

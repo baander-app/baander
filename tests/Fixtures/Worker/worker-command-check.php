@@ -144,8 +144,7 @@ if (in_array($mode, $consumerAckModes, true)) {
             || $pending !== []
             || $redis->xLen('scheduler_occurrences') !== 0
             || $redis->zCard('scheduler_occurrences__queue') !== 0
-            || $redis->xLen('failed_messages') !== 0
-            || $redis->zCard('failed_messages__queue') !== 0
+            || (int) $db->fetchOne('SELECT count(*) FROM failed_messages') !== 0
         ) {
             throw new RuntimeException(
                 'The original pending Redis entry must replay and ACK with no second execution or changed returned receipt.',
@@ -499,7 +498,7 @@ if ($mode === 'verify-scheduler' || $mode === 'replay-scheduler') {
     $redis->auth(['default', 'test-only']);
     $pending = $redis->xPending('scheduler_occurrences', 'baander');
     if (!is_array($pending) || ($pending[0] ?? null) !== 0 || $redis->xLen('scheduler_occurrences') !== 0
-        || $redis->zCard('scheduler_occurrences__queue') !== 0 || $redis->xLen('failed_messages') !== 0) {
+        || $redis->zCard('scheduler_occurrences__queue') !== 0 || (int) $db->fetchOne('SELECT count(*) FROM failed_messages') !== 0) {
         throw new RuntimeException('Scheduler occurrence must be acknowledged without retries or dead letters.');
     }
     if ($mode === 'replay-scheduler') {
@@ -554,8 +553,7 @@ if ($mode === 'verify-outbox' || $mode === 'replay-outbox') {
     $redis->auth(['default', 'test-only']);
     $pending = $redis->xPending('messages', 'baander');
     if (!is_array($pending) || ($pending[0] ?? null) !== 0 || $redis->xLen('messages') !== 0
-        || $redis->xLen('failed_messages') !== 0 || $redis->zCard('messages__queue') !== 0
-        || $redis->zCard('failed_messages__queue') !== 0) {
+        || (int) $db->fetchOne('SELECT count(*) FROM failed_messages') !== 0 || $redis->zCard('messages__queue') !== 0) {
         throw new RuntimeException('Confirmed handoffs have not both been consumed and acknowledged without retries/dead letters.');
     }
     if ($mode === 'replay-outbox') {

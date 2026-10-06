@@ -245,7 +245,13 @@ services:
         arguments:
             $redisClientFactory: '@App\Shared\Infrastructure\Redis\RedisClientFactory'
             $consumerName: '%env(MESSENGER_CONSUMER_NAME)%'
-            $failureTransport: '@messenger.transport.failed'
+
+    App\Shared\Infrastructure\Messenger\FailureTransportAdministration:
+        arguments:
+            $receiver: '@messenger.transport.failed'
+            $tableName: '%app.messenger.failure_table%'
+            $queueName: '%app.messenger.failure_queue%'
+            $projectDir: '%kernel.project_dir%'
 
     # --- Rate Limiter Administration ---
     # Arguments are filled from framework.rate_limiter by RateLimiterCatalogPass.
@@ -1240,6 +1246,11 @@ when@test:
     parameters:
         notification.push.allowed_domains: ['push.baander.app']
     services:
+        # A message whose handler fails on demand, for failure transport tests.
+        App\Tests\Fixtures\Messaging\FailureTransportProbeCodec:
+            tags: ['baander.message_payload_codec']
+        App\Tests\Fixtures\Messaging\FailureTransportProbeHandler:
+            tags: [{ name: 'messenger.message_handler' }]
         test.scheduler_manual_recorder:
             alias: App\Scheduler\Application\Port\SchedulerManualOccurrenceRecorderInterface
             public: true

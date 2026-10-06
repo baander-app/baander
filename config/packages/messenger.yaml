@@ -1,3 +1,8 @@
+parameters:
+    # Shared by the failure transport options and FailureTransportAdministration.
+    app.messenger.failure_table: failed_messages
+    app.messenger.failure_queue: failed
+
 framework:
     messenger:
         serializer:
@@ -45,11 +50,18 @@ framework:
                     multiplier: 2
                     max_delay: 60000
 
-            # Failure transport — separate stream so it does not create a second
-            # consumer group on "messages" (which would block delete_after_ack).
-            # DSN path is parsed as /stream/group: stream=failed_messages, group=failed.
+            # Failure transport — a PostgreSQL table, because only a listable receiver
+            # supports messenger:failed:show|retry|remove by id and the admin
+            # endpoints. Migration Version20261006250000 owns the table.
+            # LISTEN/NOTIFY stays off: nothing consumes this transport continuously,
+            # and LISTEN would hold the shared DBAL connection.
             failed:
-                dsn: '%env(REDIS_URL)%/failed_messages/failed'
+                dsn: 'doctrine://default'
+                options:
+                    table_name: '%app.messenger.failure_table%'
+                    queue_name: '%app.messenger.failure_queue%'
+                    auto_setup: false
+                    use_notify: false
 
         failure_transport: failed
 
@@ -99,4 +111,7 @@ when@test:
                 swoole_task: 'in-memory://'
                 async: 'in-memory://'
                 scheduler: 'in-memory://'
-                failed: 'in-memory://'
+                # The failure transport keeps its PostgreSQL table, so tests exercise
+                # the listable receiver that the admin endpoints and CLI rely on.
+            routing:
+                'App\Tests\Fixtures\Messaging\FailureTransportProbe': async

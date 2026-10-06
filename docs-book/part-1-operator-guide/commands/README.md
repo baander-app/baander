@@ -163,6 +163,16 @@ own exit code without JSON. Error output contains no credentials or raw diagnost
 | [app:monitor:prune](app-monitor-prune.md) | Prune completed job monitors older than a given age |
 | [debug:hw-transcode](debug-hw-transcode.md) | Show resolved hardware encoder profile and sample FFmpeg commands |
 
+### Failed messages
+
+Messages that exhaust their retries land in the failure transport, a PostgreSQL table. Symfony's built-in commands manage it by ID, and the admin endpoints under `/api/monitor/transport/failed` use the same receiver (see [Monitoring](../monitoring.md#failed-messages)). Pass `--force` to skip the confirmation prompt, which non-interactive runs require.
+
+| Command | Description |
+|---------|-------------|
+| `messenger:failed:show` | List failed messages, or show one with `messenger:failed:show <id>` |
+| `messenger:failed:retry <id> --force` | Handle a failed message again; one that fails again returns under a new ID, and the fourth failed retry discards it |
+| `messenger:failed:remove <id> --force` | Remove a failed message; `--all` removes every message the transport can deliver now |
+
 ## Development & Docs
 
 | Command | Description |

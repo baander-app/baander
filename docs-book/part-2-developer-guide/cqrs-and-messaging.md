@@ -130,6 +130,8 @@ php bin/console messenger:consume async
 
 Workers are managed by supervisord inside the Docker container. If a command fails, it is retried according to the Messenger retry configuration.
 
+A message that exhausts its retries goes to the `failed` transport. That transport is a PostgreSQL table, `failed_messages`, created by a migration rather than by Messenger (`auto_setup: false`) and excluded from Doctrine schema comparison. Its receiver is listable, so `messenger:failed:show`, `messenger:failed:retry` and `messenger:failed:remove` work by message ID, and the admin endpoints in [Monitoring](../part-1-operator-guide/monitoring.md#failed-messages) use the same receiver. Tests use this table too; the other transports are in-memory.
+
 In tests, commands are processed synchronously by default — no worker process is needed. This makes unit and functional tests deterministic.
 
 ## See Also

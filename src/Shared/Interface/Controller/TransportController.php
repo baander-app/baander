@@ -4,16 +4,18 @@ declare(strict_types=1);
 
 namespace App\Shared\Interface\Controller;
 
+use App\Shared\Application\FailedMessageRetryException;
+use App\Shared\Application\FailureTransportUnavailableException;
+use App\Shared\Application\Port\FailedMessageAdministrationInterface;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
+use App\Shared\Interface\DTO\ApiError;
+use App\Shared\Interface\DTO\ValidationError;
+use App\Shared\Interface\Resource\FailedMessageResource;
 use OpenApi\Attributes as OA;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Messenger\Exception\MessageDecodingFailedException;
-use Symfony\Component\Messenger\Exception\TransportException;
-use Symfony\Component\Messenger\Transport\Receiver\ReceiverInterface;
-use Symfony\Component\Process\Process;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Throwable;
@@ -28,10 +30,12 @@ final class TransportController
     public function __construct(
         private readonly RedisClientFactory $redisClientFactory,
         private readonly string $consumerName,
-        private readonly ReceiverInterface $failureTransport,
+        private readonly FailedMessageAdministrationInterface $failedMessages,
     )
     {
     }
+
+    private const string ID_REQUIREMENT = '[1-9][0-9]{0,17}';
 
     /**
      * Get transport status information.
@@ -48,14 +52,14 @@ final class TransportController
                 content: new OA\JsonContent(
                     properties: [new OA\Property(property: 'data', properties: [
                         new OA\Property(property: 'asyncQueueDepth', description: 'Number of pending messages in the async stream', type: 'integer'),
-                        new OA\Property(property: 'failedQueueDepth', description: 'Number of messages in the failed queue', type: 'integer'),
+                        new OA\Property(property: 'failedQueueDepth', description: 'Number of messages held by the failure transport', type: 'integer'),
                         new OA\Property(property: 'consumerName', description: 'Configured consumer identifier', type: 'string'),
                         new OA\Property(property: 'consumerRunning', description: 'Whether a consumer is actively processing messages (best-effort)', type: 'boolean'),
                     ], type: 'object')],
                     type: 'object',
                 ),
             ),
-            new OA\Response(response: '503', description: 'Redis unavailable',
+            new OA\Response(response: '503', description: 'Redis or the failure transport is unavailable',
                 content: new OA\JsonContent(
                     properties: [new OA\Property(property: 'message', type: 'string')],
                     type: 'object',
@@ -71,14 +75,12 @@ final class TransportController
                 // Async queue depth: XLEN on the Redis stream
                 $asyncQueueDepth = (int)$redis->xlen('messages');
 
-                // Failed queue depth: LLEN on the failed transport list
-                $failedQueueDepth = (int)$redis->llen('messages_failed');
-
                 // Consumer running: check XINFO CONSUMERS for our group/consumer
                 $consumerRunning = false;
                 try {
+                    // phpredis returns false when the stream or group does not exist.
                     $consumers = $redis->xinfo('CONSUMERS', 'messages', 'baander');
-                    foreach ($consumers as $consumer) {
+                    foreach (is_array($consumers) ? $consumers : [] as $consumer) {
                         if (($consumer['name'] ?? null) === $this->consumerName) {
                             $consumerRunning = true;
                             break;
@@ -91,33 +93,122 @@ final class TransportController
 
                 return [
                     'asyncQueueDepth'  => $asyncQueueDepth,
-                    'failedQueueDepth' => $failedQueueDepth,
                     'consumerRunning'  => $consumerRunning,
                 ];
             });
-
-            return $this->successResponse([
-                'asyncQueueDepth'  => $result['asyncQueueDepth'],
-                'failedQueueDepth' => $result['failedQueueDepth'],
-                'consumerName'     => $this->consumerName,
-                'consumerRunning'  => $result['consumerRunning'],
-            ]);
         } catch (Throwable $e) {
             return $this->errorResponse(
                 sprintf('Redis unavailable: %s', $e->getMessage()),
                 Response::HTTP_SERVICE_UNAVAILABLE,
             );
         }
+
+        try {
+            $failedQueueDepth = $this->failedMessages->count();
+        } catch (FailureTransportUnavailableException $e) {
+            return $this->transportUnavailable($e);
+        }
+
+        return $this->successResponse([
+            'asyncQueueDepth'  => $result['asyncQueueDepth'],
+            'failedQueueDepth' => $failedQueueDepth,
+            'consumerName'     => $this->consumerName,
+            'consumerRunning'  => $result['consumerRunning'],
+        ]);
+    }
+
+    /**
+     * List the messages held by the failure transport, newest first.
+     *
+     * CLI counterpart: messenger:failed:show.
+     */
+    #[OA\Get(
+        path: '/api/monitor/transport/failed',
+        description: 'Lists the messages held by the failure transport, newest first. CLI counterpart: messenger:failed:show.',
+        summary: 'List failed messages',
+        parameters: [
+            new OA\Parameter(name: 'page', description: 'Page number', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 1, minimum: 1)),
+            new OA\Parameter(name: 'limit', description: 'Messages per page', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 50, maximum: 100, minimum: 1)),
+        ],
+        responses: [
+            new OA\Response(response: '200', description: 'Paginated failed messages', content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: FailedMessageResource::class))),
+                new OA\Property(property: 'meta', required: ['current_page', 'last_page', 'per_page', 'total'], properties: [
+                    new OA\Property(property: 'current_page', type: 'integer'),
+                    new OA\Property(property: 'last_page', type: 'integer'),
+                    new OA\Property(property: 'per_page', type: 'integer'),
+                    new OA\Property(property: 'total', type: 'integer'),
+                ], type: 'object'),
+            ])),
+            new OA\Response(response: '503', description: 'Failure transport unavailable', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+        ],
+    )]
+    #[Route('/failed', name: 'failed_list', methods: ['GET'])]
+    public function listFailed(Request $request): JsonResponse
+    {
+        $page = max(1, (int) $request->query->get('page', 1));
+        $limit = min(100, max(1, (int) $request->query->get('limit', 50)));
+
+        try {
+            $result = $this->failedMessages->page($page, $limit);
+        } catch (FailureTransportUnavailableException $e) {
+            return $this->transportUnavailable($e);
+        }
+
+        return $this->paginatedResponse(FailedMessageResource::paginate(
+            $result->messages,
+            $page,
+            max(1, (int) ceil($result->total / $limit)),
+            $limit,
+            $result->total,
+        ));
+    }
+
+    /**
+     * Show one failed message.
+     *
+     * CLI counterpart: messenger:failed:show {id}.
+     */
+    #[OA\Get(
+        path: '/api/monitor/transport/failed/{id}',
+        description: 'Returns one message held by the failure transport. CLI counterpart: messenger:failed:show {id}.',
+        summary: 'Show a failed message',
+        parameters: [
+            new OA\Parameter(name: 'id', description: 'Failed message ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[1-9][0-9]{0,17}$')),
+        ],
+        responses: [
+            new OA\Response(response: '200', description: 'Failed message', content: new OA\JsonContent(properties: [
+                new OA\Property(property: 'data', ref: new Model(type: FailedMessageResource::class)),
+            ])),
+            new OA\Response(response: '404', description: 'Message not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '503', description: 'Failure transport unavailable', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+        ],
+    )]
+    #[Route('/failed/{id}', name: 'failed_show', requirements: ['id' => self::ID_REQUIREMENT], methods: ['GET'])]
+    public function showFailed(string $id): JsonResponse
+    {
+        try {
+            $message = $this->failedMessages->find($id);
+        } catch (FailureTransportUnavailableException $e) {
+            return $this->transportUnavailable($e);
+        }
+
+        if ($message === null) {
+            return $this->notFound('Failed message not found.');
+        }
+
+        return $this->successResponse(FailedMessageResource::from($message));
     }
 
     /**
      * Flush all messages from the failed transport.
      *
      * Requires ?confirm=true query parameter to prevent accidental invocation.
+     * CLI counterpart: messenger:failed:remove --all --force.
      */
     #[OA\Post(
         path: '/api/monitor/transport/failed/flush',
-        description: 'Removes all messages from the failed transport. Requires ?confirm=true query parameter.',
+        description: 'Removes all messages from the failed transport. Requires ?confirm=true query parameter. CLI counterpart: messenger:failed:remove --all --force.',
         summary: 'Flush all failed messages',
         parameters: [
             new OA\Parameter(name: 'confirm', description: 'Must be set to "true" to confirm the operation', in: 'query', required: true, schema: new OA\Schema(type: 'string', enum: ['true'])),
@@ -128,11 +219,10 @@ final class TransportController
                     properties: [new OA\Property(property: 'data', properties: [
                         new OA\Property(property: 'flushed', description: 'Number of messages removed from the failed queue', type: 'integer'),
                     ], type: 'object')],
-                    type: 'object',
                 ),
             ),
-            new OA\Response(response: '422', description: 'Missing confirm parameter', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
-            new OA\Response(response: '503', description: 'Failure transport unavailable', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'Missing confirm parameter', content: new OA\JsonContent(ref: new Model(type: ValidationError::class))),
+            new OA\Response(response: '503', description: 'Failure transport unavailable', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
         ],
     )]
     #[Route('/failed/flush', name: 'failed_flush', methods: ['POST'])]
@@ -145,29 +235,10 @@ final class TransportController
             );
         }
 
-        // Symfony has no messenger:failed:flush command, and messenger:failed:remove --all
-        // needs a listable receiver, which the Redis failure transport is not. Draining the
-        // receiver works for every transport and reports an exact count.
-        $flushed = 0;
         try {
-            do {
-                $removed = 0;
-                try {
-                    foreach ($this->failureTransport->get() as $envelope) {
-                        $this->failureTransport->reject($envelope);
-                        $removed++;
-                    }
-                } catch (MessageDecodingFailedException) {
-                    // Receivers reject an undecodable message before throwing.
-                    $removed++;
-                }
-                $flushed += $removed;
-            } while ($removed > 0);
-        } catch (TransportException $e) {
-            return $this->errorResponse(
-                sprintf('Failure transport unavailable: %s', $e->getMessage()),
-                Response::HTTP_SERVICE_UNAVAILABLE,
-            );
+            $flushed = $this->failedMessages->removeAll();
+        } catch (FailureTransportUnavailableException $e) {
+            return $this->transportUnavailable($e);
         }
 
         return $this->successResponse([
@@ -178,14 +249,14 @@ final class TransportController
     /**
      * Retry a specific failed message by its ID.
      *
-     * Re-dispatches the message through the messenger worker.
+     * CLI counterpart: messenger:failed:retry {id} --force.
      */
     #[OA\Post(
         path: '/api/monitor/transport/failed/{id}/retry',
-        description: 'Re-dispatches a specific failed message through the messenger worker.',
+        description: 'Handles a failed message again by running messenger:failed:retry {id} --force. A message that fails again returns to the failure transport under a new ID; the fourth failed retry, or an unrecoverable failure, discards it.',
         summary: 'Retry a failed message',
         parameters: [
-            new OA\Parameter(name: 'id', description: 'Failed message ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'id', description: 'Failed message ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[1-9][0-9]{0,17}$')),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Message retried',
@@ -193,31 +264,83 @@ final class TransportController
                     properties: [new OA\Property(property: 'data', properties: [
                         new OA\Property(property: 'retried', description: 'The ID of the retried message', type: 'string'),
                     ], type: 'object')],
-                    type: 'object',
                 ),
             ),
-            new OA\Response(response: '404', description: 'Message not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '500', description: 'Retry failed', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '404', description: 'Message not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '500', description: 'Retry failed', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '503', description: 'Failure transport unavailable', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
         ],
     )]
-    #[Route('/failed/{id}/retry', name: 'failed_retry', methods: ['POST'])]
+    #[Route('/failed/{id}/retry', name: 'failed_retry', requirements: ['id' => self::ID_REQUIREMENT], methods: ['POST'])]
     public function retryFailed(string $id): JsonResponse
     {
-        // An HTTP-triggered process has no terminal: without --force the per-message
-        // prompt reads EOF and aborts the retry. --no-interaction disables any other prompt.
-        $process = new Process(['php', 'bin/console', 'messenger:failed:retry', $id, '--force', '--no-interaction']);
-        $process->run();
+        try {
+            $found = $this->failedMessages->retry($id);
+        } catch (FailureTransportUnavailableException $e) {
+            return $this->transportUnavailable($e);
+        } catch (FailedMessageRetryException $e) {
+            return $this->errorResponse(
+                sprintf('Failed to retry message: %s', $e->getMessage()),
+                Response::HTTP_INTERNAL_SERVER_ERROR,
+            );
+        }
 
-        if (!$process->isSuccessful()) {
-            // Console renders command errors on stderr.
-            return $process->getErrorOutput()
-                    |> trim(...)
-                    |> (fn($x) => sprintf('Failed to retry message: %s', $x))
-                    |> (fn($x) => $this->errorResponse($x, Response::HTTP_INTERNAL_SERVER_ERROR));
+        if (!$found) {
+            return $this->notFound('Failed message not found.');
         }
 
         return $this->successResponse([
             'retried' => $id,
         ]);
+    }
+
+    /**
+     * Remove a specific failed message by its ID.
+     *
+     * CLI counterpart: messenger:failed:remove {id} --force.
+     */
+    #[OA\Delete(
+        path: '/api/monitor/transport/failed/{id}',
+        description: 'Removes one message from the failure transport. CLI counterpart: messenger:failed:remove {id} --force.',
+        summary: 'Remove a failed message',
+        parameters: [
+            new OA\Parameter(name: 'id', description: 'Failed message ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[1-9][0-9]{0,17}$')),
+        ],
+        responses: [
+            new OA\Response(response: '200', description: 'Message removed',
+                content: new OA\JsonContent(
+                    properties: [new OA\Property(property: 'data', properties: [
+                        new OA\Property(property: 'removed', description: 'The ID of the removed message', type: 'string'),
+                    ], type: 'object')],
+                ),
+            ),
+            new OA\Response(response: '404', description: 'Message not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '503', description: 'Failure transport unavailable', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+        ],
+    )]
+    #[Route('/failed/{id}', name: 'failed_remove', requirements: ['id' => self::ID_REQUIREMENT], methods: ['DELETE'])]
+    public function removeFailed(string $id): JsonResponse
+    {
+        try {
+            $removed = $this->failedMessages->remove($id);
+        } catch (FailureTransportUnavailableException $e) {
+            return $this->transportUnavailable($e);
+        }
+
+        if (!$removed) {
+            return $this->notFound('Failed message not found.');
+        }
+
+        return $this->successResponse([
+            'removed' => $id,
+        ]);
+    }
+
+    private function transportUnavailable(FailureTransportUnavailableException $e): JsonResponse
+    {
+        return $this->errorResponse(
+            sprintf('Failure transport unavailable: %s', $e->getMessage()),
+            Response::HTTP_SERVICE_UNAVAILABLE,
+        );
     }
 }

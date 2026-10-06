@@ -99,6 +99,35 @@ curl -X POST -s -H "Authorization: Bearer $TOKEN" \
 
 Cancellation is cooperative -- the job handler must check for the cancellation flag at its next checkpoint. Queued jobs are flagged before the worker picks them up.
 
+### Failed messages
+
+A message that exhausts its retries moves to the failure transport, the `failed_messages` PostgreSQL table. The endpoints below list and manage it. Each one has a console counterpart that uses the same receiver.
+
+```bash
+# List failed messages, newest first (page and limit are optional; limit is at most 100)
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "https://baander.test/api/monitor/transport/failed?page=1&limit=50" | jq .
+
+# Show, retry or remove one message
+curl -s -H "Authorization: Bearer $TOKEN" "https://baander.test/api/monitor/transport/failed/<id>" | jq .
+curl -X POST -s -H "Authorization: Bearer $TOKEN" "https://baander.test/api/monitor/transport/failed/<id>/retry" | jq .
+curl -X DELETE -s -H "Authorization: Bearer $TOKEN" "https://baander.test/api/monitor/transport/failed/<id>" | jq .
+
+# Remove every failed message
+curl -X POST -s -H "Authorization: Bearer $TOKEN" \
+  "https://baander.test/api/monitor/transport/failed/flush?confirm=true" | jq .
+```
+
+| Endpoint | Console counterpart |
+|----------|---------------------|
+| `GET /api/monitor/transport/failed` | `messenger:failed:show` |
+| `GET /api/monitor/transport/failed/{id}` | `messenger:failed:show <id>` |
+| `POST /api/monitor/transport/failed/{id}/retry` | `messenger:failed:retry <id> --force` |
+| `DELETE /api/monitor/transport/failed/{id}` | `messenger:failed:remove <id> --force` |
+| `POST /api/monitor/transport/failed/flush?confirm=true` | `messenger:failed:remove --all --force` |
+
+Retrying runs `messenger:failed:retry` in a child process, which handles the message before the request returns. A message that fails again goes back to the failure transport under a new ID with its retry count increased. The failure transport allows three such retries, Symfony's default retry strategy: when a message with retry count 3 fails again, or a retry fails with an unrecoverable exception, the message is discarded. Record its details before a fourth retry if you still need them. The list and flush endpoints include messages waiting out a retry delay; `messenger:failed:show` without an ID and `messenger:failed:remove --all` skip them until the delay ends. `GET /api/monitor/transport/status` reports the number of failed messages as `failedQueueDepth`.
+
 ## Job Analytics
 
 The analytics endpoints provide aggregate insights into job performance over a time range. All require `ROLE_ADMIN`.
@@ -339,6 +368,12 @@ make exec cmd="tail -100 /var/log/nginx/access.log"
 | `GET /api/monitor/jobs/{jobId}` | Job detail (admin) |
 | `POST /api/monitor/jobs/{jobId}/retry` | Retry a failed job (admin) |
 | `POST /api/monitor/jobs/{jobId}/cancel` | Cancel a job (admin) |
+| `GET /api/monitor/transport/status` | Transport queue depths and consumer state (admin) |
+| `GET /api/monitor/transport/failed` | Failed message list (admin) |
+| `GET /api/monitor/transport/failed/{id}` | Failed message detail (admin) |
+| `POST /api/monitor/transport/failed/{id}/retry` | Retry a failed message (admin) |
+| `DELETE /api/monitor/transport/failed/{id}` | Remove a failed message (admin) |
+| `POST /api/monitor/transport/failed/flush?confirm=true` | Remove all failed messages (admin) |
 | `GET /api/monitor/analytics/summary` | Job analytics summary (admin) |
 | `GET /api/monitor/analytics/timing` | Job timing analytics (admin) |
 | `GET /api/monitor/analytics/failures` | Job failure analytics (admin) |
