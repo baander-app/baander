@@ -75,4 +75,71 @@ final class JobMonitorCursorPaginationTest extends TestCase
 
         self::assertSame($this->expected, $seen);
     }
+
+    public function testDescendingPagesStartWithTheNewestJobAndWalkForwardAndBack(): void
+    {
+        $expected = array_reverse($this->expected);
+
+        self::assertSame($expected, $this->walkForward('createdAt', 'desc'));
+        self::assertSame($expected, $this->walkBackFromLastPage('createdAt', 'desc'));
+    }
+
+    public function testJobsThatNeverStartedAppearOnceWhenSortingByStartTime(): void
+    {
+        // Only job-b and job-d have started; the others have no start time and sort lowest.
+        $connection = $this->entityManager->getConnection();
+        $connection->executeStatement("UPDATE job_monitors SET started_at = '2026-02-01 12:00:00' WHERE job_id = 'job-d'");
+        $connection->executeStatement("UPDATE job_monitors SET started_at = '2026-02-01 11:00:00' WHERE job_id = 'job-b'");
+        $unstarted = array_values(array_diff($this->expected, ['job-b', 'job-d']));
+        usort($unstarted, fn (string $left, string $right): int => $this->idOf($left) <=> $this->idOf($right));
+
+        self::assertSame([...$unstarted, 'job-b', 'job-d'], $this->walkForward('startedAt', 'asc'));
+        self::assertSame(['job-d', 'job-b', ...array_reverse($unstarted)], $this->walkForward('startedAt', 'desc'));
+    }
+
+    /** @return list<string> */
+    private function walkForward(string $sort, string $direction): array
+    {
+        $service = static::getContainer()->get(JobMonitorService::class);
+        $filter = new JobMonitorFilter(status: null, name: 'cursor-test', queue: null);
+        $seen = [];
+        $cursor = null;
+        $pages = 0;
+        do {
+            $page = $service->findWithCursor($filter, $cursor, 2, $sort, $direction);
+            self::assertSame($pages > 0, $page->hasPreviousPage, 'Only pages after the first have a previous page.');
+            $seen = [...$seen, ...array_map(static fn (JobMonitorEntity $job): string => $job->getJobId(), $page->items)];
+            $cursor = $page->nextCursor;
+            ++$pages;
+        } while ($page->hasNextPage && $pages <= count(self::CREATED));
+
+        return $seen;
+    }
+
+    /** @return list<string> */
+    private function walkBackFromLastPage(string $sort, string $direction): array
+    {
+        $service = static::getContainer()->get(JobMonitorService::class);
+        $filter = new JobMonitorFilter(status: null, name: 'cursor-test', queue: null);
+        $cursor = null;
+        do {
+            $page = $service->findWithCursor($filter, $cursor, 2, $sort, $direction);
+            $cursor = $page->nextCursor;
+        } while ($page->hasNextPage);
+
+        $seen = array_map(static fn (JobMonitorEntity $job): string => $job->getJobId(), $page->items);
+        $cursor = $page->prevCursor;
+        while ($cursor !== null) {
+            $page = $service->findWithCursor($filter, $cursor, 2, $sort, $direction);
+            $seen = [...array_map(static fn (JobMonitorEntity $job): string => $job->getJobId(), $page->items), ...$seen];
+            $cursor = $page->hasPreviousPage ? $page->prevCursor : null;
+        }
+
+        return $seen;
+    }
+
+    private function idOf(string $jobId): string
+    {
+        return (string) $this->entityManager->getConnection()->fetchOne('SELECT id FROM job_monitors WHERE job_id = ?', [$jobId]);
+    }
 }

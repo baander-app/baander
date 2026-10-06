@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Messenger;
 
 use App\Shared\Domain\Model\Cursor;
-use App\Shared\Domain\Model\CursorDirection;
 use App\Shared\Domain\Model\JobStatus;
 use App\Shared\Infrastructure\Doctrine\Entity\JobMonitorEntity;
 use App\Shared\Infrastructure\Pagination\CursorPaginator;
@@ -180,48 +179,8 @@ final class JobMonitorService
             default => 'j.createdAt',
         };
 
-        // The cursor paginator always sorts ASC internally and uses keyset conditions.
-        // For DESC sort, we reverse the cursor direction and extractors.
-        $isDesc = strtolower($direction) === 'desc';
-
-        if ($isDesc) {
-            // Reverse the cursor direction: if client sends next cursor, treat as prev (seek backward in ASC).
-            $effectiveCursor = null;
-            if ($cursor !== null) {
-                $values = $cursor->getValues();
-                $reversedDirection = ($cursor->getDirection() === CursorDirection::Next)
-                    ? CursorDirection::Prev
-                    : CursorDirection::Next;
-                $effectiveCursor = Cursor::create($reversedDirection, $values);
-            }
-
-            $result = $this->cursorPaginator->paginate(
-                $qb,
-                $sortColumn,
-                'j.id',
-                $effectiveCursor,
-                $limit,
-                function (JobMonitorEntity $entity) use ($sort): array {
-                    $sortValue = $this->extractSortValue($entity, $sort);
-
-                    return ['sort' => $sortValue, 'id' => $entity->getId()->toString()];
-                },
-                withCount: false,
-            );
-
-            // Swap next/prev cursors to present DESC pagination to the client.
-            return new CursorResult(
-                items: $result->items,
-                nextCursor: $result->prevCursor,
-                prevCursor: $result->nextCursor,
-                hasNextPage: $result->hasPreviousPage,
-                hasPreviousPage: $result->hasNextPage,
-                total: 0,
-                staleCursor: $result->staleCursor,
-                perPage: $result->perPage,
-            );
-        }
-
+        // Start, finish and duration are empty until a job starts or finishes; the paginator
+        // sorts missing values lowest, so they lead ascending pages and close descending ones.
         return $this->cursorPaginator->paginate(
             $qb,
             $sortColumn,
@@ -229,11 +188,11 @@ final class JobMonitorService
             $cursor,
             $limit,
             function (JobMonitorEntity $entity) use ($sort): array {
-                $sortValue = $this->extractSortValue($entity, $sort);
-
-                return ['sort' => $sortValue, 'id' => $entity->getId()->toString()];
+                return ['sort' => $this->extractSortValue($entity, $sort), 'id' => $entity->getId()->toString()];
             },
             withCount: false,
+            descending: strtolower($direction) === 'desc',
+            nullableSort: in_array($sort, ['startedAt', 'finishedAt', 'duration'], true),
         );
     }
 
@@ -613,13 +572,11 @@ final class JobMonitorService
     /**
      * Extract the sort value from an entity for cursor-based pagination.
      */
-    private function extractSortValue(JobMonitorEntity $entity, string $sort): string
+    private function extractSortValue(JobMonitorEntity $entity, string $sort): ?string
     {
         return match ($sort) {
-            'createdAt' => $entity->getCreatedAt()->format(\DateTimeInterface::ATOM),
-            'startedAt' => ($entity->getStartedAt() ?? new \DateTimeImmutable('1970-01-01'))->format(\DateTimeInterface::ATOM),
-            'finishedAt' => ($entity->getFinishedAt() ?? new \DateTimeImmutable('1970-01-01'))->format(\DateTimeInterface::ATOM),
-            'duration' => ($entity->getFinishedAt() ?? new \DateTimeImmutable('1970-01-01'))->format(\DateTimeInterface::ATOM),
+            'startedAt' => $entity->getStartedAt()?->format(\DateTimeInterface::ATOM),
+            'finishedAt', 'duration' => $entity->getFinishedAt()?->format(\DateTimeInterface::ATOM),
             default => $entity->getCreatedAt()->format(\DateTimeInterface::ATOM),
         };
     }
