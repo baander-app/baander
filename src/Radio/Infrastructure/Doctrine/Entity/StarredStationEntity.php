@@ -9,6 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'starred_stations')]
+#[ORM\Index(name: 'idx_starred_stations_station_id', columns: ['station_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_starred_stations_user_id_station_id', columns: ['user_id', 'station_id'])]
 class StarredStationEntity
 {
@@ -21,7 +22,7 @@ class StarredStationEntity
     private Uuid $userId;
 
     #[ORM\ManyToOne(targetEntity: RadioStationEntity::class)]
-    #[ORM\JoinColumn(name: 'station_id', referencedColumnName: 'id', nullable: false)]
+    #[ORM\JoinColumn(name: 'station_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private RadioStationEntity $station;
 
     #[ORM\Column(type: 'datetime_immutable')]

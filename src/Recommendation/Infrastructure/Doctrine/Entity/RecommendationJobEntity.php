@@ -10,6 +10,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'recommendation_jobs')]
+#[ORM\Index(name: 'idx_recommendation_jobs_original_job_id', columns: ['original_job_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_recommendation_jobs_public_id', columns: ['public_id'])]
 #[ORM\Index(name: 'idx_recommendation_jobs_status', columns: ['status'])]
 #[ORM\Index(name: 'idx_recommendation_jobs_user_id', columns: ['user_id'])]

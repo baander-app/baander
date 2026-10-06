@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
 use App\Kernel;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
@@ -141,6 +142,16 @@ trait OwnershipPersistenceHarness
         $this->manager->flush();
 
         return $id;
+    }
+
+    /** Transcode jobs and sessions reference an existing video. */
+    private function createVideo(): Uuid
+    {
+        $video = new VideoEntity(new PublicId(), '/media/ownership-test.mkv', bin2hex(random_bytes(16)));
+        $this->manager->persist($video);
+        $this->manager->flush();
+
+        return $video->getId();
     }
 
     private function deleteUser(Uuid $id): void

@@ -10,6 +10,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'pairing_sessions')]
+#[ORM\Index(name: 'idx_pairing_sessions_server_id', columns: ['server_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_pairing_sessions_public_id', columns: ['public_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_pairing_sessions_pairing_code', columns: ['pairing_code'])]
 class PairingSessionEntity

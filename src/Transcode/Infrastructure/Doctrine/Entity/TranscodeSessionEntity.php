@@ -10,6 +10,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'transcode_sessions')]
+#[ORM\Index(name: 'idx_transcode_sessions_video_id', columns: ['video_id'])]
 #[ORM\Index(name: 'idx_transcode_sessions_job_id', columns: ['job_id'])]
 #[ORM\Index(name: 'idx_transcode_sessions_state', columns: ['state'])]
 #[ORM\Index(name: 'idx_transcode_sessions_user_id', columns: ['user_id'])]

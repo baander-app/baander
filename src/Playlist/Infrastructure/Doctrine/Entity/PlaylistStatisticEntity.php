@@ -9,6 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'playlist_statistics')]
+#[ORM\Index(name: 'idx_playlist_statistics_playlist_id', columns: ['playlist_id'])]
 class PlaylistStatisticEntity
 {
     #[ORM\Id]

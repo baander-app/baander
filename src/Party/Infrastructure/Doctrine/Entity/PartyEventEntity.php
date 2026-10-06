@@ -9,6 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'party_events')]
+#[ORM\Index(name: 'idx_party_events_user_id', columns: ['user_id'])]
 #[ORM\Index(name: 'idx_party_events_session_id', columns: ['session_id'])]
 #[ORM\Index(name: 'idx_party_events_occurred_at', columns: ['occurred_at'])]
 class PartyEventEntity

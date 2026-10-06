@@ -13,6 +13,8 @@ use League\OAuth2\Server\Entities\ScopeEntityInterface;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'oauth_auth_codes')]
+#[ORM\Index(name: 'idx_oauth_auth_codes_client_id', columns: ['client_id'])]
+#[ORM\Index(name: 'idx_oauth_auth_codes_user_id', columns: ['user_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_oauth_auth_codes_code_id', columns: ['code_id'])]
 class AuthCodeEntity implements AuthCodeEntityInterface
 {

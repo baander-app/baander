@@ -15,6 +15,8 @@ use RuntimeException;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'oauth_device_codes')]
+#[ORM\Index(name: 'idx_oauth_device_codes_client_id', columns: ['client_id'])]
+#[ORM\Index(name: 'idx_oauth_device_codes_user_id', columns: ['user_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_oauth_device_codes_device_code', columns: ['device_code'])]
 #[ORM\UniqueConstraint(name: 'uniq_oauth_device_codes_user_code', columns: ['user_code'])]
 class DeviceCodeEntity implements DeviceCodeEntityInterface

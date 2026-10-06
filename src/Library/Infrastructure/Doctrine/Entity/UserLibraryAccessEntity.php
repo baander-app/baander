@@ -9,6 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'user_library_access')]
+#[ORM\Index(name: 'idx_user_library_access_library_id', columns: ['library_id'])]
 class UserLibraryAccessEntity
 {
     /**

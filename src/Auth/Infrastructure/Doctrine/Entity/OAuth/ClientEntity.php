@@ -11,6 +11,7 @@ use League\OAuth2\Server\Entities\ClientEntityInterface;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'oauth_clients')]
+#[ORM\Index(name: 'idx_oauth_clients_user_id', columns: ['user_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_oauth_clients_public_id', columns: ['public_id'])]
 class ClientEntity implements ClientEntityInterface
 {

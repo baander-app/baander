@@ -9,6 +9,8 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'movie_video')]
+#[ORM\Index(name: 'idx_movie_video_movie_id', columns: ['movie_id'])]
+#[ORM\Index(name: 'idx_movie_video_video_id', columns: ['video_id'])]
 class MovieVideoEntity
 {
     #[ORM\Id]

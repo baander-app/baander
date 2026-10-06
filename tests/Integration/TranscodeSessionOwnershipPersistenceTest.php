@@ -28,6 +28,8 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
 {
     use OwnershipPersistenceHarness;
 
+    private ?Uuid $video = null;
+
     public function testOwnerIsAScalarUuidField(): void
     {
         $this->assertScalarUuidOwners([TranscodeSessionEntity::class => ['userId', 'user_id']]);
@@ -133,7 +135,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             publicId: new PublicId(),
             userId: $this->createUser(),
             jobId: $this->createJob(),
-            videoId: Uuid::generate(),
+            videoId: $this->video(),
             state: SessionState::Active,
             priority: SessionPriority::Normal,
             audioProfile: AudioProfile::streamingStereo(),
@@ -208,7 +210,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
             'public_id' => (new PublicId())->toString(),
             'user_id' => $owner->toString(),
             'job_id' => $job?->toString(),
-            'video_id' => Uuid::generate()->toString(),
+            'video_id' => $this->video()->toString(),
             'created_at' => '2026-10-06 12:00:00+00',
             'updated_at' => '2026-10-06 12:00:00+00',
         ]);
@@ -218,7 +220,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
 
     private function createJob(): Uuid
     {
-        $job = new TranscodeJobEntity(new PublicId(), Uuid::generate(), '1080p');
+        $job = new TranscodeJobEntity(new PublicId(), $this->createVideo(), '1080p');
         $this->manager->persist($job);
         $this->manager->flush();
 
@@ -227,6 +229,12 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
 
     private function session(Uuid $owner, Uuid $job): TranscodeSession
     {
-        return TranscodeSession::create($owner, $job, Uuid::generate(), AudioProfile::streamingStereo());
+        return TranscodeSession::create($owner, $job, $this->video(), AudioProfile::streamingStereo());
+    }
+
+    /** An existing video for sessions; each job has its own, as a video has one job per quality tier. */
+    private function video(): Uuid
+    {
+        return $this->video ??= $this->createVideo();
     }
 }

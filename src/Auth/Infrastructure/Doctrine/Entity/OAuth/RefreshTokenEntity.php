@@ -11,6 +11,7 @@ use League\OAuth2\Server\Entities\RefreshTokenEntityInterface;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'oauth_refresh_tokens')]
+#[ORM\Index(name: 'idx_oauth_refresh_tokens_previous_refresh_token_id', columns: ['previous_refresh_token_id'])]
 #[ORM\Index(name: 'idx_oauth_refresh_tokens_access_token_id', columns: ['access_token_id'])]
 #[ORM\Index(name: 'idx_oauth_refresh_tokens_chain_id', columns: ['chain_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_oauth_refresh_tokens_token_id', columns: ['token_id'])]
