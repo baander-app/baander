@@ -166,4 +166,24 @@ describe('useSongList pagination', () => {
     await waitFor(() => expect(result.current.songs[0]?.publicId).toBe('large'))
     expect(mockGetSongIndex.mock.calls[1][0]).toEqual({ limit: 50 })
   })
+
+  it('sends the API sort field and order and keeps them on next-page requests', async () => {
+    mockGetSongIndex.mockResolvedValueOnce(page(['newest'], 'cursor-added', 2))
+      .mockResolvedValueOnce(page(['oldest'], null, 2))
+    const { result } = renderHook(() => useSongList({ sort: { field: 'added', direction: 'desc' } }), { wrapper: wrapper() })
+    await waitFor(() => expect(result.current.hasNextPage).toBe(true))
+    act(() => result.current.fetchMore())
+    await waitFor(() => expect(result.current.songs).toHaveLength(2))
+
+    expect(mockGetSongIndex.mock.calls[0][0]).toEqual({ limit: 100, sort: 'added', order: 'desc' })
+    expect(mockGetSongIndex.mock.calls[1][0]).toEqual({ limit: 100, sort: 'added', order: 'desc', cursor: 'cursor-added' })
+  })
+
+  it('omits sort parameters until both the field and the direction are set', async () => {
+    mockGetSongIndex.mockResolvedValue(page(['song'], null, 1))
+    renderHook(() => useSongList({ sort: { field: 'artist', direction: null } }), { wrapper: wrapper() })
+
+    await waitFor(() => expect(mockGetSongIndex).toHaveBeenCalledOnce())
+    expect(mockGetSongIndex.mock.calls[0][0]).toEqual({ limit: 100 })
+  })
 })

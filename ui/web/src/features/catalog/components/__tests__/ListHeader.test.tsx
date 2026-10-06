@@ -144,4 +144,45 @@ describe('ListHeader', () => {
     const state = useListColumnStore.getState()
     expect(state.visibleColumns).toContain('genre')
   })
+
+  it.each([
+    ['Artist', 'artist'],
+    ['Album', 'album'],
+    ['Year', 'year'],
+    ['Date Added', 'added'],
+  ] as const)('sorts the %s column by the API field %s', (label, field) => {
+    useListColumnStore.setState({ visibleColumns: ['title', 'artist', 'album', 'year', 'createdAt'] })
+    const onSortChange = vi.fn()
+    render(<ListHeader sort={defaultSort} onSortChange={onSortChange} />)
+
+    fireEvent.click(screen.getByRole('button', { name: label }))
+
+    expect(onSortChange).toHaveBeenCalledWith({ field, direction: 'asc' })
+  })
+
+  it('does not offer sorting for columns the API cannot sort', () => {
+    useListColumnStore.setState({ visibleColumns: ['#', 'title', 'genre', 'duration', 'bitrate', 'format'] })
+    const onSortChange = vi.fn()
+    render(<ListHeader sort={defaultSort} onSortChange={onSortChange} />)
+
+    for (const label of ['#', 'Genre', 'Duration', 'Bitrate', 'Format']) {
+      expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument()
+      fireEvent.click(screen.getByText(label))
+    }
+
+    expect(screen.getByRole('button', { name: 'Title' })).toBeInTheDocument()
+    expect(onSortChange).not.toHaveBeenCalled()
+  })
+
+  it('shows the sort indicator only on the column for the active API field', () => {
+    render(
+      <ListHeader
+        sort={{ field: 'artist', direction: 'asc' }}
+        onSortChange={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: /artist/i })).toHaveTextContent('▲')
+    expect(screen.getByRole('button', { name: 'Title' })).not.toHaveTextContent('▲')
+  })
 })

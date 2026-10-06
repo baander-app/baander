@@ -5,9 +5,12 @@ import {
   getGetSongIndexQueryKey,
   type GetSongIndexParams,
 } from '@/shared/api-client/gen/endpoints'
+import { createLogger } from '@/shared/lib/logger'
 import type { ListSongData } from '../components/ListRow'
 import type { SortState } from '../components/ListHeader'
 import { extractCursorMeta } from '../utils/api-adapters'
+
+const logger = createLogger('catalog.song-list')
 
 function parseSong(raw: Record<string, unknown>, index: number): ListSongData {
   return {
@@ -80,10 +83,16 @@ export function useSongList({ sort, pageSize = 100 }: UseSongListOptions): UseSo
   const { fetchNextPage, refetch, hasNextPage, isFetching } = query
   const fetchMore = useCallback(() => {
     if (!hasNextPage || isFetching) return
-    void fetchNextPage({ cancelRefetch: false }).catch(() => undefined)
+    // Request failures surface through isFetchMoreError; a rejection here is unexpected.
+    fetchNextPage({ cancelRefetch: false }).catch((error: unknown) => {
+      logger.error('Failed to load the next song page:', error)
+    })
   }, [fetchNextPage, hasNextPage, isFetching])
   const retry = useCallback(() => {
-    void refetch({ cancelRefetch: false }).catch(() => undefined)
+    // Request failures surface through isError; a rejection here is unexpected.
+    refetch({ cancelRefetch: false }).catch((error: unknown) => {
+      logger.error('Failed to reload the song list:', error)
+    })
   }, [refetch])
 
   return {

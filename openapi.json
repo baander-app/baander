@@ -5637,15 +5637,23 @@
                     {
                         "name": "sort",
                         "in": "query",
-                        "description": "Sort field (title, artist, album, year, added)",
+                        "description": "Sort field. A cursor is valid only with the sort and order that issued it.",
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "default": "title",
+                            "enum": [
+                                "title",
+                                "artist",
+                                "album",
+                                "year",
+                                "added"
+                            ]
                         }
                     },
                     {
                         "name": "order",
                         "in": "query",
-                        "description": "Sort order (asc, desc)",
+                        "description": "Sort order",
                         "schema": {
                             "type": "string",
                             "default": "asc",
@@ -5663,6 +5671,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/CursorPaginatedResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Unsupported sort field or order, or a cursor issued for another sort field or order",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useListColumnStore } from '../list-column-store'
+import { ALL_COLUMNS, useListColumnStore } from '../list-column-store'
 
 describe('useListColumnStore', () => {
   beforeEach(() => {
@@ -49,5 +49,22 @@ describe('useListColumnStore', () => {
 
     const state = useListColumnStore.getState()
     expect(state.columnOrder).toEqual(['title', '#', 'artist'])
+  })
+
+  it('maps sortable columns to the song list API sort fields', () => {
+    const sortFields = Object.fromEntries(ALL_COLUMNS.map((column) => [column.id, column.sortField ?? null]))
+
+    expect(sortFields).toEqual({
+      '#': null,
+      title: 'title',
+      artist: 'artist',
+      album: 'album',
+      year: 'year',
+      genre: null,
+      duration: null,
+      bitrate: null,
+      format: null,
+      createdAt: 'added',
+    })
   })
 })

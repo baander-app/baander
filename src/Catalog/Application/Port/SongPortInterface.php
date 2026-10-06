@@ -28,6 +28,11 @@ interface SongPortInterface
 
     public function countVisible(LibraryReadScope $scope): int;
 
+    /**
+     * The sort field, when set, must be a {@see SongSortField} value.
+     *
+     * @throws \App\Shared\Domain\Exception\CursorMismatchException when the cursor was issued for another sort field or order
+     */
     public function searchVisibleWithCursor(SearchOptions $options, LibraryReadScope $scope): CursorPage;
 
     /**

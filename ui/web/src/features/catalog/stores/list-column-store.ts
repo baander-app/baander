@@ -1,3 +1,4 @@
+import type { GetSongIndexSort } from '@/shared/api-client/gen/endpoints'
 import { withNoopGuard } from '@/shared/stores/with-noop-guard'
 import { createSelectiveJSONStorage } from '@/shared/stores/persistence'
 import { withStoreDebug } from '@/shared/stores/debug'
@@ -9,19 +10,21 @@ export interface ColumnConfig {
   label: string
   field: string
   defaultVisible: boolean
+  /** The song list API sort field for this column; columns without one cannot be sorted. */
+  sortField?: GetSongIndexSort
 }
 
 export const ALL_COLUMNS: ColumnConfig[] = [
   { id: '#', label: '#', field: 'index', defaultVisible: true },
-  { id: 'title', label: 'Title', field: 'title', defaultVisible: true },
-  { id: 'artist', label: 'Artist', field: 'artistName', defaultVisible: true },
-  { id: 'album', label: 'Album', field: 'albumName', defaultVisible: true },
-  { id: 'year', label: 'Year', field: 'year', defaultVisible: true },
+  { id: 'title', label: 'Title', field: 'title', defaultVisible: true, sortField: 'title' },
+  { id: 'artist', label: 'Artist', field: 'artistName', defaultVisible: true, sortField: 'artist' },
+  { id: 'album', label: 'Album', field: 'albumName', defaultVisible: true, sortField: 'album' },
+  { id: 'year', label: 'Year', field: 'year', defaultVisible: true, sortField: 'year' },
   { id: 'genre', label: 'Genre', field: 'genre', defaultVisible: false },
   { id: 'duration', label: 'Duration', field: 'length', defaultVisible: true },
   { id: 'bitrate', label: 'Bitrate', field: 'bitrate', defaultVisible: false },
   { id: 'format', label: 'Format', field: 'format', defaultVisible: false },
-  { id: 'createdAt', label: 'Date Added', field: 'createdAt', defaultVisible: false },
+  { id: 'createdAt', label: 'Date Added', field: 'createdAt', defaultVisible: false, sortField: 'added' },
 ]
 
 const DEFAULT_VISIBLE = ALL_COLUMNS.filter((c) => c.defaultVisible).map((c) => c.id)

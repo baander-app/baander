@@ -10,12 +10,13 @@ import {
 import { DndContext, closestCenter, PointerSensor, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ALL_COLUMNS, DEFAULT_WIDTHS, useListColumnStore } from '../stores/list-column-store'
+import type { GetSongIndexSort } from '@/shared/api-client/gen/endpoints'
+import { ALL_COLUMNS, DEFAULT_WIDTHS, useListColumnStore, type ColumnConfig } from '../stores/list-column-store'
 import { ColumnResizeHandle } from './ColumnResizeHandle'
 import { interactiveTransition } from '@/shared/theme'
 
 export interface SortState {
-  field: string | null
+  field: GetSongIndexSort | null
   direction: 'asc' | 'desc' | null
 }
 
@@ -49,7 +50,7 @@ const DraggableWrapper = styled.div<{ $isDragging: boolean }>`
     `}
 `
 
-const SortButton = styled.button`
+const headerCell = css`
   display: flex;
   flex-shrink: 0;
   align-items: center;
@@ -60,8 +61,12 @@ const SortButton = styled.button`
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--color-muted-foreground);
-  ${interactiveTransition(['color'])}
   min-width: 0;
+`
+
+const SortButton = styled.button`
+  ${headerCell}
+  ${interactiveTransition(['color'])}
   cursor: pointer;
   background: none;
   border: none;
@@ -69,6 +74,10 @@ const SortButton = styled.button`
   &:hover {
     color: var(--color-foreground);
   }
+`
+
+const StaticHeader = styled.div`
+  ${headerCell}
 `
 
 const SortLabel = styled.span`
@@ -126,19 +135,22 @@ interface ListHeaderProps {
 
 const HEADER_HEIGHT = 32
 
+interface DraggableColumnProps {
+  col: ColumnConfig
+  isActive: boolean
+  sortDirection: 'asc' | 'desc' | null
+  width: number
+  onSortClick: (field: GetSongIndexSort) => void
+}
+
 function DraggableColumn({
   col,
   isActive,
   sortDirection,
   width,
   onSortClick,
-}: {
-  col: { id: string; label: string; field: string }
-  isActive: boolean
-  sortDirection: 'asc' | 'desc' | null
-  width: number
-  onSortClick: () => void
-}) {
+}: DraggableColumnProps) {
+  const { sortField } = col
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: col.id })
 
   return (
@@ -152,19 +164,26 @@ function DraggableColumn({
       $isDragging={isDragging}
       {...attributes}
     >
-      <SortButton
-        style={{ width }}
-        onClick={onSortClick}
-        {...listeners}
-      >
-        <SortLabel>{col.label}</SortLabel>
-        {isActive && sortDirection === 'asc' && (
-          <SortArrow>&#9650;</SortArrow>
-        )}
-        {isActive && sortDirection === 'desc' && (
-          <SortArrow>&#9660;</SortArrow>
-        )}
-      </SortButton>
+      {sortField ? (
+        <SortButton
+          type="button"
+          style={{ width }}
+          onClick={() => onSortClick(sortField)}
+          {...listeners}
+        >
+          <SortLabel>{col.label}</SortLabel>
+          {isActive && sortDirection === 'asc' && (
+            <SortArrow>&#9650;</SortArrow>
+          )}
+          {isActive && sortDirection === 'desc' && (
+            <SortArrow>&#9660;</SortArrow>
+          )}
+        </SortButton>
+      ) : (
+        <StaticHeader style={{ width }} {...listeners}>
+          <SortLabel>{col.label}</SortLabel>
+        </StaticHeader>
+      )}
     </DraggableWrapper>
   )
 }
@@ -182,7 +201,7 @@ export function ListHeader({ sort, onSortChange }: ListHeaderProps) {
   )
 
   const handleHeaderClick = useCallback(
-    (field: string) => {
+    (field: GetSongIndexSort) => {
       if (sort.field !== field) {
         onSortChange({ field, direction: 'asc' })
       } else if (sort.direction === 'asc') {
@@ -247,10 +266,10 @@ export function ListHeader({ sort, onSortChange }: ListHeaderProps) {
                 <div key={col.id} style={{ display: 'flex', alignItems: 'center', height: HEADER_HEIGHT }}>
                   <DraggableColumn
                     col={col}
-                    isActive={sort.field === col.field}
+                    isActive={sort.field === col.sortField}
                     sortDirection={sort.direction}
                     width={width}
-                    onSortClick={() => handleHeaderClick(col.field)}
+                    onSortClick={handleHeaderClick}
                   />
                   {!isLast && (
                     <ColumnResizeHandle

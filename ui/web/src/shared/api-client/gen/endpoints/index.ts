@@ -3208,14 +3208,25 @@ albumId?: string;
  */
 publicIds?: string;
 /**
- * Sort field (title, artist, album, year, added)
+ * Sort field. A cursor is valid only with the sort and order that issued it.
  */
-sort?: string;
+sort?: GetSongIndexSort;
 /**
- * Sort order (asc, desc)
+ * Sort order
  */
 order?: GetSongIndexOrder;
 };
+
+export type GetSongIndexSort = typeof GetSongIndexSort[keyof typeof GetSongIndexSort];
+
+
+export const GetSongIndexSort = {
+  title: 'title',
+  artist: 'artist',
+  album: 'album',
+  year: 'year',
+  added: 'added',
+} as const;
 
 export type GetSongIndexOrder = typeof GetSongIndexOrder[keyof typeof GetSongIndexOrder];
 
@@ -13023,7 +13034,7 @@ export const getGetSongIndexQueryKey = (params?: GetSongIndexParams,) => {
     }
 
 
-export const getGetSongIndexQueryOptions = <TData = Awaited<ReturnType<typeof getSongIndex>>, TError = ErrorType<unknown>>(params?: GetSongIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSongIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetSongIndexQueryOptions = <TData = Awaited<ReturnType<typeof getSongIndex>>, TError = ErrorType<ApiError>>(params?: GetSongIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSongIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -13042,10 +13053,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetSongIndexQueryResult = NonNullable<Awaited<ReturnType<typeof getSongIndex>>>
-export type GetSongIndexQueryError = ErrorType<unknown>
+export type GetSongIndexQueryError = ErrorType<ApiError>
 
 
-export function useGetSongIndex<TData = Awaited<ReturnType<typeof getSongIndex>>, TError = ErrorType<unknown>>(
+export function useGetSongIndex<TData = Awaited<ReturnType<typeof getSongIndex>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetSongIndexParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSongIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getSongIndex>>,
@@ -13055,7 +13066,7 @@ export function useGetSongIndex<TData = Awaited<ReturnType<typeof getSongIndex>>
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetSongIndex<TData = Awaited<ReturnType<typeof getSongIndex>>, TError = ErrorType<unknown>>(
+export function useGetSongIndex<TData = Awaited<ReturnType<typeof getSongIndex>>, TError = ErrorType<ApiError>>(
  params?: GetSongIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSongIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getSongIndex>>,
@@ -13065,7 +13076,7 @@ export function useGetSongIndex<TData = Awaited<ReturnType<typeof getSongIndex>>
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetSongIndex<TData = Awaited<ReturnType<typeof getSongIndex>>, TError = ErrorType<unknown>>(
+export function useGetSongIndex<TData = Awaited<ReturnType<typeof getSongIndex>>, TError = ErrorType<ApiError>>(
  params?: GetSongIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSongIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -13073,7 +13084,7 @@ export function useGetSongIndex<TData = Awaited<ReturnType<typeof getSongIndex>>
  * @summary List songs (cursor-paginated)
  */
 
-export function useGetSongIndex<TData = Awaited<ReturnType<typeof getSongIndex>>, TError = ErrorType<unknown>>(
+export function useGetSongIndex<TData = Awaited<ReturnType<typeof getSongIndex>>, TError = ErrorType<ApiError>>(
  params?: GetSongIndexParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getSongIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {

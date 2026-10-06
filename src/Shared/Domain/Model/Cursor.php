@@ -8,6 +8,7 @@ final readonly class Cursor
 {
     /**
      * @param array<string, mixed> $values Associative: sort column name => value, plus `id` key for tiebreaker
+     *                                    and an optional `binding` key naming the ordering the cursor belongs to
      */
     private function __construct(
         private CursorDirection $direction,

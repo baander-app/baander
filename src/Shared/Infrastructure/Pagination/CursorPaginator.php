@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Pagination;
 
+use App\Shared\Domain\Exception\CursorMismatchException;
 use App\Shared\Domain\Model\Cursor;
 use App\Shared\Domain\Model\CursorDirection;
 use Doctrine\ORM\QueryBuilder;
@@ -28,8 +29,11 @@ final class CursorPaginator
      * @param bool         $withCount      Whether to execute the COUNT query. When false, total will be 0.
      * @param bool         $descending     Whether pages run from the highest key to the lowest
      * @param bool         $nullableSort   Whether the sort expression can be NULL; the extractor then returns null for it
+     * @param string|null  $cursorBinding  Identifies the ordering (for example "title:asc"). Issued cursors carry it,
+     *                                     and an incoming cursor without the same value is rejected.
      *
      * @throws \InvalidArgumentException if $limit < 1
+     * @throws CursorMismatchException  if $cursorBinding is set and the cursor was issued for another ordering
      */
     public function paginate(
         QueryBuilder $qb,
@@ -41,9 +45,13 @@ final class CursorPaginator
         bool $withCount = true,
         bool $descending = false,
         bool $nullableSort = false,
+        ?string $cursorBinding = null,
     ): CursorResult {
         if ($limit < 1) {
             throw new \InvalidArgumentException(sprintf('Limit must be at least 1, got %d.', $limit));
+        }
+        if ($cursorBinding !== null && $cursor !== null && ($cursor->getValues()['binding'] ?? null) !== $cursorBinding) {
+            throw CursorMismatchException::forBinding($cursorBinding);
         }
 
         $total = $withCount ? $this->executeCount($qb) : 0;
@@ -84,10 +92,10 @@ final class CursorPaginator
         $nextCursor = null;
         $prevCursor = null;
         if ($hasNextPage && $items !== []) {
-            $nextCursor = $this->cursorAt($items[array_key_last($items)], CursorDirection::Next, $valueExtractor);
+            $nextCursor = $this->cursorAt($items[array_key_last($items)], CursorDirection::Next, $valueExtractor, $cursorBinding);
         }
         if ($hasPreviousPage && $items !== []) {
-            $prevCursor = $this->cursorAt($items[array_key_first($items)], CursorDirection::Prev, $valueExtractor);
+            $prevCursor = $this->cursorAt($items[array_key_first($items)], CursorDirection::Prev, $valueExtractor, $cursorBinding);
         }
 
         return new CursorResult(
@@ -102,14 +110,18 @@ final class CursorPaginator
         );
     }
 
-    private function cursorAt(mixed $item, CursorDirection $direction, callable $valueExtractor): Cursor
+    private function cursorAt(mixed $item, CursorDirection $direction, callable $valueExtractor, ?string $cursorBinding): Cursor
     {
         $values = $valueExtractor($item);
-
-        return Cursor::create($direction, [
+        $position = [
             'sort' => $values['sort'],
             'id' => $values['id'],
-        ]);
+        ];
+        if ($cursorBinding !== null) {
+            $position['binding'] = $cursorBinding;
+        }
+
+        return Cursor::create($direction, $position);
     }
 
     /**

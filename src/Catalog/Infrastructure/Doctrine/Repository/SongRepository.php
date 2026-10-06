@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Infrastructure\Doctrine\Repository;
 
+use App\Catalog\Application\Port\SongSortField;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Model\SongState;
 use App\Catalog\Domain\Repository\SongRepositoryInterface;
@@ -389,24 +390,21 @@ final class SongRepository implements SongRepositoryInterface
 
         $qb = $this->buildFilterQuery($options, $qb, 's.title', $applyFilters);
 
-        $sortField = $options->hasSort() ? $options->getSortField() : 'title';
-        $sortColumn = 's.title';
-        if ($options->hasSort()) {
-            $sortColumn = $this->resolveSortColumn($options->getSortField(), $qb);
-        }
-
-        $valueExtractor = $this->buildValueExtractor($sortField);
+        $sortField = $options->hasSort() ? SongSortField::from($options->getSortField()) : SongSortField::Title;
+        $descending = $options->hasSort() && strtolower($options->getSortOrder()) === 'desc';
 
         $result = $this->cursorPaginator->paginate(
             $qb,
-            $sortColumn,
+            $this->resolveSortColumn($sortField, $qb),
             's.id',
             $options->getCursor(),
             $options->getLimit(),
-            $valueExtractor,
-            descending: $options->hasSort() && strtolower($options->getSortOrder()) === 'desc',
+            $this->buildValueExtractor($sortField),
+            descending: $descending,
             // Albums without a year sort before every year.
-            nullableSort: $sortField === 'year',
+            nullableSort: $sortField === SongSortField::Year,
+            // A cursor keeps its position only in the ordering that issued it.
+            cursorBinding: $sortField->value . ':' . ($descending ? 'desc' : 'asc'),
         );
 
         $domainItems = array_map(fn(SongEntity $e) => self::entityToDomain($e), $result->items);
@@ -643,15 +641,14 @@ final class SongRepository implements SongRepositoryInterface
             ->setParameter('album_filter_id', $albumEntity->getId());
     }
 
-    private function resolveSortColumn(string $sortField, \Doctrine\ORM\QueryBuilder $qb): string
+    private function resolveSortColumn(SongSortField $sortField, \Doctrine\ORM\QueryBuilder $qb): string
     {
         return match ($sortField) {
-            'title' => 's.title',
-            'artist' => $this->joinArtistForSort($qb),
-            'album' => $this->joinAlbumForSort($qb),
-            'year' => $this->joinAlbumYearForSort($qb),
-            'added' => 's.createdAt',
-            default => 's.title',
+            SongSortField::Title => 's.title',
+            SongSortField::Artist => $this->joinArtistForSort($qb),
+            SongSortField::Album => $this->joinAlbumForSort($qb),
+            SongSortField::Year => $this->joinAlbumYearForSort($qb),
+            SongSortField::Added => 's.createdAt',
         };
     }
 
@@ -687,17 +684,17 @@ final class SongRepository implements SongRepositoryInterface
         return 'al_sort.title';
     }
 
-    private function buildValueExtractor(string $sortField): \Closure
+    private function buildValueExtractor(SongSortField $sortField): \Closure
     {
         return match ($sortField) {
-            'artist' => function (SongEntity $e): array {
+            SongSortField::Artist => function (SongEntity $e): array {
                 $artistName = $this->getArtistNameForSong($e->getId()) ?? '';
                 return ['sort' => $artistName, 'id' => $e->getId()->toString()];
             },
-            'album' => fn (SongEntity $e): array => ['sort' => $e->getAlbum()->getTitle(), 'id' => $e->getId()->toString()],
-            'year' => fn (SongEntity $e): array => ['sort' => $e->getAlbum()->getYear(), 'id' => $e->getId()->toString()],
-            'added' => fn (SongEntity $e): array => ['sort' => $e->getCreatedAt()->format('c'), 'id' => $e->getId()->toString()],
-            default => fn (SongEntity $e): array => ['sort' => $e->getTitle(), 'id' => $e->getId()->toString()],
+            SongSortField::Album => fn (SongEntity $e): array => ['sort' => $e->getAlbum()->getTitle(), 'id' => $e->getId()->toString()],
+            SongSortField::Year => fn (SongEntity $e): array => ['sort' => $e->getAlbum()->getYear(), 'id' => $e->getId()->toString()],
+            SongSortField::Added => fn (SongEntity $e): array => ['sort' => $e->getCreatedAt()->format('c'), 'id' => $e->getId()->toString()],
+            SongSortField::Title => fn (SongEntity $e): array => ['sort' => $e->getTitle(), 'id' => $e->getId()->toString()],
         };
     }
 

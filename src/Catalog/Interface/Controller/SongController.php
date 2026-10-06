@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Catalog\Interface\Controller;
 
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Port\SongSortField;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Interface\Request\UpdateSongRequest;
 use App\Catalog\Interface\Resource\SongResource;
+use App\Shared\Domain\Exception\CursorMismatchException;
 use App\Shared\Domain\Model\Cursor;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
@@ -16,6 +18,8 @@ use App\Shared\Infrastructure\Pagination\CursorCodec;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\DTO\CursorPaginatedResponse;
+use App\Shared\Interface\Exception\InvalidQueryParameter;
+use App\Shared\Interface\Request\QueryParameters;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -51,11 +55,12 @@ final class SongController
             new OA\Parameter(name: 'artistId', description: 'Filter by artist public ID', in: 'query', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'albumId', description: 'Filter by album public ID', in: 'query', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'publicIds', description: 'Comma-separated public IDs to filter by', in: 'query', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'sort', description: 'Sort field (title, artist, album, year, added)', in: 'query', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'order', description: 'Sort order (asc, desc)', in: 'query', schema: new OA\Schema(type: 'string', enum: ['asc', 'desc'], default: 'asc')),
+            new OA\Parameter(name: 'sort', description: 'Sort field. A cursor is valid only with the sort and order that issued it.', in: 'query', schema: new OA\Schema(type: 'string', enum: ['title', 'artist', 'album', 'year', 'added'], default: 'title')),
+            new OA\Parameter(name: 'order', description: 'Sort order', in: 'query', schema: new OA\Schema(type: 'string', enum: ['asc', 'desc'], default: 'asc')),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Cursor-paginated list of songs', content: new OA\JsonContent(ref: new Model(type: CursorPaginatedResponse::class))),
+            new OA\Response(response: '400', description: 'Unsupported sort field or order, or a cursor issued for another sort field or order', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
@@ -73,7 +78,11 @@ final class SongController
 
         $options = $this->buildSearchOptions($request, $query, $limit, $cursor);
 
-        $page = $this->songService->searchVisibleWithCursor($options, $scope);
+        try {
+            $page = $this->songService->searchVisibleWithCursor($options, $scope);
+        } catch (CursorMismatchException) {
+            throw new InvalidQueryParameter('cursor', 'cursor belongs to another sort or order; request the first page again without a cursor.');
+        }
         $songs = $page->getItems();
 
         $songIds = array_map(fn (Song $s) => $s->getId(), $songs);
@@ -270,13 +279,10 @@ final class SongController
             ->withFilters($filters)
             ->withCursor($cursor);
 
-        $sort = $request->query->get('sort');
-        if (is_string($sort) && $sort !== '') {
-            $order = strtolower((string) $request->query->get('order', 'asc'));
-            if (!in_array($order, ['asc', 'desc'], true)) {
-                $order = 'asc';
-            }
-            $options = $options->withSort($sort, $order);
+        $sort = QueryParameters::optionalChoice($request->query, 'sort', SongSortField::values());
+        $order = QueryParameters::optionalChoice($request->query, 'order', ['asc', 'desc']);
+        if ($sort !== null || $order !== null) {
+            $options = $options->withSort($sort ?? SongSortField::Title->value, $order ?? 'asc');
         }
 
         return $options;

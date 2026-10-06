@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Catalog\Application\Port\SongSortField;
 use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\CursorPaginatedResponse;
 use App\Shared\Interface\DTO\PaginatedResponse;
@@ -62,6 +63,15 @@ final class OpenApiSpecTest extends KernelTestCase
                 }
             }
         }
+    }
+
+    public function test_song_list_sort_enum_lists_the_supported_fields(): void
+    {
+        $spec = $this->getSpec();
+        $parameters = array_column($spec['paths']['/api/songs/']['get']['parameters'], null, 'name');
+
+        self::assertSame(SongSortField::values(), $parameters['sort']['schema']['enum']);
+        self::assertSame(['asc', 'desc'], $parameters['order']['schema']['enum']);
     }
 
     public function test_configuration_object_defaults_match_their_schema_type(): void
