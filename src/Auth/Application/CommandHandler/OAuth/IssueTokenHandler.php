@@ -288,6 +288,7 @@ final class IssueTokenHandler
         $scopes = $this->resolveScopes($command->getScopes(), [], $client, 'direct_grant');
         $chainId = ChainId::generate();
 
+        // Persist the proof key with the token so refresh can require the same key.
         $accessToken = AccessToken::issue(
             $client,
             $user,
@@ -295,6 +296,7 @@ final class IssueTokenHandler
             $command->getTokenName(),
             $this->accessTokenTtl,
             $chainId,
+            $command->getDpopJkt(),
         );
 
         $refreshToken = RefreshToken::issue(

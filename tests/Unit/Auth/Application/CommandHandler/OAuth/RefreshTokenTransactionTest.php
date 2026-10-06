@@ -37,7 +37,7 @@ final class RefreshTokenTransactionTest extends TestCase
         $connection->insert('token_state', ['used' => 0]);
         $connection->executeStatement('CREATE TABLE replacement_tokens (id INTEGER PRIMARY KEY)');
         $client = Client::create('test', ['https://example.test'], secret: 'secret', confidential: true, firstParty: true);
-        $token = RefreshToken::issue(AccessToken::issue($client, null, [], null), null);
+        $token = RefreshToken::issue(AccessToken::issue($client, null, [], null, dpopJkt: 'bound-proof-key-thumbprint'), null);
         $refresh = $this->createMock(RefreshTokenRepositoryInterface::class);
         $refresh->method('findByTokenId')->willReturn($token);
         $refresh->expects($this->once())->method('consumeByTokenId')->willReturnCallback(static function () use ($connection, $token): RefreshToken {
@@ -58,7 +58,7 @@ final class RefreshTokenTransactionTest extends TestCase
         $jwt = $this->createStub(JwtGeneratorInterface::class);
         $jwt->method('generate')->willThrowException(new RuntimeException('sign failed'));
         $handler = new RefreshTokenHandler($access, $refresh, new TokenChainValidator($access, $refresh), $manager, $jwt, 3600, 86400);
-        $command = new RefreshTokenCommand($token->getTokenId()->toString());
+        $command = new RefreshTokenCommand($token->getTokenId()->toString(), dpopJkt: 'bound-proof-key-thumbprint');
         if ($oauth) {
             $clients = $this->createStub(ClientRepositoryInterface::class);
             $clients->method('findClientByUuid')->willReturn($client);

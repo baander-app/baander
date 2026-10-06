@@ -30,6 +30,7 @@ final class AccessToken
      * Issue a new access token.
      *
      * @param Scope[] $scopes
+     * @param string|null $dpopJkt Thumbprint of the DPoP key the token is bound to (RFC 9449)
      */
     public static function issue(
         Client $client,
@@ -38,6 +39,7 @@ final class AccessToken
         ?string $name = null,
         ?DateInterval $ttl = null,
         ?ChainId $chainId = null,
+        ?string $dpopJkt = null,
     ): self {
         $expiresAt = null;
         if ($ttl !== null) {
@@ -56,6 +58,7 @@ final class AccessToken
             lastRefreshedAt: null,
             createdAt: new DateTimeImmutable(),
             updatedAt: new DateTimeImmutable(),
+            dpopJkt: $dpopJkt,
         ));
     }
 

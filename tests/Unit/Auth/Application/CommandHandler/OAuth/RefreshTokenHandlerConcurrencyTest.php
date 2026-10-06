@@ -37,6 +37,8 @@ use RuntimeException;
  */
 final class RefreshTokenHandlerConcurrencyTest extends TestCase
 {
+    private const string JKT = 'bound-proof-key-thumbprint';
+
     private AccessTokenRepositoryInterface&Stub $accessTokenRepository;
     private RefreshTokenRepositoryInterface&Stub $refreshTokenRepository;
     private EntityManagerInterface&Stub $entityManager;
@@ -94,6 +96,7 @@ final class RefreshTokenHandlerConcurrencyTest extends TestCase
                     null,
                     null,
                     $chainId,
+                    dpopJkt: self::JKT,
                 );
 
                 return RefreshToken::reconstitute(new RefreshTokenState(
@@ -126,6 +129,7 @@ final class RefreshTokenHandlerConcurrencyTest extends TestCase
                     null,
                     null,
                     $chainId,
+                    dpopJkt: self::JKT,
                 );
 
                 return RefreshToken::reconstitute(new RefreshTokenState(
@@ -142,7 +146,7 @@ final class RefreshTokenHandlerConcurrencyTest extends TestCase
                 ));
             });
 
-        $command = new RefreshTokenCommand(refreshTokenId: $tokenIdString);
+        $command = new RefreshTokenCommand(refreshTokenId: $tokenIdString, dpopJkt: self::JKT);
 
         // First request succeeds.
         $first = ($this->handler)($command);

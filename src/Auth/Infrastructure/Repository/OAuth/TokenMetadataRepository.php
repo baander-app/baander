@@ -20,9 +20,10 @@ final class TokenMetadataRepository implements TokenMetadataRepositoryInterface
 
     public function save(TokenMetadata $metadata): void
     {
+        // Metadata references the access token's primary key, not its public token identifier.
         $tokenEntity = $this->entityManager
             ->getRepository(AccessTokenEntity::class)
-            ->findOneBy(['tokenId' => $metadata->getTokenId()->toString()]);
+            ->find($metadata->getTokenId());
 
         if ($tokenEntity === null) {
             throw new \RuntimeException('Access token not found for metadata storage.');

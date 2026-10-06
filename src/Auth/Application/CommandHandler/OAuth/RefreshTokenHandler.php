@@ -60,6 +60,15 @@ final class RefreshTokenHandler
             throw new RuntimeException('Refresh token has expired.');
         }
 
+        // RFC 9449 §5: a refresh token is redeemable only with the DPoP key its
+        // token pair was issued to. Unbound tokens fail closed.
+        $boundJkt = $refreshToken->getAccessToken()->getDpopJkt();
+        $proofJkt = $command->getDpopJkt();
+        if ($boundJkt === null || $boundJkt === '' || $proofJkt === null || $proofJkt === ''
+            || !hash_equals($boundJkt, $proofJkt)) {
+            throw new RuntimeException('Refresh token proof binding does not match.');
+        }
+
         // Validate chain integrity (replay detection).
         // If the token was already used, this will revoke the entire chain.
         // Tokens without a chainId are outside the rotation model and skip validation.
@@ -91,6 +100,7 @@ final class RefreshTokenHandler
                     $oldAccessToken->getName(),
                     $this->accessTokenTtl,
                     $chainId,
+                    $oldAccessToken->getDpopJkt(),
                 );
 
                 $newRefreshToken = RefreshToken::issue(

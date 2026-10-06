@@ -22,6 +22,7 @@ use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
@@ -29,6 +30,8 @@ use RuntimeException;
 
 final class RefreshTokenHandlerTest extends TestCase
 {
+    private const string JKT = 'bound-proof-key-thumbprint';
+
     private AccessTokenRepositoryInterface&Stub $accessTokenRepository;
     private RefreshTokenRepositoryInterface&Stub $refreshTokenRepository;
     /** @var list<AccessToken> */
@@ -108,6 +111,7 @@ final class RefreshTokenHandlerTest extends TestCase
             'My Token',
             new \DateInterval('PT3600S'),
             $chainId,
+            dpopJkt: self::JKT,
         );
 
         $oldRefreshToken = RefreshToken::issue(
@@ -120,6 +124,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
         $command = new RefreshTokenCommand(
             refreshTokenId: $oldRefreshToken->getTokenId()->toString(),
+            dpopJkt: self::JKT,
         );
 
         $result = ($this->handler)($command);
@@ -150,6 +155,7 @@ final class RefreshTokenHandlerTest extends TestCase
             null,
             new \DateInterval('PT3600S'),
             $chainId,
+            dpopJkt: self::JKT,
         );
 
         $oldRefreshToken = RefreshToken::issue(
@@ -162,6 +168,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
         $command = new RefreshTokenCommand(
             refreshTokenId: $oldRefreshToken->getTokenId()->toString(),
+            dpopJkt: self::JKT,
         );
 
         ($this->handler)($command);
@@ -183,6 +190,7 @@ final class RefreshTokenHandlerTest extends TestCase
             null,
             new \DateInterval('PT3600S'),
             $chainId,
+            dpopJkt: self::JKT,
         );
 
         $oldRefreshToken = RefreshToken::issue(
@@ -195,6 +203,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
         $command = new RefreshTokenCommand(
             refreshTokenId: $oldRefreshToken->getTokenId()->toString(),
+            dpopJkt: self::JKT,
         );
 
         ($this->handler)($command);
@@ -210,12 +219,74 @@ final class RefreshTokenHandlerTest extends TestCase
 
         $command = new RefreshTokenCommand(
             refreshTokenId: str_repeat('a', 80),
+            dpopJkt: self::JKT,
         );
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('Refresh token not found');
 
         ($this->handler)($command);
+    }
+
+    /** @return iterable<string, array{string|null, string|null}> */
+    public static function unmatchedProofBindings(): iterable
+    {
+        yield 'proof from another key' => [self::JKT, 'other-proof-key-thumbprint'];
+        yield 'missing proof key' => [self::JKT, null];
+        yield 'token issued without a binding' => [null, self::JKT];
+    }
+
+    #[DataProvider('unmatchedProofBindings')]
+    public function testRefreshRequiresTheProofKeyTheTokenWasIssuedTo(?string $boundJkt, ?string $proofJkt): void
+    {
+        $chainId = ChainId::generate();
+        $accessToken = AccessToken::issue(
+            $this->createConfidentialClient(),
+            User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User'),
+            [new Scope('profile')],
+            null,
+            new \DateInterval('PT3600S'),
+            $chainId,
+            dpopJkt: $boundJkt,
+        );
+        $refreshToken = RefreshToken::issue($accessToken, $chainId, new \DateInterval('PT2592000S'));
+        $this->refreshTokenRepository->method('findByTokenId')->willReturn($refreshToken);
+
+        try {
+            ($this->handler)(new RefreshTokenCommand(
+                refreshTokenId: $refreshToken->getTokenId()->toString(),
+                dpopJkt: $proofJkt,
+            ));
+            self::fail('A refresh with an unmatched proof key must be rejected.');
+        } catch (RuntimeException $exception) {
+            self::assertSame('Refresh token proof binding does not match.', $exception->getMessage());
+        }
+        self::assertFalse($refreshToken->hasBeenUsed());
+        self::assertSame([], $this->savedAccessTokens);
+        self::assertSame([], $this->savedRefreshTokens);
+    }
+
+    public function testRotatedAccessTokenKeepsTheProofKeyBinding(): void
+    {
+        $chainId = ChainId::generate();
+        $accessToken = AccessToken::issue(
+            $this->createConfidentialClient(),
+            User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User'),
+            [new Scope('profile')],
+            null,
+            new \DateInterval('PT3600S'),
+            $chainId,
+            dpopJkt: self::JKT,
+        );
+        $refreshToken = RefreshToken::issue($accessToken, $chainId, new \DateInterval('PT2592000S'));
+        $this->refreshTokenRepository->method('findByTokenId')->willReturn($refreshToken);
+
+        ($this->handler)(new RefreshTokenCommand(
+            refreshTokenId: $refreshToken->getTokenId()->toString(),
+            dpopJkt: self::JKT,
+        ));
+
+        self::assertSame(self::JKT, $this->savedAccessTokens[1]->getDpopJkt());
     }
 
     public function testRevokedRefreshTokenThrows(): void
@@ -231,6 +302,7 @@ final class RefreshTokenHandlerTest extends TestCase
             null,
             new \DateInterval('PT3600S'),
             $chainId,
+            dpopJkt: self::JKT,
         );
 
         $oldRefreshToken = RefreshToken::issue(
@@ -244,6 +316,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
         $command = new RefreshTokenCommand(
             refreshTokenId: $oldRefreshToken->getTokenId()->toString(),
+            dpopJkt: self::JKT,
         );
 
         $this->expectException(RuntimeException::class);
@@ -266,6 +339,7 @@ final class RefreshTokenHandlerTest extends TestCase
             null,
             null, // no TTL
             $chainId,
+            dpopJkt: self::JKT,
         );
 
         // Reconstitute a refresh token with an expired date
@@ -286,6 +360,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
         $command = new RefreshTokenCommand(
             refreshTokenId: $oldRefreshToken->getTokenId()->toString(),
+            dpopJkt: self::JKT,
         );
 
         $this->expectException(RuntimeException::class);
@@ -307,6 +382,7 @@ final class RefreshTokenHandlerTest extends TestCase
             null,
             null,
             $chainId,
+            dpopJkt: self::JKT,
         );
 
         // Reconstitute with usedAt set to simulate a previously-used refresh token
@@ -327,6 +403,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
         $command = new RefreshTokenCommand(
             refreshTokenId: $oldRefreshToken->getTokenId()->toString(),
+            dpopJkt: self::JKT,
         );
 
         $this->expectException(RuntimeException::class);
@@ -347,7 +424,8 @@ final class RefreshTokenHandlerTest extends TestCase
             [new Scope('profile')],
             null,
             null,
-            null, // no chainId
+            null, // no chainId,
+            dpopJkt: self::JKT,
         );
 
         $oldRefreshToken = RefreshToken::issue(
@@ -360,6 +438,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
         $command = new RefreshTokenCommand(
             refreshTokenId: $oldRefreshToken->getTokenId()->toString(),
+            dpopJkt: self::JKT,
         );
 
         // Should succeed without any chain validation
@@ -383,6 +462,7 @@ final class RefreshTokenHandlerTest extends TestCase
             null,
             null,
             $chainId,
+            dpopJkt: self::JKT,
         );
 
         $oldRefreshToken = RefreshToken::issue(
@@ -403,6 +483,7 @@ final class RefreshTokenHandlerTest extends TestCase
             ipAddress: '10.0.0.1',
             userAgent: 'Test Browser',
             clientFingerprint: 'fingerprint-123',
+            dpopJkt: self::JKT,
         );
 
         // Should not throw -- just skips metadata storage when entity not found
@@ -424,6 +505,7 @@ final class RefreshTokenHandlerTest extends TestCase
             null,
             null,
             $chainId,
+            dpopJkt: self::JKT,
         );
 
         $oldRefreshToken = RefreshToken::issue(
@@ -437,6 +519,7 @@ final class RefreshTokenHandlerTest extends TestCase
         $command = new RefreshTokenCommand(
             refreshTokenId: $oldRefreshToken->getTokenId()->toString(),
             clientFingerprint: null,
+            dpopJkt: self::JKT,
         );
 
         $result = ($this->handler)($command);
@@ -459,6 +542,7 @@ final class RefreshTokenHandlerTest extends TestCase
             'My Laptop',
             new \DateInterval('PT3600S'),
             $chainId,
+            dpopJkt: self::JKT,
         );
 
         $oldRefreshToken = RefreshToken::issue(
@@ -471,6 +555,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
         $command = new RefreshTokenCommand(
             refreshTokenId: $oldRefreshToken->getTokenId()->toString(),
+            dpopJkt: self::JKT,
         );
 
         $result = ($this->handler)($command);
@@ -495,6 +580,7 @@ final class RefreshTokenHandlerTest extends TestCase
             null,
             null,
             $chainId,
+            dpopJkt: self::JKT,
         );
 
         $oldRefreshToken = RefreshToken::issue(
@@ -541,6 +627,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
         $command = new RefreshTokenCommand(
             refreshTokenId: $oldRefreshToken->getTokenId()->toString(),
+            dpopJkt: self::JKT,
         );
 
         $this->expectException(RuntimeException::class);
