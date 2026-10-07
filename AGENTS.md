@@ -5,8 +5,7 @@
 Use subagents proactively for substantial, separable work; no further user request
 is needed. Keep small or tightly coupled tasks local. Start useful workers early,
 with at most eight active workers across the team; the lead continues independent
-work. `.codex/config.toml` enables Codex delegation and inherits user model
-defaults; Claude Code delegates through its Agent tool under the same limits.
+work. Claude Code delegates through its Agent tool under these limits.
 
 - Give concise briefs: objective, owned files or read-only scope, dependencies,
   checks, and deliverable. Fork full history only when needed. All workers follow
