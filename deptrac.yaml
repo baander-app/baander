@@ -963,6 +963,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Auth Resources':
+      - 'UserPreference Settings Contract'
       - 'Auth Application'
       - 'Shared Application'
       - 'Auth Domain'

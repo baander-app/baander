@@ -135,6 +135,11 @@ export interface AdminResetPasswordRequest {
   password: string;
 }
 
+export interface SetAdminUserSettingRequest {
+  /** New value; validated against the setting definition */
+  value: boolean | number | string;
+}
+
 export interface CreateClientRequest {
   /**
      * @minLength 1
@@ -1067,6 +1072,49 @@ export interface AdminUserResource {
   disabled: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+export type AdminUserSettingResourceType = typeof AdminUserSettingResourceType[keyof typeof AdminUserSettingResourceType];
+
+
+export const AdminUserSettingResourceType = {
+  boolean: 'boolean',
+  integer: 'integer',
+  enum: 'enum',
+  string: 'string',
+} as const;
+
+export type AdminUserSettingResourceOptionsItem = {
+  value: number | string;
+  label: string;
+};
+
+export type AdminUserSettingResourceSource = typeof AdminUserSettingResourceSource[keyof typeof AdminUserSettingResourceSource];
+
+
+export const AdminUserSettingResourceSource = {
+  user: 'user',
+  server_default: 'server_default',
+  default: 'default',
+} as const;
+
+export interface AdminUserSettingResource {
+  key: string;
+  label: string;
+  type: AdminUserSettingResourceType;
+  /** Allowed values of an enum setting, with their labels */
+  options: AdminUserSettingResourceOptionsItem[];
+  /** Whether the user may change the setting themselves */
+  userEditable: boolean;
+  /** The user's choice as stored, also when it is no longer allowed; null when they have none */
+  storedValue: unknown | null;
+  /** False when the stored choice is no longer allowed, so the user gets the value after a reset */
+  storedValueValid: boolean;
+  /** Effective value */
+  value: boolean | number | string;
+  /** The value the setting would have after a reset */
+  resetValue: boolean | number | string;
+  source: AdminUserSettingResourceSource;
 }
 
 export interface ClientResource {
@@ -2867,6 +2915,18 @@ export type PostAdminUsersDisable200 = {
 
 export type PostAdminUsersEnable200 = {
   data?: AdminUserResource;
+};
+
+export type GetAdminUserSettingsIndex200 = {
+  data?: AdminUserSettingResource[];
+};
+
+export type PutAdminUserSettingsSet200 = {
+  data?: AdminUserSettingResource;
+};
+
+export type DeleteAdminUserSettingsReset200 = {
+  data?: AdminUserSettingResource;
 };
 
 export type GetOauthClientsIndex200 = {
@@ -8621,6 +8681,255 @@ export const usePostAdminUsersEnable = <TError = ErrorType<ApiError>,
         TContext
       > => {
       return useMutation(getPostAdminUsersEnableMutationOptions(options), queryClient);
+    }
+
+export const getGetAdminUserSettingsIndexUrl = (id: string,) => {
+
+
+
+
+  return `/api/admin/users/${id}/settings`
+}
+
+/**
+ * A stored value that is no longer allowed is returned with storedValueValid false.
+ * @summary List a user's settings
+ */
+export const getAdminUserSettingsIndex = async (id: string, options?: RequestInit): Promise<GetAdminUserSettingsIndex200> => {
+
+  return customInstance<GetAdminUserSettingsIndex200>(getGetAdminUserSettingsIndexUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminUserSettingsIndexQueryKey = (id: string,) => {
+    return [
+    `/api/admin/users/${id}/settings`
+    ] as const;
+    }
+
+
+export const getGetAdminUserSettingsIndexQueryOptions = <TData = Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError = ErrorType<ApiError>>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminUserSettingsIndexQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>> = ({ signal }) => getAdminUserSettingsIndex(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAdminUserSettingsIndexQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>>
+export type GetAdminUserSettingsIndexQueryError = ErrorType<ApiError>
+
+
+export function useGetAdminUserSettingsIndex<TData = Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError = ErrorType<ApiError>>(
+ id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminUserSettingsIndex>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminUserSettingsIndex>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminUserSettingsIndex<TData = Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError = ErrorType<ApiError>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminUserSettingsIndex>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminUserSettingsIndex>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminUserSettingsIndex<TData = Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError = ErrorType<ApiError>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List a user's settings
+ */
+
+export function useGetAdminUserSettingsIndex<TData = Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError = ErrorType<ApiError>>(
+ id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAdminUserSettingsIndexQueryOptions(id,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPutAdminUserSettingsSetUrl = (id: string,
+    key: string,) => {
+
+
+
+
+  return `/api/admin/users/${id}/settings/${key}`
+}
+
+/**
+ * Works for every user setting, including ones users cannot change themselves. The change is logged.
+ * @summary Set a user's choice for a setting
+ */
+export const putAdminUserSettingsSet = async (id: string,
+    key: string,
+    setAdminUserSettingRequest: SetAdminUserSettingRequest, options?: RequestInit): Promise<PutAdminUserSettingsSet200> => {
+
+  return customInstance<PutAdminUserSettingsSet200>(getPutAdminUserSettingsSetUrl(id,key),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(setAdminUserSettingRequest)
+  }
+);}
+
+
+
+
+export const getPutAdminUserSettingsSetMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAdminUserSettingsSet>>, TError,{id: string;key: string;data: BodyType<SetAdminUserSettingRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof putAdminUserSettingsSet>>, TError,{id: string;key: string;data: BodyType<SetAdminUserSettingRequest>}, TContext> => {
+
+const mutationKey = ['putAdminUserSettingsSet'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putAdminUserSettingsSet>>, {id: string;key: string;data: BodyType<SetAdminUserSettingRequest>}> = (props) => {
+          const {id,key,data} = props ?? {};
+
+          return  putAdminUserSettingsSet(id,key,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutAdminUserSettingsSetMutationResult = NonNullable<Awaited<ReturnType<typeof putAdminUserSettingsSet>>>
+    export type PutAdminUserSettingsSetMutationBody = BodyType<SetAdminUserSettingRequest>
+    export type PutAdminUserSettingsSetMutationError = ErrorType<ApiError | ValidationError>
+
+    /**
+ * @summary Set a user's choice for a setting
+ */
+export const usePutAdminUserSettingsSet = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAdminUserSettingsSet>>, TError,{id: string;key: string;data: BodyType<SetAdminUserSettingRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof putAdminUserSettingsSet>>,
+        TError,
+        {id: string;key: string;data: BodyType<SetAdminUserSettingRequest>},
+        TContext
+      > => {
+      return useMutation(getPutAdminUserSettingsSetMutationOptions(options), queryClient);
+    }
+
+export const getDeleteAdminUserSettingsResetUrl = (id: string,
+    key: string,) => {
+
+
+
+
+  return `/api/admin/users/${id}/settings/${key}`
+}
+
+/**
+ * The change is logged.
+ * @summary Remove a user's choice so the setting follows its default
+ */
+export const deleteAdminUserSettingsReset = async (id: string,
+    key: string, options?: RequestInit): Promise<DeleteAdminUserSettingsReset200> => {
+
+  return customInstance<DeleteAdminUserSettingsReset200>(getDeleteAdminUserSettingsResetUrl(id,key),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteAdminUserSettingsResetMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUserSettingsReset>>, TError,{id: string;key: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUserSettingsReset>>, TError,{id: string;key: string}, TContext> => {
+
+const mutationKey = ['deleteAdminUserSettingsReset'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAdminUserSettingsReset>>, {id: string;key: string}> = (props) => {
+          const {id,key} = props ?? {};
+
+          return  deleteAdminUserSettingsReset(id,key,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteAdminUserSettingsResetMutationResult = NonNullable<Awaited<ReturnType<typeof deleteAdminUserSettingsReset>>>
+
+    export type DeleteAdminUserSettingsResetMutationError = ErrorType<ApiError>
+
+    /**
+ * @summary Remove a user's choice so the setting follows its default
+ */
+export const useDeleteAdminUserSettingsReset = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUserSettingsReset>>, TError,{id: string;key: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteAdminUserSettingsReset>>,
+        TError,
+        {id: string;key: string},
+        TContext
+      > => {
+      return useMutation(getDeleteAdminUserSettingsResetMutationOptions(options), queryClient);
     }
 
 export const getGetOauthClientsIndexUrl = () => {

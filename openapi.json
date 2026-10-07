@@ -1576,6 +1576,219 @@
                 }
             }
         },
+        "/api/admin/users/{id}/settings": {
+            "get": {
+                "tags": [
+                    "Admin / Users"
+                ],
+                "summary": "List a user's settings",
+                "description": "A stored value that is no longer allowed is returned with storedValueValid false.",
+                "operationId": "get_admin_user_settings_index",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The user's settings",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/AdminUserSettingResource"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/users/{id}/settings/{key}": {
+            "put": {
+                "tags": [
+                    "Admin / Users"
+                ],
+                "summary": "Set a user's choice for a setting",
+                "description": "Works for every user setting, including ones users cannot change themselves. The change is logged.",
+                "operationId": "put_admin_user_settings_set",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "[a-z0-9_.]+"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SetAdminUserSettingRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The setting after the change",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AdminUserSettingResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User or setting not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid value",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Admin / Users"
+                ],
+                "summary": "Remove a user's choice so the setting follows its default",
+                "description": "The change is logged.",
+                "operationId": "delete_admin_user_settings_reset",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "[a-z0-9_.]+"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The setting after the reset",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AdminUserSettingResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User or setting not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/oauth/clients/": {
             "get": {
                 "tags": [
@@ -20106,6 +20319,28 @@
                 },
                 "type": "object"
             },
+            "SetAdminUserSettingRequest": {
+                "required": [
+                    "value"
+                ],
+                "properties": {
+                    "value": {
+                        "description": "New value; validated against the setting definition",
+                        "oneOf": [
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    }
+                },
+                "type": "object"
+            },
             "CreateClientRequest": {
                 "required": [
                     "name"
@@ -21977,6 +22212,113 @@
                     "updatedAt": {
                         "type": "string",
                         "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "AdminUserSettingResource": {
+                "required": [
+                    "key",
+                    "label",
+                    "type",
+                    "options",
+                    "userEditable",
+                    "storedValue",
+                    "storedValueValid",
+                    "value",
+                    "resetValue",
+                    "source"
+                ],
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "example": "language"
+                    },
+                    "label": {
+                        "type": "string",
+                        "example": "Email language"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "boolean",
+                            "integer",
+                            "enum",
+                            "string"
+                        ]
+                    },
+                    "options": {
+                        "description": "Allowed values of an enum setting, with their labels",
+                        "type": "array",
+                        "items": {
+                            "required": [
+                                "value",
+                                "label"
+                            ],
+                            "properties": {
+                                "value": {
+                                    "oneOf": [
+                                        {
+                                            "type": "integer"
+                                        },
+                                        {
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "label": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "userEditable": {
+                        "description": "Whether the user may change the setting themselves",
+                        "type": "boolean"
+                    },
+                    "storedValue": {
+                        "description": "The user's choice as stored, also when it is no longer allowed; null when they have none",
+                        "nullable": true
+                    },
+                    "storedValueValid": {
+                        "description": "False when the stored choice is no longer allowed, so the user gets the value after a reset",
+                        "type": "boolean"
+                    },
+                    "value": {
+                        "description": "Effective value",
+                        "oneOf": [
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "resetValue": {
+                        "description": "The value the setting would have after a reset",
+                        "oneOf": [
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "source": {
+                        "type": "string",
+                        "enum": [
+                            "user",
+                            "server_default",
+                            "default"
+                        ]
                     }
                 },
                 "type": "object"
