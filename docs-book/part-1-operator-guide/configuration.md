@@ -248,9 +248,7 @@ Limits applied when scanning media libraries, to prevent path traversal, oversiz
 
 ## HTTP
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `CORS_ALLOW_ORIGIN` | `^https?://(localhost\|127\.0\.0\.1)(:[0-9]+)?$` | Regex of allowed CORS origins. Tighten to your production domain(s). |
+API routes accept cross-origin requests only from the origin in `APP_URL`. Two path prefixes allow any origin: `/.well-known/`, which serves the public JWKS keys, and `/api/discovery/`, whose endpoints still require authentication. The policy is set in `config/packages/nelmio_cors.yaml`; no environment variable changes it.
 
 ## Job Monitoring
 
