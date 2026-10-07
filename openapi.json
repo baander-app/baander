@@ -822,6 +822,289 @@
                 }
             }
         },
+        "/api/admin/oauth/clients": {
+            "get": {
+                "tags": [
+                    "Admin / OAuth clients"
+                ],
+                "summary": "List OAuth clients",
+                "description": "Every client except users' personal access clients, revoked ones included, newest first. The first-party login client is listed with type first_party and cannot be changed here.",
+                "operationId": "get_admin_oauth_clients_list",
+                "responses": {
+                    "200": {
+                        "description": "The clients",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/AdminOAuthClientResource"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not an administrator",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Admin / OAuth clients"
+                ],
+                "summary": "Register an OAuth client",
+                "description": "Registers a device client (public, device authorization grant), a public client (authorization code with PKCE) or a confidential client (authorization code with a client secret). A confidential client's secret is in this response only.",
+                "operationId": "post_admin_oauth_clients_create",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AdminCreateOAuthClientRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Client registered",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AdminOAuthClientCredentialsResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not a super administrator",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid name, type or redirect URIs; `error.details.reason` is `invalid_registration` when the registration rules reject them",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/oauth/clients/{clientId}/rotate-secret": {
+            "post": {
+                "tags": [
+                    "Admin / OAuth clients"
+                ],
+                "summary": "Rotate a confidential client's secret",
+                "description": "Confidential clients only. The old secret stops working at once; tokens already issued stay valid. The new secret is in this response only.",
+                "operationId": "post_admin_oauth_clients_rotate_secret",
+                "parameters": [
+                    {
+                        "name": "clientId",
+                        "in": "path",
+                        "description": "The OAuth client_id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "New secret issued",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AdminOAuthClientCredentialsResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not a super administrator",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown client",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The client is first-party (`error.details.reason` = `protected_client`), has no secret (`no_secret`) or is revoked (`revoked`)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/oauth/clients/{clientId}/revoke": {
+            "post": {
+                "tags": [
+                    "Admin / OAuth clients"
+                ],
+                "summary": "Revoke an OAuth client",
+                "description": "Revokes the client together with every access and refresh token issued to it. Revoking a revoked client succeeds again.",
+                "operationId": "post_admin_oauth_clients_revoke",
+                "parameters": [
+                    {
+                        "name": "clientId",
+                        "in": "path",
+                        "description": "The OAuth client_id",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Client revoked",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "required": [
+                                        "data"
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AdminOAuthClientResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not a super administrator",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown client",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The client is first-party (`error.details.reason` = `protected_client`)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/admin/users": {
             "get": {
                 "tags": [
@@ -1462,8 +1745,8 @@
                 "tags": [
                     "Auth"
                 ],
-                "summary": "OAuth 2.0 authorization endpoint (RFC 6749 section 3.1)",
-                "description": "The signed-in user authorizes the client. PKCE with the S256 method is required for every client. On success, and on errors once the client and redirect URI are valid, the response redirects to the redirect URI with `code` or `error`, `state` and `iss` (RFC 9207). Cross-origin requests are refused (RFC 9700 section 2.6).",
+                "summary": "Check an authorization request (RFC 6749 section 4.1.1)",
+                "description": "Backs the consent page at `APP_URL/oauth/authorize`, which RFC 8414 metadata advertises as the authorization endpoint. The page passes on the query parameters it received; this endpoint checks them for the signed-in user and describes the request. It never redirects. When the client or redirect URI is invalid, the error has no `redirect_uri`: show it to the user. Any other error carries `redirect_uri`, the client's redirect URI with `error`, `error_description`, `state` and `iss` (RFC 6749 section 4.1.2.1, RFC 9207); navigate there.",
                 "operationId": "get_oauth_authorize",
                 "parameters": [
                     {
@@ -1531,25 +1814,32 @@
                     }
                 ],
                 "responses": {
-                    "302": {
-                        "description": "Redirect to the client with an authorization code or an error"
-                    },
-                    "400": {
-                        "description": "Missing or unregistered redirect URI",
+                    "200": {
+                        "description": "A valid request awaiting the user's decision",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/OAuthError"
+                                    "$ref": "#/components/schemas/AuthorizationRequestResource"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request; with `redirect_uri` once the client and redirect URI are valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthorizationErrorResource"
                                 }
                             }
                         }
                     },
                     "401": {
-                        "description": "Not authenticated (ApiError), or an unknown or revoked client (OAuthError invalid_client)",
+                        "description": "Not authenticated",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/OAuthError"
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -1560,91 +1850,46 @@
                 "tags": [
                     "Auth"
                 ],
-                "summary": "OAuth 2.0 authorization endpoint (RFC 6749 section 3.1)",
-                "description": "Same as GET, with the parameters in the query string.",
-                "operationId": "post_oauth_authorize",
-                "parameters": [
-                    {
-                        "name": "response_type",
-                        "in": "query",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "enum": [
-                                "code"
-                            ]
-                        }
-                    },
-                    {
-                        "name": "client_id",
-                        "in": "query",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "redirect_uri",
-                        "in": "query",
-                        "schema": {
-                            "type": "string",
-                            "format": "uri"
-                        }
-                    },
-                    {
-                        "name": "scope",
-                        "in": "query",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "state",
-                        "in": "query",
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "code_challenge",
-                        "in": "query",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "code_challenge_method",
-                        "in": "query",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "enum": [
-                                "S256"
-                            ]
+                "summary": "Approve or deny an authorization request (RFC 6749 section 4.1.2)",
+                "description": "Records the signed-in user's decision on the request the consent page showed, sent with the same parameters. Approval answers with the client's redirect URI carrying `code`, `state` and `iss` (RFC 9207); denial with `error=access_denied`, `state` and `iss`. The page navigates to `redirect_uri`. Errors follow GET.",
+                "operationId": "post_oauth_authorize_decision",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AuthorizationDecisionRequest"
+                            }
                         }
                     }
-                ],
+                },
                 "responses": {
-                    "302": {
-                        "description": "Redirect to the client with an authorization code or an error"
-                    },
-                    "400": {
-                        "description": "Missing or unregistered redirect URI",
+                    "200": {
+                        "description": "Where to send the user agent",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/OAuthError"
+                                    "$ref": "#/components/schemas/AuthorizationRedirectResource"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request; with `redirect_uri` once the client and redirect URI are valid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthorizationErrorResource"
                                 }
                             }
                         }
                     },
                     "401": {
-                        "description": "Not authenticated (ApiError), or an unknown or revoked client (OAuthError invalid_client)",
+                        "description": "Not authenticated",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/OAuthError"
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -1658,7 +1903,7 @@
                     "Auth"
                 ],
                 "summary": "OAuth 2.0 token endpoint (RFC 6749 section 3.2)",
-                "description": "Requires a DPoP proof carrying a server-issued nonce; a proof without one is answered with `use_dpop_nonce` and a `DPoP-Nonce` header. Every answer carries the nonce for the next proof. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded or JSON. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`.",
+                "description": "Requires a DPoP proof carrying a server-issued nonce. A missing or invalid proof is answered with `invalid_dpop_proof`, a proof without a fresh nonce with `use_dpop_nonce`; both carry a `DPoP-Nonce` header. Every answer carries the nonce for the next proof and `Cache-Control: no-store`. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded (RFC 6749) or JSON. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`.",
                 "operationId": "post_oauth_token",
                 "requestBody": {
                     "required": true,
@@ -1714,22 +1959,17 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "DPoP-bound token pair",
+                        "description": "DPoP-bound token pair (RFC 6749 section 5.1)",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/components/schemas/TokenResource"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/OAuthTokenResource"
                                 }
                             }
                         }
                     },
                     "400": {
-                        "description": "OAuth error, including the device polling answers authorization_pending, slow_down, access_denied and expired_token, or a DPoP nonce challenge",
+                        "description": "OAuth error, including the device polling answers authorization_pending, slow_down, access_denied and expired_token, and the DPoP answers invalid_dpop_proof and use_dpop_nonce",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1739,7 +1979,7 @@
                         }
                     },
                     "401": {
-                        "description": "Client authentication failed",
+                        "description": "Client authentication failed, or the client is revoked",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1810,61 +2050,43 @@
                     "Auth"
                 ],
                 "summary": "Device authorization request (RFC 8628 section 3.1)",
-                "description": "Only clients registered as device clients may start the device flow. Show the user code and verification URI, then poll the token endpoint with the device code no faster than `interval` seconds.",
+                "description": "Only clients registered as device clients may start the device flow. Parameters may be form-encoded (RFC 8628) or JSON. Show the user code and `verification_uri` (or encode `verification_uri_complete` in a QR code), then poll the token endpoint with the device code no faster than `interval` seconds.",
                 "operationId": "post_oauth_device_authorize",
                 "requestBody": {
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
-                                "$ref": "#/components/schemas/DeviceAuthorizeRequest"
+                                "required": [
+                                    "client_id"
+                                ],
+                                "properties": {
+                                    "client_id": {
+                                        "type": "string"
+                                    },
+                                    "scope": {
+                                        "description": "Space-separated scopes",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
                             }
                         }
                     }
                 },
                 "responses": {
                     "200": {
-                        "description": "Device code issued",
+                        "description": "Device code issued (RFC 8628 section 3.2)",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "properties": {
-                                        "data": {
-                                            "properties": {
-                                                "deviceCode": {
-                                                    "type": "string"
-                                                },
-                                                "userCode": {
-                                                    "type": "string",
-                                                    "example": "BCDF-GHJK"
-                                                },
-                                                "verificationUri": {
-                                                    "type": "string",
-                                                    "format": "uri"
-                                                },
-                                                "verificationUriComplete": {
-                                                    "type": "string",
-                                                    "format": "uri"
-                                                },
-                                                "expiresIn": {
-                                                    "type": "integer",
-                                                    "example": 900
-                                                },
-                                                "interval": {
-                                                    "type": "integer",
-                                                    "example": 5
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
+                                    "$ref": "#/components/schemas/DeviceAuthorizationResource"
                                 }
                             }
                         }
                     },
                     "400": {
-                        "description": "The client may not use the device flow",
+                        "description": "Missing client_id, or the client may not use the device flow",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1882,16 +2104,6 @@
                                 }
                             }
                         }
-                    },
-                    "422": {
-                        "description": "Validation error",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ValidationError"
-                                }
-                            }
-                        }
                     }
                 },
                 "security": []
@@ -1903,7 +2115,7 @@
                     "Auth"
                 ],
                 "summary": "Look up a pending device authorization request (RFC 8628 section 3.3)",
-                "description": "Shows the signed-in user which client a user code belongs to before they approve or deny it. Case, spaces and dashes in the code do not matter.",
+                "description": "Backs the device page at `APP_URL/device`. Shows the signed-in user which client a user code belongs to before they approve or deny it. Case, spaces and dashes in the code do not matter. `scopes` are the scopes the issued token would carry.",
                 "operationId": "get_oauth_device_verify",
                 "parameters": [
                     {
@@ -1922,24 +2134,12 @@
                         "content": {
                             "application/json": {
                                 "schema": {
+                                    "required": [
+                                        "data"
+                                    ],
                                     "properties": {
                                         "data": {
-                                            "properties": {
-                                                "userCode": {
-                                                    "type": "string",
-                                                    "example": "BCDF-GHJK"
-                                                },
-                                                "clientName": {
-                                                    "type": "string"
-                                                },
-                                                "scopes": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string"
-                                                    }
-                                                }
-                                            },
-                                            "type": "object"
+                                            "$ref": "#/components/schemas/PendingDeviceAuthorizationResource"
                                         }
                                     },
                                     "type": "object"
@@ -1948,7 +2148,7 @@
                         }
                     },
                     "400": {
-                        "description": "Unknown, expired or already processed user code",
+                        "description": "Missing user code, or an unknown, expired or already decided one; `error.details.reason` is `user_code_required`, `invalid_user_code` or `device_already_processed`",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1976,7 +2176,7 @@
                     "Auth"
                 ],
                 "summary": "Approve or deny a device authorization request (RFC 8628 section 3.3)",
-                "description": "Approving gives the device a token pair for the signed-in user at its next poll and notifies the user. Denying makes the next poll answer `access_denied`.",
+                "description": "Records the signed-in user's decision. Approval gives the device a token pair for this user at its next poll and notifies the user. Denial makes the next poll answer `access_denied`.",
                 "operationId": "post_oauth_device_approve",
                 "requestBody": {
                     "required": true,
@@ -1994,9 +2194,23 @@
                         "content": {
                             "application/json": {
                                 "schema": {
+                                    "required": [
+                                        "data"
+                                    ],
                                     "properties": {
                                         "data": {
+                                            "required": [
+                                                "decision",
+                                                "message"
+                                            ],
                                             "properties": {
+                                                "decision": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "approved",
+                                                        "denied"
+                                                    ]
+                                                },
                                                 "message": {
                                                     "type": "string",
                                                     "example": "Device approved successfully."
@@ -2011,7 +2225,7 @@
                         }
                     },
                     "400": {
-                        "description": "Unknown, expired or already processed user code",
+                        "description": "Unknown, expired or already decided user code; `error.details.reason` is `invalid_user_code` or `device_already_processed`",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -19399,6 +19613,43 @@
                 },
                 "type": "object"
             },
+            "AdminCreateOAuthClientRequest": {
+                "required": [
+                    "name",
+                    "type"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "example": "Living room TV",
+                        "default": "",
+                        "maxLength": 100
+                    },
+                    "type": {
+                        "type": "string",
+                        "default": "",
+                        "enum": [
+                            "device",
+                            "public",
+                            "confidential"
+                        ]
+                    },
+                    "redirectUris": {
+                        "description": "Required for public and confidential clients (1 to 10 URIs: https, http on a loopback host, or a private-use scheme in reverse domain form; no fragment). Must be omitted or empty for device clients.",
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "format": "uri"
+                        },
+                        "example": [
+                            "https://player.baander.app/callback"
+                        ],
+                        "default": [],
+                        "maxItems": 10
+                    }
+                },
+                "type": "object"
+            },
             "AdminCreateUserRequest": {
                 "required": [
                     "email",
@@ -19538,28 +19789,10 @@
                 },
                 "type": "object"
             },
-            "DeviceAuthorizeRequest": {
-                "required": [
-                    "clientId"
-                ],
-                "properties": {
-                    "clientId": {
-                        "type": "string",
-                        "example": "client-uuid",
-                        "default": ""
-                    },
-                    "scope": {
-                        "description": "Requested OAuth scopes",
-                        "type": "string",
-                        "default": ""
-                    }
-                },
-                "type": "object"
-            },
             "DeviceApproveRequest": {
                 "required": [
                     "userCode",
-                    "action"
+                    "decision"
                 ],
                 "properties": {
                     "userCode": {
@@ -19568,7 +19801,7 @@
                         "default": "",
                         "maxLength": 255
                     },
-                    "action": {
+                    "decision": {
                         "type": "string",
                         "example": "approve",
                         "default": "",
@@ -21198,6 +21431,112 @@
                 },
                 "type": "object"
             },
+            "AdminOAuthClientResource": {
+                "required": [
+                    "clientId",
+                    "name",
+                    "type",
+                    "redirectUris",
+                    "revoked",
+                    "createdAt",
+                    "updatedAt"
+                ],
+                "properties": {
+                    "clientId": {
+                        "description": "The OAuth client_id (public ID)",
+                        "type": "string",
+                        "example": "V1StGXR8_Z5jdHi6B-myT"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Living room TV"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "device",
+                            "public",
+                            "confidential",
+                            "first_party"
+                        ]
+                    },
+                    "redirectUris": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "format": "uri"
+                        }
+                    },
+                    "revoked": {
+                        "type": "boolean"
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "AdminOAuthClientCredentialsResource": {
+                "description": "A client right after registration or secret rotation. The secret is shown only in this response; Baander stores its SHA-256 digest.",
+                "required": [
+                    "clientId",
+                    "name",
+                    "type",
+                    "redirectUris",
+                    "revoked",
+                    "createdAt",
+                    "updatedAt",
+                    "clientSecret"
+                ],
+                "properties": {
+                    "clientId": {
+                        "description": "The OAuth client_id (public ID)",
+                        "type": "string",
+                        "example": "V1StGXR8_Z5jdHi6B-myT"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Living room TV"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "device",
+                            "public",
+                            "confidential"
+                        ]
+                    },
+                    "redirectUris": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "format": "uri"
+                        }
+                    },
+                    "revoked": {
+                        "type": "boolean"
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "clientSecret": {
+                        "description": "The client_secret of a confidential client; null for device and public clients",
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
             "AdminUserResource": {
                 "required": [
                     "id",
@@ -21262,7 +21601,6 @@
                     "uuid",
                     "publicId",
                     "name",
-                    "secret",
                     "redirect",
                     "personalAccessClient",
                     "confidential",
@@ -21281,10 +21619,6 @@
                     },
                     "name": {
                         "description": "Client name",
-                        "type": "string"
-                    },
-                    "secret": {
-                        "description": "Client secret",
                         "type": "string"
                     },
                     "redirect": {
@@ -21306,6 +21640,188 @@
                 },
                 "type": "object"
             },
+            "AuthorizationRequestResource": {
+                "description": "A valid authorization request awaiting the signed-in user's decision.",
+                "required": [
+                    "client_id",
+                    "client_name",
+                    "client_type",
+                    "scopes",
+                    "redirect_uri",
+                    "consent_required"
+                ],
+                "properties": {
+                    "client_id": {
+                        "type": "string"
+                    },
+                    "client_name": {
+                        "type": "string",
+                        "example": "Baander Player"
+                    },
+                    "client_type": {
+                        "type": "string",
+                        "enum": [
+                            "public",
+                            "confidential",
+                            "first_party",
+                            "personal_access"
+                        ]
+                    },
+                    "scopes": {
+                        "description": "The scopes an approval grants: the requested scopes Baander allows, or the default scopes when none are left",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": [
+                            "library",
+                            "playlist"
+                        ]
+                    },
+                    "redirect_uri": {
+                        "description": "The validated redirect URI the answer goes to",
+                        "type": "string",
+                        "format": "uri"
+                    },
+                    "consent_required": {
+                        "description": "False only for first-party clients, whose requests the page may approve without asking",
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "AuthorizationErrorResource": {
+                "description": "An OAuth error (RFC 6749 section 4.1.2.1). Without redirect_uri the client or redirect URI is invalid and the user must see the error; never redirect. With redirect_uri, navigate there.",
+                "required": [
+                    "error",
+                    "error_description",
+                    "redirect_uri"
+                ],
+                "properties": {
+                    "error": {
+                        "type": "string",
+                        "enum": [
+                            "invalid_request",
+                            "invalid_client",
+                            "unauthorized_client",
+                            "unsupported_response_type",
+                            "invalid_scope",
+                            "access_denied"
+                        ]
+                    },
+                    "error_description": {
+                        "type": "string"
+                    },
+                    "redirect_uri": {
+                        "description": "The client's redirect URI carrying error, error_description, state and iss",
+                        "type": "string",
+                        "format": "uri"
+                    }
+                },
+                "type": "object"
+            },
+            "AuthorizationDecisionRequest": {
+                "description": "The parameters of the authorization request the consent page showed, unchanged, with the user's decision. JSON or form-encoded.",
+                "required": [
+                    "decision",
+                    "response_type",
+                    "client_id",
+                    "redirect_uri",
+                    "scope",
+                    "state",
+                    "code_challenge",
+                    "code_challenge_method"
+                ],
+                "properties": {
+                    "decision": {
+                        "type": "string",
+                        "enum": [
+                            "approve",
+                            "deny"
+                        ]
+                    },
+                    "response_type": {
+                        "type": "string",
+                        "enum": [
+                            "code"
+                        ]
+                    },
+                    "client_id": {
+                        "type": "string"
+                    },
+                    "redirect_uri": {
+                        "type": "string",
+                        "format": "uri"
+                    },
+                    "scope": {
+                        "description": "Space-separated scopes",
+                        "type": "string"
+                    },
+                    "state": {
+                        "type": "string"
+                    },
+                    "code_challenge": {
+                        "type": "string"
+                    },
+                    "code_challenge_method": {
+                        "type": "string",
+                        "enum": [
+                            "S256"
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "AuthorizationRedirectResource": {
+                "description": "Where the web app sends the user agent after the decision.",
+                "required": [
+                    "redirect_uri"
+                ],
+                "properties": {
+                    "redirect_uri": {
+                        "description": "The client's redirect URI with code, state and iss on approval, or error=access_denied, error_description, state and iss on denial",
+                        "type": "string",
+                        "format": "uri",
+                        "example": "https://player.baander.app/callback?code=abc&state=xyz&iss=https%3A%2F%2Fbaander.app"
+                    }
+                },
+                "type": "object"
+            },
+            "OAuthTokenResource": {
+                "description": "Successful token response (RFC 6749 section 5.1) with a DPoP-bound access token (RFC 9449).",
+                "required": [
+                    "access_token",
+                    "token_type",
+                    "expires_in",
+                    "refresh_token",
+                    "scope"
+                ],
+                "properties": {
+                    "access_token": {
+                        "type": "string"
+                    },
+                    "token_type": {
+                        "type": "string",
+                        "enum": [
+                            "DPoP"
+                        ]
+                    },
+                    "expires_in": {
+                        "description": "Seconds until the access token expires",
+                        "type": "integer",
+                        "example": 3600
+                    },
+                    "refresh_token": {
+                        "type": "string"
+                    },
+                    "scope": {
+                        "description": "Space-separated scopes the access token carries",
+                        "type": "string",
+                        "example": "library playlist"
+                    }
+                },
+                "type": "object"
+            },
             "OAuthError": {
                 "description": "OAuth2 error response",
                 "required": [
@@ -21323,6 +21839,84 @@
                     },
                     "error_uri": {
                         "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "DeviceAuthorizationResource": {
+                "description": "Device authorization response (RFC 8628 section 3.2).",
+                "required": [
+                    "device_code",
+                    "user_code",
+                    "verification_uri",
+                    "verification_uri_complete",
+                    "expires_in",
+                    "interval"
+                ],
+                "properties": {
+                    "device_code": {
+                        "type": "string"
+                    },
+                    "user_code": {
+                        "type": "string",
+                        "example": "BCDF-GHJK"
+                    },
+                    "verification_uri": {
+                        "description": "The web app page where the user enters the code (APP_URL/device)",
+                        "type": "string",
+                        "format": "uri",
+                        "example": "https://baander.app/device"
+                    },
+                    "verification_uri_complete": {
+                        "description": "verification_uri with the user code as user_code",
+                        "type": "string",
+                        "format": "uri",
+                        "example": "https://baander.app/device?user_code=BCDF-GHJK"
+                    },
+                    "expires_in": {
+                        "type": "integer",
+                        "example": 900
+                    },
+                    "interval": {
+                        "description": "Minimum seconds between token polls",
+                        "type": "integer",
+                        "example": 5
+                    }
+                },
+                "type": "object"
+            },
+            "PendingDeviceAuthorizationResource": {
+                "required": [
+                    "userCode",
+                    "clientId",
+                    "clientName",
+                    "scopes",
+                    "expiresAt"
+                ],
+                "properties": {
+                    "userCode": {
+                        "description": "The normalized user code",
+                        "type": "string",
+                        "example": "BCDF-GHJK"
+                    },
+                    "clientId": {
+                        "type": "string"
+                    },
+                    "clientName": {
+                        "type": "string",
+                        "example": "Living room TV"
+                    },
+                    "scopes": {
+                        "description": "The scopes an approval grants",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "expiresAt": {
+                        "type": "string",
+                        "format": "date-time",
                         "nullable": true
                     }
                 },
@@ -23325,6 +23919,10 @@
         {
             "name": "Admin / Login Blocks",
             "description": "Honeypot login block management"
+        },
+        {
+            "name": "Admin / OAuth clients",
+            "description": "OAuth client registration for administrators"
         },
         {
             "name": "Admin / Users",

@@ -12,6 +12,7 @@ PostgreSQL index and constraint names in Baander follow one scheme: a type prefi
 | Index with a non-B-tree access method or an extension operator class | `idx_<table>_<columns>_<suffix>` | `idx_songs_title_pgroonga`, `idx_songs_public_id_trgm` |
 | Migration-only partial, expression or polymorphic index | `idx_<table>_<purpose>`, or `uniq_<table>_<purpose>` when unique | `idx_albums_cover_image_null`, `idx_images_imageable`, `uniq_genres_name_lower` |
 | Primary key | `<table>_pkey` (PostgreSQL default) | `songs_pkey` |
+| Check constraint | `chk_<table>_<purpose>` | `chk_oauth_device_codes_single_decision` |
 
 - List columns in index order, separated by underscores: `idx_notifications_user_id_created_at`.
 - A B-tree index takes no suffix. The suffixes for other indexes are defined in [Extension Indexes](#extension-indexes).

@@ -43,7 +43,7 @@ final class ClientCreationTest extends TestCase
         self::assertSame('Library player', $data['data']['name']);
         self::assertTrue($data['data']['personalAccessClient']);
         self::assertFalse($data['data']['confidential']);
-        self::assertNull($data['data']['secret']);
+        self::assertArrayNotHasKey('secret', $data['data']);
     }
 
     public function testAnonymousCreationDispatchesNothing(): void

@@ -17,6 +17,7 @@ use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -63,7 +64,19 @@ trait IssuesTokenPairs
             $this->issuedMetadata[] = $entry;
         });
 
-        return new TokenPairIssuer($accessTokens, $refreshTokens, new ScopeAllowlist(['profile', 'email', 'library', 'playlist']), $entityManager, $jwt, $metadata, 3600, 2592000);
+        $clients = $this->createStub(ClientRepositoryInterface::class);
+        $clients->method('lockActiveClientForIssuance')->willReturnCallback(function (Uuid $clientId): bool {
+            // The registered client's current state stands for its locked row.
+            foreach ($this->clients as $client) {
+                if ($client->getId()->equals($clientId)) {
+                    return !$client->isRevoked();
+                }
+            }
+
+            return false;
+        });
+
+        return new TokenPairIssuer($accessTokens, $refreshTokens, new ScopeAllowlist(['profile', 'email', 'library', 'playlist']), $entityManager, $jwt, $metadata, $clients, 3600, 2592000);
     }
 
     private function clientAuthenticator(): OAuthClientAuthenticator

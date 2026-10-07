@@ -6,12 +6,13 @@ namespace App\Tests\Unit\Auth\Infrastructure\Repository\OAuth;
 
 use App\Auth\Domain\Model\OAuth\AuthCode;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
+use App\Auth\Domain\Model\User;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AuthCodeEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Auth\Infrastructure\Repository\OAuth\AuthCodeRepository;
-use App\Auth\Domain\Model\User;
 use App\Shared\Domain\Model\Email;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
@@ -46,7 +47,7 @@ final class AuthCodeRepositoryFlushTest extends TestCase
         $client = Client::create(
             name: 'Test App',
             redirectUris: ['http://localhost'],
-            secret: 'test-secret',
+            secret: ClientSecret::fromString('test-secret'),
             confidential: true,
             firstParty: true,
         );

@@ -106,7 +106,7 @@ which asserts index scans through `pg_stat_get_xact_numscans`
 `users.email` is the only CITEXT column in application tables
 (`password_reset_tokens.email` was dropped by Version20261006320000; verified
 2026-10-07 on disposable `baander-database:latest` via `information_schema.columns`).
-Reset tokens are hashed with SHA-256 in PHP; `pgcrypto` is not used for them.
+Reset and verification tokens and OAuth client secrets are hashed with SHA-256 in PHP. Version20261007100000 converted existing plain-text client secrets with core `sha256()` (PostgreSQL 11+, not pgcrypto), and calls pgcrypto `gen_random_bytes(32)` once to give a revoked, secretless confidential client the digest of no known secret. Verified 2026-10-07 by applying the migration and running OAuthSecretHashAndCodePurgeTest on disposable `baander-database:latest`; the pgcrypto extension version was not checked.
 
 ## Diff and performance checks
 

@@ -7,14 +7,19 @@ namespace App\Auth\Application\Exception;
 use RuntimeException;
 
 /**
- * The client does not exist or is not owned by the requesting user.
+ * The client does not exist, or is not owned by the requesting user.
  *
- * Both cases share one exception so callers cannot probe other users' clients.
+ * Both owner cases share one exception so callers cannot probe other users' clients.
  */
 final class ClientNotFoundException extends RuntimeException
 {
     public static function forOwner(): self
     {
         return new self('Client not found.');
+    }
+
+    public static function forPublicId(string $publicId): self
+    {
+        return new self(sprintf('No OAuth client has the ID "%s".', $publicId));
     }
 }

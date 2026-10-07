@@ -71,9 +71,10 @@ Clients other than Baander's own apps obtain tokens through the authorization co
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `auth.scopes.user_grants` | `profile`, `email`, `library`, `playlist` | Scopes a user token may carry, whichever path issues it: password or passkey login, the authorization code grant, or the device grant. Requested scopes outside this list are silently dropped. The metadata document at `/.well-known/oauth-authorization-server` lists them as `scopes_supported`. |
-| `auth.device.verification_uri` | `%auth.oauth.issuer%/device` | Absolute URI of the web page where a user enters the code a device shows. The device authorization response returns it, and the same URI with `?user_code=` appended as the complete verification URI. |
+| `auth.oauth.authorization_page_uri` | `%auth.oauth.issuer%/oauth/authorize` | Absolute URI of the web app's consent page. The metadata document advertises it as `authorization_endpoint`. The page checks the request with `GET /api/oauth/authorize`, sends the user's decision to `POST /api/oauth/authorize`, and then sends the browser to the redirect URI it gets back. |
+| `auth.device.verification_uri` | `%auth.oauth.issuer%/device` | Absolute URI of the web app page where a signed-in user enters the code a device shows. The device authorization response returns it as `verification_uri`, and the same URI with `?user_code=` appended as `verification_uri_complete`. |
 
-The issuer is `APP_URL`. No command or admin page registers third-party or device clients yet; `app:auth:setup-clients` creates only the first-party client.
+The issuer is `APP_URL`. `app:auth:setup-clients` creates only the first-party client; administrators register device, public and confidential clients with the `app:oauth:client:*` commands or the admin API (see [OAuth Clients](user-management.md#oauth-clients)).
 
 ## Web Push (VAPID)
 
@@ -307,7 +308,7 @@ Limits applied when scanning media libraries, to prevent path traversal, oversiz
 
 ## HTTP
 
-API routes accept cross-origin requests only from the origin in `APP_URL`. Four paths allow any origin: `/.well-known/`, which serves the public JWKS keys and the OAuth authorization server metadata; `POST /api/oauth/token` and `POST /api/oauth/device/authorize`, which third-party and device clients call with a DPoP proof rather than cookies; and `/api/discovery/`, whose endpoints still require authentication. The authorization endpoint, `/api/oauth/authorize`, answers no cross-origin request at all, not even from `APP_URL` (RFC 9700 section 2.6). Token revocation and device approval follow the `APP_URL` rule. The policy is set in `config/packages/nelmio_cors.yaml` and `AuthorizationCorsOptionsProvider`; no environment variable changes it.
+API routes accept cross-origin requests only from the origin in `APP_URL`. Four paths allow any origin: `/.well-known/`, which serves the public JWKS keys and the OAuth authorization server metadata; `POST /api/oauth/token` and `POST /api/oauth/device/authorize`, which third-party and device clients call with a DPoP proof rather than cookies; and `/api/discovery/`, whose endpoints still require authentication. The authorization endpoint `/api/oauth/authorize`, token revocation, and device verification and approval follow the `APP_URL` rule, because only the web app's consent and device pages call them for the signed-in user. Third-party clients never call `/api/oauth/authorize` themselves: they send the user's browser to the consent page. The policy is set in `config/packages/nelmio_cors.yaml`; no environment variable changes it.
 
 ## Job Monitoring
 

@@ -24,6 +24,8 @@ final class AuthorizationServerMetadataController
     public function __construct(
         private readonly UrlGeneratorInterface $urlGenerator,
         private readonly string $issuer,
+        /** The web app's consent page; a browser redirect cannot carry the DPoP-bound session. */
+        private readonly string $authorizationEndpoint,
         /** @var string[] */
         private readonly array $scopes,
     ) {
@@ -41,7 +43,7 @@ final class AuthorizationServerMetadataController
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'issuer', type: 'string', format: 'uri', example: 'https://baander.app'),
-                        new OA\Property(property: 'authorization_endpoint', type: 'string', format: 'uri'),
+                        new OA\Property(property: 'authorization_endpoint', description: 'The web app consent page (APP_URL/oauth/authorize)', type: 'string', format: 'uri'),
                         new OA\Property(property: 'token_endpoint', type: 'string', format: 'uri'),
                         new OA\Property(property: 'revocation_endpoint', type: 'string', format: 'uri'),
                         new OA\Property(property: 'device_authorization_endpoint', type: 'string', format: 'uri'),
@@ -72,7 +74,7 @@ final class AuthorizationServerMetadataController
     {
         return [
             'issuer'                                => $this->issuer,
-            'authorization_endpoint'                => $this->generateUrl('oauth_authorize'),
+            'authorization_endpoint'                => $this->authorizationEndpoint,
             'token_endpoint'                        => $this->generateUrl('oauth_token'),
             'revocation_endpoint'                   => $this->generateUrl('oauth_revoke'),
             'device_authorization_endpoint'         => $this->generateUrl('oauth_device_authorize'),

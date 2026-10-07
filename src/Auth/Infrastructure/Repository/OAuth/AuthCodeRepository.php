@@ -16,6 +16,7 @@ use App\Auth\Domain\Repository\OAuth\AuthCodeRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AuthCodeEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
@@ -137,6 +138,17 @@ final class AuthCodeRepository implements AuthCodeRepositoryInterface
         return true;
     }
 
+    public function deleteExpiredBefore(DateTimeImmutable $cutoff): int
+    {
+        // A daily sequential scan of a table that holds about a day of short-lived
+        // codes costs less than an expires_at index maintained on every insert.
+        // NULL never compares below the cutoff, so codes without an expiry stay.
+        return (int) $this->entityManager->getConnection()->executeStatement(
+            'DELETE FROM oauth_auth_codes WHERE expires_at < :cutoff',
+            ['cutoff' => $cutoff->format('Y-m-d H:i:s.uP')],
+        );
+    }
+
     private function userEntityToDomain(UserEntity $entity): User
     {
         return User::reconstitute(new UserState(
@@ -159,7 +171,7 @@ final class AuthCodeRepository implements AuthCodeRepositoryInterface
             id: $entity->getId(),
             publicId: $entity->getPublicId(),
             name: $entity->getName(),
-            secret: $entity->getSecret(),
+            secretHash: $entity->getSecretHash(),
             redirectUris: $this->parseRedirectUris($entity->getRedirect()),
             personalAccessClient: $entity->isPersonalAccessClient(),
             passwordClient: $entity->isPasswordClient(),

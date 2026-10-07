@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Application\CommandHandler\OAuth;
 
-use App\Auth\Application\Command\OAuth\RefreshTokenCommand;
 use App\Auth\Application\CommandHandler\OAuth\RefreshTokenHandler;
+use App\Auth\Application\Command\OAuth\RefreshTokenCommand;
 use App\Auth\Application\Port\JwtGeneratorInterface;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
@@ -13,9 +13,11 @@ use App\Auth\Domain\Model\OAuth\RefreshToken;
 use App\Auth\Domain\Model\OAuth\RefreshTokenState;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
+use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
+use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Domain\Service\TokenChainValidator;
@@ -73,6 +75,7 @@ final class RefreshTokenHandlerConcurrencyTest extends TestCase
             $this->entityManager,
             $jwtGenerator,
             $this->createStub(TokenMetadataRepositoryInterface::class),
+            $this->activeClients(),
             accessTokenTtl: 3600,
             refreshTokenTtl: 2592000,
         );
@@ -164,12 +167,21 @@ final class RefreshTokenHandlerConcurrencyTest extends TestCase
         ($this->handler)($command);
     }
 
+    /** Every client is still active when its row is locked for issuance. */
+    private function activeClients(): ClientRepositoryInterface
+    {
+        $clients = $this->createStub(ClientRepositoryInterface::class);
+        $clients->method('lockActiveClientForIssuance')->willReturn(true);
+
+        return $clients;
+    }
+
     private function createConfidentialClient(): Client
     {
         return Client::create(
             name: 'Test App',
             redirectUris: ['http://localhost'],
-            secret: 'test-secret',
+            secret: ClientSecret::fromString('test-secret'),
             confidential: true,
             firstParty: true,
         );

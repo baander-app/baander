@@ -328,7 +328,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         $metadata = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
         self::assertSame('https://baander.app', $metadata['issuer']);
         self::assertSame('https://baander.app/api/oauth/token', $metadata['token_endpoint']);
-        self::assertSame('https://baander.app/api/oauth/authorize', $metadata['authorization_endpoint']);
+        self::assertSame('https://baander.app/oauth/authorize', $metadata['authorization_endpoint'], 'The web app consent page.');
         self::assertSame('https://baander.app/api/oauth/device/authorize', $metadata['device_authorization_endpoint']);
         self::assertSame(['S256'], $metadata['code_challenge_methods_supported']);
         self::assertContains('urn:ietf:params:oauth:grant-type:device_code', $metadata['grant_types_supported']);
@@ -340,6 +340,18 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
 
         $missing = $this->send('POST', '/api/oauth/token', form: ['grant_type' => 'refresh_token', 'client_id' => $device, 'refresh_token' => str_repeat('r', 80)]);
         self::assertSame(400, $missing->getStatusCode(), (string) $missing->getContent());
+        $error = json_decode((string) $missing->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('invalid_dpop_proof', $error['error'], 'RFC 9449: an OAuth error, not the API error envelope.');
+        self::assertIsString($error['error_description']);
+        self::assertIsString($missing->headers->get('DPoP-Nonce'));
+        self::assertStringContainsString('no-store', (string) $missing->headers->get('Cache-Control'));
+
+        $wrongEndpoint = $this->send('POST', '/api/oauth/token', form: ['grant_type' => 'refresh_token', 'client_id' => $device, 'refresh_token' => str_repeat('r', 80)], headers: [
+            'DPoP' => (new SignedDpopProof())->createWithNonce('POST', self::ORIGIN . '/api/auth/refresh', $this->nonce()),
+        ]);
+        self::assertSame(400, $wrongEndpoint->getStatusCode());
+        self::assertSame('invalid_dpop_proof', json_decode((string) $wrongEndpoint->getContent(), true, flags: JSON_THROW_ON_ERROR)['error']);
+        self::assertIsString($wrongEndpoint->headers->get('DPoP-Nonce'));
 
         $noNonce = $this->send('POST', '/api/oauth/token', form: ['grant_type' => 'refresh_token', 'client_id' => $device, 'refresh_token' => str_repeat('r', 80)], headers: [
             'DPoP' => (new SignedDpopProof())->create('POST', self::ORIGIN . '/api/oauth/token', 'none'),
@@ -359,47 +371,58 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         $clientId = $this->deviceClient();
         $tvFingerprint = hash('sha256', 'living-room-tv');
 
-        $authorization = $this->send('POST', '/api/oauth/device/authorize', json: ['clientId' => $clientId, 'scope' => 'library playlist admin']);
+        // RFC 8628 section 3.1: form-encoded client_id and scope.
+        $authorization = $this->send('POST', '/api/oauth/device/authorize', form: ['client_id' => $clientId, 'scope' => 'library playlist admin']);
         self::assertSame(200, $authorization->getStatusCode(), (string) $authorization->getContent());
-        $codes = json_decode((string) $authorization->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
-        self::assertSame('https://baander.app/device', $codes['verificationUri']);
+        self::assertStringContainsString('no-store', (string) $authorization->headers->get('Cache-Control'));
+        $codes = json_decode((string) $authorization->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(['device_code', 'user_code', 'verification_uri', 'verification_uri_complete', 'expires_in', 'interval'], array_keys($codes));
+        self::assertSame('https://baander.app/device', $codes['verification_uri']);
+        self::assertSame('https://baander.app/device?user_code=' . rawurlencode($codes['user_code']), $codes['verification_uri_complete']);
+        self::assertSame(900, $codes['expires_in']);
         self::assertSame(5, $codes['interval']);
 
         // The user has not decided: pending, then slow_down for polling too soon.
-        [$pending, $nonce] = $this->pollDevice($tv, $clientId, $codes['deviceCode'], $this->nonce(), $tvFingerprint);
+        [$pending, $nonce] = $this->pollDevice($tv, $clientId, $codes['device_code'], $this->nonce(), $tvFingerprint);
         self::assertSame(['authorization_pending', 400], [$pending['error'], $pending['status']]);
-        [$slowDown, $nonce] = $this->pollDevice($tv, $clientId, $codes['deviceCode'], $nonce, $tvFingerprint);
+        [$slowDown, $nonce] = $this->pollDevice($tv, $clientId, $codes['device_code'], $nonce, $tvFingerprint);
         self::assertSame(['slow_down', 400], [$slowDown['error'], $slowDown['status']]);
 
         // The signed-in user looks the code up as typed and approves it.
         $web = new SignedDpopProof();
         $login = $this->login($web);
-        $typed = strtolower(str_replace('-', ' ', $codes['userCode']));
+        $typed = strtolower(str_replace('-', ' ', $codes['user_code']));
         $lookup = $this->asUser($login['accessToken'], $web, 'GET', '/api/oauth/device/verify', query: ['user_code' => $typed]);
         self::assertSame(200, $lookup->getStatusCode(), (string) $lookup->getContent());
         $request = json_decode((string) $lookup->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
         self::assertSame('Grant path TV', $request['clientName']);
+        self::assertSame($clientId, $request['clientId']);
+        self::assertSame($codes['user_code'], $request['userCode']);
         self::assertSame(['library', 'playlist'], $request['scopes']);
-        $approval = $this->asUser($login['accessToken'], $web, 'POST', '/api/oauth/device/approve', json: ['userCode' => $typed, 'action' => 'approve']);
+        self::assertIsString($request['expiresAt']);
+        $approval = $this->asUser($login['accessToken'], $web, 'POST', '/api/oauth/device/approve', json: ['userCode' => $typed, 'decision' => 'approve']);
         self::assertSame(200, $approval->getStatusCode(), (string) $approval->getContent());
+        self::assertSame('approved', json_decode((string) $approval->getContent(), true, flags: JSON_THROW_ON_ERROR)['data']['decision']);
 
-        [$tokens, $nonce] = $this->pollDevice($tv, $clientId, $codes['deviceCode'], $nonce, $tvFingerprint);
+        [$tokens, $nonce] = $this->pollDevice($tv, $clientId, $codes['device_code'], $nonce, $tvFingerprint);
         self::assertSame(200, $tokens['status'], json_encode($tokens, JSON_THROW_ON_ERROR));
-        $claims = self::claims($tokens['data']['accessToken']);
+        self::assertTokenResponse($tokens, 'library playlist');
+        $claims = self::claims($tokens['access_token']);
         self::assertSame(['jkt' => $tv->thumbprint()], $claims['cnf']);
         self::assertSame($this->user->getId()->toString(), $claims['sub']);
-        self::assertSame(200, $this->me($tokens['data']['accessToken'], $tv, $tvFingerprint)->getStatusCode());
-        self::assertSame(401, $this->me($tokens['data']['accessToken'], $tv)->getStatusCode(), 'The TV fingerprint binding applies.');
+        self::assertSame(200, $this->me($tokens['access_token'], $tv, $tvFingerprint)->getStatusCode());
+        self::assertSame(401, $this->me($tokens['access_token'], $tv)->getStatusCode(), 'The TV fingerprint binding applies.');
 
         // The code is spent; refresh at the token endpoint needs the TV key.
-        [$again, $nonce] = $this->pollDevice($tv, $clientId, $codes['deviceCode'], $nonce, $tvFingerprint);
+        [$again, $nonce] = $this->pollDevice($tv, $clientId, $codes['device_code'], $nonce, $tvFingerprint);
         self::assertSame('invalid_grant', $again['error']);
-        [$stolen, $nonce] = $this->tokenRequest(new SignedDpopProof(), $nonce, ['grant_type' => 'refresh_token', 'client_id' => $clientId, 'refresh_token' => $tokens['data']['refreshToken']]);
+        [$stolen, $nonce] = $this->tokenRequest(new SignedDpopProof(), $nonce, ['grant_type' => 'refresh_token', 'client_id' => $clientId, 'refresh_token' => $tokens['refresh_token']]);
         self::assertSame('invalid_grant', $stolen['error']);
-        [$refreshed] = $this->tokenRequest($tv, $nonce, ['grant_type' => 'refresh_token', 'client_id' => $clientId, 'refresh_token' => $tokens['data']['refreshToken']], $tvFingerprint);
+        [$refreshed] = $this->tokenRequest($tv, $nonce, ['grant_type' => 'refresh_token', 'client_id' => $clientId, 'refresh_token' => $tokens['refresh_token']], $tvFingerprint);
         self::assertSame(200, $refreshed['status'], json_encode($refreshed, JSON_THROW_ON_ERROR));
-        self::assertSame(['jkt' => $tv->thumbprint()], self::claims($refreshed['data']['accessToken'])['cnf']);
-        self::assertSame(200, $this->me($refreshed['data']['accessToken'], $tv, $tvFingerprint)->getStatusCode());
+        self::assertTokenResponse($refreshed, 'library playlist');
+        self::assertSame(['jkt' => $tv->thumbprint()], self::claims($refreshed['access_token'])['cnf']);
+        self::assertSame(200, $this->me($refreshed['access_token'], $tv, $tvFingerprint)->getStatusCode());
     }
 
     /** A password change revokes the user's other tokens, including those the device grant issued. */
@@ -407,14 +430,14 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
     {
         $tv = new SignedDpopProof();
         $clientId = $this->deviceClient();
-        $codes = json_decode((string) $this->send('POST', '/api/oauth/device/authorize', json: ['clientId' => $clientId])->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
+        $codes = json_decode((string) $this->send('POST', '/api/oauth/device/authorize', form: ['client_id' => $clientId])->getContent(), true, flags: JSON_THROW_ON_ERROR);
         $web = new SignedDpopProof();
         $login = $this->login($web);
-        $approval = $this->asUser($login['accessToken'], $web, 'POST', '/api/oauth/device/approve', json: ['userCode' => $codes['userCode'], 'action' => 'approve']);
+        $approval = $this->asUser($login['accessToken'], $web, 'POST', '/api/oauth/device/approve', json: ['userCode' => $codes['user_code'], 'decision' => 'approve']);
         self::assertSame(200, $approval->getStatusCode(), (string) $approval->getContent());
-        [$tokens, $nonce] = $this->pollDevice($tv, $clientId, $codes['deviceCode'], $this->nonce());
+        [$tokens, $nonce] = $this->pollDevice($tv, $clientId, $codes['device_code'], $this->nonce());
         self::assertSame(200, $tokens['status'], json_encode($tokens, JSON_THROW_ON_ERROR));
-        self::assertSame(200, $this->me($tokens['data']['accessToken'], $tv)->getStatusCode());
+        self::assertSame(200, $this->me($tokens['access_token'], $tv)->getStatusCode());
 
         $change = $this->asUser($login['accessToken'], $web, 'PUT', '/api/auth/me/password', json: [
             'currentPassword' => self::PASSWORD,
@@ -422,8 +445,8 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         ]);
         self::assertSame(200, $change->getStatusCode(), (string) $change->getContent());
 
-        self::assertSame(401, $this->me($tokens['data']['accessToken'], $tv)->getStatusCode());
-        [$refresh] = $this->tokenRequest($tv, $nonce, ['grant_type' => 'refresh_token', 'client_id' => $clientId, 'refresh_token' => $tokens['data']['refreshToken']]);
+        self::assertSame(401, $this->me($tokens['access_token'], $tv)->getStatusCode());
+        [$refresh] = $this->tokenRequest($tv, $nonce, ['grant_type' => 'refresh_token', 'client_id' => $clientId, 'refresh_token' => $tokens['refresh_token']]);
         self::assertSame('invalid_grant', $refresh['error']);
         self::assertSame(200, $this->me($login['accessToken'], $web)->getStatusCode(), 'The session that changed the password keeps its chain.');
     }
@@ -432,28 +455,31 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
     {
         $tv = new SignedDpopProof();
         $clientId = $this->deviceClient();
-        $codes = json_decode((string) $this->send('POST', '/api/oauth/device/authorize', json: ['clientId' => $clientId])->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
+        $codes = json_decode((string) $this->send('POST', '/api/oauth/device/authorize', form: ['client_id' => $clientId])->getContent(), true, flags: JSON_THROW_ON_ERROR);
 
         $web = new SignedDpopProof();
         $login = $this->login($web);
-        $denial = $this->asUser($login['accessToken'], $web, 'POST', '/api/oauth/device/approve', json: ['userCode' => $codes['userCode'], 'action' => 'deny']);
+        $denial = $this->asUser($login['accessToken'], $web, 'POST', '/api/oauth/device/approve', json: ['userCode' => $codes['user_code'], 'decision' => 'deny']);
         self::assertSame(200, $denial->getStatusCode(), (string) $denial->getContent());
 
-        [$denied] = $this->pollDevice($tv, $clientId, $codes['deviceCode'], $this->nonce());
+        [$denied] = $this->pollDevice($tv, $clientId, $codes['device_code'], $this->nonce());
         self::assertSame(['access_denied', 400], [$denied['error'], $denied['status']]);
-        $again = $this->asUser($login['accessToken'], $web, 'POST', '/api/oauth/device/approve', json: ['userCode' => $codes['userCode'], 'action' => 'approve']);
+        $again = $this->asUser($login['accessToken'], $web, 'POST', '/api/oauth/device/approve', json: ['userCode' => $codes['user_code'], 'decision' => 'approve']);
         self::assertSame(400, $again->getStatusCode(), 'A decided request cannot be approved afterwards.');
     }
 
     public function testOnlyDeviceClientsMayStartTheDeviceFlow(): void
     {
-        $response = $this->send('POST', '/api/oauth/device/authorize', json: ['clientId' => $this->publicClient()]);
+        $response = $this->send('POST', '/api/oauth/device/authorize', json: ['client_id' => $this->publicClient()]);
 
         self::assertSame(400, $response->getStatusCode(), (string) $response->getContent());
         self::assertSame('unauthorized_client', json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR)['error']);
     }
 
-    /** Authorization code with mandatory S256 PKCE, through the production firewall. */
+    /**
+     * Authorization code with mandatory S256 PKCE, through the production firewall: the web app's
+     * consent page checks the request, sends the approval and navigates to the returned URI.
+     */
     public function testAuthorizationCodeGrantRequiresTheMatchingVerifier(): void
     {
         $clientId = $this->publicClient();
@@ -461,18 +487,28 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         $challenge = rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '=');
         $web = new SignedDpopProof();
         $login = $this->login($web);
-
-        $authorize = $this->asUser($login['accessToken'], $web, 'GET', '/api/oauth/authorize', query: [
+        $request = [
             'response_type' => 'code', 'client_id' => $clientId, 'redirect_uri' => self::REDIRECT,
-            'scope' => 'library', 'state' => 'state-123', 'code_challenge' => $challenge, 'code_challenge_method' => 'S256',
-        ]);
-        self::assertSame(302, $authorize->getStatusCode(), (string) $authorize->getContent());
-        $location = (string) $authorize->headers->get('Location');
-        self::assertStringStartsWith(self::REDIRECT . '?', $location);
-        parse_str((string) parse_url($location, PHP_URL_QUERY), $redirect);
+            'scope' => 'library admin', 'state' => 'state-123', 'code_challenge' => $challenge, 'code_challenge_method' => 'S256',
+        ];
+
+        $check = $this->asUser($login['accessToken'], $web, 'GET', '/api/oauth/authorize', query: $request);
+        self::assertSame(200, $check->getStatusCode(), (string) $check->getContent());
+        self::assertStringContainsString('no-store', (string) $check->headers->get('Cache-Control'));
+        self::assertSame([
+            'client_id' => $clientId,
+            'client_name' => 'Grant path player',
+            'client_type' => 'public',
+            'scopes' => ['library'],
+            'redirect_uri' => self::REDIRECT,
+            'consent_required' => true,
+        ], json_decode((string) $check->getContent(), true, flags: JSON_THROW_ON_ERROR));
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM oauth_auth_codes WHERE user_id = ?', [$this->user->getId()->toString()]), 'Checking issues no code.');
+
+        $redirect = $this->decide($login['accessToken'], $web, [...$request, 'decision' => 'approve']);
         self::assertSame('state-123', $redirect['state']);
         self::assertSame('https://baander.app', $redirect['iss']);
-        self::assertIsString($redirect['code']);
+        self::assertArrayHasKey('code', $redirect);
 
         $app = new SignedDpopProof();
         $exchange = ['grant_type' => 'authorization_code', 'client_id' => $clientId, 'code' => $redirect['code'], 'redirect_uri' => self::REDIRECT];
@@ -483,35 +519,138 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
 
         [$tokens, $nonce] = $this->tokenRequest($app, $nonce, [...$exchange, 'code_verifier' => $verifier]);
         self::assertSame(200, $tokens['status'], json_encode($tokens, JSON_THROW_ON_ERROR));
-        self::assertSame('DPoP', $tokens['data']['tokenType']);
-        self::assertSame(['jkt' => $app->thumbprint()], self::claims($tokens['data']['accessToken'])['cnf']);
-        self::assertSame($app->thumbprint(), $this->storedBinding(self::claims($tokens['data']['accessToken'])['jti']));
-        self::assertSame(200, $this->me($tokens['data']['accessToken'], $app)->getStatusCode());
+        self::assertTokenResponse($tokens, 'library');
+        self::assertSame(['jkt' => $app->thumbprint()], self::claims($tokens['access_token'])['cnf']);
+        self::assertSame($app->thumbprint(), $this->storedBinding(self::claims($tokens['access_token'])['jti']));
+        self::assertSame(200, $this->me($tokens['access_token'], $app)->getStatusCode());
 
         [$replay] = $this->tokenRequest($app, $nonce, [...$exchange, 'code_verifier' => $verifier]);
         self::assertSame('invalid_grant', $replay['error'], 'A code is redeemed once.');
+    }
+
+    public function testDenialSendsAccessDeniedWithTheStateToTheClient(): void
+    {
+        $web = new SignedDpopProof();
+        $login = $this->login($web);
+
+        $redirect = $this->decide($login['accessToken'], $web, [
+            'decision' => 'deny', 'response_type' => 'code', 'client_id' => $this->publicClient(), 'redirect_uri' => self::REDIRECT,
+            'state' => 'denied-state', 'code_challenge' => str_repeat('c', 43), 'code_challenge_method' => 'S256',
+        ]);
+
+        self::assertSame('access_denied', $redirect['error']);
+        self::assertSame('denied-state', $redirect['state']);
+        self::assertSame('https://baander.app', $redirect['iss']);
+        self::assertArrayNotHasKey('code', $redirect);
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM oauth_auth_codes WHERE user_id = ?', [$this->user->getId()->toString()]));
     }
 
     public function testAuthorizationRejectsThePlainPkceMethodAtTheRedirectUri(): void
     {
         $web = new SignedDpopProof();
         $login = $this->login($web);
-
-        $response = $this->asUser($login['accessToken'], $web, 'GET', '/api/oauth/authorize', query: [
+        $request = [
             'response_type' => 'code', 'client_id' => $this->publicClient(), 'redirect_uri' => self::REDIRECT,
             'state' => 'plain-state', 'code_challenge' => str_repeat('p', 43), 'code_challenge_method' => 'plain',
-        ]);
+        ];
 
-        self::assertSame(302, $response->getStatusCode(), (string) $response->getContent());
-        parse_str((string) parse_url((string) $response->headers->get('Location'), PHP_URL_QUERY), $redirect);
-        self::assertSame('invalid_request', $redirect['error']);
-        self::assertSame('plain-state', $redirect['state']);
-        self::assertArrayNotHasKey('code', $redirect);
+        foreach ([['GET', $request, null], ['POST', null, [...$request, 'decision' => 'approve']]] as [$method, $query, $json]) {
+            $response = $this->asUser($login['accessToken'], $web, $method, '/api/oauth/authorize', json: $json, query: $query ?? []);
+            self::assertSame(400, $response->getStatusCode(), (string) $response->getContent());
+            self::assertFalse($response->headers->has('Location'));
+            $error = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+            self::assertSame('invalid_request', $error['error']);
+            self::assertStringStartsWith(self::REDIRECT . '?', $error['redirect_uri']);
+            parse_str((string) parse_url($error['redirect_uri'], PHP_URL_QUERY), $redirect);
+            self::assertSame('invalid_request', $redirect['error']);
+            self::assertSame('plain-state', $redirect['state']);
+            self::assertSame('https://baander.app', $redirect['iss']);
+            self::assertArrayNotHasKey('code', $redirect);
+        }
+    }
+
+    /** RFC 6749 section 4.1.2.1: an invalid client or redirect URI is shown, never redirected. */
+    public function testAnUnregisteredRedirectUriOrUnknownClientIsNeverRedirected(): void
+    {
+        $web = new SignedDpopProof();
+        $login = $this->login($web);
+        $request = [
+            'response_type' => 'code', 'client_id' => $this->publicClient(), 'redirect_uri' => 'https://evil.baander.app/callback',
+            'state' => 'evil', 'code_challenge' => str_repeat('c', 43), 'code_challenge_method' => 'S256',
+        ];
+
+        foreach ([$request, [...$request, 'client_id' => 'unknown_client_000001', 'redirect_uri' => self::REDIRECT]] as $query) {
+            foreach ([['GET', null], ['POST', [...$query, 'decision' => 'approve']], ['POST', [...$query, 'decision' => 'deny']]] as [$method, $json]) {
+                $response = $this->asUser($login['accessToken'], $web, $method, '/api/oauth/authorize', json: $json, query: $method === 'GET' ? $query : []);
+                self::assertSame(400, $response->getStatusCode(), (string) $response->getContent());
+                $error = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+                self::assertContains($error['error'], ['invalid_request', 'invalid_client']);
+                self::assertArrayNotHasKey('redirect_uri', $error);
+                self::assertFalse($response->headers->has('Location'));
+            }
+        }
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM oauth_auth_codes WHERE user_id = ?', [$this->user->getId()->toString()]));
     }
 
     public function testAuthorizationRequiresASignedInUser(): void
     {
         self::assertSame(401, $this->send('GET', '/api/oauth/authorize', query: ['response_type' => 'code', 'client_id' => $this->publicClient()])->getStatusCode());
+        self::assertSame(401, $this->send('POST', '/api/oauth/authorize', json: ['decision' => 'approve', 'client_id' => $this->publicClient()])->getStatusCode());
+    }
+
+    public function testDeviceAuthorizationErrorsAreOAuthErrors(): void
+    {
+        $missing = $this->send('POST', '/api/oauth/device/authorize', form: ['scope' => 'library']);
+        self::assertSame(400, $missing->getStatusCode(), (string) $missing->getContent());
+        self::assertSame('invalid_request', json_decode((string) $missing->getContent(), true, flags: JSON_THROW_ON_ERROR)['error']);
+
+        $unknown = $this->send('POST', '/api/oauth/device/authorize', form: ['client_id' => 'unknown_client_000001']);
+        self::assertSame(401, $unknown->getStatusCode());
+        self::assertSame('invalid_client', json_decode((string) $unknown->getContent(), true, flags: JSON_THROW_ON_ERROR)['error']);
+    }
+
+    public function testDeviceVerificationNamesTheReasonForAnUnusableCode(): void
+    {
+        $web = new SignedDpopProof();
+        $login = $this->login($web);
+
+        $unknown = $this->asUser($login['accessToken'], $web, 'GET', '/api/oauth/device/verify', query: ['user_code' => 'BCDF-GHJK']);
+        self::assertSame(400, $unknown->getStatusCode());
+        self::assertSame('invalid_user_code', json_decode((string) $unknown->getContent(), true, flags: JSON_THROW_ON_ERROR)['error']['details']['reason']);
+
+        $codes = json_decode((string) $this->send('POST', '/api/oauth/device/authorize', form: ['client_id' => $this->deviceClient()])->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        $denial = $this->asUser($login['accessToken'], $web, 'POST', '/api/oauth/device/approve', json: ['userCode' => $codes['user_code'], 'decision' => 'deny']);
+        self::assertSame('denied', json_decode((string) $denial->getContent(), true, flags: JSON_THROW_ON_ERROR)['data']['decision']);
+        $decided = $this->asUser($login['accessToken'], $web, 'GET', '/api/oauth/device/verify', query: ['user_code' => $codes['user_code']]);
+        self::assertSame('device_already_processed', json_decode((string) $decided->getContent(), true, flags: JSON_THROW_ON_ERROR)['error']['details']['reason']);
+    }
+
+    /**
+     * @param array<string, string> $body
+     * @return array<string, string> the query parameters of the redirect URI the page navigates to
+     */
+    private function decide(string $accessToken, SignedDpopProof $key, array $body): array
+    {
+        $response = $this->asUser($accessToken, $key, 'POST', '/api/oauth/authorize', json: $body);
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+        self::assertFalse($response->headers->has('Location'), 'The page navigates; the API never redirects.');
+        $answer = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(['redirect_uri'], array_keys($answer));
+        self::assertStringStartsWith(self::REDIRECT . '?', $answer['redirect_uri']);
+        parse_str((string) parse_url($answer['redirect_uri'], PHP_URL_QUERY), $redirect);
+
+        /** @var array<string, string> $redirect */
+        return $redirect;
+    }
+
+    /** @param array<string, mixed> $tokens */
+    private static function assertTokenResponse(array $tokens, string $scope): void
+    {
+        self::assertSame(['access_token', 'token_type', 'expires_in', 'refresh_token', 'scope', 'status'], array_keys($tokens), 'RFC 6749 section 5.1 body, no envelope.');
+        self::assertSame('DPoP', $tokens['token_type']);
+        self::assertSame(3600, $tokens['expires_in']);
+        self::assertIsString($tokens['refresh_token']);
+        self::assertSame($scope, $tokens['scope']);
     }
 
     private function deviceClient(): string

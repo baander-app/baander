@@ -23,7 +23,6 @@ final class AuthorizationServerMetadataTest extends TestCase
     public function testEndpointsAreRootedAtTheIssuer(): void
     {
         $paths = [
-            'oauth_authorize' => '/api/oauth/authorize',
             'oauth_token' => '/api/oauth/token',
             'oauth_revoke' => '/api/oauth/revoke',
             'oauth_device_authorize' => '/api/oauth/device/authorize',
@@ -32,10 +31,11 @@ final class AuthorizationServerMetadataTest extends TestCase
         $router = $this->createStub(UrlGeneratorInterface::class);
         $router->method('generate')->willReturnCallback(static fn (string $route): string => $paths[$route]);
 
-        $response = (new AuthorizationServerMetadataController($router, 'https://music.baander.app/', ['profile', 'library']))();
+        $response = (new AuthorizationServerMetadataController($router, 'https://music.baander.app/', 'https://music.baander.app/oauth/authorize', ['profile', 'library']))();
         $metadata = json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame('https://music.baander.app/', $metadata['issuer']);
+        self::assertSame('https://music.baander.app/oauth/authorize', $metadata['authorization_endpoint'], 'The web app consent page.');
         self::assertSame('https://music.baander.app/api/oauth/token', $metadata['token_endpoint']);
         self::assertSame('https://music.baander.app/api/oauth/device/authorize', $metadata['device_authorization_endpoint']);
         self::assertSame(['S256'], $metadata['code_challenge_methods_supported']);

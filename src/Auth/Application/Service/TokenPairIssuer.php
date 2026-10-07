@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Application\Service;
 
 use App\Auth\Application\DTO\TokenResponseDTO;
+use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Port\JwtGeneratorInterface;
 use App\Auth\Application\ScopeAllowlist;
 use App\Auth\Domain\Model\OAuth\AccessToken;
@@ -15,6 +16,7 @@ use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
+use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use DateInterval;
@@ -29,6 +31,10 @@ use Doctrine\ORM\EntityManagerInterface;
  * requires (RFC 9449), and the client fingerprint when the token request sent
  * X-Baander-Client-Fingerprint. Refresh rotates the pair in RefreshTokenHandler
  * and carries both bindings forward.
+ *
+ * The client's row stays locked against revocation while the tokens are
+ * written, so a client revoked concurrently either rejects the issuance or has
+ * the new tokens revoked with the rest (ClientRepositoryInterface::lockActiveClientForIssuance).
  */
 final class TokenPairIssuer
 {
@@ -42,6 +48,7 @@ final class TokenPairIssuer
         private readonly EntityManagerInterface $entityManager,
         private readonly JwtGeneratorInterface $jwtGenerator,
         private readonly TokenMetadataRepositoryInterface $tokenMetadataRepository,
+        private readonly ClientRepositoryInterface $clientRepository,
         int $accessTokenTtl,
         int $refreshTokenTtl,
     ) {
@@ -52,6 +59,8 @@ final class TokenPairIssuer
     /**
      * @param string[] $requestedScopes Filtered against the allowlist; none requested yields the default scopes
      * @param (callable(): void)|null $persistWithTokens Further writes that commit or roll back with the tokens
+     *
+     * @throws OAuthProtocolException invalid_client when the client was revoked before the tokens were stored
      */
     public function issue(
         Client $client,
@@ -83,7 +92,10 @@ final class TokenPairIssuer
             $this->refreshTokenTtl,
         );
 
-        $this->entityManager->getConnection()->transactional(function () use ($accessToken, $refreshToken, $persistWithTokens): void {
+        $this->entityManager->getConnection()->transactional(function () use ($client, $accessToken, $refreshToken, $persistWithTokens): void {
+            if (!$this->clientRepository->lockActiveClientForIssuance($client->getId())) {
+                throw OAuthProtocolException::invalidClient('The client has been revoked.');
+            }
             if ($persistWithTokens !== null) {
                 $persistWithTokens();
             }

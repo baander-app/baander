@@ -29,12 +29,9 @@ final readonly class OAuthClientAuthenticator
     {
         $client = $this->identify($clientId);
 
-        if ($client->isConfidential()) {
-            $storedSecret = $client->getSecret();
-            if ($clientSecret === null || $clientSecret === '' || $storedSecret === null
-                || !hash_equals($storedSecret, $clientSecret)) {
-                throw OAuthProtocolException::invalidClient();
-            }
+        // The stored digest is compared in constant time (ClientSecret::matches).
+        if ($client->isConfidential() && !$client->authenticatesWith($clientSecret)) {
+            throw OAuthProtocolException::invalidClient();
         }
 
         return $client;

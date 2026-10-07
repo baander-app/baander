@@ -24,7 +24,8 @@ final class ClientState
         public readonly Uuid $id,
         public readonly PublicId $publicId,
         public string $name,
-        public ?string $secret,
+        /** SHA-256 digest of a confidential client's secret; the secret itself is never stored. */
+        public ?string $secretHash,
         array $redirectUris,
         public bool $personalAccessClient,
         public bool $passwordClient,

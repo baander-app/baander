@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Auth\Interface\Resource;
 
 use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Domain\Model\OAuth\Client;
+use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
 use App\Auth\Domain\Model\User;
 use App\Auth\Interface\Resource\ClientResource;
 use App\Auth\Interface\Resource\TokenResource;
@@ -58,13 +59,13 @@ final class ResourcesTest extends TestCase
 
     public function testClientResourceFrom(): void
     {
-        $client = Client::create('Test App', ['http://localhost'], secret: 'secret', confidential: true);
+        $client = Client::create('Test App', ['http://localhost'], secret: ClientSecret::fromString('secret'), confidential: true);
         $result = ClientResource::from($client);
 
         $this->assertSame($client->getId()->toString(), $result['uuid']);
         $this->assertSame($client->getPublicId()->toString(), $result['publicId']);
         $this->assertSame('Test App', $result['name']);
-        $this->assertSame('secret', $result['secret']);
+        $this->assertArrayNotHasKey('secret', $result, 'A client secret is never listed.');
         $this->assertTrue($result['confidential']);
         $this->assertFalse($result['personalAccessClient']);
         $this->assertArrayHasKey('createdAt', $result);
@@ -75,7 +76,7 @@ final class ResourcesTest extends TestCase
         $client = Client::createPersonalAccess('CLI', Uuid::generate());
         $result = ClientResource::from($client);
 
-        $this->assertNull($result['secret']);
+        $this->assertArrayNotHasKey('secret', $result);
         $this->assertTrue($result['personalAccessClient']);
         $this->assertFalse($result['confidential']);
         $this->assertSame('["http:\\/\\/localhost"]', $result['redirect']);

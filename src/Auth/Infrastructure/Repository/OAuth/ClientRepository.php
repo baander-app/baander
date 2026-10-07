@@ -41,7 +41,7 @@ final class ClientRepository implements ClientRepositoryInterface
             $client->getPublicId(),
             $client->getName(),
             $this->jsonEncoder->encode($client->getRedirectUris(), 'json'),
-            $client->getSecret(),
+            $client->getSecretHash(),
             null,
             $client->isPersonalAccessClient(),
             $client->isPasswordClient(),
@@ -102,6 +102,35 @@ final class ClientRepository implements ClientRepositoryInterface
         return array_map(fn (ClientEntity $entity): Client => $this->toDomain($entity), $entities);
     }
 
+    public function findAllExceptPersonalAccess(): array
+    {
+        $entities = $this->entityManager
+            ->getRepository(ClientEntity::class)
+            ->findBy(
+                criteria: ['personalAccessClient' => false],
+                orderBy: ['createdAt' => 'DESC', 'id' => 'ASC'],
+            );
+
+        return array_map(fn (ClientEntity $entity): Client => $this->toDomain($entity), $entities);
+    }
+
+    public function lockActiveClientForIssuance(Uuid $clientId): bool
+    {
+        $connection = $this->entityManager->getConnection();
+        if (!$connection->isTransactionActive()) {
+            throw new \LogicException('The client lock must be taken inside the transaction that issues the tokens.');
+        }
+
+        // Raw SQL on purpose: the identity map may hold a client loaded before the
+        // revocation committed. FOR SHARE waits for a concurrent revocation; under
+        // READ COMMITTED PostgreSQL then re-evaluates the WHERE clause against the
+        // committed row, so a client revoked meanwhile yields no row.
+        return $connection->fetchOne(
+            'SELECT 1 FROM oauth_clients WHERE id = :id AND revoked = FALSE FOR SHARE',
+            ['id' => $clientId->toString()],
+        ) !== false;
+    }
+
     // --- Internal ---
 
     private function toDomain(ClientEntity $entity): Client
@@ -110,7 +139,7 @@ final class ClientRepository implements ClientRepositoryInterface
             id: $entity->getId(),
             publicId: $entity->getPublicId(),
             name: $entity->getName(),
-            secret: $entity->getSecret(),
+            secretHash: $entity->getSecretHash(),
             redirectUris: $this->parseRedirectUris($entity->getRedirect()),
             personalAccessClient: $entity->isPersonalAccessClient(),
             passwordClient: $entity->isPasswordClient(),
@@ -129,9 +158,7 @@ final class ClientRepository implements ClientRepositoryInterface
         $entity->setName($client->getName());
         $entity->setRedirect($this->jsonEncoder->encode($client->getRedirectUris(), 'json'));
 
-        if ($client->getSecret() !== null) {
-            $entity->setSecret($client->getSecret());
-        }
+        $entity->setSecretHash($client->getSecretHash());
 
         if ($client->isRevoked()) {
             $entity->revoke();

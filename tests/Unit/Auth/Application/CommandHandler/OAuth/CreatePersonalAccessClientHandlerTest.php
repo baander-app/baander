@@ -32,7 +32,7 @@ final class CreatePersonalAccessClientHandlerTest extends TestCase
         self::assertTrue($client->isOwnedBy($owner));
         self::assertTrue($client->isPersonalAccessClient());
         self::assertFalse($client->isConfidential());
-        self::assertNull($client->getSecret());
+        self::assertNull($client->getSecretHash());
         self::assertFalse($client->isRevoked());
     }
 

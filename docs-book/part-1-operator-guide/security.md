@@ -263,12 +263,13 @@ VAPID_PRIVATE_KEY=<from app:generate-vapid-keys>
 
 ### OAuth clients and cross-origin access
 
-Besides Baander's own apps, other clients can obtain tokens through the OAuth 2.0 authorization server: the authorization code grant with mandatory S256 PKCE, the device authorization grant for devices without a browser, and personal access clients that users create for their own tools. No command or admin page registers third-party or device clients yet.
+Besides Baander's own apps, other clients can obtain tokens through the OAuth 2.0 authorization server: the authorization code grant with mandatory S256 PKCE, the device authorization grant for devices without a browser, and personal access clients that users create for their own tools. Administrators register device, public and confidential clients with the `app:oauth:client:*` commands or the admin API; see [OAuth Clients](user-management.md#oauth-clients).
 
 - **Token binding.** Every access token and refresh token, from any grant, is bound to the DPoP key that requested it. API requests with the token must carry a proof signed by that key, except signed stream delivery URLs, and refresh requires the same key. A token request that sends `X-Baander-Client-Fingerprint` also binds the access token to that fingerprint. Refresh tokens rotate, and reusing one revokes its whole chain.
-- **Cross-origin access.** The token endpoint and the device authorization endpoint accept requests from any origin, because their callers prove possession with DPoP instead of cookies. The authorization endpoint refuses every cross-origin request (RFC 9700 section 2.6). Revocation, device approval, and all other API routes accept only the `APP_URL` origin. See [HTTP](configuration.md#http).
+- **Client secrets.** A confidential client's secret is shown once, when it is generated, and stored only as a SHA-256 digest. Rotating it ends the old secret at once and leaves issued tokens valid.
+- **Cross-origin access.** The token endpoint and the device authorization endpoint accept requests from any origin, because their callers prove possession with DPoP instead of cookies. Revocation, device approval, the authorization endpoint `/api/oauth/authorize`, and all other API routes accept only the `APP_URL` origin. Third-party clients do not call the authorization endpoint; they send the user's browser to the web app's consent page, which calls it for the signed-in user. See [HTTP](configuration.md#http).
 - **Rate limits.** The authorization, token, and device authorization endpoints each have a per-IP limiter, and the token endpoint also counts requests per client. User code lookups and approvals share a per-IP limit that bounds code guessing. See [Rate limiting](configuration.md#rate-limiting).
-- **Revocation.** A user who revokes a personal access client also revokes every access and refresh token issued to it. Deleting a user deletes their tokens, authorization codes, and device codes.
+- **Revocation.** Revoking a client also revokes every access and refresh token issued to it. This holds for an administrator revoking a device, public or confidential client and for a user revoking a personal access client. Deleting a user deletes their tokens, authorization codes, and device codes.
 
 ### Network security
 

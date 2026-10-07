@@ -71,7 +71,7 @@ graph TD
 
 | Attribute | Detail |
 |-----------|--------|
-| **Responsibility** | User identity, first-party login (password, passkey, TOTP), OAuth 2.0 authorization server (authorization code with PKCE, device authorization, refresh, personal access clients), DPoP-bound token issuance and refresh, access token validation |
+| **Responsibility** | User identity, first-party login (password, passkey, TOTP), OAuth 2.0 authorization server (authorization code with PKCE, device authorization, refresh, personal access clients, administrator client registration), DPoP-bound token issuance and refresh, access token validation |
 | **Namespace** | `App\Auth` |
 | **Aggregates** | `User` |
 | **Repositories** | `UserRepositoryInterface` |

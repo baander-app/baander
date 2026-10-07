@@ -11,10 +11,10 @@ use Symfony\Component\Validator\Constraints\Length;
 
 #[OA\Schema(
     schema: 'DeviceApproveRequest',
-    required: ['userCode', 'action'],
+    required: ['userCode', 'decision'],
     properties: [
         new OA\Property(property: 'userCode', type: 'string', example: 'ABCD-EFGH', maxLength: 255),
-        new OA\Property(property: 'action', type: 'string', example: 'approve', enum: ['approve', 'deny']),
+        new OA\Property(property: 'decision', type: 'string', example: 'approve', enum: ['approve', 'deny']),
     ],
 )]
 final readonly class DeviceApproveRequest
@@ -24,9 +24,9 @@ final readonly class DeviceApproveRequest
         #[Length(max: 255)]
         public string $userCode = '',
 
-        #[NotBlank(message: 'Action is required.')]
-        #[Choice(choices: ['approve', 'deny'], message: 'The "action" parameter must be "approve" or "deny".')]
-        public string $action = '',
+        #[NotBlank(message: 'Decision is required.')]
+        #[Choice(choices: ['approve', 'deny'], message: 'The decision must be "approve" or "deny".')]
+        public string $decision = '',
     ) {
     }
 }

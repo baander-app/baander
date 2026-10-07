@@ -55,11 +55,20 @@ parameters:
     # resource server accepts only tokens issued for it.
     auth.oauth.issuer: '%env(APP_URL)%'
 
+    # --- Web App Authorization Pages ---
+
+    # Absolute URI of the web app's consent page. RFC 8414 metadata advertises it as
+    # the authorization_endpoint; the page reads the request from its query string,
+    # checks it with GET /api/oauth/authorize and sends the user's decision to
+    # POST /api/oauth/authorize, then navigates to the redirect URI it gets back.
+    auth.oauth.authorization_page_uri: '%auth.oauth.issuer%/oauth/authorize'
+
     # --- Device Authorization (RFC 8628) ---
 
-    # Absolute URI of the web page where a user enters the code a device shows.
-    # The device authorization response returns it, and the same URI with
-    # ?user_code=... as verification_uri_complete.
+    # Absolute URI of the web app page where a signed-in user enters the code a
+    # device shows. The device authorization response returns it as
+    # verification_uri, and the same URI with ?user_code=... as
+    # verification_uri_complete.
     auth.device.verification_uri: '%auth.oauth.issuer%/device'
 
     # --- OAuth 2.0 Key Paths ---
