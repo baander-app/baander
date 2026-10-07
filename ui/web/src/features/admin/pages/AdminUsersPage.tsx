@@ -264,6 +264,7 @@ export function AdminUsersPage() {
                   </DateCell>
                   <UserRowActions
                     user={user}
+                    canManage={isSuperAdmin}
                     onEdit={() => setActiveDialog({ type: 'edit', user })}
                     onAssignRoles={() => setActiveDialog({ type: 'roles', user })}
                     onResetPassword={() => setActiveDialog({ type: 'password', user })}
