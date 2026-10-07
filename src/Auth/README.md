@@ -7,7 +7,7 @@ Authentication and token issuance. Password login (with optional TOTP), passkey 
 The context is organized into four feature areas within each layer:
 
 - **User** — registration, login, profile management, password reset
-- **OAuth** — token lifecycle: issue at password or passkey login and through the authorization code and device code grants, rotate at refresh, revoke. Every token pair comes from `TokenPairIssuer`, and both refresh paths rotate through `RefreshTokenHandler`. Every request that issues tokens needs a DPoP proof with a server-issued nonce, and tokens are bound to the proof key. An optional `X-Baander-Client-Fingerprint` header on the token request also binds the access token to that fingerprint. The OAuth area also covers the RFC 8414 metadata document and personal access clients.
+- **OAuth** — token lifecycle: issue at password or passkey login and through the authorization code and device code grants, rotate at refresh, revoke. Every token pair comes from `TokenPairIssuer`, and both refresh paths rotate through `RefreshTokenHandler`. Every request that issues tokens needs a DPoP proof with a server-issued nonce, and tokens are bound to the proof key. An optional `X-Baander-Client-Fingerprint` header on the token request also binds the access token to that fingerprint. The OAuth area also covers the RFC 8414 metadata document, personal access clients, and the registration, secret rotation and revocation of device, public and confidential clients through the admin API and the `app:oauth:client:*` commands.
 - **Passkey** — WebAuthn registration and authentication via `web-auth/webauthn-lib`
 - **Totp** — time-based one-time password setup and verification via `otphp`
 

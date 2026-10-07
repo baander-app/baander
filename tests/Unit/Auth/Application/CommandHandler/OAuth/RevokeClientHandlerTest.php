@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Auth\Application\CommandHandler\OAuth;
 use App\Auth\Application\Command\OAuth\RevokeClientCommand;
 use App\Auth\Application\CommandHandler\OAuth\RevokeClientHandler;
 use App\Auth\Application\Exception\ClientNotFoundException;
+use App\Auth\Application\Service\ClientRevoker;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
@@ -53,7 +54,7 @@ final class RevokeClientHandlerTest extends TestCase
                 return $result;
             });
 
-        (new RevokeClientHandler($clients, $accessTokens, $refreshTokens, $transaction))(
+        (new RevokeClientHandler($clients, new ClientRevoker($clients, $accessTokens, $refreshTokens, $transaction)))(
             new RevokeClientCommand($owner, $client->getPublicId()),
         );
 
@@ -105,7 +106,7 @@ final class RevokeClientHandlerTest extends TestCase
 
         $this->expectExceptionObject($failure);
 
-        (new RevokeClientHandler($clients, $accessTokens, $refreshTokens, $transaction))(
+        (new RevokeClientHandler($clients, new ClientRevoker($clients, $accessTokens, $refreshTokens, $transaction)))(
             new RevokeClientCommand($owner, $client->getPublicId()),
         );
     }
@@ -122,6 +123,6 @@ final class RevokeClientHandlerTest extends TestCase
         $transaction = $this->createMock(TransactionPortInterface::class);
         $transaction->expects(self::never())->method('run');
 
-        return new RevokeClientHandler($clients, $accessTokens, $refreshTokens, $transaction);
+        return new RevokeClientHandler($clients, new ClientRevoker($clients, $accessTokens, $refreshTokens, $transaction));
     }
 }

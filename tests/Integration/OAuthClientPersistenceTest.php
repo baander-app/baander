@@ -55,6 +55,15 @@ final class OAuthClientPersistenceTest extends TestCase
                 }
             }
         }
+        // The client secret digest column and its checks (Version20261007100000).
+        require_once dirname(__DIR__, 2) . '/migrations/Version20261007100000.php';
+        $migration = new \DoctrineMigrations\Version20261007100000($this->writer, new NullLogger());
+        $migration->up(new Schema());
+        foreach ($migration->getSql() as $query) {
+            if (preg_match('/\AALTER TABLE oauth_clients\b/', $query->getStatement()) === 1) {
+                $this->writer->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
+            }
+        }
         CustomTypesRegistrar::register();
         $configuration = ORMSetup::createAttributeMetadataConfig([
             dirname(__DIR__, 2) . '/src/Auth/Infrastructure/Doctrine/Entity',

@@ -24,31 +24,52 @@ final readonly class DpopTokenRequestVerifier
     }
 
     /**
+     * The first-party login answer: an API error for a missing proof, a nonce challenge otherwise.
+     *
      * @return string|JsonResponse the proof key's JWK thumbprint, or the response to send instead of tokens
      */
     public function verify(Request $request): string|JsonResponse
     {
-        $proof = $request->headers->get('DPoP');
-        if ($proof === null || $proof === '') {
+        $result = $this->inspect($request);
+        if (is_string($result)) {
+            return $result;
+        }
+
+        if ($result->reason === DpopProofRejection::MISSING) {
             return new JsonResponse(
-                ['error' => ['message' => 'DPoP proof header is required.', 'code' => Response::HTTP_BAD_REQUEST]],
+                ['error' => ['message' => $result->description, 'code' => Response::HTTP_BAD_REQUEST]],
                 Response::HTTP_BAD_REQUEST,
             );
+        }
+
+        return $this->nonceManager->createChallengeResponse($result->description);
+    }
+
+    /**
+     * Checks the proof and consumes its nonce.
+     *
+     * @return string|DpopProofRejection the proof key's JWK thumbprint, or why the proof was not accepted
+     */
+    public function inspect(Request $request): string|DpopProofRejection
+    {
+        $proof = $request->headers->get('DPoP');
+        if ($proof === null || $proof === '') {
+            return DpopProofRejection::missing();
         }
 
         // Nonce challenge-response: the proof must carry a nonce this server issued.
         $nonce = $this->proofValidator->extractNonce($proof);
         if ($nonce === null || $nonce === '') {
-            return $this->nonceManager->createChallengeResponse();
+            return DpopProofRejection::nonceRequired('Authorization server requires nonce in DPoP proof.');
         }
         if (!$this->nonceManager->isValid($nonce)) {
-            return $this->nonceManager->createChallengeResponse('Authorization server requires a fresh nonce in DPoP proof.');
+            return DpopProofRejection::nonceRequired('Authorization server requires a fresh nonce in DPoP proof.');
         }
 
         $result = $this->proofValidator->validate($proof, $request);
         $jkt = $result->getJkt();
         if (!$result->isValid() || $jkt === null) {
-            return $this->nonceManager->createChallengeResponse(
+            return DpopProofRejection::invalid(
                 $result->getErrorDescription() ?? $result->getError() ?? 'DPoP proof validation failed.',
             );
         }

@@ -7,6 +7,7 @@ namespace App\Auth\Domain\Repository\OAuth;
 use App\Auth\Domain\Model\OAuth\DeviceCode;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Shared\Domain\Model\Uuid;
+use DateTimeImmutable;
 
 interface DeviceCodeRepositoryInterface
 {
@@ -25,4 +26,13 @@ interface DeviceCodeRepositoryInterface
      * token pair is issued per approval.
      */
     public function redeem(DeviceCode $deviceCode): bool;
+
+    /**
+     * Deletes device codes that expired before the cutoff, whatever their state.
+     *
+     * A code without an expiry never expires and is kept.
+     *
+     * @return int The number of deleted codes
+     */
+    public function deleteExpiredBefore(DateTimeImmutable $cutoff): int;
 }

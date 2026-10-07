@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Auth\Application\CommandHandler;
 
 use App\Auth\Application\Command\OAuth\IssueTokenCommand;
 use App\Auth\Application\CommandHandler\OAuth\IssueTokenHandler;
+use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Port\JwtGeneratorInterface;
 use App\Auth\Application\ScopeAllowlist;
 use App\Auth\Application\Service\TokenPairIssuer;
@@ -41,6 +42,8 @@ final class IssueTokenHandlerTest extends TestCase
     private array $savedMetadata = [];
     /** @var list<?string> */
     private array $jwtBindings = [];
+    /** What the issuing transaction finds when it locks the client's row. */
+    private bool $clientActiveAtIssuance = true;
     private IssueTokenHandler $handler;
 
     protected function setUp(): void
@@ -54,6 +57,7 @@ final class IssueTokenHandlerTest extends TestCase
             $this->savedRefreshTokens[] = $token;
         });
         $this->clientRepository = $this->createStub(ClientRepositoryInterface::class);
+        $this->clientRepository->method('lockActiveClientForIssuance')->willReturnCallback(fn (): bool => $this->clientActiveAtIssuance);
         $this->userRepository = $this->createStub(UserRepositoryInterface::class);
 
         $connection = $this->createStub(Connection::class);
@@ -83,6 +87,7 @@ final class IssueTokenHandlerTest extends TestCase
                 $entityManager,
                 $jwtGenerator,
                 $tokenMetadataRepository,
+                $this->clientRepository,
                 accessTokenTtl: 3600,
                 refreshTokenTtl: 2592000,
             ),
@@ -167,6 +172,23 @@ final class IssueTokenHandlerTest extends TestCase
         $this->expectExceptionMessage('Client has been revoked');
 
         ($this->handler)(new IssueTokenCommand(clientId: $client->getId(), userId: $user->getId(), dpopJkt: self::JKT));
+    }
+
+    public function testAClientRevokedBeforeTheTokensAreStoredFailsWithInvalidClient(): void
+    {
+        [$client, $user] = $this->registered();
+        $this->clientActiveAtIssuance = false;
+
+        try {
+            ($this->handler)(new IssueTokenCommand(clientId: $client->getId(), userId: $user->getId(), dpopJkt: self::JKT));
+            self::fail('Issuance must fail once the locked client row is revoked.');
+        } catch (OAuthProtocolException $exception) {
+            self::assertSame('invalid_client', $exception->error);
+            self::assertSame(401, $exception->statusCode);
+        }
+        self::assertSame([], $this->savedAccessTokens);
+        self::assertSame([], $this->savedRefreshTokens);
+        self::assertSame([], $this->savedMetadata);
     }
 
     public function testUserNotFoundThrows(): void

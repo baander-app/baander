@@ -183,7 +183,7 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
             id: $entity->getId(),
             publicId: $entity->getPublicId(),
             name: $entity->getName(),
-            secret: $entity->getSecret(),
+            secretHash: $entity->getSecretHash(),
             redirectUris: $this->parseRedirectUris($entity->getRedirect()),
             personalAccessClient: $entity->isPersonalAccessClient(),
             passwordClient: $entity->isPasswordClient(),

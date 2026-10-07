@@ -15,7 +15,7 @@ Everything you need to deploy, configure, monitor, and troubleshoot Baander.
 
 | Page | Description |
 |------|-------------|
-| [User Management](user-management.md) | Create users, manage roles, passkeys, and 2FA |
+| [User Management](user-management.md) | Create users, manage roles, passkeys, 2FA, and OAuth clients |
 | [Library Management](library-management.md) | Create libraries, scan media, and watch for changes |
 | [External APIs](external-apis.md) | Configure metadata enrichment (Discogs, Last.fm, MusicBrainz) |
 | [Media Transcoding](transcoding.md) | Transcoding quality tiers and the CPU process pool |
@@ -28,4 +28,4 @@ Everything you need to deploy, configure, monitor, and troubleshoot Baander.
 
 | Page | Description |
 |------|-------------|
-| [CLI Reference](commands/README.md) | All 26 console commands with usage and examples |
+| [CLI Reference](commands/README.md) | All 33 console commands with usage and examples |

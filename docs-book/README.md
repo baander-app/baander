@@ -11,7 +11,7 @@ Documentation for Baander, a self-hosted media library server for music, movies,
 
 - [Getting Started](part-1-operator-guide/getting-started.md) — up and running in under 10 minutes
 - [Configuration](part-1-operator-guide/configuration.md) — all environment variables
-- [CLI Reference](part-1-operator-guide/commands/README.md) — all 26 console commands
+- [CLI Reference](part-1-operator-guide/commands/README.md) — all 33 console commands
 
 ## Other Resources
 

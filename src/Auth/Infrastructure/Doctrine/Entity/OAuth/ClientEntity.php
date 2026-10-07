@@ -26,8 +26,9 @@ class ClientEntity implements ClientEntityInterface
     #[ORM\Column(type: 'text')]
     private string $name;
 
+    /** SHA-256 digest of a confidential client's secret. */
     #[ORM\Column(type: 'text', nullable: true)]
-    private ?string $secret = null;
+    private ?string $secretHash = null;
 
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $provider = null;
@@ -66,7 +67,7 @@ class ClientEntity implements ClientEntityInterface
         PublicId $publicId,
         string $name,
         string $redirect,
-        ?string $secret = null,
+        ?string $secretHash = null,
         ?string $provider = null,
         bool $personalAccessClient = false,
         bool $passwordClient = false,
@@ -79,7 +80,7 @@ class ClientEntity implements ClientEntityInterface
         $this->publicId = $publicId;
         $this->name = $name;
         $this->redirect = $redirect;
-        $this->secret = $secret;
+        $this->secretHash = $secretHash;
         $this->provider = $provider;
         $this->personalAccessClient = $personalAccessClient;
         $this->passwordClient = $passwordClient;
@@ -127,14 +128,14 @@ class ClientEntity implements ClientEntityInterface
         $this->updatedAt = new \DateTimeImmutable();
     }
 
-    public function getSecret(): ?string
+    public function getSecretHash(): ?string
     {
-        return $this->secret;
+        return $this->secretHash;
     }
 
-    public function setSecret(?string $secret): void
+    public function setSecretHash(?string $secretHash): void
     {
-        $this->secret = $secret;
+        $this->secretHash = $secretHash;
         $this->updatedAt = new \DateTimeImmutable();
     }
 

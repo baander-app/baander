@@ -14,6 +14,7 @@ use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Schema\Schema;
 use DoctrineMigrations\Version20261006280000;
 use DoctrineMigrations\Version20261006300000;
+use DoctrineMigrations\Version20261007100000;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -280,6 +281,9 @@ final class ReferentialIntegrityTest extends TestCase
         $connection = $this->manager->getConnection();
         $latest = $this->constraintsAndIndexes();
 
+        // Version20261007100000 requires an approved device code to keep its user, which the
+        // earlier SET NULL rule breaks; step back past it first.
+        $this->runMigration('down', Version20261007100000::class);
         $this->runMigration('down', Version20261006300000::class);
         $restored = $this->constraintsAndIndexes();
         foreach (['fk_oauth_access_tokens_user_id', 'fk_oauth_device_codes_user_id'] as $name) {
@@ -307,6 +311,7 @@ final class ReferentialIntegrityTest extends TestCase
         );
 
         $this->runMigration('up', Version20261006300000::class);
+        $this->runMigration('up', Version20261007100000::class);
 
         self::assertSame($latest, $this->constraintsAndIndexes());
         self::assertSame(0, $this->countOwnedRows('oauth_access_tokens', 'id', $orphanToken));
@@ -506,7 +511,7 @@ final class ReferentialIntegrityTest extends TestCase
         );
     }
 
-    /** @param class-string<Version20261006280000|Version20261006300000> $class */
+    /** @param class-string<Version20261006280000|Version20261006300000|Version20261007100000> $class */
     private function runMigration(string $direction, string $class = Version20261006280000::class): void
     {
         require_once dirname(__DIR__, 2) . '/migrations/' . substr($class, strrpos($class, '\\') + 1) . '.php';

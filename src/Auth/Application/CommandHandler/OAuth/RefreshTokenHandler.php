@@ -6,12 +6,14 @@ namespace App\Auth\Application\CommandHandler\OAuth;
 
 use App\Auth\Application\Command\OAuth\RefreshTokenCommand;
 use App\Auth\Application\DTO\TokenResponseDTO;
+use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Port\JwtGeneratorInterface;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\TokenMetadata;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
+use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Domain\Service\TokenChainValidator;
@@ -25,6 +27,11 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  *
  * Validates the refresh token, checks chain integrity for replay attacks,
  * marks the old token as used, and returns a new access/refresh token pair.
+ *
+ * A revoked client answers invalid_client (OAuthProtocolException); every other
+ * rejection is a plain RuntimeException, which the token endpoint reports as
+ * invalid_grant. The rotation holds the client's row lock against a concurrent
+ * revocation, as TokenPairIssuer does.
  */
 final class RefreshTokenHandler
 {
@@ -38,6 +45,7 @@ final class RefreshTokenHandler
         private readonly EntityManagerInterface $entityManager,
         private readonly JwtGeneratorInterface $jwtGenerator,
         private readonly TokenMetadataRepositoryInterface $tokenMetadataRepository,
+        private readonly ClientRepositoryInterface $clientRepository,
         int $accessTokenTtl,
         int $refreshTokenTtl,
     ) {
@@ -63,15 +71,18 @@ final class RefreshTokenHandler
             throw new RuntimeException('Refresh token has expired.');
         }
 
-        // A revoked client's tokens cannot be refreshed. At the token endpoint the
-        // token must also belong to the client that authenticated (RFC 6749 section 6).
+        // At the token endpoint the token must belong to the client that authenticated
+        // (RFC 6749 section 6). Checked first, so another client's revocation is not
+        // reported as a failure of the authenticated one.
         $tokenClient = $refreshToken->getAccessToken()->getClient();
-        if ($tokenClient->isRevoked()) {
-            throw new RuntimeException('Client has been revoked.');
-        }
         $clientId = $command->getClientId();
         if ($clientId !== null && !$tokenClient->getId()->equals($clientId)) {
             throw new RuntimeException('Refresh token was not issued to this client.');
+        }
+        // A revoked client's tokens cannot be refreshed. This early check uses the
+        // loaded state; the transaction below repeats it under the row lock.
+        if ($tokenClient->isRevoked()) {
+            throw self::clientRevoked();
         }
 
         // RFC 9449 §5: a refresh token is redeemable only with the DPoP key its
@@ -91,7 +102,11 @@ final class RefreshTokenHandler
         }
 
         try {
-            return $this->entityManager->getConnection()->transactional(function () use ($refreshTokenId, $command): TokenResponseDTO {
+            return $this->entityManager->getConnection()->transactional(function () use ($refreshTokenId, $command, $tokenClient): TokenResponseDTO {
+                if (!$this->clientRepository->lockActiveClientForIssuance($tokenClient->getId())) {
+                    throw self::clientRevoked();
+                }
+
                 // Atomically consume the refresh token. If another request already used
                 // this token, the conditional UPDATE will affect zero rows.
                 $consumedToken = $this->refreshTokenRepository->consumeByTokenId($refreshTokenId);
@@ -155,5 +170,10 @@ final class RefreshTokenHandler
             $this->entityManager->clear();
             throw $exception;
         }
+    }
+
+    private static function clientRevoked(): OAuthProtocolException
+    {
+        return OAuthProtocolException::invalidClient('The client has been revoked.');
     }
 }

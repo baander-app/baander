@@ -59,6 +59,26 @@ export interface PlayActivityRequest {
   player?: string | null;
 }
 
+export type AdminCreateOAuthClientRequestType = typeof AdminCreateOAuthClientRequestType[keyof typeof AdminCreateOAuthClientRequestType];
+
+
+export const AdminCreateOAuthClientRequestType = {
+  device: 'device',
+  public: 'public',
+  confidential: 'confidential',
+} as const;
+
+export interface AdminCreateOAuthClientRequest {
+  /** @maxLength 100 */
+  name: string;
+  type: AdminCreateOAuthClientRequestType;
+  /**
+     * Required for public and confidential clients (1 to 10 URIs: https, http on a loopback host, or a private-use scheme in reverse domain form; no fragment). Must be omitted or empty for device clients.
+     * @maxItems 10
+     */
+  redirectUris?: string[];
+}
+
 export type AdminCreateUserRequestRolesItem = typeof AdminCreateUserRequestRolesItem[keyof typeof AdminCreateUserRequestRolesItem];
 
 
@@ -129,16 +149,10 @@ export interface RevokeTokenRequest {
   tokenTypeHint?: string;
 }
 
-export interface DeviceAuthorizeRequest {
-  clientId: string;
-  /** Requested OAuth scopes */
-  scope?: string;
-}
-
-export type DeviceApproveRequestAction = typeof DeviceApproveRequestAction[keyof typeof DeviceApproveRequestAction];
+export type DeviceApproveRequestDecision = typeof DeviceApproveRequestDecision[keyof typeof DeviceApproveRequestDecision];
 
 
-export const DeviceApproveRequestAction = {
+export const DeviceApproveRequestDecision = {
   approve: 'approve',
   deny: 'deny',
 } as const;
@@ -146,7 +160,7 @@ export const DeviceApproveRequestAction = {
 export interface DeviceApproveRequest {
   /** @maxLength 255 */
   userCode: string;
-  action: DeviceApproveRequestAction;
+  decision: DeviceApproveRequestDecision;
 }
 
 /**
@@ -969,6 +983,55 @@ export interface LoginBlockResource {
   createdAt: string;
 }
 
+export type AdminOAuthClientResourceType = typeof AdminOAuthClientResourceType[keyof typeof AdminOAuthClientResourceType];
+
+
+export const AdminOAuthClientResourceType = {
+  device: 'device',
+  public: 'public',
+  confidential: 'confidential',
+  first_party: 'first_party',
+} as const;
+
+export interface AdminOAuthClientResource {
+  /** The OAuth client_id (public ID) */
+  clientId: string;
+  name: string;
+  type: AdminOAuthClientResourceType;
+  redirectUris: string[];
+  revoked: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type AdminOAuthClientCredentialsResourceType = typeof AdminOAuthClientCredentialsResourceType[keyof typeof AdminOAuthClientCredentialsResourceType];
+
+
+export const AdminOAuthClientCredentialsResourceType = {
+  device: 'device',
+  public: 'public',
+  confidential: 'confidential',
+} as const;
+
+/**
+ * A client right after registration or secret rotation. The secret is shown only in this response; Baander stores its SHA-256 digest.
+ */
+export interface AdminOAuthClientCredentialsResource {
+  /** The OAuth client_id (public ID) */
+  clientId: string;
+  name: string;
+  type: AdminOAuthClientCredentialsResourceType;
+  redirectUris: string[];
+  revoked: boolean;
+  createdAt: string;
+  updatedAt: string;
+  /**
+     * The client_secret of a confidential client; null for device and public clients
+     * @nullable
+     */
+  clientSecret: string | null;
+}
+
 export interface AdminUserResource {
   /** Internal UUID */
   id: string;
@@ -998,8 +1061,6 @@ export interface ClientResource {
   publicId: string;
   /** Client name */
   name: string;
-  /** Client secret */
-  secret: string;
   /** JSON-encoded array of redirect URIs */
   redirect: string;
   /** Whether this is a personal access client */
@@ -1007,6 +1068,118 @@ export interface ClientResource {
   /** Whether the client is confidential */
   confidential: boolean;
   createdAt: string;
+}
+
+export type AuthorizationRequestResourceClientType = typeof AuthorizationRequestResourceClientType[keyof typeof AuthorizationRequestResourceClientType];
+
+
+export const AuthorizationRequestResourceClientType = {
+  public: 'public',
+  confidential: 'confidential',
+  first_party: 'first_party',
+  personal_access: 'personal_access',
+} as const;
+
+/**
+ * A valid authorization request awaiting the signed-in user's decision.
+ */
+export interface AuthorizationRequestResource {
+  client_id: string;
+  client_name: string;
+  client_type: AuthorizationRequestResourceClientType;
+  /** The scopes an approval grants: the requested scopes Baander allows, or the default scopes when none are left */
+  scopes: string[];
+  /** The validated redirect URI the answer goes to */
+  redirect_uri: string;
+  /** False only for first-party clients, whose requests the page may approve without asking */
+  consent_required: boolean;
+}
+
+export type AuthorizationErrorResourceError = typeof AuthorizationErrorResourceError[keyof typeof AuthorizationErrorResourceError];
+
+
+export const AuthorizationErrorResourceError = {
+  invalid_request: 'invalid_request',
+  invalid_client: 'invalid_client',
+  unauthorized_client: 'unauthorized_client',
+  unsupported_response_type: 'unsupported_response_type',
+  invalid_scope: 'invalid_scope',
+  access_denied: 'access_denied',
+} as const;
+
+/**
+ * An OAuth error (RFC 6749 section 4.1.2.1). Without redirect_uri the client or redirect URI is invalid and the user must see the error; never redirect. With redirect_uri, navigate there.
+ */
+export interface AuthorizationErrorResource {
+  error: AuthorizationErrorResourceError;
+  error_description: string;
+  /** The client's redirect URI carrying error, error_description, state and iss */
+  redirect_uri: string;
+}
+
+export type AuthorizationDecisionRequestDecision = typeof AuthorizationDecisionRequestDecision[keyof typeof AuthorizationDecisionRequestDecision];
+
+
+export const AuthorizationDecisionRequestDecision = {
+  approve: 'approve',
+  deny: 'deny',
+} as const;
+
+export type AuthorizationDecisionRequestResponseType = typeof AuthorizationDecisionRequestResponseType[keyof typeof AuthorizationDecisionRequestResponseType];
+
+
+export const AuthorizationDecisionRequestResponseType = {
+  code: 'code',
+} as const;
+
+export type AuthorizationDecisionRequestCodeChallengeMethod = typeof AuthorizationDecisionRequestCodeChallengeMethod[keyof typeof AuthorizationDecisionRequestCodeChallengeMethod];
+
+
+export const AuthorizationDecisionRequestCodeChallengeMethod = {
+  S256: 'S256',
+} as const;
+
+/**
+ * The parameters of the authorization request the consent page showed, unchanged, with the user's decision. JSON or form-encoded.
+ */
+export interface AuthorizationDecisionRequest {
+  decision: AuthorizationDecisionRequestDecision;
+  response_type: AuthorizationDecisionRequestResponseType;
+  client_id: string;
+  redirect_uri: string;
+  /** Space-separated scopes */
+  scope: string;
+  state: string;
+  code_challenge: string;
+  code_challenge_method: AuthorizationDecisionRequestCodeChallengeMethod;
+}
+
+/**
+ * Where the web app sends the user agent after the decision.
+ */
+export interface AuthorizationRedirectResource {
+  /** The client's redirect URI with code, state and iss on approval, or error=access_denied, error_description, state and iss on denial */
+  redirect_uri: string;
+}
+
+export type OAuthTokenResourceTokenType = typeof OAuthTokenResourceTokenType[keyof typeof OAuthTokenResourceTokenType];
+
+
+export const OAuthTokenResourceTokenType = {
+  DPoP: 'DPoP',
+} as const;
+
+/**
+ * Successful token response (RFC 6749 section 5.1) with a DPoP-bound access token (RFC 9449).
+ */
+export interface OAuthTokenResource {
+  access_token: string;
+  token_type: OAuthTokenResourceTokenType;
+  /** Seconds until the access token expires */
+  expires_in: number;
+  refresh_token: string;
+  /** Space-separated scopes the access token carries */
+  scope: string;
 }
 
 /**
@@ -1017,6 +1190,32 @@ export interface OAuthError {
   error_description: string;
   /** @nullable */
   error_uri?: string | null;
+}
+
+/**
+ * Device authorization response (RFC 8628 section 3.2).
+ */
+export interface DeviceAuthorizationResource {
+  device_code: string;
+  user_code: string;
+  /** The web app page where the user enters the code (APP_URL/device) */
+  verification_uri: string;
+  /** verification_uri with the user code as user_code */
+  verification_uri_complete: string;
+  expires_in: number;
+  /** Minimum seconds between token polls */
+  interval: number;
+}
+
+export interface PendingDeviceAuthorizationResource {
+  /** The normalized user code */
+  userCode: string;
+  clientId: string;
+  clientName: string;
+  /** The scopes an approval grants */
+  scopes: string[];
+  /** @nullable */
+  expiresAt: string | null;
 }
 
 export interface TokenResource {
@@ -2475,6 +2674,22 @@ export type GetAdminLoginBlocksList200 = {
   meta?: GetAdminLoginBlocksList200Meta;
 };
 
+export type GetAdminOauthClientsList200 = {
+  data: AdminOAuthClientResource[];
+};
+
+export type PostAdminOauthClientsCreate201 = {
+  data: AdminOAuthClientCredentialsResource;
+};
+
+export type PostAdminOauthClientsRotateSecret200 = {
+  data: AdminOAuthClientCredentialsResource;
+};
+
+export type PostAdminOauthClientsRevoke200 = {
+  data: AdminOAuthClientResource;
+};
+
 export type GetAdminUsersListParams = {
 /**
  * Filter by role
@@ -2598,30 +2813,6 @@ export const GetOauthAuthorizeCodeChallengeMethod = {
   S256: 'S256',
 } as const;
 
-export type PostOauthAuthorizeParams = {
-response_type: PostOauthAuthorizeResponseType;
-client_id: string;
-redirect_uri?: string;
-scope?: string;
-state?: string;
-code_challenge: string;
-code_challenge_method: PostOauthAuthorizeCodeChallengeMethod;
-};
-
-export type PostOauthAuthorizeResponseType = typeof PostOauthAuthorizeResponseType[keyof typeof PostOauthAuthorizeResponseType];
-
-
-export const PostOauthAuthorizeResponseType = {
-  code: 'code',
-} as const;
-
-export type PostOauthAuthorizeCodeChallengeMethod = typeof PostOauthAuthorizeCodeChallengeMethod[keyof typeof PostOauthAuthorizeCodeChallengeMethod];
-
-
-export const PostOauthAuthorizeCodeChallengeMethod = {
-  S256: 'S256',
-} as const;
-
 export type PostOauthTokenBodyGrantType = typeof PostOauthTokenBodyGrantType[keyof typeof PostOauthTokenBodyGrantType];
 
 
@@ -2648,27 +2839,16 @@ export type PostOauthTokenBody = {
   refresh_token?: string;
 };
 
-export type PostOauthToken200 = {
-  data?: TokenResource;
-};
-
 export type PostOauthRevokeBody = {
   token: string;
   /** Hint for the token type (e.g. "access_token" or "refresh_token") */
   tokenTypeHint?: string;
 };
 
-export type PostOauthDeviceAuthorize200Data = {
-  deviceCode?: string;
-  userCode?: string;
-  verificationUri?: string;
-  verificationUriComplete?: string;
-  expiresIn?: number;
-  interval?: number;
-};
-
-export type PostOauthDeviceAuthorize200 = {
-  data?: PostOauthDeviceAuthorize200Data;
+export type PostOauthDeviceAuthorizeBody = {
+  client_id: string;
+  /** Space-separated scopes */
+  scope?: string;
 };
 
 export type GetOauthDeviceVerifyParams = {
@@ -2678,22 +2858,25 @@ export type GetOauthDeviceVerifyParams = {
 user_code: string;
 };
 
-export type GetOauthDeviceVerify200Data = {
-  userCode?: string;
-  clientName?: string;
-  scopes?: string[];
+export type GetOauthDeviceVerify200 = {
+  data: PendingDeviceAuthorizationResource;
 };
 
-export type GetOauthDeviceVerify200 = {
-  data?: GetOauthDeviceVerify200Data;
-};
+export type PostOauthDeviceApprove200DataDecision = typeof PostOauthDeviceApprove200DataDecision[keyof typeof PostOauthDeviceApprove200DataDecision];
+
+
+export const PostOauthDeviceApprove200DataDecision = {
+  approved: 'approved',
+  denied: 'denied',
+} as const;
 
 export type PostOauthDeviceApprove200Data = {
-  message?: string;
+  decision: PostOauthDeviceApprove200DataDecision;
+  message: string;
 };
 
 export type PostOauthDeviceApprove200 = {
-  data?: PostOauthDeviceApprove200Data;
+  data: PostOauthDeviceApprove200Data;
 };
 
 export type GetPasskeyList200DataItem = {
@@ -7386,6 +7569,321 @@ export const useDeleteAdminLoginBlocksDelete = <TError = ErrorType<ApiError>,
       return useMutation(getDeleteAdminLoginBlocksDeleteMutationOptions(options), queryClient);
     }
 
+export const getGetAdminOauthClientsListUrl = () => {
+
+
+
+
+  return `/api/admin/oauth/clients`
+}
+
+/**
+ * Every client except users' personal access clients, revoked ones included, newest first. The first-party login client is listed with type first_party and cannot be changed here.
+ * @summary List OAuth clients
+ */
+export const getAdminOauthClientsList = async ( options?: RequestInit): Promise<GetAdminOauthClientsList200> => {
+
+  return customInstance<GetAdminOauthClientsList200>(getGetAdminOauthClientsListUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminOauthClientsListQueryKey = () => {
+    return [
+    `/api/admin/oauth/clients`
+    ] as const;
+    }
+
+
+export const getGetAdminOauthClientsListQueryOptions = <TData = Awaited<ReturnType<typeof getAdminOauthClientsList>>, TError = ErrorType<ApiError>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminOauthClientsList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminOauthClientsListQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminOauthClientsList>>> = ({ signal }) => getAdminOauthClientsList({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminOauthClientsList>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAdminOauthClientsListQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminOauthClientsList>>>
+export type GetAdminOauthClientsListQueryError = ErrorType<ApiError>
+
+
+export function useGetAdminOauthClientsList<TData = Awaited<ReturnType<typeof getAdminOauthClientsList>>, TError = ErrorType<ApiError>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminOauthClientsList>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminOauthClientsList>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminOauthClientsList>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminOauthClientsList<TData = Awaited<ReturnType<typeof getAdminOauthClientsList>>, TError = ErrorType<ApiError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminOauthClientsList>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminOauthClientsList>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminOauthClientsList>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminOauthClientsList<TData = Awaited<ReturnType<typeof getAdminOauthClientsList>>, TError = ErrorType<ApiError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminOauthClientsList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List OAuth clients
+ */
+
+export function useGetAdminOauthClientsList<TData = Awaited<ReturnType<typeof getAdminOauthClientsList>>, TError = ErrorType<ApiError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminOauthClientsList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAdminOauthClientsListQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPostAdminOauthClientsCreateUrl = () => {
+
+
+
+
+  return `/api/admin/oauth/clients`
+}
+
+/**
+ * Registers a device client (public, device authorization grant), a public client (authorization code with PKCE) or a confidential client (authorization code with a client secret). A confidential client's secret is in this response only.
+ * @summary Register an OAuth client
+ */
+export const postAdminOauthClientsCreate = async (adminCreateOAuthClientRequest: AdminCreateOAuthClientRequest, options?: RequestInit): Promise<PostAdminOauthClientsCreate201> => {
+
+  return customInstance<PostAdminOauthClientsCreate201>(getPostAdminOauthClientsCreateUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminCreateOAuthClientRequest)
+  }
+);}
+
+
+
+
+export const getPostAdminOauthClientsCreateMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminOauthClientsCreate>>, TError,{data: BodyType<AdminCreateOAuthClientRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAdminOauthClientsCreate>>, TError,{data: BodyType<AdminCreateOAuthClientRequest>}, TContext> => {
+
+const mutationKey = ['postAdminOauthClientsCreate'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAdminOauthClientsCreate>>, {data: BodyType<AdminCreateOAuthClientRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postAdminOauthClientsCreate(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostAdminOauthClientsCreateMutationResult = NonNullable<Awaited<ReturnType<typeof postAdminOauthClientsCreate>>>
+    export type PostAdminOauthClientsCreateMutationBody = BodyType<AdminCreateOAuthClientRequest>
+    export type PostAdminOauthClientsCreateMutationError = ErrorType<ApiError | ValidationError>
+
+    /**
+ * @summary Register an OAuth client
+ */
+export const usePostAdminOauthClientsCreate = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminOauthClientsCreate>>, TError,{data: BodyType<AdminCreateOAuthClientRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postAdminOauthClientsCreate>>,
+        TError,
+        {data: BodyType<AdminCreateOAuthClientRequest>},
+        TContext
+      > => {
+      return useMutation(getPostAdminOauthClientsCreateMutationOptions(options), queryClient);
+    }
+
+export const getPostAdminOauthClientsRotateSecretUrl = (clientId: string,) => {
+
+
+
+
+  return `/api/admin/oauth/clients/${clientId}/rotate-secret`
+}
+
+/**
+ * Confidential clients only. The old secret stops working at once; tokens already issued stay valid. The new secret is in this response only.
+ * @summary Rotate a confidential client's secret
+ */
+export const postAdminOauthClientsRotateSecret = async (clientId: string, options?: RequestInit): Promise<PostAdminOauthClientsRotateSecret200> => {
+
+  return customInstance<PostAdminOauthClientsRotateSecret200>(getPostAdminOauthClientsRotateSecretUrl(clientId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPostAdminOauthClientsRotateSecretMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminOauthClientsRotateSecret>>, TError,{clientId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAdminOauthClientsRotateSecret>>, TError,{clientId: string}, TContext> => {
+
+const mutationKey = ['postAdminOauthClientsRotateSecret'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAdminOauthClientsRotateSecret>>, {clientId: string}> = (props) => {
+          const {clientId} = props ?? {};
+
+          return  postAdminOauthClientsRotateSecret(clientId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostAdminOauthClientsRotateSecretMutationResult = NonNullable<Awaited<ReturnType<typeof postAdminOauthClientsRotateSecret>>>
+
+    export type PostAdminOauthClientsRotateSecretMutationError = ErrorType<ApiError>
+
+    /**
+ * @summary Rotate a confidential client's secret
+ */
+export const usePostAdminOauthClientsRotateSecret = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminOauthClientsRotateSecret>>, TError,{clientId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postAdminOauthClientsRotateSecret>>,
+        TError,
+        {clientId: string},
+        TContext
+      > => {
+      return useMutation(getPostAdminOauthClientsRotateSecretMutationOptions(options), queryClient);
+    }
+
+export const getPostAdminOauthClientsRevokeUrl = (clientId: string,) => {
+
+
+
+
+  return `/api/admin/oauth/clients/${clientId}/revoke`
+}
+
+/**
+ * Revokes the client together with every access and refresh token issued to it. Revoking a revoked client succeeds again.
+ * @summary Revoke an OAuth client
+ */
+export const postAdminOauthClientsRevoke = async (clientId: string, options?: RequestInit): Promise<PostAdminOauthClientsRevoke200> => {
+
+  return customInstance<PostAdminOauthClientsRevoke200>(getPostAdminOauthClientsRevokeUrl(clientId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPostAdminOauthClientsRevokeMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminOauthClientsRevoke>>, TError,{clientId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAdminOauthClientsRevoke>>, TError,{clientId: string}, TContext> => {
+
+const mutationKey = ['postAdminOauthClientsRevoke'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAdminOauthClientsRevoke>>, {clientId: string}> = (props) => {
+          const {clientId} = props ?? {};
+
+          return  postAdminOauthClientsRevoke(clientId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostAdminOauthClientsRevokeMutationResult = NonNullable<Awaited<ReturnType<typeof postAdminOauthClientsRevoke>>>
+
+    export type PostAdminOauthClientsRevokeMutationError = ErrorType<ApiError>
+
+    /**
+ * @summary Revoke an OAuth client
+ */
+export const usePostAdminOauthClientsRevoke = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminOauthClientsRevoke>>, TError,{clientId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postAdminOauthClientsRevoke>>,
+        TError,
+        {clientId: string},
+        TContext
+      > => {
+      return useMutation(getPostAdminOauthClientsRevokeMutationOptions(options), queryClient);
+    }
+
 export const getGetAdminUsersListUrl = (params?: GetAdminUsersListParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -8246,12 +8744,12 @@ export const getGetOauthAuthorizeUrl = (params: GetOauthAuthorizeParams,) => {
 }
 
 /**
- * The signed-in user authorizes the client. PKCE with the S256 method is required for every client. On success, and on errors once the client and redirect URI are valid, the response redirects to the redirect URI with `code` or `error`, `state` and `iss` (RFC 9207). Cross-origin requests are refused (RFC 9700 section 2.6).
- * @summary OAuth 2.0 authorization endpoint (RFC 6749 section 3.1)
+ * Backs the consent page at `APP_URL/oauth/authorize`, which RFC 8414 metadata advertises as the authorization endpoint. The page passes on the query parameters it received; this endpoint checks them for the signed-in user and describes the request. It never redirects. When the client or redirect URI is invalid, the error has no `redirect_uri`: show it to the user. Any other error carries `redirect_uri`, the client's redirect URI with `error`, `error_description`, `state` and `iss` (RFC 6749 section 4.1.2.1, RFC 9207); navigate there.
+ * @summary Check an authorization request (RFC 6749 section 4.1.1)
  */
-export const getOauthAuthorize = async (params: GetOauthAuthorizeParams, options?: RequestInit): Promise<unknown> => {
+export const getOauthAuthorize = async (params: GetOauthAuthorizeParams, options?: RequestInit): Promise<AuthorizationRequestResource> => {
 
-  return customInstance<unknown>(getGetOauthAuthorizeUrl(params),
+  return customInstance<AuthorizationRequestResource>(getGetOauthAuthorizeUrl(params),
   {
     ...options,
     method: 'GET'
@@ -8271,7 +8769,7 @@ export const getGetOauthAuthorizeQueryKey = (params?: GetOauthAuthorizeParams,) 
     }
 
 
-export const getGetOauthAuthorizeQueryOptions = <TData = Awaited<ReturnType<typeof getOauthAuthorize>>, TError = ErrorType<void | OAuthError>>(params: GetOauthAuthorizeParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOauthAuthorize>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetOauthAuthorizeQueryOptions = <TData = Awaited<ReturnType<typeof getOauthAuthorize>>, TError = ErrorType<AuthorizationErrorResource | ApiError>>(params: GetOauthAuthorizeParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOauthAuthorize>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -8290,10 +8788,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetOauthAuthorizeQueryResult = NonNullable<Awaited<ReturnType<typeof getOauthAuthorize>>>
-export type GetOauthAuthorizeQueryError = ErrorType<void | OAuthError>
+export type GetOauthAuthorizeQueryError = ErrorType<AuthorizationErrorResource | ApiError>
 
 
-export function useGetOauthAuthorize<TData = Awaited<ReturnType<typeof getOauthAuthorize>>, TError = ErrorType<void | OAuthError>>(
+export function useGetOauthAuthorize<TData = Awaited<ReturnType<typeof getOauthAuthorize>>, TError = ErrorType<AuthorizationErrorResource | ApiError>>(
  params: GetOauthAuthorizeParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOauthAuthorize>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getOauthAuthorize>>,
@@ -8303,7 +8801,7 @@ export function useGetOauthAuthorize<TData = Awaited<ReturnType<typeof getOauthA
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetOauthAuthorize<TData = Awaited<ReturnType<typeof getOauthAuthorize>>, TError = ErrorType<void | OAuthError>>(
+export function useGetOauthAuthorize<TData = Awaited<ReturnType<typeof getOauthAuthorize>>, TError = ErrorType<AuthorizationErrorResource | ApiError>>(
  params: GetOauthAuthorizeParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOauthAuthorize>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getOauthAuthorize>>,
@@ -8313,15 +8811,15 @@ export function useGetOauthAuthorize<TData = Awaited<ReturnType<typeof getOauthA
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetOauthAuthorize<TData = Awaited<ReturnType<typeof getOauthAuthorize>>, TError = ErrorType<void | OAuthError>>(
+export function useGetOauthAuthorize<TData = Awaited<ReturnType<typeof getOauthAuthorize>>, TError = ErrorType<AuthorizationErrorResource | ApiError>>(
  params: GetOauthAuthorizeParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOauthAuthorize>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary OAuth 2.0 authorization endpoint (RFC 6749 section 3.1)
+ * @summary Check an authorization request (RFC 6749 section 4.1.1)
  */
 
-export function useGetOauthAuthorize<TData = Awaited<ReturnType<typeof getOauthAuthorize>>, TError = ErrorType<void | OAuthError>>(
+export function useGetOauthAuthorize<TData = Awaited<ReturnType<typeof getOauthAuthorize>>, TError = ErrorType<AuthorizationErrorResource | ApiError>>(
  params: GetOauthAuthorizeParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getOauthAuthorize>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -8339,44 +8837,37 @@ export function useGetOauthAuthorize<TData = Awaited<ReturnType<typeof getOauthA
 
 
 
-export const getPostOauthAuthorizeUrl = (params: PostOauthAuthorizeParams,) => {
-  const normalizedParams = new URLSearchParams();
+export const getPostOauthAuthorizeDecisionUrl = () => {
 
-  Object.entries(params || {}).forEach(([key, value]) => {
 
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : String(value))
-    }
-  });
 
-  const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/oauth/authorize?${stringifiedParams}` : `/api/oauth/authorize`
+  return `/api/oauth/authorize`
 }
 
 /**
- * Same as GET, with the parameters in the query string.
- * @summary OAuth 2.0 authorization endpoint (RFC 6749 section 3.1)
+ * Records the signed-in user's decision on the request the consent page showed, sent with the same parameters. Approval answers with the client's redirect URI carrying `code`, `state` and `iss` (RFC 9207); denial with `error=access_denied`, `state` and `iss`. The page navigates to `redirect_uri`. Errors follow GET.
+ * @summary Approve or deny an authorization request (RFC 6749 section 4.1.2)
  */
-export const postOauthAuthorize = async (params: PostOauthAuthorizeParams, options?: RequestInit): Promise<unknown> => {
+export const postOauthAuthorizeDecision = async (authorizationDecisionRequest: AuthorizationDecisionRequest, options?: RequestInit): Promise<AuthorizationRedirectResource> => {
 
-  return customInstance<unknown>(getPostOauthAuthorizeUrl(params),
+  return customInstance<AuthorizationRedirectResource>(getPostOauthAuthorizeDecisionUrl(),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(authorizationDecisionRequest)
   }
 );}
 
 
 
 
-export const getPostOauthAuthorizeMutationOptions = <TError = ErrorType<void | OAuthError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postOauthAuthorize>>, TError,{params: PostOauthAuthorizeParams}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postOauthAuthorize>>, TError,{params: PostOauthAuthorizeParams}, TContext> => {
+export const getPostOauthAuthorizeDecisionMutationOptions = <TError = ErrorType<AuthorizationErrorResource | ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postOauthAuthorizeDecision>>, TError,{data: BodyType<AuthorizationDecisionRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postOauthAuthorizeDecision>>, TError,{data: BodyType<AuthorizationDecisionRequest>}, TContext> => {
 
-const mutationKey = ['postOauthAuthorize'];
+const mutationKey = ['postOauthAuthorizeDecision'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
@@ -8386,10 +8877,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postOauthAuthorize>>, {params: PostOauthAuthorizeParams}> = (props) => {
-          const {params} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postOauthAuthorizeDecision>>, {data: BodyType<AuthorizationDecisionRequest>}> = (props) => {
+          const {data} = props ?? {};
 
-          return  postOauthAuthorize(params,requestOptions)
+          return  postOauthAuthorizeDecision(data,requestOptions)
         }
 
 
@@ -8399,22 +8890,22 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
   return  { mutationFn, ...mutationOptions }}
 
-    export type PostOauthAuthorizeMutationResult = NonNullable<Awaited<ReturnType<typeof postOauthAuthorize>>>
-
-    export type PostOauthAuthorizeMutationError = ErrorType<void | OAuthError>
+    export type PostOauthAuthorizeDecisionMutationResult = NonNullable<Awaited<ReturnType<typeof postOauthAuthorizeDecision>>>
+    export type PostOauthAuthorizeDecisionMutationBody = BodyType<AuthorizationDecisionRequest>
+    export type PostOauthAuthorizeDecisionMutationError = ErrorType<AuthorizationErrorResource | ApiError>
 
     /**
- * @summary OAuth 2.0 authorization endpoint (RFC 6749 section 3.1)
+ * @summary Approve or deny an authorization request (RFC 6749 section 4.1.2)
  */
-export const usePostOauthAuthorize = <TError = ErrorType<void | OAuthError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postOauthAuthorize>>, TError,{params: PostOauthAuthorizeParams}, TContext>, request?: SecondParameter<typeof customInstance>}
+export const usePostOauthAuthorizeDecision = <TError = ErrorType<AuthorizationErrorResource | ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postOauthAuthorizeDecision>>, TError,{data: BodyType<AuthorizationDecisionRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
-        Awaited<ReturnType<typeof postOauthAuthorize>>,
+        Awaited<ReturnType<typeof postOauthAuthorizeDecision>>,
         TError,
-        {params: PostOauthAuthorizeParams},
+        {data: BodyType<AuthorizationDecisionRequest>},
         TContext
       > => {
-      return useMutation(getPostOauthAuthorizeMutationOptions(options), queryClient);
+      return useMutation(getPostOauthAuthorizeDecisionMutationOptions(options), queryClient);
     }
 
 export const getPostOauthTokenUrl = () => {
@@ -8426,12 +8917,12 @@ export const getPostOauthTokenUrl = () => {
 }
 
 /**
- * Requires a DPoP proof carrying a server-issued nonce; a proof without one is answered with `use_dpop_nonce` and a `DPoP-Nonce` header. Every answer carries the nonce for the next proof. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded or JSON. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`.
+ * Requires a DPoP proof carrying a server-issued nonce. A missing or invalid proof is answered with `invalid_dpop_proof`, a proof without a fresh nonce with `use_dpop_nonce`; both carry a `DPoP-Nonce` header. Every answer carries the nonce for the next proof and `Cache-Control: no-store`. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded (RFC 6749) or JSON. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`.
  * @summary OAuth 2.0 token endpoint (RFC 6749 section 3.2)
  */
-export const postOauthToken = async (postOauthTokenBody: PostOauthTokenBody, options?: RequestInit): Promise<PostOauthToken200> => {
+export const postOauthToken = async (postOauthTokenBody: PostOauthTokenBody, options?: RequestInit): Promise<OAuthTokenResource> => {
 
-  return customInstance<PostOauthToken200>(getPostOauthTokenUrl(),
+  return customInstance<OAuthTokenResource>(getPostOauthTokenUrl(),
   {
     ...options,
     method: 'POST',
@@ -8567,26 +9058,26 @@ export const getPostOauthDeviceAuthorizeUrl = () => {
 }
 
 /**
- * Only clients registered as device clients may start the device flow. Show the user code and verification URI, then poll the token endpoint with the device code no faster than `interval` seconds.
+ * Only clients registered as device clients may start the device flow. Parameters may be form-encoded (RFC 8628) or JSON. Show the user code and `verification_uri` (or encode `verification_uri_complete` in a QR code), then poll the token endpoint with the device code no faster than `interval` seconds.
  * @summary Device authorization request (RFC 8628 section 3.1)
  */
-export const postOauthDeviceAuthorize = async (deviceAuthorizeRequest: DeviceAuthorizeRequest, options?: RequestInit): Promise<PostOauthDeviceAuthorize200> => {
+export const postOauthDeviceAuthorize = async (postOauthDeviceAuthorizeBody: PostOauthDeviceAuthorizeBody, options?: RequestInit): Promise<DeviceAuthorizationResource> => {
 
-  return customInstance<PostOauthDeviceAuthorize200>(getPostOauthDeviceAuthorizeUrl(),
+  return customInstance<DeviceAuthorizationResource>(getPostOauthDeviceAuthorizeUrl(),
   {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(deviceAuthorizeRequest)
+    body: JSON.stringify(postOauthDeviceAuthorizeBody)
   }
 );}
 
 
 
 
-export const getPostOauthDeviceAuthorizeMutationOptions = <TError = ErrorType<OAuthError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postOauthDeviceAuthorize>>, TError,{data: BodyType<DeviceAuthorizeRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postOauthDeviceAuthorize>>, TError,{data: BodyType<DeviceAuthorizeRequest>}, TContext> => {
+export const getPostOauthDeviceAuthorizeMutationOptions = <TError = ErrorType<OAuthError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postOauthDeviceAuthorize>>, TError,{data: BodyType<PostOauthDeviceAuthorizeBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postOauthDeviceAuthorize>>, TError,{data: BodyType<PostOauthDeviceAuthorizeBody>}, TContext> => {
 
 const mutationKey = ['postOauthDeviceAuthorize'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -8598,7 +9089,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postOauthDeviceAuthorize>>, {data: BodyType<DeviceAuthorizeRequest>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postOauthDeviceAuthorize>>, {data: BodyType<PostOauthDeviceAuthorizeBody>}> = (props) => {
           const {data} = props ?? {};
 
           return  postOauthDeviceAuthorize(data,requestOptions)
@@ -8612,18 +9103,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PostOauthDeviceAuthorizeMutationResult = NonNullable<Awaited<ReturnType<typeof postOauthDeviceAuthorize>>>
-    export type PostOauthDeviceAuthorizeMutationBody = BodyType<DeviceAuthorizeRequest>
-    export type PostOauthDeviceAuthorizeMutationError = ErrorType<OAuthError | ValidationError>
+    export type PostOauthDeviceAuthorizeMutationBody = BodyType<PostOauthDeviceAuthorizeBody>
+    export type PostOauthDeviceAuthorizeMutationError = ErrorType<OAuthError>
 
     /**
  * @summary Device authorization request (RFC 8628 section 3.1)
  */
-export const usePostOauthDeviceAuthorize = <TError = ErrorType<OAuthError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postOauthDeviceAuthorize>>, TError,{data: BodyType<DeviceAuthorizeRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+export const usePostOauthDeviceAuthorize = <TError = ErrorType<OAuthError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postOauthDeviceAuthorize>>, TError,{data: BodyType<PostOauthDeviceAuthorizeBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postOauthDeviceAuthorize>>,
         TError,
-        {data: BodyType<DeviceAuthorizeRequest>},
+        {data: BodyType<PostOauthDeviceAuthorizeBody>},
         TContext
       > => {
       return useMutation(getPostOauthDeviceAuthorizeMutationOptions(options), queryClient);
@@ -8645,7 +9136,7 @@ export const getGetOauthDeviceVerifyUrl = (params: GetOauthDeviceVerifyParams,) 
 }
 
 /**
- * Shows the signed-in user which client a user code belongs to before they approve or deny it. Case, spaces and dashes in the code do not matter.
+ * Backs the device page at `APP_URL/device`. Shows the signed-in user which client a user code belongs to before they approve or deny it. Case, spaces and dashes in the code do not matter. `scopes` are the scopes the issued token would carry.
  * @summary Look up a pending device authorization request (RFC 8628 section 3.3)
  */
 export const getOauthDeviceVerify = async (params: GetOauthDeviceVerifyParams, options?: RequestInit): Promise<GetOauthDeviceVerify200> => {
@@ -8747,7 +9238,7 @@ export const getPostOauthDeviceApproveUrl = () => {
 }
 
 /**
- * Approving gives the device a token pair for the signed-in user at its next poll and notifies the user. Denying makes the next poll answer `access_denied`.
+ * Records the signed-in user's decision. Approval gives the device a token pair for this user at its next poll and notifies the user. Denial makes the next poll answer `access_denied`.
  * @summary Approve or deny a device authorization request (RFC 8628 section 3.3)
  */
 export const postOauthDeviceApprove = async (deviceApproveRequest: DeviceApproveRequest, options?: RequestInit): Promise<PostOauthDeviceApprove200> => {

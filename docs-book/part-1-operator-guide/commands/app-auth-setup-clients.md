@@ -31,4 +31,5 @@ The command is **idempotent**: it looks up the client by its fixed public ID and
 
 - Safe to run repeatedly. An existing client is left untouched.
 - The public ID is an identifier, not a secret.
-- The command creates no third-party or device clients for the OAuth authorization server. No command registers those yet.
+- The command creates no other OAuth clients. Register device, public and confidential clients with [app:oauth:client:create](app-oauth-client-create.md).
+- The `app:oauth:client:*` commands list the first-party client but do not rotate or revoke it.

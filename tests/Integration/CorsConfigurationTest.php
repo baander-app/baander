@@ -159,12 +159,21 @@ final class CorsConfigurationTest extends TestCase
         yield 'foreign host' => ['https://foreign.baander.app'];
     }
 
-    public function testAuthorizationEndpointAndNonApiPathHaveNoCors(): void
+    public function testNonApiPathHasNoCors(): void
     {
-        foreach (['/api/oauth/authorize', '/api/oauth/%61uthorize', '/api/oauth/authorize/', '/api/oauth/%61uthorize%2f', '/unmatched'] as $path) {
-            self::assertFalse($this->preflight($path, 'GET', 'Authorization')->headers->has('Access-Control-Allow-Origin'));
-            self::assertFalse($this->actual($path, self::ORIGIN, new Response())->headers->has('Access-Control-Allow-Origin'));
-        }
+        self::assertFalse($this->preflight('/unmatched', 'GET', 'Authorization')->headers->has('Access-Control-Allow-Origin'));
+        self::assertFalse($this->actual('/unmatched', self::ORIGIN, new Response())->headers->has('Access-Control-Allow-Origin'));
+    }
+
+    /** The consent page calls the authorization endpoint like any app API; other origins get no CORS grant. */
+    public function testAuthorizationEndpointAllowsOnlyTheAppOrigin(): void
+    {
+        $preflight = $this->preflight('/api/oauth/authorize', 'POST', 'Content-Type, Authorization, DPoP');
+        self::assertSame(self::ORIGIN, $preflight->headers->get('Access-Control-Allow-Origin'));
+        self::assertSame(self::ORIGIN, $this->actual('/api/oauth/authorize', self::ORIGIN, new Response())
+            ->headers->get('Access-Control-Allow-Origin'));
+        self::assertFalse($this->actual('/api/oauth/authorize', 'https://foreign.baander.app', new Response())
+            ->headers->has('Access-Control-Allow-Origin'));
     }
 
     public function testPublicMetadataStillAllowsForeignOrigins(): void

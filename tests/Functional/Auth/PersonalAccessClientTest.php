@@ -34,7 +34,7 @@ final class PersonalAccessClientTest extends TestCase
         self::assertSame('Owner CLI', $first['name']);
         self::assertTrue($first['personalAccessClient']);
         self::assertFalse($first['confidential']);
-        self::assertNull($first['secret']);
+        self::assertArrayNotHasKey('secret', $first);
 
         $ownerClients = $this->listClients($owner);
         self::assertEqualsCanonicalizing(['Owner CLI', 'Owner scripts'], array_column($ownerClients, 'name'));

@@ -911,6 +911,7 @@ deptrac:
     'Auth Application':
       - 'Auth Identity Contract'
       - 'Auth Device Approval Event Contract'
+      - 'Scheduler Schedulable Contract'
       - 'Auth Domain'
       - 'Shared Domain'
       - 'Shared Application'

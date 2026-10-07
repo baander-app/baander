@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Auth\Application\CommandHandler;
 
 use App\Auth\Application\Command\OAuth\RefreshTokenCommand;
 use App\Auth\Application\CommandHandler\OAuth\RefreshTokenHandler;
+use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Port\JwtGeneratorInterface;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
@@ -15,8 +16,10 @@ use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\TokenMetadata;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
+use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
+use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Domain\Service\TokenChainValidator;
@@ -46,6 +49,8 @@ final class RefreshTokenHandlerTest extends TestCase
     private TokenMetadataRepositoryInterface&Stub $tokenMetadataRepository;
     /** @var list<TokenMetadata> */
     private array $savedMetadata = [];
+    /** What the rotation transaction finds when it locks the client's row. */
+    private bool $clientActiveAtIssuance = true;
     private RefreshTokenHandler $handler;
 
     protected function setUp(): void
@@ -102,6 +107,7 @@ final class RefreshTokenHandlerTest extends TestCase
             $this->entityManager,
             $this->jwtGenerator,
             $this->tokenMetadataRepository,
+            $this->activeClients(),
             accessTokenTtl: 3600,
             refreshTokenTtl: 2592000,
         );
@@ -332,14 +338,45 @@ final class RefreshTokenHandlerTest extends TestCase
         $refreshToken = $this->boundRefreshToken();
         $refreshToken->getAccessToken()->getClient()->revoke();
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Client has been revoked');
+        try {
+            ($this->handler)(new RefreshTokenCommand(refreshTokenId: $refreshToken->getTokenId()->toString(), dpopJkt: self::JKT));
+            self::fail('A revoked client must not refresh.');
+        } catch (OAuthProtocolException $exception) {
+            self::assertSame('invalid_client', $exception->error);
+        }
+        self::assertFalse($refreshToken->hasBeenUsed());
+    }
+
+    public function testAClientRevokedAfterLoadingFailsUnderTheRowLockWithoutRotating(): void
+    {
+        $refreshToken = $this->boundRefreshToken();
+        $this->clientActiveAtIssuance = false;
 
         try {
             ($this->handler)(new RefreshTokenCommand(refreshTokenId: $refreshToken->getTokenId()->toString(), dpopJkt: self::JKT));
-        } finally {
-            self::assertFalse($refreshToken->hasBeenUsed());
+            self::fail('The locked client row decides, not the state loaded before the transaction.');
+        } catch (OAuthProtocolException $exception) {
+            self::assertSame('invalid_client', $exception->error);
+            self::assertSame(401, $exception->statusCode);
         }
+        self::assertFalse($refreshToken->hasBeenUsed());
+        self::assertSame([], $this->savedAccessTokens);
+        self::assertSame([], $this->savedRefreshTokens);
+    }
+
+    public function testAnotherClientsRevokedTokenIsReportedAsForeignNotAsInvalidClient(): void
+    {
+        $refreshToken = $this->boundRefreshToken();
+        $refreshToken->getAccessToken()->getClient()->revoke();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('not issued to this client');
+
+        ($this->handler)(new RefreshTokenCommand(
+            refreshTokenId: $refreshToken->getTokenId()->toString(),
+            dpopJkt: self::JKT,
+            clientId: Uuid::generate(),
+        ));
     }
 
     public function testAtTheTokenEndpointTheTokenMustBelongToTheAuthenticatedClient(): void
@@ -725,6 +762,7 @@ final class RefreshTokenHandlerTest extends TestCase
             $entityManager,
             $jwtGenerator,
             $this->createStub(TokenMetadataRepositoryInterface::class),
+            $this->activeClients(),
             accessTokenTtl: 3600,
             refreshTokenTtl: 2592000,
         );
@@ -742,12 +780,20 @@ final class RefreshTokenHandlerTest extends TestCase
 
     // --- Helpers ---
 
+    private function activeClients(): ClientRepositoryInterface
+    {
+        $clients = $this->createStub(ClientRepositoryInterface::class);
+        $clients->method('lockActiveClientForIssuance')->willReturnCallback(fn (): bool => $this->clientActiveAtIssuance);
+
+        return $clients;
+    }
+
     private function createConfidentialClient(): Client
     {
         return Client::create(
             name: 'Test App',
             redirectUris: ['http://localhost'],
-            secret: 'test-secret',
+            secret: ClientSecret::fromString('test-secret'),
             confidential: true,
             firstParty: true,
         );

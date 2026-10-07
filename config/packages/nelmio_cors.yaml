@@ -7,10 +7,6 @@ nelmio_cors:
         expose_headers: ['Link', 'DPoP-Nonce']
         max_age: 3600
     paths:
-        # The authorization endpoint must not answer cross-origin requests (RFC 9700 section 2.6).
-        # AuthorizationCorsOptionsProvider enforces this before routing, for encoded and
-        # trailing-slash variants of the path too.
-
         # OAuth token endpoint and device authorization: called by third-party and device
         # clients from any origin. Requests carry a DPoP proof, not cookies.
         '^/api/oauth/(token|device/authorize)$':
@@ -51,7 +47,8 @@ nelmio_cors:
             allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'X-Baander-Client-Fingerprint', 'X-Baander-Correlation-ID', 'Accept', 'Origin', 'Range', 'If-Range']
             expose_headers: ['Link', 'DPoP-Nonce', 'Content-Range', 'Accept-Ranges', 'ETag', 'Last-Modified']
 
-        # Catch-all for all other API routes (SPA, auth, OAuth token revocation, device approval, etc.)
+        # Catch-all for all other API routes (SPA, auth, OAuth token revocation, the consent and
+        # device pages' authorization and device approval calls, etc.)
         '^/api/':
             allow_origin: ['%env(APP_URL)%']
             allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'X-Baander-Device-Id', 'X-Baander-Client-Fingerprint', 'X-Baander-Correlation-ID', 'Accept', 'Origin']

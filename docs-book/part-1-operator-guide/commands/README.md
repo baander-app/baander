@@ -109,7 +109,12 @@ own exit code without JSON. Error output contains no credentials or raw diagnost
 |---------|-------------|
 | [app:auth:rotate-secrets](app-auth-rotate-secrets.md) | Prepare an OAuth bundle and invalidate grants during offline cutover |
 | [app:auth:setup-clients](app-auth-setup-clients.md) | Create the first-party OAuth client that password and passkey login issue tokens to |
+| [app:oauth:client:create](app-oauth-client-create.md) | Register a device, public or confidential OAuth client |
+| [app:oauth:client:list](app-oauth-client-list.md) | List OAuth clients other than personal access clients |
+| [app:oauth:client:revoke](app-oauth-client-revoke.md) | Revoke an OAuth client and every token issued to it |
+| [app:oauth:client:rotate-secret](app-oauth-client-rotate-secret.md) | Give a confidential OAuth client a new secret |
 | [app:oauth:generate-keys](app-oauth-generate-keys.md) | Generate OAuth2 private and public keys for JWT signing |
+| [app:oauth:purge-codes](app-oauth-purge-codes.md) | Delete authorization and device codes that expired more than an hour ago |
 | [app:user:change-email](app-user-change-email.md) | Change a user's email address and send a verification link to it |
 | [app:user:create](app-user-create.md) | Create a new user account |
 | [app:user:disable](app-user-disable.md) | Disable a user account |

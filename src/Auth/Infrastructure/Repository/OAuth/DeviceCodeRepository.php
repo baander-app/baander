@@ -17,6 +17,7 @@ use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\DeviceCodeEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Uuid;
+use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
@@ -201,6 +202,16 @@ final class DeviceCodeRepository implements DeviceCodeRepositoryInterface
         return true;
     }
 
+    public function deleteExpiredBefore(DateTimeImmutable $cutoff): int
+    {
+        // As for authorization codes, the daily purge scans the small table rather
+        // than maintaining an expires_at index; codes without an expiry stay.
+        return (int) $this->entityManager->getConnection()->executeStatement(
+            'DELETE FROM oauth_device_codes WHERE expires_at < :cutoff',
+            ['cutoff' => $cutoff->format('Y-m-d H:i:s.uP')],
+        );
+    }
+
     private function userEntityToDomain(UserEntity $entity): User
     {
         return User::reconstitute(new UserState(
@@ -223,7 +234,7 @@ final class DeviceCodeRepository implements DeviceCodeRepositoryInterface
             id: $entity->getId(),
             publicId: $entity->getPublicId(),
             name: $entity->getName(),
-            secret: $entity->getSecret(),
+            secretHash: $entity->getSecretHash(),
             redirectUris: $this->parseRedirectUris($entity->getRedirect()),
             personalAccessClient: $entity->isPersonalAccessClient(),
             passwordClient: $entity->isPasswordClient(),
