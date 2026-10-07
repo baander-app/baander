@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Auth\Interface\Resource;
 
 use App\Auth\Application\DTO\TokenResponseDTO;
-use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\User;
-use App\Auth\Interface\Resource\ClientResource;
 use App\Auth\Interface\Resource\TokenResource;
 use App\Auth\Interface\Resource\UserResource;
 use App\Shared\Domain\Model\Email;
@@ -53,19 +51,5 @@ final class ResourcesTest extends TestCase
         $result = TokenResource::fromDto($dto);
 
         $this->assertSame('tok', $result['accessToken']);
-    }
-
-    public function testClientResourceFrom(): void
-    {
-        $client = Client::create('Test App', ['http://localhost'], secret: 'secret', confidential: true);
-        $result = ClientResource::from($client);
-
-        $this->assertSame($client->getId()->toString(), $result['uuid']);
-        $this->assertSame($client->getPublicId()->toString(), $result['publicId']);
-        $this->assertSame('Test App', $result['name']);
-        $this->assertSame('secret', $result['secret']);
-        $this->assertTrue($result['confidential']);
-        $this->assertFalse($result['personalAccessClient']);
-        $this->assertArrayHasKey('createdAt', $result);
     }
 }

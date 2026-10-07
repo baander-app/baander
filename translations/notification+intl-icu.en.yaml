@@ -17,11 +17,6 @@ token:
     title: "Token revoked"
     body: "A {tokenType} token was revoked."
 
-device_code:
-  approved:
-    title: "Device approved"
-    body: "A new device was authorized to access your account."
-
 library:
   scan_completed:
     title: "Library scan completed"

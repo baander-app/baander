@@ -247,7 +247,6 @@ final class OpenApiSpecTest extends KernelTestCase
             'RequestPasswordResetRequest',
             'VerifyEmailRequest',
             'UpdateProfileRequest',
-            'CreateClientRequest',
             'EnableTotpRequest',
             'DisableTotpRequest',
             'RegisterPasskeyRequest',

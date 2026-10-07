@@ -22,7 +22,6 @@ success:
   email_verified: "Email verified."
   totp_enabled: "TOTP enabled successfully."
   totp_disable_not_implemented: "TOTP disable is not yet fully implemented."
-  client_revoked: "Client revoked successfully."
   device_approved: "Device approved successfully."
   device_denied: "Device access denied."
   passkey_deleted: "Passkey deleted successfully."

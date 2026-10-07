@@ -7,8 +7,7 @@ namespace App\Auth\Application\DTO;
 /**
  * DTO representing a successful token issuance response.
  *
- * Follows the OAuth 2.0 token response format per RFC 6749 Section 5.1,
- * with additional fields for refresh token rotation and device code flows.
+ * Follows the OAuth 2.0 token response format per RFC 6749 Section 5.1.
  */
 final readonly class TokenResponseDTO
 {
@@ -18,8 +17,6 @@ final readonly class TokenResponseDTO
      * @param int $expiresIn Seconds until the access token expires
      * @param string|null $refreshToken The refresh token string (if applicable)
      * @param string[] $scopes The granted scopes
-     * @param string|null $deviceId Device code user code (device_code grant only)
-     * @param int $verificationInterval Polling interval for device code flow
      */
     public function __construct(
         private string $accessToken,
@@ -27,8 +24,6 @@ final readonly class TokenResponseDTO
         private int $expiresIn = 3600,
         private ?string $refreshToken = null,
         private array $scopes = [],
-        private ?string $deviceId = null,
-        private int $verificationInterval = 5,
     ) {
     }
 
@@ -58,16 +53,6 @@ final readonly class TokenResponseDTO
     public function getScopes(): array
     {
         return $this->scopes;
-    }
-
-    public function getDeviceId(): ?string
-    {
-        return $this->deviceId;
-    }
-
-    public function getVerificationInterval(): int
-    {
-        return $this->verificationInterval;
     }
 
     /**

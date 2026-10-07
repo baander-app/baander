@@ -245,9 +245,9 @@ The proof must be signed by the key the token pair was issued to. Each refresh t
 
 Password and passkey login accept an optional `X-Baander-Client-Fingerprint` header. If it is sent, the access token is bound to that value, and every API request with the token must send the same header or get `401` (`AUTH_INVALID_TOKEN`). Refresh keeps the binding. Tokens issued without the header ignore it. WebSocket connections authenticated with a query token do not check it.
 
-### Revocation and Introspection
+### Revocation
 
-`POST /api/auth/logout` revokes the current access token. The two OAuth endpoints require an authenticated request: `POST /api/oauth/revoke` (RFC 7009) revokes an access or refresh token and always returns `200`, and `POST /api/oauth/introspect` (RFC 7662) reports whether an access token is active. Access tokens can be verified with the keys at `GET /.well-known/jwks.json`.
+`POST /api/auth/logout` revokes the current access token. `POST /api/oauth/revoke` (RFC 7009) requires an authenticated request, revokes an access or refresh token, and always returns `200`. Access tokens can be verified with the keys at `GET /.well-known/jwks.json`.
 
 ## Resource Pattern
 

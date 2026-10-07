@@ -12,7 +12,7 @@ use Stringable;
  * Human-readable pairing code for server discovery.
  *
  * Generates consonant-based codes (e.g., "BCDF-GHJK") matching the
- * RFC 8628 DeviceCode userCode pattern for consistency.
+ * RFC 8628 user code pattern (section 6.1).
  */
 final readonly class PairingCode implements Stringable, JsonSerializable
 {

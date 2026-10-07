@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Interface\Request;
 
-use App\Auth\Interface\Request\User\CreateClientRequest;
 use App\Auth\Interface\Request\Totp\DisableTotpRequest;
 use App\Auth\Interface\Request\Totp\EnableTotpRequest;
 use App\Auth\Interface\Request\User\LoginRequest;
@@ -108,13 +107,6 @@ final class RequestsTest extends TestCase
         $this->assertSame('', $req->challengeKey);
         $this->assertNull($req->response);
         $this->assertSame('', $req->userId);
-    }
-
-    public function testCreateClientRequestConstructor(): void
-    {
-        $req = new CreateClientRequest(name: 'My App');
-
-        $this->assertSame('My App', $req->name);
     }
 
     public function testRefreshTokenRequestConstructor(): void

@@ -15,21 +15,19 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 #[AsCommand(
     name: 'app:auth:setup-clients',
-    description: 'Create OAuth2 password clients for the SPA and Electron app.',
+    description: 'Create the first-party OAuth client that password and passkey login issue tokens to.',
 )]
 final class SetupClientsCommand extends Command
 {
     /**
-     * Fixed, deterministic public IDs for the first-party dev clients.
+     * Fixed, deterministic public ID for the first-party client.
      *
-     * Using fixed IDs means the values in .env (AUTH_SPA_CLIENT_ID /
-     * AUTH_ELECTRON_CLIENT_ID) always resolve to a client row, even after a
-     * full database reset (app:dev:setup --fresh). They are 21-char NanoID-
-     * compatible strings (letters, digits, underscore). The public ID is an
-     * identifier, not a secret — client confidentiality comes from secrets.
+     * Using a fixed ID means the value in .env (AUTH_SPA_CLIENT_ID) always
+     * resolves to a client row, even after a full database reset
+     * (app:dev:setup --fresh). It is a 21-char NanoID-compatible string
+     * (letters, digits, underscore). The public ID is an identifier, not a secret.
      */
     public const string SPA_PUBLIC_ID = 'baander_dev_spa_00001';
-    public const string ELECTRON_PUBLIC_ID = 'baander_dev_elc_00001';
 
     public function __construct(
         private readonly ClientRepositoryInterface $clientRepository,
@@ -46,24 +44,17 @@ final class SetupClientsCommand extends Command
             PublicId::fromString(self::SPA_PUBLIC_ID),
             $io,
         );
-        $electron = $this->seedClient(
-            'Bånder Electron',
-            PublicId::fromString(self::ELECTRON_PUBLIC_ID),
-            $io,
-        );
 
-        $io->success('OAuth clients are ready.');
+        $io->success('The OAuth client is ready.');
         $io->table(
             ['App', 'Public ID', 'Name'],
             [
                 ['SPA', $spa->getPublicId()->toString(), $spa->getName()],
-                ['Electron', $electron->getPublicId()->toString(), $electron->getName()],
             ],
         );
 
-        $io->section('These IDs are already set in .env for the dev environment:');
+        $io->section('This ID is already set in .env for the dev environment:');
         $io->text('AUTH_SPA_CLIENT_ID=' . $spa->getPublicId()->toString());
-        $io->text('AUTH_ELECTRON_CLIENT_ID=' . $electron->getPublicId()->toString());
 
         return Command::SUCCESS;
     }

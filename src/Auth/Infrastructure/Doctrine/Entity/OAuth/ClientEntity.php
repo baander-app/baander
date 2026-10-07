@@ -11,7 +11,6 @@ use League\OAuth2\Server\Entities\ClientEntityInterface;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'oauth_clients')]
-#[ORM\Index(name: 'idx_oauth_clients_user_id', columns: ['user_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_oauth_clients_public_id', columns: ['public_id'])]
 class ClientEntity implements ClientEntityInterface
 {
@@ -36,13 +35,7 @@ class ClientEntity implements ClientEntityInterface
     private string $redirect;
 
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
-    private bool $personalAccessClient = false;
-
-    #[ORM\Column(type: 'boolean', options: ['default' => false])]
     private bool $passwordClient = false;
-
-    #[ORM\Column(type: 'boolean', options: ['default' => false])]
-    private bool $deviceClient = false;
 
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
     private bool $confidential = false;
@@ -52,9 +45,6 @@ class ClientEntity implements ClientEntityInterface
 
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
     private bool $revoked = false;
-
-    #[ORM\Column(type: 'uuid', nullable: true)]
-    private ?Uuid $userId = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
@@ -68,9 +58,7 @@ class ClientEntity implements ClientEntityInterface
         string $redirect,
         ?string $secret = null,
         ?string $provider = null,
-        bool $personalAccessClient = false,
         bool $passwordClient = false,
-        bool $deviceClient = false,
         bool $confidential = false,
         bool $firstParty = false,
         ?Uuid $id = null,
@@ -81,9 +69,7 @@ class ClientEntity implements ClientEntityInterface
         $this->redirect = $redirect;
         $this->secret = $secret;
         $this->provider = $provider;
-        $this->personalAccessClient = $personalAccessClient;
         $this->passwordClient = $passwordClient;
-        $this->deviceClient = $deviceClient;
         $this->confidential = $confidential;
         $this->firstParty = $firstParty;
         $this->createdAt = new \DateTimeImmutable();
@@ -154,19 +140,9 @@ class ClientEntity implements ClientEntityInterface
         $this->updatedAt = new \DateTimeImmutable();
     }
 
-    public function isPersonalAccessClient(): bool
-    {
-        return $this->personalAccessClient;
-    }
-
     public function isPasswordClient(): bool
     {
         return $this->passwordClient;
-    }
-
-    public function isDeviceClient(): bool
-    {
-        return $this->deviceClient;
     }
 
     public function isConfidential(): bool
@@ -188,16 +164,6 @@ class ClientEntity implements ClientEntityInterface
     {
         $this->revoked = true;
         $this->updatedAt = new \DateTimeImmutable();
-    }
-
-    public function getUserId(): ?Uuid
-    {
-        return $this->userId;
-    }
-
-    public function setUserId(?Uuid $userId): void
-    {
-        $this->userId = $userId;
     }
 
     public function getCreatedAt(): \DateTimeImmutable

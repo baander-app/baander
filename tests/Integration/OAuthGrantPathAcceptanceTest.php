@@ -107,8 +107,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
     protected function tearDown(): void
     {
         if (isset($this->connection, $this->user)) {
-            // Refresh tokens and token metadata cascade from access tokens; passkeys cascade from the user.
-            $this->connection->executeStatement('DELETE FROM oauth_access_tokens WHERE user_id = ?', [$this->user->getId()->toString()]);
+            // Access tokens, with their refresh tokens and token metadata, and passkeys cascade from the user.
             $this->connection->executeStatement('DELETE FROM users WHERE id = ?', [$this->user->getId()->toString()]);
         }
         if (isset($this->manager) && $this->manager->isOpen()) {
@@ -307,6 +306,10 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         yield 'device authorization' => ['POST', '/api/oauth/device/authorize'];
         yield 'device verification' => ['GET', '/api/oauth/device/verify'];
         yield 'device approval' => ['POST', '/api/oauth/device/approve'];
+        yield 'introspection' => ['POST', '/api/oauth/introspect'];
+        yield 'personal access client list' => ['GET', '/api/oauth/clients/'];
+        yield 'personal access client creation' => ['POST', '/api/oauth/clients/'];
+        yield 'personal access client revocation' => ['DELETE', '/api/oauth/clients/baander_dev_spa_00001'];
     }
 
     /** The RFC 8414 document advertised the removed endpoints; the path now falls through to the SPA. */
@@ -318,7 +321,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertStringNotContainsString('token_endpoint', (string) $response->getContent());
     }
 
-    /** Only first-party login and refresh mint tokens; the third-party OAuth endpoints are gone. */
+    /** Only first-party login and refresh mint tokens; the third-party OAuth, introspection and personal access client endpoints are gone. */
     #[DataProvider('removedOAuthEndpoints')]
     public function testThirdPartyOAuthEndpointsAreNotRouted(string $method, string $path): void
     {

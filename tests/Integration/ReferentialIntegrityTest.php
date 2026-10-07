@@ -13,6 +13,7 @@ use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Schema\Schema;
 use DoctrineMigrations\Version20261006280000;
+use DoctrineMigrations\Version20261006300000;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -49,7 +50,6 @@ final class ReferentialIntegrityTest extends TestCase
         'movies.tmdb_id' => 'external TMDB identifier',
         'oauth_access_tokens.chain_id' => 'token chain identifier with no chain table',
         'oauth_access_tokens.token_id' => 'the token\'s own OAuth identifier',
-        'oauth_auth_codes.code_id' => 'the code\'s own OAuth identifier',
         'oauth_refresh_tokens.chain_id' => 'token chain identifier with no chain table',
         'oauth_refresh_tokens.token_id' => 'the token\'s own OAuth identifier',
         'oauth_token_metadata.session_id' => 'client-reported session identifier',
@@ -86,7 +86,6 @@ final class ReferentialIntegrityTest extends TestCase
 
     /** ON DELETE rules chosen by the referential integrity audit (Version20261006280000). */
     private const RULES = [
-        'fk_oauth_clients_user_id' => 'CASCADE',
         'fk_pairing_sessions_server_id' => 'CASCADE',
         'fk_party_events_session_id' => 'CASCADE',
         'fk_party_events_user_id' => 'CASCADE',
@@ -98,6 +97,11 @@ final class ReferentialIntegrityTest extends TestCase
         'fk_transcode_sessions_video_id' => 'CASCADE',
         'fk_user_favorites_user_id' => 'CASCADE',
         'fk_user_theme_moods_user_id' => 'CASCADE',
+    ];
+
+    /** Deleting a user deletes their access tokens (Version20261006300000). */
+    private const OAUTH_RULES = [
+        'fk_oauth_access_tokens_user_id' => 'CASCADE',
     ];
 
     /** ON DELETE rules for a party's video and transcode job (Version20261006310000). */
@@ -163,7 +167,7 @@ final class ReferentialIntegrityTest extends TestCase
 
     public function testForeignKeysChosenByTheAuditHaveTheirDeleteRules(): void
     {
-        $expected = [...self::RULES, ...self::PARTY_MEDIA_RULES];
+        $expected = [...self::RULES, ...self::OAUTH_RULES, ...self::PARTY_MEDIA_RULES];
         ksort($expected);
         $rules = $this->manager->getConnection()->fetchAllKeyValue(<<<'SQL'
             SELECT conname, CASE confdeltype WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL'
@@ -203,6 +207,26 @@ final class ReferentialIntegrityTest extends TestCase
             self::assertSame(0, $this->countOwnedRows($table, 'user_id', $owner), $table);
             self::assertSame(1, $this->countOwnedRows($table, 'user_id', $other), $table);
         }
+    }
+
+    public function testDeletingAUserRemovesTheirAccessTokensWithTheirRefreshTokensAndMetadata(): void
+    {
+        $owner = $this->createUser();
+        $other = $this->createUser();
+        $client = $this->createClient();
+        $tokens = [];
+        foreach ([$owner, $other] as $user) {
+            $tokens[] = $this->createAccessToken($client, $user);
+        }
+
+        $this->deleteUser($owner);
+
+        self::assertSame(0, $this->countOwnedRows('oauth_access_tokens', 'user_id', $owner));
+        self::assertSame(0, $this->countOwnedRows('oauth_refresh_tokens', 'access_token_id', $tokens[0]));
+        self::assertSame(0, $this->countOwnedRows('oauth_token_metadata', 'token_id', $tokens[0]));
+        self::assertSame(1, $this->countOwnedRows('oauth_access_tokens', 'user_id', $other));
+        self::assertSame(1, $this->countOwnedRows('oauth_refresh_tokens', 'access_token_id', $tokens[1]));
+        self::assertSame(1, $this->countOwnedRows('oauth_token_metadata', 'token_id', $tokens[1]));
     }
 
     public function testDeletingAVideoRemovesItsTranscodeJobsAndTheirSessions(): void
@@ -333,6 +357,8 @@ final class ReferentialIntegrityTest extends TestCase
         $connection = $this->manager->getConnection();
         $latest = $this->constraintsAndIndexes();
 
+        // Version20261006300000 dropped columns and tables Version20261006280000 constrains; restore them first.
+        $this->runMigration('down', Version20261006300000::class);
         $this->runMigration('down');
         $restored = $this->constraintsAndIndexes();
         foreach (array_keys(self::RULES) as $name) {
@@ -376,7 +402,25 @@ final class ReferentialIntegrityTest extends TestCase
 
         $this->runMigration('up');
 
+        // Rows Version20261006300000 removes: a personal access client with a token, and a token whose user was deleted.
+        $personal = $this->createClient(['personal_access_client' => 'true', 'user_id' => $owner->toString()]);
+        $personalToken = $this->createAccessToken($personal, $owner);
+        $tokenOwner = $this->createUser();
+        $orphanToken = $this->createAccessToken($this->createClient(), $tokenOwner);
+        $this->deleteUser($tokenOwner);
+        self::assertSame(
+            [['user_id' => null]],
+            $connection->fetchAllAssociative('SELECT user_id FROM oauth_access_tokens WHERE id = :id', ['id' => $orphanToken->toString()]),
+        );
+
+        $this->runMigration('up', Version20261006300000::class);
+
         self::assertSame($latest, $this->constraintsAndIndexes());
+        self::assertSame(0, $this->countOwnedRows('oauth_clients', 'id', $personal));
+        foreach ([$personalToken, $orphanToken] as $token) {
+            self::assertSame(0, $this->countOwnedRows('oauth_access_tokens', 'id', $token));
+            self::assertSame(0, $this->countOwnedRows('oauth_refresh_tokens', 'access_token_id', $token));
+        }
         self::assertSame(
             [$keptFavorite->toString()],
             $connection->fetchFirstColumn('SELECT id FROM user_favorites WHERE id IN (:kept, :orphan)', [
@@ -391,11 +435,12 @@ final class ReferentialIntegrityTest extends TestCase
         );
     }
 
-    private function runMigration(string $direction): void
+    /** @param class-string<Version20261006280000|Version20261006300000> $class */
+    private function runMigration(string $direction, string $class = Version20261006280000::class): void
     {
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261006280000.php';
+        require_once dirname(__DIR__, 2) . '/migrations/' . substr($class, strrpos($class, '\\') + 1) . '.php';
         $connection = $this->manager->getConnection();
-        $migration = new Version20261006280000($connection, new NullLogger());
+        $migration = new $class($connection, new NullLogger());
         $migration->{$direction}(new Schema());
         foreach ($migration->getSql() as $query) {
             $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
@@ -413,6 +458,35 @@ final class ReferentialIntegrityTest extends TestCase
             SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = current_schema()
              ORDER BY 1
             SQL);
+    }
+
+    /** @param array<string, string> $columns */
+    private function createClient(array $columns = []): Uuid
+    {
+        return $this->insert('oauth_clients', [
+            'public_id' => (new PublicId())->toString(),
+            'name' => 'Integrity client',
+            'redirect' => '["https://app.baander.app/callback"]',
+            'created_at' => '2026-10-07 12:00:00+00',
+            'updated_at' => '2026-10-07 12:00:00+00',
+            ...$columns,
+        ]);
+    }
+
+    /** An access token with one refresh token and its metadata. */
+    private function createAccessToken(Uuid $client, Uuid $user): Uuid
+    {
+        $times = ['created_at' => '2026-10-07 12:00:00+00', 'updated_at' => '2026-10-07 12:00:00+00'];
+        $token = $this->insert('oauth_access_tokens', [
+            'token_id' => bin2hex(random_bytes(16)),
+            'client_id' => $client->toString(),
+            'user_id' => $user->toString(),
+            ...$times,
+        ]);
+        $this->insert('oauth_refresh_tokens', ['token_id' => bin2hex(random_bytes(16)), 'access_token_id' => $token->toString(), ...$times]);
+        $this->insert('oauth_token_metadata', ['token_id' => $token->toString(), ...$times]);
+
+        return $token;
     }
 
     private function createTranscodeJob(Uuid $video, string $tier = '1080p'): Uuid

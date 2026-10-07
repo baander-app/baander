@@ -43,8 +43,8 @@ configuration and files securely before changing anything.
 
    `--offline` is your assertion that all application processes are stopped. The
    command cannot detect or fence another running instance. It validates the
-   bundle, deletes access tokens, refresh tokens, authorization codes, device
-   codes, and token metadata in one database transaction, then invalidates the
+   bundle, deletes access tokens, refresh tokens, and token metadata in one
+   database transaction, then invalidates the
    token cache. The reported count includes metadata rows. Clients, scopes, and
    users are preserved.
 3. After success, install both values from `oauth.env` while applications

@@ -12,6 +12,7 @@ use Doctrine\Migrations\DependencyFactory;
 use Doctrine\Migrations\Version\Version;
 use DoctrineMigrations\Version20261006210000;
 use DoctrineMigrations\Version20261006270000;
+use DoctrineMigrations\Version20261006300000;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -29,7 +30,7 @@ final class TextColumnMigrationTest extends TestCase
         'domain_event_outbox_receipt' => ['consumer'],
     ];
 
-    /** Converted columns that Version20261006270000 later dropped. */
+    /** Converted columns that later migrations dropped (Version20261006270000, then the table in Version20261006300000). */
     private const DROPPED = ['oauth_auth_codes.code_challenge_method'];
 
     public function testApplicationStringColumnsAreText(): void
@@ -47,7 +48,7 @@ final class TextColumnMigrationTest extends TestCase
     public function testSchemaComparisonIsCleanForTheMappedTables(): void
     {
         // The domain_event_outbox tables are migration-owned and excluded by the DBAL schema filter.
-        $this->assertSchemaComparisonIsClean(['movies', 'movie_collections', 'job_monitors', 'oauth_auth_codes']);
+        $this->assertSchemaComparisonIsClean(['movies', 'movie_collections', 'job_monitors']);
     }
 
     public function testMigrationKeepsStoredValuesAndRemovesTheLengthLimits(): void
@@ -62,6 +63,7 @@ final class TextColumnMigrationTest extends TestCase
 
         require_once dirname(__DIR__, 2) . '/migrations/Version20261006210000.php';
         require_once dirname(__DIR__, 2) . '/migrations/Version20261006270000.php';
+        require_once dirname(__DIR__, 2) . '/migrations/Version20261006300000.php';
         $run = static function (string $direction, string $class = Version20261006210000::class) use ($connection): void {
             $migration = new $class($connection, new NullLogger());
             $migration->{$direction}(new Schema());
@@ -70,8 +72,9 @@ final class TextColumnMigrationTest extends TestCase
             }
         };
 
-        // Restore the dropped PKCE columns, then recreate the VARCHAR columns and store values
-        // that fit their former limits.
+        // Restore the dropped oauth_auth_codes table and its PKCE columns, then recreate the
+        // VARCHAR columns and store values that fit their former limits.
+        $run('down', Version20261006300000::class);
         $run('down', Version20261006270000::class);
         $run('down');
         self::assertSame('character varying', $this->columnTypes()['movies.tagline']);
@@ -101,6 +104,9 @@ final class TextColumnMigrationTest extends TestCase
               WHERE table_schema = current_schema() AND table_name = 'oauth_auth_codes' AND column_name LIKE 'code_challenge%'",
         ));
         self::assertSame(1, (int) $connection->fetchOne('SELECT COUNT(*) FROM oauth_auth_codes WHERE id = :id', ['id' => $rows['oauth_auth_codes'][1]]));
+
+        $run('up', Version20261006300000::class);
+        self::assertFalse($connection->createSchemaManager()->tablesExist(['oauth_auth_codes']));
     }
 
     /** @return array<string, array{string, string|int, array<string, string|int>}> table => [key column, key, stored values] */

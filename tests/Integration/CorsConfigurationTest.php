@@ -172,6 +172,28 @@ final class CorsConfigurationTest extends TestCase
             ->headers->get('Access-Control-Allow-Origin'));
     }
 
+    /** First-party clients revoke tokens from the app origin; other origins get no CORS grant. */
+    public function testTokenRevocationAllowsOnlyTheAppOrigin(): void
+    {
+        $preflight = $this->preflight('/api/oauth/revoke', 'POST', 'Content-Type, Authorization, DPoP');
+        self::assertSame(200, $preflight->getStatusCode());
+        self::assertSame(self::ORIGIN, $preflight->headers->get('Access-Control-Allow-Origin'));
+        self::assertSame(self::ORIGIN, $this->actual('/api/oauth/revoke', self::ORIGIN, new Response())
+            ->headers->get('Access-Control-Allow-Origin'));
+
+        $foreign = 'https://foreign.baander.app';
+        self::assertFalse($this->preflight('/api/oauth/revoke', 'POST', 'Content-Type', $foreign)
+            ->headers->has('Access-Control-Allow-Origin'));
+        self::assertFalse($this->actual('/api/oauth/revoke', $foreign, new Response())
+            ->headers->has('Access-Control-Allow-Origin'));
+    }
+
+    public function testRemovedIntrospectionPathHasNoWildcardOrigin(): void
+    {
+        self::assertFalse($this->actual('/api/oauth/introspect', 'https://foreign.baander.app', new Response())
+            ->headers->has('Access-Control-Allow-Origin'));
+    }
+
     public function testStreamSigningPostRemainsAllowed(): void
     {
         self::assertSame(200, $this->preflight('/api/stream/sign', 'POST', 'Content-Type, Authorization, DPoP')->getStatusCode());

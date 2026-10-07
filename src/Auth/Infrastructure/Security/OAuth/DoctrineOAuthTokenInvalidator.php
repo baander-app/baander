@@ -17,10 +17,7 @@ use Throwable;
 /** Offline maintenance only; transaction locks do not fence workers after commit. */
 final readonly class DoctrineOAuthTokenInvalidator implements OAuthTokenInvalidatorInterface
 {
-    private const array TABLES = [
-        'oauth_token_metadata', 'oauth_refresh_tokens', 'oauth_auth_codes',
-        'oauth_device_codes', 'oauth_access_tokens',
-    ];
+    private const array TABLES = ['oauth_token_metadata', 'oauth_refresh_tokens', 'oauth_access_tokens'];
 
     public function __construct(
         private Connection $connection,

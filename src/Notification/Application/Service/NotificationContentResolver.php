@@ -48,11 +48,6 @@ final class NotificationContentResolver
                     'body' => ['tokenType' => $payload['token_type'] ?? 'access'],
                 ],
             ],
-            'device_code.approved' => [
-                'titleKey' => 'device_code.approved.title',
-                'bodyKey' => 'device_code.approved.body',
-                'parameters' => ['title' => [], 'body' => []],
-            ],
             'user.registered' => [
                 'titleKey' => 'user.registered.title',
                 'bodyKey' => 'user.registered.body',

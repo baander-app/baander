@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Application\DTO;
 
-use App\Auth\Application\DTO\LoginUserDTO;
 use App\Auth\Application\DTO\RegisterUserDTO;
 use App\Auth\Application\DTO\RequestPasswordResetDTO;
 use App\Auth\Application\DTO\TokenResponseDTO;
@@ -22,8 +21,6 @@ final class DTOTest extends TestCase
             expiresIn: 3600,
             refreshToken: 'ref-456',
             scopes: ['access-api', 'admin'],
-            deviceId: 'device-1',
-            verificationInterval: 10,
         );
 
         $this->assertSame('tok-123', $dto->getAccessToken());
@@ -31,8 +28,6 @@ final class DTOTest extends TestCase
         $this->assertSame(3600, $dto->getExpiresIn());
         $this->assertSame('ref-456', $dto->getRefreshToken());
         $this->assertSame(['access-api', 'admin'], $dto->getScopes());
-        $this->assertSame('device-1', $dto->getDeviceId());
-        $this->assertSame(10, $dto->getVerificationInterval());
     }
 
     public function testTokenResponseDTOToArrayMinimal(): void
@@ -86,14 +81,6 @@ final class DTOTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         new RegisterUserDTO('Alice', 'a@b.com', 'short');
-    }
-
-    public function testLoginUserDTO(): void
-    {
-        $dto = new LoginUserDTO(new Email('a@b.com'), 'pw');
-
-        $this->assertSame('a@b.com', $dto->getEmail()->toString());
-        $this->assertSame('pw', $dto->getPassword());
     }
 
     public function testRequestPasswordResetDTO(): void

@@ -65,17 +65,16 @@ WEB_PORT_SSL=8443
 
 Then start with `make start` and visit `http://localhost:8080`.
 
-### 5. Set up OAuth clients
+### 5. Set up the OAuth client
 
 ```bash
 make exec cmd="php bin/console app:auth:setup-clients"
 ```
 
-The command prints two environment variables. Add them to your `.env` file:
+The command prints one environment variable. Make sure your `.env` file contains it:
 
 ```env
 AUTH_SPA_CLIENT_ID=<printed-id>
-AUTH_ELECTRON_CLIENT_ID=<printed-id>
 ```
 
 ### 6. Create a media library

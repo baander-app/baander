@@ -16,7 +16,7 @@ use RuntimeException;
  * Aggregate root for a server pairing session.
  *
  * Lifecycle: pending → completed | expired.
- * Modeled after OAuth DeviceCode (RFC 8628) approve/deny/consume pattern.
+ * Modeled after the OAuth device authorization grant (RFC 8628).
  */
 final class PairingSession
 {

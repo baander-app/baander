@@ -36,7 +36,7 @@ class AccessTokenEntity implements AccessTokenEntityInterface
     private string $tokenId;
 
     #[ORM\ManyToOne(targetEntity: UserEntity::class)]
-    #[ORM\JoinColumn(name: 'user_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
+    #[ORM\JoinColumn(name: 'user_id', referencedColumnName: 'id', nullable: true, onDelete: 'CASCADE')]
     private ?UserEntity $user = null;
 
     #[ORM\ManyToOne(targetEntity: ClientEntity::class)]

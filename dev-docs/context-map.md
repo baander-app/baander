@@ -76,7 +76,7 @@ graph TD
 | **Aggregates** | `User` |
 | **Repositories** | `UserRepositoryInterface` |
 | **Ports** | `UserPortInterface`, `AuthenticatedUserIdentityInterface`, `PasswordHasherInterface`, `JwtGeneratorInterface`, `TotpVerifierInterface`, `DpopJtiCacheInterface`, `PasskeyVerifierInterface`, `PasswordResetTokenRepositoryInterface`, `EmailVerificationTokenRepositoryInterface`, `OAuthSecretBundleInterface`, `OAuthTokenInvalidatorInterface` |
-| **Events** | `UserRegistered`, `UserCreatedByOperator`, `EmailVerified`, `PasswordChanged`, `TokenIssued`, `TokenRevoked`, `DeviceCodeApproved`, `PasskeyRegistered`, `PasskeyDeleted` |
+| **Events** | `UserRegistered`, `UserCreatedByOperator`, `EmailVerified`, `PasswordChanged`, `TokenRevoked`, `PasskeyRegistered`, `PasskeyDeleted` |
 | **Tech** | League OAuth2 Server resource server (anti-corruption layer), WebAuthn (web-auth/webauthn-lib), OTPHP (TOTP), Redis (DPoP JTI cache, cached access tokens) |
 
 ### Catalog
@@ -308,11 +308,9 @@ graph LR
         A2["user.created_by_operator"]
         A3["password.changed"]
         A4["email.verified"]
-        A5["oauth.token_issued"]
-        A6["oauth.token_revoked"]
-        A7["oauth.device_code_approved"]
-        A8["passkey.registered"]
-        A9["passkey.deleted"]
+        A5["oauth.token_revoked"]
+        A6["passkey.registered"]
+        A7["passkey.deleted"]
     end
 
     subgraph Catalog
@@ -351,10 +349,9 @@ graph LR
     A1 -->|"Security"| Bridge
     A2 -->|"Security"| Bridge
     A3 -->|"Security"| Bridge
+    A5 -->|"Security"| Bridge
     A6 -->|"Security"| Bridge
     A7 -->|"Security"| Bridge
-    A8 -->|"Security"| Bridge
-    A9 -->|"Security"| Bridge
 
     C1 -->|"MediaChanges"| Bridge
 
@@ -366,7 +363,7 @@ graph LR
     Bridge --> N
 ```
 
-Unconnected events (no consumer): `email.verified`, `oauth.token_issued`, `song.metadata_updated`, `metadata.synced`, all Party events, all Playlist events, `transcode.job_created`, `transcode.job_completed`, `transcode.job_failed`, `transcode.session_attached`.
+Unconnected events (no consumer): `email.verified`, `song.metadata_updated`, `metadata.synced`, all Party events, all Playlist events, `transcode.job_created`, `transcode.job_completed`, `transcode.job_failed`, `transcode.session_attached`.
 
 ### Event Notification Categories
 
@@ -374,7 +371,7 @@ The `EventCategoryResolver` maps events to categories that determine how and whe
 
 | Category | Events |
 |----------|--------|
-| **Security** | `UserRegistered`, `PasswordChanged`, `PasskeyRegistered`, `PasskeyDeleted`, `TokenRevoked`, `DeviceCodeApproved` |
+| **Security** | `UserRegistered`, `PasswordChanged`, `PasskeyRegistered`, `PasskeyDeleted`, `TokenRevoked` |
 | **BackgroundJobs** | `LibraryScanCompleted` |
 | **MediaChanges** | `AlbumCreated` |
 

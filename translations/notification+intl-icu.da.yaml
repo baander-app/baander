@@ -17,11 +17,6 @@ token:
     title: "Token tilbagekaldt"
     body: "Et {tokenType}-token blev tilbagekaldt."
 
-device_code:
-  approved:
-    title: "Enhed godkendt"
-    body: "En ny enhed blev godkendt til at få adgang til din konto."
-
 library:
   scan_completed:
     title: "Biblioteksscannering fuldført"

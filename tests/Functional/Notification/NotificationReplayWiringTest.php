@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Notification;
 
-use App\Auth\Domain\Event\OAuth\TokenIssued;
+use App\Auth\Domain\Event\EmailVerified;
 use App\Auth\Domain\Event\PasswordChanged;
 use App\Auth\Domain\Event\UserRegistered;
 use App\Library\Domain\Event\LibraryScanCompleted;
@@ -27,6 +27,6 @@ final class NotificationReplayWiringTest extends KernelTestCase
         self::assertCount(2, $dispatcher->getListeners(UserRegistered::class));
         self::assertCount(1, $dispatcher->getListeners(PasswordChanged::class));
         self::assertCount(1, $dispatcher->getListeners(LibraryScanCompleted::class));
-        self::assertSame([], $dispatcher->getListeners(TokenIssued::class));
+        self::assertSame([], $dispatcher->getListeners(EmailVerified::class));
     }
 }

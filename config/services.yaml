@@ -422,10 +422,6 @@ services:
             $cache: '@cache.tags'
     App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface:
         alias: App\Auth\Infrastructure\Repository\OAuth\RefreshTokenRepository
-    App\Auth\Domain\Repository\OAuth\AuthCodeRepositoryInterface:
-        alias: App\Auth\Infrastructure\Repository\OAuth\AuthCodeRepository
-    App\Auth\Domain\Repository\OAuth\DeviceCodeRepositoryInterface:
-        alias: App\Auth\Infrastructure\Repository\OAuth\DeviceCodeRepository
     App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface:
         alias: App\Auth\Infrastructure\Repository\OAuth\ClientRepository
     App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface:

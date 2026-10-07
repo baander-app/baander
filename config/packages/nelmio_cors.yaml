@@ -7,21 +7,6 @@ nelmio_cors:
         expose_headers: ['Link', 'DPoP-Nonce']
         max_age: 3600
     paths:
-        # OAuth protocol endpoints: allow cross-origin clients
-        '^/api/oauth/introspect$':
-            allow_origin: ['*']
-            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'X-Baander-Client-Fingerprint', 'X-Baander-Correlation-ID', 'Accept', 'Origin']
-            allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
-            expose_headers: ['Link', 'DPoP-Nonce']
-            max_age: 3600
-
-        '^/api/oauth/revoke$':
-            allow_origin: ['*']
-            allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'X-Baander-Client-Fingerprint', 'X-Baander-Correlation-ID', 'Accept', 'Origin']
-            allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
-            expose_headers: ['Link', 'DPoP-Nonce']
-            max_age: 3600
-
         # JWKS endpoint: public, allow all origins
         '^/\.well-known/':
             allow_origin: ['*']
@@ -53,7 +38,7 @@ nelmio_cors:
             allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'X-Baander-Client-Fingerprint', 'X-Baander-Correlation-ID', 'Accept', 'Origin', 'Range', 'If-Range']
             expose_headers: ['Link', 'DPoP-Nonce', 'Content-Range', 'Accept-Ranges', 'ETag', 'Last-Modified']
 
-        # Catch-all for all other API routes (SPA, auth, etc.)
+        # Catch-all for all other API routes (SPA, auth, OAuth token revocation, etc.)
         '^/api/':
             allow_origin: ['%env(APP_URL)%']
             allow_headers: ['Content-Type', 'Authorization', 'DPoP', 'X-Requested-With', 'X-Baander-Device-Id', 'X-Baander-Client-Fingerprint', 'X-Baander-Correlation-ID', 'Accept', 'Origin']

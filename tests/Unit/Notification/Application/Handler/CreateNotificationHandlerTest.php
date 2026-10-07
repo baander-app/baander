@@ -104,9 +104,9 @@ final class CreateNotificationHandlerTest extends TestCase
         $this->notificationRepository = $this->createMock(NotificationRepositoryInterface::class);
 
         $command = new CreateNotificationCommand(
-            eventClass: \App\Auth\Domain\Event\OAuth\TokenIssued::class,
-            payload: ['token_id' => 'abc', 'scopes' => ['read']],
-            eventName: 'token.issued',
+            eventClass: \App\Auth\Domain\Event\EmailVerified::class,
+            payload: ['user_id' => Uuid::generate()->toString(), 'email' => 'listener@baander.app', 'occurred_at' => '2026-10-07T00:00:00+00:00'],
+            eventName: 'user.email_verified',
         );
 
         $this->notificationRepository->expects($this->never())->method('save');

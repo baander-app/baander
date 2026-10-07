@@ -22,7 +22,6 @@ success:
   email_verified: "E-mail bekræftet."
   totp_enabled: "TOTP aktiveret."
   totp_disable_not_implemented: "TOTP-deaktivering er endnu ikke fuldt implementeret."
-  client_revoked: "Klient tilbagekaldt."
   device_approved: "Enhed godkendt."
   device_denied: "Enhedsadgang nægtet."
   passkey_deleted: "passkey slettet."

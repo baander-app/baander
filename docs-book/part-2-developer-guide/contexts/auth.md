@@ -12,8 +12,6 @@ The Auth context signs users in to Baander's own clients and validates their tok
 | `Client` | OAuth 2.0 client application |
 | `AccessToken` | Issued access token |
 | `RefreshToken` | Issued refresh token |
-| `AuthCode` | Authorization code. Retained persistence only (`oauth_auth_codes`); no flow creates codes |
-| `DeviceCode` | Device authorization code. Retained persistence only (`oauth_device_codes`); no flow creates codes |
 | `Passkey` | WebAuthn passkey credential |
 | `ThirdPartyCredential` | External provider credential |
 | `LoginBlock` | Honeypot login block record |
@@ -29,7 +27,7 @@ The Auth context signs users in to Baander's own clients and validates their tok
 
 ## Commands & Handlers
 
-Commands and handlers are organized into feature namespaces under `Application/Command/` and `Application/CommandHandler/`: `OAuth/`, `Passkey/`, `Totp/`, and `User/`. Password login is checked by `PasswordAuthenticator` on the API firewall, not by a command. `LoginUserCommand` and `ApproveDeviceCodeCommand` still exist but no endpoint dispatches them.
+Commands and handlers are organized into feature namespaces under `Application/Command/` and `Application/CommandHandler/`: `OAuth/`, `Passkey/`, `Totp/`, and `User/`. Password login is checked by `PasswordAuthenticator` on the API firewall, not by a command.
 
 | Command | Handler | Purpose |
 |---------|---------|---------|
@@ -71,12 +69,10 @@ Commands and handlers are organized into feature namespaces under `Application/C
 | `UserRegistered` | Self-registration completed |
 | `UserCreatedByOperator` | Operator created a user |
 | `PasswordChanged` | Password updated |
-| `TokenIssued` | Defined; not currently dispatched |
 | `TokenRevoked` | Token revoked |
 | `PasskeyRegistered` | Passkey added |
 | `PasskeyDeleted` | Passkey removed |
 | `EmailVerified` | Email verification completed |
-| `DeviceCodeApproved` | Raised by `ApproveDeviceCodeHandler`, which no endpoint dispatches |
 
 ## API Endpoints
 
@@ -104,9 +100,6 @@ All endpoints except the JWKS document are under `/api`.
 | POST | `/api/auth/passkey/authenticate` | Verify an assertion without issuing tokens |
 | DELETE | `/api/auth/passkey/{publicId}` | Delete a passkey |
 | POST | `/api/oauth/revoke` | Token revocation (RFC 7009) |
-| POST | `/api/oauth/introspect` | Token introspection (RFC 7662) |
-| GET, POST | `/api/oauth/clients/` | List or create the current user's personal access clients |
-| DELETE | `/api/oauth/clients/{publicId}` | Revoke a client |
 | GET | `/.well-known/jwks.json` | JSON Web Key Set for verifying access tokens |
 
 ### Admin — User Management
@@ -123,6 +116,8 @@ All routes under `/api/admin/users` (controller `AdminUserController`, gated `RO
 | POST | `/api/admin/users/{id}/reset-password` | Reset a user's password |
 | POST | `/api/admin/users/{id}/disable` | Disable a user |
 | POST | `/api/admin/users/{id}/enable` | Enable a user |
+
+Deleting a user deletes their access tokens (`fk_oauth_access_tokens_user_id` is `ON DELETE CASCADE`), and the existing cascades from `oauth_access_tokens` then delete the matching refresh tokens and token metadata.
 
 ### Admin — Login Blocks
 
@@ -170,7 +165,7 @@ Password and passkey login accept an optional `X-Baander-Client-Fingerprint` hea
 | League OAuth adapters | Anti-corruption layer | League access token and refresh token repository interfaces aliased to internal adapters in `services.yaml` |
 | `ResourceServerFactory` | Security | Builds League's `ResourceServer` with `DpopAwareBearerTokenValidator` for access token validation |
 | `CachedAccessTokenRepository` | Cache decorator | Caches access token lookups |
-| Doctrine entities | ORM | Persistence for all models, including the retained `oauth_auth_codes` and `oauth_device_codes` tables |
+| Doctrine entities | ORM | Persistence for all models |
 | Doctrine repositories | ORM | Repository implementations for all aggregates |
 | Voter classes | Security | Authorization checks for protected resources |
 

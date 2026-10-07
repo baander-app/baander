@@ -45,8 +45,7 @@ Redis is used for:
 |----------|---------|-------------|
 | `OAUTH_PRIVATE_KEY_PATH` | `%kernel.project_dir%/config/secrets/oauth/private.key` | Path to the RSA private key for signing JWT access tokens. Generate with `app:oauth:generate-keys`. |
 | `OAUTH_PUBLIC_KEY_PATH` | `%kernel.project_dir%/config/secrets/oauth/public.key` | Path to the RSA public key for verifying JWT access tokens. |
-| `AUTH_SPA_CLIENT_ID` | `baander_dev_spa_00001` | Public ID of the first-party SPA OAuth client. Seeded by `app:auth:setup-clients`. |
-| `AUTH_ELECTRON_CLIENT_ID` | `baander_dev_elc_00001` | Public ID of the first-party Electron OAuth client. Seeded by `app:auth:setup-clients`. |
+| `AUTH_SPA_CLIENT_ID` | `baander_dev_spa_00001` | Public ID of the first-party OAuth client that password and passkey login issue tokens to. The web and Electron apps both use it. Seeded by `app:auth:setup-clients`. |
 
 Provision the RSA key files outside the image and set the two key-path variables to
 readable paths inside the web container. The default paths resolve relative to the

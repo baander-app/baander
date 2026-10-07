@@ -19,7 +19,6 @@ final class EventCategoryResolver
         \App\Auth\Domain\Event\Passkey\PasskeyRegistered::class => NotificationCategory::Security,
         \App\Auth\Domain\Event\Passkey\PasskeyDeleted::class => NotificationCategory::Security,
         \App\Auth\Domain\Event\OAuth\TokenRevoked::class => NotificationCategory::Security,
-        \App\Auth\Domain\Event\OAuth\DeviceCodeApproved::class => NotificationCategory::Security,
         \App\Auth\Domain\Event\UserRegistered::class => NotificationCategory::Security,
 
         // Background Jobs events
@@ -31,7 +30,6 @@ final class EventCategoryResolver
         \App\Catalog\Domain\Event\AlbumCreated::class => NotificationCategory::MediaChanges,
 
         // Excluded from notifications (not in the map):
-        // - TokenIssued (too noisy, R6)
         // - MetadataSynced (async context, no user)
         // - SongMetadataUpdated (async context, no user)
         // - SmartPlaylistSynced (low priority, deferred)

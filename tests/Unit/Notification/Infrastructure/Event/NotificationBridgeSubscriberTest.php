@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Notification\Infrastructure\Event;
 
 use App\Auth\Domain\Event\PasswordChanged;
-use App\Auth\Domain\Event\OAuth\TokenIssued;
+use App\Auth\Domain\Event\EmailVerified;
 use App\Catalog\Domain\Event\AlbumCreated;
 use App\Notification\Application\DTO\CreateNotificationCommand;
 use App\Notification\Domain\Service\EventCategoryResolver;
@@ -61,7 +61,7 @@ final class NotificationBridgeSubscriberTest extends TestCase
 
     public function testUnmappedEventDoesNotDispatchToMessenger(): void
     {
-        $event = new TokenIssued('token-123', ['read', 'write']);
+        $event = new EmailVerified(Uuid::generate(), new Email('listener@baander.app'));
 
         $this->bus->expects($this->never())->method('dispatch');
 

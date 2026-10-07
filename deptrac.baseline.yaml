@@ -45,14 +45,6 @@ deptrac:
       - App\Auth\Domain\Repository\LoginBlockRepositoryInterface
     App\Auth\Interface\Controller\AdminUserController:
       - App\Auth\Domain\Model\User
-    App\Auth\Interface\Controller\OAuth\ClientController:
-      - App\Auth\Domain\Model\OAuth\Client
-      - App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface
-      - App\Auth\Infrastructure\Security\SecurityUser
-    App\Auth\Interface\Controller\OAuth\OAuthController:
-      - App\Auth\Domain\Model\OAuth\AccessToken
-      - App\Auth\Domain\Model\OAuth\TokenId
-      - App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface
     App\Auth\Interface\Controller\Passkey\PasskeyController:
       - App\Auth\Domain\Model\Passkey\Passkey
       - App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface
@@ -244,7 +236,6 @@ deptrac:
     App\Notification\Application\Handler\SendWebhookHandler:
       - App\Notification\Infrastructure\Webhook\WebhookDeliveryService
     App\Notification\Domain\Service\EventCategoryResolver:
-      - App\Auth\Domain\Event\OAuth\DeviceCodeApproved
       - App\Auth\Domain\Event\OAuth\TokenRevoked
       - App\Auth\Domain\Event\Passkey\PasskeyDeleted
       - App\Auth\Domain\Event\Passkey\PasskeyRegistered

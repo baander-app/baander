@@ -26,11 +26,11 @@ parameters:
     # Email verification token time-to-live. Default: 24 hours.
     auth.email_verification_token.ttl: 86400
 
-    # --- First-Party Login Clients ---
-    # Public IDs of the pre-registered clients that login issues tokens to.
-    # Run `php bin/console app:auth:setup-clients` to create them.
+    # --- First-Party Login Client ---
+    # Public ID of the pre-registered client that password and passkey login
+    # issue tokens to, for every first-party app (web, Electron and mobile).
+    # Run `php bin/console app:auth:setup-clients` to create it.
     auth.spa_client_id: '%env(AUTH_SPA_CLIENT_ID)%'
-    auth.electron_client_id: '%env(AUTH_ELECTRON_CLIENT_ID)%'
 
     # --- Token Issuer ---
 

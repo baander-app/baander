@@ -6,7 +6,6 @@ namespace App\Tests\Unit\Auth\Domain\Model;
 
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\ClientState;
-use App\Shared\Domain\Model\Uuid;
 use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
@@ -22,9 +21,7 @@ final class ClientTest extends TestCase
         $this->assertFalse($client->isConfidential());
         $this->assertFalse($client->isRevoked());
         $this->assertFalse($client->isFirstParty());
-        $this->assertFalse($client->isPersonalAccessClient());
         $this->assertFalse($client->isPasswordClient());
-        $this->assertFalse($client->isDeviceClient());
     }
 
     public function testCreateConfidentialRequiresSecret(): void
@@ -50,13 +47,14 @@ final class ClientTest extends TestCase
         Client::create('  ', []);
     }
 
-    public function testCreatePersonalAccess(): void
+    public function testCreateFirstPartyPasswordClientWithAssignedPublicId(): void
     {
-        $client = Client::createPersonalAccess('My Token');
+        $publicId = \App\Shared\Domain\Model\PublicId::fromString('baander_dev_spa_00001');
+        $client = Client::create('Bånder SPA', ['http://localhost'], firstParty: true, passwordClient: true, publicId: $publicId);
 
-        $this->assertSame('My Token', $client->getName());
-        $this->assertTrue($client->isPersonalAccessClient());
+        $this->assertTrue($client->getPublicId()->equals($publicId));
         $this->assertTrue($client->isFirstParty());
+        $this->assertTrue($client->isPasswordClient());
     }
 
     public function testReconstituteRestoresRevokedState(): void
@@ -67,12 +65,9 @@ final class ClientTest extends TestCase
             name: 'Test',
             secret: null,
             redirectUris: [],
-            personalAccessClient: false,
             passwordClient: false,
-            deviceClient: false,
             confidential: false,
             firstParty: false,
-            userId: null,
             createdAt: new \DateTimeImmutable(),
             updatedAt: new \DateTimeImmutable(),
             revoked: true,
@@ -146,81 +141,5 @@ final class ClientTest extends TestCase
         $this->assertInstanceOf(\App\Shared\Domain\Model\PublicId::class, $client->getPublicId());
         $this->assertInstanceOf(\DateTimeImmutable::class, $client->getCreatedAt());
         $this->assertInstanceOf(\DateTimeImmutable::class, $client->getUpdatedAt());
-    }
-
-    public function testCreateWithUserId(): void
-    {
-        $userId = Uuid::v4();
-        $client = Client::create('Test', [], userId: $userId);
-
-        $this->assertNotNull($client->getUserId());
-        $this->assertTrue($client->getUserId()->equals($userId));
-    }
-
-    public function testCreateWithoutUserIdDefaultsToNull(): void
-    {
-        $client = Client::create('Test', []);
-
-        $this->assertNull($client->getUserId());
-    }
-
-    public function testCreatePersonalAccessWithUserId(): void
-    {
-        $userId = Uuid::v4();
-        $client = Client::createPersonalAccess('My Token', $userId);
-
-        $this->assertNotNull($client->getUserId());
-        $this->assertTrue($client->getUserId()->equals($userId));
-        $this->assertTrue($client->isPersonalAccessClient());
-    }
-
-    public function testIsOwnedByReturnsTrueForMatchingUserId(): void
-    {
-        $userId = Uuid::v4();
-        $client = Client::create('Test', [], userId: $userId);
-
-        $this->assertTrue($client->isOwnedBy($userId));
-    }
-
-    public function testIsOwnedByReturnsFalseForDifferentUserId(): void
-    {
-        $userId = Uuid::v4();
-        $otherUserId = Uuid::v4();
-        $client = Client::create('Test', [], userId: $userId);
-
-        $this->assertFalse($client->isOwnedBy($otherUserId));
-    }
-
-    public function testIsOwnedByReturnsFalseWhenUserIdIsNull(): void
-    {
-        $client = Client::create('Test', []);
-        $userId = Uuid::v4();
-
-        $this->assertFalse($client->isOwnedBy($userId));
-    }
-
-    public function testReconstituteWithUserId(): void
-    {
-        $userId = Uuid::v4();
-        $client = Client::reconstitute(new ClientState(
-            id: Uuid::v4(),
-            publicId: \App\Shared\Domain\Model\PublicId::fromString('cli_abc123def456ghjkl'),
-            name: 'Test',
-            secret: null,
-            redirectUris: [],
-            personalAccessClient: false,
-            passwordClient: false,
-            deviceClient: false,
-            confidential: false,
-            firstParty: false,
-            userId: $userId,
-            createdAt: new \DateTimeImmutable(),
-            updatedAt: new \DateTimeImmutable(),
-            revoked: false,
-        ));
-
-        $this->assertNotNull($client->getUserId());
-        $this->assertTrue($client->getUserId()->equals($userId));
-        $this->assertTrue($client->isOwnedBy($userId));
     }
 }

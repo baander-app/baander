@@ -185,12 +185,10 @@ docker compose exec redis redis-cli -a "$REDIS_PASSWORD" FLUSHALL
 
 After rotating `APP_SECRET` and flushing Redis, all existing sessions and OAuth tokens are invalid. Users will need to log in again.
 
-If OAuth refresh tokens are a concern, consider truncating the relevant database tables:
+If OAuth refresh tokens are a concern, truncate the token tables in one statement. Refresh tokens and token metadata reference access tokens, so PostgreSQL rejects truncating `oauth_access_tokens` on its own:
 
 ```sql
-TRUNCATE oauth_access_tokens;
-TRUNCATE oauth_refresh_tokens;
-TRUNCATE oauth_auth_codes;
+TRUNCATE oauth_access_tokens, oauth_refresh_tokens, oauth_token_metadata;
 ```
 
 ### 5. Audit user accounts

@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Application\CommandHandler;
 
-use App\Auth\Application\Command\OAuth\ApproveDeviceCodeCommand;
 use App\Auth\Application\Command\Passkey\AuthenticatePasskeyCommand;
 use App\Auth\Application\Command\Totp\EnableTotpCommand;
 use App\Auth\Application\Command\OAuth\IssueTokenCommand;
-use App\Auth\Application\Command\User\LoginUserCommand;
 use App\Auth\Application\Command\OAuth\RevokeTokenCommand;
 use App\Auth\Application\Command\OAuth\RefreshTokenCommand;
 use App\Auth\Application\Command\Passkey\RegisterPasskeyCommand;
@@ -26,14 +24,6 @@ final class CommandsTest extends TestCase
 
         $this->assertSame('a@b.com', $cmd->getEmail()->toString());
         $this->assertSame('Alice', $cmd->getName());
-        $this->assertSame('pw', $cmd->getPlainPassword());
-    }
-
-    public function testLoginUserCommandGetters(): void
-    {
-        $cmd = new LoginUserCommand(new Email('a@b.com'), 'pw');
-
-        $this->assertSame('a@b.com', $cmd->getEmail()->toString());
         $this->assertSame('pw', $cmd->getPlainPassword());
     }
 
@@ -118,15 +108,6 @@ final class CommandsTest extends TestCase
 
         $this->assertSame('user-1', $cmd->getUserId());
         $this->assertSame('123456', $cmd->getCode());
-    }
-
-    public function testApproveDeviceCodeCommandGetters(): void
-    {
-        $userId = Uuid::v4();
-        $cmd = new ApproveDeviceCodeCommand('ABCD', $userId);
-
-        $this->assertSame('ABCD', $cmd->getUserCode());
-        $this->assertSame($userId, $cmd->getUserId());
     }
 
     public function testRequestPasswordResetCommandGetters(): void

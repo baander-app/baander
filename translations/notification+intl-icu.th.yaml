@@ -15,10 +15,6 @@ token:
   revoked:
     title: เพิกถอน Token แล้ว
     body: มีการเพิกถอน Token {tokenType}
-device_code:
-  approved:
-    title: อนุมัติอุปกรณ์แล้ว
-    body: มีการอนุมัติอุปกรณ์ใหม่เพื่อเข้าถึงบัญชีของคุณ
 library:
   scan_completed:
     title: สแกนไลบรารีเสร็จสิ้น
