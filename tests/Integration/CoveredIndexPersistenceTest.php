@@ -65,7 +65,16 @@ final class CoveredIndexPersistenceTest extends TestCase
         }
 
         // Equality on the dropped index's columns, as in owner lookups and foreign-key cascades, uses the wider index.
+        // Analyzing first puts the tables in the state that once failed in the full suite: a near-empty table
+        // with fresh statistics. PGroonga estimates a scan of its whole index at zero cost, so on such a table
+        // the planner prefers an unqualified PGroonga bitmap or index-only scan with a filter over any B-tree
+        // lookup. Only an index scan with an index condition shows that the wider index serves the predicate.
+        foreach (array_unique(array_column(self::COVERED, 0)) as $table) {
+            $connection->executeStatement('ANALYZE ' . $table);
+        }
         $connection->executeStatement('SET LOCAL enable_seqscan = off');
+        $connection->executeStatement('SET LOCAL enable_bitmapscan = off');
+        $connection->executeStatement('SET LOCAL enable_indexonlyscan = off');
         foreach (self::COVERED as $dropped => [$table, $predicate, $covering]) {
             $parameters = array_filter(
                 ['id' => self::ID, 'text' => 'covered-index-probe'],
@@ -76,7 +85,8 @@ final class CoveredIndexPersistenceTest extends TestCase
                 sprintf('EXPLAIN (COSTS OFF) SELECT 1 FROM %s WHERE %s', $table, $predicate),
                 $parameters,
             ));
-            self::assertStringContainsString($covering, $plan, $dropped);
+            self::assertStringContainsString('Index Scan using ' . $covering . ' on ' . $table, $plan, $dropped);
+            self::assertStringContainsString('Index Cond:', $plan, $dropped);
         }
     }
 

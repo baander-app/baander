@@ -107,7 +107,19 @@ or erase index attributes merely to eliminate churn.
 On a disposable representative dataset, EXPLAIN the actual parameterized search
 query and compare semantics before/after. EXPLAIN ANALYZE executes the query;
 use it only for suitable read-only workload or explicitly isolated work. A small
-table's sequential plan is not proof of a broken index. Test fresh migrations
+table's sequential plan is not proof of a broken index.
+
+PGroonga 4.0.5 estimates a scan of its whole index at zero cost. For an equality
+predicate its operator classes cannot serve, the planner may still choose an
+unqualified PGroonga bitmap or index-only scan with a `Filter` over the B-tree that
+has an `Index Cond`. Verified 2026-10-07 on PostgreSQL 18 (disposable container):
+it happens on near-empty tables with fresh statistics, on stale statistics after
+deletes, and when the predicate value is estimated to be frequent. With current
+statistics on a populated table, the B-tree wins. No `pgroonga.*` setting changes
+this. A test that asserts a B-tree serves a lookup on a column that also has a
+PGroonga index must disable bitmap and index-only scans and assert the `Index Cond`,
+as [CoveredIndexPersistenceTest](../../../../tests/Integration/CoveredIndexPersistenceTest.php)
+does. Test fresh migrations
 and upgrades with the real extension-capable image; ORM SchemaTool alone neither
 installs extensions nor reproduces all custom migration indexes. Report what the
 test environment actually covered.
