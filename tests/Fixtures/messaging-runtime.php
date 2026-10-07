@@ -64,7 +64,8 @@ if ($mode === 'prepare') {
 } elseif ($mode === 'one-row-per-job') {
     // A redelivery restarts its job's row, so the killed attempt leaves no running row behind.
     $rows = $db->fetchAssociative("SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE status = 'finished' AND finished_at >= started_at) AS finished, max(attempt) AS attempts FROM job_monitors");
-    exit((int) $rows['total'] === (int) $argv[2] && (int) $rows['finished'] === (int) $argv[2] && (int) $rows['attempts'] === 2 ? 0 : 1);
+    $expected = (int) ($argv[2] ?? 1);
+    exit((int) $rows['total'] === $expected && (int) $rows['finished'] === $expected && (int) $rows['attempts'] === 2 ? 0 : 1);
 } else {
     throw new RuntimeException('Unknown runtime-test mode.');
 }
