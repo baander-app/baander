@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Auth\Infrastructure\Mail;
 
+use App\Shared\Domain\Model\Setting\SupportedLanguages;
+use App\UserPreference\Application\Port\UserSettingsContractInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\Request;
@@ -26,6 +28,10 @@ use Twig\Environment;
  * and PHP-FPM dispatch after the response has gone out. Without a current request (a console
  * command or a worker) it is sent at once.
  *
+ * The recipient's language is read from their settings only when the email is sent, so the
+ * request itself does no per-account work, and the subject and templates get that language
+ * explicitly; the shared translator's locale is never changed.
+ *
  * The email goes straight to the mailer transport rather than through MailerInterface, which
  * would dispatch it on the message bus: the credential must never be serialized into a
  * Messenger transport or the failed-message table. A failed send is logged without the
@@ -40,6 +46,7 @@ final class AfterResponseMailer
         private readonly TransportInterface $transport,
         private readonly Environment $twig,
         private readonly TranslatorInterface $translator,
+        private readonly UserSettingsContractInterface $settings,
         private readonly RequestStack $requestStack,
         private readonly LoggerInterface $logger,
         private readonly string $appName,
@@ -75,17 +82,19 @@ final class AfterResponseMailer
 
     private function sendNow(CredentialEmail $email): void
     {
+        $locale = $this->language($email);
+
         try {
             $context = [
                 ...$email->context,
                 'appName' => $this->appName,
                 'name' => $email->name,
-                'locale' => $email->locale,
+                'locale' => $locale,
             ];
 
             $message = (new Email())
                 ->to(new Address($email->address, $email->name))
-                ->subject($this->translator->trans($email->subjectKey, ['app' => $this->appName], 'auth', $email->locale))
+                ->subject($this->translator->trans($email->subjectKey, ['app' => $this->appName], 'auth', $locale))
                 ->text($this->twig->render($email->template . '.txt.twig', $context))
                 ->html($this->twig->render($email->template . '.html.twig', $context));
 
@@ -97,6 +106,26 @@ final class AfterResponseMailer
                 'userId' => $email->userId,
                 'exceptionClass' => $e::class,
             ]);
+        }
+    }
+
+    /**
+     * The recipient's email language, read when the email is sent. An email that cannot
+     * learn it is still worth sending, so a failed lookup falls back to English.
+     */
+    private function language(CredentialEmail $email): string
+    {
+        try {
+            return $this->settings->resolveLanguage($email->userId);
+        } catch (\Throwable $e) {
+            // The exception message may quote the address or the link, so log only its class.
+            $this->logger->warning('Email language could not be resolved; sending in English.', [
+                'channel' => $email->logChannel,
+                'userId' => $email->userId,
+                'exceptionClass' => $e::class,
+            ]);
+
+            return SupportedLanguages::FALLBACK;
         }
     }
 }

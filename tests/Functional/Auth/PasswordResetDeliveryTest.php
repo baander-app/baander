@@ -6,6 +6,7 @@ namespace App\Tests\Functional\Auth;
 
 use App\Auth\Application\Port\PasswordHasherInterface;
 use App\Auth\Infrastructure\Mail\AfterResponseMailer;
+use App\Shared\Application\Port\SystemSettingStoreInterface;
 use App\Shared\Domain\Model\Email as EmailAddress;
 use Doctrine\DBAL\Connection;
 use Monolog\Handler\TestHandler;
@@ -62,6 +63,19 @@ final class PasswordResetDeliveryTest extends RateLimitTestCase
         $this->assertSame(0, (int) $this->connection()->fetchOne('SELECT count(*) FROM password_reset_tokens WHERE user_id = ?', [$user->getId()->toString()]));
     }
 
+    public function testTheEmailIsInTheServerDefaultLanguageForAUserWithoutAChoice(): void
+    {
+        $user = $this->createTestUser(name: 'Alice Example');
+        static::getContainer()->get(SystemSettingStoreInterface::class)->save(['i18n.default_language' => 'da']);
+
+        $this->requestReset($user->getEmail());
+
+        $email = $this->onlyEmail();
+        $this->assertSame('Nulstil din adgangskode til ' . static::getContainer()->getParameter('app.name'), $email->getSubject());
+        $this->assertStringContainsString('Hej Alice Example', (string) $email->getTextBody());
+        $this->assertStringContainsString('<html lang="da">', (string) $email->getHtmlBody());
+    }
+
     public function testAnUnknownAddressGetsTheSameResponseAndNoEmail(): void
     {
         $response = $this->requestReset('nobody-' . bin2hex(random_bytes(4)) . '@baander.app');
@@ -114,6 +128,7 @@ final class PasswordResetDeliveryTest extends RateLimitTestCase
             $transport,
             $twig,
             $translator,
+            $container->get('test.user_settings_contract'),
             $requestStack,
             new Logger('test', [$logs]),
             'Baander',

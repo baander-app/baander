@@ -16,7 +16,6 @@ final readonly class MailerEmailVerificationDelivery implements EmailVerificatio
 {
     public function __construct(
         private AfterResponseMailer $mailer,
-        private AuthEmailLocale $locale,
         private string $appUrl,
     ) {
     }
@@ -27,7 +26,6 @@ final readonly class MailerEmailVerificationDelivery implements EmailVerificatio
             userId: $user->getId()->toString(),
             address: $user->getEmail(),
             name: $user->getName(),
-            locale: $this->locale->forUser($user),
             template: 'email/auth/email_verification',
             subjectKey: 'email_verification_email.subject',
             context: [
