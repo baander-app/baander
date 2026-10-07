@@ -22,6 +22,9 @@ final class ActivityAdminController
 {
     use ApiResponsesTrait;
 
+    private const string FROM_DESCRIPTION = 'First day counted (Y-m-d), from its start in the server time zone. Defaults to 30 days before now.';
+    private const string TO_DESCRIPTION = 'Last day counted (Y-m-d), up to the start of the next day in the server time zone; must not precede from. Defaults to today.';
+
     public function __construct(
         private readonly ActivityAnalyticsPortInterface $analytics,
     ) {
@@ -31,8 +34,8 @@ final class ActivityAdminController
         path: '/api/admin/activity/summary',
         summary: 'Get activity summary statistics',
         parameters: [
-            new OA\Parameter(name: 'from', description: 'Start date (Y-m-d)', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
-            new OA\Parameter(name: 'to', description: 'End date (Y-m-d)', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
+            new OA\Parameter(name: 'from', description: self::FROM_DESCRIPTION, in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
+            new OA\Parameter(name: 'to', description: self::TO_DESCRIPTION, in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
         ],
         responses: [
             new OA\Response(
@@ -65,8 +68,8 @@ final class ActivityAdminController
         path: '/api/admin/activity/top-tracks',
         summary: 'Get top tracks by play count',
         parameters: [
-            new OA\Parameter(name: 'from', description: 'Start date (Y-m-d)', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
-            new OA\Parameter(name: 'to', description: 'End date (Y-m-d)', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
+            new OA\Parameter(name: 'from', description: self::FROM_DESCRIPTION, in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
+            new OA\Parameter(name: 'to', description: self::TO_DESCRIPTION, in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
             new OA\Parameter(name: 'limit', description: 'Max results', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 10, maximum: 100, minimum: 1)),
         ],
         responses: [
@@ -103,8 +106,8 @@ final class ActivityAdminController
         path: '/api/admin/activity/top-artists',
         summary: 'Get top artists by play count',
         parameters: [
-            new OA\Parameter(name: 'from', description: 'Start date (Y-m-d)', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
-            new OA\Parameter(name: 'to', description: 'End date (Y-m-d)', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
+            new OA\Parameter(name: 'from', description: self::FROM_DESCRIPTION, in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
+            new OA\Parameter(name: 'to', description: self::TO_DESCRIPTION, in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
             new OA\Parameter(name: 'limit', description: 'Max results', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 10, maximum: 100, minimum: 1)),
         ],
         responses: [
@@ -139,8 +142,8 @@ final class ActivityAdminController
         path: '/api/admin/activity/engagement',
         summary: 'Get user engagement metrics',
         parameters: [
-            new OA\Parameter(name: 'from', description: 'Start date (Y-m-d)', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
-            new OA\Parameter(name: 'to', description: 'End date (Y-m-d)', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
+            new OA\Parameter(name: 'from', description: self::FROM_DESCRIPTION, in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
+            new OA\Parameter(name: 'to', description: self::TO_DESCRIPTION, in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date')),
         ],
         responses: [
             new OA\Response(
@@ -169,14 +172,19 @@ final class ActivityAdminController
     }
 
     /**
+     * The instants [from, to) covering the requested days. Both dates are inclusive calendar days in
+     * the server time zone, so the range ends at the start of the day after `to`. That boundary does
+     * not depend on how finely last_played_at is stored, unlike an inclusive end at 23:59:59.
+     *
      * @return array{\DateTimeImmutable, \DateTimeImmutable}
      */
     private function parseDateRange(Request $request): array
     {
         $from = QueryParameters::optionalDate($request->query, 'from') ?? new \DateTimeImmutable('-30 days');
-        $to = (QueryParameters::optionalDate($request->query, 'to') ?? new \DateTimeImmutable('today'))->setTime(23, 59, 59);
+        $lastDay = QueryParameters::optionalDate($request->query, 'to') ?? new \DateTimeImmutable('today');
+        $to = $lastDay->modify('+1 day');
 
-        if ($from > $to) {
+        if ($from >= $to) {
             throw new InvalidQueryParameter('to', 'End date must not precede start date.');
         }
 

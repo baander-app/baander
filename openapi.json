@@ -17,7 +17,7 @@
                     {
                         "name": "from",
                         "in": "query",
-                        "description": "Start date (Y-m-d)",
+                        "description": "First day counted (Y-m-d), from its start in the server time zone. Defaults to 30 days before now.",
                         "required": false,
                         "schema": {
                             "type": "string",
@@ -27,7 +27,7 @@
                     {
                         "name": "to",
                         "in": "query",
-                        "description": "End date (Y-m-d)",
+                        "description": "Last day counted (Y-m-d), up to the start of the next day in the server time zone; must not precede from. Defaults to today.",
                         "required": false,
                         "schema": {
                             "type": "string",
@@ -99,7 +99,7 @@
                     {
                         "name": "from",
                         "in": "query",
-                        "description": "Start date (Y-m-d)",
+                        "description": "First day counted (Y-m-d), from its start in the server time zone. Defaults to 30 days before now.",
                         "required": false,
                         "schema": {
                             "type": "string",
@@ -109,7 +109,7 @@
                     {
                         "name": "to",
                         "in": "query",
-                        "description": "End date (Y-m-d)",
+                        "description": "Last day counted (Y-m-d), up to the start of the next day in the server time zone; must not precede from. Defaults to today.",
                         "required": false,
                         "schema": {
                             "type": "string",
@@ -198,7 +198,7 @@
                     {
                         "name": "from",
                         "in": "query",
-                        "description": "Start date (Y-m-d)",
+                        "description": "First day counted (Y-m-d), from its start in the server time zone. Defaults to 30 days before now.",
                         "required": false,
                         "schema": {
                             "type": "string",
@@ -208,7 +208,7 @@
                     {
                         "name": "to",
                         "in": "query",
-                        "description": "End date (Y-m-d)",
+                        "description": "Last day counted (Y-m-d), up to the start of the next day in the server time zone; must not precede from. Defaults to today.",
                         "required": false,
                         "schema": {
                             "type": "string",
@@ -289,7 +289,7 @@
                     {
                         "name": "from",
                         "in": "query",
-                        "description": "Start date (Y-m-d)",
+                        "description": "First day counted (Y-m-d), from its start in the server time zone. Defaults to 30 days before now.",
                         "required": false,
                         "schema": {
                             "type": "string",
@@ -299,7 +299,7 @@
                     {
                         "name": "to",
                         "in": "query",
-                        "description": "End date (Y-m-d)",
+                        "description": "Last day counted (Y-m-d), up to the start of the next day in the server time zone; must not precede from. Defaults to today.",
                         "required": false,
                         "schema": {
                             "type": "string",

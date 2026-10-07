@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Interface\Console;
 
+use App\Auth\Application\Command\User\CreateUserCommand as CreateUserMessage;
 use App\Auth\Domain\Model\User;
 use App\Auth\Interface\Console\CreateUserCommand;
 use App\Shared\Domain\Model\Email;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
@@ -137,9 +139,21 @@ final class CreateUserCommandTest extends TestCase
         $this->assertStringContainsString('Invalid role', $tester->getDisplay());
     }
 
-    public function testPasswordTooShort(): void
+    /** @return iterable<string, array{string}> */
+    public static function passwordsOutsideThePolicy(): iterable
     {
-        $tester = new CommandTester($this->createCommandWithStream("short\n"));
+        yield 'seven characters' => ['1234567'];
+        yield 'four two-byte characters, eight bytes' => [str_repeat('æ', 4)];
+        yield '256 characters' => [str_repeat('a', 256)];
+    }
+
+    #[DataProvider('passwordsOutsideThePolicy')]
+    public function testRejectsAPasswordOutsideThePolicyWithoutCreatingTheUser(string $password): void
+    {
+        $commandBus = $this->createMock(MessageBusInterface::class);
+        $commandBus->expects($this->never())->method('dispatch');
+
+        $tester = new CommandTester(new CreateUserCommand($commandBus, $this->createInputStream($password . "\n")));
         $tester->execute([
             'email' => 'test@baander.app',
             'name' => 'Alice',
@@ -147,6 +161,39 @@ final class CreateUserCommandTest extends TestCase
         ], ['interactive' => false]);
 
         $this->assertSame(Command::FAILURE, $tester->getStatusCode());
-        $this->assertStringContainsString('8 characters', $tester->getDisplay());
+        $this->assertStringContainsString('between 8 and 255 characters', $tester->getDisplay());
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function passwordsAtThePolicyBounds(): iterable
+    {
+        yield 'eight two-byte characters' => [str_repeat('æ', 8)];
+        yield '255 two-byte characters' => [str_repeat('æ', 255)];
+    }
+
+    #[DataProvider('passwordsAtThePolicyBounds')]
+    public function testAcceptsThePolicyBoundsCountedInCharacters(string $password): void
+    {
+        $dispatched = [];
+        $user = User::createByOperator(Email::fromString('alice@baander.app'), 'hashed-pw', 'Alice', ['ROLE_USER']);
+        $this->commandBus->method('dispatch')->willReturnCallback(
+            static function (object $message) use (&$dispatched, $user): Envelope {
+                $dispatched[] = $message;
+
+                return new Envelope($message, [new HandledStamp($user, 'handler')]);
+            },
+        );
+
+        $tester = new CommandTester($this->createCommandWithStream($password . "\n"));
+        $tester->execute([
+            'email' => 'alice@baander.app',
+            'name' => 'Alice',
+            '--password' => true,
+        ], ['interactive' => false]);
+
+        $this->assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
+        $this->assertCount(1, $dispatched);
+        $this->assertInstanceOf(CreateUserMessage::class, $dispatched[0]);
+        $this->assertSame($password, $dispatched[0]->getPlainPassword());
     }
 }

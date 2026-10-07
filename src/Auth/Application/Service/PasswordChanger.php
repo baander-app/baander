@@ -26,9 +26,6 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
  */
 final readonly class PasswordChanger
 {
-    public const int MIN_LENGTH = 8;
-    public const int MAX_LENGTH = 255;
-
     public function __construct(
         private PasswordHasherInterface $passwordHasher,
         private UserRepositoryInterface $userRepository,
@@ -43,14 +40,11 @@ final readonly class PasswordChanger
      * @param AccessToken|null $keep the session to leave signed in: this access token and its
      *                               refresh chain. Null signs out every session.
      *
-     * @throws PasswordPolicyException when the password is too short or too long
+     * @throws PasswordPolicyException when the password breaks PasswordPolicy
      */
     public function change(User $user, string $plainPassword, ?AccessToken $keep = null): void
     {
-        $length = mb_strlen($plainPassword);
-        if ($length < self::MIN_LENGTH || $length > self::MAX_LENGTH) {
-            throw PasswordPolicyException::length(self::MIN_LENGTH, self::MAX_LENGTH);
-        }
+        PasswordPolicy::assertAcceptable($plainPassword);
 
         // Hash before opening the transaction; Argon2id is deliberately slow.
         $hashedPassword = $this->passwordHasher->hash($plainPassword);

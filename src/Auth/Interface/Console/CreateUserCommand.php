@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Auth\Interface\Console;
 
 use App\Auth\Application\Command\User\CreateUserCommand as CreateUserMessage;
+use App\Auth\Application\Exception\PasswordPolicyException;
+use App\Auth\Application\Service\PasswordPolicy;
 use App\Shared\Domain\Model\Email;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -92,8 +94,10 @@ final class CreateUserCommand extends Command
             }
         }
 
-        if (\strlen($password) < 8) {
-            $io->error('Password must be at least 8 characters.');
+        try {
+            PasswordPolicy::assertAcceptable($password);
+        } catch (PasswordPolicyException $e) {
+            $io->error($e->getMessage());
 
             return Command::FAILURE;
         }

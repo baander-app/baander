@@ -2211,11 +2211,11 @@ export const AcceptLanguageParameter = {
 
 export type GetAdminActivitySummaryParams = {
 /**
- * Start date (Y-m-d)
+ * First day counted (Y-m-d), from its start in the server time zone. Defaults to 30 days before now.
  */
 from?: string;
 /**
- * End date (Y-m-d)
+ * Last day counted (Y-m-d), up to the start of the next day in the server time zone; must not precede from. Defaults to today.
  */
 to?: string;
 };
@@ -2233,11 +2233,11 @@ export type GetAdminActivitySummary200 = {
 
 export type GetAdminActivityTopTracksParams = {
 /**
- * Start date (Y-m-d)
+ * First day counted (Y-m-d), from its start in the server time zone. Defaults to 30 days before now.
  */
 from?: string;
 /**
- * End date (Y-m-d)
+ * Last day counted (Y-m-d), up to the start of the next day in the server time zone; must not precede from. Defaults to today.
  */
 to?: string;
 /**
@@ -2263,11 +2263,11 @@ export type GetAdminActivityTopTracks200 = {
 
 export type GetAdminActivityTopArtistsParams = {
 /**
- * Start date (Y-m-d)
+ * First day counted (Y-m-d), from its start in the server time zone. Defaults to 30 days before now.
  */
 from?: string;
 /**
- * End date (Y-m-d)
+ * Last day counted (Y-m-d), up to the start of the next day in the server time zone; must not precede from. Defaults to today.
  */
 to?: string;
 /**
@@ -2289,11 +2289,11 @@ export type GetAdminActivityTopArtists200 = {
 
 export type GetAdminActivityEngagementParams = {
 /**
- * Start date (Y-m-d)
+ * First day counted (Y-m-d), from its start in the server time zone. Defaults to 30 days before now.
  */
 from?: string;
 /**
- * End date (Y-m-d)
+ * Last day counted (Y-m-d), up to the start of the next day in the server time zone; must not precede from. Defaults to today.
  */
 to?: string;
 };

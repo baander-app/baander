@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Activity\Application\Port;
 
+/**
+ * Play statistics over the activities last played in [$from, $to): each range includes its start
+ * and excludes its end, so consecutive ranges count every activity once.
+ */
 interface ActivityAnalyticsPortInterface
 {
     /**

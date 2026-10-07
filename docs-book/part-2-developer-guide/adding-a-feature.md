@@ -141,7 +141,8 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'playlist_favorite_albums')]
-#[ORM\UniqueConstraint(name: 'uniq_user_album', columns: ['user_id', 'album_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_playlist_favorite_albums_user_id_album_id', columns: ['user_id', 'album_id'])]
+#[ORM\Index(name: 'idx_playlist_favorite_albums_album_id', columns: ['album_id'])]
 class FavoriteAlbumEntity
 {
     #[ORM\Id]
@@ -224,16 +225,16 @@ App\Playlist\Application\Port\FavoriteAlbumPortInterface:
 
 ## 8. Migration
 
-Create a Doctrine migration for the new table. Migrations live in `migrations/` and are named sequentially.
+Create a Doctrine migration for the new table. Migrations live in `migrations/` and are named `VersionYYYYMMDDHHMMSS`. Name every index and constraint as [Database Naming](database-naming.md) describes, with the same names as the entity mapping.
 
 ```php
-// migrations/Version024_CreatePlaylistFavoriteAlbums.php
+// migrations/Version20261007120000.php
 namespace DoctrineMigrations;
 
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
-final class Version024_CreatePlaylistFavoriteAlbums extends AbstractMigration
+final class Version20261007120000 extends AbstractMigration
 {
     public function getDescription(): string
     {
@@ -247,11 +248,15 @@ final class Version024_CreatePlaylistFavoriteAlbums extends AbstractMigration
                 id UUID NOT NULL,
                 user_id UUID NOT NULL,
                 album_id UUID NOT NULL,
-                added_at TIMESTAMP(0) WITH TIME ZONE NOT NULL,
-                PRIMARY KEY(id),
-                UNIQUE(user_id, album_id)
+                added_at TIMESTAMPTZ NOT NULL,
+                PRIMARY KEY (id),
+                CONSTRAINT uniq_playlist_favorite_albums_user_id_album_id UNIQUE (user_id, album_id),
+                CONSTRAINT fk_playlist_favorite_albums_user_id FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                CONSTRAINT fk_playlist_favorite_albums_album_id FOREIGN KEY (album_id) REFERENCES albums (id) ON DELETE CASCADE
             )
         SQL);
+        // The unique constraint leads with user_id and serves its cascade; album_id needs its own index.
+        $this->addSql('CREATE INDEX idx_playlist_favorite_albums_album_id ON playlist_favorite_albums (album_id)');
     }
 
     public function down(Schema $schema): void
@@ -260,6 +265,8 @@ final class Version024_CreatePlaylistFavoriteAlbums extends AbstractMigration
     }
 }
 ```
+
+`added_at` records an instant, so the migration declares it `TIMESTAMPTZ` without a precision. Do not copy the type from Doctrine's generated SQL: for a `datetime_immutable` mapping Doctrine emits `TIMESTAMP(0) WITHOUT TIME ZONE`, which stores no time zone and rounds to whole seconds. The entity still maps the column as `datetime_immutable`. The `mapping_types` entry in `config/packages/doctrine.yaml` reads every `TIMESTAMPTZ` column back as `datetime_immutable`, so schema comparison finds no difference.
 
 Run the migration:
 

@@ -25,13 +25,13 @@ final class ActivityAnalyticsRepository implements ActivityAnalyticsPortInterfac
             FROM media_activities m
             LEFT JOIN songs s ON s.id = m.song_id
             WHERE m.last_played_at >= :from
-              AND m.last_played_at <= :to
+              AND m.last_played_at < :to
               AND m.play_count > 0
         SQL;
 
         $row = $this->connection->executeQuery($sql, [
-            'from' => $from->format('Y-m-d H:i:s'),
-            'to' => $to->format('Y-m-d H:i:s'),
+            'from' => self::instant($from),
+            'to' => self::instant($to),
         ])->fetchAssociative();
 
         return [
@@ -55,7 +55,7 @@ final class ActivityAnalyticsRepository implements ActivityAnalyticsPortInterfac
             LEFT JOIN artists ar ON ar.id = m.artist_id
             LEFT JOIN albums al ON al.id = m.album_id
             WHERE m.last_played_at >= :from
-              AND m.last_played_at <= :to
+              AND m.last_played_at < :to
               AND m.play_count > 0
             GROUP BY s.title, ar.name, al.title
             ORDER BY play_count DESC
@@ -63,8 +63,8 @@ final class ActivityAnalyticsRepository implements ActivityAnalyticsPortInterfac
         SQL;
 
         $rows = $this->connection->executeQuery($sql, [
-            'from' => $from->format('Y-m-d H:i:s'),
-            'to' => $to->format('Y-m-d H:i:s'),
+            'from' => self::instant($from),
+            'to' => self::instant($to),
             'limit' => $limit,
         ])->fetchAllAssociative();
 
@@ -85,7 +85,7 @@ final class ActivityAnalyticsRepository implements ActivityAnalyticsPortInterfac
             FROM media_activities m
             INNER JOIN artists ar ON ar.id = m.artist_id
             WHERE m.last_played_at >= :from
-              AND m.last_played_at <= :to
+              AND m.last_played_at < :to
               AND m.play_count > 0
             GROUP BY ar.name
             ORDER BY play_count DESC
@@ -93,8 +93,8 @@ final class ActivityAnalyticsRepository implements ActivityAnalyticsPortInterfac
         SQL;
 
         $rows = $this->connection->executeQuery($sql, [
-            'from' => $from->format('Y-m-d H:i:s'),
-            'to' => $to->format('Y-m-d H:i:s'),
+            'from' => self::instant($from),
+            'to' => self::instant($to),
             'limit' => $limit,
         ])->fetchAllAssociative();
 
@@ -114,13 +114,13 @@ final class ActivityAnalyticsRepository implements ActivityAnalyticsPortInterfac
             FROM media_activities m
             LEFT JOIN songs s ON s.id = m.song_id
             WHERE m.last_played_at >= :from
-              AND m.last_played_at <= :to
+              AND m.last_played_at < :to
               AND m.play_count > 0
         SQL;
 
         $row = $this->connection->executeQuery($sql, [
-            'from' => $from->format('Y-m-d H:i:s'),
-            'to' => $to->format('Y-m-d H:i:s'),
+            'from' => self::instant($from),
+            'to' => self::instant($to),
         ])->fetchAssociative();
 
         $activeUsers = (int) ($row['active_users'] ?? 0);
@@ -135,5 +135,14 @@ final class ActivityAnalyticsRepository implements ActivityAnalyticsPortInterfac
             'avg_plays_per_user' => $avgPlaysPerUser,
             'avg_session_length' => $avgSessionLength,
         ];
+    }
+
+    /**
+     * An instant as a timestamptz literal. The offset makes it independent of the PHP and session
+     * time zones, and the microseconds keep a fractional boundary exact.
+     */
+    private static function instant(\DateTimeInterface $at): string
+    {
+        return $at->format('Y-m-d H:i:s.uP');
     }
 }

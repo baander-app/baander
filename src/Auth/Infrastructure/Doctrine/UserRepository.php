@@ -210,9 +210,14 @@ final class UserRepository implements UserRepositoryInterface
     {
         $qb = $this->entityManager->createQueryBuilder();
 
+        // users.email is CITEXT, so plain equality is case-insensitive and uses uniq_users_email;
+        // LOWER() on the column would turn it into a text comparison that only a sequential scan
+        // can answer. Keep the parameter an untyped string: PostgreSQL then infers citext from the
+        // column. A parameter typed or cast as text makes the comparison text = text, which is
+        // case-sensitive and skips the index as well.
         return $qb->select('u')
             ->from(UserEntity::class, 'u')
-            ->where('LOWER(u.email) = LOWER(:email)')
+            ->where('u.email = :email')
             ->setParameter('email', $email->toString())
             ->getQuery()
             ->getOneOrNullResult();
