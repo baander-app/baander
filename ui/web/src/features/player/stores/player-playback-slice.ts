@@ -1,6 +1,14 @@
 import type { PlayerPlaybackState, PlayerPlaybackActions, PlayerSliceContext } from './player-types'
 import { getCurrentTime, updateTime } from './player-time-tracker'
-import { buildStreamUrl, invalidatePlaybackSelection, requestSelectedTrackPlayback, syncPlaybackVolume } from './player-playback-runtime'
+import {
+  buildStreamUrl,
+  canSeekStream,
+  chooseTranscodeFormat,
+  invalidatePlaybackSelection,
+  notifySeekUnavailable,
+  requestSelectedTrackPlayback,
+  syncPlaybackVolume,
+} from './player-playback-runtime'
 
 export function createPlayerPlaybackSlice({ get, commit }: PlayerSliceContext): PlayerPlaybackState & PlayerPlaybackActions {
   return {
@@ -10,7 +18,18 @@ export function createPlayerPlaybackSlice({ get, commit }: PlayerSliceContext): 
     replayCurrentTrack: () => {
       const { currentTrack, audioElement } = get()
       if (!currentTrack || !audioElement?.src) return
-      requestSelectedTrackPlayback(currentTrack, get, commit, 'preserve')
+      requestSelectedTrackPlayback(currentTrack, get, commit, canSeekStream(audioElement) ? 'preserve' : 'reload')
+    },
+    switchToTranscodedStream: () => {
+      const { currentTrack, audioElement, isPlaying } = get()
+      if (!currentTrack || !audioElement) return
+      const format = chooseTranscodeFormat(audioElement)
+      if (isPlaying) {
+        requestSelectedTrackPlayback(currentTrack, get, commit, 'replace', format)
+        return
+      }
+      invalidatePlaybackSelection()
+      audioElement.src = buildStreamUrl(currentTrack.publicId, format)
     },
     setIsPlaying: (playing) => {
       if (playing === get().isPlaying) return
@@ -30,7 +49,13 @@ export function createPlayerPlaybackSlice({ get, commit }: PlayerSliceContext): 
       if (!Number.isFinite(time)) return
       const { audioElement, duration } = get()
       const clamped = Math.max(0, Math.min(duration || 0, time))
-      if (audioElement && audioElement.currentTime !== clamped) audioElement.currentTime = clamped
+      if (audioElement && audioElement.currentTime !== clamped) {
+        if (!canSeekStream(audioElement)) {
+          notifySeekUnavailable()
+          return
+        }
+        audioElement.currentTime = clamped
+      }
       if (getCurrentTime() !== clamped) updateTime(clamped)
     },
     setAudioElement: (element) => {

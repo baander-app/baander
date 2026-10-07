@@ -186,6 +186,24 @@ for (const action of ['next', 'previous'] as const) {
   })
 }
 
+test('native playback requests a transcoded stream when Chromium cannot decode the original format', async ({ page, origin }) => {
+  const requested: string[] = []
+  await page.route('**/api/stream/track?*', async route => {
+    const url = new URL(route.request().url())
+    requested.push(url.search)
+    if (url.searchParams.get('id') === 'first' && !url.searchParams.has('format')) {
+      await route.fulfill({ status: 200, contentType: 'audio/x-ape', body: 'MAC undecodable fixture media' })
+    } else await route.continue()
+  })
+  await start(page, origin)
+  const playing = await snapshot(page)
+  expect(playing.track).toBe('first')
+  expect(playing.playing).toBe(true)
+  // The fixture server returns its WAV for any format; the request shape is what matters.
+  expect(requested).toContain('?id=first&format=opus')
+  await expect.poll(() => page.evaluate(() => window.playbackFixture.activity())).toEqual(['first'])
+})
+
 test('native repeat-one records each successful iteration without reloading the media source', async ({ page, origin }) => {
   await page.goto(origin)
   await page.waitForFunction(() => document.documentElement.dataset.ready === 'true')

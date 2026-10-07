@@ -38,7 +38,7 @@ export const test = base.extend<Record<never, never>, { origin: string }>({
         entryPoints: [fileURLToPath(new URL('./playback-fixture.tsx', import.meta.url))], absWorkingDir: webRoot,
         alias: { '@': sourceRoot }, nodePaths: [resolve(webRoot, 'node_modules')],
         plugins: [{ name: 'external-services', setup(plugin) {
-          plugin.onResolve({ filter: /^(?:react(?:-dom)?|zustand|scheduler)(?:\/.*)?$/ }, args => ({ path: require.resolve(args.path) }))
+          plugin.onResolve({ filter: /^(?:react(?:-dom)?|zustand|scheduler|sonner)(?:\/.*)?$/ }, args => ({ path: require.resolve(args.path) }))
           plugin.onResolve({ filter: /(?:activity-service|eq-reapply|wasm-loader)$/ }, args => ({ path: args.path, namespace: 'fixture' }))
           plugin.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path.endsWith('activity-service')
             ? 'export const activityService={recordPlay(payload){(globalThis.playbackActivity??=[]).push(payload.songId)}}'

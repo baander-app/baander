@@ -2,6 +2,7 @@ import { getCurrentTime, updateTime } from '@/features/player/stores/player-time
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { audioService } from '../../services/audio-service'
 import { activityService } from '../../services/activity-service'
+import { toast } from 'sonner'
 import {
   usePlayerStore,
   generateShuffleBag,
@@ -12,6 +13,10 @@ import {
 
 vi.mock('../../services/audio-service', () => ({
   audioService: { getProcessor: vi.fn(() => null) },
+}))
+
+vi.mock('sonner', () => ({
+  toast: { error: vi.fn(), info: vi.fn() },
 }))
 
 // --- Helpers ---------------------------------------------------------------
@@ -385,6 +390,57 @@ describe('player-store', () => {
       expect(audio.play).not.toHaveBeenCalled()
       expect(audio.currentTime).toBe(42)
       expect(activityService.recordPlay).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('transcoded streams', () => {
+    const TRANSCODED = '/api/stream/track?id=t0&format=opus'
+    beforeEach(() => { vi.spyOn(activityService, 'recordPlay').mockResolvedValue() })
+    afterEach(() => { vi.mocked(activityService.recordPlay).mockRestore() })
+
+    function prepareTranscoded(duration: number) {
+      seedQueue(0, 1)
+      const audio = makeAudioStub()
+      audio.src = TRANSCODED
+      Object.defineProperty(audio, 'duration', { value: duration, configurable: true })
+      audio.currentTime = 12
+      usePlayerStore.getState().setAudioElement(audio)
+      usePlayerStore.getState().setDuration(Number.isFinite(duration) ? duration : 0)
+      updateTime(12)
+      vi.mocked(toast.info).mockClear()
+      return audio
+    }
+
+    it('keeps the position and explains why seeking is unavailable while the stream is converted', () => {
+      const audio = prepareTranscoded(Infinity)
+      usePlayerStore.getState().seekTo(60)
+      expect(audio.currentTime).toBe(12)
+      expect(getCurrentTime()).toBe(12)
+      expect(toast.info).toHaveBeenCalledWith("Seeking isn't available yet", expect.objectContaining({
+        description: 'This track is being converted for your browser. You can seek in it the next time it plays.',
+      }))
+    })
+
+    it('seeks in a converted stream once the browser knows its duration', () => {
+      const audio = prepareTranscoded(200)
+      usePlayerStore.getState().seekTo(60)
+      expect(audio.currentTime).toBe(60)
+      expect(getCurrentTime()).toBe(60)
+      expect(toast.info).not.toHaveBeenCalled()
+    })
+
+    it('reloads a converted stream to repeat it when it cannot seek back to the start', async () => {
+      const audio = prepareTranscoded(Infinity)
+      const load = vi.fn()
+      Object.assign(audio, { load })
+      usePlayerStore.getState().replayCurrentTrack()
+      await Promise.resolve()
+      expect(audio.src).toBe(TRANSCODED)
+      expect(load).toHaveBeenCalledOnce()
+      expect(load.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(audio.play).mock.invocationCallOrder[0])
+      expect(getCurrentTime()).toBe(0)
+      expect(audio.play).toHaveBeenCalledOnce()
+      expect(activityService.recordPlay).toHaveBeenCalledOnce()
     })
   })
 
