@@ -27,6 +27,7 @@ final class SharedSettingDefinitions implements SettingDefinitionProviderInterfa
             default: SupportedLanguages::FALLBACK,
             allowedValues: SupportedLanguages::codes(),
             valueLabels: SupportedLanguages::NATIVE_NAMES,
+            userVisible: true,
             enforced: false,
         );
 

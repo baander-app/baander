@@ -1,5 +1,7 @@
 framework:
     default_locale: en
+    # The languages emails can be sent in; keep in step with SupportedLanguages.
+    enabled_locales: ['en', 'da', 'th']
     translator:
         default_path: '%kernel.project_dir%/translations'
         fallbacks:
