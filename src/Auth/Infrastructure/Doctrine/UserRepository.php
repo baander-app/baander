@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Infrastructure\Doctrine;
 
+use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
 use App\Auth\Application\Port\PasswordResetTokenRepositoryInterface;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Model\UserState;
@@ -20,6 +21,7 @@ final class UserRepository implements UserRepositoryInterface
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly PasswordResetTokenRepositoryInterface $passwordResetTokens,
+        private readonly EmailVerificationTokenRepositoryInterface $emailVerificationTokens,
     ) {
     }
 
@@ -34,6 +36,12 @@ final class UserRepository implements UserRepositoryInterface
         if ($this->entityManager->contains($entity)
             && ($entity->getEmail() !== $user->getEmail() || $entity->getPassword() !== $user->getPassword())) {
             $this->passwordResetTokens->revokeForUser($user->getId());
+        }
+
+        // A verification token vouches for the address it was sent to; a new address needs a
+        // new token, which the email change issues once the user is saved.
+        if ($this->entityManager->contains($entity) && $entity->getEmail() !== $user->getEmail()) {
+            $this->emailVerificationTokens->revokeForUser($user->getId());
         }
 
         $this->syncToEntity($user, $entity);

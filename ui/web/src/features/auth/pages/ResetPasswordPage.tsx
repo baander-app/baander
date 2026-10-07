@@ -1,9 +1,7 @@
-import { useEffect, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
 import { useTranslation } from '@/shared/i18n'
 import { AuthPageLayout } from '../components/AuthPageLayout'
 import { InvalidResetLink, ResetPasswordForm } from '../components/ResetPasswordForm'
-import { readResetToken } from '../lib/reset-token'
+import { useFragmentToken } from '../hooks/use-fragment-token'
 
 /**
  * Opened from the reset email. The token arrives in the URL fragment; the page keeps it in
@@ -13,15 +11,7 @@ import { readResetToken } from '../lib/reset-token'
  */
 export function ResetPasswordPage() {
   const { t } = useTranslation()
-  const location = useLocation()
-  const navigate = useNavigate()
-  const [token] = useState(() => readResetToken(location.hash))
-
-  useEffect(() => {
-    if (location.hash === '') return
-
-    navigate({ pathname: location.pathname, search: location.search }, { replace: true })
-  }, [location.hash, location.pathname, location.search, navigate])
+  const token = useFragmentToken()
 
   return (
     <AuthPageLayout title={t('auth.passwordReset.resetTitle')}>

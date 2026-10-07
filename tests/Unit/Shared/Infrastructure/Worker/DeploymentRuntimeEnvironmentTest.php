@@ -93,9 +93,19 @@ final class DeploymentRuntimeEnvironmentTest extends TestCase
     {
         $variables = ['APP_ENV' => 'prod', 'APP_DEBUG' => '0', 'DATABASE_URL' => 'postgresql://db.baander.app/baander',
             'REDIS_URL' => 'redis://redis.baander.app/0', 'REDIS_PASSWORD' => '', 'APP_SECRET' => 'secret',
-            'MESSENGER_TRANSPORT_DSN' => 'redis://redis.baander.app/messages', 'MAILER_DSN' => 'smtp://mail.baander.app'];
+            'MESSENGER_TRANSPORT_DSN' => 'redis://redis.baander.app/messages', 'MAILER_DSN' => 'smtp://mail.baander.app',
+            'MAIL_FROM_ADDRESS' => 'noreply@baander.app', 'MAIL_FROM_NAME' => 'Bånder'];
         ksort($variables);
         self::assertSame($variables, new DeploymentRuntimeEnvironment($variables)->variables);
+    }
+
+    public function testPassesTheSenderSettingsWorkerEmailNeeds(): void
+    {
+        $environment = new DeploymentRuntimeEnvironment(['MAIL_FROM_ADDRESS' => 'noreply@baander.app', 'MAIL_FROM_NAME' => 'Bånder']);
+
+        $environment->withFile(static function (string $path): void {
+            self::assertSame("MAIL_FROM_ADDRESS=noreply@baander.app\nMAIL_FROM_NAME=Bånder\n", file_get_contents($path));
+        });
     }
 
     public function testByteLimitsIncludeKeysEqualsAndNewlines(): void

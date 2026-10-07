@@ -103,7 +103,7 @@ final class AuthControllerVerifyEmailTest extends TestCase
             ->expects($this->once())
             ->method('dispatch')
             ->willReturnCallback(function ($command) {
-                return new Envelope($command, [new HandledStamp(true, 'handler')]);
+                return new Envelope($command, [new HandledStamp(null, 'handler')]);
             });
 
         $response = $this->controller->verifyEmail($payload);
@@ -114,25 +114,17 @@ final class AuthControllerVerifyEmailTest extends TestCase
         $this->assertStringNotContainsStringIgnoringCase('not yet implemented', $data['data']['message']);
     }
 
-    /** @return iterable<string, array{string, bool}> */
+    /** @return iterable<string, array{bool}> */
     public static function verificationFailures(): iterable
     {
-        foreach (['missing', 'invalid', 'expired', 'alreadyUsed'] as $reason) {
-            yield $reason . ' direct' => [$reason, false];
-            yield $reason . ' Messenger-wrapped' => [$reason, true];
-        }
+        yield 'direct' => [false];
+        yield 'Messenger-wrapped' => [true];
     }
 
     #[DataProvider('verificationFailures')]
-    public function testVerifyEmailMapsUseCaseFailuresWithoutLeakingDetails(string $reason, bool $wrapped): void
+    public function testVerifyEmailMapsUseCaseFailuresWithoutLeakingDetails(bool $wrapped): void
     {
-        $failure = match ($reason) {
-            'missing' => EmailVerificationException::missing(),
-            'invalid' => EmailVerificationException::invalid(),
-            'expired' => EmailVerificationException::expired(),
-            'alreadyUsed' => EmailVerificationException::alreadyUsed(),
-            default => throw new \InvalidArgumentException('Unknown verification failure.'),
-        };
+        $failure = EmailVerificationException::invalid();
         $this->commandBus
             ->expects($this->once())
             ->method('dispatch')

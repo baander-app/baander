@@ -308,6 +308,7 @@ services:
             $authPasswordResetIpLimiter: '@limiter.auth_password_reset_ip'
             $authRefreshClientLimiter: '@limiter.auth_refresh_client'
             $authPasskeyIpLimiter: '@limiter.auth_passkey_ip'
+            $authEmailVerificationIpLimiter: '@limiter.auth_email_verification_ip'
             $environment: '%kernel.environment%'
 
     App\Auth\Infrastructure\Security\ApiRateLimitListener:
@@ -373,10 +374,6 @@ services:
             $accessTokenTtl: '%auth.access_token.ttl%'
             $refreshTokenTtl: '%auth.refresh_token.ttl%'
 
-    App\Auth\Application\CommandHandler\User\RegisterUserHandler:
-        arguments:
-            $emailVerificationTokenTtl: '%auth.email_verification_token.ttl%'
-
     App\Auth\Application\CommandHandler\User\RequestPasswordResetHandler:
         arguments:
             $tokenLifetimeMinutes: '%auth.password_reset_token.lifetime_minutes%'
@@ -387,7 +384,29 @@ services:
     App\Auth\Infrastructure\Mail\MailerPasswordResetDelivery:
         arguments:
             $appUrl: '%env(APP_URL)%'
+
+    App\Auth\Infrastructure\Mail\AfterResponseMailer:
+        arguments:
             $appName: '%app.name%'
+
+    # --- Email Verification ---
+    App\Auth\Application\Service\EmailVerificationIssuer:
+        arguments:
+            $tokenTtlSeconds: '%auth.email_verification_token.ttl%'
+
+    App\Auth\Application\Port\EmailVerificationDeliveryInterface:
+        alias: App\Auth\Infrastructure\Mail\MailerEmailVerificationDelivery
+
+    App\Auth\Infrastructure\Mail\MailerEmailVerificationDelivery:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+
+    App\Auth\Application\Port\EmailVerificationResendThrottleInterface:
+        alias: App\Auth\Infrastructure\Security\RateLimiterEmailVerificationResendThrottle
+
+    App\Auth\Infrastructure\Security\RateLimiterEmailVerificationResendThrottle:
+        arguments:
+            $authEmailVerificationUserLimiter: '@limiter.auth_email_verification_user'
 
     # --- Login Controllers ---
     App\Auth\Interface\Controller\User\LoginController:

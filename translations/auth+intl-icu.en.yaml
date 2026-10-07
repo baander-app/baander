@@ -12,7 +12,7 @@ errors:
   user_code_required: 'The "user_code" parameter is required.'
   invalid_user_code: "Invalid or expired user code."
   device_already_processed: "Device code already processed."
-  email_verification_failed: "Email verification failed."
+  email_verification_failed: "This verification link is invalid or has expired."
   internal: "Internal server error."
   password_reset_failed: "This password reset link is invalid or has expired."
   current_password_incorrect: "Current password is incorrect."
@@ -20,7 +20,6 @@ errors:
 success:
   token_revoked: "Token revoked successfully."
   password_reset_sent: "If the email exists, a password reset link has been sent."
-  email_not_implemented: "Email verification is not yet implemented."
   email_verified: "Email verified."
   totp_enabled: "TOTP enabled successfully."
   totp_disable_not_implemented: "TOTP disable is not yet fully implemented."
@@ -39,3 +38,16 @@ password_reset_email:
   fallback: "If the button does not work, copy this link into your browser:"
   expiry: "The link works once and expires in {minutes, plural, one {# minute} other {# minutes}}."
   ignore: "If you did not ask for this, ignore this email. Your password stays the same."
+
+email_verification_email:
+  subject: "Verify your email address for {app}"
+  heading: "Verify your email address"
+  greeting: "Hi {name},"
+  intro: "Confirm that this address belongs to your {app} account. Open the link below to verify it."
+  action: "Verify email address"
+  fallback: "If the button does not work, copy this link into your browser:"
+  expiry: "The link works once and expires in {hours, plural, one {# hour} other {# hours}}."
+  ignore: "If you did not create an account or change your email address, ignore this email."
+
+email_verification:
+  resend_sent: "If your email address still needs verification, a new link has been sent."

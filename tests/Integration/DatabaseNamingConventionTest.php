@@ -90,6 +90,7 @@ final class DatabaseNamingConventionTest extends TestCase
     {
         $latest = array_column($this->objects(), 'name');
         // Later migrations dropped some of the renamed indexes and tables; restore them so the rename can be reversed.
+        $this->runMigration('Version20261006360000', 'down');
         $this->runMigration('Version20261006300000', 'down');
         $this->runMigration('Version20261006260000', 'down');
         $this->runMigration('Version20261006240000', 'down');
@@ -112,6 +113,7 @@ final class DatabaseNamingConventionTest extends TestCase
         $this->runMigration('Version20261006240000', 'up');
         $this->runMigration('Version20261006260000', 'up');
         $this->runMigration('Version20261006300000', 'up');
+        $this->runMigration('Version20261006360000', 'up');
         self::assertSame($latest, array_column($this->objects(), 'name'));
     }
 

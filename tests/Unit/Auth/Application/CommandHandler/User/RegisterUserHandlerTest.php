@@ -6,19 +6,21 @@ namespace App\Tests\Unit\Auth\Application\CommandHandler;
 
 use App\Auth\Application\Command\User\RegisterUserCommand;
 use App\Auth\Application\CommandHandler\User\RegisterUserHandler;
+use App\Auth\Application\Port\EmailVerificationDeliveryInterface;
 use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
 use App\Auth\Application\Port\PasswordHasherInterface;
+use App\Auth\Application\Service\EmailVerificationIssuer;
+use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
-use App\Auth\Application\DTO\EmailVerificationTokenDTO;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
-use RuntimeException;
 
 final class RegisterUserHandlerTest extends TestCase
 {
@@ -26,156 +28,106 @@ final class RegisterUserHandlerTest extends TestCase
     private PasswordHasherInterface&Stub $passwordHasher;
     private EventDispatcherInterface&Stub $eventDispatcher;
     private MessageBusInterface&Stub $bus;
-    private EmailVerificationTokenRepositoryInterface&Stub $emailVerificationTokenRepository;
     private TransactionPortInterface&Stub $transaction;
-    private RegisterUserHandler $handler;
+    private bool $active = false;
+    /** @var list<array{string, string, string, \DateTimeImmutable, bool}> userId, email, token, expiry, inside the transaction */
+    private array $issued = [];
+    /** @var list<array{User, string, bool}> user, token, inside the transaction */
+    private array $delivered = [];
 
     protected function setUp(): void
     {
         $this->userRepository = $this->createStub(UserRepositoryInterface::class);
+        $this->userRepository->method('existsWithEmail')->willReturn(false);
         $this->passwordHasher = $this->createStub(PasswordHasherInterface::class);
+        $this->passwordHasher->method('hash')->willReturn('hashed-pw');
         $this->eventDispatcher = $this->createStub(EventDispatcherInterface::class);
+        $this->eventDispatcher->method('dispatch')->willReturnArgument(0);
         $this->bus = $this->createStub(MessageBusInterface::class);
         $this->bus->method('dispatch')->willReturnCallback(fn (object $m) => new Envelope($m));
-        $this->emailVerificationTokenRepository = $this->createVerificationTokenRepository();
         $this->transaction = $this->createStub(TransactionPortInterface::class);
-        $this->transaction->method('run')->willReturnCallback(static fn (callable $operation): mixed => $operation());
-        $this->handler = $this->createRegisterUserHandlerFixture();
+        $this->transaction->method('run')->willReturnCallback(function (callable $operation): mixed {
+            $this->active = true;
+            try {
+                return $operation();
+            } finally {
+                $this->active = false;
+            }
+        });
     }
 
-    /** @return ($expectCalls is true ? EmailVerificationTokenRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject : EmailVerificationTokenRepositoryInterface&Stub) */
-    private function createVerificationTokenRepository(bool $expectCalls = false): EmailVerificationTokenRepositoryInterface&Stub
+    public function testRegistersAnUnverifiedUser(): void
     {
-        $double = $expectCalls ? $this->createMock(EmailVerificationTokenRepositoryInterface::class) : $this->createStub(EmailVerificationTokenRepositoryInterface::class);
-        $double->method('createForUser')->willReturnCallback(
-            fn ($userId, $token, $expiresAt) => new EmailVerificationTokenDTO(
-                Uuid::generate(),
-                $userId,
-                $token,
-                $expiresAt,
-            ),
-        );
-        return $double;
-    }
-
-    private function createRegisterUserHandlerFixture(): RegisterUserHandler
-    {
-        $fixture = new RegisterUserHandler(
-            $this->userRepository,
-            $this->passwordHasher,
-            $this->eventDispatcher,
-            $this->bus,
-            $this->emailVerificationTokenRepository,
-            $this->transaction,
-        );
-        return $fixture;
-    }
-
-    public function testRegistersUser(): void
-    {
-        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
-        $this->handler = $this->createRegisterUserHandlerFixture();
-
-        $email = new Email('test@baander.app');
-        $this->userRepository->method('existsWithEmail')->willReturn(false);
-        $this->passwordHasher->method('hash')->willReturn('hashed-pw');
-        $this->userRepository->expects($this->once())->method('save');
-
-        $user = ($this->handler)(new RegisterUserCommand($email, 'Alice', 'password123'));
+        $user = ($this->handler())(new RegisterUserCommand(new Email('test@baander.app'), 'Alice', 'password123'));
 
         $this->assertSame('Alice', $user->getName());
         $this->assertSame('test@baander.app', $user->getEmail());
+        $this->assertFalse($user->isEmailVerified());
     }
 
     public function testThrowsOnDuplicateEmail(): void
     {
-        $email = new Email('test@baander.app');
+        $this->userRepository = $this->createStub(UserRepositoryInterface::class);
         $this->userRepository->method('existsWithEmail')->willReturn(true);
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('already exists');
 
-        ($this->handler)(new RegisterUserCommand($email, 'Alice', 'password123'));
+        ($this->handler())(new RegisterUserCommand(new Email('test@baander.app'), 'Alice', 'password123'));
     }
 
-    public function testCreatesEmailVerificationTokenAfterRegistration(): void
+    public function testIssuesATokenInTheTransactionAndDeliversItAfterTheCommit(): void
     {
-        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
-        $this->emailVerificationTokenRepository = $this->createVerificationTokenRepository(expectCalls: true);
-        $this->handler = $this->createRegisterUserHandlerFixture();
+        $user = ($this->handler())(new RegisterUserCommand(new Email('test@baander.app'), 'Alice', 'password123'));
 
-        $email = new Email('test@baander.app');
-        $this->userRepository->method('existsWithEmail')->willReturn(false);
-        $this->passwordHasher->method('hash')->willReturn('hashed-pw');
-        $this->userRepository->expects($this->once())->method('save');
-        $this->emailVerificationTokenRepository
-            ->expects($this->once())
-            ->method('createForUser')
-            ->with(
-                $this->isInstanceOf(Uuid::class),
-                $this->matchesRegularExpression('/^[0-9A-Z]{26}$/'),
-                $this->isInstanceOf(\DateTimeImmutable::class),
-            )->willReturnCallback(static fn (Uuid $userId, string $token, \DateTimeImmutable $expiresAt): EmailVerificationTokenDTO => new EmailVerificationTokenDTO(Uuid::generate(), $userId, $token, $expiresAt));
+        $this->assertCount(1, $this->issued);
+        [$userId, $email, $token, $expiresAt, $inside] = $this->issued[0];
+        $this->assertSame($user->getId()->toString(), $userId);
+        $this->assertSame('test@baander.app', $email);
+        $this->assertMatchesRegularExpression('/^[0-9a-f]{64}$/', $token, 'A 256-bit random token.');
+        $this->assertEqualsWithDelta(time() + 86400, $expiresAt->getTimestamp(), 5);
+        $this->assertTrue($inside, 'The token is stored with the user.');
 
-        ($this->handler)(new RegisterUserCommand($email, 'Alice', 'password123'));
+        $this->assertCount(1, $this->delivered);
+        $this->assertSame($user, $this->delivered[0][0]);
+        $this->assertSame($token, $this->delivered[0][1]);
+        $this->assertFalse($this->delivered[0][2], 'The link is sent only after the commit.');
     }
 
-    public function testEventFailureEscapesTheTransaction(): void
+    public function testEventFailureEscapesTheTransactionAndSendsNothing(): void
     {
-        $active = false;
         $failure = new \RuntimeException('Outbox insertion failed.');
-        $this->transaction = $this->createMock(TransactionPortInterface::class);
-        $this->transaction->expects($this->once())->method('run')->willReturnCallback(
-            function (callable $operation) use (&$active, $failure): mixed {
-                $active = true;
-                try {
-                    return $operation();
-                } catch (\RuntimeException $exception) {
-                    $this->assertSame($failure, $exception);
-                    throw $exception;
-                } finally {
-                    $active = false;
-                }
-            },
-        );
-        $userRepository = $this->createMock(UserRepositoryInterface::class);
-        $this->userRepository = $userRepository;
-        $userRepository->expects($this->once())->method('save')->willReturnCallback(
-            function () use (&$active): void {
-                $this->assertTrue($active);
-            },
-        );
-        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-        $this->eventDispatcher->expects($this->once())->method('dispatch')->willReturnCallback(
-            function () use (&$active, $failure): never {
-                $this->assertTrue($active);
-                throw $failure;
-            },
-        );
-        $this->passwordHasher = $this->createStub(PasswordHasherInterface::class);
-        $this->passwordHasher->method('hash')->willReturn('hashed-pw');
-        $this->bus = $this->createMock(MessageBusInterface::class);
-        $this->bus->expects($this->once())->method('dispatch')->willReturnCallback(
-            function (object $message) use (&$active): Envelope {
-                $this->assertTrue($active);
-                return new Envelope($message);
-            },
-        );
-        $this->emailVerificationTokenRepository = $this->createMock(EmailVerificationTokenRepositoryInterface::class);
-        $this->emailVerificationTokenRepository->expects($this->once())->method('createForUser')->willReturnCallback(
-            function ($userId, string $token, \DateTimeImmutable $expiresAt) use (&$active): EmailVerificationTokenDTO {
-                $this->assertTrue($active);
-                return new EmailVerificationTokenDTO(
-                    Uuid::generate(),
-                    $userId,
-                    $token,
-                    $expiresAt,
-                );
-            },
-        );
-        $this->handler = $this->createRegisterUserHandlerFixture();
+        $this->eventDispatcher = $this->createStub(EventDispatcherInterface::class);
+        $this->eventDispatcher->method('dispatch')->willThrowException($failure);
 
-        $this->expectExceptionObject($failure);
-        ($this->handler)(new RegisterUserCommand(new Email('alice@baander.app'), 'Alice', 'password123'));
+        try {
+            ($this->handler())(new RegisterUserCommand(new Email('alice@baander.app'), 'Alice', 'password123'));
+            $this->fail('The event failure must escape.');
+        } catch (\RuntimeException $exception) {
+            $this->assertSame($failure, $exception);
+        }
+
+        $this->assertSame([], $this->delivered, 'A rolled-back registration emails no link.');
+    }
+
+    private function handler(): RegisterUserHandler
+    {
+        $tokens = $this->createStub(EmailVerificationTokenRepositoryInterface::class);
+        $tokens->method('issue')->willReturnCallback(function (Uuid $userId, Email $email, string $token, \DateTimeImmutable $expiresAt): void {
+            $this->issued[] = [$userId->toString(), $email->toString(), $token, $expiresAt, $this->active];
+        });
+        $delivery = $this->createStub(EmailVerificationDeliveryInterface::class);
+        $delivery->method('deliver')->willReturnCallback(function (User $user, string $token): void {
+            $this->delivered[] = [$user, $token, $this->active];
+        });
+
+        return new RegisterUserHandler(
+            $this->userRepository,
+            $this->passwordHasher,
+            $this->eventDispatcher,
+            $this->bus,
+            new EmailVerificationIssuer($tokens, $delivery, 86400),
+            $this->transaction,
+        );
     }
 }

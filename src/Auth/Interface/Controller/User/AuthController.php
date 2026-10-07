@@ -6,11 +6,15 @@ namespace App\Auth\Interface\Controller\User;
 
 use App\Auth\Application\Command\OAuth\RefreshTokenCommand;
 use App\Auth\Application\Command\OAuth\RevokeTokenCommand;
+use App\Auth\Application\Command\User\ChangeEmailCommand;
 use App\Auth\Application\Command\User\ChangePasswordCommand;
 use App\Auth\Application\Command\User\RegisterUserCommand;
 use App\Auth\Application\Command\User\RequestPasswordResetCommand;
+use App\Auth\Application\Command\User\ResendEmailVerificationCommand;
 use App\Auth\Application\Command\User\ResetPasswordCommand;
+use App\Auth\Application\Command\User\VerifyEmailCommand;
 use App\Auth\Application\Exception\CurrentPasswordMismatchException;
+use App\Auth\Application\Exception\EmailAddressInUseException;
 use App\Auth\Application\Exception\EmailVerificationException;
 use App\Auth\Application\Exception\PasswordPolicyException;
 use App\Auth\Application\Exception\PasswordResetException;
@@ -46,6 +50,7 @@ use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 #[OA\Tag(name: 'Auth', description: 'User registration, login, and profile management')]
@@ -462,48 +467,41 @@ final class AuthController
     #[OA\Post(
         path: '/api/auth/email/verify',
         summary: 'Verify an email address with a token',
+        description: 'Redeems the token from a verification email once. The token verifies only the address it was sent to, while the account still has that address.',
         security: [],
         requestBody: new OA\RequestBody(
             required: true,
-            content: new OA\JsonContent(required: ['token'], properties: [
-                        new OA\Property(property: 'token', type: 'string', example: 'verification-token-abc123'),
-                    ]),
+            content: new OA\JsonContent(ref: new Model(type: VerifyEmailRequest::class)),
         ),
         responses: [
             new OA\Response(
                 response: '200',
-                description: 'Verification status',
+                description: 'Email address verified',
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'message', type: 'string', example: 'Email verification not yet implemented.'),
+                            new OA\Property(property: 'message', type: 'string', example: 'Email verified.'),
                         ], type: 'object'),
                     ],
                     type: 'object',
                 ),
             ),
+            new OA\Response(response: '400', description: 'The token is unknown, expired, already used or for an address the account no longer has', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '429', description: 'Too many verification attempts from this IP', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/email/verify', name: 'email_verify', methods: ['POST'])]
     public function verifyEmail(#[MapRequestPayload] VerifyEmailRequest $payload): JsonResponse
     {
-        $command = new \App\Auth\Application\Command\User\VerifyEmailCommand(token: $payload->token);
-
         try {
-            $envelope = $this->commandBus->dispatch($command);
-            $stamp = $envelope->last(HandledStamp::class);
-            $verified = $stamp?->getResult() === true;
+            $this->commandBus->dispatch(new VerifyEmailCommand(token: $payload->token));
         } catch (\Throwable $e) {
             return $this->handleCommandException(
                 $e,
-                $this->trans('errors.email_verification_failed', domain: 'auth'),
-                Response::HTTP_BAD_REQUEST,
+                $this->trans('errors.internal', domain: 'auth'),
+                Response::HTTP_INTERNAL_SERVER_ERROR,
             );
-        }
-
-        if (!$verified) {
-            return $this->errorResponse($this->trans('errors.email_verification_failed', domain: 'auth'), Response::HTTP_BAD_REQUEST);
         }
 
         return $this->successResponse([
@@ -511,9 +509,54 @@ final class AuthController
         ]);
     }
 
+    #[OA\Post(
+        path: '/api/auth/me/email/verification',
+        summary: 'Send a new verification email',
+        description: 'Emails the current user a new verification link and ends the one sent earlier. The answer is the same whether or not an email was sent: nothing is sent when the address is already verified or the user has used up their resend allowance.',
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'Request accepted',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'data', properties: [
+                            new OA\Property(property: 'message', type: 'string', example: 'If your email address still needs verification, a new link has been sent.'),
+                        ], type: 'object'),
+                    ],
+                    type: 'object',
+                ),
+            ),
+            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '429', description: 'Too many verification requests from this IP', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        ],
+    )]
+    #[Route('/me/email/verification', name: 'me_email_verification', methods: ['POST'])]
+    #[IsGranted('IS_AUTHENTICATED_FULLY')]
+    public function resendEmailVerification(): JsonResponse
+    {
+        $user = $this->getCurrentUser();
+        if ($user === null) {
+            return $this->notFound();
+        }
+
+        try {
+            $this->commandBus->dispatch(new ResendEmailVerificationCommand($user->getId()->toString()));
+        } catch (\Throwable $e) {
+            // The answer stays the same; the user can ask again.
+            $this->logger->error('Verification email resend failed.', [
+                'exception' => $e,
+            ]);
+        }
+
+        return $this->successResponse([
+            'message' => $this->trans('email_verification.resend_sent', domain: 'auth'),
+        ]);
+    }
+
     #[OA\Put(
         path: '/api/auth/me/email',
         summary: 'Change the current user email',
+        description: 'The new address starts unverified and is sent a verification link; links sent to the old address stop working.',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(required: ['email'], properties: [
@@ -544,28 +587,21 @@ final class AuthController
             return $this->notFound();
         }
 
-        $newEmail = new Email($payload->email);
-
-        if ($this->userService->existsWithEmail($newEmail) && $newEmail->toString() !== $user->getEmail()) {
-            return $this->errorResponse('This email address is already in use.', Response::HTTP_CONFLICT);
-        }
-
-        $user->changeEmail($newEmail->toString());
-
         try {
-            $this->userService->save($user);
+            $changed = $this->commandBus->dispatch(new ChangeEmailCommand($user->getId()->toString(), $payload->email))
+                ->last(HandledStamp::class)?->getResult();
         } catch (\Throwable $e) {
-            $this->logger->error('Email change failed.', [
-                'exception' => $e,
-            ]);
-
-            return $this->errorResponse(
+            return $this->handleCommandException(
+                $e,
                 $this->trans('errors.internal', domain: 'auth'),
                 Response::HTTP_INTERNAL_SERVER_ERROR,
             );
         }
+        if (!$changed instanceof User) {
+            throw new \LogicException('ChangeEmailCommand did not return the user.');
+        }
 
-        return $this->successResponse(UserResource::from($user));
+        return $this->successResponse(UserResource::from($changed));
     }
 
     #[OA\Put(
@@ -663,6 +699,10 @@ final class AuthController
                 $this->trans('errors.current_password_incorrect', domain: 'auth'),
                 Response::HTTP_UNPROCESSABLE_ENTITY,
             );
+        }
+
+        if ($previous instanceof EmailAddressInUseException) {
+            return $this->errorResponse($previous->getMessage(), Response::HTTP_CONFLICT);
         }
 
         if ($previous instanceof PasswordPolicyException) {

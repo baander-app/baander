@@ -46,6 +46,7 @@ final class RateLimitListener
         RateLimiterFactoryInterface $authPasswordResetIpLimiter,
         RateLimiterFactoryInterface $authRefreshClientLimiter,
         RateLimiterFactoryInterface $authPasskeyIpLimiter,
+        RateLimiterFactoryInterface $authEmailVerificationIpLimiter,
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
         private readonly string $environment,
@@ -94,7 +95,13 @@ final class RateLimitListener
                 'limiter' => $authPasskeyIpLimiter,
                 'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
             ],
-            // Token refresh: per-client (uses the refresh token as the client identifier)
+            // Email verification and verification resend requests: per-IP, one shared bucket
+            [
+                'pattern' => '#^/api/auth/(email/verify|me/email/verification)$#',
+                'limiter' => $authEmailVerificationIpLimiter,
+                'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
+            ],
+                        // Token refresh: per-client (uses the refresh token as the client identifier)
             [
                 'pattern' => '#^/api/auth/refresh$#',
                 'limiter' => $authRefreshClientLimiter,

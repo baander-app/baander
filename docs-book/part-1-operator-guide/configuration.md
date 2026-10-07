@@ -72,7 +72,7 @@ These are configured as parameters in `config/packages/auth.yaml` and can be ove
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `MAILER_DSN` | `smtp://localhost:1025` | Mailer transport DSN. Required for email features (password reset, notifications). Use your provider's SMTP URL in production. |
+| `MAILER_DSN` | `smtp://localhost:1025` | Mailer transport DSN. Required for email features (password reset, email verification, notifications). Use your provider's SMTP URL in production. |
 | `MAIL_FROM_ADDRESS` | `noreply@localhost` | From address for outgoing email. |
 | `MAIL_FROM_NAME` | `Bånder` | From name for outgoing email. |
 
@@ -118,6 +118,10 @@ Limits are set in `config/packages/auth.yaml`. Each limit feeds a Symfony rate l
 | `auth.rate_limit.password_reset.window` | `900` (15 min) | Window in seconds for both password reset limits. |
 | `auth.rate_limit.refresh.max_attempts` | `60` | Max token refresh requests per refresh token within the window. |
 | `auth.rate_limit.refresh.window` | `60` (1 min) | Window in seconds for token refresh. |
+| `auth.rate_limit.email_verification.max_attempts` | `10` | Max email verification attempts and verification resend requests per IP within the window. |
+| `auth.rate_limit.email_verification.window` | `900` (15 min) | Window in seconds for the per-IP verification limit. |
+| `auth.rate_limit.email_verification_resend_per_user.max_attempts` | `3` | Max verification emails a signed-in user can ask for within the window. |
+| `auth.rate_limit.email_verification_resend_per_user.window` | `3600` (1 hour) | Window in seconds for the per-user resend limit. |
 
 Each limiter counts requests per key:
 
@@ -132,17 +136,19 @@ Each limiter counts requests per key:
 | `auth_password_reset_ip` | `POST /api/auth/password/reset-request`, `POST /api/auth/password/reset` (one shared bucket) | Client IP |
 | `auth_password_reset_email` | `POST /api/auth/password/reset-request` | Lower-cased email |
 | `auth_refresh_client` | `POST /api/auth/refresh` | Refresh token, or client IP when the body has none |
+| `auth_email_verification_ip` | `POST /api/auth/email/verify`, `POST /api/auth/me/email/verification` (one shared bucket) | Client IP |
+| `auth_email_verification_user` | `POST /api/auth/me/email/verification` | User ID |
 | `config_check` | Admin configuration check (10 per minute) | One bucket shared by all callers |
 | `batch_cover_extract` | `POST /api/albums/covers/extract` (10 per minute) | Client IP |
 | `discovery_endpoint_ip` | Discovery registration and pairing (30 per minute) | Client IP |
 
 The last three have fixed limits in `config/packages/framework.yaml` and no `auth.yaml` parameter.
 
-A request over a limit gets `429 Too Many Requests` with a `Retry-After` header in seconds. The password reset account limit is the exception: over it, the endpoint returns the same `200` response as for any other address but issues no reset token, so the response never shows whether an account exists. The per-IP reset limit still answers `429`.
+A request over a limit gets `429 Too Many Requests` with a `Retry-After` header in seconds. The password reset account limit and the verification resend user limit are the exceptions. Over the reset account limit, the endpoint returns the same `200` response as for any other address but issues no reset token, so the response never shows whether an account exists. Over the resend user limit, the endpoint returns its usual `200` response but sends no email. The per-IP reset and verification limits still answer `429`.
 
 Media delivery routes are exempt from `anonymous_api` and `authenticated_api`, so playback is never throttled by the general API budget: the audio stream (`/api/stream/track`), the HLS and DASH manifests and segments under `/api/transcode/{id}/` (`master.m3u8`, `media.m3u8`, `manifest.mpd`, `init`, `segment`), subtitle playlists and segments, image files (`/api/images/{id}/file`) and album covers (`GET /api/albums/{id}/cover`). Health, readiness and metrics endpoints (`/health`, `/ready`, `/live`, `/metrics`) are outside `/api` and are never limited.
 
-With `APP_ENV=dev`, only the `config_check` and `auth_password_reset_email` limits apply; the others are skipped.
+With `APP_ENV=dev`, only the `config_check`, `auth_password_reset_email` and `auth_email_verification_user` limits apply; the others are skipped.
 
 Under Swoole, the application trusts `X-Forwarded-For` from the directly connected peer, normally the bundled nginx, and uses the last address in it as the client IP. If another proxy sits in front of nginx, every client shares that proxy's address and its anonymous budget unless nginx restores the real client address (`set_real_ip_from`). Do not expose the Swoole port directly: a client could then send its own `X-Forwarded-For` and evade every per-IP limit.
 
@@ -181,6 +187,20 @@ Baander sends the email after the HTTP response has gone out, so the request tak
 Without working email, reset a forgotten password with [`app:user:reset-password`](commands/app-user-reset-password.md) or from the admin panel.
 
 A password change revokes the sessions that the old password started. Redeeming a reset token, an administrator reset and `app:user:reset-password` revoke all of the user's access and refresh tokens. When users change their own password, the session that made the change stays signed in and their other sessions are revoked.
+
+### Email verification
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `auth.email_verification_token.ttl` | `86400` (24 hours) | Lifetime of an email verification token, in seconds. Set in `config/packages/auth.yaml`; must be at least `60`. |
+
+Verification confirms that the user owns the account's email address. Until it does, Baander sends the account no notification email. Operator-created accounts start verified; every other account needs working email to verify (see [Mail](#mail)).
+
+Baander emails a verification link when a user registers and whenever an email address changes, whether the user changes it, an administrator changes it in the admin panel, or an operator runs [`app:user:change-email`](commands/app-user-change-email.md). A changed address starts unverified. The link opens `APP_URL/verify-email`, so `APP_URL` must be the address users reach the web app at. As with password reset, the token sits in the link's fragment (`#token=…`) and stays out of access logs and `Referer` headers. A signed-in user whose address is unverified can ask for a new link in **Settings**, which calls `POST /api/auth/me/email/verification`. That endpoint answers the same way whether or not it sent an email.
+
+A user has at most one outstanding verification token; a new link replaces it. A token verifies only the address it was sent to. It is removed when it is redeemed, when the account is deleted, and when the account's email address changes, so a link sent to an old address stops working. Baander stores only a SHA-256 hash of the token, with the address.
+
+Baander sends the email after the HTTP response has gone out, or at once when the change comes from the command line. A failed send never fails the registration or email change that caused it. Baander logs the failure with the user ID but without the token or the address, and does not retry; the user can ask for a new link. Like the reset email, the verification email uses the request's locale.
 
 ### Token binding
 

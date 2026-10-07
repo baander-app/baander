@@ -1,7 +1,11 @@
 import { type FormEvent, useState } from 'react'
 import styled from 'styled-components'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
+import { useCurrentUserRefresh } from '@/features/auth/hooks/use-current-user-refresh'
+import { applyCurrentUser } from '@/features/auth/lib/current-user'
 import { parseApiError } from '@/features/auth/lib/parse-api-error'
+import { putAuthMeEmail } from '@/shared/api-client/gen/endpoints'
+import { useTranslation } from '@/shared/i18n'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
 import { Card, CardContent } from '@/shared/components/ui/card'
@@ -16,6 +20,7 @@ import {
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { Loader2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { EmailVerificationNotice } from './EmailVerificationNotice'
 
 const CardContentStyled = styled(CardContent)`
   display: flex;
@@ -129,6 +134,8 @@ export function AccountManagement() {
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
 
+  useCurrentUserRefresh()
+
   const handleLogout = async () => {
     setLoggingOut(true)
     try {
@@ -162,6 +169,8 @@ export function AccountManagement() {
               Change
             </Button>
           </Row>
+
+          {user?.emailVerifiedAt === null && <EmailVerificationNotice />}
 
           {/* Password row */}
           <Row>
@@ -198,6 +207,7 @@ export function AccountManagement() {
 }
 
 function ChangeEmailDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { t } = useTranslation()
   const user = useAuthStore((s) => s.user)
   const [email, setEmail] = useState(user?.email ?? '')
   const [loading, setLoading] = useState(false)
@@ -209,9 +219,9 @@ function ChangeEmailDialog({ open, onOpenChange }: { open: boolean; onOpenChange
     setLoading(true)
 
     try {
-      await AXIOS_INSTANCE.put('/api/auth/me/email', { email })
-      // Update the local user state
-      useAuthStore.getState().updateUser({ email })
+      const response = await putAuthMeEmail({ email })
+      // The new address starts unverified, which brings up the verification notice.
+      if (response.data) applyCurrentUser(response.data)
       onOpenChange(false)
     } catch (err: unknown) {
       setError(parseApiError(err, 'Failed to change email.').message)
@@ -226,7 +236,7 @@ function ChangeEmailDialog({ open, onOpenChange }: { open: boolean; onOpenChange
         <DialogHeader>
           <DialogTitle>Change email</DialogTitle>
           <DialogDescription>
-            Enter your new email address. You may need to verify it.
+            {t('auth.emailVerification.changeEmailDescription')}
           </DialogDescription>
         </DialogHeader>
         <Form onSubmit={handleSubmit}>

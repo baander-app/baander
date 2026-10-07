@@ -10,12 +10,17 @@ import { getDpopKeyPair, setDpopKeyPair, clearDpopKeyPair, getDpopNonce, setDpop
 import { loadStoredAuth, saveStoredAuth, clearStoredAuth } from '@/shared/crypto/auth-db'
 import { createLogger } from '@/shared/lib/logger'
 
-interface User {
+export interface User {
   uuid: string
   email: string
   publicId: string
   name: string | null
   roles: string[]
+  /**
+   * When the current address was verified; null while it is unverified. Absent when not yet
+   * known, as for a mock login, until the profile is read from /api/auth/me.
+   */
+  emailVerifiedAt?: string | null
 }
 
 interface AuthState {

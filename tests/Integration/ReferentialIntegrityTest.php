@@ -110,6 +110,11 @@ final class ReferentialIntegrityTest extends TestCase
         'fk_password_reset_tokens_user_id' => 'CASCADE',
     ];
 
+    /** A verification token ends with its user (Version20261006360000). */
+    private const EMAIL_VERIFICATION_RULES = [
+        'fk_email_verification_tokens_user_id' => 'CASCADE',
+    ];
+
     public function testEveryReferenceColumnHasAForeignKeyOrADocumentedReason(): void
     {
         $columns = $this->manager->getConnection()->fetchAllKeyValue(<<<'SQL'
@@ -166,7 +171,7 @@ final class ReferentialIntegrityTest extends TestCase
 
     public function testForeignKeysChosenByTheAuditHaveTheirDeleteRules(): void
     {
-        $expected = [...self::RULES, ...self::OAUTH_RULES, ...self::PARTY_MEDIA_RULES, ...self::PASSWORD_RESET_RULES];
+        $expected = [...self::RULES, ...self::OAUTH_RULES, ...self::PARTY_MEDIA_RULES, ...self::PASSWORD_RESET_RULES, ...self::EMAIL_VERIFICATION_RULES];
         ksort($expected);
         $rules = $this->manager->getConnection()->fetchAllKeyValue(<<<'SQL'
             SELECT conname, CASE confdeltype WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL'
@@ -180,7 +185,7 @@ final class ReferentialIntegrityTest extends TestCase
         self::assertSame($expected, $rules);
     }
 
-    public function testDeletingAUserRemovesTheirFavoritesThemeMoodAndResetToken(): void
+    public function testDeletingAUserRemovesTheirFavoritesThemeMoodAndTokens(): void
     {
         $owner = $this->createUser();
         $other = $this->createUser();
@@ -205,11 +210,18 @@ final class ReferentialIntegrityTest extends TestCase
                 'created_at' => '2026-10-06 12:00:00+00',
                 'expires_at' => '2026-10-06 13:00:00+00',
             ]);
+            $this->manager->getConnection()->insert('email_verification_tokens', [
+                'user_id' => $user->toString(),
+                'email' => 'verify-' . $user->toString() . '@baander.app',
+                'token_hash' => hash('sha256', 'verify-' . $user->toString()),
+                'created_at' => '2026-10-06 12:00:00+00',
+                'expires_at' => '2026-10-07 12:00:00+00',
+            ]);
         }
 
         $this->deleteUser($owner);
 
-        foreach (['user_favorites', 'user_theme_moods', 'password_reset_tokens'] as $table) {
+        foreach (['user_favorites', 'user_theme_moods', 'password_reset_tokens', 'email_verification_tokens'] as $table) {
             self::assertSame(0, $this->countOwnedRows($table, 'user_id', $owner), $table);
             self::assertSame(1, $this->countOwnedRows($table, 'user_id', $other), $table);
         }

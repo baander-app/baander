@@ -25,7 +25,9 @@ The OAuth models AccessToken, Client and RefreshToken each have a state object a
 | `DpopJtiCacheInterface` | DPoP JTI replay protection (backed by Redis) |
 | `PasswordResetTokenRepositoryInterface` | Each user's single outstanding password reset token (hashed, single use) |
 | `PasswordResetDeliveryInterface` | Emails the reset link after the response is sent; never persists or logs the token |
-| `EmailVerificationTokenRepositoryInterface` | Email verification token persistence |
+| `EmailVerificationTokenRepositoryInterface` | Each user's single outstanding email verification token (hashed, bound to the address, single use) |
+| `EmailVerificationDeliveryInterface` | Emails the verification link after the response is sent; never persists or logs the token |
+| `EmailVerificationResendThrottleInterface` | Per-user limit on verification resend requests |
 | `AuthenticatedUserIdentityInterface` | Identity of the user a login authenticator verified |
 | `OAuthSecretBundleInterface` | Key bundle preparation and validation for secret rotation |
 | `OAuthTokenInvalidatorInterface` | Token deletion during offline secret rotation |

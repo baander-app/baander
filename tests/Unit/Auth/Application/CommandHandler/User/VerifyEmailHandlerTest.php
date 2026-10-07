@@ -6,172 +6,136 @@ namespace App\Tests\Unit\Auth\Application\CommandHandler\User;
 
 use App\Auth\Application\Command\User\VerifyEmailCommand;
 use App\Auth\Application\CommandHandler\User\VerifyEmailHandler;
-use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
+use App\Auth\Application\DTO\RedeemedEmailVerification;
 use App\Auth\Application\Exception\EmailVerificationException;
+use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
+use App\Auth\Domain\Event\EmailVerified;
+use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
-use App\Auth\Application\DTO\EmailVerificationTokenDTO;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
-use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\Stub;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 final class VerifyEmailHandlerTest extends TestCase
 {
-    private EmailVerificationTokenRepositoryInterface&Stub $tokenRepository;
-    private UserRepositoryInterface&Stub $userRepository;
-    private EventDispatcherInterface&Stub $eventDispatcher;
-    private TransactionPortInterface&Stub $transaction;
-    private VerifyEmailHandler $handler;
+    private bool $active = false;
+    private ?RedeemedEmailVerification $redeemed = null;
+    private ?User $user = null;
+    /** @var list<string> */
+    private array $redeemedTokens = [];
+    /** @var list<bool> whether each save ran inside the transaction */
+    private array $saves = [];
+    /** @var list<object> */
+    private array $events = [];
+    private ?\Throwable $eventFailure = null;
 
-    protected function setUp(): void
+    public function testVerifiesTheAddressTheTokenWasIssuedFor(): void
     {
-        $this->tokenRepository = $this->createStub(EmailVerificationTokenRepositoryInterface::class);
-        $this->userRepository = $this->createStub(UserRepositoryInterface::class);
-        $this->eventDispatcher = $this->createStub(EventDispatcherInterface::class);
-        $this->transaction = $this->createStub(TransactionPortInterface::class);
-        $this->transaction->method('run')->willReturnCallback(static fn (callable $operation): mixed => $operation());
-        $this->handler = $this->createVerifyEmailHandlerFixture();
+        $this->user = User::register(new Email('alice@baander.app'), 'hashed-pw', 'Alice');
+        $this->redeemed = new RedeemedEmailVerification($this->user->getId(), new Email('alice@baander.app'));
+
+        ($this->handler())(new VerifyEmailCommand(' raw-token '));
+
+        $this->assertSame(['raw-token'], $this->redeemedTokens);
+        $this->assertTrue($this->user->isEmailVerified());
+        $this->assertSame([true], $this->saves);
+        $this->assertCount(1, $this->events);
+        $this->assertInstanceOf(EmailVerified::class, $this->events[0]);
     }
 
-    private function createVerifyEmailHandlerFixture(): VerifyEmailHandler
+    public function testAnAlreadyVerifiedAddressSucceedsWithoutASecondEvent(): void
     {
-        $fixture = new VerifyEmailHandler(
-            $this->tokenRepository,
-            $this->userRepository,
-            $this->eventDispatcher,
-            $this->transaction,
-        );
-        return $fixture;
+        $this->user = User::createByOperator(new Email('alice@baander.app'), 'hashed-pw', 'Alice', ['ROLE_USER']);
+        $this->redeemed = new RedeemedEmailVerification($this->user->getId(), new Email('alice@baander.app'));
+
+        ($this->handler())(new VerifyEmailCommand('raw-token'));
+
+        $this->assertSame([], $this->saves);
+        $this->assertSame([], $this->events);
     }
 
-    public function testVerifyEmailMarksUserVerifiedAndDeletesToken(): void
+    /** @return iterable<string, array{string}> */
+    public static function unusableTokens(): iterable
     {
-        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-        $this->tokenRepository = $this->createMock(EmailVerificationTokenRepositoryInterface::class);
-        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
-        $this->handler = $this->createVerifyEmailHandlerFixture();
-
-        $tokenString = 'valid-token';
-        $tokenEntity = new EmailVerificationTokenDTO(
-            Uuid::generate(),
-            Uuid::generate(),
-            $tokenString,
-            new \DateTimeImmutable('+1 hour'),
-        );
-
-        $this->tokenRepository->method('findByToken')->willReturn($tokenEntity);
-        $this->userRepository->expects($this->once())->method('findByUuid')->with($tokenEntity->userId)->willReturn(
-            \App\Auth\Domain\Model\User::register(new Email('alice@baander.app'), 'hashed-pw', 'Alice'),
-        );
-        $this->userRepository->expects($this->once())->method('save');
-        $this->tokenRepository->expects($this->once())->method('delete')->with($tokenEntity->id);
-        $this->eventDispatcher->expects($this->once())->method('dispatch')->with(
-            $this->isInstanceOf(\App\Auth\Domain\Event\EmailVerified::class),
-        );
-
-        $result = ($this->handler)(new VerifyEmailCommand($tokenString));
-
-        $this->assertTrue($result);
+        yield 'empty token' => ['empty'];
+        yield 'unknown or expired token' => ['unknown'];
+        yield 'user gone' => ['no-user'];
+        yield 'address changed since' => ['other-address'];
+        yield 'disabled account' => ['disabled'];
     }
 
-    public function testEmptyTokenThrows(): void
+    #[DataProvider('unusableTokens')]
+    public function testAnUnusableTokenGetsOneAnswerAndVerifiesNothing(string $case): void
     {
-        $this->expectException(EmailVerificationException::class);
+        $this->user = User::register(new Email('alice@baander.app'), 'hashed-pw', 'Alice');
+        $this->redeemed = new RedeemedEmailVerification($this->user->getId(), new Email('alice@baander.app'));
+        match ($case) {
+            'unknown' => $this->redeemed = null,
+            'no-user' => $this->user = null,
+            'other-address' => $this->redeemed = new RedeemedEmailVerification($this->user->getId(), new Email('old-alice@baander.app')),
+            'disabled' => $this->user->disable(),
+            default => null,
+        };
 
-        ($this->handler)(new VerifyEmailCommand(''));
+        try {
+            ($this->handler())(new VerifyEmailCommand($case === 'empty' ? '  ' : 'raw-token'));
+            $this->fail('An unusable token must be rejected.');
+        } catch (EmailVerificationException $exception) {
+            $this->assertSame('Invalid or expired verification token.', $exception->getMessage());
+        }
+
+        $this->assertSame([], $this->saves);
+        $this->assertSame([], $this->events);
+        $this->assertSame($case === 'empty' ? [] : ['raw-token'], $this->redeemedTokens);
     }
 
-    public function testUnknownTokenThrows(): void
+    public function testAnEventFailureEscapesTheTransaction(): void
     {
-        $this->tokenRepository->method('findByToken')->willReturn(null);
+        $this->user = User::register(new Email('alice@baander.app'), 'hashed-pw', 'Alice');
+        $this->redeemed = new RedeemedEmailVerification($this->user->getId(), new Email('alice@baander.app'));
+        $this->eventFailure = new \RuntimeException('Outbox insertion failed.');
 
-        $this->expectException(EmailVerificationException::class);
+        $this->expectExceptionObject($this->eventFailure);
 
-        ($this->handler)(new VerifyEmailCommand('unknown'));
+        ($this->handler())(new VerifyEmailCommand('raw-token'));
     }
 
-    public function testExpiredTokenThrows(): void
+    private function handler(): VerifyEmailHandler
     {
-        $tokenEntity = new EmailVerificationTokenDTO(
-            Uuid::generate(),
-            Uuid::generate(),
-            'expired-token',
-            new \DateTimeImmutable('-1 hour'),
-        );
+        $tokens = $this->createStub(EmailVerificationTokenRepositoryInterface::class);
+        $tokens->method('redeem')->willReturnCallback(function (string $token): ?RedeemedEmailVerification {
+            $this->assertTrue($this->active, 'Redemption is part of the verification transaction.');
+            $this->redeemedTokens[] = $token;
 
-        $this->tokenRepository->method('findByToken')->willReturn($tokenEntity);
+            return $this->redeemed;
+        });
+        $users = $this->createStub(UserRepositoryInterface::class);
+        $users->method('findByUuid')->willReturnCallback(fn (): ?User => $this->user);
+        $users->method('save')->willReturnCallback(function (): void {
+            $this->saves[] = $this->active;
+        });
+        $dispatcher = $this->createStub(EventDispatcherInterface::class);
+        $dispatcher->method('dispatch')->willReturnCallback(function (object $event): object {
+            $this->assertTrue($this->active);
+            if ($this->eventFailure !== null) {
+                throw $this->eventFailure;
+            }
+            $this->events[] = $event;
 
-        $this->expectException(EmailVerificationException::class);
+            return $event;
+        });
+        $transaction = $this->createStub(TransactionPortInterface::class);
+        $transaction->method('run')->willReturnCallback(function (callable $operation): mixed {
+            $this->active = true;
+            try {
+                return $operation();
+            } finally {
+                $this->active = false;
+            }
+        });
 
-        ($this->handler)(new VerifyEmailCommand('expired-token'));
-    }
-
-    public function testUsedTokenThrows(): void
-    {
-        $tokenEntity = new EmailVerificationTokenDTO(
-            Uuid::generate(),
-            Uuid::generate(),
-            'used-token',
-            new \DateTimeImmutable('+1 hour'),
-            usedAt: new \DateTimeImmutable(),
-        );
-
-        $this->tokenRepository->method('findByToken')->willReturn($tokenEntity);
-
-        $this->expectException(EmailVerificationException::class);
-
-        ($this->handler)(new VerifyEmailCommand('used-token'));
-    }
-
-    public function testEventFailureEscapesTheTransaction(): void
-    {
-        $active = false;
-        $failure = new \RuntimeException('Outbox insertion failed.');
-        $this->transaction = $this->createMock(TransactionPortInterface::class);
-        $this->transaction->expects($this->once())->method('run')->willReturnCallback(
-            function (callable $operation) use (&$active, $failure): mixed {
-                $active = true;
-                try {
-                    return $operation();
-                } catch (\RuntimeException $exception) {
-                    $this->assertSame($failure, $exception);
-                    throw $exception;
-                } finally {
-                    $active = false;
-                }
-            },
-        );
-        $userRepository = $this->createMock(UserRepositoryInterface::class);
-        $this->userRepository = $userRepository;
-        $userRepository->expects($this->once())->method('save')->willReturnCallback(
-            function () use (&$active): void {
-                $this->assertTrue($active);
-            },
-        );
-        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-        $this->eventDispatcher->expects($this->once())->method('dispatch')->willReturnCallback(
-            function () use (&$active, $failure): never {
-                $this->assertTrue($active);
-                throw $failure;
-            },
-        );
-        $token = new EmailVerificationTokenDTO(
-            Uuid::generate(),
-            Uuid::generate(),
-            'valid-token',
-            new \DateTimeImmutable('+1 hour'),
-        );
-        $this->tokenRepository = $this->createMock(EmailVerificationTokenRepositoryInterface::class);
-        $this->tokenRepository->method('findByToken')->willReturn($token);
-        $this->tokenRepository->expects($this->never())->method('delete');
-        $userRepository->method('findByUuid')->willReturn(
-            \App\Auth\Domain\Model\User::register(new Email('alice@baander.app'), 'hashed-pw', 'Alice'),
-        );
-        $this->handler = $this->createVerifyEmailHandlerFixture();
-
-        $this->expectExceptionObject($failure);
-        ($this->handler)(new VerifyEmailCommand('valid-token'));
+        return new VerifyEmailHandler($tokens, $users, $dispatcher, $transaction);
     }
 }

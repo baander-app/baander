@@ -44,7 +44,9 @@ Commands and handlers are organized into feature namespaces under `Application/C
 | `RevokeTokenCommand` | `RevokeTokenHandler` | Token revocation (OAuth/) |
 | `RegisterPasskeyCommand` | `RegisterPasskeyHandler` | Add a WebAuthn passkey (Passkey/) |
 | `AuthenticatePasskeyCommand` | `AuthenticatePasskeyHandler` | Verify a WebAuthn assertion during passkey login (Passkey/) |
-| `VerifyEmailCommand` | `VerifyEmailHandler` | Email address verification (User/) |
+| `VerifyEmailCommand` | `VerifyEmailHandler` | Redeem a verification token and mark the address verified (User/) |
+| `ResendEmailVerificationCommand` | `ResendEmailVerificationHandler` | Send a signed-in user a new verification link (User/) |
+| `ChangeEmailCommand` | `ChangeEmailHandler` | Every email change: the user's own, the admin panel's and `app:user:change-email` (User/) |
 | `EnableTotpCommand` | `EnableTotpHandler` | Enable TOTP 2FA (Totp/) |
 | `DisableTotpCommand` | `DisableTotpHandler` | Disable TOTP 2FA (Totp/) |
 
@@ -62,7 +64,9 @@ Commands and handlers are organized into feature namespaces under `Application/C
 | `PasswordResetDeliveryInterface` | Emails the reset link after the response is sent; never persists or logs the token |
 | `DpopJtiCacheInterface` | DPoP replay protection |
 | `AuthenticatedUserIdentityInterface` | Identity of the user a login authenticator verified |
-| `EmailVerificationTokenRepositoryInterface` | Email verification token storage |
+| `EmailVerificationTokenRepositoryInterface` | Each user's single outstanding verification token, stored as a SHA-256 hash with the address it verifies and redeemed once |
+| `EmailVerificationDeliveryInterface` | Emails the verification link after the response is sent; never persists or logs the token |
+| `EmailVerificationResendThrottleInterface` | Per-user limit on verification resend requests |
 | `OAuthSecretBundleInterface` | Prepare and validate key bundles for `app:auth:rotate-secrets` |
 | `OAuthTokenInvalidatorInterface` | Delete all token rows during offline key rotation |
 
@@ -74,11 +78,25 @@ Commands and handlers are organized into feature namespaces under `Application/C
 
 `MailerPasswordResetDelivery` implements the port. It builds the link `APP_URL/reset-password#token=…` and captures the request locale, because `LocaleListener` resets the translator before the email is sent. It then waits for `kernel.terminate`, which the Swoole server and PHP-FPM both dispatch after the response has gone out. Sending inside the request would make the request slower for real accounts than for unknown addresses, and that difference would reveal which addresses have accounts. Pending emails are held in a `WeakMap` keyed by the main request, so concurrent coroutines in one worker do not send each other's mail. Without a current request (a console command or a worker), it sends at once.
 
-The delivery calls the mailer transport directly rather than `MailerInterface`. `MailerInterface` dispatches a `SendEmailMessage` on the message bus, and a later routing change could put the token into Redis or the `failed_messages` table. Notification email (`SendEmailCommand` on `swoole_task`) can be retried from those stores; a reset email cannot, and does not need to be, because the user can ask for a new link. A failed send is logged with the user ID and exception class only, since transport errors can quote the recipient. The templates are `templates/email/auth/password_reset.{txt,html}.twig`, translated through the `password_reset_email` keys in the `auth` domain.
+Sending is shared with the verification email through `AfterResponseMailer`, which queues a `CredentialEmail` and sends it.
+
+The mailer calls the mailer transport directly rather than `MailerInterface`. `MailerInterface` dispatches a `SendEmailMessage` on the message bus, and a later routing change could put the token into Redis or the `failed_messages` table. Notification email (`SendEmailCommand` on `swoole_task`) can be retried from those stores; a reset email cannot, and does not need to be, because the user can ask for a new link. A failed send is logged with the user ID and exception class only, since transport errors can quote the recipient. The templates are `templates/email/auth/password_reset.{txt,html}.twig`, translated through the `password_reset_email` keys in the `auth` domain.
 
 The web pages are `/forgot-password` and `/reset-password` in `ui/web/src/features/auth/`. The reset page reads the token from the fragment, removes the fragment from the address bar, and clears the local session after a successful reset, because the server has revoked it.
 
 All three password paths (`ResetPasswordHandler`, `SetUserPasswordHandler`, `ChangePasswordHandler`) call the application service `PasswordChanger`. It enforces the 8 to 255 character policy, hashes the password, and then, in one transaction, saves the user, revokes the user's access and refresh tokens and records `PasswordChanged`. A user's own change keeps the session that made it: the presenting access token and its refresh chain. The other two paths revoke everything. A reset token that is unknown, expired, already used, or belongs to a disabled account gets one generic `400`.
+
+## Email Verification
+
+`email_verification_tokens` follows the design of `password_reset_tokens`. It holds at most one token per user, keyed by `user_id` with `ON DELETE CASCADE`, and stores only the SHA-256 hash of the 256-bit token together with the `email` (`CITEXT`) the token was issued for. `UserRepository::save` removes the token when the stored email address changes. The lifetime is `auth.email_verification_token.ttl` (seconds).
+
+Redemption is a single `DELETE … RETURNING`, so a token works once even under concurrent requests. `VerifyEmailHandler` runs that statement in the same transaction that marks the address verified and records `EmailVerified`; if the commit fails, the token stays redeemable. The handler accepts the token only while the account still has the address the token was issued for and is not disabled. Every other case, including an unknown, expired or used token, gets one generic `400`.
+
+`EmailVerificationIssuer` is the single place tokens are issued. Its `issue()` stores the hash for the user's current address inside the caller's transaction and returns the raw token. It issues nothing for a verified address or a disabled account. Its `deliver()` hands the token to `EmailVerificationDeliveryInterface` after the commit, so a rolled-back registration or email change never emails a link. Three callers use it. `RegisterUserHandler` issues on registration. `ChangeEmailHandler` issues on every email change: `PUT /api/auth/me/email`, `PATCH /api/admin/users/{id}` and `app:user:change-email` all dispatch `ChangeEmailCommand`. `ResendEmailVerificationHandler` serves `POST /api/auth/me/email/verification`. The resend endpoint answers the same `200` whether it sent an email or not; over the per-user limit (`auth_email_verification_user`) it sends nothing. Redemption and resend requests share the per-IP limit `auth_email_verification_ip`, which answers `429` with `Retry-After`.
+
+`MailerEmailVerificationDelivery` builds the link `APP_URL/verify-email#token=…` and queues the email on `AfterResponseMailer`. That is the reset email's path: it sends after the response and straight to the mailer transport, so a slow or failing mail server neither delays an HTTP response nor fails a registration. The templates are `templates/email/auth/email_verification.{txt,html}.twig`, translated through the `email_verification_email` keys in the `auth` domain. Both auth emails take their language from `AuthEmailLocale::forUser()`, which returns the request locale today. A per-user language setting belongs in that method.
+
+The web page is `/verify-email` in `ui/web/src/features/auth/`. It reads the token from the fragment and removes the fragment from the address bar. The account card in **Settings** shows an unverified address and offers a new link.
 
 ## Domain Events
 
@@ -105,9 +123,10 @@ All endpoints except the JWKS document are under `/api`.
 | POST | `/api/auth/logout` | Revoke the current access token |
 | POST | `/api/auth/password/reset-request` | Issue a password reset token; always answers `200` |
 | POST | `/api/auth/password/reset` | Redeem a reset token and set a new password |
-| POST | `/api/auth/email/verify` | Verify an email address |
+| POST | `/api/auth/email/verify` | Redeem a verification token; one generic `400` for every unusable token |
+| POST | `/api/auth/me/email/verification` | Send the current user a new verification link; always answers `200` |
 | GET, PUT | `/api/auth/me` | Read or update the current user |
-| PUT | `/api/auth/me/email` | Change email |
+| PUT | `/api/auth/me/email` | Change email; the new address is unverified and is sent a link |
 | PUT | `/api/auth/me/password` | Change password; other sessions are signed out |
 | POST | `/api/auth/totp/setup` | Generate a TOTP secret and provisioning URI |
 | POST | `/api/auth/totp/enable` | Enable TOTP after verifying a code |
@@ -129,7 +148,7 @@ All routes under `/api/admin/users` (controller `AdminUserController`, gated `RO
 |--------|------|---------|
 | GET | `/api/admin/users` | List users (paginated, filter by role/disabled) |
 | POST | `/api/admin/users` | Create a user |
-| PATCH | `/api/admin/users/{id}` | Update a user |
+| PATCH | `/api/admin/users/{id}` | Update a user's name or email (email CLI: `app:user:change-email`) |
 | DELETE | `/api/admin/users/{id}` | Delete a user |
 | POST | `/api/admin/users/{id}/roles` | Assign roles |
 | POST | `/api/admin/users/{id}/reset-password` | Reset a user's password and sign them out (CLI: `app:user:reset-password`) |

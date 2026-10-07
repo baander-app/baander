@@ -133,3 +133,18 @@ parameters:
     # Maximum /api requests per authenticated user (sliding window). Default: 1800 per minute.
     auth.rate_limit.authenticated_api.max_requests: 1800
     auth.rate_limit.authenticated_api.window: 60
+
+    # --- Email Verification ---
+    # The verification token lifetime is auth.email_verification_token.ttl above.
+
+    # Maximum verification attempts and resend requests per IP within the window.
+    # POST /api/auth/email/verify and POST /api/auth/me/email/verification share
+    # one bucket and answer 429 with Retry-After over the limit. Default: 10 per 15 minutes.
+    auth.rate_limit.email_verification.max_attempts: 10
+    auth.rate_limit.email_verification.window: 900
+
+    # Maximum verification emails a signed-in user can ask for within the window.
+    # Over the limit, the resend request still returns the generic response but sends
+    # nothing. Default: 3 per hour.
+    auth.rate_limit.email_verification_resend_per_user.max_attempts: 3
+    auth.rate_limit.email_verification_resend_per_user.window: 3600

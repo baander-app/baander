@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Controller;
 
+use App\Auth\Application\Command\User\ChangeEmailCommand;
 use App\Auth\Application\Command\User\CreateUserCommand;
 use App\Auth\Application\Command\User\SetUserPasswordCommand;
+use App\Auth\Application\Exception\EmailAddressInUseException;
 use App\Auth\Application\Port\UserPortInterface;
 use App\Auth\Domain\Model\User;
 use App\Auth\Interface\Request\Admin\AdminAssignRolesRequest;
@@ -23,6 +25,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
+use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
@@ -131,6 +134,7 @@ final class AdminUserController
     #[OA\Patch(
         path: '/api/admin/users/{id}',
         summary: 'Update a user',
+        description: 'A new email address starts unverified and is sent a verification link.',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(ref: new Model(type: AdminUpdateUserRequest::class)),
@@ -140,6 +144,7 @@ final class AdminUserController
                 new OA\Property(property: 'data', ref: new Model(type: AdminUserResource::class)),
             ])),
             new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '409', description: 'Email already taken', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/{id}', name: 'update', methods: ['PATCH'])]
@@ -151,19 +156,27 @@ final class AdminUserController
             return $this->notFound('User not found.');
         }
 
+        // The same use case as the user's own change and `app:user:change-email`: the new
+        // address starts unverified and is sent a verification link.
+        if ($request->email !== null) {
+            try {
+                $user = $this->commandBus->dispatch(new ChangeEmailCommand($user->getId()->toString(), $request->email))
+                    ->last(HandledStamp::class)?->getResult();
+            } catch (HandlerFailedException $e) {
+                if ($e->getPrevious() instanceof EmailAddressInUseException) {
+                    return $this->errorResponse('This email address is already in use.', Response::HTTP_CONFLICT);
+                }
+                throw $e;
+            }
+            if (!$user instanceof User) {
+                throw new \LogicException('ChangeEmailCommand did not return the user.');
+            }
+        }
+
         if ($request->name !== null) {
             $user->updateName($request->name);
+            $this->userService->save($user);
         }
-
-        if ($request->email !== null) {
-            $newEmail = new Email($request->email);
-            if ($newEmail->toString() !== $user->getEmail() && $this->userService->existsWithEmail($newEmail)) {
-                return $this->errorResponse('This email address is already in use.', Response::HTTP_CONFLICT);
-            }
-            $user->changeEmail($newEmail->toString());
-        }
-
-        $this->userService->save($user);
 
         return $this->successResponse(AdminUserResource::from($user));
     }

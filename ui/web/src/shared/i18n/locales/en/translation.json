@@ -46,6 +46,23 @@
       "rateLimited_one": "Too many attempts. Try again in {{count}} second.",
       "rateLimited_other": "Too many attempts. Try again in {{count}} seconds.",
       "success": "Your password has been reset. Log in with your new password."
+    },
+    "emailVerification": {
+      "title": "Verify your email",
+      "verifying": "Verifying your email address…",
+      "verified": "Your email address is verified.",
+      "continue": "Continue to Bånder",
+      "logIn": "Log in",
+      "invalidLink": "This verification link is invalid or has expired.",
+      "logInToResend": "Log in to request a new verification link.",
+      "tryAgain": "Try again",
+      "rateLimited_one": "Too many attempts. Try again in {{count}} second.",
+      "rateLimited_other": "Too many attempts. Try again in {{count}} seconds.",
+      "resend": "Resend verification email",
+      "resendSent": "If your email address still needs verification, a new link is on its way. Check your inbox and spam folder.",
+      "notVerified": "Not verified",
+      "notVerifiedHint": "Open the link in the verification email we sent to this address, or send a new one.",
+      "changeEmailDescription": "Enter your new email address. We'll send a verification link to it, and your address stays unverified until you open that link."
     }
   },
   "player": {

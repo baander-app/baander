@@ -27,6 +27,8 @@ framework:
             cache.rate_limiter.config_check: { adapter: cache.rate_limiter }
             cache.rate_limiter.batch_cover_extract: { adapter: cache.rate_limiter }
             cache.rate_limiter.discovery_endpoint_ip: { adapter: cache.rate_limiter }
+            cache.rate_limiter.auth_email_verification_ip: { adapter: cache.rate_limiter }
+            cache.rate_limiter.auth_email_verification_user: { adapter: cache.rate_limiter }
 
             # Doctrine system cache (metadata, query) — indefinite, cleared on deploy
             doctrine.system_cache_pool:

@@ -4,23 +4,31 @@ declare(strict_types=1);
 
 namespace App\Auth\Application\Port;
 
-use App\Auth\Application\DTO\EmailVerificationTokenDTO;
+use App\Auth\Application\DTO\RedeemedEmailVerification;
+use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 
+/**
+ * Stores each user's single outstanding email verification token.
+ *
+ * Implementations keep only a hash of the token, together with the address it verifies. A
+ * token belongs to the user it was issued to and is removed with that user.
+ */
 interface EmailVerificationTokenRepositoryInterface
 {
     /**
-     * Create and persist a new email verification token for the given user.
+     * Stores a newly issued token for the user's address, replacing any token issued earlier.
      */
-    public function createForUser(Uuid $userId, string $token, \DateTimeImmutable $expiresAt): EmailVerificationTokenDTO;
+    public function issue(Uuid $userId, Email $email, string $token, \DateTimeImmutable $expiresAt): void;
 
     /**
-     * Find a token by its raw token string.
+     * Removes the token and returns whom and which address it was issued for, or null when
+     * no such token exists or it expired at or before $at. A token can be redeemed only once.
      */
-    public function findByToken(string $token): ?EmailVerificationTokenDTO;
+    public function redeem(string $token, \DateTimeImmutable $at): ?RedeemedEmailVerification;
 
     /**
-     * Remove a token by identity after verification; an absent token is a no-op.
+     * Removes the user's outstanding token, if any.
      */
-    public function delete(Uuid $tokenId): void;
+    public function revokeForUser(Uuid $userId): void;
 }

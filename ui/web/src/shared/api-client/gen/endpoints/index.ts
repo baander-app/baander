@@ -2738,16 +2738,20 @@ export type PutAuthMeUpdate200 = {
   data?: PutAuthMeUpdate200Data;
 };
 
-export type PostAuthEmailVerifyBody = {
-  token: string;
-};
-
 export type PostAuthEmailVerify200Data = {
   message?: string;
 };
 
 export type PostAuthEmailVerify200 = {
   data?: PostAuthEmailVerify200Data;
+};
+
+export type PostAuthMeEmailVerification200Data = {
+  message?: string;
+};
+
+export type PostAuthMeEmailVerification200 = {
+  data?: PostAuthMeEmailVerification200Data;
 };
 
 export type PutAuthMeEmailBody = {
@@ -7448,6 +7452,7 @@ export const getPatchAdminUsersUpdateUrl = (id: string,) => {
 }
 
 /**
+ * A new email address starts unverified and is sent a verification link.
  * @summary Update a user
  */
 export const patchAdminUsersUpdate = async (id: string,
@@ -9127,25 +9132,26 @@ export const getPostAuthEmailVerifyUrl = () => {
 }
 
 /**
+ * Redeems the token from a verification email once. The token verifies only the address it was sent to, while the account still has that address.
  * @summary Verify an email address with a token
  */
-export const postAuthEmailVerify = async (postAuthEmailVerifyBody: PostAuthEmailVerifyBody, options?: RequestInit): Promise<PostAuthEmailVerify200> => {
+export const postAuthEmailVerify = async (verifyEmailRequest: VerifyEmailRequest, options?: RequestInit): Promise<PostAuthEmailVerify200> => {
 
   return customInstance<PostAuthEmailVerify200>(getPostAuthEmailVerifyUrl(),
   {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(postAuthEmailVerifyBody)
+    body: JSON.stringify(verifyEmailRequest)
   }
 );}
 
 
 
 
-export const getPostAuthEmailVerifyMutationOptions = <TError = ErrorType<ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthEmailVerify>>, TError,{data: BodyType<PostAuthEmailVerifyBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postAuthEmailVerify>>, TError,{data: BodyType<PostAuthEmailVerifyBody>}, TContext> => {
+export const getPostAuthEmailVerifyMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthEmailVerify>>, TError,{data: BodyType<VerifyEmailRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAuthEmailVerify>>, TError,{data: BodyType<VerifyEmailRequest>}, TContext> => {
 
 const mutationKey = ['postAuthEmailVerify'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -9157,7 +9163,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAuthEmailVerify>>, {data: BodyType<PostAuthEmailVerifyBody>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAuthEmailVerify>>, {data: BodyType<VerifyEmailRequest>}> = (props) => {
           const {data} = props ?? {};
 
           return  postAuthEmailVerify(data,requestOptions)
@@ -9171,21 +9177,92 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PostAuthEmailVerifyMutationResult = NonNullable<Awaited<ReturnType<typeof postAuthEmailVerify>>>
-    export type PostAuthEmailVerifyMutationBody = BodyType<PostAuthEmailVerifyBody>
-    export type PostAuthEmailVerifyMutationError = ErrorType<ValidationError>
+    export type PostAuthEmailVerifyMutationBody = BodyType<VerifyEmailRequest>
+    export type PostAuthEmailVerifyMutationError = ErrorType<ApiError | ValidationError>
 
     /**
  * @summary Verify an email address with a token
  */
-export const usePostAuthEmailVerify = <TError = ErrorType<ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthEmailVerify>>, TError,{data: BodyType<PostAuthEmailVerifyBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+export const usePostAuthEmailVerify = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthEmailVerify>>, TError,{data: BodyType<VerifyEmailRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postAuthEmailVerify>>,
         TError,
-        {data: BodyType<PostAuthEmailVerifyBody>},
+        {data: BodyType<VerifyEmailRequest>},
         TContext
       > => {
       return useMutation(getPostAuthEmailVerifyMutationOptions(options), queryClient);
+    }
+
+export const getPostAuthMeEmailVerificationUrl = () => {
+
+
+
+
+  return `/api/auth/me/email/verification`
+}
+
+/**
+ * Emails the current user a new verification link and ends the one sent earlier. The answer is the same whether or not an email was sent: nothing is sent when the address is already verified or the user has used up their resend allowance.
+ * @summary Send a new verification email
+ */
+export const postAuthMeEmailVerification = async ( options?: RequestInit): Promise<PostAuthMeEmailVerification200> => {
+
+  return customInstance<PostAuthMeEmailVerification200>(getPostAuthMeEmailVerificationUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPostAuthMeEmailVerificationMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthMeEmailVerification>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAuthMeEmailVerification>>, TError,void, TContext> => {
+
+const mutationKey = ['postAuthMeEmailVerification'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAuthMeEmailVerification>>, void> = () => {
+
+
+          return  postAuthMeEmailVerification(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostAuthMeEmailVerificationMutationResult = NonNullable<Awaited<ReturnType<typeof postAuthMeEmailVerification>>>
+
+    export type PostAuthMeEmailVerificationMutationError = ErrorType<ApiError>
+
+    /**
+ * @summary Send a new verification email
+ */
+export const usePostAuthMeEmailVerification = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthMeEmailVerification>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postAuthMeEmailVerification>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getPostAuthMeEmailVerificationMutationOptions(options), queryClient);
     }
 
 export const getPutAuthMeEmailUrl = () => {
@@ -9197,6 +9274,7 @@ export const getPutAuthMeEmailUrl = () => {
 }
 
 /**
+ * The new address starts unverified and is sent a verification link; links sent to the old address stop working.
  * @summary Change the current user email
  */
 export const putAuthMeEmail = async (putAuthMeEmailBody: PutAuthMeEmailBody, options?: RequestInit): Promise<PutAuthMeEmail200> => {

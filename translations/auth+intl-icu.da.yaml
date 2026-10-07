@@ -12,7 +12,7 @@ errors:
   user_code_required: 'Parameteren "user_code" er påkrævet.'
   invalid_user_code: "Ugyldig eller udløbet brugerkode."
   device_already_processed: "Enhedskode er allerede behandlet."
-  email_verification_failed: "E-mailbekræftelse mislykkedes."
+  email_verification_failed: "Bekræftelseslinket er ugyldigt eller udløbet."
   internal: "Intern serverfejl."
   password_reset_failed: "Linket til nulstilling af adgangskode er ugyldigt eller udløbet."
   current_password_incorrect: "Den nuværende adgangskode er forkert."
@@ -20,7 +20,6 @@ errors:
 success:
   token_revoked: "Token tilbagekaldt."
   password_reset_sent: "Hvis e-mailadressen findes, er der sendt et link til nulstilling af adgangskode."
-  email_not_implemented: "E-mailbekræftelse er endnu ikke implementeret."
   email_verified: "E-mail bekræftet."
   totp_enabled: "TOTP aktiveret."
   totp_disable_not_implemented: "TOTP-deaktivering er endnu ikke fuldt implementeret."
@@ -39,3 +38,16 @@ password_reset_email:
   fallback: "Hvis knappen ikke virker, kan du kopiere dette link ind i din browser:"
   expiry: "Linket kan bruges én gang og udløber om {minutes, plural, one {# minut} other {# minutter}}."
   ignore: "Hvis du ikke har bedt om dette, kan du se bort fra denne e-mail. Din adgangskode forbliver uændret."
+
+email_verification_email:
+  subject: "Bekræft din e-mailadresse til {app}"
+  heading: "Bekræft din e-mailadresse"
+  greeting: "Hej {name}"
+  intro: "Bekræft, at denne adresse hører til din konto på {app}. Åbn linket nedenfor for at bekræfte den."
+  action: "Bekræft e-mailadresse"
+  fallback: "Hvis knappen ikke virker, kan du kopiere dette link ind i din browser:"
+  expiry: "Linket kan bruges én gang og udløber om {hours, plural, one {# time} other {# timer}}."
+  ignore: "Hvis du ikke har oprettet en konto eller ændret din e-mailadresse, kan du se bort fra denne e-mail."
+
+email_verification:
+  resend_sent: "Hvis din e-mailadresse stadig mangler at blive bekræftet, er der sendt et nyt link."

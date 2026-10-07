@@ -72,7 +72,9 @@ The two database addresses must reach the same database from the host and worker
 network respectively. The controller URL and credentials file stay on the host.
 Docker receives the admitted runtime values through a temporary private env-file;
 trusted daemon operators can inspect the resulting container environment.
-Optional runtime keys are `REDIS_PASSWORD` and `MAILER_DSN`; values cannot contain
+Optional runtime keys are `REDIS_PASSWORD`, `MAILER_DSN`, `MAIL_FROM_ADDRESS` and
+`MAIL_FROM_NAME`; without the last two, email a worker sends comes from
+`noreply@localhost`. Values cannot contain
 line breaks and their complete env-file is limited to 4 KiB.
 
 Apply an external deadline to every action. DBAL does not enforce a hard connection
@@ -108,6 +110,7 @@ own exit code without JSON. Error output contains no credentials or raw diagnost
 | [app:auth:rotate-secrets](app-auth-rotate-secrets.md) | Prepare an OAuth bundle and invalidate grants during offline cutover |
 | [app:auth:setup-clients](app-auth-setup-clients.md) | Create the first-party OAuth client that password and passkey login issue tokens to |
 | [app:oauth:generate-keys](app-oauth-generate-keys.md) | Generate OAuth2 private and public keys for JWT signing |
+| [app:user:change-email](app-user-change-email.md) | Change a user's email address and send a verification link to it |
 | [app:user:create](app-user-create.md) | Create a new user account |
 | [app:user:disable](app-user-disable.md) | Disable a user account |
 | [app:user:enable](app-user-enable.md) | Enable a previously disabled user account |

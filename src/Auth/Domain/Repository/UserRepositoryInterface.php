@@ -14,7 +14,8 @@ interface UserRepositoryInterface
     /**
      * Persists the user. When the email address or password hash differs from the stored
      * one, the user's outstanding password reset token is removed: it was issued for the
-     * old credentials. The user's deletion removes it as well.
+     * old credentials. When the email address differs, the outstanding email verification
+     * token is removed too. The user's deletion removes both.
      */
     public function save(User $user): void;
 

@@ -4,87 +4,105 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Auth;
 
-use App\Auth\Application\DTO\EmailVerificationTokenDTO;
 use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
-use App\Auth\Infrastructure\Doctrine\Entity\EmailVerificationTokenEntity;
+use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
 
 final class EmailVerificationTokenRepositoryTest extends TestCase
 {
-    public function testPortCreatesAndReloadsAnImmutableTokenAndDeletesByIdentity(): void
+    public function testRedeemingReturnsTheUserAndAddressOnceAndStoresOnlyAHash(): void
     {
         $user = $this->createTestUser();
-        $repository = $this->repository();
+        $this->tokens()->issue($user->getId(), new Email($user->getEmail()), 'raw-token-a', new \DateTimeImmutable('+1 hour'));
+
+        $stored = $this->entityManager->getConnection()->fetchAssociative('SELECT * FROM email_verification_tokens');
+        $this->assertIsArray($stored);
+        $this->assertSame(hash('sha256', 'raw-token-a'), $stored['token_hash']);
+        $this->assertSame($user->getEmail(), $stored['email']);
+        $this->assertNotContains('raw-token-a', $stored);
+
+        $redeemed = $this->tokens()->redeem('raw-token-a', new \DateTimeImmutable());
+        $this->assertNotNull($redeemed);
+        $this->assertTrue($user->getId()->equals($redeemed->userId));
+        $this->assertSame($user->getEmail(), $redeemed->email->toString());
+        $this->assertNull($this->tokens()->redeem('raw-token-a', new \DateTimeImmutable()), 'A token is single use.');
+        $this->assertNull($this->tokens()->redeem('unknown-token', new \DateTimeImmutable()));
+    }
+
+    public function testATokenExpiresAtItsExpiryInstant(): void
+    {
+        $user = $this->createTestUser();
+        $email = new Email($user->getEmail());
         $expiresAt = new \DateTimeImmutable('2030-01-02T03:04:05+00:00');
-        $created = $repository->createForUser($user->getId(), 'port-token', $expiresAt);
-        $this->assertInstanceOf(EmailVerificationTokenDTO::class, $created);
-        $this->assertTrue($user->getId()->equals($created->userId));
-        $this->assertSame('port-token', $created->token);
-        $this->assertEquals($expiresAt, $created->expiresAt);
-        $this->assertNull($created->usedAt);
 
-        $this->entityManager->clear();
-        $loaded = $repository->findByToken('port-token');
-        $this->assertNotNull($loaded);
-        $this->assertTrue($created->id->equals($loaded->id));
-        $this->assertTrue($created->userId->equals($loaded->userId));
-        $this->assertSame($created->token, $loaded->token);
-        $this->assertEquals($expiresAt, $loaded->expiresAt);
+        $this->tokens()->issue($user->getId(), $email, 'raw-token-b', $expiresAt);
+        $this->assertNull($this->tokens()->redeem('raw-token-b', $expiresAt), 'The expiry instant is already too late.');
+        $this->assertSame(0, $this->outstanding(), 'An expired token is removed when presented.');
 
-        $entity = $this->entityManager->find(EmailVerificationTokenEntity::class, $loaded->id);
-        $this->assertInstanceOf(EmailVerificationTokenEntity::class, $entity);
-        $entity->markUsed();
-        $this->entityManager->flush();
-        $this->assertNull($loaded->usedAt, 'A previously returned snapshot cannot change with the managed entity.');
-        $used = $repository->findByToken('port-token');
-        $this->assertNotNull($used);
-        $this->assertEquals($entity->getUsedAt(), $used->usedAt);
-
-        $repository->delete($loaded->id);
-        $this->entityManager->clear();
-        $this->assertNull($repository->findByToken('port-token'));
-        $repository->delete($loaded->id);
-        $repository->delete(Uuid::generate());
-        $this->assertNull($repository->findByToken('unknown-token'));
+        $this->tokens()->issue($user->getId(), $email, 'raw-token-b', $expiresAt);
+        $this->assertNotNull($this->tokens()->redeem('raw-token-b', $expiresAt->modify('-1 second')));
     }
 
-    public function testVerificationConsumesTheTokenAndRejectsReplay(): void
+    public function testIssuingReplacesTheUsersEarlierTokenAndAddress(): void
     {
         $user = $this->createTestUser();
-        $this->repository()->createForUser($user->getId(), 'single-use-token', new \DateTimeImmutable('+1 hour'));
+        $this->tokens()->issue($user->getId(), new Email('first-' . $user->getEmail()), 'first-token', new \DateTimeImmutable('+1 hour'));
+        $this->tokens()->issue($user->getId(), new Email($user->getEmail()), 'second-token', new \DateTimeImmutable('+1 hour'));
 
-        $this->assertJsonResponse($this->anonymousRequest('POST', '/api/auth/email/verify', ['token' => 'single-use-token']), 200);
-        $this->assertNull($this->repository()->findByToken('single-use-token'));
-        $verified = $this->userRepository->findByUuid($user->getId());
-        $this->assertNotNull($verified);
-        $this->assertTrue($verified->isEmailVerified());
-        $this->assertJsonResponse($this->anonymousRequest('POST', '/api/auth/email/verify', ['token' => 'single-use-token']), 400);
+        $this->assertSame(1, $this->outstanding());
+        $this->assertNull($this->tokens()->redeem('first-token', new \DateTimeImmutable()));
+        $this->assertSame($user->getEmail(), $this->tokens()->redeem('second-token', new \DateTimeImmutable())?->email->toString());
     }
 
-    public function testExpiredVerificationPreservesTokenAndUnverifiedUser(): void
+    public function testRevokingRemovesOnlyThatUsersToken(): void
+    {
+        $owner = $this->createTestUser();
+        $other = $this->createTestUser();
+        $this->tokens()->issue($owner->getId(), new Email($owner->getEmail()), 'owner-token', new \DateTimeImmutable('+1 hour'));
+        $this->tokens()->issue($other->getId(), new Email($other->getEmail()), 'other-token', new \DateTimeImmutable('+1 hour'));
+
+        $this->tokens()->revokeForUser($owner->getId());
+        $this->tokens()->revokeForUser(Uuid::generate());
+
+        $this->assertNull($this->tokens()->redeem('owner-token', new \DateTimeImmutable()));
+        $this->assertNotNull($this->tokens()->redeem('other-token', new \DateTimeImmutable()));
+    }
+
+    public function testChangingTheEmailRemovesTheTokenButRenamingKeepsIt(): void
     {
         $user = $this->createTestUser();
-        $created = $this->repository()->createForUser($user->getId(), 'expired-port-token', new \DateTimeImmutable('-1 hour'));
+        $this->tokens()->issue($user->getId(), new Email($user->getEmail()), 'kept-token', new \DateTimeImmutable('+1 hour'));
 
-        $this->assertJsonResponse($this->anonymousRequest('POST', '/api/auth/email/verify', ['token' => 'expired-port-token']), 400);
-        $remaining = $this->repository()->findByToken('expired-port-token');
-        $this->assertNotNull($remaining);
-        $this->assertTrue($created->id->equals($remaining->id));
-        $unverified = $this->userRepository->findByUuid($user->getId());
-        $this->assertNotNull($unverified);
-        $this->assertFalse($unverified->isEmailVerified());
+        $user->updateName('Renamed User');
+        $this->userRepository->save($user);
+        $this->assertSame(1, $this->outstanding());
+
+        $user->changeEmail('changed-' . bin2hex(random_bytes(4)) . '@baander.app');
+        $this->userRepository->save($user);
+        $this->assertSame(0, $this->outstanding());
     }
 
-    public function testMissingUserCannotCreateAToken(): void
+    public function testDeletingTheUserRemovesTheirToken(): void
     {
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('User not found.');
-        $this->repository()->createForUser(Uuid::generate(), 'orphan-token', new \DateTimeImmutable('+1 hour'));
+        $user = $this->createTestUser();
+        $this->tokens()->issue($user->getId(), new Email($user->getEmail()), 'deleted-token', new \DateTimeImmutable('+1 hour'));
+
+        $this->userRepository->delete($user->getId());
+
+        $this->assertSame(0, $this->outstanding());
     }
 
-    private function repository(): EmailVerificationTokenRepositoryInterface
+    private function outstanding(): int
     {
-        return static::getContainer()->get(EmailVerificationTokenRepositoryInterface::class);
+        return (int) $this->entityManager->getConnection()->fetchOne('SELECT count(*) FROM email_verification_tokens');
+    }
+
+    private function tokens(): EmailVerificationTokenRepositoryInterface
+    {
+        $repository = static::getContainer()->get(EmailVerificationTokenRepositoryInterface::class);
+        $this->assertInstanceOf(EmailVerificationTokenRepositoryInterface::class, $repository);
+
+        return $repository;
     }
 }

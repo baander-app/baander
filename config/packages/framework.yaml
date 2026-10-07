@@ -15,6 +15,9 @@ parameters:
         config_check: 'Admin configuration check'
         batch_cover_extract: 'Album cover batch extraction'
         discovery_endpoint_ip: 'Discovery registration and pairing requests per IP'
+        # Email verification (U44)
+        auth_email_verification_ip: 'Email verification attempts and resend requests per IP'
+        auth_email_verification_user: 'Verification email resend requests per user'
 
 framework:
     secret: '%env(APP_SECRET)%'
@@ -116,6 +119,18 @@ framework:
             interval: '60 seconds'
             cache_pool: cache.rate_limiter.discovery_endpoint_ip
 
+        # Email verification: redemption and resend per IP, resend per user.
+        auth_email_verification_ip:
+            policy: fixed_window
+            limit: '%auth.rate_limit.email_verification.max_attempts%'
+            interval: '%auth.rate_limit.email_verification.window% seconds'
+            cache_pool: cache.rate_limiter.auth_email_verification_ip
+        auth_email_verification_user:
+            policy: fixed_window
+            limit: '%auth.rate_limit.email_verification_resend_per_user.max_attempts%'
+            interval: '%auth.rate_limit.email_verification_resend_per_user.window% seconds'
+            cache_pool: cache.rate_limiter.auth_email_verification_user
+
 when@test:
     framework:
         test: true
@@ -145,4 +160,8 @@ when@test:
             config_check:
                 limit: 10000
             discovery_endpoint_ip:
+                limit: 10000
+            auth_email_verification_ip:
+                limit: 10000
+            auth_email_verification_user:
                 limit: 10000

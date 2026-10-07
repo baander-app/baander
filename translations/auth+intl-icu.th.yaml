@@ -12,14 +12,13 @@ errors:
   user_code_required: The "user_code" parameter is required.
   invalid_user_code: Invalid or expired user code.
   device_already_processed: Device code already processed.
-  email_verification_failed: Email verification failed.
+  email_verification_failed: This verification link is invalid or has expired.
   internal: Internal server error.
   password_reset_failed: This password reset link is invalid or has expired.
   current_password_incorrect: Current password is incorrect.
 success:
   token_revoked: Token revoked successfully.
   password_reset_sent: If the email exists, a password reset link has been sent.
-  email_not_implemented: Email verification is not yet implemented.
   email_verified: Email verified.
   totp_enabled: TOTP enabled successfully.
   totp_disable_not_implemented: TOTP disable is not yet fully implemented.
@@ -38,3 +37,16 @@ password_reset_email:
   fallback: "หากปุ่มใช้งานไม่ได้ ให้คัดลอกลิงก์นี้ไปวางในเบราว์เซอร์:"
   expiry: "ลิงก์นี้ใช้ได้ครั้งเดียวและจะหมดอายุใน {minutes} นาที"
   ignore: "หากคุณไม่ได้ขอรีเซ็ตรหัสผ่าน ให้เพิกเฉยต่ออีเมลนี้ รหัสผ่านของคุณจะไม่เปลี่ยนแปลง"
+
+email_verification_email:
+  subject: "ยืนยันที่อยู่อีเมลของคุณสำหรับ {app}"
+  heading: "ยืนยันที่อยู่อีเมลของคุณ"
+  greeting: "สวัสดี {name}"
+  intro: "ยืนยันว่าที่อยู่นี้เป็นของบัญชี {app} ของคุณ เปิดลิงก์ด้านล่างเพื่อยืนยัน"
+  action: "ยืนยันที่อยู่อีเมล"
+  fallback: "หากปุ่มใช้งานไม่ได้ ให้คัดลอกลิงก์นี้ไปวางในเบราว์เซอร์:"
+  expiry: "ลิงก์นี้ใช้ได้ครั้งเดียวและจะหมดอายุใน {hours} ชั่วโมง"
+  ignore: "หากคุณไม่ได้สร้างบัญชีหรือเปลี่ยนที่อยู่อีเมล ให้เพิกเฉยต่ออีเมลนี้"
+
+email_verification:
+  resend_sent: "หากที่อยู่อีเมลของคุณยังไม่ได้รับการยืนยัน เราได้ส่งลิงก์ใหม่ให้แล้ว"

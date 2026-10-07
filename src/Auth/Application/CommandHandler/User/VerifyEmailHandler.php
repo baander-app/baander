@@ -15,62 +15,59 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
- * Verifies an email address using a single-use token.
+ * Verifies an email address with a single-use token.
  *
- * Looks the token up in the persistent store, enforces expiry and single-use,
- * marks the associated user's email as verified, and deletes the token.
+ * Redemption deletes the token in the same transaction that marks the address verified and
+ * records EmailVerified, so a failed commit leaves the token redeemable. A token verifies only
+ * the address it was issued for, and only while the account still has that address.
  */
-final class VerifyEmailHandler
+final readonly class VerifyEmailHandler
 {
     public function __construct(
-        private readonly EmailVerificationTokenRepositoryInterface $emailVerificationTokenRepository,
-        private readonly UserRepositoryInterface $userRepository,
-        private readonly EventDispatcherInterface $eventDispatcher,
-        private readonly TransactionPortInterface $transaction,
+        private EmailVerificationTokenRepositoryInterface $emailVerificationTokenRepository,
+        private UserRepositoryInterface $userRepository,
+        private EventDispatcherInterface $eventDispatcher,
+        private TransactionPortInterface $transaction,
     ) {
     }
 
+    /**
+     * @throws EmailVerificationException for an unknown, expired or used token, a token for an
+     *                                    address the account no longer has, or a disabled account
+     */
     #[AsMessageHandler]
-    public function __invoke(VerifyEmailCommand $command): bool
+    public function __invoke(VerifyEmailCommand $command): void
     {
         $token = trim($command->getToken());
-
         if ($token === '') {
-            throw EmailVerificationException::missing();
+            throw EmailVerificationException::invalid();
         }
 
-        return $this->transaction->run(function () use ($token): bool {
-            $verification = $this->emailVerificationTokenRepository->findByToken($token);
+        // An unusable token is still deleted: the transaction commits and the caller is told
+        // only that the token is invalid.
+        $verified = $this->transaction->run(function () use ($token): bool {
+            $redeemed = $this->emailVerificationTokenRepository->redeem($token, new \DateTimeImmutable());
+            $user = $redeemed === null ? null : $this->userRepository->findByUuid($redeemed->userId);
 
-            if ($verification === null) {
-                throw EmailVerificationException::invalid();
+            if ($redeemed === null || $user === null || $user->isDisabled()
+                || !Email::fromString($user->getEmail())->equals($redeemed->email)) {
+                return false;
             }
 
-            if ($verification->expiresAt < new \DateTimeImmutable()) {
-                throw EmailVerificationException::expired();
+            if (!$user->isEmailVerified()) {
+                $user->verifyEmail();
+                $this->userRepository->save($user);
+                $this->eventDispatcher->dispatch(new EmailVerified(
+                    userId: $user->getId(),
+                    email: $redeemed->email,
+                ));
             }
-
-            if ($verification->usedAt !== null) {
-                throw EmailVerificationException::alreadyUsed();
-            }
-
-            $user = $this->userRepository->findByUuid($verification->userId);
-
-            if ($user === null) {
-                throw EmailVerificationException::invalid();
-            }
-
-            $user->verifyEmail();
-            $this->userRepository->save($user);
-
-            $this->eventDispatcher->dispatch(new EmailVerified(
-                userId: $user->getId(),
-                email: Email::fromString($user->getEmail()),
-            ));
-
-            $this->emailVerificationTokenRepository->delete($verification->id);
 
             return true;
         });
+
+        if (!$verified) {
+            throw EmailVerificationException::invalid();
+        }
     }
 }

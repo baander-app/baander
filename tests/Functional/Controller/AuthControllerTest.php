@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Controller;
 
+use App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface;
 use App\Auth\Domain\Model\User;
-use App\Auth\Infrastructure\Doctrine\Entity\EmailVerificationTokenEntity;
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Shared\Domain\Model\Email;
 use App\Tests\Functional\TestCase;
 
 final class AuthControllerTest extends TestCase
@@ -134,15 +134,7 @@ final class AuthControllerTest extends TestCase
     public function testVerifyEmailWithValidTokenMarksUserVerified(): void
     {
         $user = $this->createTestUser();
-        $userEntity = $this->entityManager->find(UserEntity::class, $user->getId());
-
-        $token = new EmailVerificationTokenEntity(
-            $userEntity,
-            'functional-test-token',
-            new \DateTimeImmutable('+1 hour'),
-        );
-        $this->entityManager->persist($token);
-        $this->entityManager->flush();
+        $this->verificationTokens()->issue($user->getId(), new Email($user->getEmail()), 'functional-test-token', new \DateTimeImmutable('+1 hour'));
 
         $response = $this->anonymousRequest('POST', '/api/auth/email/verify', [
             'token' => 'functional-test-token',
@@ -158,21 +150,25 @@ final class AuthControllerTest extends TestCase
     public function testVerifyEmailWithExpiredTokenFails(): void
     {
         $user = $this->createTestUser();
-        $userEntity = $this->entityManager->find(UserEntity::class, $user->getId());
-
-        $token = new EmailVerificationTokenEntity(
-            $userEntity,
-            'expired-functional-token',
-            new \DateTimeImmutable('-1 hour'),
-        );
-        $this->entityManager->persist($token);
-        $this->entityManager->flush();
+        $this->verificationTokens()->issue($user->getId(), new Email($user->getEmail()), 'expired-functional-token', new \DateTimeImmutable('-1 hour'));
 
         $response = $this->anonymousRequest('POST', '/api/auth/email/verify', [
             'token' => 'expired-functional-token',
         ]);
 
-        $this->assertJsonResponse($response, 400);
+        $data = $this->assertJsonResponse($response, 400, 'error');
+        $this->assertSame('This verification link is invalid or has expired.', $data['error']['message']);
+    }
+
+    public function testVerifyEmailRejectsATokenForAnAddressTheAccountNoLongerHas(): void
+    {
+        $user = $this->createTestUser();
+        $this->verificationTokens()->issue($user->getId(), new Email('previous-' . $user->getEmail()), 'stale-address-token', new \DateTimeImmutable('+1 hour'));
+
+        $this->assertJsonResponse($this->anonymousRequest('POST', '/api/auth/email/verify', ['token' => 'stale-address-token']), 400);
+
+        $this->entityManager->clear();
+        $this->assertFalse($this->userRepository->findByUuid($user->getId())?->isEmailVerified());
     }
 
     // ---------------------------------------------------------------
@@ -195,6 +191,17 @@ final class AuthControllerTest extends TestCase
         $this->assertFalse($stored->isEmailVerified(), 'A new address is unverified until its owner confirms it.');
     }
 
+    public function testChangingToAnAddressInUseIsAConflict(): void
+    {
+        $user = $this->createTestUser();
+        $other = $this->createTestUser();
+
+        $response = $this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $other->getEmail()]);
+
+        $data = $this->assertJsonResponse($response, 409, 'error');
+        $this->assertSame('This email address is already in use.', $data['error']['message']);
+    }
+
     // ---------------------------------------------------------------
     // PUT /api/auth/me/password
     // ---------------------------------------------------------------
@@ -210,5 +217,13 @@ final class AuthControllerTest extends TestCase
 
         $data = $this->assertJsonResponse($response, 422, 'error');
         $this->assertSame('Current password is incorrect.', $data['error']['message']);
+    }
+
+    private function verificationTokens(): EmailVerificationTokenRepositoryInterface
+    {
+        $repository = static::getContainer()->get(EmailVerificationTokenRepositoryInterface::class);
+        $this->assertInstanceOf(EmailVerificationTokenRepositoryInterface::class, $repository);
+
+        return $repository;
     }
 }

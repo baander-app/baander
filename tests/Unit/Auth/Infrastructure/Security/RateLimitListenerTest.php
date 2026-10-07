@@ -29,6 +29,7 @@ final class RateLimitListenerTest extends TestCase
     private RateLimiterFactoryInterface&MockObject $passwordResetIpLimiter;
     private RateLimiterFactoryInterface&MockObject $refreshClientLimiter;
     private RateLimiterFactoryInterface&MockObject $passkeyIpLimiter;
+    private RateLimiterFactoryInterface&MockObject $emailVerificationIpLimiter;
     private LoggerInterface&MockObject $logger;
     private RateLimitListener $listener;
 
@@ -44,6 +45,7 @@ final class RateLimitListenerTest extends TestCase
         $this->passwordResetIpLimiter = $this->createMock(RateLimiterFactoryInterface::class);
         $this->refreshClientLimiter = $this->createMock(RateLimiterFactoryInterface::class);
         $this->passkeyIpLimiter = $this->createMock(RateLimiterFactoryInterface::class);
+        $this->emailVerificationIpLimiter = $this->createMock(RateLimiterFactoryInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->listener = new RateLimitListener(
@@ -53,6 +55,7 @@ final class RateLimitListenerTest extends TestCase
             authPasswordResetIpLimiter: $this->passwordResetIpLimiter,
             authRefreshClientLimiter: $this->refreshClientLimiter,
             authPasskeyIpLimiter: $this->passkeyIpLimiter,
+            authEmailVerificationIpLimiter: $this->emailVerificationIpLimiter,
             logger: $this->logger,
             jsonEncoder: new JsonEncoder(),
             environment: 'test',
@@ -257,6 +260,39 @@ final class RateLimitListenerTest extends TestCase
         $event = $this->createRequestEvent($this->createJsonRequest('/api/auth/passkey/register'));
 
         $this->passkeyIpLimiter->expects($this->never())->method('create');
+
+        $this->listener->onKernelRequest($event);
+    }
+
+    // --- Email verification rate limiting tests ---
+
+    /** @return iterable<string, array{string}> */
+    public static function emailVerificationPaths(): iterable
+    {
+        yield 'redemption' => ['/api/auth/email/verify'];
+        yield 'resend' => ['/api/auth/me/email/verification'];
+    }
+
+    #[DataProvider('emailVerificationPaths')]
+    public function testEmailVerificationIsLimitedPerIp(string $path): void
+    {
+        $event = $this->createRequestEvent($this->createJsonRequest($path, ip: '10.0.0.9'));
+
+        $this->emailVerificationIpLimiter->expects($this->once())
+            ->method('create')
+            ->with('10.0.0.9')
+            ->willReturn($this->createRejectedLimit(90));
+
+        $this->expectException(TooManyRequestsHttpException::class);
+
+        $this->listener->onKernelRequest($event);
+    }
+
+    public function testChangingTheEmailIsNotLimitedByTheVerificationLimiter(): void
+    {
+        $event = $this->createRequestEvent($this->createJsonRequest('/api/auth/me/email', 'PUT'));
+
+        $this->emailVerificationIpLimiter->expects($this->never())->method('create');
 
         $this->listener->onKernelRequest($event);
     }

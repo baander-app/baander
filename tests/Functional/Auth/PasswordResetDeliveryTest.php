@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Auth;
 
 use App\Auth\Application\Port\PasswordHasherInterface;
-use App\Auth\Infrastructure\Mail\MailerPasswordResetDelivery;
+use App\Auth\Infrastructure\Mail\AfterResponseMailer;
 use App\Shared\Domain\Model\Email as EmailAddress;
 use Doctrine\DBAL\Connection;
 use Monolog\Handler\TestHandler;
@@ -110,13 +110,12 @@ final class PasswordResetDeliveryTest extends RateLimitTestCase
         $this->assertInstanceOf(Environment::class, $twig);
         $requestStack = $container->get(RequestStack::class);
         $this->assertInstanceOf(RequestStack::class, $requestStack);
-        $container->set(MailerPasswordResetDelivery::class, new MailerPasswordResetDelivery(
+        $container->set(AfterResponseMailer::class, new AfterResponseMailer(
             $transport,
             $twig,
             $translator,
             $requestStack,
             new Logger('test', [$logs]),
-            'https://baander.app',
             'Baander',
         ));
 

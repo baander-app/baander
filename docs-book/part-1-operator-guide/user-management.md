@@ -98,6 +98,26 @@ Users who forget their password can reset it themselves once [email is configure
 
 By default a user can ask for a link 10 times per 15 minutes; after that the page still confirms but no email is sent. See [Password reset](configuration.md#password-reset) for the limits and how the link is built. API clients use the same two endpoints as the web pages: `POST /api/auth/password/reset-request` and `POST /api/auth/password/reset`.
 
+## Verifying Email Addresses
+
+Baander sends notification email only to verified addresses. Operator-created accounts start verified. Self-registered accounts, and any account whose address changes, start unverified, and Baander emails the address a verification link once [email is configured](configuration.md#mail):
+
+1. The user opens the link, which leads to the web app's **Verify your email** page. The page confirms the address, or says the link is invalid or has expired.
+2. The link works once and expires after 24 hours. It verifies only the address it was sent to, so after another email change it no longer works.
+3. A signed-in user whose address is unverified sees **Not verified** under the email address in **Settings** and can select **Resend verification email**. A new link replaces the earlier one. By default a user can ask 3 times per hour; after that the page still confirms but no email is sent.
+
+See [Email verification](configuration.md#email-verification) for the lifetime, the limits and how the link is built.
+
+## Changing an Email Address
+
+Users change their own address in **Settings**. Operators change it in the admin panel or with the CLI:
+
+```bash
+make exec cmd="php bin/console app:user:change-email alice@baander.app alice.new@baander.app"
+```
+
+The command accepts the current email address or the UUID. All three ways make the new address unverified, email it a verification link, and end the verification and password reset links sent to the old address. See [app:user:change-email](commands/app-user-change-email.md).
+
 ## Disabling and Enabling Users
 
 Disable a user account to revoke access without deleting it:

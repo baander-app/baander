@@ -16,6 +16,7 @@ use App\Auth\Application\Exception\UserNotFoundException;
 use App\Auth\Application\Port\PasswordHasherInterface;
 use App\Auth\Application\Port\PasswordResetTokenRepositoryInterface;
 use App\Auth\Application\Service\PasswordChanger;
+use App\Auth\Application\Service\UserLookup;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\TokenId;
@@ -87,7 +88,7 @@ final class PasswordHandlersTest extends TestCase
 
     public function testOperatorResetFindsTheUserByEmailOrUuidAndSignsOutEverySession(): void
     {
-        $handler = new SetUserPasswordHandler($this->userRepository(), $this->changer());
+        $handler = new SetUserPasswordHandler(new UserLookup($this->userRepository()), $this->changer());
 
         $handler(new SetUserPasswordCommand('Owner@Baander.app', 'by-email-password'));
         self::assertSame('hashed:by-email-password', $this->user->getPassword());
@@ -99,7 +100,7 @@ final class PasswordHandlersTest extends TestCase
 
     public function testOperatorResetReportsAnUnknownUser(): void
     {
-        $handler = new SetUserPasswordHandler($this->userRepository(), $this->changer());
+        $handler = new SetUserPasswordHandler(new UserLookup($this->userRepository()), $this->changer());
 
         foreach (['nobody@baander.app', Uuid::generate()->toString(), 'not-a-uuid'] as $identifier) {
             try {

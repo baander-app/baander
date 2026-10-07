@@ -86,12 +86,18 @@ try {
     $assertCount("SELECT COUNT(*) FROM domain_event_outbox WHERE event_name = 'user.registered'", 1);
     echo "Registration rolls back user, token, preferences, and outbox; same-bus retry commits all four.\n";
 
-    $token = (string) $observer->fetchOne('SELECT t.token FROM email_verification_tokens t JOIN users u ON u.id = t.user_id WHERE u.email = ?', [$registerEmail]);
+    // Only the token's hash is stored and the email delivery is not observable here, so replace
+    // the issued hash with that of a known token.
+    $token = bin2hex(random_bytes(32));
+    $observer->executeStatement(
+        'UPDATE email_verification_tokens SET token_hash = ? WHERE user_id = (SELECT id FROM users WHERE email = ?)',
+        [hash('sha256', $token), $registerEmail],
+    );
     $verify = new VerifyEmailCommand($token);
     $rejectEvent('user.email_verified');
     $expectConstraintFailure($verify, 'producer_reject_event');
     $assertCount('SELECT COUNT(*) FROM users WHERE email = ? AND email_verified_at IS NULL', 1, [$registerEmail]);
-    $assertCount('SELECT COUNT(*) FROM email_verification_tokens WHERE token = ? AND used_at IS NULL', 1, [$token]);
+    $assertCount('SELECT COUNT(*) FROM email_verification_tokens WHERE token_hash = ?', 1, [hash('sha256', $token)]);
     $assertCount("SELECT COUNT(*) FROM domain_event_outbox WHERE event_name = 'user.email_verified'", 0);
     $allowEvents();
     $bus->dispatch($verify);

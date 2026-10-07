@@ -7,6 +7,7 @@ import { LoginPage } from '../auth/pages/LoginPage'
 import { RegisterPage } from '../auth/pages/RegisterPage'
 import { ForgotPasswordPage } from '../auth/pages/ForgotPasswordPage'
 import { ResetPasswordPage } from '../auth/pages/ResetPasswordPage'
+import { VerifyEmailPage } from '../auth/pages/VerifyEmailPage'
 import { AlbumsPage } from '../catalog/pages/AlbumsPage'
 import { AlbumDetailPage } from '../catalog/pages/AlbumDetailPage'
 import { ArtistDetailPage } from '../catalog/pages/ArtistDetailPage'
@@ -43,6 +44,7 @@ export const publicRoutes: RouteObject[] = [
   { path: '/register', element: <RegisterPage /> },
   { path: '/forgot-password', element: <ForgotPasswordPage /> },
   { path: '/reset-password', element: <ResetPasswordPage /> },
+  { path: '/verify-email', element: <VerifyEmailPage /> },
 ]
 
 export const protectedRoutes: RouteObject[] = [

@@ -1011,6 +1011,7 @@
                     "Admin / Users"
                 ],
                 "summary": "Update a user",
+                "description": "A new email address starts unverified and is sent a verification link.",
                 "operationId": "patch_admin_users_update",
                 "parameters": [
                     {
@@ -1050,6 +1051,16 @@
                     },
                     "404": {
                         "description": "User not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Email already taken",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2500,29 +2511,21 @@
                     "Auth"
                 ],
                 "summary": "Verify an email address with a token",
+                "description": "Redeems the token from a verification email once. The token verifies only the address it was sent to, while the account still has that address.",
                 "operationId": "post_auth_email_verify",
                 "requestBody": {
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
-                                "required": [
-                                    "token"
-                                ],
-                                "properties": {
-                                    "token": {
-                                        "type": "string",
-                                        "example": "verification-token-abc123"
-                                    }
-                                },
-                                "type": "object"
+                                "$ref": "#/components/schemas/VerifyEmailRequest"
                             }
                         }
                     }
                 },
                 "responses": {
                     "200": {
-                        "description": "Verification status",
+                        "description": "Email address verified",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2531,13 +2534,23 @@
                                             "properties": {
                                                 "message": {
                                                     "type": "string",
-                                                    "example": "Email verification not yet implemented."
+                                                    "example": "Email verified."
                                                 }
                                             },
                                             "type": "object"
                                         }
                                     },
                                     "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The token is unknown, expired, already used or for an address the account no longer has",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -2551,9 +2564,72 @@
                                 }
                             }
                         }
+                    },
+                    "429": {
+                        "description": "Too many verification attempts from this IP",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": []
+            }
+        },
+        "/api/auth/me/email/verification": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Send a new verification email",
+                "description": "Emails the current user a new verification link and ends the one sent earlier. The answer is the same whether or not an email was sent: nothing is sent when the address is already verified or the user has used up their resend allowance.",
+                "operationId": "post_auth_me_email_verification",
+                "responses": {
+                    "200": {
+                        "description": "Request accepted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string",
+                                                    "example": "If your email address still needs verification, a new link has been sent."
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many verification requests from this IP",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/auth/me/email": {
@@ -2562,6 +2638,7 @@
                     "Auth"
                 ],
                 "summary": "Change the current user email",
+                "description": "The new address starts unverified and is sent a verification link; links sent to the old address stop working.",
                 "operationId": "put_auth_me_email",
                 "requestBody": {
                     "required": true,
