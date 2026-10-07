@@ -1099,6 +1099,9 @@ services:
     App\Lyrics\Application\Port\LrclibClientInterface:
         alias: App\Lyrics\Infrastructure\Api\LrclibClient
 
+    App\Lyrics\Application\Port\LyricsFetchRequestInterface:
+        alias: App\Lyrics\Application\Service\LyricsFetchRequester
+
     App\Lyrics\Infrastructure\Api\LrclibClient:
         arguments:
             $baseUrl: '%env(LRCLIB_BASE_URL)%'

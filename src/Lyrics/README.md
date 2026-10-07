@@ -15,6 +15,7 @@ The `Lyrics` aggregate stores lyrics indexed by song ID, supporting multiple sou
 - On-demand fetch: cached endpoint (`/api/get-cached`) first for predictable latency, fallback to full (`/api/get`) on 404
 - Search fallback: manual keyword search via `/api/search` when auto-match by track signature fails
 - Bulk scan: console command iterates songs without lyrics and fetches from LRCLIB
+- Automatic fetch: while `lyrics.auto_fetch` is on, Catalog ingest queues one fetch on the `async` transport for each new song without a sidecar `.lrc` file. The setting is off by default and does not gate the bulk scan or the on-demand fetch.
 
 ## Ports
 
@@ -22,6 +23,7 @@ The `Lyrics` aggregate stores lyrics indexed by song ID, supporting multiple sou
 |------|-------|---------|
 | `LyricsPortInterface` | Application | Lyrics CRUD + LRCLIB orchestration (fetch, search, apply) |
 | `LrclibClientInterface` | Application | LRCLIB HTTP API contract (getBySignature, search, getById) |
+| `LyricsFetchRequestInterface` | Application (contract) | Lets Catalog ingest request fetches for new songs; reads `lyrics.auto_fetch` on every call |
 
 ## Events
 

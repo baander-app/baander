@@ -10,6 +10,7 @@ use App\Library\Application\Command\ScanLibraryCommand;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Domain\ValueObject\LibrarySlug;
+use App\Lyrics\Application\Command\FetchLyricsCommand;
 use App\Media\Application\Command\PruneMissingImagesCommand;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Metadata\Application\Message\SyncAlbumMessage;
@@ -55,6 +56,7 @@ final class JsonMessageCodecTest extends TestCase
         yield [new ScanLibraryCommand(new LibrarySlug('music'), true)];
         yield [new FilesDiscovered($id, 'music', '/music', [new DiscoveredFile('/music/a.flac', 'a.flac', 'flac', 100, 12345, 'abc')])];
         yield [new ExtractAlbumCoverCommand($id)];
+        yield [new FetchLyricsCommand($id)];
         yield [new SyncSongMessage($id, true)];
         yield [new SyncAlbumMessage($id)];
         yield [new SyncLibraryMessage($id, true, true, true)];

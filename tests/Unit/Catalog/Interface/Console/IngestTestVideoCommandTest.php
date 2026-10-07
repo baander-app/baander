@@ -18,6 +18,7 @@ use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Application\Port\LibraryProvisioningInterface;
 use App\Library\Application\Port\ProvisionedLibraryScan;
+use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
 use PHPUnit\Framework\MockObject\Stub;
@@ -104,7 +105,8 @@ final class IngestTestVideoCommandTest extends TestCase
         $handler = new FilesDiscoveredHandler(
             $this->createStub(AlbumPortInterface::class), $this->createStub(GenrePortInterface::class),
             $this->createStub(SongPortInterface::class), $this->createStub(MoviePortInterface::class),
-            $videos, $this->createStub(MetadataContentReaderPortInterface::class), new FFprobeAdapter(new JsonEncoder()), $bus, new NullLogger(),
+            $videos, $this->createStub(MetadataContentReaderPortInterface::class), new FFprobeAdapter(new JsonEncoder()), $bus,
+            $this->createStub(LyricsFetchRequestInterface::class), new NullLogger(),
         );
 
         return new IngestTestVideoCommand(new MovieLibraryIngest($provisioning, $handler, $videos));

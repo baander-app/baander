@@ -34,7 +34,7 @@ deptrac:
         Catalog: ['Catalog Song Lookup Contract', 'Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Resources', 'Catalog Interface']
         Filesystem: ['Filesystem Infrastructure', 'Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
         Library: ['Library Read Scope Contract', 'Library Content Stats Contract', 'Library Files Discovered Contract', 'Library Provisioning Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
-        Lyrics: ['Lyrics Domain', 'Lyrics Application', 'Lyrics Infrastructure', 'Lyrics Resources', 'Lyrics Interface']
+        Lyrics: ['Lyrics Fetch Request Contract', 'Lyrics Domain', 'Lyrics Application', 'Lyrics Infrastructure', 'Lyrics Resources', 'Lyrics Interface']
         Media: ['Media Domain', 'Media Application', 'Media Infrastructure', 'Media Resources', 'Media Interface']
         Metadata: ['Metadata Domain', 'Metadata Application', 'Metadata Infrastructure', 'Metadata Interface']
         Notification: ['Notification Domain', 'Notification Application', 'Notification Infrastructure', 'Notification Resources', 'Notification Interface']
@@ -844,10 +844,20 @@ deptrac:
             - type: classLike
               value: '^App\\QoL\\Interface\\Resource\\'
 
-    - name: 'Lyrics Application'
+    - name: 'Lyrics Fetch Request Contract'
       collectors:
         - type: classLike
-          value: '^App\\Lyrics\\Application\\'
+          value: '^App\\Lyrics\\Application\\Port\\LyricsFetchRequestInterface$'
+
+    - name: 'Lyrics Application'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Lyrics\\Application\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Lyrics\\Application\\Port\\LyricsFetchRequestInterface$'
 
     - name: 'Lyrics Resources'
       collectors:
@@ -963,6 +973,7 @@ deptrac:
     'Catalog Domain':
       - 'Shared Domain'
     'Catalog Application':
+      - 'Lyrics Fetch Request Contract'
       - 'Library Files Discovered Contract'
       - 'Library Provisioning Contract'
       - 'Scheduler Schedulable Contract'
@@ -1488,7 +1499,10 @@ deptrac:
       - 'Shared Application'
       - 'Shared Interface'
 
+    'Lyrics Fetch Request Contract':
+      - 'Shared Domain'
     'Lyrics Application':
+      - 'Lyrics Fetch Request Contract'
       - 'Catalog Song Lookup Contract'
       - 'Scheduler Schedulable Contract'
       - 'Lyrics Domain'

@@ -6,6 +6,7 @@ namespace App\Tests\Fixtures\Messaging;
 
 use App\Catalog\Infrastructure\Messaging\CatalogMessagePayloadCodec;
 use App\Library\Infrastructure\Messaging\LibraryMessagePayloadCodec;
+use App\Lyrics\Infrastructure\Messaging\LyricsMessagePayloadCodec;
 use App\Media\Infrastructure\Messaging\MediaMessagePayloadCodec;
 use App\Metadata\Infrastructure\Messaging\MetadataMessagePayloadCodec;
 use App\Notification\Infrastructure\Messaging\NotificationMessagePayloadCodec;
@@ -23,6 +24,7 @@ final class MessageCodecFactory
         return new JsonMessageCodec([
             new CatalogMessagePayloadCodec(),
             new LibraryMessagePayloadCodec(),
+            new LyricsMessagePayloadCodec(),
             new MediaMessagePayloadCodec(),
             new MetadataMessagePayloadCodec(),
             new NotificationMessagePayloadCodec(),
