@@ -94,6 +94,10 @@ index eligibility for the emitted predicate, not just the presence of an index.
 See [PostgreSQL 18 pg_trgm](https://www.postgresql.org/docs/18/pgtrgm.html).
 `citext` is a physical type with a registered DBAL conversion; inspect comparison
 and uniqueness semantics before replacing it with plain text or lower-case SQL.
+`users.email` is the only CITEXT column in application tables
+(`password_reset_tokens.email` was dropped by Version20261006320000; verified
+2026-10-07 on disposable `baander-database:latest` via `information_schema.columns`).
+Reset tokens are hashed with SHA-256 in PHP; `pgcrypto` is not used for them.
 
 ## Diff and performance checks
 
