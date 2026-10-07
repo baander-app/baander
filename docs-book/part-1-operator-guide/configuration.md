@@ -113,7 +113,7 @@ Limits are set in `config/packages/auth.yaml`. Each limit feeds a Symfony rate l
 | `auth.rate_limit.register.max_attempts` | `10` | Max registration attempts per IP within the window. |
 | `auth.rate_limit.register.window` | `900` (15 min) | Window in seconds for registration. |
 | `auth.rate_limit.password_reset.max_attempts` | `10` | Max password reset requests per IP within the window. |
-| `auth.rate_limit.password_reset_per_email.max_attempts` | `5` | Max password reset requests per account (normalized email) within the window. |
+| `auth.rate_limit.password_reset_per_email.max_attempts` | `10` | Max password reset requests per account (normalized email) within the window. |
 | `auth.rate_limit.password_reset.window` | `900` (15 min) | Window in seconds for both password reset limits. |
 | `auth.rate_limit.refresh.max_attempts` | `60` | Max token refresh requests per refresh token within the window. |
 | `auth.rate_limit.refresh.window` | `60` (1 min) | Window in seconds for token refresh. |

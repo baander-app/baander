@@ -106,8 +106,8 @@ parameters:
     # Maximum password reset requests per account (normalized email) within the
     # password reset window. Over the limit, the request still returns the generic
     # success response but issues no token, so the limit reveals nothing about
-    # whether the account exists. Default: 5 per 15 minutes.
-    auth.rate_limit.password_reset_per_email.max_attempts: 5
+    # whether the account exists. Default: 10 per 15 minutes.
+    auth.rate_limit.password_reset_per_email.max_attempts: 10
 
     # Maximum token refresh requests per client within the window. Default: 60 per minute.
     auth.rate_limit.refresh.max_attempts: 60
