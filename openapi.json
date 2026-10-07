@@ -1198,6 +1198,16 @@
                                 }
                             }
                         }
+                    },
+                    "403": {
+                        "description": "Forbidden; admins need the admin.can_view_users setting",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             },
@@ -1206,6 +1216,7 @@
                     "Admin / Users"
                 ],
                 "summary": "Create a new user",
+                "description": "Super admins may create any user. Admins may create users with ROLE_USER only, and only while the admin.can_create_users setting is on.",
                 "operationId": "post_admin_users_create",
                 "requestBody": {
                     "required": true,

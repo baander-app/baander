@@ -4,11 +4,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ThemeProvider } from 'styled-components'
 import { resolveTheme } from '@/shared/theme/resolve-theme'
-import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { AxiosError, type AxiosResponse } from 'axios'
+import { AXIOS_INSTANCE, customInstance } from '@/shared/api-client/axios-instance'
 import type { AdminUserListParams } from '../../api/user-admin-api'
 import { AdminUsersPage } from '../AdminUsersPage'
 
-vi.mock('@/shared/api-client/axios-instance', () => ({ AXIOS_INSTANCE: { get: vi.fn() } }))
+vi.mock('@/shared/api-client/axios-instance', () => ({
+  AXIOS_INSTANCE: { get: vi.fn() },
+  customInstance: vi.fn(),
+}))
+vi.mock('@/features/auth/hooks/use-admin-check', () => ({
+  useAdminCheck: () => ({ isAdmin: true, isSuperAdmin: superAdmin, roles: [] }),
+}))
 vi.mock('../../components/users/UserRowActions', () => ({ UserRowActions: () => null }))
 vi.mock('../../components/users/CreateUserDialog', () => ({ CreateUserDialog: () => null }))
 vi.mock('../../components/users/EditUserDialog', () => ({ EditUserDialog: () => null }))
@@ -17,9 +24,11 @@ vi.mock('../../components/users/ResetPasswordDialog', () => ({ ResetPasswordDial
 vi.mock('../../components/users/DeleteUserDialog', () => ({ DeleteUserDialog: () => null }))
 
 const mockGet = vi.mocked(AXIOS_INSTANCE.get)
+const mockCustomInstance = vi.mocked(customInstance)
 let total: number
 let fail: boolean
 let client: QueryClient
+let superAdmin: boolean
 
 function mount() {
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -40,7 +49,9 @@ describe('admin user pagination', () => {
   beforeEach(() => {
     total = 101
     fail = false
+    superAdmin = true
     mockGet.mockReset()
+    mockCustomInstance.mockReset()
     mockGet.mockImplementation(async (_url, config) => {
       if (fail) throw new Error('Unavailable')
       const { offset = 0, limit = 50 } = config?.params as AdminUserListParams
@@ -130,5 +141,63 @@ describe('admin user pagination', () => {
     await user.click(screen.getByRole('button', { name: 'Retry' }))
     await screen.findByText('user0@baander.app')
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+  })
+})
+
+describe('admin user management toggles', () => {
+  beforeEach(() => {
+    superAdmin = false
+    mockGet.mockReset()
+    mockGet.mockResolvedValue({ data: { data: [], meta: { total: 0, limit: 50, offset: 0 } } })
+    mockCustomInstance.mockReset()
+  })
+
+  afterEach(() => {
+    cleanup()
+    client?.clear()
+  })
+
+  function adminSettings(canViewUsers: boolean, canCreateUsers: boolean) {
+    mockCustomInstance.mockResolvedValue({
+      data: [
+        { key: 'admin.can_view_users', value: canViewUsers, storedValue: null, isExplicit: false, storedValueValid: true },
+        { key: 'admin.can_create_users', value: canCreateUsers, storedValue: null, isExplicit: false, storedValueValid: true },
+      ],
+    })
+  }
+
+  it('shows Create User to a super admin without reading the settings', async () => {
+    superAdmin = true
+    mount()
+
+    expect(await screen.findByRole('button', { name: /Create User/ })).toBeInTheDocument()
+    expect(mockCustomInstance).not.toHaveBeenCalled()
+  })
+
+  it('hides Create User from an admin while admin.can_create_users is off', async () => {
+    adminSettings(true, false)
+    mount()
+
+    await screen.findByText('No users found.')
+    await waitFor(() => expect(mockCustomInstance).toHaveBeenCalledWith('/api/admin/settings', expect.anything()))
+    expect(screen.queryByRole('button', { name: /Create User/ })).not.toBeInTheDocument()
+  })
+
+  it('shows Create User to an admin while admin.can_create_users is on', async () => {
+    adminSettings(true, true)
+    mount()
+
+    expect(await screen.findByRole('button', { name: /Create User/ })).toBeInTheDocument()
+  })
+
+  it('replaces the list with an explanation when the server denies the admin the user list', async () => {
+    adminSettings(false, false)
+    mockGet.mockRejectedValue(new AxiosError('Forbidden', 'ERR_BAD_REQUEST', undefined, undefined, { status: 403 } as AxiosResponse))
+    mount()
+
+    expect(await screen.findByText(/Admins cannot view the user list on this server/)).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Filter by role' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('navigation', { name: 'Users pagination' })).not.toBeInTheDocument()
   })
 })

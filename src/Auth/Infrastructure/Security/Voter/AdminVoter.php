@@ -13,20 +13,18 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
  *
  * @extends Voter<string, mixed>
  *
- * Single attribute: ADMIN_ACCESS — grants access only to users
- * with the ROLE_ADMIN role. All other users are denied.
+ * ADMIN_ACCESS grants admins and super admins; SYSTEM_SETTINGS grants super
+ * admins only. User management has its own toggle-aware UserManagementVoter.
  */
 final class AdminVoter extends Voter
 {
     public const string ADMIN_ACCESS = 'ADMIN_ACCESS';
-    public const string USER_MANAGEMENT = 'USER_MANAGEMENT';
     public const string SYSTEM_SETTINGS = 'SYSTEM_SETTINGS';
 
     protected function supports(string $attribute, mixed $subject): bool
     {
         return in_array($attribute, [
             self::ADMIN_ACCESS,
-            self::USER_MANAGEMENT,
             self::SYSTEM_SETTINGS,
         ], true);
     }
@@ -35,7 +33,7 @@ final class AdminVoter extends Voter
     {
         return match ($attribute) {
             self::ADMIN_ACCESS => $this->isAdmin($token),
-            self::USER_MANAGEMENT, self::SYSTEM_SETTINGS => $this->isSuperAdmin($token),
+            self::SYSTEM_SETTINGS => $this->isSuperAdmin($token),
             default => false,
         };
     }

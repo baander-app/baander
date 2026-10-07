@@ -21,6 +21,7 @@ use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Request\QueryParameters;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -41,6 +42,7 @@ final class AdminUserController
     public function __construct(
         private readonly UserPortInterface $userService,
         private readonly MessageBusInterface $commandBus,
+        private readonly Security $security,
     ) {
     }
 
@@ -69,9 +71,11 @@ final class AdminUserController
                 ),
             ),
             new OA\Response(response: '400', description: 'Invalid query parameters', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '403', description: 'Forbidden; admins need the admin.can_view_users setting', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('', name: 'list', methods: ['GET'])]
+    #[IsGranted('USER_MANAGEMENT_LIST')]
     public function list(Request $request): JsonResponse
     {
         $role = QueryParameters::optionalChoice($request->query, 'role', ['ROLE_USER', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN']);
@@ -94,6 +98,7 @@ final class AdminUserController
     #[OA\Post(
         path: '/api/admin/users',
         summary: 'Create a new user',
+        description: 'Super admins may create any user. Admins may create users with ROLE_USER only, and only while the admin.can_create_users setting is on.',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(ref: new Model(type: AdminCreateUserRequest::class)),
@@ -107,10 +112,15 @@ final class AdminUserController
         ],
     )]
     #[Route('', name: 'create', methods: ['POST'])]
-    #[IsGranted('ROLE_SUPER_ADMIN')]
     public function create(
         #[MapRequestPayload] AdminCreateUserRequest $request,
     ): JsonResponse {
+        // Checked here rather than with #[IsGranted]: the vote needs the requested roles,
+        // and the payload is mapped only after #[IsGranted] subjects are resolved.
+        if (!$this->security->isGranted('USER_MANAGEMENT_CREATE', $request->roles)) {
+            return $this->forbidden('Admins may create users with ROLE_USER only, and only while admin.can_create_users is on.');
+        }
+
         $email = new Email($request->email);
 
         if ($this->userService->existsWithEmail($email)) {
