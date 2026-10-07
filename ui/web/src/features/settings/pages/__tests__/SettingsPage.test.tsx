@@ -34,6 +34,11 @@ vi.mock('../../components/PasskeyManagement', () => ({
   PasskeyManagement: () => <div data-testid="passkey-management">Passkey Mock</div>,
 }));
 
+// The email language control has its own tests; here only its placement matters
+vi.mock('../../components/EmailLanguageSetting', () => ({
+  EmailLanguageSetting: () => <div data-testid="email-language-setting">Email language Mock</div>,
+}));
+
 import { SettingsPage } from '../SettingsPage';
 
 function renderWithTheme(ui: React.ReactElement) {
@@ -117,6 +122,13 @@ describe('SettingsPage', () => {
   it('renders the PasskeyManagement component', () => {
     renderWithTheme(<SettingsPage />);
     expect(screen.getByTestId('passkey-management')).toBeInTheDocument();
+  });
+
+  it('renders the email language setting in the Account section', () => {
+    renderWithTheme(<SettingsPage />);
+    const account = screen.getByRole('heading', { name: 'Account' }).closest('section');
+    expect(account).not.toBeNull();
+    expect(account).toContainElement(screen.getByTestId('email-language-setting'));
   });
 
   it('renders the About section with version', () => {
