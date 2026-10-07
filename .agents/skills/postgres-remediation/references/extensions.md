@@ -94,6 +94,15 @@ index eligibility for the emitted predicate, not just the presence of an index.
 See [PostgreSQL 18 pg_trgm](https://www.postgresql.org/docs/18/pgtrgm.html).
 `citext` is a physical type with a registered DBAL conversion; inspect comparison
 and uniqueness semantics before replacing it with plain text or lower-case SQL.
+Compare a CITEXT column with plain equality and an untyped string parameter:
+pdo_pgsql sends string parameters untyped, so PostgreSQL infers `citext` and
+`uniq_users_email` serves the lookup case-insensitively. `LOWER(col) = LOWER(:p)`
+and a parameter typed or cast as `text` both resolve to `text = text`; the first
+needs a sequential scan, the second is also case-sensitive. Verified 2026-10-07 on
+PostgreSQL 18.4 (disposable `baander-database:latest`, 100k rows) and by
+[UserEmailLookupTest](../../../../tests/Functional/Auth/UserEmailLookupTest.php),
+which asserts index scans through `pg_stat_get_xact_numscans`
+(`pg_stat_xact_user_indexes` does not exist).
 `users.email` is the only CITEXT column in application tables
 (`password_reset_tokens.email` was dropped by Version20261006320000; verified
 2026-10-07 on disposable `baander-database:latest` via `information_schema.columns`).

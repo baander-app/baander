@@ -53,7 +53,10 @@ schema comparison cannot see timestamptz precision, and mapping a timestamptz
 column as `datetimetz_immutable` creates drift; keep `datetime_immutable` until
 the convention changes. `DateTimeImmutableType` writes `Y-m-d H:i:s` with no
 offset and no fraction, so hand-written SQL binds instants as `Y-m-d H:i:s.uP`
-strings. When widening timestamp precision, widen cursor sort values too
+strings. On a `timestamptz(0)` column PostgreSQL rounds a raw fractional instant
+(23:59:59.5 becomes the next midnight), while ORM writes are already truncated in
+PHP; ranges therefore use `[day start, next day start)` rather than relying on either.
+When widening timestamp precision, widen cursor sort values too
 (`JobMonitorService::extractSortValue`): a whole-second cursor re-includes its own row.
 
 For IDs, distinguish application-assigned UUID with `GeneratedValue('NONE')`,
