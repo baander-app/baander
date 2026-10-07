@@ -152,4 +152,36 @@ final class TranscodeFileStorage implements TranscodeStoragePortInterface
     {
         return $this->resolver->getVideoDirectories();
     }
+
+    public function getAudioRenditionDirectories(): array
+    {
+        return $this->resolver->getAudioRenditionDirectories();
+    }
+
+    public function resolveAudioRenditionDirectory(string $trackKey): string
+    {
+        return $this->resolver->resolveAudioRenditionDirectory($trackKey);
+    }
+
+    public function isAudioRenditionEncodingSince(string $trackKey, \DateTimeImmutable $since): bool
+    {
+        $directory = $this->resolver->resolveAudioRenditionDirectory($trackKey);
+        if (is_link($directory) || !is_dir($directory)) {
+            return false;
+        }
+
+        foreach (scandir($directory) ?: [] as $entry) {
+            $path = $directory . '/' . $entry;
+            if (!str_ends_with($entry, SegmentFileResolver::PARTIAL_SUFFIX) || is_link($path) || !is_file($path)) {
+                continue;
+            }
+            clearstatcache(true, $path);
+            $modified = @filemtime($path);
+            if ($modified !== false && $modified >= $since->getTimestamp()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }

@@ -73,7 +73,7 @@ final class SweepTranscodeCacheHandlerTest extends TestCase
         $handler = $this->buildHandler();
         $result = $handler->sweep(['ttl_hours' => 24]);
 
-        $this->assertContains($videoId->toString(), $result->deletedVideoIds);
+        $this->assertContains($videoId->toString(), $result->deletedDirectories);
         $this->assertFileDoesNotExist($dir);
         $this->assertSame(4, $result->bytesFreed);
         $this->assertFalse($result->dryRun);
@@ -92,7 +92,7 @@ final class SweepTranscodeCacheHandlerTest extends TestCase
         try {
             $result = $this->buildHandler()->sweep(['ttl_hours' => 24]);
 
-            self::assertContains($videoId->toString(), $result->deletedVideoIds);
+            self::assertContains($videoId->toString(), $result->deletedDirectories);
             self::assertSame(4, $result->bytesFreed);
             self::assertDirectoryDoesNotExist($dir);
             self::assertSame('outside content', file_get_contents($outside));
@@ -117,7 +117,7 @@ final class SweepTranscodeCacheHandlerTest extends TestCase
         $handler = $this->buildHandler();
         $result = $handler->sweep(['ttl_hours' => 24]);
 
-        $this->assertNotContains($videoId->toString(), $result->deletedVideoIds);
+        $this->assertNotContains($videoId->toString(), $result->deletedDirectories);
         $this->assertContains($videoId->toString(), $result->skippedActive);
         $this->assertDirectoryExists($dir);
     }
@@ -147,7 +147,7 @@ final class SweepTranscodeCacheHandlerTest extends TestCase
         $handler = $this->buildHandler();
         $result = $handler->sweep(['ttl_hours' => 24]);
 
-        $this->assertNotContains($videoId->toString(), $result->deletedVideoIds);
+        $this->assertNotContains($videoId->toString(), $result->deletedDirectories);
         $this->assertContains($videoId->toString(), $result->skippedActive);
         $this->assertDirectoryExists($dir);
     }
@@ -161,7 +161,7 @@ final class SweepTranscodeCacheHandlerTest extends TestCase
         $handler = $this->buildHandler();
         $result = $handler->sweep(['ttl_hours' => 24]);
 
-        $this->assertNotContains($videoId->toString(), $result->deletedVideoIds);
+        $this->assertNotContains($videoId->toString(), $result->deletedDirectories);
         $this->assertDirectoryExists($dir);
     }
 
@@ -182,12 +182,12 @@ final class SweepTranscodeCacheHandlerTest extends TestCase
         $result = $handler->sweep(['ttl_hours' => 24, 'max_gb' => 0.0]);
 
         // Oldest (old) must be deleted before newest (new).
-        $posOld = array_search($old->toString(), $result->deletedVideoIds, true);
-        $posNew = array_search($new->toString(), $result->deletedVideoIds, true);
+        $posOld = array_search($old->toString(), $result->deletedDirectories, true);
+        $posNew = array_search($new->toString(), $result->deletedDirectories, true);
         $this->assertNotFalse($posOld);
         $this->assertNotFalse($posNew);
         $this->assertLessThan($posNew, $posOld, 'oldest video should be evicted before newest');
-        $this->assertContains($old->toString(), $result->deletedVideoIds);
+        $this->assertContains($old->toString(), $result->deletedDirectories);
     }
 
     public function testSizeBudgetDoesNotEvictActiveDirectories(): void
@@ -206,8 +206,8 @@ final class SweepTranscodeCacheHandlerTest extends TestCase
         $handler = $this->buildHandler();
         $result = $handler->sweep(['ttl_hours' => 24, 'max_gb' => 0.0]);
 
-        $this->assertNotContains($active->toString(), $result->deletedVideoIds, 'active dir must survive budget pressure');
-        $this->assertContains($idle->toString(), $result->deletedVideoIds);
+        $this->assertNotContains($active->toString(), $result->deletedDirectories, 'active dir must survive budget pressure');
+        $this->assertContains($idle->toString(), $result->deletedDirectories);
     }
 
     public function testDryRunReportsDeletionsWithoutDeleting(): void
@@ -220,8 +220,42 @@ final class SweepTranscodeCacheHandlerTest extends TestCase
         $result = $handler->sweep(['ttl_hours' => 24, 'dry_run' => true]);
 
         $this->assertTrue($result->dryRun);
-        $this->assertContains($videoId->toString(), $result->deletedVideoIds);
+        $this->assertContains($videoId->toString(), $result->deletedDirectories);
         $this->assertDirectoryExists($dir, 'dry-run must not delete anything');
+    }
+
+    public function testIdleTrackAudioRenditionsShareTheTtlPolicy(): void
+    {
+        $idle = $this->cacheRoot . '/audio-renditions/idleTrackPublicId001';
+        $recent = $this->cacheRoot . '/audio-renditions/recentTrackPublicId01';
+        $this->writeSegment($idle, 'mp3-192k-0123456789abcdef.mp3', 'idle', 3600 * 26);
+        $this->writeSegment($recent, 'opus-128k-0123456789abcdef.opus', 'recent', 60);
+
+        $result = $this->buildHandler()->sweep(['ttl_hours' => 24]);
+
+        self::assertSame(['audio-renditions/idleTrackPublicId001'], $result->deletedDirectories);
+        self::assertContains('audio-renditions/recentTrackPublicId01', $result->retainedDirectories);
+        self::assertNotContains('audio-renditions', $result->retainedDirectories);
+        self::assertSame([], $result->skippedActive);
+        self::assertDirectoryDoesNotExist($idle);
+        self::assertDirectoryExists($recent);
+    }
+
+    public function testTrackAudioRenditionsBeingEncodedSurviveTtlAndSizeBudget(): void
+    {
+        $encoding = $this->cacheRoot . '/audio-renditions/encodingTrackId000001';
+        $abandoned = $this->cacheRoot . '/audio-renditions/abandonedTrackId00001';
+        $this->writeSegment($encoding, 'mp3-320k-0123456789abcdef.mp3', 'old rendition', 3600 * 26);
+        $this->writeSegment($encoding, 'aac-192k-0123456789abcdef.aac.part', 'growing', 5);
+        // A partial file nobody has written to for longer than the active window.
+        $this->writeSegment($abandoned, 'aac-192k-0123456789abcdef.aac.part', 'stale', 3600 * 2);
+
+        $result = $this->buildHandler()->sweep(['ttl_hours' => 24, 'max_gb' => 0.0]);
+
+        self::assertSame(['audio-renditions/encodingTrackId000001'], $result->skippedActive);
+        self::assertSame(['audio-renditions/abandonedTrackId00001'], $result->deletedDirectories);
+        self::assertDirectoryExists($encoding);
+        self::assertDirectoryDoesNotExist($abandoned);
     }
 
     // --- helpers -----------------------------------------------------------

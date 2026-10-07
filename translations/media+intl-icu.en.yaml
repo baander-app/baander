@@ -7,3 +7,6 @@ errors:
   missing_track_id: 'Missing "id" parameter.'
   invalid_track_id_format: "Invalid track ID format."
   track_not_found: "Track not found."
+  unsupported_transcode_format: 'Unsupported "format". Use opus, aac or mp3.'
+  invalid_transcode_bitrate: '"bitrate" must be a positive whole number of bits per second and needs a "format".'
+  transcode_failed: "Audio transcoding failed."

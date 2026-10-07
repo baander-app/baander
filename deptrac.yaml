@@ -41,7 +41,7 @@ deptrac:
         Party: ['Party Domain', 'Party Application', 'Party Infrastructure', 'Party Resources', 'Party Interface']
         Playlist: ['Playlist Deletion Preview Contract', 'Playlist Domain', 'Playlist Application', 'Playlist Infrastructure', 'Playlist Resources', 'Playlist Interface']
         Recommendation: ['Recommendation Domain', 'Recommendation Application', 'Recommendation Infrastructure', 'Recommendation Resources', 'Recommendation Interface']
-        Transcode: ['Transcode Playback Access Contract', 'Transcode Domain', 'Transcode Application', 'Transcode Infrastructure', 'Transcode Resources', 'Transcode Interface']
+        Transcode: ['Transcode Playback Access Contract', 'Transcode Audio Rendition Contract', 'Transcode Domain', 'Transcode Application', 'Transcode Infrastructure', 'Transcode Resources', 'Transcode Interface']
         UserPreference: ['UserPreference Settings Contract', 'UserPreference Domain', 'UserPreference Application', 'UserPreference Infrastructure', 'UserPreference Resources', 'UserPreference Interface']
         Discovery: ['Discovery Domain', 'Discovery Application', 'Discovery Infrastructure', 'Discovery Resources', 'Discovery Interface']
         Favorites: ['Favorites Domain', 'Favorites Application', 'Favorites Infrastructure', 'Favorites Resources', 'Favorites Interface']
@@ -518,6 +518,12 @@ deptrac:
         - type: classLike
           value: '^App\\Transcode\\Application\\Port\\PlaybackAccessInterface$'
 
+    # Media streams tracks through this cached audio transcoding contract.
+    - name: 'Transcode Audio Rendition Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Transcode\\Application\\(Port\\AudioRendition(PortInterface|Format)?|Exception\\AudioRenditionFailedException)$'
+
     - name: 'Transcode Application'
       collectors:
         - type: bool
@@ -527,6 +533,8 @@ deptrac:
           must_not:
             - type: classLike
               value: '^App\\Transcode\\Application\\Port\\PlaybackAccessInterface$'
+            - type: classLike
+              value: '^App\\Transcode\\Application\\(Port\\AudioRendition(PortInterface|Format)?|Exception\\AudioRenditionFailedException)$'
 
     - name: 'Transcode Infrastructure'
       collectors:
@@ -1076,6 +1084,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Media Interface':
+      - 'Transcode Audio Rendition Contract'
       - 'Media Resources'
       - 'Media Application'
       - 'Shared Domain'
@@ -1221,16 +1230,20 @@ deptrac:
     # --- Transcode ---
     'Transcode Playback Access Contract':
       - 'Shared Domain'
+    'Transcode Audio Rendition Contract':
+      - 'Shared Domain'
     'Transcode Domain':
       - 'Shared Domain'
     'Transcode Application':
       - 'Transcode Playback Access Contract'
+      - 'Transcode Audio Rendition Contract'
       - 'Scheduler Schedulable Contract'
       - 'Transcode Domain'
       - 'Shared Domain'
       - 'Shared Application'
     'Transcode Infrastructure':
       - 'Transcode Playback Access Contract'
+      - 'Transcode Audio Rendition Contract'
       - 'QoL Encoder Profile Contract'
       - 'QoL Quality Ladder Contract'
       - 'QoL Stream Admission Contract'

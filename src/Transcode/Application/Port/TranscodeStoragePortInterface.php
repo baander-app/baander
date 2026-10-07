@@ -46,8 +46,27 @@ interface TranscodeStoragePortInterface
      *
      * Each entry is the basename of a direct child of the cache root (a
      * videoId string). Returns an empty array when the root does not exist.
+     * The audio rendition directory is not a video and is not listed.
      *
      * @return list<string>
      */
     public function getVideoDirectories(): array;
+
+    // --- Track Audio Renditions ---
+
+    /**
+     * List the tracks that have an audio rendition directory on disk.
+     *
+     * @return list<string> track keys
+     */
+    public function getAudioRenditionDirectories(): array;
+
+    /** Absolute path of the directory holding one track's audio renditions. */
+    public function resolveAudioRenditionDirectory(string $trackKey): string;
+
+    /**
+     * Whether an encoder has written to one of the track's renditions at or
+     * after the given instant, meaning an encode is (or was until recently) running.
+     */
+    public function isAudioRenditionEncodingSince(string $trackKey, \DateTimeImmutable $since): bool;
 }

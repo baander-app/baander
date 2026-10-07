@@ -33,6 +33,11 @@ use Psr\Log\NullLogger;
  * in-progress, or (b) a viewer has a session that was updated within the
  * active-playback window (default 30 min — a recently-touched session means
  * someone is watching right now).
+ *
+ * Track audio renditions share both policies and the size budget. Their cache
+ * unit is the track's rendition directory (all formats and bitrates), reported
+ * as `audio-renditions/<track>`. It counts as active while an encoder has
+ * written a partial rendition within the active-playback window.
  */
 final class SweepTranscodeCacheHandler
 {
@@ -44,6 +49,9 @@ final class SweepTranscodeCacheHandler
 
     /** Window during which a session update counts as "viewer actively watching" (seconds). */
     public const int DEFAULT_ACTIVE_WINDOW_SECONDS = 1800;
+
+    /** Prefix of the reported name of a track's audio rendition directory. */
+    public const string AUDIO_RENDITION_UNIT_PREFIX = 'audio-renditions/';
 
     public function __construct(
         private readonly TranscodeStoragePortInterface $storage,
@@ -67,7 +75,19 @@ final class SweepTranscodeCacheHandler
         $ttlCutoff = (new DateTimeImmutable())->modify(sprintf('-%d hours', $ttlHours));
         $activeCutoff = (new DateTimeImmutable())->modify(sprintf('-%d seconds', $activeWindow));
 
-        $videoIds = $this->storage->getVideoDirectories();
+        // Cache units: each video directory, then each track's audio renditions.
+        $directories = [];
+        $active = [];
+        foreach ($this->storage->getVideoDirectories() as $videoId) {
+            $directories[$videoId] = $this->storage->getBasePath() . '/' . $videoId;
+            $active[$videoId] = fn (): bool => $this->isVideoActive($videoId, $activeCutoff);
+        }
+        foreach ($this->storage->getAudioRenditionDirectories() as $trackKey) {
+            $unit = self::AUDIO_RENDITION_UNIT_PREFIX . $trackKey;
+            $directories[$unit] = $this->storage->resolveAudioRenditionDirectory($trackKey);
+            $active[$unit] = fn (): bool => $this->storage->isAudioRenditionEncodingSince($trackKey, $activeCutoff);
+        }
+        $units = array_map(strval(...), array_keys($directories));
 
         $deleted = [];
         $retained = [];
@@ -78,26 +98,26 @@ final class SweepTranscodeCacheHandler
         $dirNewestMtime = [];
         $totalBytes = 0;
 
-        // First pass: classify each video directory.
-        foreach ($videoIds as $videoId) {
-            $dir = $this->storage->getBasePath() . '/' . $videoId;
+        // First pass: classify each cache directory.
+        foreach ($units as $unit) {
+            $dir = $directories[$unit];
             $size = $this->storage->getDirectorySize($dir);
-            $dirSize[$videoId] = $size;
+            $dirSize[$unit] = $size;
             $totalBytes += $size;
-            $dirNewestMtime[$videoId] = $this->newestFileMtime($dir);
+            $dirNewestMtime[$unit] = $this->newestFileMtime($dir);
 
             // R4 — never sweep active content.
-            if ($this->isVideoActive($videoId, $activeCutoff)) {
-                $skippedActive[] = $videoId;
-                $retained[] = $videoId;
-                $this->logger->debug('Cache sweep: skipping active video {video}.', ['video' => $videoId]);
+            if ($active[$unit]()) {
+                $skippedActive[] = $unit;
+                $retained[] = $unit;
+                $this->logger->debug('Cache sweep: skipping active cache directory {directory}.', ['directory' => $unit]);
                 continue;
             }
 
             // R1 — TTL: delete if the newest file is older than the TTL cutoff.
-            $newestMtime = $dirNewestMtime[$videoId];
+            $newestMtime = $dirNewestMtime[$unit];
             if ($newestMtime !== null && (new DateTimeImmutable('@' . $newestMtime)) < $ttlCutoff) {
-                $this->deleteVideoDir($videoId, $dir, $size, $dryRun, $deleted, $bytesFreed);
+                $this->deleteDirectory($unit, $dir, $size, $dryRun, $deleted, $bytesFreed);
                 $totalBytes -= $size;
                 continue;
             }
@@ -110,11 +130,11 @@ final class SweepTranscodeCacheHandler
         // non-active directories (by newest-file mtime) until under budget.
         if ($totalBytes > $maxBytes) {
             $evictionCandidates = [];
-            foreach ($videoIds as $videoId) {
-                if (isset($alreadyDeleted[$videoId]) || isset($alreadySkipped[$videoId])) {
+            foreach ($units as $unit) {
+                if (isset($alreadyDeleted[$unit]) || isset($alreadySkipped[$unit])) {
                     continue;
                 }
-                $evictionCandidates[] = $videoId;
+                $evictionCandidates[] = $unit;
             }
 
             usort(
@@ -122,28 +142,28 @@ final class SweepTranscodeCacheHandler
                 static fn (string $a, string $b) => ($dirNewestMtime[$a] ?? 0) <=> ($dirNewestMtime[$b] ?? 0),
             );
 
-            foreach ($evictionCandidates as $videoId) {
+            foreach ($evictionCandidates as $unit) {
                 if ($totalBytes <= $maxBytes) {
                     break;
                 }
-                $size = $dirSize[$videoId];
-                $dir = $this->storage->getBasePath() . '/' . $videoId;
-                $this->deleteVideoDir($videoId, $dir, $size, $dryRun, $deleted, $bytesFreed);
+                $size = $dirSize[$unit];
+                $dir = $directories[$unit];
+                $this->deleteDirectory($unit, $dir, $size, $dryRun, $deleted, $bytesFreed);
                 $totalBytes -= $size;
             }
         }
 
-        foreach ($videoIds as $videoId) {
-            if (!in_array($videoId, $deleted, true)) {
-                if (!in_array($videoId, $retained, true)) {
-                    $retained[] = $videoId;
+        foreach ($units as $unit) {
+            if (!in_array($unit, $deleted, true)) {
+                if (!in_array($unit, $retained, true)) {
+                    $retained[] = $unit;
                 }
             }
         }
 
         return new SweepTranscodeCacheResult(
-            deletedVideoIds: $deleted,
-            retainedVideoIds: $retained,
+            deletedDirectories: $deleted,
+            retainedDirectories: $retained,
             skippedActive: $skippedActive,
             bytesFreed: $bytesFreed,
             totalCacheBytesBefore: array_sum($dirSize),
@@ -209,8 +229,8 @@ final class SweepTranscodeCacheHandler
     }
 
     /** @param list<string> $deleted */
-    private function deleteVideoDir(
-        string $videoId,
+    private function deleteDirectory(
+        string $unit,
         string $dir,
         int $size,
         bool $dryRun,
@@ -220,11 +240,11 @@ final class SweepTranscodeCacheHandler
         if (!$dryRun) {
             $this->storage->deleteDirectory($dir);
         }
-        $deleted[] = $videoId;
+        $deleted[] = $unit;
         $bytesFreed += $size;
-        $this->logger->debug('Cache sweep: {action} video {video} ({bytes} bytes).', [
+        $this->logger->debug('Cache sweep: {action} cache directory {directory} ({bytes} bytes).', [
             'action' => $dryRun ? 'would delete' : 'deleted',
-            'video' => $videoId,
+            'directory' => $unit,
             'bytes' => $size,
         ]);
     }
