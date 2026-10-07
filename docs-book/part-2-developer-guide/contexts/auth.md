@@ -57,6 +57,7 @@ Commands and handlers are organized into feature namespaces under `Application/C
 | `TotpVerifierInterface` | TOTP code verification |
 | `UserPortInterface` | User operations |
 | `PasswordResetTokenRepositoryInterface` | Password reset token storage |
+| `PasswordResetRequestThrottleInterface` | Per-account limit on password reset requests, keyed by normalized email |
 | `DpopJtiCacheInterface` | DPoP replay protection |
 | `AuthenticatedUserIdentityInterface` | Identity of the user a login authenticator verified |
 | `EmailVerificationTokenRepositoryInterface` | Email verification token storage |

@@ -28,6 +28,7 @@ final class RateLimitListenerTest extends TestCase
     private RateLimiterFactoryInterface&MockObject $registerIpLimiter;
     private RateLimiterFactoryInterface&MockObject $passwordResetIpLimiter;
     private RateLimiterFactoryInterface&MockObject $refreshClientLimiter;
+    private RateLimiterFactoryInterface&MockObject $passkeyIpLimiter;
     private LoggerInterface&MockObject $logger;
     private RateLimitListener $listener;
 
@@ -42,6 +43,7 @@ final class RateLimitListenerTest extends TestCase
         $this->registerIpLimiter = $this->createMock(RateLimiterFactoryInterface::class);
         $this->passwordResetIpLimiter = $this->createMock(RateLimiterFactoryInterface::class);
         $this->refreshClientLimiter = $this->createMock(RateLimiterFactoryInterface::class);
+        $this->passkeyIpLimiter = $this->createMock(RateLimiterFactoryInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->listener = new RateLimitListener(
@@ -50,6 +52,7 @@ final class RateLimitListenerTest extends TestCase
             authRegisterIpLimiter: $this->registerIpLimiter,
             authPasswordResetIpLimiter: $this->passwordResetIpLimiter,
             authRefreshClientLimiter: $this->refreshClientLimiter,
+            authPasskeyIpLimiter: $this->passkeyIpLimiter,
             logger: $this->logger,
             jsonEncoder: new JsonEncoder(),
             environment: 'test',
@@ -210,6 +213,41 @@ final class RateLimitListenerTest extends TestCase
         $this->passwordResetIpLimiter->method('create')->willReturn($this->createRejectedLimit(300));
 
         $this->expectException(TooManyRequestsHttpException::class);
+
+        $this->listener->onKernelRequest($event);
+    }
+
+    // --- Passkey sign-in rate limiting tests ---
+
+    /** @return iterable<string, array{string}> */
+    public static function passkeySignInPaths(): iterable
+    {
+        yield 'authentication options' => ['/api/auth/passkey/authenticate/options'];
+        yield 'assertion verification' => ['/api/auth/passkey/authenticate'];
+        yield 'passkey login' => ['/api/auth/login/passkey'];
+    }
+
+    #[DataProvider('passkeySignInPaths')]
+    public function testPasskeySignInIsLimitedPerIp(string $path): void
+    {
+        $request = $this->createJsonRequest($path, ip: '10.0.0.7');
+        $event = $this->createRequestEvent($request);
+
+        $this->passkeyIpLimiter->expects($this->once())
+            ->method('create')
+            ->with('10.0.0.7')
+            ->willReturn($this->createRejectedLimit(120));
+
+        $this->expectException(TooManyRequestsHttpException::class);
+
+        $this->listener->onKernelRequest($event);
+    }
+
+    public function testPasskeyRegistrationIsNotLimitedBySignInLimiter(): void
+    {
+        $event = $this->createRequestEvent($this->createJsonRequest('/api/auth/passkey/register'));
+
+        $this->passkeyIpLimiter->expects($this->never())->method('create');
 
         $this->listener->onKernelRequest($event);
     }

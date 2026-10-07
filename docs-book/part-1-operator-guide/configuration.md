@@ -30,7 +30,7 @@ The test database uses `baander_test` as the database name — configured in `.e
 Redis is used for:
 - **Cache** — tag-aware caching for API responses, OAuth tokens, and user sessions
 - **Messenger** — async job transport (scan jobs, notification delivery)
-- **Rate limiting** — login, registration, and password reset attempt tracking
+- **Rate limiting** — limiter state for API requests and for login, passkey, registration, password reset and token refresh attempts
 
 ## Messenger
 
@@ -97,19 +97,53 @@ All API keys are optional — Baander works without them, but metadata enrichmen
 
 ### Rate limiting
 
-Configured in `config/packages/auth.yaml`:
+Limits are set in `config/packages/auth.yaml`. Each limit feeds a Symfony rate limiter in `config/packages/framework.yaml`, and each limiter has its own Redis pool, so the admin **Rate Limits** tab and `app:rate-limiter:clear` can reset one limiter without touching the others.
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `auth.rate_limit.login.max_attempts` | `5` | Max login attempts per IP within the window. |
-| `auth.rate_limit.login.window` | `300` (5 min) | Window in seconds for login rate limiting. |
-| `auth.rate_limit.login_per_email.max_attempts` | `3` | Max login attempts per IP+email combo (prevents distributed brute force). |
-| `auth.rate_limit.register.max_attempts` | `3` | Max registration attempts per IP within the window. |
-| `auth.rate_limit.register.window` | `900` (15 min) | Window in seconds for registration rate limiting. |
-| `auth.rate_limit.password_reset.max_attempts` | `5` | Max password reset requests per IP within the window. |
-| `auth.rate_limit.password_reset.window` | `900` (15 min) | Window in seconds for password reset rate limiting. |
-| `auth.rate_limit.refresh.max_attempts` | `30` | Max token refresh requests per client within the window. |
-| `auth.rate_limit.refresh.window` | `60` (1 min) | Window in seconds for token refresh rate limiting. |
+| `auth.rate_limit.anonymous_api.max_requests` | `360` | Max `/api` requests per client IP for requests without an authenticated user (sliding window). |
+| `auth.rate_limit.anonymous_api.window` | `60` (1 min) | Window in seconds for anonymous API requests. |
+| `auth.rate_limit.authenticated_api.max_requests` | `1800` | Max `/api` requests per authenticated user (sliding window). |
+| `auth.rate_limit.authenticated_api.window` | `60` (1 min) | Window in seconds for authenticated API requests. |
+| `auth.rate_limit.login.max_attempts` | `20` | Max login attempts per IP within the window. |
+| `auth.rate_limit.login.window` | `300` (5 min) | Window in seconds for both login limits. |
+| `auth.rate_limit.login_per_email.max_attempts` | `10` | Max login attempts per IP and email pair (prevents distributed brute force). |
+| `auth.rate_limit.passkey.max_attempts` | `40` | Max passkey sign-in requests per IP within the window. One sign-in uses two requests. |
+| `auth.rate_limit.passkey.window` | `300` (5 min) | Window in seconds for passkey sign-in. |
+| `auth.rate_limit.register.max_attempts` | `10` | Max registration attempts per IP within the window. |
+| `auth.rate_limit.register.window` | `900` (15 min) | Window in seconds for registration. |
+| `auth.rate_limit.password_reset.max_attempts` | `10` | Max password reset requests per IP within the window. |
+| `auth.rate_limit.password_reset_per_email.max_attempts` | `5` | Max password reset requests per account (normalized email) within the window. |
+| `auth.rate_limit.password_reset.window` | `900` (15 min) | Window in seconds for both password reset limits. |
+| `auth.rate_limit.refresh.max_attempts` | `60` | Max token refresh requests per refresh token within the window. |
+| `auth.rate_limit.refresh.window` | `60` (1 min) | Window in seconds for token refresh. |
+
+Each limiter counts requests per key:
+
+| Limiter | Applies to | Key |
+|---------|------------|-----|
+| `anonymous_api` | Every `/api` request without an authenticated user, including requests whose credentials are rejected | Client IP |
+| `authenticated_api` | Every `/api` request with an authenticated user | User ID |
+| `auth_login_ip` | `POST /api/auth/login` | Client IP |
+| `auth_login_ip_email` | `POST /api/auth/login` | Client IP and email |
+| `auth_passkey_ip` | `POST /api/auth/passkey/authenticate/options`, `POST /api/auth/passkey/authenticate`, `POST /api/auth/login/passkey` | Client IP |
+| `auth_register_ip` | `POST /api/auth/register` | Client IP |
+| `auth_password_reset_ip` | `POST /api/auth/password/reset-request` | Client IP |
+| `auth_password_reset_email` | `POST /api/auth/password/reset-request` | Lower-cased email |
+| `auth_refresh_client` | `POST /api/auth/refresh` | Refresh token, or client IP when the body has none |
+| `config_check` | Admin configuration check (10 per minute) | One bucket shared by all callers |
+| `batch_cover_extract` | `POST /api/albums/covers/extract` (10 per minute) | Client IP |
+| `discovery_endpoint_ip` | Discovery registration and pairing (30 per minute) | Client IP |
+
+The last three have fixed limits in `config/packages/framework.yaml` and no `auth.yaml` parameter.
+
+A request over a limit gets `429 Too Many Requests` with a `Retry-After` header in seconds. The password reset account limit is the exception: over it, the endpoint returns the same `200` response as for any other address but issues no reset token, so the response never shows whether an account exists. The per-IP reset limit still answers `429`.
+
+Media delivery routes are exempt from `anonymous_api` and `authenticated_api`, so playback is never throttled by the general API budget: the audio stream (`/api/stream/track`), the HLS and DASH manifests and segments under `/api/transcode/{id}/` (`master.m3u8`, `media.m3u8`, `manifest.mpd`, `init`, `segment`), subtitle playlists and segments, image files (`/api/images/{id}/file`) and album covers (`GET /api/albums/{id}/cover`). Health, readiness and metrics endpoints (`/health`, `/ready`, `/live`, `/metrics`) are outside `/api` and are never limited.
+
+With `APP_ENV=dev`, only the `config_check` and `auth_password_reset_email` limits apply; the others are skipped.
+
+Under Swoole, the application trusts `X-Forwarded-For` from the directly connected peer, normally the bundled nginx, and uses the last address in it as the client IP. If another proxy sits in front of nginx, every client shares that proxy's address and its anonymous budget unless nginx restores the real client address (`set_real_ip_from`). Do not expose the Swoole port directly: a client could then send its own `X-Forwarded-For` and evade every per-IP limit.
 
 ### Passkeys (WebAuthn)
 
@@ -136,7 +170,6 @@ Configured in `config/packages/auth.yaml`:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PASSWORD_RESET_EXPIRE` | `60` | Password reset link lifetime, in minutes. |
-| `PASSWORD_RESET_THROTTLE` | `60` | Minimum seconds between reset requests for the same user. |
 | `PASSWORD_TIMEOUT` | `10800` | Seconds before a password is considered stale for re-authentication prompts. |
 
 ### Token binding

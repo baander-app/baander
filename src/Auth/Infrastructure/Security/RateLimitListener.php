@@ -17,8 +17,9 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
  * Kernel event listener that enforces rate limits on auth endpoints.
  *
  * Protects against brute-force attacks by applying per-IP rate limiting
- * to sensitive auth endpoints. For login, an additional per-IP+email
- * compound limit prevents distributed brute-force attempts on a single account.
+ * to sensitive auth endpoints, including passkey sign-in. For login, an
+ * additional per-IP+email compound limit prevents distributed brute-force
+ * attempts on a single account.
  *
  * Returns 429 Too Many Requests with a Retry-After header when limits are exceeded.
  *
@@ -44,6 +45,7 @@ final class RateLimitListener
         RateLimiterFactoryInterface $authRegisterIpLimiter,
         RateLimiterFactoryInterface $authPasswordResetIpLimiter,
         RateLimiterFactoryInterface $authRefreshClientLimiter,
+        RateLimiterFactoryInterface $authPasskeyIpLimiter,
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
         private readonly string $environment,
@@ -83,6 +85,13 @@ final class RateLimitListener
             [
                 'pattern' => '#^/api/auth/password/reset-request$#',
                 'limiter' => $authPasswordResetIpLimiter,
+                'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
+            ],
+            // Passkey sign-in: per-IP across the options, verification and login
+            // endpoints. Options requests store a challenge, so they are limited too.
+            [
+                'pattern' => '#^/api/auth/(passkey/authenticate(/options)?|login/passkey)$#',
+                'limiter' => $authPasskeyIpLimiter,
                 'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
             ],
             // Token refresh: per-client (uses the refresh token as the client identifier)
@@ -135,7 +144,7 @@ final class RateLimitListener
 
             if (!$result->isAccepted()) {
                 $retryAfter = $result->getRetryAfter();
-                $seconds = (int) ceil($retryAfter->getTimestamp() - time());
+                $seconds = max(1, (int) ceil($retryAfter->getTimestamp() - time()));
 
                 $this->logger->warning('Rate limit exceeded', [
                     'path' => $path,

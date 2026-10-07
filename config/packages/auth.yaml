@@ -103,6 +103,29 @@ parameters:
     auth.rate_limit.password_reset.max_attempts: 10
     auth.rate_limit.password_reset.window: 900
 
+    # Maximum password reset requests per account (normalized email) within the
+    # password reset window. Over the limit, the request still returns the generic
+    # success response but issues no token, so the limit reveals nothing about
+    # whether the account exists. Default: 5 per 15 minutes.
+    auth.rate_limit.password_reset_per_email.max_attempts: 5
+
     # Maximum token refresh requests per client within the window. Default: 60 per minute.
     auth.rate_limit.refresh.max_attempts: 60
     auth.rate_limit.refresh.window: 60
+
+    # Maximum passkey sign-in requests per IP within the window. Covers the
+    # authentication options, assertion verification and passkey login endpoints;
+    # one sign-in uses two requests. Default: 40 per 5 minutes.
+    auth.rate_limit.passkey.max_attempts: 40
+    auth.rate_limit.passkey.window: 300
+
+    # --- API Rate Limiting ---
+
+    # Maximum /api requests per client IP for requests without an authenticated
+    # user (sliding window). Default: 360 per minute.
+    auth.rate_limit.anonymous_api.max_requests: 360
+    auth.rate_limit.anonymous_api.window: 60
+
+    # Maximum /api requests per authenticated user (sliding window). Default: 1800 per minute.
+    auth.rate_limit.authenticated_api.max_requests: 1800
+    auth.rate_limit.authenticated_api.window: 60

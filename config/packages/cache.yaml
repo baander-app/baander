@@ -17,13 +17,13 @@ framework:
                 default_lifetime: 3600
             cache.rate_limiter.anonymous_api: { adapter: cache.rate_limiter }
             cache.rate_limiter.authenticated_api: { adapter: cache.rate_limiter }
-            cache.rate_limiter.oauth_token: { adapter: cache.rate_limiter }
-            cache.rate_limiter.password_reset: { adapter: cache.rate_limiter }
             cache.rate_limiter.auth_login_ip: { adapter: cache.rate_limiter }
             cache.rate_limiter.auth_login_ip_email: { adapter: cache.rate_limiter }
             cache.rate_limiter.auth_register_ip: { adapter: cache.rate_limiter }
             cache.rate_limiter.auth_password_reset_ip: { adapter: cache.rate_limiter }
+            cache.rate_limiter.auth_password_reset_email: { adapter: cache.rate_limiter }
             cache.rate_limiter.auth_refresh_client: { adapter: cache.rate_limiter }
+            cache.rate_limiter.auth_passkey_ip: { adapter: cache.rate_limiter }
             cache.rate_limiter.config_check: { adapter: cache.rate_limiter }
             cache.rate_limiter.batch_cover_extract: { adapter: cache.rate_limiter }
             cache.rate_limiter.discovery_endpoint_ip: { adapter: cache.rate_limiter }

@@ -3,15 +3,15 @@ parameters:
     # Shown by the admin panel and app:rate-limiter:list next to each limiter
     # configured under framework.rate_limiter below.
     app.rate_limiter.descriptions:
-        anonymous_api: 'Anonymous API requests'
-        authenticated_api: 'Authenticated API requests'
-        oauth_token: 'OAuth2 token issuance'
-        password_reset: 'Password reset token requests'
+        anonymous_api: 'Unauthenticated /api requests per client IP'
+        authenticated_api: 'Authenticated /api requests per user'
         auth_login_ip: 'Login attempts per IP (brute-force protection)'
         auth_login_ip_email: 'Login attempts per IP+email (distributed brute-force protection)'
         auth_register_ip: 'Registration attempts per IP'
         auth_password_reset_ip: 'Password reset requests per IP'
+        auth_password_reset_email: 'Password reset requests per account (normalized email)'
         auth_refresh_client: 'Token refresh per client'
+        auth_passkey_ip: 'Passkey sign-in requests per IP'
         config_check: 'Admin configuration check'
         batch_cover_extract: 'Album cover batch extraction'
         discovery_endpoint_ip: 'Discovery registration and pairing requests per IP'
@@ -48,26 +48,17 @@ framework:
     # Rate limiting. Each limiter has its own Redis-backed pool (config/packages/cache.yaml)
     # so the admin panel and app:rate-limiter:clear can reset one limiter without the others.
     rate_limiter:
+        # Generic /api limiters, enforced by App\Auth\Infrastructure\Security\ApiRateLimitListener.
         anonymous_api:
             policy: sliding_window
-            limit: 360
-            interval: '60 seconds'
+            limit: '%auth.rate_limit.anonymous_api.max_requests%'
+            interval: '%auth.rate_limit.anonymous_api.window% seconds'
             cache_pool: cache.rate_limiter.anonymous_api
         authenticated_api:
             policy: sliding_window
-            limit: 1800
-            interval: '60 seconds'
+            limit: '%auth.rate_limit.authenticated_api.max_requests%'
+            interval: '%auth.rate_limit.authenticated_api.window% seconds'
             cache_pool: cache.rate_limiter.authenticated_api
-        oauth_token:
-            policy: fixed_window
-            limit: 60
-            interval: '60 seconds'
-            cache_pool: cache.rate_limiter.oauth_token
-        password_reset:
-            policy: fixed_window
-            limit: 10
-            interval: '15 minutes'
-            cache_pool: cache.rate_limiter.password_reset
 
         # Auth endpoint-specific rate limiters (brute-force protection)
         auth_login_ip:
@@ -90,11 +81,21 @@ framework:
             limit: '%auth.rate_limit.password_reset.max_attempts%'
             interval: '%auth.rate_limit.password_reset.window% seconds'
             cache_pool: cache.rate_limiter.auth_password_reset_ip
+        auth_password_reset_email:
+            policy: fixed_window
+            limit: '%auth.rate_limit.password_reset_per_email.max_attempts%'
+            interval: '%auth.rate_limit.password_reset.window% seconds'
+            cache_pool: cache.rate_limiter.auth_password_reset_email
         auth_refresh_client:
             policy: fixed_window
             limit: '%auth.rate_limit.refresh.max_attempts%'
             interval: '%auth.rate_limit.refresh.window% seconds'
             cache_pool: cache.rate_limiter.auth_refresh_client
+        auth_passkey_ip:
+            policy: fixed_window
+            limit: '%auth.rate_limit.passkey.max_attempts%'
+            interval: '%auth.rate_limit.passkey.window% seconds'
+            cache_pool: cache.rate_limiter.auth_passkey_ip
 
         # Admin endpoint-specific rate limiters
         config_check:
@@ -125,10 +126,6 @@ when@test:
                 limit: 10000
             authenticated_api:
                 limit: 10000
-            oauth_token:
-                limit: 10000
-            password_reset:
-                limit: 10000
             auth_login_ip:
                 limit: 10000
             auth_login_ip_email:
@@ -137,7 +134,11 @@ when@test:
                 limit: 10000
             auth_password_reset_ip:
                 limit: 10000
+            auth_password_reset_email:
+                limit: 10000
             auth_refresh_client:
+                limit: 10000
+            auth_passkey_ip:
                 limit: 10000
             batch_cover_extract:
                 limit: 10000

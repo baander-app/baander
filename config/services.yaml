@@ -323,7 +323,21 @@ services:
             $authRegisterIpLimiter: '@limiter.auth_register_ip'
             $authPasswordResetIpLimiter: '@limiter.auth_password_reset_ip'
             $authRefreshClientLimiter: '@limiter.auth_refresh_client'
+            $authPasskeyIpLimiter: '@limiter.auth_passkey_ip'
             $environment: '%kernel.environment%'
+
+    App\Auth\Infrastructure\Security\ApiRateLimitListener:
+        arguments:
+            $anonymousApiLimiter: '@limiter.anonymous_api'
+            $authenticatedApiLimiter: '@limiter.authenticated_api'
+            $environment: '%kernel.environment%'
+
+    App\Auth\Application\Port\PasswordResetRequestThrottleInterface:
+        alias: App\Auth\Infrastructure\Security\RateLimiterPasswordResetRequestThrottle
+
+    App\Auth\Infrastructure\Security\RateLimiterPasswordResetRequestThrottle:
+        arguments:
+            $authPasswordResetEmailLimiter: '@limiter.auth_password_reset_email'
 
     # --- Admin Rate Limiting ---
     App\Catalog\Infrastructure\EventListener\AdminRateLimitListener:
