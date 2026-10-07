@@ -8,7 +8,7 @@ parameters:
         auth_login_ip: 'Login attempts per IP (brute-force protection)'
         auth_login_ip_email: 'Login attempts per IP+email (distributed brute-force protection)'
         auth_register_ip: 'Registration attempts per IP'
-        auth_password_reset_ip: 'Password reset requests per IP'
+        auth_password_reset_ip: 'Password reset requests and redemptions per IP'
         auth_password_reset_email: 'Password reset requests per account (normalized email)'
         auth_refresh_client: 'Token refresh per client'
         auth_passkey_ip: 'Passkey sign-in requests per IP'

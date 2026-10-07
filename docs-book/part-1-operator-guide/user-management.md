@@ -37,7 +37,7 @@ See the [full command reference](commands/app-user-create.md) for exit codes and
 
 ### Password requirements
 
-The only enforced requirement is a minimum of 8 characters. There is no formal password policy beyond this — no complexity rules, no expiration, and no history. Passwords are hashed with Argon2id (memory cost: 65536, time cost: 4), which provides strong protection even if the database is compromised. See the [security guide](security.md#password-security) for more on password hashing.
+A password must be 8 to 255 characters. There is no formal password policy beyond this — no complexity rules, no expiration, and no history. Passwords are hashed with Argon2id (memory cost: 65536, time cost: 4), which provides strong protection even if the database is compromised. See the [security guide](security.md#password-security) for more on password hashing.
 
 ## Roles
 
@@ -78,6 +78,18 @@ Key points for operators:
 - 2FA is entirely user-managed — there is no CLI command to enable or disable it on behalf of a user.
 - When a user enables 2FA, they receive a QR code and a set of recovery codes.
 - If a user loses access to their authenticator and has exhausted their recovery codes, the operator must intervene by resetting the 2FA secret directly in the database and then providing the new secret to the user out of band.
+
+## Resetting a Password
+
+Set a new password for a user who has forgotten theirs:
+
+```bash
+make exec cmd="php bin/console app:user:reset-password alice@baander.app"
+```
+
+The command prompts for the password, or reads it from stdin with `--password`. It accepts an email address or UUID and does the same as **Reset password** in the admin panel. Both sign the user out of every session. See [app:user:reset-password](commands/app-user-reset-password.md).
+
+Users can also request a reset token themselves with `POST /api/auth/password/reset-request` and redeem it with `POST /api/auth/password/reset`. Baander does not send the reset email yet, so this self-service flow cannot be completed until email delivery is added.
 
 ## Disabling and Enabling Users
 

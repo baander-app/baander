@@ -14,6 +14,8 @@ errors:
   device_already_processed: "Enhedskode er allerede behandlet."
   email_verification_failed: "E-mailbekræftelse mislykkedes."
   internal: "Intern serverfejl."
+  password_reset_failed: "Linket til nulstilling af adgangskode er ugyldigt eller udløbet."
+  current_password_incorrect: "Den nuværende adgangskode er forkert."
 
 success:
   token_revoked: "Token tilbagekaldt."
@@ -25,3 +27,5 @@ success:
   device_approved: "Enhed godkendt."
   device_denied: "Enhedsadgang nægtet."
   passkey_deleted: "passkey slettet."
+  password_reset: "Din adgangskode er blevet nulstillet."
+  password_changed: "Adgangskoden er ændret."

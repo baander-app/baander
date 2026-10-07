@@ -93,7 +93,7 @@ final class AccessTokenRepositoryTest extends TestCase
         $this->entityManager->expects($this->once())
             ->method('clear');
 
-        $this->repository->revokeForUser($user);
+        $this->repository->revokeForUser($user->getId());
     }
 
     public function testRevokeForUserClearsEntityManager(): void
@@ -114,7 +114,7 @@ final class AccessTokenRepositoryTest extends TestCase
                 $callOrder[] = 'clear';
             });
 
-        $this->repository->revokeForUser($user);
+        $this->repository->revokeForUser($user->getId());
 
         $this->assertSame(['executeStatement', 'clear'], $callOrder);
     }
@@ -148,6 +148,6 @@ final class AccessTokenRepositoryTest extends TestCase
             ->method('clear');
 
         // Should not throw
-        $this->repository->revokeForUser($user);
+        $this->repository->revokeForUser($user->getId());
     }
 }

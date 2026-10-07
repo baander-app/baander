@@ -11,6 +11,11 @@ use App\Shared\Domain\Model\Uuid;
 
 interface UserRepositoryInterface
 {
+    /**
+     * Persists the user. When the email address or password hash differs from the stored
+     * one, the user's outstanding password reset token is removed: it was issued for the
+     * old credentials. The user's deletion removes it as well.
+     */
     public function save(User $user): void;
 
     public function delete(Uuid $id): void;

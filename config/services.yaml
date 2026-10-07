@@ -310,7 +310,7 @@ services:
             $publicKeyPath: '%auth.public_key_path%'
 
     App\Auth\Application\Port\PasswordResetTokenRepositoryInterface:
-        alias: App\Auth\Infrastructure\Repository\OAuth\PasswordResetTokenRepository
+        alias: App\Auth\Infrastructure\Repository\PasswordResetTokenRepository
 
     App\Auth\Application\Port\EmailVerificationTokenRepositoryInterface:
         alias: App\Auth\Infrastructure\Repository\EmailVerificationTokenRepository
@@ -392,6 +392,10 @@ services:
     App\Auth\Application\CommandHandler\User\RegisterUserHandler:
         arguments:
             $emailVerificationTokenTtl: '%auth.email_verification_token.ttl%'
+
+    App\Auth\Application\CommandHandler\User\RequestPasswordResetHandler:
+        arguments:
+            $tokenLifetimeMinutes: '%auth.password_reset_token.lifetime_minutes%'
 
     # --- Login Controllers ---
     App\Auth\Interface\Controller\User\LoginController:

@@ -11,6 +11,7 @@ use App\Auth\Application\Port\PasswordResetTokenRepositoryInterface;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
@@ -28,20 +29,13 @@ final class RequestPasswordResetHandlerTest extends TestCase
     {
         $this->userRepository = $this->createStub(UserRepositoryInterface::class);
         $this->tokenRepository = $this->createMock(PasswordResetTokenRepositoryInterface::class);
-        $throttle = $this->createStub(PasswordResetRequestThrottleInterface::class);
-        $throttle->method('tryAcquire')->willReturnCallback(function (Email $email): bool {
-            $this->throttledEmails[] = $email->toString();
-
-            return $this->throttleAccepts;
-        });
-        $this->handler = new RequestPasswordResetHandler($this->userRepository, $this->tokenRepository, $throttle);
+        $this->handler = $this->handler(60);
     }
 
     public function testChargesTheNormalizedAddressBeforeIssuingAToken(): void
     {
-        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
-        $this->userRepository->method('findByEmail')->willReturn($user);
-        $this->tokenRepository->expects($this->once())->method('save');
+        $this->userRepository->method('findByEmail')->willReturn($this->user());
+        $this->tokenRepository->expects($this->once())->method('issue');
 
         ($this->handler)(new RequestPasswordResetCommand(new Email('Test@Baander.app')));
 
@@ -51,7 +45,7 @@ final class RequestPasswordResetHandlerTest extends TestCase
     public function testChargesUnknownAddressesToo(): void
     {
         $this->userRepository->method('findByEmail')->willReturn(null);
-        $this->tokenRepository->expects($this->never())->method('save');
+        $this->tokenRepository->expects($this->never())->method('issue');
 
         ($this->handler)(new RequestPasswordResetCommand(new Email('unknown@baander.app')));
 
@@ -61,68 +55,58 @@ final class RequestPasswordResetHandlerTest extends TestCase
     public function testIssuesNoTokenWhenTheAccountLimitIsReached(): void
     {
         $this->throttleAccepts = false;
-        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
-        $this->userRepository->method('findByEmail')->willReturn($user);
-
-        $this->tokenRepository->expects($this->never())->method('save');
+        $this->userRepository->method('findByEmail')->willReturn($this->user());
+        $this->tokenRepository->expects($this->never())->method('issue');
 
         ($this->handler)(new RequestPasswordResetCommand(new Email('test@baander.app')));
     }
 
-    public function testCreatesTokenForExistingUser(): void
+    public function testIssuesARandomTokenToTheUserForTheConfiguredLifetime(): void
     {
-        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
+        $user = $this->user();
         $this->userRepository->method('findByEmail')->willReturn($user);
-
-        $this->tokenRepository
-            ->expects($this->once())
-            ->method('save')
-            ->with($this->equalTo('test@baander.app'), $this->callback(fn($v) => is_string($v)));
-
-        ($this->handler)(new RequestPasswordResetCommand(new Email('test@baander.app')));
-    }
-
-    public function testDoesNothingForUnknownEmail(): void
-    {
-        $this->userRepository->method('findByEmail')->willReturn(null);
-
-        $this->tokenRepository
-            ->expects($this->never())
-            ->method('save');
-
-        ($this->handler)(new RequestPasswordResetCommand(new Email('unknown@baander.app')));
-    }
-
-    public function testUpdatesTokenWhenOneAlreadyExists(): void
-    {
-        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
-        $this->userRepository->method('findByEmail')->willReturn($user);
-
-        $stored = ['test@baander.app' => 'existing-token-string'];
-        $this->tokenRepository->expects($this->once())->method('save')
-            ->with('test@baander.app', $this->callback(static fn (string $token): bool => \Symfony\Component\Uid\Ulid::isValid($token)))
-            ->willReturnCallback(static function (string $email, string $token) use (&$stored): void {
-                $stored[$email] = $token;
+        $issued = [];
+        $this->tokenRepository->expects($this->exactly(2))->method('issue')
+            ->willReturnCallback(static function (Uuid $userId, string $token, \DateTimeImmutable $expiresAt) use (&$issued): void {
+                $issued[] = [$userId, $token, $expiresAt];
             });
 
-        ($this->handler)(new RequestPasswordResetCommand(new Email('test@baander.app')));
-        self::assertNotSame('existing-token-string', $stored['test@baander.app']);
+        $before = new \DateTimeImmutable('+90 minutes');
+        $handler = $this->handler(90);
+        $handler(new RequestPasswordResetCommand(new Email('test@baander.app')));
+        $handler(new RequestPasswordResetCommand(new Email('test@baander.app')));
+        $after = new \DateTimeImmutable('+90 minutes');
+
+        [[$userId, $token, $expiresAt], [, $secondToken]] = $issued;
+        self::assertTrue($user->getId()->equals($userId), 'The token belongs to the account, not the address.');
+        self::assertMatchesRegularExpression('/^[0-9a-f]{64}$/', $token, 'A token carries 256 random bits.');
+        self::assertNotSame($token, $secondToken);
+        self::assertGreaterThanOrEqual($before->getTimestamp(), $expiresAt->getTimestamp());
+        self::assertLessThanOrEqual($after->getTimestamp(), $expiresAt->getTimestamp());
     }
 
-    public function testCreatesNewTokenWhenNoneExists(): void
+    public function testRejectsALifetimeShorterThanAMinute(): void
     {
-        $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
-        $this->userRepository->method('findByEmail')->willReturn($user);
+        $this->tokenRepository->expects($this->never())->method('issue');
+        $this->expectException(\InvalidArgumentException::class);
 
-        $stored = [];
-        $this->tokenRepository->expects($this->once())->method('save')
-            ->with('test@baander.app', $this->callback(static fn (string $token): bool => \Symfony\Component\Uid\Ulid::isValid($token)))
-            ->willReturnCallback(static function (string $email, string $token) use (&$stored): void {
-                $stored[$email] = $token;
-            });
+        $this->handler(0);
+    }
 
-        ($this->handler)(new RequestPasswordResetCommand(new Email('test@baander.app')));
-        self::assertArrayHasKey('test@baander.app', $stored);
+    private function handler(int $lifetimeMinutes): RequestPasswordResetHandler
+    {
+        $throttle = $this->createStub(PasswordResetRequestThrottleInterface::class);
+        $throttle->method('tryAcquire')->willReturnCallback(function (Email $email): bool {
+            $this->throttledEmails[] = $email->toString();
 
+            return $this->throttleAccepts;
+        });
+
+        return new RequestPasswordResetHandler($this->userRepository, $this->tokenRepository, $throttle, $lifetimeMinutes);
+    }
+
+    private function user(): User
+    {
+        return User::register(new Email('test@baander.app'), 'hashed', 'Alice');
     }
 }

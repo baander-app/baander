@@ -81,9 +81,9 @@ final class RateLimitListener
                 'limiter' => $authRegisterIpLimiter,
                 'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
             ],
-            // Password reset request: per-IP
+            // Password reset request and redemption: per-IP, one shared bucket
             [
-                'pattern' => '#^/api/auth/password/reset-request$#',
+                'pattern' => '#^/api/auth/password/reset(-request)?$#',
                 'limiter' => $authPasswordResetIpLimiter,
                 'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
             ],

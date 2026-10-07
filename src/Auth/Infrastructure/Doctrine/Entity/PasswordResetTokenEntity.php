@@ -6,43 +6,48 @@ namespace App\Auth\Infrastructure\Doctrine\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
 
+/**
+ * A user's single outstanding password reset token. Only the SHA-256 hash of the token is
+ * stored; the row is deleted with the user (fk_password_reset_tokens_user_id).
+ *
+ * This mapping keeps schema comparison aware of the table. PasswordResetTokenRepository
+ * writes it with single SQL statements and never loads the entity.
+ */
 #[ORM\Entity]
 #[ORM\Table(name: 'password_reset_tokens')]
+#[ORM\UniqueConstraint(name: 'uniq_password_reset_tokens_token_hash', columns: ['token_hash'])]
 class PasswordResetTokenEntity
 {
     #[ORM\Id]
-    #[ORM\Column(type: 'citext')]
-    private string $email;
+    #[ORM\ManyToOne(targetEntity: UserEntity::class)]
+    #[ORM\JoinColumn(name: 'user_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
+    private UserEntity $user;
 
     #[ORM\Column(type: 'text')]
-    private string $token;
+    private string $tokenHash;
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
-    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
-    private ?\DateTimeImmutable $expiresAt = null;
+    #[ORM\Column(type: 'datetime_immutable')]
+    private \DateTimeImmutable $expiresAt;
 
-    public function __construct(string $email, string $token)
+    public function __construct(UserEntity $user, string $tokenHash, \DateTimeImmutable $expiresAt)
     {
-        $this->email = $email;
-        $this->token = $token;
+        $this->user = $user;
+        $this->tokenHash = $tokenHash;
         $this->createdAt = new \DateTimeImmutable();
+        $this->expiresAt = $expiresAt;
     }
 
-    public function getEmail(): string
+    public function getUser(): UserEntity
     {
-        return $this->email;
+        return $this->user;
     }
 
-    public function getToken(): string
+    public function getTokenHash(): string
     {
-        return $this->token;
-    }
-
-    public function setToken(string $token): void
-    {
-        $this->token = $token;
+        return $this->tokenHash;
     }
 
     public function getCreatedAt(): \DateTimeImmutable
@@ -50,18 +55,8 @@ class PasswordResetTokenEntity
         return $this->createdAt;
     }
 
-    public function getExpiresAt(): ?\DateTimeImmutable
+    public function getExpiresAt(): \DateTimeImmutable
     {
         return $this->expiresAt;
-    }
-
-    public function setExpiresAt(\DateTimeImmutable $expiresAt): void
-    {
-        $this->expiresAt = $expiresAt;
-    }
-
-    public function isExpired(): bool
-    {
-        return $this->expiresAt !== null && $this->expiresAt < new \DateTimeImmutable();
     }
 }

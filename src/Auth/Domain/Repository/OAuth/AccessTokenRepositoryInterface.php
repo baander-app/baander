@@ -6,8 +6,8 @@ namespace App\Auth\Domain\Repository\OAuth;
 
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\TokenId;
-use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
+use App\Shared\Domain\Model\Uuid;
 
 interface AccessTokenRepositoryInterface
 {
@@ -17,5 +17,9 @@ interface AccessTokenRepositoryInterface
 
     public function revokeByChainId(ChainId $chainId): void;
 
-    public function revokeForUser(User $user): void;
+    /**
+     * Revokes every access token issued to the user. When $keep is given, that token and
+     * the tokens of its refresh chain stay valid.
+     */
+    public function revokeForUser(Uuid $userId, ?AccessToken $keep = null): void;
 }

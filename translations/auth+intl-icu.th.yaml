@@ -14,6 +14,8 @@ errors:
   device_already_processed: Device code already processed.
   email_verification_failed: Email verification failed.
   internal: Internal server error.
+  password_reset_failed: This password reset link is invalid or has expired.
+  current_password_incorrect: Current password is incorrect.
 success:
   token_revoked: Token revoked successfully.
   password_reset_sent: If the email exists, a password reset link has been sent.
@@ -24,3 +26,5 @@ success:
   device_approved: Device approved successfully.
   device_denied: Device access denied.
   passkey_deleted: Passkey deleted successfully.
+  password_reset: Your password has been reset.
+  password_changed: Password changed.

@@ -111,7 +111,7 @@ Limits are set in `config/packages/auth.yaml`. Each limit feeds a Symfony rate l
 | `auth.rate_limit.passkey.window` | `300` (5 min) | Window in seconds for passkey sign-in. |
 | `auth.rate_limit.register.max_attempts` | `10` | Max registration attempts per IP within the window. |
 | `auth.rate_limit.register.window` | `900` (15 min) | Window in seconds for registration. |
-| `auth.rate_limit.password_reset.max_attempts` | `10` | Max password reset requests per IP within the window. |
+| `auth.rate_limit.password_reset.max_attempts` | `10` | Max password reset requests and redemptions per IP within the window. |
 | `auth.rate_limit.password_reset_per_email.max_attempts` | `10` | Max password reset requests per account (normalized email) within the window. |
 | `auth.rate_limit.password_reset.window` | `900` (15 min) | Window in seconds for both password reset limits. |
 | `auth.rate_limit.refresh.max_attempts` | `60` | Max token refresh requests per refresh token within the window. |
@@ -127,7 +127,7 @@ Each limiter counts requests per key:
 | `auth_login_ip_email` | `POST /api/auth/login` | Client IP and email |
 | `auth_passkey_ip` | `POST /api/auth/passkey/authenticate/options`, `POST /api/auth/passkey/authenticate`, `POST /api/auth/login/passkey` | Client IP |
 | `auth_register_ip` | `POST /api/auth/register` | Client IP |
-| `auth_password_reset_ip` | `POST /api/auth/password/reset-request` | Client IP |
+| `auth_password_reset_ip` | `POST /api/auth/password/reset-request`, `POST /api/auth/password/reset` (one shared bucket) | Client IP |
 | `auth_password_reset_email` | `POST /api/auth/password/reset-request` | Lower-cased email |
 | `auth_refresh_client` | `POST /api/auth/refresh` | Refresh token, or client IP when the body has none |
 | `config_check` | Admin configuration check (10 per minute) | One bucket shared by all callers |
@@ -164,12 +164,17 @@ Configured in `config/packages/auth.yaml`:
 | `ARGON2ID_TIME_COST` | `4` | Argon2id time cost (iterations). |
 | `ARGON2ID_THREAD_COST` | `3` | Argon2id parallelism (thread count). |
 
-### Password reset & timeout
+### Password reset
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PASSWORD_RESET_EXPIRE` | `60` | Password reset link lifetime, in minutes. |
-| `PASSWORD_TIMEOUT` | `10800` | Seconds before a password is considered stale for re-authentication prompts. |
+| `PASSWORD_RESET_EXPIRE` | `60` | Lifetime of a password reset token, in minutes. Must be at least `1`. |
+
+A user has at most one outstanding reset token; a new request replaces it. The token is removed when it is redeemed, when the account is deleted, and when the account's email address or password changes. Baander stores only a SHA-256 hash of the token.
+
+Baander does not send the reset email yet. `POST /api/auth/password/reset-request` issues a token and `POST /api/auth/password/reset` redeems one, but nothing delivers the token to the user. Until delivery exists, reset a forgotten password with [`app:user:reset-password`](commands/app-user-reset-password.md) or from the admin panel.
+
+A password change revokes the sessions that the old password started. Redeeming a reset token, an administrator reset and `app:user:reset-password` revoke all of the user's access and refresh tokens. When users change their own password, the session that made the change stays signed in and their other sessions are revoked.
 
 ### Token binding
 

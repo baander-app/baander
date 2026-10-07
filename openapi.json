@@ -1123,6 +1123,7 @@
                     "Admin / Users"
                 ],
                 "summary": "Reset a user password",
+                "description": "Sets the password and signs the user out of every session.",
                 "operationId": "post_admin_users_reset_password",
                 "parameters": [
                     {
@@ -2270,6 +2271,80 @@
                 "security": []
             }
         },
+        "/api/auth/password/reset": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Set a new password with a password reset token",
+                "description": "Redeems the token once and signs the account out of every session.",
+                "operationId": "post_auth_password_reset",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ResetPasswordRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Password reset",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string",
+                                                    "example": "Your password has been reset."
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The token is unknown, expired or already used",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many password reset attempts from this IP",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        },
         "/api/auth/me": {
             "get": {
                 "tags": [
@@ -2553,6 +2628,7 @@
                     "Auth"
                 ],
                 "summary": "Change the current user password",
+                "description": "Signs the account out of every other session; the session that made the request stays signed in.",
                 "operationId": "put_auth_me_password",
                 "requestBody": {
                     "required": true,
@@ -2571,6 +2647,7 @@
                                     "newPassword": {
                                         "type": "string",
                                         "example": "********",
+                                        "maxLength": 255,
                                         "minLength": 8
                                     }
                                 },
@@ -18772,6 +18849,28 @@
                 },
                 "type": "object"
             },
+            "ResetPasswordRequest": {
+                "required": [
+                    "token",
+                    "password"
+                ],
+                "properties": {
+                    "token": {
+                        "description": "The password reset token.",
+                        "type": "string",
+                        "default": "",
+                        "maxLength": 255
+                    },
+                    "password": {
+                        "type": "string",
+                        "example": "********",
+                        "default": "",
+                        "maxLength": 255,
+                        "minLength": 8
+                    }
+                },
+                "type": "object"
+            },
             "UpdateProfileRequest": {
                 "required": [
                     "name"
@@ -18829,6 +18928,7 @@
                         "type": "string",
                         "example": "********",
                         "default": "",
+                        "maxLength": 255,
                         "minLength": 8
                     }
                 },

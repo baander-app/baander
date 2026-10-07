@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Auth\Domain\Repository\OAuth;
 
+use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
+use App\Shared\Domain\Model\Uuid;
 
 interface RefreshTokenRepositoryInterface
 {
@@ -28,4 +30,10 @@ interface RefreshTokenRepositoryInterface
     public function findByChainId(ChainId $chainId): array;
 
     public function revokeByChainId(ChainId $chainId): void;
+
+    /**
+     * Revokes every refresh token issued with one of the user's access tokens. When $keep is
+     * given, refresh tokens issued with it or in its refresh chain stay valid.
+     */
+    public function revokeForUser(Uuid $userId, ?AccessToken $keep = null): void;
 }

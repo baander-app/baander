@@ -111,6 +111,7 @@ own exit code without JSON. Error output contains no credentials or raw diagnost
 | [app:user:create](app-user-create.md) | Create a new user account |
 | [app:user:disable](app-user-disable.md) | Disable a user account |
 | [app:user:enable](app-user-enable.md) | Enable a previously disabled user account |
+| [app:user:reset-password](app-user-reset-password.md) | Set a new password for a user and sign them out everywhere |
 
 ## Libraries & Catalog
 

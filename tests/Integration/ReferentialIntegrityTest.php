@@ -21,15 +21,11 @@ use Psr\Log\NullLogger;
  * Every column that refers to another row has a foreign key and an index that leads with it.
  *
  * Reads the catalog of the fully migrated disposable PostgreSQL database. A reference column
- * is one named `*_id` or `*_uuid` (other than the row's own `public_id`), or one listed in
- * SEMANTIC_REFERENCES.
+ * is one named `*_id` or `*_uuid` (other than the row's own `public_id`).
  */
 final class ReferentialIntegrityTest extends TestCase
 {
     use OwnershipPersistenceHarness;
-
-    /** References whose name does not end in `_id`. */
-    private const SEMANTIC_REFERENCES = ['password_reset_tokens.email'];
 
     /** Reference-like columns without a foreign key, and why. */
     private const UNCONSTRAINED = [
@@ -57,7 +53,6 @@ final class ReferentialIntegrityTest extends TestCase
         'party_members.audio_profile_id' => 'identifier within the video\'s probe data',
         'party_members.subtitle_track_id' => 'identifier within the video\'s probe data',
         'passkeys.credential_id' => 'the credential\'s own WebAuthn identifier',
-        'password_reset_tokens.email' => 'pending decision: a token must not survive an email change or account deletion',
         'radio_stations.external_id' => 'external station directory identifier',
         'recommendations.source_id' => 'polymorphic with source_type',
         'recommendations.target_id' => 'polymorphic with target_type',
@@ -110,6 +105,11 @@ final class ReferentialIntegrityTest extends TestCase
         'fk_party_sessions_video_id' => 'CASCADE',
     ];
 
+    /** A reset token ends with its user (Version20261006320000). */
+    private const PASSWORD_RESET_RULES = [
+        'fk_password_reset_tokens_user_id' => 'CASCADE',
+    ];
+
     public function testEveryReferenceColumnHasAForeignKeyOrADocumentedReason(): void
     {
         $columns = $this->manager->getConnection()->fetchAllKeyValue(<<<'SQL'
@@ -127,8 +127,7 @@ final class ReferentialIntegrityTest extends TestCase
         $violations = [];
         foreach ($columns as $column => $constrained) {
             [, $name] = explode('.', $column);
-            $reference = (str_ends_with($name, '_id') && $name !== 'public_id') || str_ends_with($name, '_uuid')
-                || in_array($column, self::SEMANTIC_REFERENCES, true);
+            $reference = (str_ends_with($name, '_id') && $name !== 'public_id') || str_ends_with($name, '_uuid');
             if (!$reference) {
                 continue;
             }
@@ -167,7 +166,7 @@ final class ReferentialIntegrityTest extends TestCase
 
     public function testForeignKeysChosenByTheAuditHaveTheirDeleteRules(): void
     {
-        $expected = [...self::RULES, ...self::OAUTH_RULES, ...self::PARTY_MEDIA_RULES];
+        $expected = [...self::RULES, ...self::OAUTH_RULES, ...self::PARTY_MEDIA_RULES, ...self::PASSWORD_RESET_RULES];
         ksort($expected);
         $rules = $this->manager->getConnection()->fetchAllKeyValue(<<<'SQL'
             SELECT conname, CASE confdeltype WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL'
@@ -181,7 +180,7 @@ final class ReferentialIntegrityTest extends TestCase
         self::assertSame($expected, $rules);
     }
 
-    public function testDeletingAUserRemovesTheirFavoritesAndThemeMood(): void
+    public function testDeletingAUserRemovesTheirFavoritesThemeMoodAndResetToken(): void
     {
         $owner = $this->createUser();
         $other = $this->createUser();
@@ -199,11 +198,18 @@ final class ReferentialIntegrityTest extends TestCase
                 'created_at' => '2026-10-06 12:00:00',
                 'updated_at' => '2026-10-06 12:00:00',
             ]);
+            // Keyed by user_id, so the table has no id column for insert() to fill.
+            $this->manager->getConnection()->insert('password_reset_tokens', [
+                'user_id' => $user->toString(),
+                'token_hash' => hash('sha256', $user->toString()),
+                'created_at' => '2026-10-06 12:00:00+00',
+                'expires_at' => '2026-10-06 13:00:00+00',
+            ]);
         }
 
         $this->deleteUser($owner);
 
-        foreach (['user_favorites', 'user_theme_moods'] as $table) {
+        foreach (['user_favorites', 'user_theme_moods', 'password_reset_tokens'] as $table) {
             self::assertSame(0, $this->countOwnedRows($table, 'user_id', $owner), $table);
             self::assertSame(1, $this->countOwnedRows($table, 'user_id', $other), $table);
         }

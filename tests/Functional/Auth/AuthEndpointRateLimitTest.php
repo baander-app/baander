@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Auth;
 
-use App\Auth\Application\Port\PasswordResetTokenRepositoryInterface;
-
 final class AuthEndpointRateLimitTest extends RateLimitTestCase
 {
     public function testPasswordResetUnderTheAccountLimitIssuesAToken(): void
@@ -15,7 +13,7 @@ final class AuthEndpointRateLimitTest extends RateLimitTestCase
         $response = $this->requestFrom('198.51.100.40', 'POST', '/api/auth/password/reset-request', content: ['email' => $user->getEmail()]);
 
         self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
-        self::assertNotNull($this->tokens()->findByEmail($user->getEmail()));
+        self::assertTrue($this->hasResetToken($user->getId()->toString()));
     }
 
     public function testPasswordResetOverTheAccountLimitAnswersLikeAnUnknownAddress(): void
@@ -31,7 +29,7 @@ final class AuthEndpointRateLimitTest extends RateLimitTestCase
         self::assertSame(200, $unknown->getStatusCode(), (string) $unknown->getContent());
         self::assertSame($unknown->getContent(), $limited->getContent());
         self::assertNull($limited->headers->get('Retry-After'));
-        self::assertNull($this->tokens()->findByEmail($user->getEmail()), 'No token may be issued over the account limit.');
+        self::assertFalse($this->hasResetToken($user->getId()->toString()), 'No token may be issued over the account limit.');
     }
 
     public function testPasswordResetStillLimitsPerIp(): void
@@ -39,6 +37,13 @@ final class AuthEndpointRateLimitTest extends RateLimitTestCase
         $this->exhaust('auth_password_reset_ip', '198.51.100.42');
 
         $this->assertTooManyRequests($this->requestFrom('198.51.100.42', 'POST', '/api/auth/password/reset-request', content: ['email' => 'someone@baander.app']));
+    }
+
+    public function testPasswordResetRedemptionSharesThePerIpLimit(): void
+    {
+        $this->exhaust('auth_password_reset_ip', '198.51.100.43');
+
+        $this->assertTooManyRequests($this->requestFrom('198.51.100.43', 'POST', '/api/auth/password/reset', content: ['token' => 'guess', 'password' => 'guessed-password']));
     }
 
     public function testPasskeySignInIsLimitedPerIp(): void
@@ -53,11 +58,11 @@ final class AuthEndpointRateLimitTest extends RateLimitTestCase
         self::assertSame(200, $other->getStatusCode(), (string) $other->getContent());
     }
 
-    private function tokens(): PasswordResetTokenRepositoryInterface
+    private function hasResetToken(string $userId): bool
     {
-        $repository = static::getContainer()->get(PasswordResetTokenRepositoryInterface::class);
-        self::assertInstanceOf(PasswordResetTokenRepositoryInterface::class, $repository);
-
-        return $repository;
+        return (bool) $this->entityManager->getConnection()->fetchOne(
+            'SELECT EXISTS (SELECT 1 FROM password_reset_tokens WHERE user_id = ?)',
+            [$userId],
+        );
     }
 }

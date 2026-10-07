@@ -4,18 +4,29 @@ declare(strict_types=1);
 
 namespace App\Auth\Application\Port;
 
+use App\Shared\Domain\Model\Uuid;
+
+/**
+ * Stores each user's single outstanding password reset token.
+ *
+ * Implementations keep only a hash of the token. A token belongs to the user it was issued
+ * to and is removed with that user.
+ */
 interface PasswordResetTokenRepositoryInterface
 {
     /**
-     * Persist a password reset token for the given email.
-     * If a token already exists for this email, it will be updated.
+     * Stores a newly issued token for the user, replacing any token issued earlier.
      */
-    public function save(string $email, string $token): void;
+    public function issue(Uuid $userId, string $token, \DateTimeImmutable $expiresAt): void;
 
     /**
-     * Find the current password reset token for the given email.
-     *
-     * @return string|null The token string, or null if none exists
+     * Removes the token and returns the user it was issued to, or null when no such token
+     * exists or it expired at or before $at. A token can be redeemed only once.
      */
-    public function findByEmail(string $email): ?string;
+    public function redeem(string $token, \DateTimeImmutable $at): ?Uuid;
+
+    /**
+     * Removes the user's outstanding token, if any.
+     */
+    public function revokeForUser(Uuid $userId): void;
 }

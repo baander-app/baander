@@ -204,6 +204,19 @@ export interface RequestPasswordResetRequest {
   email: string;
 }
 
+export interface ResetPasswordRequest {
+  /**
+     * The password reset token.
+     * @maxLength 255
+     */
+  token: string;
+  /**
+     * @minLength 8
+     * @maxLength 255
+     */
+  password: string;
+}
+
 export interface UpdateProfileRequest {
   /**
      * @minLength 1
@@ -222,7 +235,10 @@ export interface ChangeEmailRequest {
 
 export interface ChangePasswordRequest {
   currentPassword: string;
-  /** @minLength 8 */
+  /**
+     * @minLength 8
+     * @maxLength 255
+     */
   newPassword: string;
 }
 
@@ -2681,6 +2697,14 @@ export type PostAuthPasswordResetRequest200 = {
   data?: PostAuthPasswordResetRequest200Data;
 };
 
+export type PostAuthPasswordReset200Data = {
+  message?: string;
+};
+
+export type PostAuthPasswordReset200 = {
+  data?: PostAuthPasswordReset200Data;
+};
+
 export type GetAuthMe200 = {
   data?: UserResource;
 };
@@ -2736,7 +2760,10 @@ export type PutAuthMeEmail200 = {
 
 export type PutAuthMePasswordBody = {
   currentPassword: string;
-  /** @minLength 8 */
+  /**
+     * @minLength 8
+     * @maxLength 255
+     */
   newPassword: string;
 };
 
@@ -7563,6 +7590,7 @@ export const getPostAdminUsersResetPasswordUrl = (id: string,) => {
 }
 
 /**
+ * Sets the password and signs the user out of every session.
  * @summary Reset a user password
  */
 export const postAdminUsersResetPassword = async (id: string,
@@ -8848,6 +8876,77 @@ export const usePostAuthPasswordResetRequest = <TError = ErrorType<ValidationErr
       return useMutation(getPostAuthPasswordResetRequestMutationOptions(options), queryClient);
     }
 
+export const getPostAuthPasswordResetUrl = () => {
+
+
+
+
+  return `/api/auth/password/reset`
+}
+
+/**
+ * Redeems the token once and signs the account out of every session.
+ * @summary Set a new password with a password reset token
+ */
+export const postAuthPasswordReset = async (resetPasswordRequest: ResetPasswordRequest, options?: RequestInit): Promise<PostAuthPasswordReset200> => {
+
+  return customInstance<PostAuthPasswordReset200>(getPostAuthPasswordResetUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(resetPasswordRequest)
+  }
+);}
+
+
+
+
+export const getPostAuthPasswordResetMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthPasswordReset>>, TError,{data: BodyType<ResetPasswordRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAuthPasswordReset>>, TError,{data: BodyType<ResetPasswordRequest>}, TContext> => {
+
+const mutationKey = ['postAuthPasswordReset'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAuthPasswordReset>>, {data: BodyType<ResetPasswordRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  postAuthPasswordReset(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostAuthPasswordResetMutationResult = NonNullable<Awaited<ReturnType<typeof postAuthPasswordReset>>>
+    export type PostAuthPasswordResetMutationBody = BodyType<ResetPasswordRequest>
+    export type PostAuthPasswordResetMutationError = ErrorType<ApiError | ValidationError>
+
+    /**
+ * @summary Set a new password with a password reset token
+ */
+export const usePostAuthPasswordReset = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthPasswordReset>>, TError,{data: BodyType<ResetPasswordRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postAuthPasswordReset>>,
+        TError,
+        {data: BodyType<ResetPasswordRequest>},
+        TContext
+      > => {
+      return useMutation(getPostAuthPasswordResetMutationOptions(options), queryClient);
+    }
+
 export const getGetAuthMeUrl = () => {
 
 
@@ -9168,6 +9267,7 @@ export const getPutAuthMePasswordUrl = () => {
 }
 
 /**
+ * Signs the account out of every other session; the session that made the request stays signed in.
  * @summary Change the current user password
  */
 export const putAuthMePassword = async (putAuthMePasswordBody: PutAuthMePasswordBody, options?: RequestInit): Promise<PutAuthMePassword200> => {

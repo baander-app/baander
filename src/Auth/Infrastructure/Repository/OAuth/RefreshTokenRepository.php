@@ -20,6 +20,7 @@ use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\RefreshTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
@@ -104,6 +105,27 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
             'UPDATE oauth_refresh_tokens SET revoked = TRUE, updated_at = NOW() WHERE chain_id = :chainId AND revoked = FALSE',
             ['chainId' => $chainId->toString()],
         );
+        $this->entityManager->clear();
+    }
+
+    public function revokeForUser(Uuid $userId, ?AccessToken $keep = null): void
+    {
+        $sql = <<<'SQL'
+            UPDATE oauth_refresh_tokens r SET revoked = TRUE, updated_at = NOW()
+              FROM oauth_access_tokens a
+             WHERE a.id = r.access_token_id AND a.user_id = :userId AND r.revoked = FALSE
+            SQL;
+        $params = ['userId' => $userId->toString()];
+        if ($keep !== null) {
+            $sql .= ' AND r.access_token_id <> :keepId';
+            $params['keepId'] = $keep->getId()->toString();
+            if ($keep->getChainId() !== null) {
+                $sql .= ' AND r.chain_id IS DISTINCT FROM :keepChainId';
+                $params['keepChainId'] = $keep->getChainId()->toString();
+            }
+        }
+
+        $this->entityManager->getConnection()->executeStatement($sql, $params);
         $this->entityManager->clear();
     }
 

@@ -205,9 +205,18 @@ final class RateLimitListenerTest extends TestCase
         $this->listener->onKernelRequest($event);
     }
 
-    public function testPasswordResetOverLimitThrowsTooManyRequests(): void
+    /** @return iterable<string, array{string, array<string, string>}> */
+    public static function passwordResetPaths(): iterable
     {
-        $request = $this->createJsonRequest('/api/auth/password/reset-request', body: ['email' => 'user@baander.app']);
+        yield 'reset request' => ['/api/auth/password/reset-request', ['email' => 'user@baander.app']];
+        yield 'reset redemption' => ['/api/auth/password/reset', ['token' => 'token', 'password' => 'new-password']];
+    }
+
+    /** @param array<string, string> $body */
+    #[DataProvider('passwordResetPaths')]
+    public function testPasswordResetOverLimitThrowsTooManyRequests(string $path, array $body): void
+    {
+        $request = $this->createJsonRequest($path, body: $body);
         $event = $this->createRequestEvent($request);
 
         $this->passwordResetIpLimiter->method('create')->willReturn($this->createRejectedLimit(300));

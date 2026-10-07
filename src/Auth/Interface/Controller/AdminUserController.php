@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Interface\Controller;
 
 use App\Auth\Application\Command\User\CreateUserCommand;
-use App\Auth\Application\Port\PasswordHasherInterface;
+use App\Auth\Application\Command\User\SetUserPasswordCommand;
 use App\Auth\Application\Port\UserPortInterface;
 use App\Auth\Domain\Model\User;
 use App\Auth\Interface\Request\Admin\AdminAssignRolesRequest;
@@ -224,6 +224,7 @@ final class AdminUserController
     #[OA\Post(
         path: '/api/admin/users/{id}/reset-password',
         summary: 'Reset a user password',
+        description: 'Sets the password and signs the user out of every session.',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(ref: new Model(type: AdminResetPasswordRequest::class)),
@@ -239,16 +240,15 @@ final class AdminUserController
     )]
     #[Route('/{id}/reset-password', name: 'reset_password', methods: ['POST'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
-    public function resetPassword(string $id, #[MapRequestPayload] AdminResetPasswordRequest $request, PasswordHasherInterface $passwordHasher): JsonResponse
+    public function resetPassword(string $id, #[MapRequestPayload] AdminResetPasswordRequest $request): JsonResponse
     {
         $user = $this->findUserOr404($id);
         if ($user === null) {
             return $this->notFound('User not found.');
         }
 
-        $user->changePassword($passwordHasher->hash($request->password));
-
-        $this->userService->save($user);
+        // The same use case as `app:user:reset-password`: it also signs the user out everywhere.
+        $this->commandBus->dispatch(new SetUserPasswordCommand($user->getId()->toString(), $request->password));
 
         return $this->successResponse(['message' => 'Password reset successfully.']);
     }

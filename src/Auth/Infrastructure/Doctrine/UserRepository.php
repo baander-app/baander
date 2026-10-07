@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Infrastructure\Doctrine;
 
+use App\Auth\Application\Port\PasswordResetTokenRepositoryInterface;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Model\UserState;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
@@ -18,12 +19,23 @@ final class UserRepository implements UserRepositoryInterface
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
+        private readonly PasswordResetTokenRepositoryInterface $passwordResetTokens,
     ) {
     }
 
     public function save(User $user): void
     {
         $entity = $this->findEntityOrCreate($user);
+
+        // A reset token was issued for the credentials the account had then. Any change of
+        // address or password hash ends it, as Django's reset tokens do; that includes a
+        // rehash on login, which is harmless because the user has just proven the password.
+        // Revoking before the flush means a failed save can only cost an outstanding token.
+        if ($this->entityManager->contains($entity)
+            && ($entity->getEmail() !== $user->getEmail() || $entity->getPassword() !== $user->getPassword())) {
+            $this->passwordResetTokens->revokeForUser($user->getId());
+        }
+
         $this->syncToEntity($user, $entity);
         $this->entityManager->persist($entity);
         $this->entityManager->flush();
@@ -169,10 +181,8 @@ final class UserRepository implements UserRepositoryInterface
         $entity->setTotpSecret($user->getTotpSecret() ?? '');
         $entity->setRoles($user->getRoles());
         $entity->setDisabled($user->isDisabled());
-
-        if ($user->isEmailVerified() && $entity->getEmailVerifiedAt() === null) {
-            $entity->markEmailAsVerified();
-        }
+        // The domain clears verification when the address changes, so copy it both ways.
+        $entity->setEmailVerifiedAt($user->getEmailVerifiedAt());
     }
 
     private function findEntityOrCreate(User $user): UserEntity

@@ -23,7 +23,7 @@ The OAuth models AccessToken, Client and RefreshToken each have a state object a
 | `TotpVerifierInterface` | TOTP code verification |
 | `PasskeyVerifierInterface` | WebAuthn passkey verification |
 | `DpopJtiCacheInterface` | DPoP JTI replay protection (backed by Redis) |
-| `PasswordResetTokenRepositoryInterface` | Password reset token persistence |
+| `PasswordResetTokenRepositoryInterface` | Each user's single outstanding password reset token (hashed, single use) |
 | `EmailVerificationTokenRepositoryInterface` | Email verification token persistence |
 | `AuthenticatedUserIdentityInterface` | Identity of the user a login authenticator verified |
 | `OAuthSecretBundleInterface` | Key bundle preparation and validation for secret rotation |

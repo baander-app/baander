@@ -26,6 +26,10 @@ parameters:
     # Email verification token time-to-live. Default: 24 hours.
     auth.email_verification_token.ttl: 86400
 
+    # Password reset token lifetime in minutes, from PASSWORD_RESET_EXPIRE. Default: 60.
+    env(PASSWORD_RESET_EXPIRE): '60'
+    auth.password_reset_token.lifetime_minutes: '%env(int:PASSWORD_RESET_EXPIRE)%'
+
     # --- First-Party Login Client ---
     # Public ID of the pre-registered client that password and passkey login
     # issue tokens to, for every first-party app (web, Electron and mobile).

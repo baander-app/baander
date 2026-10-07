@@ -174,4 +174,41 @@ final class AuthControllerTest extends TestCase
 
         $this->assertJsonResponse($response, 400);
     }
+
+    // ---------------------------------------------------------------
+    // PUT /api/auth/me/email
+    // ---------------------------------------------------------------
+
+    public function testChangingTheEmailClearsItsVerification(): void
+    {
+        $user = $this->createAdminUser();
+        $this->assertTrue($user->isEmailVerified(), 'Operator-created users start verified.');
+        $newEmail = 'changed-' . bin2hex(random_bytes(4)) . '@baander.app';
+
+        $response = $this->authenticatedRequest('PUT', '/api/auth/me/email', $user, ['email' => $newEmail]);
+
+        $this->assertJsonResponse($response, 200);
+        $this->entityManager->clear();
+        $stored = $this->userRepository->findByUuid($user->getId());
+        $this->assertNotNull($stored);
+        $this->assertSame($newEmail, $stored->getEmail());
+        $this->assertFalse($stored->isEmailVerified(), 'A new address is unverified until its owner confirms it.');
+    }
+
+    // ---------------------------------------------------------------
+    // PUT /api/auth/me/password
+    // ---------------------------------------------------------------
+
+    public function testChangingThePasswordRequiresTheCurrentOne(): void
+    {
+        $user = $this->createTestUser();
+
+        $response = $this->authenticatedRequest('PUT', '/api/auth/me/password', $user, [
+            'currentPassword' => 'not-the-password',
+            'newPassword' => 'another-password-456',
+        ]);
+
+        $data = $this->assertJsonResponse($response, 422, 'error');
+        $this->assertSame('Current password is incorrect.', $data['error']['message']);
+    }
 }

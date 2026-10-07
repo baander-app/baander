@@ -6,9 +6,14 @@ namespace App\Auth\Interface\Controller\User;
 
 use App\Auth\Application\Command\OAuth\RefreshTokenCommand;
 use App\Auth\Application\Command\OAuth\RevokeTokenCommand;
+use App\Auth\Application\Command\User\ChangePasswordCommand;
 use App\Auth\Application\Command\User\RegisterUserCommand;
 use App\Auth\Application\Command\User\RequestPasswordResetCommand;
+use App\Auth\Application\Command\User\ResetPasswordCommand;
+use App\Auth\Application\Exception\CurrentPasswordMismatchException;
 use App\Auth\Application\Exception\EmailVerificationException;
+use App\Auth\Application\Exception\PasswordPolicyException;
+use App\Auth\Application\Exception\PasswordResetException;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Application\Port\UserPortInterface;
 use App\Auth\Domain\Model\User;
@@ -20,6 +25,7 @@ use App\Auth\Interface\Request\User\ChangeEmailRequest;
 use App\Auth\Interface\Request\User\ChangePasswordRequest;
 use App\Auth\Interface\Request\User\RegisterRequest;
 use App\Auth\Interface\Request\User\RequestPasswordResetRequest;
+use App\Auth\Interface\Request\User\ResetPasswordRequest;
 use App\Auth\Interface\Request\User\UpdateProfileRequest;
 use App\Auth\Interface\Request\User\VerifyEmailRequest;
 use App\Auth\Interface\Resource\TokenResource;
@@ -305,6 +311,51 @@ final class AuthController
         ]);
     }
 
+    #[OA\Post(
+        path: '/api/auth/password/reset',
+        summary: 'Set a new password with a password reset token',
+        description: 'Redeems the token once and signs the account out of every session.',
+        security: [],
+        requestBody: new OA\RequestBody(
+            required: true,
+            content: new OA\JsonContent(ref: new Model(type: ResetPasswordRequest::class)),
+        ),
+        responses: [
+            new OA\Response(
+                response: '200',
+                description: 'Password reset',
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: 'data', properties: [
+                            new OA\Property(property: 'message', type: 'string', example: 'Your password has been reset.'),
+                        ], type: 'object'),
+                    ],
+                    type: 'object',
+                ),
+            ),
+            new OA\Response(response: '400', description: 'The token is unknown, expired or already used', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '429', description: 'Too many password reset attempts from this IP', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        ],
+    )]
+    #[Route('/password/reset', name: 'password_reset', methods: ['POST'])]
+    public function resetPassword(#[MapRequestPayload] ResetPasswordRequest $payload): JsonResponse
+    {
+        try {
+            $this->commandBus->dispatch(new ResetPasswordCommand(token: $payload->token, password: $payload->password));
+        } catch (\Throwable $e) {
+            return $this->handleCommandException(
+                $e,
+                $this->trans('errors.internal', domain: 'auth'),
+                Response::HTTP_INTERNAL_SERVER_ERROR,
+            );
+        }
+
+        return $this->successResponse([
+            'message' => $this->trans('success.password_reset', domain: 'auth'),
+        ]);
+    }
+
     #[OA\Get(
         path: '/api/auth/me',
         summary: 'Get the current authenticated user profile',
@@ -519,11 +570,12 @@ final class AuthController
     #[OA\Put(
         path: '/api/auth/me/password',
         summary: 'Change the current user password',
+        description: 'Signs the account out of every other session; the session that made the request stays signed in.',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(required: ['currentPassword', 'newPassword'], properties: [
                         new OA\Property(property: 'currentPassword', type: 'string', example: '********'),
-                        new OA\Property(property: 'newPassword', type: 'string', example: '********', minLength: 8),
+                        new OA\Property(property: 'newPassword', type: 'string', example: '********', maxLength: 255, minLength: 8),
                     ]),
         ),
         responses: [
@@ -544,29 +596,26 @@ final class AuthController
         ],
     )]
     #[Route('/me/password', name: 'me_password', methods: ['PUT'])]
-    public function changePassword(
-        #[MapRequestPayload] ChangePasswordRequest $payload,
-        \App\Auth\Application\Port\PasswordHasherInterface $passwordHasher,
-    ): JsonResponse {
+    public function changePassword(#[MapRequestPayload] ChangePasswordRequest $payload, Request $request): JsonResponse
+    {
         $user = $this->getCurrentUser();
         if ($user === null) {
             return $this->notFound();
         }
 
-        if (!$passwordHasher->verify($payload->currentPassword, $user->getPassword())) {
-            return $this->errorResponse('Current password is incorrect.', Response::HTTP_UNPROCESSABLE_ENTITY);
-        }
-
-        $user->changePassword($passwordHasher->hash($payload->newPassword));
+        // OAuth2Authenticator copies the presenting token's identifier here; its session stays signed in.
+        $currentAccessTokenId = $request->attributes->get('oauth_access_token_id');
 
         try {
-            $this->userService->save($user);
+            $this->commandBus->dispatch(new ChangePasswordCommand(
+                userId: $user->getId()->toString(),
+                currentPassword: $payload->currentPassword,
+                newPassword: $payload->newPassword,
+                currentAccessTokenId: is_string($currentAccessTokenId) && $currentAccessTokenId !== '' ? $currentAccessTokenId : null,
+            ));
         } catch (\Throwable $e) {
-            $this->logger->error('Password change failed.', [
-                'exception' => $e,
-            ]);
-
-            return $this->errorResponse(
+            return $this->handleCommandException(
+                $e,
                 $this->trans('errors.internal', domain: 'auth'),
                 Response::HTTP_INTERNAL_SERVER_ERROR,
             );
@@ -600,6 +649,24 @@ final class AuthController
         $previous = $exception instanceof HandlerFailedException
             ? $exception->getPrevious()
             : $exception;
+
+        if ($previous instanceof PasswordResetException) {
+            return $this->errorResponse(
+                $this->trans('errors.password_reset_failed', domain: 'auth'),
+                Response::HTTP_BAD_REQUEST,
+            );
+        }
+
+        if ($previous instanceof CurrentPasswordMismatchException) {
+            return $this->errorResponse(
+                $this->trans('errors.current_password_incorrect', domain: 'auth'),
+                Response::HTTP_UNPROCESSABLE_ENTITY,
+            );
+        }
+
+        if ($previous instanceof PasswordPolicyException) {
+            return $this->errorResponse($previous->getMessage(), Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
 
         if ($previous instanceof EmailVerificationException) {
             return $this->errorResponse(

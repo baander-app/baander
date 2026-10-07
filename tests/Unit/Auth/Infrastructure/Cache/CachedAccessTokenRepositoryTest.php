@@ -196,7 +196,7 @@ final class CachedAccessTokenRepositoryTest extends TestCase
     public function testBulkRevocationInvalidatesLegacyTaggedStatus(string $method): void
     {
         $this->seed(true);
-        $argument = $method === 'revokeByChainId' ? ChainId::generate() : $this->user;
+        $argument = $method === 'revokeByChainId' ? ChainId::generate() : $this->user->getId();
         $inner = $this->createMock(AccessTokenRepositoryInterface::class);
         $inner->expects($this->once())->method($method)->with($argument);
 
@@ -208,7 +208,7 @@ final class CachedAccessTokenRepositoryTest extends TestCase
     #[DataProvider('bulkMethods')]
     public function testBulkDatabaseFailureDoesNotInvalidateCache(string $method): void
     {
-        $argument = $method === 'revokeByChainId' ? ChainId::generate() : $this->user;
+        $argument = $method === 'revokeByChainId' ? ChainId::generate() : $this->user->getId();
         $failure = new \RuntimeException('Database unavailable');
         $inner = $this->createMock(AccessTokenRepositoryInterface::class);
         $inner->expects($this->once())->method($method)->willThrowException($failure);
@@ -222,7 +222,7 @@ final class CachedAccessTokenRepositoryTest extends TestCase
     #[DataProvider('bulkMethods')]
     public function testBulkCacheAndLoggerFailureDoNotMaskDatabaseSuccess(string $method): void
     {
-        $argument = $method === 'revokeByChainId' ? ChainId::generate() : $this->user;
+        $argument = $method === 'revokeByChainId' ? ChainId::generate() : $this->user->getId();
         $inner = $this->createMock(AccessTokenRepositoryInterface::class);
         $inner->expects($this->once())->method($method)->with($argument);
         $cache = $this->createStub(TagAwareCacheInterface::class);

@@ -10,6 +10,7 @@ use App\Auth\Domain\Event\Passkey\PasskeyRegistered;
 use App\Auth\Infrastructure\Doctrine\Entity\PasskeyEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Auth\Infrastructure\Doctrine\UserRepository;
+use App\Auth\Infrastructure\Repository\PasswordResetTokenRepository;
 use App\Auth\Infrastructure\Repository\Passkey\PasskeyRepository;
 use App\Shared\Domain\Event\Outbox\OutboxRepository;
 use App\Shared\Domain\Event\Outbox\OutboxSubscriber;
@@ -101,7 +102,7 @@ final class PasskeyRegistrationOutboxTransactionTest extends TestCase
         $this->manager->persist($userEntity);
         $this->manager->flush();
         $userId = $userEntity->getId();
-        $users = new UserRepository($this->manager);
+        $users = new UserRepository($this->manager, new PasswordResetTokenRepository($this->manager->getConnection()));
         $passkeys = new PasskeyRepository($this->manager);
         $outbox = new OutboxRepository($this->writer);
         $events = new EventDispatcher();

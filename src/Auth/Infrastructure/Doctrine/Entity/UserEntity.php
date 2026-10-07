@@ -114,6 +114,16 @@ class UserEntity
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    public function setEmailVerifiedAt(?\DateTimeImmutable $emailVerifiedAt): void
+    {
+        if ($emailVerifiedAt == $this->emailVerifiedAt) {
+            return;
+        }
+
+        $this->emailVerifiedAt = $emailVerifiedAt;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
     public function getPassword(): string
     {
         return $this->password;

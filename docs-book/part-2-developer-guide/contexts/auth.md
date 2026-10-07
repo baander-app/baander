@@ -35,7 +35,10 @@ Commands and handlers are organized into feature namespaces under `Application/C
 | `CreateUserCommand` | `CreateUserHandler` | Operator-created users (User/) |
 | `DisableUserCommand` | `DisableUserHandler` | Disable a user account (User/) |
 | `EnableUserCommand` | `EnableUserHandler` | Re-enable a disabled account (User/) |
-| `RequestPasswordResetCommand` | `RequestPasswordResetHandler` | Password reset initiation (User/) |
+| `RequestPasswordResetCommand` | `RequestPasswordResetHandler` | Issue a password reset token for the account with that email (User/) |
+| `ResetPasswordCommand` | `ResetPasswordHandler` | Redeem a reset token and set a new password (User/) |
+| `SetUserPasswordCommand` | `SetUserPasswordHandler` | Operator password reset from the admin panel or `app:user:reset-password` (User/) |
+| `ChangePasswordCommand` | `ChangePasswordHandler` | A user changes their own password (User/) |
 | `IssueTokenCommand` | `IssueTokenHandler` | Issue a DPoP-bound token pair after password or passkey login (OAuth/) |
 | `RefreshTokenCommand` | `RefreshTokenHandler` | Rotate a refresh token for a new token pair (OAuth/) |
 | `RevokeTokenCommand` | `RevokeTokenHandler` | Token revocation (OAuth/) |
@@ -54,7 +57,7 @@ Commands and handlers are organized into feature namespaces under `Application/C
 | `PasswordHasherInterface` | Password hashing |
 | `TotpVerifierInterface` | TOTP code verification |
 | `UserPortInterface` | User operations |
-| `PasswordResetTokenRepositoryInterface` | Password reset token storage |
+| `PasswordResetTokenRepositoryInterface` | Each user's single outstanding reset token, stored as a SHA-256 hash and redeemed once |
 | `PasswordResetRequestThrottleInterface` | Per-account limit on password reset requests, keyed by normalized email |
 | `DpopJtiCacheInterface` | DPoP replay protection |
 | `AuthenticatedUserIdentityInterface` | Identity of the user a login authenticator verified |
@@ -62,13 +65,21 @@ Commands and handlers are organized into feature namespaces under `Application/C
 | `OAuthSecretBundleInterface` | Prepare and validate key bundles for `app:auth:rotate-secrets` |
 | `OAuthTokenInvalidatorInterface` | Delete all token rows during offline key rotation |
 
+## Password Reset and Password Changes
+
+`password_reset_tokens` holds at most one token per user, keyed by `user_id` with `ON DELETE CASCADE`. Only the SHA-256 hash of the 256-bit token is stored. `UserRepository::save` removes the token whenever the stored email address or password hash changes, so a token never outlives the credentials it was issued for or carries over to a later account with the same address. The lifetime comes from `PASSWORD_RESET_EXPIRE` (minutes).
+
+`RequestPasswordResetHandler` charges the per-account limiter before looking up the address and issues a token only for an existing account; the endpoint answers the same way in every case. The raw token exists only in that handler's memory, and nothing delivers it yet. Email delivery belongs in a port that the handler calls after issuing the token. Do not put the raw token in a domain event, because events are stored in the outbox.
+
+All three password paths (`ResetPasswordHandler`, `SetUserPasswordHandler`, `ChangePasswordHandler`) call the application service `PasswordChanger`. It enforces the 8 to 255 character policy, hashes the password, and then, in one transaction, saves the user, revokes the user's access and refresh tokens and records `PasswordChanged`. A user's own change keeps the session that made it: the presenting access token and its refresh chain. The other two paths revoke everything. A reset token that is unknown, expired, already used, or belongs to a disabled account gets one generic `400`.
+
 ## Domain Events
 
 | Event | Trigger |
 |-------|---------|
 | `UserRegistered` | Self-registration completed |
 | `UserCreatedByOperator` | Operator created a user |
-| `PasswordChanged` | Password updated |
+| `PasswordChanged` | Password updated through `PasswordChanger` |
 | `TokenRevoked` | Token revoked |
 | `PasskeyRegistered` | Passkey added |
 | `PasskeyDeleted` | Passkey removed |
@@ -85,11 +96,12 @@ All endpoints except the JWKS document are under `/api`.
 | POST | `/api/auth/login/passkey` | Passkey login (issues tokens) |
 | POST | `/api/auth/refresh` | Refresh token rotation (issues tokens) |
 | POST | `/api/auth/logout` | Revoke the current access token |
-| POST | `/api/auth/password/reset-request` | Request a password reset email |
+| POST | `/api/auth/password/reset-request` | Issue a password reset token; always answers `200` |
+| POST | `/api/auth/password/reset` | Redeem a reset token and set a new password |
 | POST | `/api/auth/email/verify` | Verify an email address |
 | GET, PUT | `/api/auth/me` | Read or update the current user |
 | PUT | `/api/auth/me/email` | Change email |
-| PUT | `/api/auth/me/password` | Change password |
+| PUT | `/api/auth/me/password` | Change password; other sessions are signed out |
 | POST | `/api/auth/totp/setup` | Generate a TOTP secret and provisioning URI |
 | POST | `/api/auth/totp/enable` | Enable TOTP after verifying a code |
 | POST | `/api/auth/totp/disable` | Disable TOTP (requires a current code) |
@@ -113,7 +125,7 @@ All routes under `/api/admin/users` (controller `AdminUserController`, gated `RO
 | PATCH | `/api/admin/users/{id}` | Update a user |
 | DELETE | `/api/admin/users/{id}` | Delete a user |
 | POST | `/api/admin/users/{id}/roles` | Assign roles |
-| POST | `/api/admin/users/{id}/reset-password` | Reset a user's password |
+| POST | `/api/admin/users/{id}/reset-password` | Reset a user's password and sign them out (CLI: `app:user:reset-password`) |
 | POST | `/api/admin/users/{id}/disable` | Disable a user |
 | POST | `/api/admin/users/{id}/enable` | Enable a user |
 

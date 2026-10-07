@@ -7,8 +7,8 @@ namespace App\Auth\Infrastructure\Cache;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
-use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
+use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Cache\CacheTags;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Cache\TagAwareCacheInterface;
@@ -60,14 +60,14 @@ final readonly class CachedAccessTokenRepository implements AccessTokenRepositor
         );
     }
 
-    public function revokeForUser(User $user): void
+    public function revokeForUser(Uuid $userId, ?AccessToken $keep = null): void
     {
-        $this->inner->revokeForUser($user);
+        $this->inner->revokeForUser($userId, $keep);
 
         $this->invalidateCache(
             fn (): bool => $this->cache->invalidateTags([CacheTags::OAUTH_TOKEN]),
             'Failed to invalidate token cache on user revocation',
-            ['user_id' => $user->getId()->toString()],
+            ['user_id' => $userId->toString()],
         );
     }
 

@@ -17,6 +17,7 @@ use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
@@ -61,13 +62,20 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
         $this->entityManager->clear();
     }
 
-    public function revokeForUser(User $user): void
+    public function revokeForUser(Uuid $userId, ?AccessToken $keep = null): void
     {
-        $conn = $this->entityManager->getConnection();
-        $conn->executeStatement(
-            'UPDATE oauth_access_tokens SET revoked = TRUE, updated_at = NOW() WHERE user_id = :userId AND revoked = FALSE',
-            ['userId' => $user->getId()->toString()],
-        );
+        $sql = 'UPDATE oauth_access_tokens SET revoked = TRUE, updated_at = NOW() WHERE user_id = :userId AND revoked = FALSE';
+        $params = ['userId' => $userId->toString()];
+        if ($keep !== null) {
+            $sql .= ' AND id <> :keepId';
+            $params['keepId'] = $keep->getId()->toString();
+            if ($keep->getChainId() !== null) {
+                $sql .= ' AND chain_id IS DISTINCT FROM :keepChainId';
+                $params['keepChainId'] = $keep->getChainId()->toString();
+            }
+        }
+
+        $this->entityManager->getConnection()->executeStatement($sql, $params);
         $this->entityManager->clear();
     }
 

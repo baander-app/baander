@@ -27,7 +27,7 @@ The initial migration enables `citext`, `ltree`, `pg_stat_statements`, `pg_trgm`
 |-----------|----------------------|--------|
 | `pgroonga` | Full-text search on catalog titles and names | `_pgroonga` suffix; see [PGroonga](#pgroonga) |
 | `pg_trgm` | GIN `gin_trgm_ops` indexes on `public_id` columns | `_trgm` suffix |
-| `citext` | `users.email` and `password_reset_tokens.email` are `CITEXT` | Ordinary `idx_`/`uniq_` names; a unique index on a `CITEXT` column is case-insensitive |
+| `citext` | `users.email` is `CITEXT` | Ordinary `idx_`/`uniq_` names; a unique index on a `CITEXT` column is case-insensitive |
 | `ltree` | Enabled; no column uses it | `_ltree` suffix for an index using an `ltree` operator class |
 | `pgcrypto`, `uuid-ossp`, `pg_stat_statements` | Functions and statistics only | No index naming |
 
