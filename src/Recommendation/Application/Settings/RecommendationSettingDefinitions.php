@@ -23,7 +23,7 @@ final class RecommendationSettingDefinitions implements SettingDefinitionProvide
             description: 'Automatically generate recommendation snapshots',
             group: 'Content',
             default: false,
-            enforced: false,
+            enforced: true,
         );
     }
 }

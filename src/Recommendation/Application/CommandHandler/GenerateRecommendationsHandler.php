@@ -10,19 +10,25 @@ use App\Recommendation\Application\Command\DeleteRecommendationsBySourceCommand;
 use App\Recommendation\Application\Command\GenerateRecommendationsCommand;
 use App\Recommendation\Application\Command\SaveRecommendationCommand;
 use App\Recommendation\Application\Port\RecommendationJobPortInterface;
+use App\Recommendation\Application\Settings\RecommendationSettingDefinitions;
 use App\Recommendation\Domain\Model\RecommendationJob;
 use App\Recommendation\Domain\Service\CollaborativeFilteringCalculator;
 use App\Recommendation\Domain\Service\ContentSimilarityCalculator;
 use App\Recommendation\Domain\Service\GenreSimilarityCalculator;
 use App\Recommendation\Domain\ValueObject\RecommendationType;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class GenerateRecommendationsHandler
 {
+    /** The scheduler records this as the run's last result. */
+    public const string SKIPPED_AUTO_GENERATE_OFF = 'skipped: ' . RecommendationSettingDefinitions::AUTO_GENERATE . ' is off';
+
     private const STRATEGY_COLLABORATIVE = 'collaborative';
     private const STRATEGY_CONTENT = 'content';
     private const STRATEGY_GENRE = 'genre';
@@ -38,13 +44,26 @@ final class GenerateRecommendationsHandler
         private readonly CpuProcessPool $cpuProcessPool,
         private readonly JsonEncoder $jsonEncoder,
         private readonly string $databaseUrl,
+        private readonly SystemSettingsPortInterface $settings,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
-    /** @return array<string, int>|RecommendationJob */
+    /** @return array<string, int>|RecommendationJob|string the string is the skip of an automatic run */
     #[AsMessageHandler]
-    public function __invoke(GenerateRecommendationsCommand $command): array|RecommendationJob
+    public function __invoke(GenerateRecommendationsCommand $command): array|RecommendationJob|string
     {
+        if (!$command->isFull() && !$command->isIncremental()) {
+            throw new \InvalidArgumentException(sprintf('Unknown recommendation generation mode "%s".', $command->getMode()));
+        }
+
+        // Read when the run fires, so an admin's change applies to the next run.
+        if ($command->isAutomatic() && $this->settings->get(RecommendationSettingDefinitions::AUTO_GENERATE) !== true) {
+            $this->logger->info('Scheduled recommendation generation skipped: ' . RecommendationSettingDefinitions::AUTO_GENERATE . ' is off.');
+
+            return self::SKIPPED_AUTO_GENERATE_OFF;
+        }
+
         $isFull = $command->isFull();
 
         // Use pool worker if available (Swoole context)
