@@ -63,6 +63,17 @@ final class RefreshTokenHandler
             throw new RuntimeException('Refresh token has expired.');
         }
 
+        // A revoked client's tokens cannot be refreshed. At the token endpoint the
+        // token must also belong to the client that authenticated (RFC 6749 section 6).
+        $tokenClient = $refreshToken->getAccessToken()->getClient();
+        if ($tokenClient->isRevoked()) {
+            throw new RuntimeException('Client has been revoked.');
+        }
+        $clientId = $command->getClientId();
+        if ($clientId !== null && !$tokenClient->getId()->equals($clientId)) {
+            throw new RuntimeException('Refresh token was not issued to this client.');
+        }
+
         // RFC 9449 §5: a refresh token is redeemable only with the DPoP key its
         // token pair was issued to. Unbound tokens fail closed.
         $boundJkt = $refreshToken->getAccessToken()->getDpopJkt();

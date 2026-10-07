@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Auth\Application\Command\OAuth;
 
+use App\Shared\Domain\Model\Uuid;
+
 /**
  * Command DTO for refreshing an OAuth 2.0 access token.
  *
@@ -18,7 +20,14 @@ final readonly class RefreshTokenCommand
         private ?string $userAgent = null,
         private ?string $clientFingerprint = null,
         private ?string $dpopJkt = null,
+        private ?Uuid $clientId = null,
     ) {
+    }
+
+    /** The authenticated client at the token endpoint; null for first-party refresh. */
+    public function getClientId(): ?Uuid
+    {
+        return $this->clientId;
     }
 
     public function getRefreshTokenId(): string

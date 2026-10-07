@@ -1282,6 +1282,476 @@
                 }
             }
         },
+        "/api/oauth/clients/": {
+            "get": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "List personal access clients",
+                "operationId": "get_oauth_clients_index",
+                "responses": {
+                    "200": {
+                        "description": "List of clients",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ClientResource"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Create a new personal access client",
+                "operationId": "post_oauth_clients_create",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "name"
+                                ],
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "example": "My App"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Client created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ClientResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/oauth/clients/{publicId}": {
+            "delete": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Revoke an OAuth client",
+                "operationId": "delete_oauth_clients_revoke",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "description": "Client public ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Client revoked",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string",
+                                                    "example": "Client revoked."
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid public ID",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Client not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/oauth/authorize": {
+            "get": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "OAuth 2.0 authorization endpoint (RFC 6749 section 3.1)",
+                "description": "The signed-in user authorizes the client. PKCE with the S256 method is required for every client. On success, and on errors once the client and redirect URI are valid, the response redirects to the redirect URI with `code` or `error`, `state` and `iss` (RFC 9207). Cross-origin requests are refused (RFC 9700 section 2.6).",
+                "operationId": "get_oauth_authorize",
+                "parameters": [
+                    {
+                        "name": "response_type",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "code"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "client_id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "redirect_uri",
+                        "in": "query",
+                        "description": "Required unless the client registered exactly one redirect URI",
+                        "schema": {
+                            "type": "string",
+                            "format": "uri"
+                        }
+                    },
+                    {
+                        "name": "scope",
+                        "in": "query",
+                        "description": "Space-separated scopes",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "state",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "code_challenge",
+                        "in": "query",
+                        "description": "BASE64URL(SHA256(code_verifier))",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "code_challenge_method",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "S256"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "302": {
+                        "description": "Redirect to the client with an authorization code or an error"
+                    },
+                    "400": {
+                        "description": "Missing or unregistered redirect URI",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OAuthError"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated (ApiError), or an unknown or revoked client (OAuthError invalid_client)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OAuthError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "OAuth 2.0 authorization endpoint (RFC 6749 section 3.1)",
+                "description": "Same as GET, with the parameters in the query string.",
+                "operationId": "post_oauth_authorize",
+                "parameters": [
+                    {
+                        "name": "response_type",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "code"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "client_id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "redirect_uri",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "uri"
+                        }
+                    },
+                    {
+                        "name": "scope",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "state",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "code_challenge",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "code_challenge_method",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "S256"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "302": {
+                        "description": "Redirect to the client with an authorization code or an error"
+                    },
+                    "400": {
+                        "description": "Missing or unregistered redirect URI",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OAuthError"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated (ApiError), or an unknown or revoked client (OAuthError invalid_client)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OAuthError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/oauth/token": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "OAuth 2.0 token endpoint (RFC 6749 section 3.2)",
+                "description": "Requires a DPoP proof carrying a server-issued nonce; a proof without one is answered with `use_dpop_nonce` and a `DPoP-Nonce` header. Every answer carries the nonce for the next proof. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded or JSON. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`.",
+                "operationId": "post_oauth_token",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "grant_type",
+                                    "client_id"
+                                ],
+                                "properties": {
+                                    "grant_type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "authorization_code",
+                                            "refresh_token",
+                                            "urn:ietf:params:oauth:grant-type:device_code"
+                                        ]
+                                    },
+                                    "client_id": {
+                                        "type": "string"
+                                    },
+                                    "client_secret": {
+                                        "description": "Confidential clients only",
+                                        "type": "string"
+                                    },
+                                    "code": {
+                                        "description": "Authorization code (authorization_code grant)",
+                                        "type": "string"
+                                    },
+                                    "redirect_uri": {
+                                        "description": "The redirect URI of the authorization request (authorization_code grant)",
+                                        "type": "string",
+                                        "format": "uri"
+                                    },
+                                    "code_verifier": {
+                                        "description": "PKCE code verifier (authorization_code grant)",
+                                        "type": "string"
+                                    },
+                                    "device_code": {
+                                        "description": "Device code (device_code grant)",
+                                        "type": "string"
+                                    },
+                                    "refresh_token": {
+                                        "description": "Refresh token (refresh_token grant)",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "DPoP-bound token pair",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/TokenResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "OAuth error, including the device polling answers authorization_pending, slow_down, access_denied and expired_token, or a DPoP nonce challenge",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OAuthError"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Client authentication failed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OAuthError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        },
         "/api/oauth/revoke": {
             "post": {
                 "tags": [
@@ -1318,6 +1788,245 @@
                         "content": {
                             "application/json": {
                                 "schema": {}
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/oauth/device/authorize": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Device authorization request (RFC 8628 section 3.1)",
+                "description": "Only clients registered as device clients may start the device flow. Show the user code and verification URI, then poll the token endpoint with the device code no faster than `interval` seconds.",
+                "operationId": "post_oauth_device_authorize",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DeviceAuthorizeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Device code issued",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "properties": {
+                                                "deviceCode": {
+                                                    "type": "string"
+                                                },
+                                                "userCode": {
+                                                    "type": "string",
+                                                    "example": "BCDF-GHJK"
+                                                },
+                                                "verificationUri": {
+                                                    "type": "string",
+                                                    "format": "uri"
+                                                },
+                                                "verificationUriComplete": {
+                                                    "type": "string",
+                                                    "format": "uri"
+                                                },
+                                                "expiresIn": {
+                                                    "type": "integer",
+                                                    "example": 900
+                                                },
+                                                "interval": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The client may not use the device flow",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OAuthError"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unknown or revoked client",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OAuthError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": []
+            }
+        },
+        "/api/oauth/device/verify": {
+            "get": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Look up a pending device authorization request (RFC 8628 section 3.3)",
+                "description": "Shows the signed-in user which client a user code belongs to before they approve or deny it. Case, spaces and dashes in the code do not matter.",
+                "operationId": "get_oauth_device_verify",
+                "parameters": [
+                    {
+                        "name": "user_code",
+                        "in": "query",
+                        "description": "The user code displayed on the device",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The pending request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "properties": {
+                                                "userCode": {
+                                                    "type": "string",
+                                                    "example": "BCDF-GHJK"
+                                                },
+                                                "clientName": {
+                                                    "type": "string"
+                                                },
+                                                "scopes": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Unknown, expired or already processed user code",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/oauth/device/approve": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Approve or deny a device authorization request (RFC 8628 section 3.3)",
+                "description": "Approving gives the device a token pair for the signed-in user at its next poll and notifies the user. Denying makes the next poll answer `access_denied`.",
+                "operationId": "post_oauth_device_approve",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DeviceApproveRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Device approved or denied",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "properties": {
+                                                "message": {
+                                                    "type": "string",
+                                                    "example": "Device approved successfully."
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Unknown, expired or already processed user code",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
                             }
                         }
                     },
@@ -18796,6 +19505,21 @@
                 },
                 "type": "object"
             },
+            "CreateClientRequest": {
+                "required": [
+                    "name"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "example": "My App",
+                        "default": "",
+                        "maxLength": 255,
+                        "minLength": 1
+                    }
+                },
+                "type": "object"
+            },
             "RevokeTokenRequest": {
                 "required": [
                     "token"
@@ -18810,6 +19534,48 @@
                         "description": "Hint for the token type (e.g. \"access_token\" or \"refresh_token\")",
                         "type": "string",
                         "default": ""
+                    }
+                },
+                "type": "object"
+            },
+            "DeviceAuthorizeRequest": {
+                "required": [
+                    "clientId"
+                ],
+                "properties": {
+                    "clientId": {
+                        "type": "string",
+                        "example": "client-uuid",
+                        "default": ""
+                    },
+                    "scope": {
+                        "description": "Requested OAuth scopes",
+                        "type": "string",
+                        "default": ""
+                    }
+                },
+                "type": "object"
+            },
+            "DeviceApproveRequest": {
+                "required": [
+                    "userCode",
+                    "action"
+                ],
+                "properties": {
+                    "userCode": {
+                        "type": "string",
+                        "example": "ABCD-EFGH",
+                        "default": "",
+                        "maxLength": 255
+                    },
+                    "action": {
+                        "type": "string",
+                        "example": "approve",
+                        "default": "",
+                        "enum": [
+                            "approve",
+                            "deny"
+                        ]
                     }
                 },
                 "type": "object"
@@ -20491,6 +21257,77 @@
                 },
                 "type": "object"
             },
+            "ClientResource": {
+                "required": [
+                    "uuid",
+                    "publicId",
+                    "name",
+                    "secret",
+                    "redirect",
+                    "personalAccessClient",
+                    "confidential",
+                    "createdAt"
+                ],
+                "properties": {
+                    "uuid": {
+                        "description": "Internal UUID",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "publicId": {
+                        "description": "Public-facing UUID",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "name": {
+                        "description": "Client name",
+                        "type": "string"
+                    },
+                    "secret": {
+                        "description": "Client secret",
+                        "type": "string"
+                    },
+                    "redirect": {
+                        "description": "JSON-encoded array of redirect URIs",
+                        "type": "string"
+                    },
+                    "personalAccessClient": {
+                        "description": "Whether this is a personal access client",
+                        "type": "boolean"
+                    },
+                    "confidential": {
+                        "description": "Whether the client is confidential",
+                        "type": "boolean"
+                    },
+                    "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "OAuthError": {
+                "description": "OAuth2 error response",
+                "required": [
+                    "error",
+                    "error_description"
+                ],
+                "properties": {
+                    "error": {
+                        "type": "string",
+                        "example": "invalid_grant"
+                    },
+                    "error_description": {
+                        "type": "string",
+                        "example": "The provided authorization code is invalid."
+                    },
+                    "error_uri": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
             "TokenResource": {
                 "required": [
                     "accessToken",
@@ -20512,28 +21349,6 @@
                     },
                     "refreshToken": {
                         "description": "OAuth 2.0 refresh token",
-                        "type": "string",
-                        "nullable": true
-                    }
-                },
-                "type": "object"
-            },
-            "OAuthError": {
-                "description": "OAuth2 error response",
-                "required": [
-                    "error",
-                    "error_description"
-                ],
-                "properties": {
-                    "error": {
-                        "type": "string",
-                        "example": "invalid_grant"
-                    },
-                    "error_description": {
-                        "type": "string",
-                        "example": "The provided authorization code is invalid."
-                    },
-                    "error_uri": {
                         "type": "string",
                         "nullable": true
                     }
@@ -22466,9 +23281,26 @@
         "securitySchemes": {
             "bearerAuth": {
                 "type": "http",
-                "description": "DPoP-bound access token (JWT), sent as `Authorization: DPoP <token>` with a DPoP proof. Obtain via `/api/auth/login`, `/api/auth/login/passkey` or `/api/auth/refresh`.",
+                "description": "DPoP-bound access token (JWT), sent as `Authorization: DPoP <token>` with a DPoP proof. First-party apps obtain it via `/api/auth/login`, `/api/auth/login/passkey` or `/api/auth/refresh`; other clients via `/api/oauth/token`.",
                 "bearerFormat": "JWT",
                 "scheme": "bearer"
+            },
+            "oauth2AuthCode": {
+                "type": "oauth2",
+                "description": "OAuth 2.0 authorization code flow with mandatory S256 PKCE. Token requests need a nonce-bearing DPoP proof, and the issued tokens are DPoP-bound.",
+                "flows": {
+                    "authorizationCode": {
+                        "authorizationUrl": "/api/oauth/authorize",
+                        "tokenUrl": "/api/oauth/token",
+                        "refreshUrl": "/api/oauth/token",
+                        "scopes": {
+                            "profile": "Read the profile",
+                            "email": "Read the email address",
+                            "library": "Use the music library",
+                            "playlist": "Manage playlists"
+                        }
+                    }
+                }
             }
         }
     },

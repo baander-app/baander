@@ -23,7 +23,7 @@ use Symfony\Contracts\Cache\TagAwareCacheInterface;
 /** Actual migration tables and foreign keys, observed outside the maintenance transaction. */
 final class OAuthTokenInvalidationTest extends TestCase
 {
-    private const array GRANTS = ['oauth_token_metadata', 'oauth_refresh_tokens', 'oauth_access_tokens'];
+    private const array GRANTS = ['oauth_token_metadata', 'oauth_refresh_tokens', 'oauth_auth_codes', 'oauth_device_codes', 'oauth_access_tokens'];
     private Connection $writer;
     private Connection $observer;
     private string $schema;
@@ -96,7 +96,7 @@ final class OAuthTokenInvalidationTest extends TestCase
 
             return true;
         });
-        self::assertSame(4, new DoctrineOAuthTokenInvalidator($this->writer, $cache)->invalidate());
+        self::assertSame(7, new DoctrineOAuthTokenInvalidator($this->writer, $cache)->invalidate());
         $this->assertPrincipalsRemain();
         $this->assertGrantRows(0);
     }
@@ -107,8 +107,7 @@ final class OAuthTokenInvalidationTest extends TestCase
             CREATE FUNCTION reject_oauth_delete() RETURNS trigger LANGUAGE plpgsql AS $$
             BEGIN RAISE EXCEPTION 'injected-private-failure'; END $$
             SQL);
-        // Access tokens are deleted last, after their refresh tokens and metadata.
-        $this->writer->executeStatement('CREATE TRIGGER reject_oauth_delete BEFORE DELETE ON oauth_access_tokens FOR EACH ROW EXECUTE FUNCTION reject_oauth_delete()');
+        $this->writer->executeStatement('CREATE TRIGGER reject_oauth_delete BEFORE DELETE ON oauth_auth_codes FOR EACH ROW EXECUTE FUNCTION reject_oauth_delete()');
         $cache = $this->createMock(TagAwareCacheInterface::class);
         $cache->expects(self::never())->method('invalidateTags');
         try {
@@ -119,7 +118,7 @@ final class OAuthTokenInvalidationTest extends TestCase
             self::assertStringNotContainsString('injected-private-failure', (string) $error);
         }
         self::assertFalse($this->writer->isConnected());
-        $this->assertGrantRows(4);
+        $this->assertGrantRows(7);
         $this->assertPrincipalsRemain();
     }
 
@@ -138,7 +137,7 @@ final class OAuthTokenInvalidationTest extends TestCase
             new DoctrineOAuthTokenInvalidator($this->writer, $cache)->invalidate();
             self::fail('Unconfirmed cache invalidation must report the committed phase.');
         } catch (OAuthTokenCacheInvalidationFailed $error) {
-            self::assertSame(4, $error->deletedRows);
+            self::assertSame(7, $error->deletedRows);
             self::assertNull($error->getPrevious());
             self::assertStringNotContainsString('injected-private-cache-failure', (string) $error);
         }
@@ -190,13 +189,13 @@ final class OAuthTokenInvalidationTest extends TestCase
         }
         self::assertSame(1, $this->writer->getTransactionNestingLevel());
         self::assertTrue($this->writer->isConnected());
-        $this->assertGrantRows(4);
+        $this->assertGrantRows(7);
     }
 
     public function testLockTimeoutRollsBackAndDiscardsDedicatedConnection(): void
     {
         $this->observer->beginTransaction();
-        $this->observer->executeStatement('LOCK TABLE oauth_access_tokens IN ACCESS EXCLUSIVE MODE');
+        $this->observer->executeStatement('LOCK TABLE oauth_device_codes IN ACCESS EXCLUSIVE MODE');
         $cache = $this->createMock(TagAwareCacheInterface::class);
         $cache->expects(self::never())->method('invalidateTags');
         try {
@@ -208,7 +207,7 @@ final class OAuthTokenInvalidationTest extends TestCase
             $this->observer->rollBack();
         }
         self::assertFalse($this->writer->isConnected());
-        $this->assertGrantRows(4);
+        $this->assertGrantRows(7);
     }
 
     private function seed(): void
@@ -230,8 +229,15 @@ final class OAuthTokenInvalidationTest extends TestCase
             'access_token_id' => $access, ...$times]);
         $this->writer->insert('oauth_refresh_tokens', ['id' => Uuid::generate()->toString(), 'token_id' => 'rotation-refresh-successor',
             'access_token_id' => $access, 'previous_refresh_token_id' => $refresh, ...$times]);
+        $this->writer->insert('oauth_auth_codes', ['id' => Uuid::generate()->toString(), 'code_id' => 'rotation-auth-code',
+            'client_id' => $client, 'user_id' => $user, ...$times]);
+        foreach (['pending', 'approved'] as $phase) {
+            $this->writer->insert('oauth_device_codes', ['id' => Uuid::generate()->toString(), 'device_code' => 'rotation-device-' . $phase,
+                'user_code' => 'rotation-user-' . $phase, 'client_id' => $client, 'user_id' => $user,
+                'verification_uri' => 'https://baander.app/device', 'approved' => $phase === 'approved' ? 'true' : 'false', ...$times]);
+        }
         $this->writer->insert('oauth_token_metadata', ['id' => Uuid::generate()->toString(), 'token_id' => $access, ...$times]);
-        $this->assertGrantRows(4);
+        $this->assertGrantRows(7);
     }
 
     private function assertGrantRows(int $expected): void

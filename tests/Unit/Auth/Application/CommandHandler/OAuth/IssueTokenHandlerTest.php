@@ -8,6 +8,7 @@ use App\Auth\Application\Command\OAuth\IssueTokenCommand;
 use App\Auth\Application\CommandHandler\OAuth\IssueTokenHandler;
 use App\Auth\Application\Port\JwtGeneratorInterface;
 use App\Auth\Application\ScopeAllowlist;
+use App\Auth\Application\Service\TokenPairIssuer;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
@@ -73,16 +74,18 @@ final class IssueTokenHandlerTest extends TestCase
         });
 
         $this->handler = new IssueTokenHandler(
-            $accessTokenRepository,
-            $refreshTokenRepository,
             $this->clientRepository,
             $this->userRepository,
-            new ScopeAllowlist(['profile', 'email', 'library', 'playlist']),
-            $entityManager,
-            $jwtGenerator,
-            $tokenMetadataRepository,
-            accessTokenTtl: 3600,
-            refreshTokenTtl: 2592000,
+            new TokenPairIssuer(
+                $accessTokenRepository,
+                $refreshTokenRepository,
+                new ScopeAllowlist(['profile', 'email', 'library', 'playlist']),
+                $entityManager,
+                $jwtGenerator,
+                $tokenMetadataRepository,
+                accessTokenTtl: 3600,
+                refreshTokenTtl: 2592000,
+            ),
         );
     }
 

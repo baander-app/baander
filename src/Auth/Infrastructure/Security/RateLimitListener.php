@@ -32,10 +32,12 @@ final class RateLimitListener
     /**
      * Map of route patterns to the rate limiter factory to use.
      *
-     * Each entry maps a route path regex to the limiter factory. The first
-     * matching route wins; order matters (more specific first).
+     * Each entry maps a route path regex to the limiter factory. Every matching
+     * rule is charged, so one path can have several limits (per IP and per client).
      *
-     * @var array<array{pattern: string, limiter: RateLimiterFactoryInterface, key_resolver: callable(Request): string, skip_empty_key?: bool}>
+     * Rules apply to POST unless they list their methods.
+     *
+     * @var array<array{pattern: string, limiter: RateLimiterFactoryInterface, key_resolver: callable(Request): string, skip_empty_key?: bool, methods?: list<string>}>
      */
     private readonly array $rules;
 
@@ -47,6 +49,11 @@ final class RateLimitListener
         RateLimiterFactoryInterface $authRefreshClientLimiter,
         RateLimiterFactoryInterface $authPasskeyIpLimiter,
         RateLimiterFactoryInterface $authEmailVerificationIpLimiter,
+        RateLimiterFactoryInterface $oauthTokenIpLimiter,
+        RateLimiterFactoryInterface $oauthTokenClientLimiter,
+        RateLimiterFactoryInterface $oauthAuthorizeIpLimiter,
+        RateLimiterFactoryInterface $oauthDeviceAuthorizeIpLimiter,
+        RateLimiterFactoryInterface $oauthDeviceVerifyIpLimiter,
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
         private readonly string $environment,
@@ -112,7 +119,55 @@ final class RateLimitListener
                     return $token !== '' ? $token : ($r->getClientIp() ?? 'unknown');
                 },
             ],
+            // OAuth token endpoint: per IP, and per client across all addresses.
+            [
+                'pattern' => '#^/api/oauth/token$#',
+                'limiter' => $oauthTokenIpLimiter,
+                'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
+            ],
+            [
+                'pattern' => '#^/api/oauth/token$#',
+                'limiter' => $oauthTokenClientLimiter,
+                'key_resolver' => fn (Request $r): string => $this->oauthClientId($r),
+                'skip_empty_key' => true,
+            ],
+            // Authorization endpoint: per IP, for both methods it accepts.
+            [
+                'pattern' => '#^/api/oauth/authorize$#',
+                'limiter' => $oauthAuthorizeIpLimiter,
+                'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
+                'methods' => ['GET', 'POST'],
+            ],
+            // Device authorization: per IP; each request stores a device code.
+            [
+                'pattern' => '#^/api/oauth/device/authorize$#',
+                'limiter' => $oauthDeviceAuthorizeIpLimiter,
+                'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
+            ],
+            // User code lookup, approval and denial: per IP, bounding user code guessing.
+            [
+                'pattern' => '#^/api/oauth/device/(verify|approve)$#',
+                'limiter' => $oauthDeviceVerifyIpLimiter,
+                'key_resolver' => fn (Request $r): string => $r->getClientIp() ?? 'unknown',
+                'methods' => ['GET', 'POST'],
+            ],
         ];
+    }
+
+    /** The client_id of a form-encoded or JSON token request, or an empty string. */
+    private function oauthClientId(Request $request): string
+    {
+        $clientId = $request->request->all()['client_id'] ?? null;
+        if ($clientId === null) {
+            try {
+                $body = $this->jsonEncoder->decode((string) $request->getContent(), 'json');
+            } catch (\Throwable) {
+                return '';
+            }
+            $clientId = is_array($body) ? ($body['client_id'] ?? null) : null;
+        }
+
+        return is_string($clientId) ? $clientId : '';
     }
 
     #[AsEventListener(event: KernelEvents::REQUEST, priority: 10)]
@@ -134,7 +189,7 @@ final class RateLimitListener
                 continue;
             }
 
-            if (!$request->isMethod('POST')) {
+            if (!in_array($request->getMethod(), $rule['methods'] ?? ['POST'], true)) {
                 continue;
             }
 

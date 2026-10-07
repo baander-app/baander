@@ -46,6 +46,7 @@ final class ReferentialIntegrityTest extends TestCase
         'movies.tmdb_id' => 'external TMDB identifier',
         'oauth_access_tokens.chain_id' => 'token chain identifier with no chain table',
         'oauth_access_tokens.token_id' => 'the token\'s own OAuth identifier',
+        'oauth_auth_codes.code_id' => 'the code\'s own OAuth identifier',
         'oauth_refresh_tokens.chain_id' => 'token chain identifier with no chain table',
         'oauth_refresh_tokens.token_id' => 'the token\'s own OAuth identifier',
         'oauth_token_metadata.session_id' => 'client-reported session identifier',
@@ -81,6 +82,7 @@ final class ReferentialIntegrityTest extends TestCase
 
     /** ON DELETE rules chosen by the referential integrity audit (Version20261006280000). */
     private const RULES = [
+        'fk_oauth_clients_user_id' => 'CASCADE',
         'fk_pairing_sessions_server_id' => 'CASCADE',
         'fk_party_events_session_id' => 'CASCADE',
         'fk_party_events_user_id' => 'CASCADE',
@@ -94,9 +96,11 @@ final class ReferentialIntegrityTest extends TestCase
         'fk_user_theme_moods_user_id' => 'CASCADE',
     ];
 
-    /** Deleting a user deletes their access tokens (Version20261006300000). */
+    /** Deleting a user deletes their OAuth tokens and codes (Version001_InitialSchema, Version20261006300000). */
     private const OAUTH_RULES = [
         'fk_oauth_access_tokens_user_id' => 'CASCADE',
+        'fk_oauth_auth_codes_user_id' => 'CASCADE',
+        'fk_oauth_device_codes_user_id' => 'CASCADE',
     ];
 
     /** ON DELETE rules for a party's video and transcode job (Version20261006310000). */
@@ -247,6 +251,75 @@ final class ReferentialIntegrityTest extends TestCase
         self::assertSame(1, $this->countOwnedRows('oauth_token_metadata', 'token_id', $tokens[1]));
     }
 
+    public function testDeletingAUserRemovesTheirAuthCodesAndApprovedDeviceCodes(): void
+    {
+        $owner = $this->createUser();
+        $other = $this->createUser();
+        $client = $this->createClient();
+        foreach ([$owner, $other] as $user) {
+            $this->createAuthCode($client, $user);
+            $this->createDeviceCode($client, $user);
+        }
+        // Device codes are bound to a user only on approval.
+        $pending = $this->createDeviceCode($client);
+        $denied = $this->createDeviceCode($client, denied: true);
+
+        $this->deleteUser($owner);
+
+        foreach (['oauth_auth_codes', 'oauth_device_codes'] as $table) {
+            self::assertSame(0, $this->countOwnedRows($table, 'user_id', $owner), $table);
+            self::assertSame(1, $this->countOwnedRows($table, 'user_id', $other), $table);
+        }
+        foreach ([$pending, $denied] as $code) {
+            self::assertSame(1, $this->countOwnedRows('oauth_device_codes', 'id', $code));
+        }
+    }
+
+    public function testOAuthOwnerMigrationRemovesRowsWithoutTheirUserAndRoundTrips(): void
+    {
+        $connection = $this->manager->getConnection();
+        $latest = $this->constraintsAndIndexes();
+
+        $this->runMigration('down', Version20261006300000::class);
+        $restored = $this->constraintsAndIndexes();
+        foreach (['fk_oauth_access_tokens_user_id', 'fk_oauth_device_codes_user_id'] as $name) {
+            self::assertStringEndsWith('ON DELETE SET NULL', $restored[$name], $name);
+        }
+
+        // Rows the earlier rules left behind when their user was deleted.
+        $client = $this->createClient();
+        $kept = $this->createUser();
+        $keptToken = $this->createAccessToken($client, $kept);
+        $keptCode = $this->createDeviceCode($client, $kept);
+        $deleted = $this->createUser();
+        $orphanToken = $this->createAccessToken($client, $deleted);
+        $orphanCode = $this->createDeviceCode($client, $deleted);
+        $pending = $this->createDeviceCode($client);
+        $denied = $this->createDeviceCode($client, denied: true);
+        $this->deleteUser($deleted);
+        self::assertSame(
+            [['user_id' => null]],
+            $connection->fetchAllAssociative('SELECT user_id FROM oauth_access_tokens WHERE id = :id', ['id' => $orphanToken->toString()]),
+        );
+        self::assertSame(
+            [['user_id' => null, 'approved' => true]],
+            $connection->fetchAllAssociative('SELECT user_id, approved FROM oauth_device_codes WHERE id = :id', ['id' => $orphanCode->toString()]),
+        );
+
+        $this->runMigration('up', Version20261006300000::class);
+
+        self::assertSame($latest, $this->constraintsAndIndexes());
+        self::assertSame(0, $this->countOwnedRows('oauth_access_tokens', 'id', $orphanToken));
+        self::assertSame(0, $this->countOwnedRows('oauth_refresh_tokens', 'access_token_id', $orphanToken));
+        self::assertSame(0, $this->countOwnedRows('oauth_token_metadata', 'token_id', $orphanToken));
+        self::assertSame(0, $this->countOwnedRows('oauth_device_codes', 'id', $orphanCode));
+        self::assertSame(1, $this->countOwnedRows('oauth_access_tokens', 'id', $keptToken));
+        self::assertSame(1, $this->countOwnedRows('oauth_refresh_tokens', 'access_token_id', $keptToken));
+        foreach ([$keptCode, $pending, $denied] as $code) {
+            self::assertSame(1, $this->countOwnedRows('oauth_device_codes', 'id', $code));
+        }
+    }
+
     public function testDeletingAVideoRemovesItsTranscodeJobsAndTheirSessions(): void
     {
         $viewer = $this->createUser();
@@ -375,8 +448,6 @@ final class ReferentialIntegrityTest extends TestCase
         $connection = $this->manager->getConnection();
         $latest = $this->constraintsAndIndexes();
 
-        // Version20261006300000 dropped columns and tables Version20261006280000 constrains; restore them first.
-        $this->runMigration('down', Version20261006300000::class);
         $this->runMigration('down');
         $restored = $this->constraintsAndIndexes();
         foreach (array_keys(self::RULES) as $name) {
@@ -420,25 +491,7 @@ final class ReferentialIntegrityTest extends TestCase
 
         $this->runMigration('up');
 
-        // Rows Version20261006300000 removes: a personal access client with a token, and a token whose user was deleted.
-        $personal = $this->createClient(['personal_access_client' => 'true', 'user_id' => $owner->toString()]);
-        $personalToken = $this->createAccessToken($personal, $owner);
-        $tokenOwner = $this->createUser();
-        $orphanToken = $this->createAccessToken($this->createClient(), $tokenOwner);
-        $this->deleteUser($tokenOwner);
-        self::assertSame(
-            [['user_id' => null]],
-            $connection->fetchAllAssociative('SELECT user_id FROM oauth_access_tokens WHERE id = :id', ['id' => $orphanToken->toString()]),
-        );
-
-        $this->runMigration('up', Version20261006300000::class);
-
         self::assertSame($latest, $this->constraintsAndIndexes());
-        self::assertSame(0, $this->countOwnedRows('oauth_clients', 'id', $personal));
-        foreach ([$personalToken, $orphanToken] as $token) {
-            self::assertSame(0, $this->countOwnedRows('oauth_access_tokens', 'id', $token));
-            self::assertSame(0, $this->countOwnedRows('oauth_refresh_tokens', 'access_token_id', $token));
-        }
         self::assertSame(
             [$keptFavorite->toString()],
             $connection->fetchFirstColumn('SELECT id FROM user_favorites WHERE id IN (:kept, :orphan)', [
@@ -505,6 +558,36 @@ final class ReferentialIntegrityTest extends TestCase
         $this->insert('oauth_token_metadata', ['token_id' => $token->toString(), ...$times]);
 
         return $token;
+    }
+
+    private function createAuthCode(Uuid $client, Uuid $user): Uuid
+    {
+        return $this->insert('oauth_auth_codes', [
+            'code_id' => bin2hex(random_bytes(16)),
+            'client_id' => $client->toString(),
+            'user_id' => $user->toString(),
+            'redirect_uri' => 'https://app.baander.app/callback',
+            'code_challenge' => 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM',
+            'code_challenge_method' => 'S256',
+            'created_at' => '2026-10-07 12:00:00+00',
+            'updated_at' => '2026-10-07 12:00:00+00',
+        ]);
+    }
+
+    /** A device code approved by $user, or a pending or denied one without a user. */
+    private function createDeviceCode(Uuid $client, ?Uuid $user = null, bool $denied = false): Uuid
+    {
+        return $this->insert('oauth_device_codes', [
+            'device_code' => bin2hex(random_bytes(16)),
+            'user_code' => strtoupper(bin2hex(random_bytes(4))),
+            'client_id' => $client->toString(),
+            'verification_uri' => 'https://app.baander.app/device',
+            'user_id' => $user?->toString(),
+            'approved' => $user !== null ? 'true' : 'false',
+            'denied' => $denied ? 'true' : 'false',
+            'created_at' => '2026-10-07 12:00:00+00',
+            'updated_at' => '2026-10-07 12:00:00+00',
+        ]);
     }
 
     private function createTranscodeJob(Uuid $video, string $tier = '1080p'): Uuid

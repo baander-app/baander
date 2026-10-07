@@ -19,6 +19,7 @@ final class EventCategoryResolver
         \App\Auth\Domain\Event\Passkey\PasskeyRegistered::class => NotificationCategory::Security,
         \App\Auth\Domain\Event\Passkey\PasskeyDeleted::class => NotificationCategory::Security,
         \App\Auth\Domain\Event\OAuth\TokenRevoked::class => NotificationCategory::Security,
+        \App\Auth\Domain\Event\OAuth\DeviceCodeApproved::class => NotificationCategory::Security,
         \App\Auth\Domain\Event\UserRegistered::class => NotificationCategory::Security,
 
         // Background Jobs events

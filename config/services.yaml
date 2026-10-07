@@ -309,6 +309,11 @@ services:
             $authRefreshClientLimiter: '@limiter.auth_refresh_client'
             $authPasskeyIpLimiter: '@limiter.auth_passkey_ip'
             $authEmailVerificationIpLimiter: '@limiter.auth_email_verification_ip'
+            $oauthTokenIpLimiter: '@limiter.oauth_token_ip'
+            $oauthTokenClientLimiter: '@limiter.oauth_token_client'
+            $oauthAuthorizeIpLimiter: '@limiter.oauth_authorize_ip'
+            $oauthDeviceAuthorizeIpLimiter: '@limiter.oauth_device_authorize_ip'
+            $oauthDeviceVerifyIpLimiter: '@limiter.oauth_device_verify_ip'
             $environment: '%kernel.environment%'
 
     App\Auth\Infrastructure\Security\ApiRateLimitListener:
@@ -354,7 +359,7 @@ services:
     # --- Scope Allowlist ---
     App\Auth\Application\ScopeAllowlist:
         arguments:
-            $scopes: '%auth.scopes.login%'
+            $scopes: '%auth.scopes.user_grants%'
 
     # --- JWT Generation ---
     App\Auth\Application\Port\JwtGeneratorInterface:
@@ -364,10 +369,30 @@ services:
             $resourceServerUri: '%auth.oauth.issuer%'
 
     # --- Token Handlers ---
-    App\Auth\Application\CommandHandler\OAuth\IssueTokenHandler:
+    App\Auth\Application\Service\TokenPairIssuer:
         arguments:
             $accessTokenTtl: '%auth.access_token.ttl%'
             $refreshTokenTtl: '%auth.refresh_token.ttl%'
+
+    # --- OAuth Authorization Server (authorization code, device and refresh grants) ---
+    App\Auth\Application\CommandHandler\OAuth\CreateAuthorizationCodeHandler:
+        arguments:
+            $authCodeTtl: '%auth.auth_code.ttl%'
+
+    App\Auth\Application\CommandHandler\OAuth\RequestDeviceAuthorizationHandler:
+        arguments:
+            $verificationUri: '%auth.device.verification_uri%'
+            $deviceCodeTtl: '%auth.device_code.ttl%'
+            $pollingInterval: '%auth.device_code.interval%'
+
+    App\Auth\Interface\Controller\OAuth\OAuthController:
+        arguments:
+            $issuer: '%auth.oauth.issuer%'
+
+    App\Auth\Interface\Controller\OAuth\AuthorizationServerMetadataController:
+        arguments:
+            $issuer: '%auth.oauth.issuer%'
+            $scopes: '%auth.scopes.user_grants%'
 
     App\Auth\Application\CommandHandler\OAuth\RefreshTokenHandler:
         arguments:
@@ -437,6 +462,10 @@ services:
             $cache: '@cache.tags'
     App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface:
         alias: App\Auth\Infrastructure\Repository\OAuth\RefreshTokenRepository
+    App\Auth\Domain\Repository\OAuth\AuthCodeRepositoryInterface:
+        alias: App\Auth\Infrastructure\Repository\OAuth\AuthCodeRepository
+    App\Auth\Domain\Repository\OAuth\DeviceCodeRepositoryInterface:
+        alias: App\Auth\Infrastructure\Repository\OAuth\DeviceCodeRepository
     App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface:
         alias: App\Auth\Infrastructure\Repository\OAuth\ClientRepository
     App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface:

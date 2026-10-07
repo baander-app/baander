@@ -71,13 +71,13 @@ graph TD
 
 | Attribute | Detail |
 |-----------|--------|
-| **Responsibility** | User identity, first-party login (password, passkey, TOTP), DPoP-bound token issuance and refresh, access token validation |
+| **Responsibility** | User identity, first-party login (password, passkey, TOTP), OAuth 2.0 authorization server (authorization code with PKCE, device authorization, refresh, personal access clients), DPoP-bound token issuance and refresh, access token validation |
 | **Namespace** | `App\Auth` |
 | **Aggregates** | `User` |
 | **Repositories** | `UserRepositoryInterface` |
 | **Ports** | `UserPortInterface`, `AuthenticatedUserIdentityInterface`, `PasswordHasherInterface`, `JwtGeneratorInterface`, `TotpVerifierInterface`, `DpopJtiCacheInterface`, `PasskeyVerifierInterface`, `PasswordResetTokenRepositoryInterface`, `EmailVerificationTokenRepositoryInterface`, `OAuthSecretBundleInterface`, `OAuthTokenInvalidatorInterface` |
-| **Events** | `UserRegistered`, `UserCreatedByOperator`, `EmailVerified`, `PasswordChanged`, `TokenRevoked`, `PasskeyRegistered`, `PasskeyDeleted` |
-| **Tech** | League OAuth2 Server resource server (anti-corruption layer), WebAuthn (web-auth/webauthn-lib), OTPHP (TOTP), Redis (DPoP JTI cache, cached access tokens) |
+| **Events** | `UserRegistered`, `UserCreatedByOperator`, `EmailVerified`, `PasswordChanged`, `TokenRevoked`, `DeviceCodeApproved`, `PasskeyRegistered`, `PasskeyDeleted` |
+| **Tech** | Own OAuth 2.0 authorization server (RFC 6749, 7636, 8628, 8414, 9207), League OAuth2 Server resource server (anti-corruption layer), WebAuthn (web-auth/webauthn-lib), OTPHP (TOTP), Redis (DPoP JTI cache and nonces, cached access tokens, rate limiters) |
 
 ### Catalog
 
@@ -306,11 +306,12 @@ graph LR
     subgraph Auth
         A1["user.registered"]
         A2["user.created_by_operator"]
-        A3["password.changed"]
-        A4["email.verified"]
-        A5["oauth.token_revoked"]
-        A6["passkey.registered"]
-        A7["passkey.deleted"]
+        A3["user.password_changed"]
+        A4["user.email_verified"]
+        A5["token.revoked"]
+        A6["user.passkey_registered"]
+        A7["user.passkey_deleted"]
+        A8["device_code.approved"]
     end
 
     subgraph Catalog
@@ -352,6 +353,7 @@ graph LR
     A5 -->|"Security"| Bridge
     A6 -->|"Security"| Bridge
     A7 -->|"Security"| Bridge
+    A8 -->|"Security"| Bridge
 
     C1 -->|"MediaChanges"| Bridge
 
@@ -363,7 +365,7 @@ graph LR
     Bridge --> N
 ```
 
-Unconnected events (no consumer): `email.verified`, `song.metadata_updated`, `metadata.synced`, all Party events, all Playlist events, `transcode.job_created`, `transcode.job_completed`, `transcode.job_failed`, `transcode.session_attached`.
+Unconnected events (no consumer): `user.email_verified`, `song.metadata_updated`, `metadata.synced`, all Party events, all Playlist events, `transcode.job_created`, `transcode.job_completed`, `transcode.job_failed`, `transcode.session_attached`.
 
 ### Event Notification Categories
 
@@ -371,7 +373,7 @@ The `EventCategoryResolver` maps events to categories that determine how and whe
 
 | Category | Events |
 |----------|--------|
-| **Security** | `UserRegistered`, `PasswordChanged`, `PasskeyRegistered`, `PasskeyDeleted`, `TokenRevoked` |
+| **Security** | `UserRegistered`, `PasswordChanged`, `PasskeyRegistered`, `PasskeyDeleted`, `TokenRevoked`, `DeviceCodeApproved` |
 | **BackgroundJobs** | `LibraryScanCompleted` |
 | **MediaChanges** | `AlbumCreated` |
 
@@ -424,6 +426,11 @@ graph TD
 
 - **What:** `Notification\Security\NotificationVoter` uses `Auth\Infrastructure\Security\SecurityUser` for authorization decisions
 - **Why:** Notification endpoints need to verify the authenticated user owns the resources being accessed.
+
+### Notification -> Auth (Domain layer)
+
+- **What:** `Notification\Domain\Service\EventCategoryResolver` maps `Auth\Domain\Event\OAuth\DeviceCodeApproved` to the Security category. Deptrac allows this through the `Auth Device Approval Event Contract` layer, which contains only that event class; the other Auth events the resolver maps are entries in `deptrac.baseline.yaml`.
+- **Why:** Approving a device request gives a device a token pair, so the user is notified. The narrow layer keeps the rest of Auth Domain out of Notification's reach.
 
 ### Metadata -> Catalog, Media (Application layer)
 
@@ -494,7 +501,7 @@ graph TD
 
 ### OAuth 2.0 Resource Server (Auth Context)
 
-Auth uses the League OAuth2 Server library only for its `ResourceServer`, which validates access tokens; Auth issues tokens itself at login and refresh. `config/services.yaml` aliases League's access token and refresh token repository interfaces to the adapters in `Auth\Infrastructure\Adapter\OAuth`. The adapters translate between League's data structures and Baander's domain models, preventing the external library's concepts from leaking into the domain layer.
+Auth uses the League OAuth2 Server library only for its `ResourceServer`, which validates access tokens; Auth issues tokens itself, at login and refresh and through its own authorization server endpoints under `/api/oauth/`. `config/services.yaml` aliases League's access token and refresh token repository interfaces to the adapters in `Auth\Infrastructure\Adapter\OAuth`. The adapters translate between League's data structures and Baander's domain models, preventing the external library's concepts from leaking into the domain layer.
 
 ### External API Adapters (Metadata Context)
 
@@ -572,7 +579,7 @@ graph TD
 
 | Context | Layer Completeness | Aggregate Pattern | Notes |
 |---------|-------------------|------------------|-------|
-| Auth | Full 4-layer + features | State object | Most mature. OAuth resource-server ACL. 9 domain events. |
+| Auth | Full 4-layer + features | State object | Most mature. Own OAuth authorization server; League resource-server ACL. 8 domain events. |
 | Catalog | Full 4-layer | State objects | Core domain. PGroonga search on `SongRepository`. 6 aggregates. |
 | Library | Full 4-layer | No state object | Orchestrates scanning pipeline. Heaviest cross-context coupling. |
 | Media | Full 4-layer | No state object | Storage/streaming abstraction. |

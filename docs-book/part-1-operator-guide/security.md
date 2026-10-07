@@ -185,10 +185,10 @@ docker compose exec redis redis-cli -a "$REDIS_PASSWORD" FLUSHALL
 
 After rotating `APP_SECRET` and flushing Redis, all existing sessions and OAuth tokens are invalid. Users will need to log in again.
 
-If OAuth refresh tokens are a concern, truncate the token tables in one statement. Refresh tokens and token metadata reference access tokens, so PostgreSQL rejects truncating `oauth_access_tokens` on its own:
+If OAuth refresh tokens are a concern, truncate the token tables in one statement. Refresh tokens and token metadata reference access tokens, so PostgreSQL rejects truncating `oauth_access_tokens` on its own. Include the authorization code and device code tables: an unredeemed code can still be exchanged for a new token pair.
 
 ```sql
-TRUNCATE oauth_access_tokens, oauth_refresh_tokens, oauth_token_metadata;
+TRUNCATE oauth_access_tokens, oauth_refresh_tokens, oauth_token_metadata, oauth_auth_codes, oauth_device_codes;
 ```
 
 ### 5. Audit user accounts
@@ -260,6 +260,15 @@ MAILER_DSN=smtp://user:pass@smtp.baander.app:587
 VAPID_PUBLIC_KEY=<from app:generate-vapid-keys>
 VAPID_PRIVATE_KEY=<from app:generate-vapid-keys>
 ```
+
+### OAuth clients and cross-origin access
+
+Besides Baander's own apps, other clients can obtain tokens through the OAuth 2.0 authorization server: the authorization code grant with mandatory S256 PKCE, the device authorization grant for devices without a browser, and personal access clients that users create for their own tools. No command or admin page registers third-party or device clients yet.
+
+- **Token binding.** Every access token and refresh token, from any grant, is bound to the DPoP key that requested it. API requests with the token must carry a proof signed by that key, except signed stream delivery URLs, and refresh requires the same key. A token request that sends `X-Baander-Client-Fingerprint` also binds the access token to that fingerprint. Refresh tokens rotate, and reusing one revokes its whole chain.
+- **Cross-origin access.** The token endpoint and the device authorization endpoint accept requests from any origin, because their callers prove possession with DPoP instead of cookies. The authorization endpoint refuses every cross-origin request (RFC 9700 section 2.6). Revocation, device approval, and all other API routes accept only the `APP_URL` origin. See [HTTP](configuration.md#http).
+- **Rate limits.** The authorization, token, and device authorization endpoints each have a per-IP limiter, and the token endpoint also counts requests per client. User code lookups and approvals share a per-IP limit that bounds code guessing. See [Rate limiting](configuration.md#rate-limiting).
+- **Revocation.** A user who revokes a personal access client also revokes every access and refresh token issued to it. Deleting a user deletes their tokens, authorization codes, and device codes.
 
 ### Network security
 

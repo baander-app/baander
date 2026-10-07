@@ -30,7 +30,7 @@ deptrac:
       groups:
         Shared: ['Shared Domain', 'Shared Application', 'Shared Infrastructure', 'Shared Interface']
         Activity: ['Activity Domain', 'Activity Application', 'Activity Infrastructure', 'Activity Resources', 'Activity Interface']
-        Auth: ['Auth Domain', 'Auth Identity Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
+        Auth: ['Auth Domain', 'Auth Identity Contract', 'Auth Device Approval Event Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
         Catalog: ['Catalog Song Lookup Contract', 'Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Resources', 'Catalog Interface']
         Filesystem: ['Filesystem Infrastructure', 'Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
         Library: ['Library Read Scope Contract', 'Library Content Stats Contract', 'Library Files Discovered Contract', 'Library Provisioning Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
@@ -113,8 +113,20 @@ deptrac:
     # =============================================
     - name: 'Auth Domain'
       collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Auth\\Domain\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Auth\\Domain\\Event\\OAuth\\DeviceCodeApproved$'
+
+    # The device approval event is a published notification contract: Notification
+    # maps it to the Security category without reaching into the rest of Auth Domain.
+    - name: 'Auth Device Approval Event Contract'
+      collectors:
         - type: classLike
-          value: '^App\\Auth\\Domain\\'
+          value: '^App\\Auth\\Domain\\Event\\OAuth\\DeviceCodeApproved$'
 
     # Only this security-principal contract is public across context boundaries.
     - name: 'Auth Identity Contract'
@@ -892,10 +904,13 @@ deptrac:
 
     # --- Auth ---
     'Auth Identity Contract': []
+    'Auth Device Approval Event Contract':
+      - 'Shared Domain'
     'Auth Domain':
       - 'Shared Domain'
     'Auth Application':
       - 'Auth Identity Contract'
+      - 'Auth Device Approval Event Contract'
       - 'Auth Domain'
       - 'Shared Domain'
       - 'Shared Application'
@@ -1074,6 +1089,7 @@ deptrac:
 
     # --- Notification ---
     'Notification Domain':
+      - 'Auth Device Approval Event Contract'
       - 'Shared Domain'
     'Notification Application':
       - 'Notification Domain'

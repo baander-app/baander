@@ -11,6 +11,7 @@ use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Infrastructure\Cache\CachedAccessTokenRepository;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Cache\CacheTags;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -231,6 +232,46 @@ final class CachedAccessTokenRepositoryTest extends TestCase
         $logger->method('error')->willThrowException(new \RuntimeException('Logger unavailable'));
 
         $this->decorator($inner, $cache, $logger)->{$method}($argument);
+    }
+
+    public function testClientRevocationInvalidatesLegacyTaggedStatus(): void
+    {
+        $this->seed(true);
+        $clientId = Uuid::generate();
+        $inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $inner->expects($this->once())->method('revokeByClientId')->with($clientId);
+
+        $this->decorator($inner)->revokeByClientId($clientId);
+
+        self::assertFalse($this->cache->getItem($this->key())->isHit());
+    }
+
+    public function testClientRevocationDatabaseFailureDoesNotInvalidateCache(): void
+    {
+        $failure = new \RuntimeException('Database unavailable');
+        $inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $inner->expects($this->once())->method('revokeByClientId')->willThrowException($failure);
+        $cache = $this->createMock(TagAwareCacheInterface::class);
+        $cache->expects($this->never())->method('invalidateTags');
+        $this->expectExceptionObject($failure);
+
+        $this->decorator($inner, $cache)->revokeByClientId(Uuid::generate());
+    }
+
+    public function testClientRevocationCacheFailureIsLoggedAfterDatabaseSuccess(): void
+    {
+        $clientId = Uuid::generate();
+        $inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $inner->expects($this->once())->method('revokeByClientId')->with($clientId);
+        $cache = $this->createStub(TagAwareCacheInterface::class);
+        $cache->method('invalidateTags')->willReturn(false);
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('error')->with(
+            $this->stringContains('client revocation'),
+            $this->callback(fn (array $context): bool => $context['client_id'] === $clientId->toString()),
+        );
+
+        $this->decorator($inner, $cache, $logger)->revokeByClientId($clientId);
     }
 
     private function seed(?bool $status): void

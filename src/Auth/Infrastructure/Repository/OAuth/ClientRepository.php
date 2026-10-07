@@ -43,11 +43,14 @@ final class ClientRepository implements ClientRepositoryInterface
             $this->jsonEncoder->encode($client->getRedirectUris(), 'json'),
             $client->getSecret(),
             null,
+            $client->isPersonalAccessClient(),
             $client->isPasswordClient(),
+            $client->isDeviceClient(),
             $client->isConfidential(),
             $client->isFirstParty(),
             id: $client->getId(),
         );
+        $entity->setUserId($client->getUserId());
 
         if ($client->isRevoked()) {
             $entity->revoke();
@@ -75,6 +78,30 @@ final class ClientRepository implements ClientRepositoryInterface
         return $entity !== null ? $this->toDomain($entity) : null;
     }
 
+    public function findPersonalAccessClients(): array
+    {
+        $entities = $this->entityManager
+            ->getRepository(ClientEntity::class)
+            ->findBy(
+                criteria: ['personalAccessClient' => true, 'revoked' => false],
+                orderBy: ['createdAt' => 'DESC'],
+            );
+
+        return array_map(fn (ClientEntity $entity): Client => $this->toDomain($entity), $entities);
+    }
+
+    public function findPersonalAccessClientsByUser(Uuid $userId): array
+    {
+        $entities = $this->entityManager
+            ->getRepository(ClientEntity::class)
+            ->findBy(
+                criteria: ['personalAccessClient' => true, 'revoked' => false, 'userId' => $userId],
+                orderBy: ['createdAt' => 'DESC'],
+            );
+
+        return array_map(fn (ClientEntity $entity): Client => $this->toDomain($entity), $entities);
+    }
+
     // --- Internal ---
 
     private function toDomain(ClientEntity $entity): Client
@@ -85,9 +112,12 @@ final class ClientRepository implements ClientRepositoryInterface
             name: $entity->getName(),
             secret: $entity->getSecret(),
             redirectUris: $this->parseRedirectUris($entity->getRedirect()),
+            personalAccessClient: $entity->isPersonalAccessClient(),
             passwordClient: $entity->isPasswordClient(),
+            deviceClient: $entity->isDeviceClient(),
             confidential: $entity->isConfidential(),
             firstParty: $entity->isFirstParty(),
+            userId: $entity->getUserId(),
             createdAt: $entity->getCreatedAt(),
             updatedAt: $entity->getUpdatedAt(),
             revoked: $entity->isRevoked(),

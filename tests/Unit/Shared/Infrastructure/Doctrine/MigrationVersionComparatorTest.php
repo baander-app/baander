@@ -51,7 +51,6 @@ final class MigrationVersionComparatorTest extends TestCase
         'DoctrineMigrations\\Version20261006240000',
         'DoctrineMigrations\\Version20261006250000',
         'DoctrineMigrations\\Version20261006260000',
-        'DoctrineMigrations\\Version20261006270000',
         'DoctrineMigrations\\Version20261006280000',
         'DoctrineMigrations\\Version20261006290000',
         'DoctrineMigrations\\Version20261006300000',
@@ -59,6 +58,7 @@ final class MigrationVersionComparatorTest extends TestCase
         'DoctrineMigrations\\Version20261006320000',
         'DoctrineMigrations\\Version20261006330000',
         'DoctrineMigrations\\Version20261006340000',
+        'DoctrineMigrations\\Version20261006350000',
         'DoctrineMigrations\\Version20261006360000',
     ];
 

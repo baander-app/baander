@@ -12,7 +12,8 @@ use InvalidArgumentException;
 /**
  * OAuth 2.0 Client aggregate root.
  *
- * A pre-registered first-party client that password and passkey login issue tokens to.
+ * Represents an OAuth client application that can request tokens on behalf
+ * of users or on its own behalf (client credentials grant).
  */
 final class Client
 {
@@ -25,6 +26,9 @@ final class Client
      * Create a new OAuth client.
      *
      * @param string[] $redirectUris
+     */
+    /**
+     * @param string[] $redirectUris
      * @param ?PublicId $publicId Pre-assigned public ID for seeding/importing
      *                           clients with a known identity (e.g. dev setup).
      *                           Defaults to a freshly generated NanoID.
@@ -35,8 +39,11 @@ final class Client
         ?string $secret = null,
         bool $confidential = false,
         bool $firstParty = false,
+        bool $personalAccessClient = false,
         bool $passwordClient = false,
-        ?PublicId $publicId = null,
+        bool $deviceClient = false,
+        ?Uuid $userId = null,
+        ?\App\Shared\Domain\Model\PublicId $publicId = null,
     ): self {
         if (trim($name) === '') {
             throw new InvalidArgumentException('Client name cannot be empty.');
@@ -48,13 +55,16 @@ final class Client
 
         return new self(new ClientState(
             id: new Uuid(),
-            publicId: $publicId ?? new PublicId(),
+            publicId: $publicId ?? new \App\Shared\Domain\Model\PublicId(),
             name: $name,
             secret: $secret,
             redirectUris: $redirectUris,
+            personalAccessClient: $personalAccessClient,
             passwordClient: $passwordClient,
+            deviceClient: $deviceClient,
             confidential: $confidential,
             firstParty: $firstParty,
+            userId: $userId,
             createdAt: new DateTimeImmutable(),
             updatedAt: new DateTimeImmutable(),
         ));
@@ -68,6 +78,20 @@ final class Client
     public static function reconstitute(ClientState $state): self
     {
         return new self($state);
+    }
+
+    /**
+     * Create a personal access client (non-confidential, first-party).
+     */
+    public static function createPersonalAccess(string $name, ?Uuid $userId = null): self
+    {
+        return self::create(
+            name: $name,
+            redirectUris: ['http://localhost'],
+            firstParty: true,
+            personalAccessClient: true,
+            userId: $userId,
+        );
     }
 
     public function revoke(): void
@@ -108,7 +132,7 @@ final class Client
         return $this->state->id;
     }
 
-    public function getPublicId(): PublicId
+    public function getPublicId(): \App\Shared\Domain\Model\PublicId
     {
         return $this->state->publicId;
     }
@@ -131,9 +155,19 @@ final class Client
         return $this->state->redirectUris;
     }
 
+    public function isPersonalAccessClient(): bool
+    {
+        return $this->state->personalAccessClient;
+    }
+
     public function isPasswordClient(): bool
     {
         return $this->state->passwordClient;
+    }
+
+    public function isDeviceClient(): bool
+    {
+        return $this->state->deviceClient;
     }
 
     public function isConfidential(): bool
@@ -159,6 +193,20 @@ final class Client
     public function getUpdatedAt(): DateTimeImmutable
     {
         return $this->state->updatedAt;
+    }
+
+    public function getUserId(): ?Uuid
+    {
+        return $this->state->userId;
+    }
+
+    public function isOwnedBy(Uuid $userId): bool
+    {
+        if ($this->state->userId === null) {
+            return false;
+        }
+
+        return $this->state->userId->equals($userId);
     }
 
     public function getState(): ClientState

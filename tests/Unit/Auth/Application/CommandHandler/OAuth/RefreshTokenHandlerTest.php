@@ -327,6 +327,71 @@ final class RefreshTokenHandlerTest extends TestCase
         self::assertSame(self::JKT, $this->savedAccessTokens[1]->getDpopJkt());
     }
 
+    public function testATokenOfARevokedClientCannotBeRefreshed(): void
+    {
+        $refreshToken = $this->boundRefreshToken();
+        $refreshToken->getAccessToken()->getClient()->revoke();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('Client has been revoked');
+
+        try {
+            ($this->handler)(new RefreshTokenCommand(refreshTokenId: $refreshToken->getTokenId()->toString(), dpopJkt: self::JKT));
+        } finally {
+            self::assertFalse($refreshToken->hasBeenUsed());
+        }
+    }
+
+    public function testAtTheTokenEndpointTheTokenMustBelongToTheAuthenticatedClient(): void
+    {
+        $refreshToken = $this->boundRefreshToken();
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('not issued to this client');
+
+        try {
+            ($this->handler)(new RefreshTokenCommand(
+                refreshTokenId: $refreshToken->getTokenId()->toString(),
+                dpopJkt: self::JKT,
+                clientId: Uuid::generate(),
+            ));
+        } finally {
+            self::assertFalse($refreshToken->hasBeenUsed());
+        }
+    }
+
+    public function testAtTheTokenEndpointTheIssuingClientMayRefresh(): void
+    {
+        $refreshToken = $this->boundRefreshToken();
+
+        $result = ($this->handler)(new RefreshTokenCommand(
+            refreshTokenId: $refreshToken->getTokenId()->toString(),
+            dpopJkt: self::JKT,
+            clientId: $refreshToken->getAccessToken()->getClient()->getId(),
+        ));
+
+        self::assertNotEmpty($result->getRefreshToken());
+        self::assertTrue($refreshToken->hasBeenUsed());
+    }
+
+    private function boundRefreshToken(): RefreshToken
+    {
+        $chainId = ChainId::generate();
+        $accessToken = AccessToken::issue(
+            $this->createConfidentialClient(),
+            User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User'),
+            [new Scope('profile')],
+            null,
+            new \DateInterval('PT3600S'),
+            $chainId,
+            dpopJkt: self::JKT,
+        );
+        $refreshToken = RefreshToken::issue($accessToken, $chainId, new \DateInterval('PT2592000S'));
+        $this->refreshTokenRepository->method('findByTokenId')->willReturn($refreshToken);
+
+        return $refreshToken;
+    }
+
     public function testRevokedRefreshTokenThrows(): void
     {
         $user = User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User');

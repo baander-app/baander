@@ -31,3 +31,4 @@ The command is **idempotent**: it looks up the client by its fixed public ID and
 
 - Safe to run repeatedly. An existing client is left untouched.
 - The public ID is an identifier, not a secret.
+- The command creates no third-party or device clients for the OAuth authorization server. No command registers those yet.

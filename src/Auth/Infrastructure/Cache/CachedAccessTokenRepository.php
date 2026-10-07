@@ -71,6 +71,17 @@ final readonly class CachedAccessTokenRepository implements AccessTokenRepositor
         );
     }
 
+    public function revokeByClientId(Uuid $clientId): void
+    {
+        $this->inner->revokeByClientId($clientId);
+
+        $this->invalidateCache(
+            fn (): bool => $this->cache->invalidateTags([CacheTags::OAUTH_TOKEN]),
+            'Failed to invalidate token cache on client revocation',
+            ['client_id' => $clientId->toString()],
+        );
+    }
+
     /**
      * @param callable(): bool $operation
      * @param array<string, mixed> $context

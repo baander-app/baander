@@ -36,4 +36,7 @@ interface RefreshTokenRepositoryInterface
      * given, refresh tokens issued with it or in its refresh chain stay valid.
      */
     public function revokeForUser(Uuid $userId, ?AccessToken $keep = null): void;
+
+    /** Revoke every active refresh token whose access token was issued to the client. */
+    public function revokeByClientId(Uuid $clientId): void;
 }

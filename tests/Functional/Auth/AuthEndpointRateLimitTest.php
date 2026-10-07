@@ -58,6 +58,40 @@ final class AuthEndpointRateLimitTest extends RateLimitTestCase
         self::assertSame(200, $other->getStatusCode(), (string) $other->getContent());
     }
 
+    public function testOAuthTokenEndpointIsLimitedPerIpAndPerClient(): void
+    {
+        $this->exhaust('oauth_token_ip', '198.51.100.60');
+        $this->assertTooManyRequests($this->requestFrom('198.51.100.60', 'POST', '/api/oauth/token', content: ['grant_type' => 'refresh_token', 'client_id' => 'rate_limit_client_0001']));
+
+        $this->exhaust('oauth_token_client', 'rate_limit_client_0002');
+        $this->assertTooManyRequests($this->requestFrom('198.51.100.61', 'POST', '/api/oauth/token', content: ['grant_type' => 'refresh_token', 'client_id' => 'rate_limit_client_0002']));
+
+        // Another address and client still reach the endpoint, which then asks for a DPoP proof.
+        $other = $this->requestFrom('198.51.100.62', 'POST', '/api/oauth/token', content: ['grant_type' => 'refresh_token', 'client_id' => 'rate_limit_client_0003']);
+        self::assertSame(400, $other->getStatusCode(), (string) $other->getContent());
+    }
+
+    public function testDeviceAuthorizationIsLimitedPerIp(): void
+    {
+        $this->exhaust('oauth_device_authorize_ip', '198.51.100.63');
+
+        $this->assertTooManyRequests($this->requestFrom('198.51.100.63', 'POST', '/api/oauth/device/authorize', content: ['clientId' => 'rate_limit_client_0004']));
+    }
+
+    public function testAuthorizationAndUserCodeEndpointsAreLimitedPerIp(): void
+    {
+        $user = $this->createTestUser();
+        $this->exhaust('oauth_authorize_ip', '198.51.100.64');
+        $this->exhaust('oauth_device_verify_ip', '198.51.100.64');
+
+        $this->assertTooManyRequests($this->requestFrom('198.51.100.64', 'GET', '/api/oauth/authorize?response_type=code&client_id=rate_limit_client_0005', $user->getId()->toString()));
+        $this->assertTooManyRequests($this->requestFrom('198.51.100.64', 'GET', '/api/oauth/device/verify?user_code=BCDF-GHJK', $user->getId()->toString()));
+        $this->assertTooManyRequests($this->requestFrom('198.51.100.64', 'POST', '/api/oauth/device/approve', $user->getId()->toString(), ['userCode' => 'BCDF-GHJK', 'action' => 'approve']));
+
+        $lookup = $this->requestFrom('198.51.100.65', 'GET', '/api/oauth/device/verify?user_code=BCDF-GHJK', $user->getId()->toString());
+        self::assertSame(400, $lookup->getStatusCode(), (string) $lookup->getContent());
+    }
+
     private function hasResetToken(string $userId): bool
     {
         return (bool) $this->entityManager->getConnection()->fetchOne(

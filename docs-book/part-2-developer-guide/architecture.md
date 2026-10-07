@@ -13,7 +13,7 @@ Baander has 21 bounded contexts plus a Shared kernel. Most contexts follow the f
 | Context | Responsibility | Layers |
 |---------|---------------|--------|
 | Activity | Listen history tracking | Full |
-| Auth | First-party login and DPoP-bound tokens, passkeys, TOTP | Full |
+| Auth | Login, OAuth 2.0 authorization server, DPoP-bound tokens, passkeys, TOTP | Full |
 | Catalog | Artists, albums, songs, movies, videos, genres | Full |
 | Command | CLI commands (OpenAPI export) | Interface only — no domain logic, just thin wrappers around other contexts |
 | Discovery | LAN server discovery and device pairing | Full |
@@ -124,7 +124,7 @@ See the [Shared Kernel](shared-kernel.md) page for detailed documentation.
 
 ## Anti-Corruption Layer
 
-Baander uses League OAuth2 Server only for its `ResourceServer`, which validates access tokens. Auth issues tokens itself through the login and refresh endpoints; it runs no League authorization server. League defines its own repository interfaces (e.g., `League\OAuth2\Server\Repositories\AccessTokenRepositoryInterface`) that the resource server calls internally. Without an anti-corruption layer, the Auth domain would depend directly on League interfaces, coupling business logic to a third-party library.
+Baander uses League OAuth2 Server only for its `ResourceServer`, which validates access tokens. Auth issues tokens itself, through the login and refresh endpoints and through its own authorization server at `/api/oauth/authorize`, `/api/oauth/token`, and `/api/oauth/device/authorize`; it runs no League authorization server. League defines its own repository interfaces (e.g., `League\OAuth2\Server\Repositories\AccessTokenRepositoryInterface`) that the resource server calls internally. Without an anti-corruption layer, the Auth domain would depend directly on League interfaces, coupling business logic to a third-party library.
 
 Instead, `config/services.yaml` aliases League's interfaces to internal adapter implementations:
 

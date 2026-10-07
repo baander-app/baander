@@ -30,7 +30,7 @@ The test database uses `baander_test` as the database name — configured in `.e
 Redis is used for:
 - **Cache** — tag-aware caching for API responses, OAuth tokens, and user sessions
 - **Messenger** — async job transport (scan jobs, notification delivery)
-- **Rate limiting** — limiter state for API requests and for login, passkey, registration, password reset and token refresh attempts
+- **Rate limiting** — limiter state for API requests, for login, passkey, registration, password reset and token refresh attempts, and for the OAuth authorization server endpoints
 
 ## Messenger
 
@@ -60,6 +60,20 @@ These are configured as parameters in `config/packages/auth.yaml` and can be ove
 |-----------|---------|-------------|
 | `auth.access_token.ttl` | `3600` (1 hour) | Access token lifetime in seconds. |
 | `auth.refresh_token.ttl` | `2592000` (30 days) | Refresh token lifetime in seconds. |
+| `auth.auth_code.ttl` | `600` (10 minutes) | Authorization code lifetime in seconds (authorization code grant with PKCE). |
+| `auth.device_code.ttl` | `900` (15 minutes) | Device code lifetime in seconds (RFC 8628). |
+| `auth.device_code.interval` | `5` | Minimum seconds between a device's token polls. A faster poll is answered with `slow_down` and adds 5 seconds to that device code's interval. |
+
+### Authorization server
+
+Clients other than Baander's own apps obtain tokens through the authorization code grant, the device authorization grant, and the refresh token grant. These parameters are also in `config/packages/auth.yaml`:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `auth.scopes.user_grants` | `profile`, `email`, `library`, `playlist` | Scopes a user token may carry, whichever path issues it: password or passkey login, the authorization code grant, or the device grant. Requested scopes outside this list are silently dropped. The metadata document at `/.well-known/oauth-authorization-server` lists them as `scopes_supported`. |
+| `auth.device.verification_uri` | `%auth.oauth.issuer%/device` | Absolute URI of the web page where a user enters the code a device shows. The device authorization response returns it, and the same URI with `?user_code=` appended as the complete verification URI. |
+
+The issuer is `APP_URL`. No command or admin page registers third-party or device clients yet; `app:auth:setup-clients` creates only the first-party client.
 
 ## Web Push (VAPID)
 
@@ -122,6 +136,15 @@ Limits are set in `config/packages/auth.yaml`. Each limit feeds a Symfony rate l
 | `auth.rate_limit.email_verification.window` | `900` (15 min) | Window in seconds for the per-IP verification limit. |
 | `auth.rate_limit.email_verification_resend_per_user.max_attempts` | `3` | Max verification emails a signed-in user can ask for within the window. |
 | `auth.rate_limit.email_verification_resend_per_user.window` | `3600` (1 hour) | Window in seconds for the per-user resend limit. |
+| `auth.rate_limit.oauth_token.max_attempts` | `120` | Max OAuth token endpoint requests per IP within the window. A polling device makes about 12 per minute at the default interval. |
+| `auth.rate_limit.oauth_token.window` | `60` (1 min) | Window in seconds for both token endpoint limits. |
+| `auth.rate_limit.oauth_token_client.max_attempts` | `600` | Max token endpoint requests per `client_id` within the `oauth_token` window, from all addresses together. |
+| `auth.rate_limit.oauth_authorize.max_attempts` | `30` | Max authorization endpoint requests per IP within the window. |
+| `auth.rate_limit.oauth_authorize.window` | `60` (1 min) | Window in seconds for the authorization endpoint. |
+| `auth.rate_limit.oauth_device_authorize.max_attempts` | `20` | Max device authorization requests per IP within the window. Each request stores a device code. |
+| `auth.rate_limit.oauth_device_authorize.window` | `300` (5 min) | Window in seconds for device authorization. |
+| `auth.rate_limit.oauth_device_verify.max_attempts` | `30` | Max user code lookups, approvals and denials per IP within the window. This bounds user code guessing. |
+| `auth.rate_limit.oauth_device_verify.window` | `300` (5 min) | Window in seconds for user code lookups, approvals and denials. |
 
 Each limiter counts requests per key:
 
@@ -138,6 +161,11 @@ Each limiter counts requests per key:
 | `auth_refresh_client` | `POST /api/auth/refresh` | Refresh token, or client IP when the body has none |
 | `auth_email_verification_ip` | `POST /api/auth/email/verify`, `POST /api/auth/me/email/verification` (one shared bucket) | Client IP |
 | `auth_email_verification_user` | `POST /api/auth/me/email/verification` | User ID |
+| `oauth_token_ip` | `POST /api/oauth/token` | Client IP |
+| `oauth_token_client` | `POST /api/oauth/token` | `client_id` from the form or JSON body; skipped when the body has none |
+| `oauth_authorize_ip` | `GET` and `POST /api/oauth/authorize` | Client IP |
+| `oauth_device_authorize_ip` | `POST /api/oauth/device/authorize` | Client IP |
+| `oauth_device_verify_ip` | `GET /api/oauth/device/verify`, `POST /api/oauth/device/approve` | Client IP |
 | `config_check` | Admin configuration check (10 per minute) | One bucket shared by all callers |
 | `batch_cover_extract` | `POST /api/albums/covers/extract` (10 per minute) | Client IP |
 | `discovery_endpoint_ip` | Discovery registration and pairing (30 per minute) | Client IP |
@@ -279,7 +307,7 @@ Limits applied when scanning media libraries, to prevent path traversal, oversiz
 
 ## HTTP
 
-API routes accept cross-origin requests only from the origin in `APP_URL`. Two path prefixes allow any origin: `/.well-known/`, which serves the public JWKS keys, and `/api/discovery/`, whose endpoints still require authentication. The policy is set in `config/packages/nelmio_cors.yaml`; no environment variable changes it.
+API routes accept cross-origin requests only from the origin in `APP_URL`. Four paths allow any origin: `/.well-known/`, which serves the public JWKS keys and the OAuth authorization server metadata; `POST /api/oauth/token` and `POST /api/oauth/device/authorize`, which third-party and device clients call with a DPoP proof rather than cookies; and `/api/discovery/`, whose endpoints still require authentication. The authorization endpoint, `/api/oauth/authorize`, answers no cross-origin request at all, not even from `APP_URL` (RFC 9700 section 2.6). Token revocation and device approval follow the `APP_URL` rule. The policy is set in `config/packages/nelmio_cors.yaml` and `AuthorizationCorsOptionsProvider`; no environment variable changes it.
 
 ## Job Monitoring
 

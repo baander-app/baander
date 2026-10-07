@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Notification\Domain\Event;
 
+use App\Auth\Domain\Event\OAuth\DeviceCodeApproved;
 use App\Auth\Domain\Event\Passkey\PasskeyDeleted;
 use App\Auth\Domain\Event\Passkey\PasskeyRegistered;
 use App\Auth\Domain\Event\PasswordChanged;
@@ -41,6 +42,7 @@ final class EventWiringTest extends TestCase
             [PasskeyRegistered::class],
             [PasskeyDeleted::class],
             [TokenRevoked::class],
+            [DeviceCodeApproved::class],
             [UserRegistered::class],
             [AlbumCreated::class],
             [LibraryScanCompleted::class],
@@ -101,6 +103,16 @@ final class EventWiringTest extends TestCase
         $this->assertSame($libraryId->toString(), $restored->libraryId->toString());
         $this->assertSame(150, $restored->filesDiscovered);
         $this->assertSame(120, $restored->filesProcessed);
+    }
+
+    public function testDeviceCodeApprovedToPayloadAndBack(): void
+    {
+        $event = new DeviceCodeApproved('dc-123', 'user-uuid-456', $this->now);
+        $payload = $event->toPayload();
+
+        $restored = DeviceCodeApproved::fromPayload($payload);
+        $this->assertSame('dc-123', $restored->getDeviceCodeId());
+        $this->assertSame('user-uuid-456', $restored->getUserId());
     }
 
     public function testPlaylistCreatedToPayloadWithUserId(): void

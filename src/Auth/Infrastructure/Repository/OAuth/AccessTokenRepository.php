@@ -79,6 +79,16 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
         $this->entityManager->clear();
     }
 
+    public function revokeByClientId(Uuid $clientId): void
+    {
+        $conn = $this->entityManager->getConnection();
+        $conn->executeStatement(
+            'UPDATE oauth_access_tokens SET revoked = TRUE, updated_at = NOW() WHERE client_id = :clientId AND revoked = FALSE',
+            ['clientId' => $clientId->toString()],
+        );
+        $this->entityManager->clear();
+    }
+
     // --- Internal ---
 
     private function findEntityOrCreate(AccessToken $accessToken): AccessTokenEntity
@@ -175,9 +185,12 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
             name: $entity->getName(),
             secret: $entity->getSecret(),
             redirectUris: $this->parseRedirectUris($entity->getRedirect()),
+            personalAccessClient: $entity->isPersonalAccessClient(),
             passwordClient: $entity->isPasswordClient(),
+            deviceClient: $entity->isDeviceClient(),
             confidential: $entity->isConfidential(),
             firstParty: $entity->isFirstParty(),
+            userId: $entity->getUserId(),
             createdAt: $entity->getCreatedAt(),
             updatedAt: $entity->getUpdatedAt(),
             revoked: $entity->isRevoked(),

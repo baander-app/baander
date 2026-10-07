@@ -198,7 +198,7 @@ App\Auth\Application\Port\TotpVerifierInterface:
 
 ## Anti-Corruption Layer
 
-Baander uses League OAuth2 Server only to validate access tokens through its `ResourceServer`. The League access token and refresh token repository interfaces are aliased to internal adapters in `services.yaml`, so the library's interfaces stay out of the domain layer.
+Baander uses League OAuth2 Server only to validate access tokens through its `ResourceServer`; Auth's own handlers issue tokens for login, refresh, and the OAuth grants. The League access token and refresh token repository interfaces are aliased to internal adapters in `services.yaml`, so the library's interfaces stay out of the domain layer.
 
 ## Request DTOs and Resources
 

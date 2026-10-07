@@ -12,6 +12,11 @@ parameters:
         auth_password_reset_email: 'Password reset requests per account (normalized email)'
         auth_refresh_client: 'Token refresh per client'
         auth_passkey_ip: 'Passkey sign-in requests per IP'
+        oauth_token_ip: 'OAuth token endpoint requests per IP'
+        oauth_token_client: 'OAuth token endpoint requests per client'
+        oauth_authorize_ip: 'OAuth authorization requests per IP'
+        oauth_device_authorize_ip: 'Device authorization requests per IP'
+        oauth_device_verify_ip: 'Device user code lookups, approvals and denials per IP'
         config_check: 'Admin configuration check'
         batch_cover_extract: 'Album cover batch extraction'
         discovery_endpoint_ip: 'Discovery registration and pairing requests per IP'
@@ -100,6 +105,33 @@ framework:
             interval: '%auth.rate_limit.passkey.window% seconds'
             cache_pool: cache.rate_limiter.auth_passkey_ip
 
+        # OAuth authorization server endpoints (third-party and device clients)
+        oauth_token_ip:
+            policy: fixed_window
+            limit: '%auth.rate_limit.oauth_token.max_attempts%'
+            interval: '%auth.rate_limit.oauth_token.window% seconds'
+            cache_pool: cache.rate_limiter.oauth_token_ip
+        oauth_token_client:
+            policy: fixed_window
+            limit: '%auth.rate_limit.oauth_token_client.max_attempts%'
+            interval: '%auth.rate_limit.oauth_token.window% seconds'
+            cache_pool: cache.rate_limiter.oauth_token_client
+        oauth_authorize_ip:
+            policy: fixed_window
+            limit: '%auth.rate_limit.oauth_authorize.max_attempts%'
+            interval: '%auth.rate_limit.oauth_authorize.window% seconds'
+            cache_pool: cache.rate_limiter.oauth_authorize_ip
+        oauth_device_authorize_ip:
+            policy: fixed_window
+            limit: '%auth.rate_limit.oauth_device_authorize.max_attempts%'
+            interval: '%auth.rate_limit.oauth_device_authorize.window% seconds'
+            cache_pool: cache.rate_limiter.oauth_device_authorize_ip
+        oauth_device_verify_ip:
+            policy: fixed_window
+            limit: '%auth.rate_limit.oauth_device_verify.max_attempts%'
+            interval: '%auth.rate_limit.oauth_device_verify.window% seconds'
+            cache_pool: cache.rate_limiter.oauth_device_verify_ip
+
         # Admin endpoint-specific rate limiters
         config_check:
             policy: fixed_window
@@ -154,6 +186,16 @@ when@test:
             auth_refresh_client:
                 limit: 10000
             auth_passkey_ip:
+                limit: 10000
+            oauth_token_ip:
+                limit: 10000
+            oauth_token_client:
+                limit: 10000
+            oauth_authorize_ip:
+                limit: 10000
+            oauth_device_authorize_ip:
+                limit: 10000
+            oauth_device_verify_ip:
                 limit: 10000
             batch_cover_extract:
                 limit: 10000

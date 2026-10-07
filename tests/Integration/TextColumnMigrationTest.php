@@ -11,8 +11,6 @@ use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\DependencyFactory;
 use Doctrine\Migrations\Version\Version;
 use DoctrineMigrations\Version20261006210000;
-use DoctrineMigrations\Version20261006270000;
-use DoctrineMigrations\Version20261006300000;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -30,12 +28,9 @@ final class TextColumnMigrationTest extends TestCase
         'domain_event_outbox_receipt' => ['consumer'],
     ];
 
-    /** Converted columns that later migrations dropped (Version20261006270000, then the table in Version20261006300000). */
-    private const DROPPED = ['oauth_auth_codes.code_challenge_method'];
-
     public function testApplicationStringColumnsAreText(): void
     {
-        self::assertSame(array_fill_keys($this->currentColumns(), 'text'), $this->columnTypes());
+        self::assertSame(array_fill_keys($this->convertedColumns(), 'text'), $this->columnTypes());
         // Doctrine Migrations owns its metadata table; every application column is TEXT.
         self::assertSame(['doctrine_migration_versions.version'], $this->manager->getConnection()->fetchFirstColumn(
             "SELECT table_name || '.' || column_name FROM information_schema.columns
@@ -48,7 +43,7 @@ final class TextColumnMigrationTest extends TestCase
     public function testSchemaComparisonIsCleanForTheMappedTables(): void
     {
         // The domain_event_outbox tables are migration-owned and excluded by the DBAL schema filter.
-        $this->assertSchemaComparisonIsClean(['movies', 'movie_collections', 'job_monitors']);
+        $this->assertSchemaComparisonIsClean(['movies', 'movie_collections', 'job_monitors', 'oauth_auth_codes']);
     }
 
     public function testMigrationKeepsStoredValuesAndRemovesTheLengthLimits(): void
@@ -62,20 +57,15 @@ final class TextColumnMigrationTest extends TestCase
         self::assertCount(0, $migrations->getMigrationStatusCalculator()->getNewMigrations());
 
         require_once dirname(__DIR__, 2) . '/migrations/Version20261006210000.php';
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261006270000.php';
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261006300000.php';
-        $run = static function (string $direction, string $class = Version20261006210000::class) use ($connection): void {
-            $migration = new $class($connection, new NullLogger());
+        $run = static function (string $direction) use ($connection): void {
+            $migration = new Version20261006210000($connection, new NullLogger());
             $migration->{$direction}(new Schema());
             foreach ($migration->getSql() as $query) {
                 $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
             }
         };
 
-        // Restore the dropped oauth_auth_codes table and its PKCE columns, then recreate the
-        // VARCHAR columns and store values that fit their former limits.
-        $run('down', Version20261006300000::class);
-        $run('down', Version20261006270000::class);
+        // Recreate the VARCHAR columns and store values that fit their former limits.
         $run('down');
         self::assertSame('character varying', $this->columnTypes()['movies.tagline']);
         $rows = $this->insertRows();
@@ -95,18 +85,6 @@ final class TextColumnMigrationTest extends TestCase
         $tagline = str_repeat('t', 300);
         $connection->executeStatement('UPDATE movies SET tagline = :tagline WHERE id = :id', ['tagline' => $tagline, 'id' => $rows['movies'][1]]);
         self::assertSame($tagline, $connection->fetchOne('SELECT tagline FROM movies WHERE id = :id', ['id' => $rows['movies'][1]]));
-
-        // Dropping the PKCE columns returns the schema to its current state and keeps the auth code row.
-        $run('up', Version20261006270000::class);
-        self::assertSame(array_fill_keys($this->currentColumns(), 'text'), $this->columnTypes());
-        self::assertSame([], $connection->fetchFirstColumn(
-            "SELECT column_name FROM information_schema.columns
-              WHERE table_schema = current_schema() AND table_name = 'oauth_auth_codes' AND column_name LIKE 'code_challenge%'",
-        ));
-        self::assertSame(1, (int) $connection->fetchOne('SELECT COUNT(*) FROM oauth_auth_codes WHERE id = :id', ['id' => $rows['oauth_auth_codes'][1]]));
-
-        $run('up', Version20261006300000::class);
-        self::assertFalse($connection->createSchemaManager()->tablesExist(['oauth_auth_codes']));
     }
 
     /** @return array<string, array{string, string|int, array<string, string|int>}> table => [key column, key, stored values] */
@@ -143,7 +121,9 @@ final class TextColumnMigrationTest extends TestCase
             'redirect' => 'https://app.baander.app/callback', 'created_at' => $now, 'updated_at' => $now]);
         $authCode = Uuid::generate()->toString();
         $connection->insert('oauth_auth_codes', ['id' => $authCode, 'code_id' => 'u19-' . $suffix, 'user_id' => $this->createUser()->toString(),
-            'client_id' => $client, 'code_challenge_method' => 'S256', 'created_at' => $now, 'updated_at' => $now]);
+            'client_id' => $client, 'redirect_uri' => 'https://app.baander.app/callback',
+            'code_challenge' => 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM', 'code_challenge_method' => 'S256',
+            'created_at' => $now, 'updated_at' => $now]);
 
         $notification = str_repeat('n', 64);
         $connection->insert('domain_event_outbox_delivery', ['channel' => 'webhook', 'notification_id' => $notification, 'payload' => '{}']);
@@ -185,12 +165,6 @@ final class TextColumnMigrationTest extends TestCase
         sort($columns);
 
         return $columns;
-    }
-
-    /** @return list<string> */
-    private function currentColumns(): array
-    {
-        return array_values(array_diff($this->convertedColumns(), self::DROPPED));
     }
 
     /** @return array<string, string> */

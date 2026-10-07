@@ -156,11 +156,11 @@ Validation errors include a `details` key with field-level messages:
 
 ## Authentication
 
-Baander issues tokens only to its own clients. Three endpoints issue tokens: password login, passkey login, and refresh. All three require a DPoP proof and return the same token response. There is no authorization code, device, or client credentials flow.
+Baander's own apps get tokens from three endpoints: password login, passkey login, and refresh. Other clients use the OAuth 2.0 authorization server: the authorization code grant with PKCE, the device authorization grant, and the refresh token grant, all redeemed at `POST /api/oauth/token`. Every token endpoint requires a DPoP proof and returns the same token response. There is no client credentials grant.
 
 ### Token Response
 
-A successful login or refresh returns:
+A successful login, refresh, or token endpoint request returns:
 
 ```json
 {
@@ -185,6 +185,8 @@ Login responses also include a `user` object inside `data`.
 Token lifetimes are configured in `config/packages/auth.yaml`:
 - **Access token**: 3600 seconds (1 hour) — `auth.access_token.ttl`
 - **Refresh token**: 2592000 seconds (30 days) — `auth.refresh_token.ttl`
+- **Authorization code**: 600 seconds (10 minutes) — `auth.auth_code.ttl`
+- **Device code**: 900 seconds (15 minutes) — `auth.device_code.ttl`
 
 ### DPoP Proofs
 
@@ -243,7 +245,37 @@ The proof must be signed by the key the token pair was issued to. Each refresh t
 
 ### Client Fingerprint Binding
 
-Password and passkey login accept an optional `X-Baander-Client-Fingerprint` header. If it is sent, the access token is bound to that value, and every API request with the token must send the same header or get `401` (`AUTH_INVALID_TOKEN`). Refresh keeps the binding. Tokens issued without the header ignore it. WebSocket connections authenticated with a query token do not check it.
+Password login, passkey login, and the token endpoint accept an optional `X-Baander-Client-Fingerprint` header. If it is sent, the access token is bound to that value, and every API request with the token must send the same header or get `401` (`AUTH_INVALID_TOKEN`). Refresh keeps the binding. Tokens issued without the header ignore it. WebSocket connections authenticated with a query token do not check it.
+
+### OAuth 2.0 Authorization Server
+
+Clients other than Baander's own apps discover the endpoints at `GET /.well-known/oauth-authorization-server` (RFC 8414). The document roots every endpoint at the issuer (`APP_URL`, for example `https://baander.app`) and advertises `code` as the only response type, the three grant types, `none` and `client_secret_post` client authentication, `S256` as the only PKCE method, the DPoP signing algorithms, and the scopes from `auth.scopes.user_grants` as `scopes_supported`.
+
+**Authorization code with PKCE.** The signed-in user's request to `GET` or `POST /api/oauth/authorize` carries the user's DPoP-bound access token. The client parameters are in the query string:
+
+```
+GET /api/oauth/authorize?response_type=code&client_id=<client_id>&redirect_uri=http://127.0.0.1:53682/callback&scope=library%20playlist&state=<state>&code_challenge=<challenge>&code_challenge_method=S256
+Authorization: DPoP <accessToken>
+DPoP: <proof>
+```
+
+PKCE with `S256` is required for every client; `plain` and a missing method are rejected. The redirect URI must match a registered one exactly, except that a loopback URI matches on any port (RFC 8252), and it may be omitted only when the client registered exactly one. An unknown client or redirect URI is answered with OAuth error JSON; every later error, and success, redirects to the redirect URI with `code` or `error`, plus `state` and `iss` (RFC 9207). The endpoint refuses cross-origin requests. The client then redeems the code:
+
+```
+POST /api/oauth/token
+Content-Type: application/x-www-form-urlencoded
+DPoP: <proof>
+
+grant_type=authorization_code&client_id=<client_id>&code=<code>&redirect_uri=http://127.0.0.1:53682/callback&code_verifier=<verifier>
+```
+
+**Device authorization.** A device client posts `{"clientId": "...", "scope": "library"}` to `POST /api/oauth/device/authorize` and gets `deviceCode`, `userCode` (such as `BCDF-GHJK`), `verificationUri`, `verificationUriComplete`, `expiresIn`, and `interval`. It shows the user code and polls the token endpoint with `grant_type=urn:ietf:params:oauth:grant-type:device_code` and `device_code`. The signed-in user looks the code up with `GET /api/oauth/device/verify?user_code=...` and decides with `POST /api/oauth/device/approve` and `{"userCode": "...", "action": "approve"}` or `"deny"`. Polls answer `authorization_pending` until then, `slow_down` when they come sooner than the interval (which then grows by 5 seconds), `access_denied` after a denial, and `expired_token` after expiry. An approved code is redeemed once.
+
+**Refresh at the token endpoint.** `grant_type=refresh_token` rotates a pair exactly as `POST /api/auth/refresh` does, and the refresh token must have been issued to the authenticated client.
+
+The token endpoint accepts form-encoded or JSON parameters. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`. Errors use the RFC 6749 shape `{"error": "...", "error_description": "..."}`, and every answer, OAuth errors included, carries `Cache-Control: no-store` and a `DPoP-Nonce` for the next proof. A successful answer uses the token response above.
+
+**Personal access clients.** `GET` and `POST /api/oauth/clients/` list and create the current user's personal access clients, and `DELETE /api/oauth/clients/{publicId}` revokes one together with its access and refresh tokens. Only the owner can revoke a client.
 
 ### Revocation
 

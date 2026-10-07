@@ -7,9 +7,11 @@
 parameters:
     # --- OAuth 2.0 Scope Allowlist ---
 
-    # Scopes allowed for tokens issued by password and passkey login.
-    # Requested scopes outside this list are silently dropped.
-    auth.scopes.login:
+    # Scopes a user token may carry, whether issued by password or passkey login,
+    # the authorization code grant or the device grant. Requested scopes outside
+    # this list are silently dropped. The RFC 8414 metadata lists them as
+    # scopes_supported.
+    auth.scopes.user_grants:
         - profile
         - email
         - library
@@ -22,6 +24,17 @@ parameters:
 
     # Refresh token time-to-live. Default: 30 days.
     auth.refresh_token.ttl: 2592000
+
+    # Authorization code time-to-live (authorization code grant with PKCE). Default: 10 minutes.
+    auth.auth_code.ttl: 600
+
+    # Device code time-to-live (RFC 8628). Default: 15 minutes.
+    auth.device_code.ttl: 900
+
+    # Minimum seconds between a device's token polls (RFC 8628). A faster poll is
+    # answered with slow_down and adds 5 seconds to that device code's interval.
+    # Default: 5 seconds.
+    auth.device_code.interval: 5
 
     # Email verification token time-to-live. Default: 24 hours.
     auth.email_verification_token.ttl: 86400
@@ -41,6 +54,13 @@ parameters:
     # Canonical issuer URI. Access tokens carry it as their audience, and the
     # resource server accepts only tokens issued for it.
     auth.oauth.issuer: '%env(APP_URL)%'
+
+    # --- Device Authorization (RFC 8628) ---
+
+    # Absolute URI of the web page where a user enters the code a device shows.
+    # The device authorization response returns it, and the same URI with
+    # ?user_code=... as verification_uri_complete.
+    auth.device.verification_uri: '%auth.oauth.issuer%/device'
 
     # --- OAuth 2.0 Key Paths ---
 
@@ -122,6 +142,31 @@ parameters:
     # one sign-in uses two requests. Default: 40 per 5 minutes.
     auth.rate_limit.passkey.max_attempts: 40
     auth.rate_limit.passkey.window: 300
+
+    # --- OAuth Endpoint Rate Limiting ---
+
+    # Maximum OAuth token endpoint requests per IP within the window. A polling
+    # device makes about 12 per minute at the default interval. Default: 120 per minute.
+    auth.rate_limit.oauth_token.max_attempts: 120
+    auth.rate_limit.oauth_token.window: 60
+
+    # Maximum OAuth token endpoint requests per client_id within the oauth_token
+    # window, from all addresses together. Default: 600 per minute.
+    auth.rate_limit.oauth_token_client.max_attempts: 600
+
+    # Maximum authorization endpoint requests per IP within the window. Default: 30 per minute.
+    auth.rate_limit.oauth_authorize.max_attempts: 30
+    auth.rate_limit.oauth_authorize.window: 60
+
+    # Maximum device authorization requests per IP within the window; each one
+    # stores a device code. Default: 20 per 5 minutes.
+    auth.rate_limit.oauth_device_authorize.max_attempts: 20
+    auth.rate_limit.oauth_device_authorize.window: 300
+
+    # Maximum user code lookups, approvals and denials per IP within the window,
+    # which bounds user code guessing. Default: 30 per 5 minutes.
+    auth.rate_limit.oauth_device_verify.max_attempts: 30
+    auth.rate_limit.oauth_device_verify.window: 300
 
     # --- API Rate Limiting ---
 

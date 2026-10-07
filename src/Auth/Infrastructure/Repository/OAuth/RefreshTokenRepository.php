@@ -129,6 +129,23 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
         $this->entityManager->clear();
     }
 
+    public function revokeByClientId(Uuid $clientId): void
+    {
+        $conn = $this->entityManager->getConnection();
+        $conn->executeStatement(
+            <<<'SQL'
+                UPDATE oauth_refresh_tokens AS refresh_token
+                SET revoked = TRUE, updated_at = NOW()
+                FROM oauth_access_tokens AS access_token
+                WHERE refresh_token.access_token_id = access_token.id
+                  AND access_token.client_id = :clientId
+                  AND refresh_token.revoked = FALSE
+                SQL,
+            ['clientId' => $clientId->toString()],
+        );
+        $this->entityManager->clear();
+    }
+
     // --- Internal ---
 
     /**
@@ -274,9 +291,12 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
             name: $entity->getClient()->getName(),
             secret: $entity->getClient()->getSecret(),
             redirectUris: $this->parseRedirectUris($entity->getClient()->getRedirect()),
+            personalAccessClient: $entity->getClient()->isPersonalAccessClient(),
             passwordClient: $entity->getClient()->isPasswordClient(),
+            deviceClient: $entity->getClient()->isDeviceClient(),
             confidential: $entity->getClient()->isConfidential(),
             firstParty: $entity->getClient()->isFirstParty(),
+            userId: $entity->getClient()->getUserId(),
             createdAt: $entity->getClient()->getCreatedAt(),
             updatedAt: $entity->getClient()->getUpdatedAt(),
             revoked: $entity->getClient()->isRevoked(),

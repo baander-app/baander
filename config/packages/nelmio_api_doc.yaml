@@ -11,7 +11,20 @@ nelmio_api_doc:
                     type: http
                     scheme: bearer
                     bearerFormat: JWT
-                    description: 'DPoP-bound access token (JWT), sent as `Authorization: DPoP <token>` with a DPoP proof. Obtain via `/api/auth/login`, `/api/auth/login/passkey` or `/api/auth/refresh`.'
+                    description: 'DPoP-bound access token (JWT), sent as `Authorization: DPoP <token>` with a DPoP proof. First-party apps obtain it via `/api/auth/login`, `/api/auth/login/passkey` or `/api/auth/refresh`; other clients via `/api/oauth/token`.'
+                oauth2AuthCode:
+                    type: oauth2
+                    description: 'OAuth 2.0 authorization code flow with mandatory S256 PKCE. Token requests need a nonce-bearing DPoP proof, and the issued tokens are DPoP-bound.'
+                    flows:
+                        authorizationCode:
+                            authorizationUrl: /api/oauth/authorize
+                            tokenUrl: /api/oauth/token
+                            refreshUrl: /api/oauth/token
+                            scopes:
+                                profile: 'Read the profile'
+                                email: 'Read the email address'
+                                library: 'Use the music library'
+                                playlist: 'Manage playlists'
             parameters:
                 Accept-Language:
                     name: Accept-Language

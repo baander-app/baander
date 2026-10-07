@@ -1,6 +1,6 @@
 # Auth
 
-The Auth context signs users in to Baander's own clients and validates their tokens. Password login (with optional TOTP), passkey login (WebAuthn), and refresh are the only ways to get tokens. Every token pair is bound to the client's DPoP key, and refresh tokens rotate. Auth uses League OAuth2 Server only to validate access tokens, behind an anti-corruption layer; it does not offer authorization code, device, or client credentials flows.
+The Auth context signs users in, issues their tokens, and validates those tokens on every request. Baander's own apps get tokens from password login (with optional TOTP), passkey login (WebAuthn), and refresh. Other clients use the OAuth 2.0 authorization server: the authorization code grant with mandatory S256 PKCE, the device authorization grant (RFC 8628), and the refresh token grant at `POST /api/oauth/token`. Every token pair, whichever path issues it, is bound to the client's DPoP key, and refresh tokens rotate. Auth implements the authorization server itself; it uses League OAuth2 Server only to validate access tokens, behind an anti-corruption layer. There is no client credentials grant.
 
 ## Domain Models
 
@@ -12,6 +12,8 @@ The Auth context signs users in to Baander's own clients and validates their tok
 | `Client` | OAuth 2.0 client application |
 | `AccessToken` | Issued access token |
 | `RefreshToken` | Issued refresh token |
+| `AuthCode` | Single-use authorization code, bound to its redirect URI and S256 code challenge |
+| `DeviceCode` | Device authorization request with its device code, user code, polling interval, and approval state |
 | `Passkey` | WebAuthn passkey credential |
 | `ThirdPartyCredential` | External provider credential |
 | `LoginBlock` | Honeypot login block record |
@@ -27,7 +29,7 @@ The Auth context signs users in to Baander's own clients and validates their tok
 
 ## Commands & Handlers
 
-Commands and handlers are organized into feature namespaces under `Application/Command/` and `Application/CommandHandler/`: `OAuth/`, `Passkey/`, `Totp/`, and `User/`. Password login is checked by `PasswordAuthenticator` on the API firewall, not by a command.
+Commands and handlers are organized into feature namespaces under `Application/Command/` and `Application/CommandHandler/`: `OAuth/`, `Passkey/`, `Totp/`, and `User/`. Password login is checked by `PasswordAuthenticator` on the API firewall, not by a command. Three application services under `Application/Service/` are shared by the OAuth handlers: `TokenPairIssuer` mints every new token pair, `OAuthClientAuthenticator` identifies and authenticates the client of an OAuth request, and `PendingDeviceCodeFinder` resolves a user code as the user typed it.
 
 | Command | Handler | Purpose |
 |---------|---------|---------|
@@ -42,6 +44,15 @@ Commands and handlers are organized into feature namespaces under `Application/C
 | `IssueTokenCommand` | `IssueTokenHandler` | Issue a DPoP-bound token pair after password or passkey login (OAuth/) |
 | `RefreshTokenCommand` | `RefreshTokenHandler` | Rotate a refresh token for a new token pair (OAuth/) |
 | `RevokeTokenCommand` | `RevokeTokenHandler` | Token revocation (OAuth/) |
+| `CreateAuthorizationCodeCommand` | `CreateAuthorizationCodeHandler` | Issue an authorization code to a client the signed-in user authorizes (OAuth/) |
+| `ExchangeAuthorizationCodeCommand` | `ExchangeAuthorizationCodeHandler` | Authorization code grant at the token endpoint (OAuth/) |
+| `RequestDeviceAuthorizationCommand` | `RequestDeviceAuthorizationHandler` | Start the device flow for a device client (OAuth/) |
+| `ExchangeDeviceCodeCommand` | `ExchangeDeviceCodeHandler` | Device code grant: answer a poll or issue the token pair (OAuth/) |
+| `ApproveDeviceCodeCommand` | `ApproveDeviceCodeHandler` | The signed-in user approves a device request (OAuth/) |
+| `DenyDeviceCodeCommand` | `DenyDeviceCodeHandler` | The signed-in user denies a device request (OAuth/) |
+| `ExchangeRefreshTokenCommand` | `ExchangeRefreshTokenHandler` | Refresh token grant at the token endpoint, through `RefreshTokenHandler` (OAuth/) |
+| `CreatePersonalAccessClientCommand` | `CreatePersonalAccessClientHandler` | Create a personal access client for the current user (OAuth/) |
+| `RevokeClientCommand` | `RevokeClientHandler` | Revoke the user's client and every token issued to it (OAuth/) |
 | `RegisterPasskeyCommand` | `RegisterPasskeyHandler` | Add a WebAuthn passkey (Passkey/) |
 | `AuthenticatePasskeyCommand` | `AuthenticatePasskeyHandler` | Verify a WebAuthn assertion during passkey login (Passkey/) |
 | `VerifyEmailCommand` | `VerifyEmailHandler` | Redeem a verification token and mark the address verified (User/) |
@@ -49,6 +60,8 @@ Commands and handlers are organized into feature namespaces under `Application/C
 | `ChangeEmailCommand` | `ChangeEmailHandler` | Every email change: the user's own, the admin panel's and `app:user:change-email` (User/) |
 | `EnableTotpCommand` | `EnableTotpHandler` | Enable TOTP 2FA (Totp/) |
 | `DisableTotpCommand` | `DisableTotpHandler` | Disable TOTP 2FA (Totp/) |
+
+Two queries serve the OAuth endpoints: `GetDeviceAuthorizationQuery` (`GetDeviceAuthorizationHandler`) shows the user which client a user code belongs to, and `ListPersonalAccessClientsQuery` (`ListPersonalAccessClientsHandler`) lists the current user's personal access clients.
 
 ## Ports
 
@@ -109,10 +122,11 @@ The web page is `/verify-email` in `ui/web/src/features/auth/`. It reads the tok
 | `PasskeyRegistered` | Passkey added |
 | `PasskeyDeleted` | Passkey removed |
 | `EmailVerified` | Email verification completed |
+| `DeviceCodeApproved` | The user approved a device request; Notification maps it to the Security category (`device_code.approved`) |
 
 ## API Endpoints
 
-All endpoints except the JWKS document are under `/api`.
+All endpoints except the two `/.well-known/` documents are under `/api`.
 
 | Method | Path | Purpose |
 |--------|------|---------|
@@ -137,7 +151,15 @@ All endpoints except the JWKS document are under `/api`.
 | POST | `/api/auth/passkey/authenticate/options` | WebAuthn authentication options for passkey login |
 | POST | `/api/auth/passkey/authenticate` | Verify an assertion without issuing tokens |
 | DELETE | `/api/auth/passkey/{publicId}` | Delete a passkey |
+| GET, POST | `/api/oauth/authorize` | Authorization endpoint: the signed-in user authorizes a client (authorization code with S256 PKCE) |
+| POST | `/api/oauth/token` | Token endpoint for the authorization code, device code, and refresh token grants (public; DPoP proof required) |
 | POST | `/api/oauth/revoke` | Token revocation (RFC 7009) |
+| POST | `/api/oauth/device/authorize` | Device authorization request (RFC 8628; public) |
+| GET | `/api/oauth/device/verify` | Show the signed-in user the pending request behind a user code |
+| POST | `/api/oauth/device/approve` | Approve or deny a device request |
+| GET, POST | `/api/oauth/clients/` | List or create the current user's personal access clients |
+| DELETE | `/api/oauth/clients/{publicId}` | Revoke one of the current user's clients and its tokens |
+| GET | `/.well-known/oauth-authorization-server` | Authorization server metadata (RFC 8414) |
 | GET | `/.well-known/jwks.json` | JSON Web Key Set for verifying access tokens |
 
 ### Admin — User Management
@@ -155,7 +177,7 @@ All routes under `/api/admin/users` (controller `AdminUserController`, gated `RO
 | POST | `/api/admin/users/{id}/disable` | Disable a user |
 | POST | `/api/admin/users/{id}/enable` | Enable a user |
 
-Deleting a user deletes their access tokens (`fk_oauth_access_tokens_user_id` is `ON DELETE CASCADE`), and the existing cascades from `oauth_access_tokens` then delete the matching refresh tokens and token metadata.
+Deleting a user deletes their access tokens (`fk_oauth_access_tokens_user_id` is `ON DELETE CASCADE`), and the existing cascades from `oauth_access_tokens` then delete the matching refresh tokens and token metadata. The user's authorization codes and device codes are deleted with them as well (`Version20261006300000` made `fk_oauth_device_codes_user_id` cascade; authorization codes always did).
 
 ### Admin — Login Blocks
 
@@ -169,13 +191,68 @@ All routes under `/api/admin/login-blocks` (controller `AdminLoginBlockControlle
 
 ## Token Issuance
 
-Only three endpoints issue tokens: `POST /api/auth/login`, `POST /api/auth/login/passkey`, and `POST /api/auth/refresh`. Login dispatches `IssueTokenCommand` for the SPA client named by `auth.spa_client_id`; refresh dispatches `RefreshTokenCommand`. `IssueTokenHandler` handles only this first-party issuance. The response wraps `accessToken`, `tokenType` (`DPoP`), `expiresIn`, and `refreshToken` in `data`; login responses also include `user`.
+Four endpoints issue tokens. Baander's own apps use `POST /api/auth/login`, `POST /api/auth/login/passkey`, and `POST /api/auth/refresh`; other clients use `POST /api/oauth/token`. Login dispatches `IssueTokenCommand` for the SPA client named by `auth.spa_client_id`, and first-party refresh dispatches `RefreshTokenCommand`. The token endpoint dispatches one command per grant (see [Token Endpoint](#token-endpoint)).
+
+Every new token pair comes from `TokenPairIssuer`, whether password login, passkey login, the authorization code grant, or the device code grant asked for it. It stores a DPoP-bound access token and a refresh token that starts a new rotation chain, with both rows written in one transaction. A grant can pass a further write that commits or rolls back with the tokens; the code grants use it to redeem their code. The refresh token is a plain opaque identifier; neither League encryption nor an `OAUTH_ENCRYPTION_KEY` is involved. Requested scopes are filtered against `auth.scopes.user_grants`, and a request for no scopes gets the default scopes.
+
+Rotation happens in `RefreshTokenHandler` for both refresh paths. It consumes the old refresh token atomically, issues the new pair in the same chain, and carries the DPoP key and the client fingerprint forward. A replayed refresh token revokes its chain. Tokens of a revoked client cannot be refreshed.
+
+The response wraps `accessToken`, `tokenType` (`DPoP`), `expiresIn`, and `refreshToken` in `data`; login responses also include `user`. The token endpoint uses the same `data` envelope.
 
 ### DPoP
 
-All three endpoints require a `DPoP` header carrying a proof (RFC 9449) with a server-issued nonce. A proof without a valid nonce gets `400` with `{"error": "use_dpop_nonce"}` and a `DPoP-Nonce` header; the client retries with a new proof that carries that nonce. Each nonce works once. A successful response returns a fresh `DPoP-Nonce` for the client's next proof. A missing `DPoP` header returns a `400` `ApiError`.
+All four endpoints require a `DPoP` header carrying a proof (RFC 9449) with a server-issued nonce. A proof without a valid nonce gets `400` with `{"error": "use_dpop_nonce"}` and a `DPoP-Nonce` header; the client retries with a new proof that carries that nonce. Each nonce works once. A successful response returns a fresh `DPoP-Nonce` for the client's next proof. A missing `DPoP` header returns a `400` `ApiError`.
+
+At the token endpoint, `TokenEndpointDpopListener` checks the proof before any grant runs and stores it on the request as `VerifiedDpopProof`. Because a polling device spends a nonce on every request, every answer the controller gives, OAuth errors included, carries the next `DPoP-Nonce`.
 
 Tokens are bound to the proof key: the access token JWT carries `cnf.jkt`, and the thumbprint is stored with the token (`dpop_jkt`). Refresh requires a proof signed by the same key, and the new pair keeps the binding. `DpopBindingListener` requires a matching proof on every API request made with the token, except signed stream delivery URLs.
+
+### Token Endpoint
+
+`POST /api/oauth/token` is public: the client and the grant identify the caller, not a user token. Parameters may be form-encoded (RFC 6749) or a JSON object. `grant_type` selects the command:
+
+| `grant_type` | Command | Required parameters |
+|--------------|---------|---------------------|
+| `authorization_code` | `ExchangeAuthorizationCodeCommand` | `code`, `code_verifier`, and `redirect_uri` unless the client registered exactly one |
+| `urn:ietf:params:oauth:grant-type:device_code` | `ExchangeDeviceCodeCommand` | `device_code` |
+| `refresh_token` | `ExchangeRefreshTokenCommand` | `refresh_token` |
+
+`OAuthClientAuthenticator` authenticates the client by `client_id`. A public client sends only its ID (`none`); a confidential client also sends `client_secret` (`client_secret_post`). Unknown, malformed, and revoked clients all fail with `401` `invalid_client`, so the answer does not reveal which it was.
+
+Errors follow RFC 6749: `{"error": "...", "error_description": "..."}`, with `400` except for `invalid_client`. Every controller answer, success or error, carries `Cache-Control: no-store` and the next `DPoP-Nonce`. At this endpoint a refresh token must belong to the authenticated client; `ExchangeRefreshTokenHandler` reports every refresh rejection as `invalid_grant` without saying why.
+
+### Authorization Code Grant
+
+The signed-in user calls `GET` or `POST /api/oauth/authorize` with a DPoP-bound access token; the parameters are in the query string in both cases. `CreateAuthorizationCodeHandler` checks the request in two stages:
+
+1. **Client and redirect URI.** The client must exist and not be revoked. The `redirect_uri` must match a registered URI exactly; a loopback URI (`http` on `localhost`, `127.0.0.1`, or `[::1]`) also matches on any port, because native apps listen on an ephemeral one (RFC 8252 section 7.3). The parameter may be omitted only when the client registered exactly one URI. Until both are valid, an error is answered as RFC 6749 error JSON and never redirected.
+2. **Everything else.** `response_type` must be `code`. Device clients are refused (`unauthorized_client`). PKCE is required for every client: `code_challenge` must be a base64url SHA-256 digest and `code_challenge_method` must be `S256`; `plain` and a missing method are rejected. A disabled or missing user gets `access_denied`. These errors are redirected to the redirect URI with `error`, `error_description`, `state`, and `iss`.
+
+On success the response redirects to the redirect URI with `code`, `state`, and `iss` (RFC 9207), so the client can detect a mix-up between servers. The endpoint answers no cross-origin requests (RFC 9700 section 2.6); `AuthorizationCorsOptionsProvider` enforces this before routing, including for encoded and trailing-slash variants of the path.
+
+The code is stored with its redirect URI, `code_challenge`, and `code_challenge_method`. `Version20261006350000` makes the challenge columns `NOT NULL` and adds `chk_oauth_auth_codes_code_challenge_method` (`code_challenge_method = 'S256'`). A code lives for `auth.auth_code.ttl` seconds (600 by default).
+
+At the token endpoint, `ExchangeAuthorizationCodeHandler` requires that the code belongs to the authenticated client, is unexpired and unused, was issued for the same redirect URI, and matches the `code_verifier`. It redeems the code atomically in the transaction that stores the token pair, so concurrent redemptions yield one pair.
+
+### Device Authorization Grant
+
+The device flow (RFC 8628) serves devices without a browser, such as TV apps. Only clients registered as device clients may use it.
+
+1. The device posts `{clientId, scope}` as JSON to `POST /api/oauth/device/authorize`, which is public. The answer contains `deviceCode`, `userCode` (such as `BCDF-GHJK`), `verificationUri`, `verificationUriComplete`, `expiresIn`, and `interval`. `verificationUri` is `auth.device.verification_uri`, by default the issuer followed by `/device`; the complete URI adds `?user_code=`.
+2. The device shows the user code and polls the token endpoint with the device code grant, no faster than `interval` seconds.
+3. The signed-in user looks the code up with `GET /api/oauth/device/verify?user_code=...`, which returns the client name and scopes, then sends `POST /api/oauth/device/approve` with `{userCode, action}`, where `action` is `approve` or `deny`. Case, spaces, and dashes in the user code do not matter.
+
+While the user has not decided, a poll answers `authorization_pending`. A poll sooner than the current interval answers `slow_down`, and that device code's interval grows by 5 seconds (RFC 8628 section 3.5). A denied request answers `access_denied` and an expired one `expired_token`. An approved code is redeemed once, in the transaction that stores the token pair; a second redemption gets `invalid_grant`.
+
+Device codes live for `auth.device_code.ttl` seconds (900 by default), and the initial interval is `auth.device_code.interval` (5 seconds). Approval raises `DeviceCodeApproved`, which notifies the user as a Security event.
+
+### Personal Access Clients
+
+A signed-in user can create named clients for their own tools with `POST /api/oauth/clients/` and list them with `GET /api/oauth/clients/`. `Client::createPersonalAccess()` makes a public client owned by the user with the loopback redirect URI `http://localhost`. `DELETE /api/oauth/clients/{publicId}` works only for the owner; another user's client answers `404`. Revoking a client also revokes its access and refresh tokens, because the resource server checks each token's own revocation flag.
+
+### Client Registration
+
+No CLI command or admin page registers third-party or device clients yet; how operators register them is an open question. `app:auth:setup-clients` seeds only the first-party SPA client. The web app has no page at the device verification URI and no consent page for the authorization endpoint yet.
 
 ### Passkey Login
 
@@ -187,7 +264,7 @@ Tokens are bound to the proof key: the access token JWT carries `cnf.jkt`, and t
 
 ### Client Fingerprint Binding
 
-Password and passkey login accept an optional `X-Baander-Client-Fingerprint` header. When present, it is stored in `oauth_token_metadata` and binds the access token: `OAuth2Authenticator` rejects any request with that token whose header is missing or different (`401`, `AUTH_INVALID_TOKEN`). If the metadata lookup fails, the request is rejected. Refresh copies the binding to the new token. Tokens issued without the header are unbound and ignore it. No first-party client sends the header today, and the WebSocket query-token authenticator does not check it.
+Password login, passkey login, and every grant at the token endpoint accept an optional `X-Baander-Client-Fingerprint` header. When present, it is stored in `oauth_token_metadata` and binds the access token: `OAuth2Authenticator` rejects any request with that token whose header is missing or different (`401`, `AUTH_INVALID_TOKEN`). If the metadata lookup fails, the request is rejected. Refresh copies the binding to the new token. Tokens issued without the header are unbound and ignore it. No first-party client sends the header today, and the WebSocket query-token authenticator does not check it.
 
 ## Cross-Context Relationships
 
@@ -195,6 +272,7 @@ Password and passkey login accept an optional `X-Baander-Client-Fingerprint` hea
 |-----------|---------|---------|
 | Depends on | Shared | `Uuid`, `PublicId`, `Email` |
 | Depended on by | All contexts | Every authenticated endpoint depends on Auth |
+| Depended on by | Notification | Notification Domain maps `DeviceCodeApproved` to the Security category through the narrow `Auth Device Approval Event Contract` Deptrac layer |
 
 ## Infrastructure
 
@@ -203,6 +281,9 @@ Password and passkey login accept an optional `X-Baander-Client-Fingerprint` hea
 | League OAuth adapters | Anti-corruption layer | League access token and refresh token repository interfaces aliased to internal adapters in `services.yaml` |
 | `ResourceServerFactory` | Security | Builds League's `ResourceServer` with `DpopAwareBearerTokenValidator` for access token validation |
 | `CachedAccessTokenRepository` | Cache decorator | Caches access token lookups |
+| `TokenEndpointDpopListener` | Security | Requires a nonce-bearing DPoP proof at `POST /api/oauth/token` before the grant runs |
+| `AuthorizationCorsOptionsProvider` | Security | Denies CORS for `/api/oauth/authorize`, including encoded and trailing-slash paths |
+| `RateLimitListener` | Security | Per-IP and per-client limits for the auth and OAuth endpoints (see [Rate limiting](../../part-1-operator-guide/configuration.md#rate-limiting)) |
 | Doctrine entities | ORM | Persistence for all models |
 | Doctrine repositories | ORM | Repository implementations for all aggregates |
 | Voter classes | Security | Authorization checks for protected resources |

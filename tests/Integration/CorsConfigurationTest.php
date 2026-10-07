@@ -159,10 +159,40 @@ final class CorsConfigurationTest extends TestCase
         yield 'foreign host' => ['https://foreign.baander.app'];
     }
 
-    public function testNonApiPathHasNoCors(): void
+    public function testAuthorizationEndpointAndNonApiPathHaveNoCors(): void
     {
-        self::assertFalse($this->preflight('/unmatched', 'GET', 'Authorization')->headers->has('Access-Control-Allow-Origin'));
-        self::assertFalse($this->actual('/unmatched', self::ORIGIN, new Response())->headers->has('Access-Control-Allow-Origin'));
+        foreach (['/api/oauth/authorize', '/api/oauth/%61uthorize', '/api/oauth/authorize/', '/api/oauth/%61uthorize%2f', '/unmatched'] as $path) {
+            self::assertFalse($this->preflight($path, 'GET', 'Authorization')->headers->has('Access-Control-Allow-Origin'));
+            self::assertFalse($this->actual($path, self::ORIGIN, new Response())->headers->has('Access-Control-Allow-Origin'));
+        }
+    }
+
+    public function testPublicMetadataStillAllowsForeignOrigins(): void
+    {
+        $origin = 'https://foreign.baander.app';
+        self::assertSame($origin, $this->actual('/.well-known/oauth-authorization-server', $origin, new Response())
+            ->headers->get('Access-Control-Allow-Origin'));
+    }
+
+    /** Third-party and device clients reach the token and device authorization endpoints from any origin. */
+    public function testTokenAndDeviceAuthorizationAllowAnyOrigin(): void
+    {
+        $origin = 'https://tv.baander.app';
+        foreach (['/api/oauth/token', '/api/oauth/device/authorize'] as $path) {
+            $preflight = $this->preflight($path, 'POST', 'Content-Type, DPoP', $origin);
+            self::assertSame(200, $preflight->getStatusCode(), $path);
+            self::assertNotNull($preflight->headers->get('Access-Control-Allow-Origin'), $path);
+            self::assertSame($origin, $this->actual($path, $origin, new Response())->headers->get('Access-Control-Allow-Origin'), $path);
+        }
+    }
+
+    /** The signed-in user approves devices from the app; other origins get no CORS grant. */
+    public function testDeviceApprovalAllowsOnlyTheAppOrigin(): void
+    {
+        self::assertSame(self::ORIGIN, $this->actual('/api/oauth/device/approve', self::ORIGIN, new Response())
+            ->headers->get('Access-Control-Allow-Origin'));
+        self::assertFalse($this->actual('/api/oauth/device/approve', 'https://foreign.baander.app', new Response())
+            ->headers->has('Access-Control-Allow-Origin'));
     }
 
     public function testPublicJwksStillAllowsForeignOrigins(): void

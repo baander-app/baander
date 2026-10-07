@@ -22,4 +22,7 @@ interface AccessTokenRepositoryInterface
      * the tokens of its refresh chain stay valid.
      */
     public function revokeForUser(Uuid $userId, ?AccessToken $keep = null): void;
+
+    /** Revoke every active access token issued to the client. */
+    public function revokeByClientId(Uuid $clientId): void;
 }

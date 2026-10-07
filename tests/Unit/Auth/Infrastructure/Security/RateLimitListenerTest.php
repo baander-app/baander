@@ -30,6 +30,11 @@ final class RateLimitListenerTest extends TestCase
     private RateLimiterFactoryInterface&MockObject $refreshClientLimiter;
     private RateLimiterFactoryInterface&MockObject $passkeyIpLimiter;
     private RateLimiterFactoryInterface&MockObject $emailVerificationIpLimiter;
+    private RateLimiterFactoryInterface&MockObject $oauthTokenIpLimiter;
+    private RateLimiterFactoryInterface&MockObject $oauthTokenClientLimiter;
+    private RateLimiterFactoryInterface&MockObject $oauthAuthorizeIpLimiter;
+    private RateLimiterFactoryInterface&MockObject $oauthDeviceAuthorizeIpLimiter;
+    private RateLimiterFactoryInterface&MockObject $oauthDeviceVerifyIpLimiter;
     private LoggerInterface&MockObject $logger;
     private RateLimitListener $listener;
 
@@ -46,6 +51,11 @@ final class RateLimitListenerTest extends TestCase
         $this->refreshClientLimiter = $this->createMock(RateLimiterFactoryInterface::class);
         $this->passkeyIpLimiter = $this->createMock(RateLimiterFactoryInterface::class);
         $this->emailVerificationIpLimiter = $this->createMock(RateLimiterFactoryInterface::class);
+        $this->oauthTokenIpLimiter = $this->createMock(RateLimiterFactoryInterface::class);
+        $this->oauthTokenClientLimiter = $this->createMock(RateLimiterFactoryInterface::class);
+        $this->oauthAuthorizeIpLimiter = $this->createMock(RateLimiterFactoryInterface::class);
+        $this->oauthDeviceAuthorizeIpLimiter = $this->createMock(RateLimiterFactoryInterface::class);
+        $this->oauthDeviceVerifyIpLimiter = $this->createMock(RateLimiterFactoryInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->listener = new RateLimitListener(
@@ -56,6 +66,11 @@ final class RateLimitListenerTest extends TestCase
             authRefreshClientLimiter: $this->refreshClientLimiter,
             authPasskeyIpLimiter: $this->passkeyIpLimiter,
             authEmailVerificationIpLimiter: $this->emailVerificationIpLimiter,
+            oauthTokenIpLimiter: $this->oauthTokenIpLimiter,
+            oauthTokenClientLimiter: $this->oauthTokenClientLimiter,
+            oauthAuthorizeIpLimiter: $this->oauthAuthorizeIpLimiter,
+            oauthDeviceAuthorizeIpLimiter: $this->oauthDeviceAuthorizeIpLimiter,
+            oauthDeviceVerifyIpLimiter: $this->oauthDeviceVerifyIpLimiter,
             logger: $this->logger,
             jsonEncoder: new JsonEncoder(),
             environment: 'test',
@@ -338,6 +353,63 @@ final class RateLimitListenerTest extends TestCase
             ->willReturn($limiter);
 
         $this->listener->onKernelRequest($event);
+    }
+
+    // --- OAuth authorization server endpoints ---
+
+    public function testTokenEndpointIsLimitedPerIpAndPerClient(): void
+    {
+        $request = Request::create('/api/oauth/token', 'POST', ['grant_type' => 'refresh_token', 'client_id' => 'tv_client_000000000001'], server: ['REMOTE_ADDR' => '10.0.0.9']);
+
+        $this->oauthTokenIpLimiter->expects($this->once())->method('create')->with('10.0.0.9')->willReturn($this->createAcceptedLimit());
+        $this->oauthTokenClientLimiter->expects($this->once())->method('create')->with('tv_client_000000000001')->willReturn($this->createRejectedLimit(30));
+
+        $this->expectException(TooManyRequestsHttpException::class);
+
+        $this->listener->onKernelRequest($this->createRequestEvent($request));
+    }
+
+    public function testTokenEndpointReadsTheClientIdFromAJsonBody(): void
+    {
+        $request = $this->createJsonRequest('/api/oauth/token', body: ['grant_type' => 'refresh_token', 'client_id' => 'json_client_00000000001']);
+
+        $this->oauthTokenIpLimiter->method('create')->willReturn($this->createAcceptedLimit());
+        $this->oauthTokenClientLimiter->expects($this->once())->method('create')->with('json_client_00000000001')->willReturn($this->createAcceptedLimit());
+
+        $this->listener->onKernelRequest($this->createRequestEvent($request));
+    }
+
+    public function testTokenRequestWithoutClientIdSkipsThePerClientLimit(): void
+    {
+        $request = $this->createJsonRequest('/api/oauth/token', body: ['grant_type' => 'refresh_token']);
+
+        $this->oauthTokenIpLimiter->method('create')->willReturn($this->createAcceptedLimit());
+        $this->oauthTokenClientLimiter->expects($this->never())->method('create');
+
+        $this->listener->onKernelRequest($this->createRequestEvent($request));
+    }
+
+    /** @return iterable<string, array{string, string, string}> */
+    public static function oauthIpLimitedRequests(): iterable
+    {
+        yield 'authorize GET' => ['GET', '/api/oauth/authorize', 'oauthAuthorizeIpLimiter'];
+        yield 'authorize POST' => ['POST', '/api/oauth/authorize', 'oauthAuthorizeIpLimiter'];
+        yield 'device authorization' => ['POST', '/api/oauth/device/authorize', 'oauthDeviceAuthorizeIpLimiter'];
+        yield 'user code lookup' => ['GET', '/api/oauth/device/verify', 'oauthDeviceVerifyIpLimiter'];
+        yield 'device approval' => ['POST', '/api/oauth/device/approve', 'oauthDeviceVerifyIpLimiter'];
+    }
+
+    #[DataProvider('oauthIpLimitedRequests')]
+    public function testOAuthEndpointsAreLimitedPerIp(string $method, string $path, string $limiter): void
+    {
+        $request = $this->createJsonRequest($path, $method, ip: '10.0.0.11');
+        $factory = $this->{$limiter};
+        self::assertInstanceOf(MockObject::class, $factory);
+        $factory->expects($this->once())->method('create')->with('10.0.0.11')->willReturn($this->createRejectedLimit(60));
+
+        $this->expectException(TooManyRequestsHttpException::class);
+
+        $this->listener->onKernelRequest($this->createRequestEvent($request));
     }
 
     // --- Non-rate-limited endpoints ---

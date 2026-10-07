@@ -18,4 +18,16 @@ interface ClientRepositoryInterface
     public function findClientByUuid(Uuid $uuid): ?Client;
 
     public function findClientByPublicId(PublicId $publicId): ?Client;
+
+    /**
+     * @return Client[]
+     */
+    public function findPersonalAccessClients(): array;
+
+    /**
+     * Find personal access clients belonging to a specific user.
+     *
+     * @return Client[]
+     */
+    public function findPersonalAccessClientsByUser(Uuid $userId): array;
 }

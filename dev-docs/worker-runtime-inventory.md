@@ -609,8 +609,9 @@ through retries and configuration installation. Cache failures and uncertain
 commits require offline recovery; there is no automatic global fence or online
 atomic cutover. See the operator rotation runbook for installation and recovery.
 
-Refresh runs only through `/api/auth/refresh` (`RefreshTokenHandler`); the League
-token endpoint and its grants are removed. The handler requires the original DPoP key
+Refresh runs through `RefreshTokenHandler`, both at `/api/auth/refresh` and for the
+`refresh_token` grant at Auth's own `/api/oauth/token`; no League token endpoint
+exists. The handler requires the original DPoP key
 binding, then consumes the refresh token and persists its replacement in one
 transaction. A replayed refresh token revokes its chain. Failure rolls back the
 transaction and clears aborted ORM state. `OAuthGrantPathAcceptanceTest` covers
