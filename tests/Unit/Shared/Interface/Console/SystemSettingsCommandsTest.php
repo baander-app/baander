@@ -81,7 +81,7 @@ final class SystemSettingsCommandsTest extends TestCase
 
         $tester->execute([]);
 
-        $this->assertMatchesRegularExpression('/transcode\.enabled\s+true\s+false\s+true\s+not yet/', $tester->getDisplay());
+        $this->assertMatchesRegularExpression('/transcode\.enabled\s+true\s+false\s+true\s+yes/', $tester->getDisplay());
         $this->assertMatchesRegularExpression('/transcode\.max_bitrate\s+320\s+320\s+\(default\)/', $tester->getDisplay());
     }
 

@@ -11,6 +11,7 @@ use App\Auth\Infrastructure\Security\OAuth\DpopNonceManager;
 use App\Auth\Infrastructure\Security\OAuth\DpopProofValidator;
 use App\Auth\Infrastructure\Security\Passkey\PasskeyService;
 use App\Auth\Interface\Controller\User\AuthController;
+use App\Auth\Interface\Request\AcceptLanguageMatcher;
 use App\Auth\Interface\Request\User\VerifyEmailRequest;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -81,6 +82,7 @@ final class AuthControllerVerifyEmailTest extends TestCase
             $dpopNonceManager,
             $this->jsonEncoder,
             new NullLogger(),
+            new AcceptLanguageMatcher(),
         );
 
         $translator = $this->createStub(TranslatorInterface::class);
