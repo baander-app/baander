@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Auth\Application\CommandHandler;
 
 use App\Auth\Application\Command\User\RequestPasswordResetCommand;
 use App\Auth\Application\CommandHandler\User\RequestPasswordResetHandler;
+use App\Auth\Application\Port\PasswordResetDeliveryInterface;
 use App\Auth\Application\Port\PasswordResetRequestThrottleInterface;
 use App\Auth\Application\Port\PasswordResetTokenRepositoryInterface;
 use App\Auth\Domain\Model\User;
@@ -23,6 +24,8 @@ final class RequestPasswordResetHandlerTest extends TestCase
     private bool $throttleAccepts = true;
     /** @var list<string> */
     private array $throttledEmails = [];
+    /** @var list<array{User, string, \DateTimeImmutable}> */
+    private array $delivered = [];
     private RequestPasswordResetHandler $handler;
 
     protected function setUp(): void
@@ -50,6 +53,7 @@ final class RequestPasswordResetHandlerTest extends TestCase
         ($this->handler)(new RequestPasswordResetCommand(new Email('unknown@baander.app')));
 
         self::assertSame(['unknown@baander.app'], $this->throttledEmails);
+        self::assertSame([], $this->delivered);
     }
 
     public function testIssuesNoTokenWhenTheAccountLimitIsReached(): void
@@ -59,6 +63,8 @@ final class RequestPasswordResetHandlerTest extends TestCase
         $this->tokenRepository->expects($this->never())->method('issue');
 
         ($this->handler)(new RequestPasswordResetCommand(new Email('test@baander.app')));
+
+        self::assertSame([], $this->delivered);
     }
 
     public function testIssuesARandomTokenToTheUserForTheConfiguredLifetime(): void
@@ -83,6 +89,13 @@ final class RequestPasswordResetHandlerTest extends TestCase
         self::assertNotSame($token, $secondToken);
         self::assertGreaterThanOrEqual($before->getTimestamp(), $expiresAt->getTimestamp());
         self::assertLessThanOrEqual($after->getTimestamp(), $expiresAt->getTimestamp());
+
+        self::assertCount(2, $this->delivered, 'Every issued token is delivered.');
+        [[$deliveredTo, $deliveredToken, $deliveredExpiry], [, $secondDelivered]] = $this->delivered;
+        self::assertSame($user, $deliveredTo);
+        self::assertSame($token, $deliveredToken, 'The delivered token is the one whose hash was stored.');
+        self::assertSame($expiresAt, $deliveredExpiry);
+        self::assertSame($secondToken, $secondDelivered);
     }
 
     public function testRejectsALifetimeShorterThanAMinute(): void
@@ -102,7 +115,12 @@ final class RequestPasswordResetHandlerTest extends TestCase
             return $this->throttleAccepts;
         });
 
-        return new RequestPasswordResetHandler($this->userRepository, $this->tokenRepository, $throttle, $lifetimeMinutes);
+        $delivery = $this->createStub(PasswordResetDeliveryInterface::class);
+        $delivery->method('deliver')->willReturnCallback(function (User $user, string $token, \DateTimeImmutable $expiresAt): void {
+            $this->delivered[] = [$user, $token, $expiresAt];
+        });
+
+        return new RequestPasswordResetHandler($this->userRepository, $this->tokenRepository, $throttle, $delivery, $lifetimeMinutes);
     }
 
     private function user(): User

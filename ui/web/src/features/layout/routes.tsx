@@ -5,6 +5,8 @@ import { ProtectedRoute } from '../auth/components/ProtectedRoute'
 import { AdminRoute } from '../admin/components/layout/AdminRoute'
 import { LoginPage } from '../auth/pages/LoginPage'
 import { RegisterPage } from '../auth/pages/RegisterPage'
+import { ForgotPasswordPage } from '../auth/pages/ForgotPasswordPage'
+import { ResetPasswordPage } from '../auth/pages/ResetPasswordPage'
 import { AlbumsPage } from '../catalog/pages/AlbumsPage'
 import { AlbumDetailPage } from '../catalog/pages/AlbumDetailPage'
 import { ArtistDetailPage } from '../catalog/pages/ArtistDetailPage'
@@ -39,6 +41,8 @@ import { AdminSettingsPage } from '../admin/pages/AdminSettingsPage'
 export const publicRoutes: RouteObject[] = [
   { path: '/login', element: <LoginPage /> },
   { path: '/register', element: <RegisterPage /> },
+  { path: '/forgot-password', element: <ForgotPasswordPage /> },
+  { path: '/reset-password', element: <ResetPasswordPage /> },
 ]
 
 export const protectedRoutes: RouteObject[] = [

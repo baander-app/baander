@@ -381,6 +381,14 @@ services:
         arguments:
             $tokenLifetimeMinutes: '%auth.password_reset_token.lifetime_minutes%'
 
+    App\Auth\Application\Port\PasswordResetDeliveryInterface:
+        alias: App\Auth\Infrastructure\Mail\MailerPasswordResetDelivery
+
+    App\Auth\Infrastructure\Mail\MailerPasswordResetDelivery:
+        arguments:
+            $appUrl: '%env(APP_URL)%'
+            $appName: '%app.name%'
+
     # --- Login Controllers ---
     App\Auth\Interface\Controller\User\LoginController:
         arguments:

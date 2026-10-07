@@ -76,6 +76,8 @@ These are configured as parameters in `config/packages/auth.yaml` and can be ove
 | `MAIL_FROM_ADDRESS` | `noreply@localhost` | From address for outgoing email. |
 | `MAIL_FROM_NAME` | `Bånder` | From name for outgoing email. |
 
+`config/packages/mailer.yaml` builds the `From` header of every outgoing email from `MAIL_FROM_NAME` and `MAIL_FROM_ADDRESS`. Mail servers often reject a sender address whose domain they cannot verify, so use an address at a domain your SMTP provider is allowed to send for. The test environment replaces `MAILER_DSN` with `null://null`, so tests never send real mail.
+
 ## External APIs
 
 All API keys are optional — Baander works without them, but metadata enrichment will be limited to what's available locally.
@@ -172,7 +174,11 @@ Configured in `config/packages/auth.yaml`:
 
 A user has at most one outstanding reset token; a new request replaces it. The token is removed when it is redeemed, when the account is deleted, and when the account's email address or password changes. Baander stores only a SHA-256 hash of the token.
 
-Baander does not send the reset email yet. `POST /api/auth/password/reset-request` issues a token and `POST /api/auth/password/reset` redeems one, but nothing delivers the token to the user. Until delivery exists, reset a forgotten password with [`app:user:reset-password`](commands/app-user-reset-password.md) or from the admin panel.
+Self-service reset needs working email. When a user asks for a reset on the web login page, `POST /api/auth/password/reset-request` issues a token for an existing account and emails a link through `MAILER_DSN` (see [Mail](#mail)). The link opens `APP_URL/reset-password`, so `APP_URL` must be the address users reach the web app at. The token sits in the link's fragment (`#token=…`); browsers do not send fragments to the server, so the token stays out of access logs and `Referer` headers. The email states the link's lifetime from `PASSWORD_RESET_EXPIRE`.
+
+Baander sends the email after the HTTP response has gone out, so the request takes as long for an unknown address as for a real account. A failed send does not change the response either. Baander logs the failure with the user ID but without the token or the address, and does not retry; the user can ask for a new link. The email uses the request's locale. The API does not yet choose a locale from `Accept-Language`, so reset emails are currently sent in English.
+
+Without working email, reset a forgotten password with [`app:user:reset-password`](commands/app-user-reset-password.md) or from the admin panel.
 
 A password change revokes the sessions that the old password started. Redeeming a reset token, an administrator reset and `app:user:reset-password` revoke all of the user's access and refresh tokens. When users change their own password, the session that made the change stays signed in and their other sessions are revoked.
 

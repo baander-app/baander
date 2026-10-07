@@ -89,7 +89,14 @@ make exec cmd="php bin/console app:user:reset-password alice@baander.app"
 
 The command prompts for the password, or reads it from stdin with `--password`. It accepts an email address or UUID and does the same as **Reset password** in the admin panel. Both sign the user out of every session. See [app:user:reset-password](commands/app-user-reset-password.md).
 
-Users can also request a reset token themselves with `POST /api/auth/password/reset-request` and redeem it with `POST /api/auth/password/reset`. Baander does not send the reset email yet, so this self-service flow cannot be completed until email delivery is added.
+Users who forget their password can reset it themselves once [email is configured](configuration.md#mail):
+
+1. On the login page, the user selects **Forgot password?** and enters their email address. The page shows the same confirmation whether or not an account uses that address.
+2. If an account does, Baander emails it a link to the **Choose a new password** page. The link works once and expires after `PASSWORD_RESET_EXPIRE` minutes (60 by default).
+3. The user enters the new password twice. It must be 8 to 255 characters. If the link was already used, has expired, or the account is disabled, the page says the link is invalid or has expired and links to the request page.
+4. Baander sets the password, signs the user out of every session, and returns to the login page with a confirmation.
+
+By default a user can ask for a link 10 times per 15 minutes; after that the page still confirms but no email is sent. See [Password reset](configuration.md#password-reset) for the limits and how the link is built. API clients use the same two endpoints as the web pages: `POST /api/auth/password/reset-request` and `POST /api/auth/password/reset`.
 
 ## Disabling and Enabling Users
 

@@ -139,7 +139,9 @@ Set `MAILER_DSN` in `.env`:
 MAILER_DSN=smtp://user:pass@smtp.example.com:587
 ```
 
-The Docker development environment includes [Mailpit](https://mailpit.axllent.org/) as a local SMTP server for testing. The default development DSN is `smtp://mailpit:1025`. See the Mail section in [configuration.md](configuration.md#mail) for full details.
+The Docker development environment includes [Mailpit](https://mailpit.axllent.org/) as a local SMTP server for testing. The default development DSN is `smtp://mailpit:1025`. See the Mail section in [configuration.md](configuration.md#mail) for full details, including the sender address.
+
+Password reset emails use the same transport but are not notifications: they ignore notification preferences and are sent whenever a user asks for a reset. See [Password reset](configuration.md#password-reset).
 
 ## Scope
 

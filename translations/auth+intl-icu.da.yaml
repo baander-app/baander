@@ -29,3 +29,13 @@ success:
   passkey_deleted: "passkey slettet."
   password_reset: "Din adgangskode er blevet nulstillet."
   password_changed: "Adgangskoden er ændret."
+
+password_reset_email:
+  subject: "Nulstil din adgangskode til {app}"
+  heading: "Nulstil din adgangskode"
+  greeting: "Hej {name}"
+  intro: "Nogen har bedt om at nulstille adgangskoden til din konto på {app}. Åbn linket nedenfor for at vælge en ny adgangskode."
+  action: "Vælg en ny adgangskode"
+  fallback: "Hvis knappen ikke virker, kan du kopiere dette link ind i din browser:"
+  expiry: "Linket kan bruges én gang og udløber om {minutes, plural, one {# minut} other {# minutter}}."
+  ignore: "Hvis du ikke har bedt om dette, kan du se bort fra denne e-mail. Din adgangskode forbliver uændret."

@@ -272,17 +272,18 @@ final class AuthController
         responses: [
             new OA\Response(
                 response: '200',
-                description: 'Reset email sent (always returns 200)',
+                description: 'Request accepted. The answer is the same whether or not an account uses the address; an existing account is emailed a reset link.',
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'message', type: 'string', example: 'Password reset email sent.'),
+                            new OA\Property(property: 'message', type: 'string', example: 'If the email exists, a password reset link has been sent.'),
                         ], type: 'object'),
                     ],
                     type: 'object',
                 ),
             ),
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '429', description: 'Too many password reset requests from this IP', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/password/reset-request', name: 'password_reset_request', methods: ['POST'])]

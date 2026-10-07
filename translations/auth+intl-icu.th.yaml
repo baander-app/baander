@@ -28,3 +28,13 @@ success:
   passkey_deleted: Passkey deleted successfully.
   password_reset: Your password has been reset.
   password_changed: Password changed.
+
+password_reset_email:
+  subject: "รีเซ็ตรหัสผ่าน {app} ของคุณ"
+  heading: "รีเซ็ตรหัสผ่านของคุณ"
+  greeting: "สวัสดี {name}"
+  intro: "มีผู้ขอรีเซ็ตรหัสผ่านสำหรับบัญชี {app} ของคุณ เปิดลิงก์ด้านล่างเพื่อตั้งรหัสผ่านใหม่"
+  action: "ตั้งรหัสผ่านใหม่"
+  fallback: "หากปุ่มใช้งานไม่ได้ ให้คัดลอกลิงก์นี้ไปวางในเบราว์เซอร์:"
+  expiry: "ลิงก์นี้ใช้ได้ครั้งเดียวและจะหมดอายุใน {minutes} นาที"
+  ignore: "หากคุณไม่ได้ขอรีเซ็ตรหัสผ่าน ให้เพิกเฉยต่ออีเมลนี้ รหัสผ่านของคุณจะไม่เปลี่ยนแปลง"

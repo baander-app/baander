@@ -1,3 +1,17 @@
+parameters:
+    # Defaults match docs-book/part-1-operator-guide/configuration.md.
+    env(MAIL_FROM_ADDRESS): 'noreply@localhost'
+    env(MAIL_FROM_NAME): 'Bånder'
+
 framework:
     mailer:
         dsn: '%env(MAILER_DSN)%'
+        # Applied to every message that does not set its own From header.
+        headers:
+            From: '%env(MAIL_FROM_NAME)% <%env(MAIL_FROM_ADDRESS)%>'
+
+when@test:
+    framework:
+        mailer:
+            # Nothing leaves the test process; the message logger still records each email.
+            dsn: 'null://null'

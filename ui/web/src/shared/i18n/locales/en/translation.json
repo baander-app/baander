@@ -26,7 +26,27 @@
     "password": "Password",
     "confirmPassword": "Confirm password",
     "totpCode": "Authentication code",
-    "passkey": "Passkey"
+    "passkey": "Passkey",
+    "name": "Name",
+    "passwordMismatch": "The passwords do not match.",
+    "forgotPassword": "Forgot password?",
+    "passwordReset": {
+      "requestTitle": "Reset your password",
+      "requestIntro": "Enter the email address you log in with. If it belongs to an account, you'll get an email with a link to choose a new password.",
+      "sendLink": "Send reset link",
+      "requestSent": "If that address belongs to an account, a reset link is on its way. Check your inbox and spam folder.",
+      "backToLogin": "Back to log in",
+      "resetTitle": "Choose a new password",
+      "newPassword": "New password",
+      "confirmPassword": "Confirm new password",
+      "passwordLength": "Use 8 to 255 characters.",
+      "submit": "Set new password",
+      "invalidLink": "This password reset link is invalid or has expired.",
+      "requestNewLink": "Request a new link",
+      "rateLimited_one": "Too many attempts. Try again in {{count}} second.",
+      "rateLimited_other": "Too many attempts. Try again in {{count}} seconds.",
+      "success": "Your password has been reset. Log in with your new password."
+    }
   },
   "player": {
     "play": "Play",

@@ -1,5 +1,8 @@
-import { Navigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
+import { useTranslation } from '@/shared/i18n'
 import { LoginForm } from '../components/LoginForm'
+import { Notice } from '../components/auth-form-styles'
+import type { PasswordResetDoneState } from '../components/ResetPasswordForm'
 import { useAuthStore } from '../stores/auth-store'
 import styled from 'styled-components'
 
@@ -40,7 +43,13 @@ const Title = styled.h1`
   letter-spacing: -0.025em;
 `;
 
+function isPasswordResetDone(state: unknown): state is PasswordResetDoneState {
+  return typeof state === 'object' && state !== null && 'passwordReset' in state && state.passwordReset === true
+}
+
 export function LoginPage() {
+  const { t } = useTranslation()
+  const location = useLocation()
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
 
   if (isAuthenticated) {
@@ -54,6 +63,11 @@ export function LoginPage() {
           <Logo src="/logo.svg" alt="Bånder" />
           <Title>Bånder</Title>
         </Header>
+        {isPasswordResetDone(location.state) && (
+          <Notice role="status">
+            {t('auth.passwordReset.success')}
+          </Notice>
+        )}
         <LoginForm />
       </Card>
     </PageWrapper>

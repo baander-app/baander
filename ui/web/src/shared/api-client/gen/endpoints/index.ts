@@ -8831,7 +8831,7 @@ export const postAuthPasswordResetRequest = async (postAuthPasswordResetRequestB
 
 
 
-export const getPostAuthPasswordResetRequestMutationOptions = <TError = ErrorType<ValidationError>,
+export const getPostAuthPasswordResetRequestMutationOptions = <TError = ErrorType<ValidationError | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthPasswordResetRequest>>, TError,{data: BodyType<PostAuthPasswordResetRequestBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postAuthPasswordResetRequest>>, TError,{data: BodyType<PostAuthPasswordResetRequestBody>}, TContext> => {
 
@@ -8860,12 +8860,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostAuthPasswordResetRequestMutationResult = NonNullable<Awaited<ReturnType<typeof postAuthPasswordResetRequest>>>
     export type PostAuthPasswordResetRequestMutationBody = BodyType<PostAuthPasswordResetRequestBody>
-    export type PostAuthPasswordResetRequestMutationError = ErrorType<ValidationError>
+    export type PostAuthPasswordResetRequestMutationError = ErrorType<ValidationError | ApiError>
 
     /**
  * @summary Request a password reset email
  */
-export const usePostAuthPasswordResetRequest = <TError = ErrorType<ValidationError>,
+export const usePostAuthPasswordResetRequest = <TError = ErrorType<ValidationError | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthPasswordResetRequest>>, TError,{data: BodyType<PostAuthPasswordResetRequestBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postAuthPasswordResetRequest>>,

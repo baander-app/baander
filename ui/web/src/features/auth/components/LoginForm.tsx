@@ -1,5 +1,5 @@
 import { type FormEvent, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/auth-store';
 import { useTranslation } from '@/shared/i18n';
 import { Input } from '@/shared/components/ui/input';
@@ -42,6 +42,18 @@ const Honeypot = styled.div`
 
 const StyledButton = styled(Button)`
   width: 100%;
+`;
+
+const ForgotLink = styled(Link)`
+  display: inline-block;
+  margin-top: 0.375rem;
+  font-size: 0.75rem;
+  color: var(--color-primary);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
 `;
 
 export function LoginForm() {
@@ -110,6 +122,9 @@ export function LoginForm() {
           onChange={(e) => setPassword(e.target.value)}
           autoComplete="current-password"
         />
+        <ForgotLink to="/forgot-password">
+          {t('auth.forgotPassword')}
+        </ForgotLink>
       </FieldWrapper>
 
       {showTotp && (

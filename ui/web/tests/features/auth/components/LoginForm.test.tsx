@@ -33,4 +33,10 @@ describe('LoginForm', () => {
     expect(screen.getByLabelText('Password')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument()
   })
+
+  it('links to the password reset request page', () => {
+    renderWithProviders(<LoginForm />)
+
+    expect(screen.getByRole('link', { name: 'Forgot password?' })).toHaveAttribute('href', '/forgot-password')
+  })
 })

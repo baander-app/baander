@@ -29,3 +29,13 @@ success:
   passkey_deleted: "Passkey deleted successfully."
   password_reset: "Your password has been reset."
   password_changed: "Password changed."
+
+password_reset_email:
+  subject: "Reset your {app} password"
+  heading: "Reset your password"
+  greeting: "Hi {name},"
+  intro: "Someone asked to reset the password for your {app} account. Open the link below to choose a new password."
+  action: "Choose a new password"
+  fallback: "If the button does not work, copy this link into your browser:"
+  expiry: "The link works once and expires in {minutes, plural, one {# minute} other {# minutes}}."
+  ignore: "If you did not ask for this, ignore this email. Your password stays the same."

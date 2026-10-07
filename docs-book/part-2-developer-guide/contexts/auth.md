@@ -59,6 +59,7 @@ Commands and handlers are organized into feature namespaces under `Application/C
 | `UserPortInterface` | User operations |
 | `PasswordResetTokenRepositoryInterface` | Each user's single outstanding reset token, stored as a SHA-256 hash and redeemed once |
 | `PasswordResetRequestThrottleInterface` | Per-account limit on password reset requests, keyed by normalized email |
+| `PasswordResetDeliveryInterface` | Emails the reset link after the response is sent; never persists or logs the token |
 | `DpopJtiCacheInterface` | DPoP replay protection |
 | `AuthenticatedUserIdentityInterface` | Identity of the user a login authenticator verified |
 | `EmailVerificationTokenRepositoryInterface` | Email verification token storage |
@@ -69,7 +70,13 @@ Commands and handlers are organized into feature namespaces under `Application/C
 
 `password_reset_tokens` holds at most one token per user, keyed by `user_id` with `ON DELETE CASCADE`. Only the SHA-256 hash of the 256-bit token is stored. `UserRepository::save` removes the token whenever the stored email address or password hash changes, so a token never outlives the credentials it was issued for or carries over to a later account with the same address. The lifetime comes from `PASSWORD_RESET_EXPIRE` (minutes).
 
-`RequestPasswordResetHandler` charges the per-account limiter before looking up the address and issues a token only for an existing account; the endpoint answers the same way in every case. The raw token exists only in that handler's memory, and nothing delivers it yet. Email delivery belongs in a port that the handler calls after issuing the token. Do not put the raw token in a domain event, because events are stored in the outbox.
+`RequestPasswordResetHandler` charges the per-account limiter before looking up the address and issues a token only for an existing account; the endpoint answers the same way in every case. After issuing the token, the handler passes it to the `PasswordResetDeliveryInterface` port. The raw token exists only in the handler's memory and in that delivery. Do not put it in a domain event, because events are stored in the outbox.
+
+`MailerPasswordResetDelivery` implements the port. It builds the link `APP_URL/reset-password#token=…` and captures the request locale, because `LocaleListener` resets the translator before the email is sent. It then waits for `kernel.terminate`, which the Swoole server and PHP-FPM both dispatch after the response has gone out. Sending inside the request would make the request slower for real accounts than for unknown addresses, and that difference would reveal which addresses have accounts. Pending emails are held in a `WeakMap` keyed by the main request, so concurrent coroutines in one worker do not send each other's mail. Without a current request (a console command or a worker), it sends at once.
+
+The delivery calls the mailer transport directly rather than `MailerInterface`. `MailerInterface` dispatches a `SendEmailMessage` on the message bus, and a later routing change could put the token into Redis or the `failed_messages` table. Notification email (`SendEmailCommand` on `swoole_task`) can be retried from those stores; a reset email cannot, and does not need to be, because the user can ask for a new link. A failed send is logged with the user ID and exception class only, since transport errors can quote the recipient. The templates are `templates/email/auth/password_reset.{txt,html}.twig`, translated through the `password_reset_email` keys in the `auth` domain.
+
+The web pages are `/forgot-password` and `/reset-password` in `ui/web/src/features/auth/`. The reset page reads the token from the fragment, removes the fragment from the address bar, and clears the local session after a successful reset, because the server has revoked it.
 
 All three password paths (`ResetPasswordHandler`, `SetUserPasswordHandler`, `ChangePasswordHandler`) call the application service `PasswordChanger`. It enforces the 8 to 255 character policy, hashes the password, and then, in one transaction, saves the user, revokes the user's access and refresh tokens and records `PasswordChanged`. A user's own change keeps the session that made it: the presenting access token and its refresh chain. The other two paths revoke everything. A reset token that is unknown, expired, already used, or belongs to a disabled account gets one generic `400`.
 

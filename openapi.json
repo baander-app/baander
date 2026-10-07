@@ -2237,7 +2237,7 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Reset email sent (always returns 200)",
+                        "description": "Request accepted. The answer is the same whether or not an account uses the address; an existing account is emailed a reset link.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2246,7 +2246,7 @@
                                             "properties": {
                                                 "message": {
                                                     "type": "string",
-                                                    "example": "Password reset email sent."
+                                                    "example": "If the email exists, a password reset link has been sent."
                                                 }
                                             },
                                             "type": "object"
@@ -2263,6 +2263,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many password reset requests from this IP",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }

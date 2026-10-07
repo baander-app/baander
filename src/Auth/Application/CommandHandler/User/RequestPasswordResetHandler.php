@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Application\CommandHandler\User;
 
 use App\Auth\Application\Command\User\RequestPasswordResetCommand;
+use App\Auth\Application\Port\PasswordResetDeliveryInterface;
 use App\Auth\Application\Port\PasswordResetRequestThrottleInterface;
 use App\Auth\Application\Port\PasswordResetTokenRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
@@ -19,6 +20,7 @@ final class RequestPasswordResetHandler
         private readonly UserRepositoryInterface $userRepository,
         private readonly PasswordResetTokenRepositoryInterface $passwordResetTokenRepository,
         private readonly PasswordResetRequestThrottleInterface $throttle,
+        private readonly PasswordResetDeliveryInterface $delivery,
         private readonly int $tokenLifetimeMinutes,
     ) {
         if ($tokenLifetimeMinutes < 1) {
@@ -43,13 +45,12 @@ final class RequestPasswordResetHandler
         }
 
         // The token is tied to the account, not the address: it ends with the account and
-        // with any change of its email or password. Only its hash is stored, so this is the
-        // one place the raw token exists; nothing delivers it to the user yet.
+        // with any change of its email or password. Only its hash is stored, so the raw token
+        // exists only here and in the delivery. It must never reach a domain event: events
+        // are stored in the outbox.
         $token = bin2hex(random_bytes(32));
-        $this->passwordResetTokenRepository->issue(
-            $user->getId(),
-            $token,
-            new \DateTimeImmutable(sprintf('+%d minutes', $this->tokenLifetimeMinutes)),
-        );
+        $expiresAt = new \DateTimeImmutable(sprintf('+%d minutes', $this->tokenLifetimeMinutes));
+        $this->passwordResetTokenRepository->issue($user->getId(), $token, $expiresAt);
+        $this->delivery->deliver($user, $token, $expiresAt);
     }
 }

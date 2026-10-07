@@ -9,5 +9,3 @@ framework:
             low: ['email']
         admin_recipients:
             - { email: admin@example.com }
-    mailer:
-        dsn: '%env(MAILER_DSN)%'
