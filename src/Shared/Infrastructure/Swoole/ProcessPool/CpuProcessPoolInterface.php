@@ -12,6 +12,9 @@ use Swoole\Table;
  */
 interface CpuProcessPoolInterface
 {
+    /** Whether the pool accepts work in this process (false outside the Swoole server). */
+    public function isRunning(): bool;
+
     public function dispatch(string $payload, string $resultKey): void;
 
     public function getResultTable(): ?Table;

@@ -17,7 +17,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 /**
  * Sweep the transcode segment cache.
  *
- * Deletes idle video cache directories older than the TTL (default 24h) and
+ * Deletes idle video and track audio rendition cache directories older than the TTL (default 24h) and
  * evicts least-recently-accessed directories when the cache exceeds the size
  * budget (default 50GB). Safe by construction: a directory whose job is still
  * encoding, or whose session was touched within the active-playback window
@@ -96,9 +96,9 @@ final class SweepTranscodeCacheCommand extends Command implements SchedulableCon
         if ($result->deletedCount() > 0) {
             $rows = array_map(
                 static fn (string $id) => ['deleted', $id],
-                $result->deletedVideoIds,
+                $result->deletedDirectories,
             );
-            (new Table($output))->setHeaders(['Action', 'Video directory'])->setRows($rows)->render();
+            (new Table($output))->setHeaders(['Action', 'Cache directory'])->setRows($rows)->render();
             $io->text(sprintf('<info>%s %d director%s.</info>', $verb, $result->deletedCount(), $result->deletedCount() === 1 ? 'y' : 'ies'));
         } else {
             $io->text('<info>No directories matched the sweep policy.</info>');

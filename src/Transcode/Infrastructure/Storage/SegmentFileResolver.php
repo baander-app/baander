@@ -11,6 +11,15 @@ use App\Transcode\Domain\ValueObject\QualityTier;
 
 final class SegmentFileResolver
 {
+    /**
+     * Cache-root child that holds one directory per track with its audio
+     * renditions. Video directories are UUIDs, so this name cannot collide.
+     */
+    public const string AUDIO_RENDITION_DIRECTORY = 'audio-renditions';
+
+    /** Suffix of a rendition that an encoder is still writing. */
+    public const string PARTIAL_SUFFIX = '.part';
+
     public function __construct(
         private readonly string $basePath,
     ) {
@@ -32,16 +41,42 @@ final class SegmentFileResolver
     public function getVideoDirectories(): array
     {
         $this->resolvePath($this->basePath);
-        if (!is_dir($this->basePath)) {
+
+        return array_values(array_filter(
+            $this->childDirectories($this->basePath),
+            static fn (string $entry): bool => $entry !== self::AUDIO_RENDITION_DIRECTORY,
+        ));
+    }
+
+    /**
+     * List the per-track audio rendition directories currently on disk.
+     *
+     * @return list<string> track keys
+     */
+    public function getAudioRenditionDirectories(): array
+    {
+        $root = rtrim($this->basePath, '/') . '/' . self::AUDIO_RENDITION_DIRECTORY;
+        $this->resolvePath($root);
+        if (is_link($root)) {
+            return [];
+        }
+
+        return $this->childDirectories($root);
+    }
+
+    /** @return list<string> */
+    private function childDirectories(string $directory): array
+    {
+        if (!is_dir($directory)) {
             return [];
         }
 
         $dirs = [];
-        foreach (scandir($this->basePath) ?: [] as $entry) {
+        foreach (scandir($directory) ?: [] as $entry) {
             if ($entry === '.' || $entry === '..') {
                 continue;
             }
-            if (!is_link($this->basePath . '/' . $entry) && is_dir($this->basePath . '/' . $entry)) {
+            if (!is_link($directory . '/' . $entry) && is_dir($directory . '/' . $entry)) {
                 $dirs[] = $entry;
             }
         }
@@ -113,6 +148,18 @@ final class SegmentFileResolver
     public function resolveAudioSegmentPath(Uuid $videoId, string $language, int $segmentIndex): string
     {
         return $this->buildPath($videoId->toString(), 'audio', $language, sprintf('seg_%d.m4s', $segmentIndex));
+    }
+
+    // --- Track Audio Rendition Paths ---
+
+    public function resolveAudioRenditionDirectory(string $trackKey): string
+    {
+        return $this->buildPath(self::AUDIO_RENDITION_DIRECTORY, $trackKey);
+    }
+
+    public function resolveAudioRenditionPath(string $trackKey, string $fileName): string
+    {
+        return $this->buildPath(self::AUDIO_RENDITION_DIRECTORY, $trackKey, $fileName);
     }
 
     // --- Subtitle Paths ---

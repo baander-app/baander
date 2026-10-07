@@ -4,3 +4,6 @@ errors:
   missing_path: 'Mangler "path"-parameter.'
   invalid_file_path: "Ugyldig filsti."
   file_not_found: "Fil ikke fundet."
+  unsupported_transcode_format: 'Ikke-understøttet "format". Brug opus, aac eller mp3.'
+  invalid_transcode_bitrate: '"bitrate" skal være et positivt heltal i bit pr. sekund og kræver et "format".'
+  transcode_failed: "Lydomkodningen mislykkedes."

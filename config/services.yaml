@@ -960,6 +960,19 @@ services:
         tags:
             - { name: 'swoole.cpu_pool_worker' }
 
+    # --- Track audio renditions (on-the-fly audio transcoding) ---
+    App\Transcode\Infrastructure\Swoole\AudioRenditionPoolWorker:
+        tags:
+            - { name: 'swoole.cpu_pool_worker' }
+
+    App\Transcode\Infrastructure\Transcode\AudioRenditionCache:
+        arguments:
+            $pool: '@App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool'
+            $ffmpegPath: '%env(FFMPEG_PATH)%'
+
+    App\Transcode\Application\Port\AudioRenditionPortInterface:
+        alias: App\Transcode\Infrastructure\Transcode\AudioRenditionCache
+
     App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool:
         arguments:
             $handlers: !tagged_iterator 'swoole.cpu_pool_worker'

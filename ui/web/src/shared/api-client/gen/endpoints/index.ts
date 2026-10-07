@@ -4113,14 +4113,24 @@ export type GetStreamTrackParams = {
  */
 id: string;
 /**
- * Target audio codec (e.g. opus, aac, mp3)
+ * Transcode to this audio format. Without it the original file is streamed.
  */
-format?: string;
+format?: GetStreamTrackFormat;
 /**
- * Target bitrate in bps
+ * Target bitrate in bits per second; requires format. Fitted to the format's supported range (opus 32000-256000, aac and mp3 32000-320000) in whole kilobits. Defaults to 128000 for opus and 192000 for aac and mp3.
+ * @minimum 1
  */
 bitrate?: number;
 };
+
+export type GetStreamTrackFormat = typeof GetStreamTrackFormat[keyof typeof GetStreamTrackFormat];
+
+
+export const GetStreamTrackFormat = {
+  opus: 'opus',
+  aac: 'aac',
+  mp3: 'mp3',
+} as const;
 
 export type GetAdminMetadataSyncStatus200DataSourcesItem = {
   name?: string;
@@ -17260,6 +17270,9 @@ export const getGetStreamTrackUrl = (params: GetStreamTrackParams,) => {
 }
 
 /**
+ * With `format` (and optionally `bitrate`) the track is transcoded. A cached
+ * rendition streams with Range support; otherwise the response streams the
+ * encode while it runs, without byte ranges.
  * @summary Stream a track by PublicId with HTTP Range support
  */
 export const getStreamTrack = async (params: GetStreamTrackParams, options?: RequestInit): Promise<void> => {
