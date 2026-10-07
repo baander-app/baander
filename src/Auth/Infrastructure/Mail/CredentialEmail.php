@@ -12,6 +12,7 @@ namespace App\Auth\Infrastructure\Mail;
 final readonly class CredentialEmail
 {
     /**
+     * @param string               $userId         the recipient, whose email language is read when the email is sent
      * @param string               $template       template path without the `.txt.twig` or `.html.twig` suffix
      * @param string               $subjectKey     key in the `auth` translation domain; receives `app`
      * @param array<string, mixed> $context        template variables besides appName, name and locale
@@ -21,7 +22,6 @@ final readonly class CredentialEmail
         public string $userId,
         public string $address,
         public string $name,
-        public string $locale,
         public string $template,
         public string $subjectKey,
         public array $context,

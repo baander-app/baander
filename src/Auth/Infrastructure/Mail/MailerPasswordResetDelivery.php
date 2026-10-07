@@ -16,7 +16,6 @@ final readonly class MailerPasswordResetDelivery implements PasswordResetDeliver
 {
     public function __construct(
         private AfterResponseMailer $mailer,
-        private AuthEmailLocale $locale,
         private string $appUrl,
     ) {
     }
@@ -27,7 +26,6 @@ final readonly class MailerPasswordResetDelivery implements PasswordResetDeliver
             userId: $user->getId()->toString(),
             address: $user->getEmail(),
             name: $user->getName(),
-            locale: $this->locale->forUser($user),
             template: 'email/auth/password_reset',
             subjectKey: 'password_reset_email.subject',
             context: [

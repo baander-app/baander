@@ -6,6 +6,7 @@ namespace App\Tests\Functional\Auth;
 
 use App\Auth\Domain\Model\User;
 use App\Auth\Infrastructure\Mail\AfterResponseMailer;
+use App\UserPreference\Application\Port\UserSettingStoreInterface;
 use Doctrine\DBAL\Connection;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
@@ -102,7 +103,7 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
         $this->assertInstanceOf(Environment::class, $twig);
         $requestStack = $container->get(RequestStack::class);
         $this->assertInstanceOf(RequestStack::class, $requestStack);
-        $container->set(AfterResponseMailer::class, new AfterResponseMailer($transport, $twig, $translator, $requestStack, new Logger('test', [$logs]), 'Baander'));
+        $container->set(AfterResponseMailer::class, new AfterResponseMailer($transport, $twig, $translator, $container->get('test.user_settings_contract'), $requestStack, new Logger('test', [$logs]), 'Baander'));
         $address = $this->uniqueEmail();
 
         $response = $this->requestFrom($this->ip(), 'POST', '/api/auth/register', content: [
@@ -237,6 +238,20 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
 
         $this->assertJsonResponse($this->verify($first), 400, 'error');
         $this->assertJsonResponse($this->verify($second), 200, 'data');
+    }
+
+    public function testTheEmailIsInTheLanguageTheUserChose(): void
+    {
+        $user = $this->registerThroughTheApi();
+        static::getContainer()->get(UserSettingStoreInterface::class)->save($user->getId(), 'language', 'th');
+
+        $this->resend($user);
+
+        $messages = $this->getMailerMessages();
+        $this->assertCount(2, $messages);
+        $this->assertInstanceOf(Email::class, $messages[1]);
+        $this->assertSame('ยืนยันที่อยู่อีเมลของคุณสำหรับ ' . static::getContainer()->getParameter('app.name'), $messages[1]->getSubject());
+        $this->assertStringContainsString('<html lang="th">', (string) $messages[1]->getHtmlBody());
     }
 
     public function testResendAnswersTheSameForAVerifiedAccountAndSendsNothing(): void

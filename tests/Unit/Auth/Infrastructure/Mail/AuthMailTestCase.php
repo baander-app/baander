@@ -6,8 +6,9 @@ namespace App\Tests\Unit\Auth\Infrastructure\Mail;
 
 use App\Auth\Domain\Model\User;
 use App\Auth\Infrastructure\Mail\AfterResponseMailer;
-use App\Auth\Infrastructure\Mail\AuthEmailLocale;
 use App\Shared\Domain\Model\Email as EmailAddress;
+use App\UserPreference\Application\Port\UserSettingsContractInterface;
+use App\UserPreference\Application\Port\UserSettingView;
 use Monolog\Handler\TestHandler;
 use Monolog\Logger;
 use PHPUnit\Framework\TestCase;
@@ -39,6 +40,11 @@ abstract class AuthMailTestCase extends TestCase
     /** @var list<Email> */
     protected array $sent = [];
     protected ?\Throwable $failure = null;
+    /** @var array<string, string> email language per user id */
+    protected array $languages = [];
+    /** @var list<string> user ids whose language was looked up, in order */
+    protected array $languageLookups = [];
+    protected ?\Throwable $languageFailure = null;
 
     protected function setUp(): void
     {
@@ -74,12 +80,56 @@ abstract class AuthMailTestCase extends TestCase
             }
         };
 
-        return new AfterResponseMailer($transport, $twig, $this->translator, $this->requestStack, new Logger('test', [$this->logs]), 'Baander');
+        $settings = new class ($this) implements UserSettingsContractInterface {
+            public function __construct(private readonly AuthMailTestCase $test)
+            {
+            }
+
+            public function resolveLanguage(string $userId): string
+            {
+                return $this->test->resolveLanguage($userId);
+            }
+
+            public function seedLanguage(string $userId, string $language): void
+            {
+                throw new \LogicException('Not used by the mailer.');
+            }
+
+            public function settings(string $userId): array
+            {
+                throw new \LogicException('Not used by the mailer.');
+            }
+
+            public function setting(string $userId, string $key): UserSettingView
+            {
+                throw new \LogicException('Not used by the mailer.');
+            }
+
+            public function set(string $userId, string $key, mixed $value): void
+            {
+                throw new \LogicException('Not used by the mailer.');
+            }
+
+            public function reset(string $userId, string $key): void
+            {
+                throw new \LogicException('Not used by the mailer.');
+            }
+        };
+
+        return new AfterResponseMailer($transport, $twig, $this->translator, $settings, $this->requestStack, new Logger('test', [$this->logs]), 'Baander');
     }
 
-    protected function locale(): AuthEmailLocale
+    /**
+     * @internal called by the recording settings contract
+     */
+    public function resolveLanguage(string $userId): string
     {
-        return new AuthEmailLocale($this->translator);
+        $this->languageLookups[] = $userId;
+        if ($this->languageFailure !== null) {
+            throw $this->languageFailure;
+        }
+
+        return $this->languages[$userId] ?? 'en';
     }
 
     /**

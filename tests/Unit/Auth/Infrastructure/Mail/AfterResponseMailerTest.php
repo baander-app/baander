@@ -14,7 +14,7 @@ final class AfterResponseMailerTest extends AuthMailTestCase
     public function testWaitsForTheResponseBeforeSendingWithinARequest(): void
     {
         $mailer = $this->mailer();
-        $delivery = new MailerPasswordResetDelivery($mailer, $this->locale(), 'https://baander.app');
+        $delivery = new MailerPasswordResetDelivery($mailer, 'https://baander.app');
         $request = Request::create('/api/auth/password/reset-request', 'POST');
         $this->requestStack->push($request);
 
@@ -32,6 +32,22 @@ final class AfterResponseMailerTest extends AuthMailTestCase
         self::assertCount(1, $this->sent, 'An email is sent once.');
     }
 
+    public function testTheLanguageIsLookedUpOnlyAfterTheResponse(): void
+    {
+        $mailer = $this->mailer();
+        $user = $this->user();
+        $request = Request::create('/api/auth/password/reset-request', 'POST');
+        $this->requestStack->push($request);
+
+        (new MailerPasswordResetDelivery($mailer, 'https://baander.app'))
+            ->deliver($user, self::TOKEN, new \DateTimeImmutable('+60 minutes'));
+
+        self::assertSame([], $this->languageLookups, 'A settings read during the request would make known accounts slower to answer.');
+
+        $mailer->onKernelTerminate($this->terminate($request));
+        self::assertSame([$user->getId()->toString()], $this->languageLookups);
+    }
+
     public function testSendsAtOnceOutsideARequest(): void
     {
         $this->mailer()->send($this->email());
@@ -39,6 +55,18 @@ final class AfterResponseMailerTest extends AuthMailTestCase
         self::assertCount(1, $this->sent);
         self::assertSame('alice@baander.app', $this->sent[0]->getTo()[0]->getAddress());
         self::assertSame('Alice', $this->sent[0]->getTo()[0]->getName());
+    }
+
+    public function testAFailedLanguageLookupSendsInEnglishAndLogsWithoutTheLinkOrTheAddress(): void
+    {
+        $this->languageFailure = new \RuntimeException('connection to alice@baander.app lost while reading ' . self::TOKEN);
+
+        $this->mailer()->send($this->email());
+
+        self::assertCount(1, $this->sent);
+        self::assertSame('Reset your Baander password', $this->sent[0]->getSubject());
+        self::assertTrue($this->logs->hasWarningThatContains('Email language could not be resolved; sending in English.'));
+        $this->assertLogsHoldNeither(self::TOKEN, 'alice@baander.app');
     }
 
     public function testAFailedSendIsLoggedWithoutTheLinkOrTheAddress(): void
@@ -65,7 +93,6 @@ final class AfterResponseMailerTest extends AuthMailTestCase
             userId: 'id',
             address: 'alice@baander.app',
             name: 'Alice',
-            locale: 'en',
             template: 'email/auth/password_reset',
             subjectKey: 'password_reset_email.subject',
             context: ['link' => 'https://baander.app/reset-password#token=' . self::TOKEN, 'validMinutes' => 60],
