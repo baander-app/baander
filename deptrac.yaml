@@ -42,7 +42,7 @@ deptrac:
         Playlist: ['Playlist Deletion Preview Contract', 'Playlist Domain', 'Playlist Application', 'Playlist Infrastructure', 'Playlist Resources', 'Playlist Interface']
         Recommendation: ['Recommendation Domain', 'Recommendation Application', 'Recommendation Infrastructure', 'Recommendation Resources', 'Recommendation Interface']
         Transcode: ['Transcode Playback Access Contract', 'Transcode Domain', 'Transcode Application', 'Transcode Infrastructure', 'Transcode Resources', 'Transcode Interface']
-        UserPreference: ['UserPreference Domain', 'UserPreference Application', 'UserPreference Infrastructure', 'UserPreference Resources', 'UserPreference Interface']
+        UserPreference: ['UserPreference Settings Contract', 'UserPreference Domain', 'UserPreference Application', 'UserPreference Infrastructure', 'UserPreference Resources', 'UserPreference Interface']
         Discovery: ['Discovery Domain', 'Discovery Application', 'Discovery Infrastructure', 'Discovery Resources', 'Discovery Interface']
         Favorites: ['Favorites Domain', 'Favorites Application', 'Favorites Infrastructure', 'Favorites Resources', 'Favorites Interface']
         Radio: ['Radio Domain', 'Radio Application', 'Radio Infrastructure', 'Radio Resources', 'Radio Interface']
@@ -556,10 +556,20 @@ deptrac:
         - type: classLike
           value: '^App\\UserPreference\\Domain\\'
 
-    - name: 'UserPreference Application'
+    - name: 'UserPreference Settings Contract'
       collectors:
         - type: classLike
-          value: '^App\\UserPreference\\Application\\'
+          value: '^App\\UserPreference\\Application\\Port\\(UserSettingsContractInterface|UserSettingView)$'
+
+    - name: 'UserPreference Application'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\UserPreference\\Application\\'
+          must_not:
+            - type: classLike
+              value: '^App\\UserPreference\\Application\\Port\\(UserSettingsContractInterface|UserSettingView)$'
 
     - name: 'UserPreference Infrastructure'
       collectors:
@@ -909,6 +919,7 @@ deptrac:
     'Auth Domain':
       - 'Shared Domain'
     'Auth Application':
+      - 'UserPreference Settings Contract'
       - 'Auth Identity Contract'
       - 'Auth Device Approval Event Contract'
       - 'Scheduler Schedulable Contract'
@@ -916,6 +927,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Auth Infrastructure':
+      - 'UserPreference Settings Contract'
       - 'Shared Application'
       - 'Auth Identity Contract'
       - 'Auth Domain'
@@ -929,6 +941,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Auth Interface':
+      - 'UserPreference Settings Contract'
       - 'Auth Resources'
       - 'Auth Identity Contract'
       - 'Auth Application'
@@ -1093,6 +1106,7 @@ deptrac:
       - 'Auth Device Approval Event Contract'
       - 'Shared Domain'
     'Notification Application':
+      - 'UserPreference Settings Contract'
       - 'Notification Domain'
       - 'Shared Domain'
       - 'Shared Application'
@@ -1245,11 +1259,15 @@ deptrac:
     # --- UserPreference ---
     'UserPreference Domain':
       - 'Shared Domain'
+    'UserPreference Settings Contract':
+      - 'Shared Application'
+      - 'Shared Domain'
     'UserPreference Application':
       - 'UserPreference Domain'
       - 'Shared Domain'
       - 'Shared Application'
     'UserPreference Infrastructure':
+      - 'UserPreference Settings Contract'
       - 'Shared Application'
       - 'UserPreference Domain'
       - 'UserPreference Application'

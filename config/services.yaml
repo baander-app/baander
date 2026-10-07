@@ -1096,6 +1096,8 @@ services:
         alias: App\Shared\Infrastructure\Doctrine\Repository\SystemSettingRepository
     App\UserPreference\Application\Port\UserSettingStoreInterface:
         alias: App\UserPreference\Infrastructure\Doctrine\UserSettingRepository
+    App\UserPreference\Application\Port\UserSettingsContractInterface:
+        alias: App\UserPreference\Infrastructure\UserSettingsContract
     App\Shared\Application\Port\AdminAlertPortInterface:
         alias: App\Shared\Infrastructure\Event\AdminAlertService
 
@@ -1319,6 +1321,10 @@ when@test:
             tags: ['baander.message_payload_codec']
         App\Tests\Fixtures\Messaging\FailureTransportProbeHandler:
             tags: [{ name: 'messenger.message_handler' }]
+        # Resolve the production user settings contract for integration checks.
+        test.user_settings_contract:
+            alias: App\UserPreference\Application\Port\UserSettingsContractInterface
+            public: true
         # User settings that only the user settings API tests use.
         App\Tests\Fixtures\Settings\TestUserSettingDefinitions:
             tags: ['baander.setting_definition_provider']
