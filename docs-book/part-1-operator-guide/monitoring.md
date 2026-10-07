@@ -83,9 +83,11 @@ curl -s -H "Authorization: Bearer $TOKEN" \
   "https://baander.test/api/monitor/jobs/<jobId>" | jq .
 ```
 
+A job keeps one record and one job ID across its deliveries. An automatic retry, a retry from the failure transport, and a redelivery after a worker stopped mid-job all run the same job again: the record returns to `running` with a new start time, loses the previous attempt's finish time, progress and error, and its `attempt` number increases. The record keeps its creation time and the queue it was first received from. `duration` covers the current attempt only.
+
 ### Retry and cancel
 
-You can retry failed jobs or cancel running/queued jobs through the API:
+You can retry failed jobs or cancel running/queued jobs through the API. Retrying a job here dispatches a copy of its stored payload as a new job, returned as `newJobId`, and marks the original job `retried`:
 
 ```bash
 # Retry a failed job

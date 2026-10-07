@@ -10,9 +10,10 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'job_monitors')]
+// One row per job: every delivery of a message restarts its job's row (JobMonitorService::startAttempt).
+#[ORM\UniqueConstraint(name: 'uniq_job_monitors_job_id', columns: ['job_id'])]
 #[ORM\Index(name: 'idx_job_monitors_queue_created_at', columns: ['queue', 'created_at'])]
 #[ORM\Index(name: 'idx_job_monitors_name_created_at', columns: ['name', 'created_at'])]
-#[ORM\Index(name: 'idx_job_monitors_job_id', columns: ['job_id'])]
 #[ORM\Index(name: 'idx_job_monitors_status_created_at', columns: ['status', 'created_at'])]
 class JobMonitorEntity
 {
@@ -57,6 +58,7 @@ class JobMonitorEntity
     )]
     private ?int $durationMicroseconds = null;
 
+    // Attempts started so far: 0 until the first delivery starts.
     #[ORM\Column(type: 'integer', options: ['default' => 0])]
     private int $attempt = 0;
 
@@ -152,10 +154,16 @@ class JobMonitorEntity
         return $this->queuedAt;
     }
 
+    /** Starts the next attempt, discarding the previous attempt's outcome. */
     public function markStarted(): void
     {
+        $this->attempt++;
         $this->startedAt = new \DateTimeImmutable();
+        $this->finishedAt = null;
         $this->status = JobStatus::Running;
+        $this->progress = null;
+        $this->exception = null;
+        $this->exceptionClass = null;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
@@ -166,21 +174,21 @@ class JobMonitorEntity
 
     public function markFinished(): void
     {
-        $this->finishedAt = new \DateTimeImmutable();
+        $this->finishedAt = $this->finishTime();
         $this->status = JobStatus::Finished;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function markFailed(): void
     {
-        $this->finishedAt = new \DateTimeImmutable();
+        $this->finishedAt = $this->finishTime();
         $this->status = JobStatus::Failed;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function markCancelled(): void
     {
-        $this->finishedAt = new \DateTimeImmutable();
+        $this->finishedAt = $this->finishTime();
         $this->status = JobStatus::Cancelled;
         $this->updatedAt = new \DateTimeImmutable();
     }
@@ -198,12 +206,6 @@ class JobMonitorEntity
     public function getAttempt(): int
     {
         return $this->attempt;
-    }
-
-    public function incrementAttempt(): void
-    {
-        $this->attempt++;
-        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function isRetried(): bool
@@ -293,5 +295,13 @@ class JobMonitorEntity
     {
         $this->auditLog = $auditLog;
         $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    /** A finish is never before the start, even when the clock went back (chk_job_monitors_finished_at). */
+    private function finishTime(): \DateTimeImmutable
+    {
+        $now = new \DateTimeImmutable();
+
+        return $this->startedAt !== null && $this->startedAt > $now ? $this->startedAt : $now;
     }
 }

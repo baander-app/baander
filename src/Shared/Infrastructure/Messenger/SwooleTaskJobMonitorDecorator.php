@@ -15,9 +15,11 @@ use Symfony\Component\Messenger\Transport\Serialization\SerializerInterface;
 /**
  * Decorates the Swoole ServerTaskTransportHandler to track async jobs.
  *
- * Creates a job_monitor entry before bus->dispatch() runs, then marks
- * it finished or failed when the handler completes. Does not depend on
- * any bus middleware. A supplied job ID is retained; otherwise one is generated here.
+ * Starts an attempt of the message's job before bus->dispatch() runs, then
+ * marks that attempt finished or failed when the handler completes. The job ID
+ * comes from the message (JobMonitoringMiddleware assigns it at dispatch), so a
+ * repeated task delivery restarts the same job_monitors row; a message without
+ * one gets an ID here.
  */
 final readonly class SwooleTaskJobMonitorDecorator implements TaskHandler
 {
@@ -56,21 +58,14 @@ final readonly class SwooleTaskJobMonitorDecorator implements TaskHandler
         $jobId = $jobIdStamp !== null ? $jobIdStamp->jobId : new PublicId();
         $jobIdStr = $jobId->toString();
 
-        // Create + mark started
-        $this->jobMonitorService->create(
+        $serialized = $this->messageSerializer->serialize($data);
+        $attempt = $this->jobMonitorService->startAttempt(
             jobId: $jobIdStr,
             name: $name,
             queue: 'swoole_task',
-        );
-
-        $serialized = $this->messageSerializer->serialize($data);
-        $this->jobMonitorService->setData(
-            jobId: $jobIdStr,
             data: $serialized,
             dataTruncated: $serialized === null,
         );
-
-        $this->jobMonitorService->markStarted($jobIdStr);
 
         $this->logger->info('Job started', [
             'job_id' => $jobIdStr,
@@ -80,7 +75,7 @@ final readonly class SwooleTaskJobMonitorDecorator implements TaskHandler
         try {
             $this->decorated->handle($server, $task);
 
-            $this->jobMonitorService->markFinished($jobIdStr);
+            $this->jobMonitorService->markFinished($jobIdStr, $attempt);
 
             $this->logger->info('Job completed', [
                 'job_id' => $jobIdStr,
@@ -88,7 +83,7 @@ final readonly class SwooleTaskJobMonitorDecorator implements TaskHandler
             ]);
         } catch (\Throwable $e) {
             try {
-                $this->jobMonitorService->markFailed($jobIdStr, $e);
+                $this->jobMonitorService->markFailed($jobIdStr, $attempt, $e);
             } catch (\Throwable $monitorException) {
                 $this->logger->error('Failed to mark job as failed in monitor', [
                     'job_id' => $jobIdStr,

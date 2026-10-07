@@ -6,6 +6,7 @@ namespace App\Shared\Infrastructure\Messenger;
 
 use App\Shared\Domain\Model\Cursor;
 use App\Shared\Domain\Model\JobStatus;
+use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Doctrine\Entity\JobMonitorEntity;
 use App\Shared\Infrastructure\Pagination\CursorPaginator;
 use App\Shared\Infrastructure\Pagination\CursorResult;
@@ -23,49 +24,71 @@ final class JobMonitorService
     ) {
     }
 
-    public function create(string $jobId, ?string $name = null, ?string $queue = null, ?string $data = null, bool $dataTruncated = false): JobMonitorEntity
+    /**
+     * Records the start of one delivery of a job and returns its attempt number.
+     *
+     * The first delivery creates the job's row. A later delivery of the same job ID (a
+     * Messenger retry, a retry from the failure transport, or a redelivery after a worker
+     * died) restarts that row: it runs again from the new start time, without the previous
+     * attempt's finish time, progress or error. The row keeps its creation time and the
+     * queue it was first received from. The upsert is atomic, so concurrent deliveries
+     * still share one row.
+     */
+    public function startAttempt(string $jobId, string $name, string $queue, ?string $data, bool $dataTruncated): int
     {
-        $monitor = new JobMonitorEntity($jobId, name: $name, queue: $queue);
-        $monitor->setData($data);
-        $monitor->setDataTruncated($dataTruncated);
+        $now = $this->now();
+        $attempt = $this->entityManager->getConnection()->fetchOne(
+            <<<'SQL'
+                INSERT INTO job_monitors (id, job_id, name, queue, status, queued_at, started_at, attempt, data, data_truncated, created_at, updated_at)
+                VALUES (:id, :job_id, :name, :queue, :status, :now, :now, 1, :data, :data_truncated, :now, :now)
+                ON CONFLICT (job_id) DO UPDATE SET
+                    name = COALESCE(job_monitors.name, EXCLUDED.name),
+                    queue = COALESCE(job_monitors.queue, EXCLUDED.queue),
+                    status = EXCLUDED.status,
+                    started_at = EXCLUDED.started_at,
+                    finished_at = NULL,
+                    attempt = job_monitors.attempt + 1,
+                    progress = NULL,
+                    exception = NULL,
+                    exception_class = NULL,
+                    data = EXCLUDED.data,
+                    data_truncated = EXCLUDED.data_truncated,
+                    updated_at = EXCLUDED.updated_at
+                RETURNING attempt
+            SQL,
+            [
+                'id' => (new Uuid())->toString(),
+                'job_id' => $jobId,
+                'name' => $name,
+                'queue' => $queue,
+                'status' => JobStatus::Running->value,
+                'now' => $now,
+                'data' => $data,
+                'data_truncated' => $dataTruncated,
+            ],
+            [
+                'data' => $data === null ? ParameterType::NULL : ParameterType::STRING,
+                'data_truncated' => ParameterType::BOOLEAN,
+            ],
+        );
 
-        $this->entityManager->persist($monitor);
-        $this->entityManager->flush();
+        if (!is_numeric($attempt)) {
+            throw new RuntimeException(sprintf('Job monitor "%s" returned no attempt number.', $jobId));
+        }
 
-        return $monitor;
+        return (int) $attempt;
     }
 
-    public function markStarted(string $jobId): void
+    /** Finishes the given attempt; a stale attempt leaves a newer one untouched. */
+    public function markFinished(string $jobId, int $attempt): void
     {
-        $this->updateJob($jobId, [
-            'status' => JobStatus::Running->value,
-            'started_at' => $this->now(),
-            'updated_at' => $this->now(),
-        ]);
+        $this->completeAttempt($jobId, $attempt, JobStatus::Finished, null);
     }
 
-    public function markFinished(string $jobId): void
+    /** Fails the given attempt; a stale attempt leaves a newer one untouched. */
+    public function markFailed(string $jobId, int $attempt, \Throwable $exception): void
     {
-        $this->updateJob($jobId, [
-            'status' => JobStatus::Finished->value,
-            'finished_at' => $this->now(),
-            'updated_at' => $this->now(),
-        ]);
-    }
-
-    public function markFailed(string $jobId, \Throwable $exception): void
-    {
-        $this->updateJob($jobId, [
-            'status' => JobStatus::Failed->value,
-            'finished_at' => $this->now(),
-            'exception_class' => $exception::class,
-            'exception' => json_encode([
-                'message' => $exception->getMessage(),
-                'file' => $exception->getFile(),
-                'line' => $exception->getLine(),
-            ], JSON_THROW_ON_ERROR),
-            'updated_at' => $this->now(),
-        ]);
+        $this->completeAttempt($jobId, $attempt, JobStatus::Failed, $exception);
     }
 
     public function setProgress(string $jobId, int $progress): void
@@ -480,11 +503,11 @@ final class JobMonitorService
 
     public function markCancelled(string $jobId): void
     {
-        $this->updateJob($jobId, [
-            'status' => JobStatus::Cancelled->value,
-            'finished_at' => $this->now(),
-            'updated_at' => $this->now(),
-        ]);
+        $now = $this->now();
+        $this->entityManager->getConnection()->executeStatement(
+            'UPDATE job_monitors SET status = :status, finished_at = GREATEST(CAST(:now AS TIMESTAMPTZ), started_at), updated_at = :now WHERE job_id = :job_id',
+            ['status' => JobStatus::Cancelled->value, 'now' => $now, 'job_id' => $jobId],
+        );
     }
 
     public function markRetriedWithAudit(string $jobId, string $newJobId, string $userId): void
@@ -537,6 +560,44 @@ final class JobMonitorService
         return $this->entityManager
             ->getRepository(JobMonitorEntity::class)
             ->findOneBy(['jobId' => $jobId]);
+    }
+
+    /**
+     * Records the outcome of one attempt. The finish time is never before the attempt's
+     * start, even when the clock went back in between; chk_job_monitors_finished_at
+     * enforces that.
+     */
+    private function completeAttempt(string $jobId, int $attempt, JobStatus $status, ?\Throwable $exception): void
+    {
+        $now = $this->now();
+        $this->entityManager->getConnection()->executeStatement(
+            <<<'SQL'
+                UPDATE job_monitors
+                SET status = :status,
+                    finished_at = GREATEST(CAST(:now AS TIMESTAMPTZ), started_at),
+                    exception_class = :exception_class,
+                    exception = CAST(:exception AS JSONB),
+                    updated_at = :now
+                WHERE job_id = :job_id AND attempt = :attempt
+            SQL,
+            [
+                'status' => $status->value,
+                'now' => $now,
+                'exception_class' => $exception === null ? null : $exception::class,
+                'exception' => $exception === null ? null : json_encode([
+                    'message' => $exception->getMessage(),
+                    'file' => $exception->getFile(),
+                    'line' => $exception->getLine(),
+                ], JSON_THROW_ON_ERROR),
+                'job_id' => $jobId,
+                'attempt' => $attempt,
+            ],
+            [
+                'exception_class' => $exception === null ? ParameterType::NULL : ParameterType::STRING,
+                'exception' => $exception === null ? ParameterType::NULL : ParameterType::STRING,
+                'attempt' => ParameterType::INTEGER,
+            ],
+        );
     }
 
     /**

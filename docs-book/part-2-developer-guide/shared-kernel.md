@@ -79,7 +79,7 @@ Never call `sleep()`, `usleep()`, or `Swoole\Coroutine::sleep()` directly.
 Async jobs dispatched via Symfony Messenger are tracked through:
 
 - `JobIdStamp` — attached to messages to assign a unique job ID
-- `JobMonitoringMiddleware` — records job start, completion, and failure
+- `JobMonitoringMiddleware` — assigns each dispatched message its job ID (`JobIdStamp`)
 - `JobMonitorService` — queries job status and history
 
 See the [Real-Time Patterns](real-time-patterns.md) page for SSE and WebSocket details.

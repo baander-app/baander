@@ -72,7 +72,7 @@ Async jobs dispatched via Symfony Messenger are tracked through three components
 | Component | Purpose |
 |-----------|---------|
 | `JobIdStamp` | Middleware stamp that assigns a unique job ID to dispatched messages |
-| `JobMonitoringMiddleware` | Records job lifecycle events (start, completion, failure) |
+| `JobMonitoringMiddleware` | Assigns each dispatched message its job ID (`JobIdStamp`) |
 | `JobMonitorService` | Queries job status and history |
 
 See the [CQRS and Messaging](../cqrs-and-messaging.md) page for dispatching patterns.

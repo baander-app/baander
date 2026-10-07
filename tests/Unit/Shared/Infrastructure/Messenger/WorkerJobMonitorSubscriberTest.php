@@ -9,7 +9,7 @@ use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Shared\Domain\Model\JobStatus;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Infrastructure\Doctrine\Entity\JobMonitorEntity;
+use App\Shared\Infrastructure\Messenger\JobAttemptStamp;
 use App\Shared\Infrastructure\Messenger\JobIdStamp;
 use App\Shared\Infrastructure\Messenger\JobMessageSerializer;
 use App\Shared\Infrastructure\Messenger\JobMonitorService;
@@ -37,28 +37,31 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class WorkerJobMonitorSubscriberTest extends TestCase
 {
-    private ?JobMonitorEntity $created = null;
+    /** @var array<string, mixed>|null parameters of the attempt start */
+    private ?array $started = null;
 
-    /** @var list<array{data: array<string, mixed>, criteria: array<string, mixed>}> */
-    private array $updates = [];
+    /** @var list<array<string, mixed>> parameters of attempt completions */
+    private array $completed = [];
 
     private WorkerJobMonitorSubscriber $subscriber;
 
     protected function setUp(): void
     {
         $connection = $this->createStub(Connection::class);
-        $connection->method('update')->willReturnCallback(function (string $table, array $data, array $criteria): int {
-            self::assertSame('job_monitors', $table);
-            $this->updates[] = ['data' => $data, 'criteria' => $criteria];
+        $connection->method('fetchOne')->willReturnCallback(function (string $sql, array $params): int {
+            self::assertStringContainsString('ON CONFLICT (job_id) DO UPDATE', $sql);
+            $this->started = $params;
+
+            return 3;
+        });
+        $connection->method('executeStatement')->willReturnCallback(function (string $sql, array $params): int {
+            self::assertStringContainsString('WHERE job_id = :job_id AND attempt = :attempt', $sql);
+            $this->completed[] = $params;
 
             return 1;
         });
 
         $em = $this->createStub(EntityManagerInterface::class);
-        $em->method('persist')->willReturnCallback(function (object $entity): void {
-            self::assertInstanceOf(JobMonitorEntity::class, $entity);
-            $this->created = $entity;
-        });
         $em->method('getConnection')->willReturn($connection);
         $this->subscriber = new WorkerJobMonitorSubscriber(
             new JobMonitorService($em, new CursorPaginator(), new JsonEncoder()),
@@ -128,27 +131,26 @@ final class WorkerJobMonitorSubscriberTest extends TestCase
         $dispatcher->addListener(WorkerMessageFailedEvent::class, $stop, -10);
         $worker->run(['sleep' => 0]);
 
-        self::assertNotNull($this->created);
-        self::assertSame('actual-async-receiver', $this->created->getQueue());
-        self::assertSame('ExtractAlbumCoverCommand', $this->created->getName());
+        self::assertNotNull($this->started);
+        self::assertSame('actual-async-receiver', $this->started['queue']);
+        self::assertSame('ExtractAlbumCoverCommand', $this->started['name']);
+        self::assertSame((MessageCodecFactory::create())->encode($command), $this->started['data']);
+        self::assertFalse($this->started['data_truncated']);
         self::assertInstanceOf(Envelope::class, $seen);
         $stamp = $seen->last(JobIdStamp::class);
         self::assertNotNull($stamp);
-        self::assertSame($this->created->getJobId(), $stamp->jobId->toString());
+        self::assertSame($this->started['job_id'], $stamp->jobId->toString());
+        self::assertSame(3, $seen->last(JobAttemptStamp::class)?->attempt);
 
         if ($existingId) {
             self::assertSame($jobId, $stamp->jobId);
         }
 
         self::assertSame('actual-async-receiver', $seen->last(ReceivedStamp::class)?->getTransportName());
-        self::assertSame(JobStatus::Running->value, $this->updates[0]['data']['status']);
-        self::assertSame((MessageCodecFactory::create())->encode($command), $this->updates[1]['data']['data']);
-        self::assertFalse($this->updates[1]['data']['data_truncated']);
-        self::assertSame(($fails ? JobStatus::Failed : JobStatus::Finished)->value, $this->updates[2]['data']['status']);
-
-        foreach ($this->updates as $update) {
-            self::assertSame(['job_id' => $stamp->jobId->toString()], $update['criteria']);
-        }
+        self::assertCount(1, $this->completed);
+        self::assertSame(($fails ? JobStatus::Failed : JobStatus::Finished)->value, $this->completed[0]['status']);
+        self::assertSame($stamp->jobId->toString(), $this->completed[0]['job_id']);
+        self::assertSame(3, $this->completed[0]['attempt']);
     }
 
     public function testUnsupportedPayloadIsMarkedTruncatedWithoutLosingQueueOrJobId(): void
@@ -157,19 +159,26 @@ final class WorkerJobMonitorSubscriberTest extends TestCase
         $event = new WorkerMessageReceivedEvent(new Envelope(new \stdClass(), [new JobIdStamp($jobId)]), 'receiver');
         $this->subscriber->onMessageReceived($event);
 
-        self::assertNotNull($this->created);
-        self::assertSame('receiver', $this->created->getQueue());
-        self::assertSame($jobId->toString(), $this->created->getJobId());
-        self::assertNull($this->updates[1]['data']['data']);
-        self::assertTrue($this->updates[1]['data']['data_truncated']);
+        self::assertNotNull($this->started);
+        self::assertSame('receiver', $this->started['queue']);
+        self::assertSame($jobId->toString(), $this->started['job_id']);
+        self::assertNull($this->started['data']);
+        self::assertTrue($this->started['data_truncated']);
     }
 
-    public function testTerminalEventsWithoutJobIdDoNotUpdateOtherJobs(): void
+    /** @return iterable<string, array{Envelope}> */
+    public static function deliveriesWithoutAStartedAttempt(): iterable
     {
-        $envelope = new Envelope(new \stdClass());
+        yield 'no job ID' => [new Envelope(new \stdClass(), [new JobAttemptStamp(1)])];
+        yield 'no attempt' => [new Envelope(new \stdClass(), [new JobIdStamp(new PublicId())])];
+    }
+
+    #[DataProvider('deliveriesWithoutAStartedAttempt')]
+    public function testTerminalEventsWithoutAStartedAttemptDoNotUpdateAnyJob(Envelope $envelope): void
+    {
         $this->subscriber->onMessageHandled(new WorkerMessageHandledEvent($envelope, 'receiver'));
         $this->subscriber->onMessageFailed(new WorkerMessageFailedEvent($envelope, 'receiver', new \RuntimeException()));
 
-        self::assertSame([], $this->updates);
+        self::assertSame([], $this->completed);
     }
 }

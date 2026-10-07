@@ -118,7 +118,7 @@ Events are dispatched via Symfony's `EventDispatcherInterface` inside handlers. 
 
 ## Job Monitoring
 
-Every dispatched command gets a `JobIdStamp` automatically applied by `JobMonitoringMiddleware`. This assigns a unique job ID that can be tracked through the monitoring endpoint. See [Monitoring](../part-1-operator-guide/monitoring.md) for details.
+Every dispatched message gets a `JobIdStamp` from `JobMonitoringMiddleware` before a transport stores it. The job ID travels with the message, so each delivery of it (a Messenger retry, a retry from the failure transport, or a redelivery after a worker died) is an attempt of the same job. `WorkerJobMonitorSubscriber` and `SwooleTaskJobMonitorDecorator` record each attempt with `JobMonitorService::startAttempt()`, which upserts the job's single `job_monitors` row, and complete only the attempt they started. See [Monitoring](../part-1-operator-guide/monitoring.md) for details.
 
 ## Async Processing
 

@@ -85,6 +85,7 @@ PY
             replacement_pid=$(php -r '\''echo json_decode(file_get_contents("/tmp/baander-messenger-async.json"), true)["pid"];'\'')
             test "$original_pid" != "$replacement_pid"
             await_check handled 2
+            php tests/Fixtures/messaging-runtime.php one-row-per-job 2
             kill -TERM "$supervisor_pid"
             wait "$supervisor_pid"
             trap - EXIT

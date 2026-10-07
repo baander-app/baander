@@ -237,10 +237,8 @@ final class JobMonitorController
             return $this->notFound('Job not found.');
         }
 
-        $duration = null;
-        if ($job->getStartedAt() !== null && $job->getFinishedAt() !== null) {
-            $duration = (float)$job->getStartedAt()->diff($job->getFinishedAt())->format('%s.%f');
-        }
+        // The generated duration column, so the detail agrees with the list's duration sort.
+        $durationMicroseconds = $job->getDurationMicroseconds();
 
         return $this->successResponse([
             'jobId'          => $job->getJobId(),
@@ -262,7 +260,7 @@ final class JobMonitorController
                 : null,
             'data'           => $job->getData(),
             'dataTruncated'  => $job->getDataTruncated(),
-            'duration'       => $duration,
+            'duration'       => $durationMicroseconds === null ? null : $durationMicroseconds / 1e6,
         ]);
     }
 

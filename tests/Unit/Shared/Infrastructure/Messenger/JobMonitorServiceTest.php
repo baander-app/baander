@@ -133,18 +133,16 @@ final class JobMonitorServiceTest extends TestCase
 
     // ── markCancelled tests ──────────────────────────────────────────────
 
-    public function testMarkCancelledUsesDbalUpdateAndDoesNotFlush(): void
+    public function testMarkCancelledFinishesNoEarlierThanTheStartAndDoesNotFlush(): void
     {
         $connection = $this->createMock(Connection::class);
         $connection->expects($this->once())
-            ->method('update')
+            ->method('executeStatement')
             ->with(
-                'job_monitors',
-                $this->callback(static function (array $data): bool {
-                    return $data['status'] === JobStatus::Cancelled->value
-                        && isset($data['finished_at'], $data['updated_at']);
-                }),
-                ['job_id' => 'job-cancel'],
+                $this->stringContains('finished_at = GREATEST(CAST(:now AS TIMESTAMPTZ), started_at)'),
+                $this->callback(static fn (array $params): bool => $params['status'] === JobStatus::Cancelled->value
+                    && $params['job_id'] === 'job-cancel'
+                    && isset($params['now'])),
             );
 
         $this->entityManager->method('getConnection')->willReturn($connection);
@@ -153,67 +151,78 @@ final class JobMonitorServiceTest extends TestCase
         $this->service->markCancelled('job-cancel');
     }
 
-    public function testMarkStartedUsesDbalUpdate(): void
+    public function testStartAttemptUpsertsTheJobRowAndReturnsItsAttempt(): void
     {
         $connection = $this->createMock(Connection::class);
         $connection->expects($this->once())
-            ->method('update')
+            ->method('fetchOne')
             ->with(
-                'job_monitors',
-                $this->callback(static function (array $data): bool {
-                    return $data['status'] === JobStatus::Running->value
-                        && isset($data['started_at'], $data['updated_at']);
-                }),
-                ['job_id' => 'job-start'],
+                $this->logicalAnd(
+                    $this->stringContains('ON CONFLICT (job_id) DO UPDATE'),
+                    $this->stringContains('finished_at = NULL'),
+                    $this->stringContains('attempt = job_monitors.attempt + 1'),
+                    $this->stringContains('RETURNING attempt'),
+                ),
+                $this->callback(static fn (array $params): bool => $params['job_id'] === 'job-start'
+                    && $params['status'] === JobStatus::Running->value
+                    && $params['name'] === 'ExtractAlbumCoverCommand'
+                    && $params['queue'] === 'async'
+                    && $params['data'] === '{}'
+                    && $params['data_truncated'] === false),
+            )
+            ->willReturn(2);
+
+        $this->entityManager->method('getConnection')->willReturn($connection);
+        $this->entityManager->expects($this->never())->method('flush');
+
+        self::assertSame(2, $this->service->startAttempt('job-start', 'ExtractAlbumCoverCommand', 'async', '{}', false));
+    }
+
+    public function testMarkFinishedUpdatesOnlyTheGivenAttempt(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->expects($this->once())
+            ->method('executeStatement')
+            ->with(
+                $this->logicalAnd(
+                    $this->stringContains('WHERE job_id = :job_id AND attempt = :attempt'),
+                    $this->stringContains('finished_at = GREATEST(CAST(:now AS TIMESTAMPTZ), started_at)'),
+                ),
+                $this->callback(static fn (array $params): bool => $params['status'] === JobStatus::Finished->value
+                    && $params['job_id'] === 'job-finish'
+                    && $params['attempt'] === 2
+                    && $params['exception'] === null
+                    && $params['exception_class'] === null),
             );
 
         $this->entityManager->method('getConnection')->willReturn($connection);
 
-        $this->service->markStarted('job-start');
+        $this->service->markFinished('job-finish', 2);
     }
 
-    public function testMarkFinishedUsesDbalUpdate(): void
-    {
-        $connection = $this->createMock(Connection::class);
-        $connection->expects($this->once())
-            ->method('update')
-            ->with(
-                'job_monitors',
-                $this->callback(static function (array $data): bool {
-                    return $data['status'] === JobStatus::Finished->value
-                        && isset($data['finished_at'], $data['updated_at']);
-                }),
-                ['job_id' => 'job-finish'],
-            );
-
-        $this->entityManager->method('getConnection')->willReturn($connection);
-
-        $this->service->markFinished('job-finish');
-    }
-
-    public function testMarkFailedUsesDbalUpdate(): void
+    public function testMarkFailedRecordsTheErrorOfTheGivenAttempt(): void
     {
         $exception = new RuntimeException('Something went wrong');
 
         $connection = $this->createMock(Connection::class);
         $connection->expects($this->once())
-            ->method('update')
+            ->method('executeStatement')
             ->with(
-                'job_monitors',
-                $this->callback(function (array $data): bool {
-                    $exceptionData = json_decode($data['exception'], true);
+                $this->stringContains('WHERE job_id = :job_id AND attempt = :attempt'),
+                $this->callback(static function (array $params): bool {
+                    $exceptionData = json_decode($params['exception'], true);
 
-                    return $data['status'] === JobStatus::Failed->value
-                        && $data['exception_class'] === RuntimeException::class
+                    return $params['status'] === JobStatus::Failed->value
+                        && $params['exception_class'] === RuntimeException::class
                         && $exceptionData['message'] === 'Something went wrong'
-                        && isset($data['finished_at'], $data['updated_at']);
+                        && $params['job_id'] === 'job-fail'
+                        && $params['attempt'] === 1;
                 }),
-                ['job_id' => 'job-fail'],
             );
 
         $this->entityManager->method('getConnection')->willReturn($connection);
 
-        $this->service->markFailed('job-fail', $exception);
+        $this->service->markFailed('job-fail', 1, $exception);
     }
 
     public function testSetProgressUsesDbalUpdate(): void

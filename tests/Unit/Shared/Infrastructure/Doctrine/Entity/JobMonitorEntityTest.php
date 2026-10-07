@@ -63,6 +63,38 @@ final class JobMonitorEntityTest extends TestCase
         $this->assertInstanceOf(\DateTimeImmutable::class, $entity->getFinishedAt());
     }
 
+    public function testMarkStartedAfterAFailureStartsTheNextAttemptWithoutTheOldOutcome(): void
+    {
+        $entity = new JobMonitorEntity(jobId: 'job-123');
+        $entity->markStarted();
+        $entity->setProgress(40);
+        $entity->setException(['message' => 'First attempt failed.']);
+        $entity->setExceptionClass(\RuntimeException::class);
+        $entity->markFailed();
+
+        $entity->markStarted();
+
+        $this->assertSame(2, $entity->getAttempt());
+        $this->assertSame(JobStatus::Running, $entity->getStatus());
+        $this->assertNotNull($entity->getStartedAt());
+        $this->assertNull($entity->getFinishedAt());
+        $this->assertNull($entity->getProgress());
+        $this->assertNull($entity->getException());
+        $this->assertNull($entity->getExceptionClass());
+    }
+
+    public function testFinishIsNeverBeforeTheStart(): void
+    {
+        $entity = new JobMonitorEntity(jobId: 'job-123');
+        $entity->markStarted();
+        $future = new \DateTimeImmutable('+1 hour');
+        (new \ReflectionProperty(JobMonitorEntity::class, 'startedAt'))->setValue($entity, $future);
+
+        $entity->markFinished();
+
+        $this->assertEquals($future, $entity->getFinishedAt());
+    }
+
     public function testMarkCancelledSetsStatusAndTimestamps(): void
     {
         $entity = new JobMonitorEntity(jobId: 'job-123');

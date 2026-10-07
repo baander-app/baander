@@ -108,6 +108,8 @@ framework:
             messenger.bus.default:
                 middleware:
                     - { id: 'App\Shared\Infrastructure\Messenger\CorrelationIdMiddleware' }
+                    # Assigns the job ID before a transport stores the message.
+                    - { id: 'App\Shared\Infrastructure\Messenger\JobMonitoringMiddleware' }
 
 when@test:
     framework:

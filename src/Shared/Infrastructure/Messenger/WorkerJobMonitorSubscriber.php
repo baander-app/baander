@@ -5,10 +5,18 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Messenger;
 
 use App\Shared\Domain\Model\PublicId;
+use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
 use Symfony\Component\Messenger\Event\WorkerMessageHandledEvent;
 use Symfony\Component\Messenger\Event\WorkerMessageReceivedEvent;
 
+/**
+ * Records each worker delivery as an attempt of the message's job.
+ *
+ * The job ID travels with the message, so a Messenger retry and a retry from the failure
+ * transport restart the job's existing row instead of adding one; the row keeps the queue
+ * it was first received from. A message without a job ID gets one here.
+ */
 final class WorkerJobMonitorSubscriber
 {
     public function __construct(
@@ -23,65 +31,49 @@ final class WorkerJobMonitorSubscriber
 
         $jobIdStamp = $envelope->last(JobIdStamp::class);
         if ($jobIdStamp === null) {
-            $jobId = new PublicId();
-            $jobIdStamp = new JobIdStamp($jobId);
+            $jobIdStamp = new JobIdStamp(new PublicId());
             $event->addStamps($jobIdStamp);
         }
-        $jobId = $jobIdStamp->jobId;
-
-        $message = $envelope->getMessage();
-        $name = (new \ReflectionClass($message))->getShortName();
-
-        $queue = $event->getReceiverName();
-
-        $this->jobMonitorService->create(
-            jobId: $jobId->toString(),
-            name: $name,
-            queue: $queue,
-        );
-
-        $this->jobMonitorService->markStarted($jobId->toString());
 
         $serialized = $this->messageSerializer->serialize($envelope);
-        if ($serialized !== null) {
-            $this->jobMonitorService->setData(
-                jobId: $jobId->toString(),
-                data: $serialized,
-                dataTruncated: false,
-            );
-        } else {
-            $this->jobMonitorService->setData(
-                jobId: $jobId->toString(),
-                data: null,
-                dataTruncated: true,
-            );
-        }
+        $attempt = $this->jobMonitorService->startAttempt(
+            jobId: $jobIdStamp->jobId->toString(),
+            name: (new \ReflectionClass($envelope->getMessage()))->getShortName(),
+            queue: $event->getReceiverName(),
+            data: $serialized,
+            dataTruncated: $serialized === null,
+        );
+        $event->addStamps(new JobAttemptStamp($attempt));
     }
 
     public function onMessageHandled(WorkerMessageHandledEvent $event): void
     {
-        $envelope = $event->getEnvelope();
-        $jobIdStamp = $envelope->last(JobIdStamp::class);
-
-        if ($jobIdStamp === null) {
-            return;
+        $attempt = $this->attempt($event->getEnvelope());
+        if ($attempt !== null) {
+            $this->jobMonitorService->markFinished($attempt[0], $attempt[1]);
         }
-
-        $this->jobMonitorService->markFinished($jobIdStamp->jobId->toString());
     }
 
     public function onMessageFailed(WorkerMessageFailedEvent $event): void
     {
-        $envelope = $event->getEnvelope();
-        $jobIdStamp = $envelope->last(JobIdStamp::class);
-
-        if ($jobIdStamp === null) {
-            return;
+        $attempt = $this->attempt($event->getEnvelope());
+        if ($attempt !== null) {
+            $this->jobMonitorService->markFailed($attempt[0], $attempt[1], $event->getThrowable());
         }
+    }
 
-        $this->jobMonitorService->markFailed(
-            jobId: $jobIdStamp->jobId->toString(),
-            exception: $event->getThrowable(),
-        );
+    /**
+     * The attempt this delivery started, or null when it started none.
+     *
+     * @return array{string, int}|null
+     */
+    private function attempt(Envelope $envelope): ?array
+    {
+        $jobIdStamp = $envelope->last(JobIdStamp::class);
+        $attemptStamp = $envelope->last(JobAttemptStamp::class);
+
+        return $jobIdStamp === null || $attemptStamp === null
+            ? null
+            : [$jobIdStamp->jobId->toString(), $attemptStamp->attempt];
     }
 }

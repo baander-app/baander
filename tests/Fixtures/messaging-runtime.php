@@ -54,10 +54,17 @@ if ($mode === 'prepare') {
         Symfony\Component\Messenger\Bridge\Redis\Transport\Connection::fromDsn(getenv('MESSENGER_TRANSPORT_DSN'), ['group' => 'baander']),
         new App\Shared\Infrastructure\Messenger\JsonTransportSerializer(MessageCodecFactory::create()),
     );
-    $transport->send(new Symfony\Component\Messenger\Envelope(new App\Shared\Domain\Event\Outbox\RelayOutboxCommand()));
+    // The job ID that JobMonitoringMiddleware assigns at dispatch.
+    $transport->send(new Symfony\Component\Messenger\Envelope(new App\Shared\Domain\Event\Outbox\RelayOutboxCommand(), [
+        new App\Shared\Infrastructure\Messenger\JobIdStamp(new App\Shared\Domain\Model\PublicId()),
+    ]));
 } elseif ($mode === 'handled') {
     $count = (int) $db->fetchOne("SELECT COUNT(*) FROM job_monitors WHERE status = 'finished'");
     exit($count >= (int) ($argv[2] ?? 1) ? 0 : 1);
+} elseif ($mode === 'one-row-per-job') {
+    // A redelivery restarts its job's row, so the killed attempt leaves no running row behind.
+    $rows = $db->fetchAssociative("SELECT COUNT(*) AS total, COUNT(*) FILTER (WHERE status = 'finished' AND finished_at >= started_at) AS finished, max(attempt) AS attempts FROM job_monitors");
+    exit((int) $rows['total'] === (int) $argv[2] && (int) $rows['finished'] === (int) $argv[2] && (int) $rows['attempts'] === 2 ? 0 : 1);
 } else {
     throw new RuntimeException('Unknown runtime-test mode.');
 }
