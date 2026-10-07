@@ -314,8 +314,6 @@ deptrac:
       - App\Party\Domain\Model\PartyMember
     App\Shared\Infrastructure\Security\WsQueryTokenAuthenticator:
       - App\Auth\Domain\Repository\UserRepositoryInterface
-    App\Shared\Interface\Controller\SystemSettingsController:
-      - App\Auth\Infrastructure\Security\Voter\AdminVoter
     App\Shared\Interface\Controller\WebSocketController:
       - App\Party\Application\Command\JoinPartySessionCommand
       - App\Party\Application\Command\LeavePartySessionCommand

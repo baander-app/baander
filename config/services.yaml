@@ -1091,7 +1091,11 @@ services:
             $baseUrl: '%env(LRCLIB_BASE_URL)%'
 
     App\Shared\Application\Port\SystemSettingsPortInterface:
+        alias: App\Shared\Application\Service\SystemSettings
+    App\Shared\Application\Port\SystemSettingStoreInterface:
         alias: App\Shared\Infrastructure\Doctrine\Repository\SystemSettingRepository
+    App\UserPreference\Application\Port\UserSettingStoreInterface:
+        alias: App\UserPreference\Infrastructure\Doctrine\UserSettingRepository
     App\Shared\Application\Port\AdminAlertPortInterface:
         alias: App\Shared\Infrastructure\Event\AdminAlertService
 

@@ -16043,18 +16043,20 @@
                 "tags": [
                     "Admin"
                 ],
-                "summary": "Get all system settings",
+                "summary": "Get every system setting with its effective and stored value",
                 "operationId": "get_admin_settings_index",
                 "responses": {
                     "200": {
-                        "description": "System settings key-value map",
+                        "description": "System settings",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "properties": {
                                         "data": {
-                                            "type": "object",
-                                            "additionalProperties": true
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/SystemSettingResource"
+                                            }
                                         }
                                     },
                                     "type": "object"
@@ -16078,7 +16080,7 @@
                 "tags": [
                     "Admin"
                 ],
-                "summary": "Update system settings (SUPER_ADMIN only)",
+                "summary": "Update system settings (SUPER_ADMIN only); any invalid value rejects the whole request",
                 "operationId": "patch_admin_settings_update",
                 "requestBody": {
                     "required": true,
@@ -16090,8 +16092,9 @@
                                 ],
                                 "properties": {
                                     "settings": {
-                                        "description": "Key-value pairs to upsert",
-                                        "type": "object"
+                                        "description": "Setting key to new value",
+                                        "type": "object",
+                                        "additionalProperties": true
                                     }
                                 },
                                 "type": "object"
@@ -16107,8 +16110,10 @@
                                 "schema": {
                                     "properties": {
                                         "data": {
-                                            "type": "object",
-                                            "additionalProperties": true
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/SystemSettingResource"
+                                            }
                                         }
                                     },
                                     "type": "object"
@@ -16117,7 +16122,7 @@
                         }
                     },
                     "400": {
-                        "description": "Invalid request body",
+                        "description": "Malformed request body",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -16128,6 +16133,112 @@
                     },
                     "403": {
                         "description": "Forbidden \u2014 SUPER_ADMIN only",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Unknown setting or invalid value, per key; nothing was written",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/settings/definitions": {
+            "get": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Get the definition of every setting, server-wide and per-user",
+                "operationId": "get_admin_settings_definitions",
+                "responses": {
+                    "200": {
+                        "description": "Setting definitions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/SettingDefinitionResource"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/settings/{key}": {
+            "delete": {
+                "tags": [
+                    "Admin"
+                ],
+                "summary": "Reset a system setting to its default (SUPER_ADMIN only)",
+                "operationId": "delete_admin_settings_reset",
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "[a-z0-9_.]+"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The setting after the reset",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/SystemSettingResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden \u2014 SUPER_ADMIN only",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown setting",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -21119,6 +21230,19 @@
                 },
                 "type": "object"
             },
+            "UpdateSystemSettingsRequest": {
+                "required": [
+                    "settings"
+                ],
+                "properties": {
+                    "settings": {
+                        "description": "Setting key to new value",
+                        "type": "object",
+                        "additionalProperties": true
+                    }
+                },
+                "type": "object"
+            },
             "CreateTranscodeSessionRequest": {
                 "required": [
                     "videoId"
@@ -23272,6 +23396,167 @@
                         "description": "Last update timestamp",
                         "type": "string",
                         "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "SystemSettingResource": {
+                "required": [
+                    "key",
+                    "value",
+                    "storedValue",
+                    "isExplicit",
+                    "storedValueValid"
+                ],
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "example": "transcode.max_bitrate"
+                    },
+                    "value": {
+                        "description": "Effective value",
+                        "oneOf": [
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "storedValue": {
+                        "description": "Raw stored value, also when it is no longer allowed; null when unset",
+                        "nullable": true
+                    },
+                    "isExplicit": {
+                        "description": "Whether a value is stored rather than the default applying",
+                        "type": "boolean"
+                    },
+                    "storedValueValid": {
+                        "description": "False when the stored value is no longer allowed and the default applies",
+                        "type": "boolean"
+                    }
+                },
+                "type": "object"
+            },
+            "SettingDefinitionResource": {
+                "required": [
+                    "key",
+                    "type",
+                    "scope",
+                    "label",
+                    "description",
+                    "group",
+                    "default",
+                    "options",
+                    "min",
+                    "max",
+                    "editRole",
+                    "userVisible",
+                    "enforced",
+                    "fallbackKey"
+                ],
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "example": "transcode.max_bitrate"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "boolean",
+                            "integer",
+                            "enum",
+                            "string"
+                        ]
+                    },
+                    "scope": {
+                        "type": "string",
+                        "enum": [
+                            "system",
+                            "user"
+                        ]
+                    },
+                    "label": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "group": {
+                        "description": "Group label the settings page shows the setting under",
+                        "type": "string"
+                    },
+                    "default": {
+                        "description": "Default value; null when the setting follows fallbackKey",
+                        "nullable": true,
+                        "oneOf": [
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "options": {
+                        "description": "Allowed values of an enum setting, with their labels",
+                        "type": "array",
+                        "items": {
+                            "required": [
+                                "value",
+                                "label"
+                            ],
+                            "properties": {
+                                "value": {
+                                    "oneOf": [
+                                        {
+                                            "type": "integer"
+                                        },
+                                        {
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "label": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "min": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "max": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "editRole": {
+                        "type": "string",
+                        "enum": [
+                            "ROLE_USER",
+                            "ROLE_SUPER_ADMIN"
+                        ]
+                    },
+                    "userVisible": {
+                        "description": "Whether signed-in users can read this system setting",
+                        "type": "boolean"
+                    },
+                    "enforced": {
+                        "description": "False while the backend does not yet honour the setting",
+                        "type": "boolean"
+                    },
+                    "fallbackKey": {
+                        "description": "System setting a user setting follows when unset",
+                        "type": "string",
+                        "nullable": true
                     }
                 },
                 "type": "object"
