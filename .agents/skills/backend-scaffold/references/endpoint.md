@@ -17,7 +17,9 @@ promoted fields fit current DTOs. Domain logic still enforces its own invariants
 Controllers coordinate through ports or command dispatch and established response
 helpers. Create the implementation and service alias together. Do not ship an alias
 to a nonexistent service or return static data to conceal missing orchestration.
-Check synchronous routing and result stamps before reading a command's result.
+Check synchronous routing before reading a command's result. Read a synchronous
+command's result from `HandledStamp`; `ResultStampMiddleware` maps only the classes
+listed in `app.result_stamp_classes`.
 
 Resources implement `public static function from(mixed $source): array` using the
 project's `AbstractResource` contract. Map selected fields and exclude persistence

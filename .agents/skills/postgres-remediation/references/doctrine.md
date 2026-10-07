@@ -43,6 +43,19 @@ PostgreSQL guidance to the actual data meaning; explain any retained exception.
 Changing a mapping alone may not remove platform timestamp precision. Verify
 generated SQL and round-trip fractions/timezones before choosing a scoped fix.
 
+PostgreSQL rejects `ALTER COLUMN … TYPE` on a column that a generated column
+reads: drop and re-add the generated column in the same migration (verified on
+PG 18.4 with `job_monitors.duration_microseconds`, Version20261006340000).
+Relaxing `timestamptz(0)` to `timestamptz` keeps stored values without a rewrite;
+re-adding a STORED column rewrites the table. Because `mapping_types: timestamptz:
+datetime_immutable` introspects every timestamptz column as `datetime_immutable`,
+schema comparison cannot see timestamptz precision, and mapping a timestamptz
+column as `datetimetz_immutable` creates drift; keep `datetime_immutable` until
+the convention changes. `DateTimeImmutableType` writes `Y-m-d H:i:s` with no
+offset and no fraction, so hand-written SQL binds instants as `Y-m-d H:i:s.uP`
+strings. When widening timestamp precision, widen cursor sort values too
+(`JobMonitorService::extractSortValue`): a whole-second cursor re-includes its own row.
+
 For IDs, distinguish application-assigned UUID with `GeneratedValue('NONE')`,
 explicit `SEQUENCE`/`IDENTITY`, and `AUTO`. Installed ORM's
 `Mapping/ClassMetadataFactory.php::determineIdGeneratorStrategy` checks configured

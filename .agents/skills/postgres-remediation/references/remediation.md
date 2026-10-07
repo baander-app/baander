@@ -36,7 +36,10 @@ accounting for every consumer.
 the producer code and deployment configuration. Do not assume UTC merely because
 the column lacks a timezone. Make the conversion zone explicit once established;
 if the historical zone is unknown, report the ambiguity rather than inventing it.
-Check Doctrine-generated precision as well as the mapping type.
+Check Doctrine-generated precision as well as the mapping type. Ranges over
+instants are half-open (`>= from AND < to`); validate RFC 3339 input with a
+timezone (`QueryParameters::optionalDateTime`) and reject `to <= from`. Do not
+emulate an inclusive day end with `23:59:59`.
 
 **Text.** Keep limits that enforce an actual contract. If replacing an arbitrary
 limit, review indexes, validation, API schemas, and clients. Use explicit checks
