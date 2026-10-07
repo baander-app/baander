@@ -19,6 +19,7 @@ use App\Catalog\Domain\ValueObject\AlbumType;
 use App\Catalog\Domain\ValueObject\ArtistRole;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
+use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
 use Psr\Log\LoggerInterface;
@@ -40,6 +41,7 @@ final class FilesDiscoveredHandler
         private readonly FFprobeAdapter $ffprobeAdapter,
         private readonly MessageBusInterface $messageBus,
         private readonly LyricsFetchRequestInterface $lyricsFetch,
+        private readonly AlbumMetadataSyncRequestInterface $albumMetadataSync,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -66,6 +68,11 @@ final class FilesDiscoveredHandler
         [$album, $wasCreated] = $this->resolveAlbum($libraryId, $message->directory, $message->files);
         if ($album === null) {
             return;
+        }
+        // resolveAlbum() has committed a new album. A retry or rescan finds it
+        // and creates none, so request its sync now rather than after the songs.
+        if ($wasCreated) {
+            $this->albumMetadataSync->requestSync($album->getId());
         }
 
         foreach ($message->files as $file) {

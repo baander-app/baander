@@ -16,6 +16,7 @@ use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
+use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
 use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
@@ -201,6 +202,7 @@ final class FilesDiscoveredLyricsRequestTest extends TestCase
             new FFprobeAdapter(new JsonEncoder()),
             $bus,
             $lyrics,
+            $this->createStub(AlbumMetadataSyncRequestInterface::class),
             new NullLogger(),
         );
     }

@@ -40,7 +40,7 @@ The Library context manages media libraries -- collections of media files organi
 
 | Event | When Emitted | Consumers |
 |-------|-------------|------------|
-| `LibraryScanCompleted` | After a library scan finishes discovering files | Metadata context (triggers enrichment for newly discovered files) |
+| `LibraryScanCompleted` | After a library scan finishes discovering files | Notification (BackgroundJobs category) |
 
 ## API Endpoints
 
@@ -71,4 +71,3 @@ All endpoints are prefixed with `/api` and served by `LibraryController`.
 |-----------|---------|--------------|
 | Depends on | Shared | Uses `Uuid` and `PublicId` for entity identification |
 | Depends on | Filesystem | Uses `MimeDetectorPortInterface` during scans and `FileWatcher` to detect filesystem changes |
-| Depended on by | Metadata | Receives scan results via `LibraryScanCompleted` events for metadata enrichment |

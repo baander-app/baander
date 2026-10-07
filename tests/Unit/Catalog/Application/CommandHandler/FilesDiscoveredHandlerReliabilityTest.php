@@ -16,6 +16,7 @@ use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
+use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
 use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Shared\Domain\Model\Uuid;
@@ -86,6 +87,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             $ffprobe,
             $messageBus,
             $this->createStub(LyricsFetchRequestInterface::class),
+            $this->createStub(AlbumMetadataSyncRequestInterface::class),
             $logger,
         );
 
@@ -156,6 +158,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             $ffprobe,
             $messageBus,
             $this->createStub(LyricsFetchRequestInterface::class),
+            $this->createStub(AlbumMetadataSyncRequestInterface::class),
             $logger,
         );
 
@@ -321,6 +324,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             new FFprobeAdapter(new JsonEncoder()),
             $bus,
             $this->createStub(LyricsFetchRequestInterface::class),
+            $this->createStub(AlbumMetadataSyncRequestInterface::class),
             $logger ?? new NullLogger(),
         );
         $file = new DiscoveredFile('/music/Test Album/01-track.mp3', 'Test Album/01-track.mp3', 'mp3', 1_000_000, time(), 'cover-fanout-hash');
