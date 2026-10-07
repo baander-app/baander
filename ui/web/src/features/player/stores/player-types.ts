@@ -49,6 +49,8 @@ export interface PlayerQueueActions {
 
 export interface PlayerPlaybackActions {
   replayCurrentTrack: () => void
+  /** Replace the current track's original stream after the browser rejected its format. */
+  switchToTranscodedStream: () => void
   setIsPlaying: (playing: boolean) => void
   setDuration: (duration: number) => void
   seekTo: (time: number) => void

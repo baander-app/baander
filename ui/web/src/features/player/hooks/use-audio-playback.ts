@@ -2,6 +2,12 @@ import { useEffect, useRef } from 'react'
 import { audioService } from '@/features/player/services/audio-service'
 import { usePlayerStore, resolveNextIndex, buildStreamUrl, syncPlaybackVolume, getPlaybackSelectionGeneration } from '@/features/player/stores/player-store'
 import { updateTime } from '@/features/player/stores/player-time-tracker'
+import {
+  chooseTranscodeFormat,
+  isTranscodedStream,
+  isUnsupportedOriginalStream,
+  notifyPlaybackFailure,
+} from '@/features/player/stores/player-playback-runtime'
 import { createLogger } from '@/shared/lib/logger'
 
 const logger = createLogger('AudioPlayback')
@@ -189,7 +195,16 @@ export function useAudioPlayback() {
         next.ready = true
         maybeFade()
       }
-      const onError = () => { if (candidate === next) invalidate() }
+      const onError = () => {
+        if (candidate !== next) return
+        if (isUnsupportedOriginalStream(nextAudio, next.nextId)) {
+          nextAudio.src = buildStreamUrl(next.nextId, chooseTranscodeFormat(nextAudio))
+          next.src = nextAudio.src
+          nextAudio.load()
+          return
+        }
+        invalidate()
+      }
       removeReadyListeners = () => {
         nextAudio.removeEventListener('canplaythrough', onReady)
         nextAudio.removeEventListener('error', onError)
@@ -218,11 +233,18 @@ export function useAudioPlayback() {
       }
       const onError = () => {
         if (!owned() || !audio.error) return
-        logger.warn('Active audio playback failed:', audio.error)
+        const state = usePlayerStore.getState()
         invalidate()
+        if (state.currentTrack && isUnsupportedOriginalStream(audio, state.currentTrack.publicId)) {
+          logger.info('Original format is not playable; requesting a transcoded stream')
+          state.switchToTranscodedStream()
+          return
+        }
+        logger.warn('Active audio playback failed:', audio.error)
         audio.pause()
-        usePlayerStore.getState().setIsPlaying(false)
+        state.setIsPlaying(false)
         audioService.setPlayingState(false)
+        notifyPlaybackFailure(isTranscodedStream(audio.src))
       }
       const onTimeUpdate = () => {
         if (!owned()) return

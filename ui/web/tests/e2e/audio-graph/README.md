@@ -71,7 +71,13 @@ requires replacement or recovery by its owner.
 Next/previous failure tests return HTTP 404 for the selected WAV and assert that
 native `play()` rejection clears the playing state. Store tests resolve or reject
 superseded play promises to check selection ownership and activity reporting,
-including navigation away and back to the same track.
+including navigation away and back to the same track. Because these 404 responses
+also fail transcoded requests, the player's transcoded retry fails as well.
+
+The transcoding fallback test answers the original stream with bytes Chromium
+cannot decode. It checks that the player requests `format=opus` and plays the
+fixture WAV. The fixture ignores `format`, so the test covers how the request is
+built, not the server's encoder.
 
 Repeat-one coverage observes calls at the activity-service boundary across native
 ended/replay cycles, checks that the source loads once, and checks that pause and

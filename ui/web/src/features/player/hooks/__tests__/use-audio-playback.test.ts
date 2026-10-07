@@ -4,6 +4,7 @@ import { renderHook, act, cleanup } from '@testing-library/react'
 import { reapplyAllEqState } from '@/features/equalizer/stores/eq-reapply'
 import { audioService } from '@/features/player/services/audio-service'
 import { activityService } from '@/features/player/services/activity-service'
+import { toast } from 'sonner'
 
 // --- Mocks must be hoisted before the hook imports them ---------------------
 
@@ -51,6 +52,10 @@ vi.mock('@/features/player/services/activity-service', () => ({
   activityService: { recordPlay: vi.fn(() => Promise.resolve()) },
 }))
 
+vi.mock('sonner', () => ({
+  toast: { error: vi.fn(), info: vi.fn() },
+}))
+
 // EQ reapply is dynamically imported inside the hook; stub it to a no-op.
 vi.mock('@/features/equalizer/stores/eq-reapply', () => ({
   reapplyAllEqState: vi.fn(),
@@ -75,6 +80,7 @@ function createStubAudioElement(): MockAudioElement {
     error: null,
     seeking: false,
     crossOrigin: '',
+    canPlayType: vi.fn(() => ''),
     play: vi.fn(() => Promise.resolve()),
     pause: vi.fn(),
     load: vi.fn(),
@@ -165,9 +171,9 @@ function endMedia(audio: MockAudioElement) {
   audio.dispatchEvent(new Event('ended'))
 }
 
-function errorMedia(audio: MockAudioElement) {
+function errorMedia(audio: MockAudioElement, code = 3) {
   audio.error = {
-    code: 3, message: 'Media decode failed',
+    code, message: code === 4 ? 'Media source not supported' : 'Media decode failed',
     MEDIA_ERR_ABORTED: 1, MEDIA_ERR_NETWORK: 2, MEDIA_ERR_DECODE: 3, MEDIA_ERR_SRC_NOT_SUPPORTED: 4,
   }
   audio.dispatchEvent(new Event('error'))
@@ -986,6 +992,7 @@ describe('useAudioPlayback', () => {
       expect(a.pause).toHaveBeenCalled()
       expect(b.pause).toHaveBeenCalled()
       expect(usePlayerStore.getState().currentTrack).toBe(queue[0])
+      expect(toast.error).toHaveBeenCalledWith('This track could not be played.', expect.anything())
       vi.mocked(a.play).mockImplementation(() => {
         a.error = null
         a.paused = false
@@ -1071,6 +1078,134 @@ describe('useAudioPlayback', () => {
       expect(usePlayerStore.getState().isPlaying).toBe(true)
       expect(a.pause).toHaveBeenCalledTimes(pauses)
       expect(audioService.setPlayingState).not.toHaveBeenCalledWith(false)
+    })
+  })
+
+  describe('unsupported original formats', () => {
+    const OPUS = 'audio/ogg; codecs=opus'
+
+    /** Original sources stay pending until the test fails them, as the media element does. */
+    function holdOriginalPlayback(audio: MockAudioElement) {
+      const played: string[] = []
+      const rejections: Array<(reason: Error) => void> = []
+      vi.mocked(audio.play).mockImplementation(() => {
+        played.push(audio.src)
+        if (!audio.src.includes('format=')) {
+          return new Promise<void>((_, reject) => { rejections.push(reject) })
+        }
+        audio.paused = false
+        return Promise.resolve()
+      })
+      const failSource = () => {
+        errorMedia(audio, 4)
+        rejections.splice(0).forEach((reject) => reject(new DOMException('Unsupported source', 'NotSupportedError')))
+      }
+      return { played, failSource }
+    }
+
+    it('requests the original stream for a track whose format the browser plays', async () => {
+      const queue = seedQueue(0, 2)
+      renderHook(() => useAudioPlayback())
+      const [a] = capturedAudioElements
+      vi.mocked(a.play).mockImplementation(() => {
+        a.paused = false
+        return Promise.resolve()
+      })
+      await act(async () => { usePlayerStore.getState().playTrack(queue[1]) })
+      expect(a.src).toBe('/api/stream/track?id=t1')
+      expect(a.canPlayType).not.toHaveBeenCalled()
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+      expect(activityService.recordPlay).toHaveBeenCalledOnce()
+    })
+
+    type CanPlay = (type: string) => CanPlayTypeResult
+    it.each<[string, CanPlay]>([
+      ['opus', (type) => type === OPUS ? 'probably' : 'maybe'],
+      ['aac', (type) => type === 'audio/aac' ? 'maybe' : ''],
+      ['mp3', () => ''],
+    ])('requests a transcoded %s stream when the browser cannot play the original format', async (format, canPlay) => {
+      const queue = seedQueue(0, 2)
+      renderHook(() => useAudioPlayback())
+      const [a] = capturedAudioElements
+      vi.mocked(a.canPlayType).mockImplementation(canPlay)
+      const playback = holdOriginalPlayback(a)
+      await act(async () => { usePlayerStore.getState().playTrack(queue[1]) })
+      await act(async () => { playback.failSource() })
+
+      const transcoded = `/api/stream/track?id=t1&format=${format}`
+      expect(a.src).toBe(transcoded)
+      expect(playback.played.at(-1)).toBe(transcoded)
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+      expect(usePlayerStore.getState().currentTrack).toBe(queue[1])
+      expect(activityService.recordPlay).toHaveBeenCalledOnce()
+      expect(toast.error).not.toHaveBeenCalled()
+    })
+
+    it('shows a playback error when the transcoded stream fails as well', async () => {
+      const queue = seedQueue(0, 2)
+      renderHook(() => useAudioPlayback())
+      const [a] = capturedAudioElements
+      vi.mocked(a.canPlayType).mockImplementation((type: string) => type === OPUS ? 'probably' : '')
+      const playback = holdOriginalPlayback(a)
+      await act(async () => { usePlayerStore.getState().playTrack(queue[1]) })
+      await act(async () => { playback.failSource() })
+      // The server refuses the transcoded stream, for example with transcoding turned off.
+      await act(async () => { errorMedia(a, 4) })
+
+      expect(a.src).toBe('/api/stream/track?id=t1&format=opus')
+      expect(usePlayerStore.getState().isPlaying).toBe(false)
+      expect(audioService.setPlayingState).toHaveBeenLastCalledWith(false)
+      expect(toast.error).toHaveBeenCalledOnce()
+      expect(toast.error).toHaveBeenCalledWith('This track could not be played.', expect.objectContaining({
+        description: 'The server could not convert it to a format this browser can play.',
+      }))
+    })
+
+    it('switches a paused restored track to a transcoded stream without starting playback', async () => {
+      const queue = [track('t0'), track('t1')]
+      renderHook(() => useAudioPlayback())
+      const [a] = capturedAudioElements
+      vi.mocked(a.canPlayType).mockImplementation((type: string) => type === OPUS ? 'probably' : '')
+      act(() => { usePlayerStore.getState().restoreQueue(queue, 1, 0) })
+      expect(a.src).toBe('/api/stream/track?id=t1')
+      await act(async () => { errorMedia(a, 4) })
+
+      expect(a.src).toBe('/api/stream/track?id=t1&format=opus')
+      expect(a.play).not.toHaveBeenCalled()
+      expect(usePlayerStore.getState().isPlaying).toBe(false)
+      expect(toast.error).not.toHaveBeenCalled()
+    })
+
+    it('stops instead of transcoding when the failed source is not the current track', async () => {
+      seedQueue(0, 2)
+      renderHook(() => useAudioPlayback())
+      const [a] = capturedAudioElements
+      a.src = '/api/stream/track?id=unavailable'
+      await act(async () => { usePlayerStore.setState({ isPlaying: true }) })
+      act(() => { errorMedia(a, 4) })
+
+      expect(a.src).toBe('/api/stream/track?id=unavailable')
+      expect(usePlayerStore.getState().isPlaying).toBe(false)
+      expect(toast.error).toHaveBeenCalledWith('This track could not be played.', expect.anything())
+    })
+
+    it('preloads a transcoded stream when the browser cannot play the next original format', async () => {
+      seedQueue(0, 2)
+      renderHook(() => useAudioPlayback())
+      const [a, b] = capturedAudioElements
+      vi.mocked(b.canPlayType).mockImplementation((type: string) => type === 'audio/aac' ? 'maybe' : '')
+      await act(async () => { timeUpdate(a, 95, 100) })
+      expect(b.src).toBe('/api/stream/track?id=t1')
+      act(() => { errorMedia(b, 4) })
+      expect(b.src).toBe('/api/stream/track?id=t1&format=aac')
+      expect(b.load).toHaveBeenCalledTimes(2)
+
+      b.error = null
+      await act(async () => { b.dispatchEvent(new Event('canplaythrough')) })
+      await act(async () => { endMedia(a) })
+      expect(usePlayerStore.getState().audioElement).toBe(b)
+      expect(usePlayerStore.getState().currentTrack?.publicId).toBe('t1')
+      expect(processorMock.instance.instantSwap).toHaveBeenCalledOnce()
     })
   })
 
