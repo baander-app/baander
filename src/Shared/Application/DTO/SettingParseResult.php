@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Application\DTO;
 
 use App\Shared\Domain\Model\Setting\SettingViolation;
+use LogicException;
 
 /**
  * A typed setting value, or the violation that rejected the input.
@@ -30,5 +31,13 @@ final readonly class SettingParseResult
     public function isValid(): bool
     {
         return $this->violation === null;
+    }
+
+    /**
+     * @throws LogicException when the input was rejected
+     */
+    public function typedValue(): bool|int|string
+    {
+        return $this->value ?? throw new LogicException(sprintf('Setting "%s" was rejected.', $this->violation?->key));
     }
 }

@@ -8,8 +8,8 @@ use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclaration;
 use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclarationProviderInterface;
 
 /**
- * Owner constraints for preference tables mapped with scalar user IDs, from Version001_InitialSchema
- * and, for user_theme_moods, Version20261006280000.
+ * Owner constraints for preference tables mapped with scalar user IDs, from Version001_InitialSchema,
+ * for user_theme_moods Version20261006280000 and for user_settings Version20261007120000.
  */
 final class UserPreferenceForeignKeys implements ForeignKeyDeclarationProviderInterface
 {
@@ -22,6 +22,7 @@ final class UserPreferenceForeignKeys implements ForeignKeyDeclarationProviderIn
         'eq_device_profiles',
         'preference_history',
         'user_theme_moods',
+        'user_settings',
     ];
 
     public function foreignKeys(): iterable

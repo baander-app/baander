@@ -766,6 +766,16 @@ export interface CreateSessionRequest {
   position: number;
 }
 
+/**
+ * Setting key to new value
+ */
+export type UpdateSystemSettingsRequestSettings = { [key: string]: unknown };
+
+export interface UpdateSystemSettingsRequest {
+  /** Setting key to new value */
+  settings: UpdateSystemSettingsRequestSettings;
+}
+
 export type CreateTranscodeSessionRequestQualityTier = typeof CreateTranscodeSessionRequestQualityTier[keyof typeof CreateTranscodeSessionRequestQualityTier];
 
 
@@ -2054,6 +2064,77 @@ export interface ScheduledJobResource {
   createdAt: string;
   /** Last update timestamp */
   updatedAt: string;
+}
+
+export interface SystemSettingResource {
+  key: string;
+  /** Effective value */
+  value: boolean | number | string;
+  /** Raw stored value, also when it is no longer allowed; null when unset */
+  storedValue: unknown | null;
+  /** Whether a value is stored rather than the default applying */
+  isExplicit: boolean;
+  /** False when the stored value is no longer allowed and the default applies */
+  storedValueValid: boolean;
+}
+
+export type SettingDefinitionResourceType = typeof SettingDefinitionResourceType[keyof typeof SettingDefinitionResourceType];
+
+
+export const SettingDefinitionResourceType = {
+  boolean: 'boolean',
+  integer: 'integer',
+  enum: 'enum',
+  string: 'string',
+} as const;
+
+export type SettingDefinitionResourceScope = typeof SettingDefinitionResourceScope[keyof typeof SettingDefinitionResourceScope];
+
+
+export const SettingDefinitionResourceScope = {
+  system: 'system',
+  user: 'user',
+} as const;
+
+export type SettingDefinitionResourceOptionsItem = {
+  value: number | string;
+  label: string;
+};
+
+export type SettingDefinitionResourceEditRole = typeof SettingDefinitionResourceEditRole[keyof typeof SettingDefinitionResourceEditRole];
+
+
+export const SettingDefinitionResourceEditRole = {
+  ROLE_USER: 'ROLE_USER',
+  ROLE_SUPER_ADMIN: 'ROLE_SUPER_ADMIN',
+} as const;
+
+export interface SettingDefinitionResource {
+  key: string;
+  type: SettingDefinitionResourceType;
+  scope: SettingDefinitionResourceScope;
+  label: string;
+  description: string;
+  /** Group label the settings page shows the setting under */
+  group: string;
+  /** Default value; null when the setting follows fallbackKey */
+  default: boolean | number | string | null;
+  /** Allowed values of an enum setting, with their labels */
+  options: SettingDefinitionResourceOptionsItem[];
+  /** @nullable */
+  min: number | null;
+  /** @nullable */
+  max: number | null;
+  editRole: SettingDefinitionResourceEditRole;
+  /** Whether signed-in users can read this system setting */
+  userVisible: boolean;
+  /** False while the backend does not yet honour the setting */
+  enforced: boolean;
+  /**
+     * System setting a user setting follows when unset
+     * @nullable
+     */
+  fallbackKey: string | null;
 }
 
 export interface FailedMessageResource {
@@ -5809,26 +5890,30 @@ export type DeleteDebugSpansClear200 = {
   status?: string;
 };
 
-export type GetAdminSettingsIndex200Data = { [key: string]: unknown };
-
 export type GetAdminSettingsIndex200 = {
-  data?: GetAdminSettingsIndex200Data;
+  data?: SystemSettingResource[];
 };
 
 /**
- * Key-value pairs to upsert
+ * Setting key to new value
  */
 export type PatchAdminSettingsUpdateBodySettings = { [key: string]: unknown };
 
 export type PatchAdminSettingsUpdateBody = {
-  /** Key-value pairs to upsert */
+  /** Setting key to new value */
   settings: PatchAdminSettingsUpdateBodySettings;
 };
 
-export type PatchAdminSettingsUpdate200Data = { [key: string]: unknown };
-
 export type PatchAdminSettingsUpdate200 = {
-  data?: PatchAdminSettingsUpdate200Data;
+  data?: SystemSettingResource[];
+};
+
+export type GetAdminSettingsDefinitions200 = {
+  data?: SettingDefinitionResource[];
+};
+
+export type DeleteAdminSettingsReset200 = {
+  data?: SystemSettingResource;
 };
 
 export type GetMonitorTransportStatus200Data = {
@@ -26768,7 +26853,7 @@ export const getGetAdminSettingsIndexUrl = () => {
 }
 
 /**
- * @summary Get all system settings
+ * @summary Get every system setting with its effective and stored value
  */
 export const getAdminSettingsIndex = async ( options?: RequestInit): Promise<GetAdminSettingsIndex200> => {
 
@@ -26839,7 +26924,7 @@ export function useGetAdminSettingsIndex<TData = Awaited<ReturnType<typeof getAd
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get all system settings
+ * @summary Get every system setting with its effective and stored value
  */
 
 export function useGetAdminSettingsIndex<TData = Awaited<ReturnType<typeof getAdminSettingsIndex>>, TError = ErrorType<ApiError>>(
@@ -26869,7 +26954,7 @@ export const getPatchAdminSettingsUpdateUrl = () => {
 }
 
 /**
- * @summary Update system settings (SUPER_ADMIN only)
+ * @summary Update system settings (SUPER_ADMIN only); any invalid value rejects the whole request
  */
 export const patchAdminSettingsUpdate = async (patchAdminSettingsUpdateBody: PatchAdminSettingsUpdateBody, options?: RequestInit): Promise<PatchAdminSettingsUpdate200> => {
 
@@ -26885,7 +26970,7 @@ export const patchAdminSettingsUpdate = async (patchAdminSettingsUpdateBody: Pat
 
 
 
-export const getPatchAdminSettingsUpdateMutationOptions = <TError = ErrorType<ApiError>,
+export const getPatchAdminSettingsUpdateMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchAdminSettingsUpdate>>, TError,{data: BodyType<PatchAdminSettingsUpdateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof patchAdminSettingsUpdate>>, TError,{data: BodyType<PatchAdminSettingsUpdateBody>}, TContext> => {
 
@@ -26914,12 +26999,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PatchAdminSettingsUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof patchAdminSettingsUpdate>>>
     export type PatchAdminSettingsUpdateMutationBody = BodyType<PatchAdminSettingsUpdateBody>
-    export type PatchAdminSettingsUpdateMutationError = ErrorType<ApiError>
+    export type PatchAdminSettingsUpdateMutationError = ErrorType<ApiError | ValidationError>
 
     /**
- * @summary Update system settings (SUPER_ADMIN only)
+ * @summary Update system settings (SUPER_ADMIN only); any invalid value rejects the whole request
  */
-export const usePatchAdminSettingsUpdate = <TError = ErrorType<ApiError>,
+export const usePatchAdminSettingsUpdate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchAdminSettingsUpdate>>, TError,{data: BodyType<PatchAdminSettingsUpdateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof patchAdminSettingsUpdate>>,
@@ -26928,6 +27013,177 @@ export const usePatchAdminSettingsUpdate = <TError = ErrorType<ApiError>,
         TContext
       > => {
       return useMutation(getPatchAdminSettingsUpdateMutationOptions(options), queryClient);
+    }
+
+export const getGetAdminSettingsDefinitionsUrl = () => {
+
+
+
+
+  return `/api/admin/settings/definitions`
+}
+
+/**
+ * @summary Get the definition of every setting, server-wide and per-user
+ */
+export const getAdminSettingsDefinitions = async ( options?: RequestInit): Promise<GetAdminSettingsDefinitions200> => {
+
+  return customInstance<GetAdminSettingsDefinitions200>(getGetAdminSettingsDefinitionsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminSettingsDefinitionsQueryKey = () => {
+    return [
+    `/api/admin/settings/definitions`
+    ] as const;
+    }
+
+
+export const getGetAdminSettingsDefinitionsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminSettingsDefinitions>>, TError = ErrorType<ApiError>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSettingsDefinitions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminSettingsDefinitionsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminSettingsDefinitions>>> = ({ signal }) => getAdminSettingsDefinitions({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminSettingsDefinitions>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAdminSettingsDefinitionsQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminSettingsDefinitions>>>
+export type GetAdminSettingsDefinitionsQueryError = ErrorType<ApiError>
+
+
+export function useGetAdminSettingsDefinitions<TData = Awaited<ReturnType<typeof getAdminSettingsDefinitions>>, TError = ErrorType<ApiError>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSettingsDefinitions>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminSettingsDefinitions>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminSettingsDefinitions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminSettingsDefinitions<TData = Awaited<ReturnType<typeof getAdminSettingsDefinitions>>, TError = ErrorType<ApiError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSettingsDefinitions>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminSettingsDefinitions>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminSettingsDefinitions>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminSettingsDefinitions<TData = Awaited<ReturnType<typeof getAdminSettingsDefinitions>>, TError = ErrorType<ApiError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSettingsDefinitions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get the definition of every setting, server-wide and per-user
+ */
+
+export function useGetAdminSettingsDefinitions<TData = Awaited<ReturnType<typeof getAdminSettingsDefinitions>>, TError = ErrorType<ApiError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSettingsDefinitions>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAdminSettingsDefinitionsQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getDeleteAdminSettingsResetUrl = (key: string,) => {
+
+
+
+
+  return `/api/admin/settings/${key}`
+}
+
+/**
+ * @summary Reset a system setting to its default (SUPER_ADMIN only)
+ */
+export const deleteAdminSettingsReset = async (key: string, options?: RequestInit): Promise<DeleteAdminSettingsReset200> => {
+
+  return customInstance<DeleteAdminSettingsReset200>(getDeleteAdminSettingsResetUrl(key),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteAdminSettingsResetMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminSettingsReset>>, TError,{key: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteAdminSettingsReset>>, TError,{key: string}, TContext> => {
+
+const mutationKey = ['deleteAdminSettingsReset'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAdminSettingsReset>>, {key: string}> = (props) => {
+          const {key} = props ?? {};
+
+          return  deleteAdminSettingsReset(key,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteAdminSettingsResetMutationResult = NonNullable<Awaited<ReturnType<typeof deleteAdminSettingsReset>>>
+
+    export type DeleteAdminSettingsResetMutationError = ErrorType<ApiError>
+
+    /**
+ * @summary Reset a system setting to its default (SUPER_ADMIN only)
+ */
+export const useDeleteAdminSettingsReset = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminSettingsReset>>, TError,{key: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteAdminSettingsReset>>,
+        TError,
+        {key: string},
+        TContext
+      > => {
+      return useMutation(getDeleteAdminSettingsResetMutationOptions(options), queryClient);
     }
 
 export const getGetMonitorTransportStatusUrl = () => {

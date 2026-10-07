@@ -22,7 +22,7 @@ final readonly class SettingDefinition
 
     /**
      * @param list<int|string>      $allowedValues enum values, all strings or all integers
-     * @param array<string, string> $valueLabels   display label per allowed value
+     * @param array<int|string, string> $valueLabels display label per allowed value (PHP turns numeric keys into integers)
      */
     public function __construct(
         public string $key,

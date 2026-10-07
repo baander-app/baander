@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 namespace App\Shared\Application\Port;
 
+use App\Shared\Application\Exception\UnknownSettingException;
+
+/**
+ * Reads the effective value of a server-wide setting: the stored value while it
+ * is still allowed, otherwise the definition's default. Every call reads the
+ * store afresh, so a long-running worker sees an admin's change.
+ */
 interface SystemSettingsPortInterface
 {
-    public function get(string $key, mixed $default = null): mixed;
-
-    public function set(string $key, mixed $value): void;
-
     /**
-     * @return array<string, mixed>
+     * @throws UnknownSettingException when no system setting has the key
      */
-    public function all(): array;
-
-    public function remove(string $key): void;
+    public function get(string $key): bool|int|string;
 }
