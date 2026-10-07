@@ -20,6 +20,7 @@
     "ext-sockets": "*",
     "ext-swoole": "*",
     "cweagans/composer-patches": "^2.0",
+    "defuse/php-encryption": "^2.4",
     "doctrine/doctrine-bundle": "^3.2.2",
     "doctrine/doctrine-migrations-bundle": "^4.0.0",
     "doctrine/orm": "^3.6.6",
