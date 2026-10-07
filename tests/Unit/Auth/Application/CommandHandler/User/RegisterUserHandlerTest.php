@@ -15,6 +15,7 @@ use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
+use App\UserPreference\Application\Port\UserSettingsContractInterface;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
@@ -34,6 +35,8 @@ final class RegisterUserHandlerTest extends TestCase
     private array $issued = [];
     /** @var list<array{User, string, bool}> user, token, inside the transaction */
     private array $delivered = [];
+    /** @var list<array{string, string, bool}> userId, language, inside the transaction */
+    private array $seeded = [];
 
     protected function setUp(): void
     {
@@ -94,6 +97,20 @@ final class RegisterUserHandlerTest extends TestCase
         $this->assertFalse($this->delivered[0][2], 'The link is sent only after the commit.');
     }
 
+    public function testTheBrowserLanguageIsSeededInsideTheRegistrationTransaction(): void
+    {
+        $user = ($this->handler())(new RegisterUserCommand(new Email('alice@baander.app'), 'Alice', 'password123', 'da'));
+
+        $this->assertSame([[$user->getId()->toString(), 'da', true]], $this->seeded);
+    }
+
+    public function testWithoutABrowserLanguageNothingIsSeeded(): void
+    {
+        ($this->handler())(new RegisterUserCommand(new Email('alice@baander.app'), 'Alice', 'password123'));
+
+        $this->assertSame([], $this->seeded);
+    }
+
     public function testEventFailureEscapesTheTransactionAndSendsNothing(): void
     {
         $failure = new \RuntimeException('Outbox insertion failed.');
@@ -128,6 +145,17 @@ final class RegisterUserHandlerTest extends TestCase
             $this->bus,
             new EmailVerificationIssuer($tokens, $delivery, 86400),
             $this->transaction,
+            $this->settings(),
         );
+    }
+
+    private function settings(): UserSettingsContractInterface
+    {
+        $settings = $this->createStub(UserSettingsContractInterface::class);
+        $settings->method('seedLanguage')->willReturnCallback(function (string $userId, string $language): void {
+            $this->seeded[] = [$userId, $language, $this->active];
+        });
+
+        return $settings;
     }
 }

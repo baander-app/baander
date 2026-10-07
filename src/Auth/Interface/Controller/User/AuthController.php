@@ -43,6 +43,7 @@ use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use App\Auth\Interface\Request\AcceptLanguageMatcher;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
@@ -69,6 +70,7 @@ final class AuthController
         private readonly DpopNonceManager $dpopNonceManager,
         private readonly JsonEncoder $jsonEncoder,
         private readonly LoggerInterface $logger,
+        private readonly AcceptLanguageMatcher $acceptLanguage,
     )
     {
     }
@@ -101,12 +103,13 @@ final class AuthController
         ],
     )]
     #[Route('/register', name: 'register', methods: ['POST'])]
-    public function register(#[MapRequestPayload] RegisterRequest $registerRequest): JsonResponse
+    public function register(#[MapRequestPayload] RegisterRequest $registerRequest, Request $request): JsonResponse
     {
         $command = new RegisterUserCommand(
             email: new Email($registerRequest->email),
             name: $registerRequest->name,
             plainPassword: $registerRequest->password,
+            browserLanguage: $this->acceptLanguage->match($request->headers->get('Accept-Language')),
         );
 
         try {

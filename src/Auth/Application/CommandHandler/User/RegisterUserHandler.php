@@ -13,6 +13,7 @@ use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Notification\Application\DTO\SeedDefaultPreferencesCommand;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
+use App\UserPreference\Application\Port\UserSettingsContractInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -26,6 +27,7 @@ final class RegisterUserHandler
         private readonly MessageBusInterface $bus,
         private readonly EmailVerificationIssuer $emailVerification,
         private readonly TransactionPortInterface $transaction,
+        private readonly UserSettingsContractInterface $settings,
     ) {
     }
 
@@ -39,8 +41,15 @@ final class RegisterUserHandler
         $hashedPassword = $this->passwordHasher->hash($command->getPlainPassword());
         $user = User::register($command->getEmail(), $hashedPassword, $command->getName());
 
-        $issued = $this->transaction->run(function () use ($user) {
+        $issued = $this->transaction->run(function () use ($user, $command) {
             $this->userRepository->save($user);
+
+            // Stored only when it differs from the server default, so a user whose browser
+            // asks for the default keeps following it when an admin changes it.
+            $browserLanguage = $command->getBrowserLanguage();
+            if ($browserLanguage !== null) {
+                $this->settings->seedLanguage($user->getId()->toString(), $browserLanguage);
+            }
 
             $issued = $this->emailVerification->issue($user);
 
