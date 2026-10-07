@@ -23,7 +23,7 @@ final class LyricsSettingDefinitions implements SettingDefinitionProviderInterfa
             description: 'Automatically fetch lyrics for new tracks',
             group: 'Content',
             default: false,
-            enforced: false,
+            enforced: true,
         );
     }
 }

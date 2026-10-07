@@ -18,6 +18,7 @@ use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Catalog\Domain\ValueObject\AlbumType;
 use App\Catalog\Domain\ValueObject\ArtistRole;
 use App\Library\Application\Message\FilesDiscovered;
+use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
 use Psr\Log\LoggerInterface;
@@ -38,6 +39,7 @@ final class FilesDiscoveredHandler
         private readonly MetadataContentReaderPortInterface $metadataReader,
         private readonly FFprobeAdapter $ffprobeAdapter,
         private readonly MessageBusInterface $messageBus,
+        private readonly LyricsFetchRequestInterface $lyricsFetch,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -57,6 +59,8 @@ final class FilesDiscoveredHandler
         $libraryId = $message->libraryId;
         $batchCount = 0;
         $failures = [];
+        // New songs without sidecar lyrics, waiting for the flush that commits them.
+        $songsAwaitingLyrics = [];
 
         // Resolve album from directory
         [$album, $wasCreated] = $this->resolveAlbum($libraryId, $message->directory, $message->files);
@@ -109,6 +113,9 @@ final class FilesDiscoveredHandler
                 );
 
                 $this->songService->persist($song);
+                if ($lyrics === null) {
+                    $songsAwaitingLyrics[] = $song->getId();
+                }
 
                 // Link artist
                 $artistName = $metadata->getArtist();
@@ -131,6 +138,7 @@ final class FilesDiscoveredHandler
                     $this->songService->flush();
                     $this->genreService->flush();
                     $batchCount = 0;
+                    $this->requestLyricsFetch($songsAwaitingLyrics);
                 }
             } catch (\Throwable $e) {
                 $failures[] = [
@@ -147,6 +155,9 @@ final class FilesDiscoveredHandler
 
         $this->songService->flush();
         $this->genreService->flush();
+        // A retry skips these songs as duplicates, so request their lyrics before
+        // reporting failed files.
+        $this->requestLyricsFetch($songsAwaitingLyrics);
 
         if ($failures !== []) {
             throw new RuntimeException($this->buildFailureMessage($failures));
@@ -346,6 +357,20 @@ final class FilesDiscoveredHandler
         );
 
         return sprintf('Failed to process %d file(s): %s', count($failures), implode('; ', $details));
+    }
+
+    /**
+     * Requests lyrics for songs that a flush has just committed, then forgets them.
+     *
+     * @param list<Uuid> $songIds
+     */
+    private function requestLyricsFetch(array &$songIds): void
+    {
+        $committed = $songIds;
+        $songIds = [];
+        if ($committed !== []) {
+            $this->lyricsFetch->requestFetch(...$committed);
+        }
     }
 
     private function dispatchCoverExtraction(Album $album): void
