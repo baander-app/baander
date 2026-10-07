@@ -1,7 +1,10 @@
 import styled from 'styled-components'
 import { useState } from 'react'
+import { isAxiosError } from 'axios'
 import { useUsers, useToggleUser } from '../hooks/use-users'
 import { type AdminUser, type AdminUserListParams } from '../api/user-admin-api'
+import { useAdminCheck } from '@/features/auth/hooks/use-admin-check'
+import { useGetAdminSettingsIndex } from '@/shared/api-client/gen/endpoints'
 import { Button } from '@/shared/components/ui/button'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/shared/components/ui/select'
 import { Plus } from 'lucide-react'
@@ -22,6 +25,7 @@ type ActiveDialog =
   | null
 
 const PAGE_SIZE = 50
+const CAN_CREATE_USERS = 'admin.can_create_users'
 
 const Container = styled.div`
   display: flex;
@@ -152,13 +156,20 @@ export function AdminUsersPage() {
   const [activeDialog, setActiveDialog] = useState<ActiveDialog>(null)
 
   const toggleUser = useToggleUser()
+  const { isSuperAdmin } = useAdminCheck()
+  // Super admins may always create users; other admins only while the server setting allows it.
+  const { data: settings } = useGetAdminSettingsIndex({ query: { enabled: !isSuperAdmin } })
+  const canCreateUsers = isSuperAdmin
+    || settings?.data?.find((setting) => setting.key === CAN_CREATE_USERS)?.value === true
 
   const params: AdminUserListParams = { limit: PAGE_SIZE, offset }
   if (roleFilter) params.role = roleFilter
   if (statusFilter === 'active') params.disabled = false
   if (statusFilter === 'disabled') params.disabled = true
 
-  const { data, isLoading, isFetching, isError, refetch } = useUsers(params)
+  const { data, error, isLoading, isFetching, isError, refetch } = useUsers(params)
+  // admin.can_view_users is enforced by the list endpoint, so its 403 is the source of truth.
+  const listDenied = isAxiosError(error) && error.response?.status === 403
   const users = isError ? [] : data?.data ?? []
   const meta = isError ? undefined : data?.meta
   const total = meta?.total
@@ -172,103 +183,113 @@ export function AdminUsersPage() {
 
   return (
     <Container>
-      <HeaderRow>
-        <Button size="sm" onClick={() => setShowCreate(true)}>
-          <Plus size={14} /> Create User
-        </Button>
-      </HeaderRow>
-
-      {/* Filters */}
-      <FilterRow>
-        <Select value={roleFilter || '_all'} onValueChange={(v) => { setRoleFilter(v === '_all' ? '' : v); setOffset(0) }}>
-          <SelectTrigger aria-label="Filter by role" style={{ height: '1.75rem', width: '8rem', fontSize: '0.8125rem' }}>
-            <SelectValue placeholder="All Roles" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_all">All Roles</SelectItem>
-            <SelectItem value="ROLE_USER">User</SelectItem>
-            <SelectItem value="ROLE_ADMIN">Admin</SelectItem>
-            <SelectItem value="ROLE_SUPER_ADMIN">Super Admin</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={statusFilter || '_all'} onValueChange={(v) => { setStatusFilter(v === '_all' ? '' : v); setOffset(0) }}>
-          <SelectTrigger aria-label="Filter by status" style={{ height: '1.75rem', width: '8rem', fontSize: '0.8125rem' }}>
-            <SelectValue placeholder="All Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_all">All Status</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="disabled">Disabled</SelectItem>
-          </SelectContent>
-        </Select>
-        <UserCount>
-          {meta ? `${meta.total} user${meta.total !== 1 ? 's' : ''}` : ''}
-        </UserCount>
-      </FilterRow>
-
-      {/* Table */}
-      {isError ? (
-        <EmptyState role="alert">
-          <p>Unable to load users.</p>
-          <Button size="sm" onClick={() => void refetch()} disabled={isFetching}>Retry</Button>
-        </EmptyState>
-      ) : isLoading ? (
-        <SkeletonStack>
-          {Array.from({ length: 5 }).map((_, i) => (
-            <SkeletonRow key={i} />
-          ))}
-        </SkeletonStack>
-      ) : users.length === 0 ? (
-        <EmptyState>No users found.</EmptyState>
-      ) : (
-        <DividerStack>
-          <ColumnHeader>
-            <ColLabel>Email</ColLabel>
-            <ColLabel>Name</ColLabel>
-            <ColLabel>Roles</ColLabel>
-            <ColLabel>Status</ColLabel>
-            <ColLabel>Created</ColLabel>
-            <span />
-          </ColumnHeader>
-          {users.map((user) => (
-            <UserRow key={user.id}>
-              <EmailCell>{user.email}</EmailCell>
-              <NameCell>{user.name}</NameCell>
-              <RolesCell>
-                {user.roles.map((role) => (
-                  <RoleBadge key={role} role={role} />
-                ))}
-              </RolesCell>
-              <StatusDot color={user.disabled ? 'red' : 'green'} label={user.disabled ? 'Disabled' : 'Active'} />
-              <DateCell>
-                {new Date(user.createdAt).toLocaleDateString()}
-              </DateCell>
-              <UserRowActions
-                user={user}
-                onEdit={() => setActiveDialog({ type: 'edit', user })}
-                onAssignRoles={() => setActiveDialog({ type: 'roles', user })}
-                onResetPassword={() => setActiveDialog({ type: 'password', user })}
-                onToggle={() => toggleUser.mutate({ id: user.id, disabled: user.disabled })}
-                onDelete={() => setActiveDialog({ type: 'delete', user })}
-              />
-            </UserRow>
-          ))}
-        </DividerStack>
+      {canCreateUsers && (
+        <HeaderRow>
+          <Button size="sm" onClick={() => setShowCreate(true)}>
+            <Plus size={14} /> Create User
+          </Button>
+        </HeaderRow>
       )}
 
-      <PaginationRow aria-label="Users pagination">
-        <UserCount aria-live="polite">
-          {meta && users.length > 0 ? `${meta.offset + 1}–${meta.offset + users.length} of ${meta.total}` : ''}
-        </UserCount>
-        <Button size="sm" variant="outline" disabled={isFetching || offset === 0}
-          onClick={() => setOffset(Math.max(0, offset - limit))}>Previous</Button>
-        <Button size="sm" variant="outline"
-          disabled={isFetching || !meta || meta.offset + meta.limit >= meta.total}
-          onClick={() => { if (meta) setOffset(meta.offset + meta.limit) }}>Next</Button>
-      </PaginationRow>
+      {listDenied ? (
+        <EmptyState>
+          Admins cannot view the user list on this server. A super admin can allow it in Settings.
+        </EmptyState>
+      ) : (
+        <>
+          {/* Filters */}
+          <FilterRow>
+            <Select value={roleFilter || '_all'} onValueChange={(v) => { setRoleFilter(v === '_all' ? '' : v); setOffset(0) }}>
+              <SelectTrigger aria-label="Filter by role" style={{ height: '1.75rem', width: '8rem', fontSize: '0.8125rem' }}>
+                <SelectValue placeholder="All Roles" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_all">All Roles</SelectItem>
+                <SelectItem value="ROLE_USER">User</SelectItem>
+                <SelectItem value="ROLE_ADMIN">Admin</SelectItem>
+                <SelectItem value="ROLE_SUPER_ADMIN">Super Admin</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter || '_all'} onValueChange={(v) => { setStatusFilter(v === '_all' ? '' : v); setOffset(0) }}>
+              <SelectTrigger aria-label="Filter by status" style={{ height: '1.75rem', width: '8rem', fontSize: '0.8125rem' }}>
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_all">All Status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="disabled">Disabled</SelectItem>
+              </SelectContent>
+            </Select>
+            <UserCount>
+              {meta ? `${meta.total} user${meta.total !== 1 ? 's' : ''}` : ''}
+            </UserCount>
+          </FilterRow>
+
+          {/* Table */}
+          {isError ? (
+            <EmptyState role="alert">
+              <p>Unable to load users.</p>
+              <Button size="sm" onClick={() => refetch()} disabled={isFetching}>Retry</Button>
+            </EmptyState>
+          ) : isLoading ? (
+            <SkeletonStack>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <SkeletonRow key={i} />
+              ))}
+            </SkeletonStack>
+          ) : users.length === 0 ? (
+            <EmptyState>No users found.</EmptyState>
+          ) : (
+            <DividerStack>
+              <ColumnHeader>
+                <ColLabel>Email</ColLabel>
+                <ColLabel>Name</ColLabel>
+                <ColLabel>Roles</ColLabel>
+                <ColLabel>Status</ColLabel>
+                <ColLabel>Created</ColLabel>
+                <span />
+              </ColumnHeader>
+              {users.map((user) => (
+                <UserRow key={user.id}>
+                  <EmailCell>{user.email}</EmailCell>
+                  <NameCell>{user.name}</NameCell>
+                  <RolesCell>
+                    {user.roles.map((role) => (
+                      <RoleBadge key={role} role={role} />
+                    ))}
+                  </RolesCell>
+                  <StatusDot color={user.disabled ? 'red' : 'green'} label={user.disabled ? 'Disabled' : 'Active'} />
+                  <DateCell>
+                    {new Date(user.createdAt).toLocaleDateString()}
+                  </DateCell>
+                  <UserRowActions
+                    user={user}
+                    onEdit={() => setActiveDialog({ type: 'edit', user })}
+                    onAssignRoles={() => setActiveDialog({ type: 'roles', user })}
+                    onResetPassword={() => setActiveDialog({ type: 'password', user })}
+                    onToggle={() => toggleUser.mutate({ id: user.id, disabled: user.disabled })}
+                    onDelete={() => setActiveDialog({ type: 'delete', user })}
+                  />
+                </UserRow>
+              ))}
+            </DividerStack>
+          )}
+
+          <PaginationRow aria-label="Users pagination">
+            <UserCount aria-live="polite">
+              {meta && users.length > 0 ? `${meta.offset + 1}–${meta.offset + users.length} of ${meta.total}` : ''}
+            </UserCount>
+            <Button size="sm" variant="outline" disabled={isFetching || offset === 0}
+              onClick={() => setOffset(Math.max(0, offset - limit))}>Previous</Button>
+            <Button size="sm" variant="outline"
+              disabled={isFetching || !meta || meta.offset + meta.limit >= meta.total}
+              onClick={() => { if (meta) setOffset(meta.offset + meta.limit) }}>Next</Button>
+          </PaginationRow>
+        </>
+      )}
 
       {/* Dialogs */}
-      <CreateUserDialog open={showCreate} onOpenChange={setShowCreate} />
+      <CreateUserDialog open={showCreate} onOpenChange={setShowCreate} canAssignRoles={isSuperAdmin} />
       <EditUserDialog
         user={activeUser}
         open={activeDialog?.type === 'edit'}

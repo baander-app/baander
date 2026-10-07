@@ -8136,6 +8136,7 @@ export const getPostAdminUsersCreateUrl = () => {
 }
 
 /**
+ * Super admins may create any user. Admins may create users with ROLE_USER only, and only while the admin.can_create_users setting is on.
  * @summary Create a new user
  */
 export const postAdminUsersCreate = async (adminCreateUserRequest: AdminCreateUserRequest, options?: RequestInit): Promise<PostAdminUsersCreate201> => {

@@ -37,13 +37,6 @@ function isSystemDefinition(definition: SettingDefinitionResource): boolean {
   return definition.scope === 'system'
 }
 
-/** Check a boolean system setting. Returns false while loading. */
-export function useSystemSetting(key: string): boolean {
-  const { data } = useSystemSettings()
-
-  return data?.find((setting) => setting.key === key)?.value === true
-}
-
 /** Saves system settings and stores the settings the server answers with. */
 export function useUpdateSystemSettings() {
   const queryClient = useQueryClient()

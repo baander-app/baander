@@ -24,7 +24,7 @@ final class UserManagementSettingDefinitions implements SettingDefinitionProvide
             description: 'Allow ADMIN role to view the user list',
             group: 'User Management',
             default: true,
-            enforced: false,
+            enforced: true,
         );
 
         yield new SettingDefinition(
@@ -32,10 +32,10 @@ final class UserManagementSettingDefinitions implements SettingDefinitionProvide
             type: SettingValueType::Boolean,
             scope: SettingScope::System,
             label: 'Create users',
-            description: 'Allow ADMIN role to create new users',
+            description: 'Allow admins to create users with the User role. Only super admins can create admins.',
             group: 'User Management',
             default: false,
-            enforced: false,
+            enforced: true,
         );
     }
 }

@@ -96,36 +96,6 @@ final class AdminVoterTest extends TestCase
         $this->assertSame(VoterInterface::ACCESS_GRANTED, $result);
     }
 
-    // --- USER_MANAGEMENT attribute ---
-
-    public function testSupportsUserManagementAttribute(): void
-    {
-        $token = $this->createToken('user-1', ['ROLE_USER']);
-        $result = $this->voter->vote($token, null, [AdminVoter::USER_MANAGEMENT]);
-
-        $this->assertNotEquals(VoterInterface::ACCESS_ABSTAIN, $result);
-    }
-
-    public function testSuperAdminGetsUserManagementGranted(): void
-    {
-        $token = $this->createToken('sa-1', ['ROLE_USER', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN']);
-
-        $this->assertSame(
-            VoterInterface::ACCESS_GRANTED,
-            $this->voter->vote($token, null, [AdminVoter::USER_MANAGEMENT]),
-        );
-    }
-
-    public function testAdminGetsUserManagementDenied(): void
-    {
-        $token = $this->createToken('admin-1', ['ROLE_USER', 'ROLE_ADMIN']);
-
-        $this->assertSame(
-            VoterInterface::ACCESS_DENIED,
-            $this->voter->vote($token, null, [AdminVoter::USER_MANAGEMENT]),
-        );
-    }
-
     // --- SYSTEM_SETTINGS attribute ---
 
     public function testSupportsSystemSettingsAttribute(): void

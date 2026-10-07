@@ -36,7 +36,14 @@ const StyledInput = styled(Input)`
   margin-top: 0.25rem;
 `
 
-export function CreateUserDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (v: boolean) => void }) {
+interface CreateUserDialogProps {
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  /** Only super admins may give a new user another role than User. */
+  canAssignRoles: boolean
+}
+
+export function CreateUserDialog({ open, onOpenChange, canAssignRoles }: CreateUserDialogProps) {
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
@@ -46,7 +53,7 @@ export function CreateUserDialog({ open, onOpenChange }: { open: boolean; onOpen
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     createUser.mutate(
-      { email, name, password, roles: [role] },
+      { email, name, password, roles: [canAssignRoles ? role : 'ROLE_USER'] },
       {
         onSuccess: () => {
           setEmail('')
@@ -79,19 +86,21 @@ export function CreateUserDialog({ open, onOpenChange }: { open: boolean; onOpen
             <Label>Password</Label>
             <StyledInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
           </FieldGroup>
-          <FieldGroup>
-            <Label>Role</Label>
-            <Select value={role} onValueChange={setRole}>
-              <SelectTrigger style={{ marginTop: '0.25rem' }}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ROLE_USER">User</SelectItem>
-                <SelectItem value="ROLE_ADMIN">Admin</SelectItem>
-                <SelectItem value="ROLE_SUPER_ADMIN">Super Admin</SelectItem>
-              </SelectContent>
-            </Select>
-          </FieldGroup>
+          {canAssignRoles && (
+            <FieldGroup>
+              <Label>Role</Label>
+              <Select value={role} onValueChange={setRole}>
+                <SelectTrigger aria-label="Role" style={{ marginTop: '0.25rem' }}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ROLE_USER">User</SelectItem>
+                  <SelectItem value="ROLE_ADMIN">Admin</SelectItem>
+                  <SelectItem value="ROLE_SUPER_ADMIN">Super Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </FieldGroup>
+          )}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
