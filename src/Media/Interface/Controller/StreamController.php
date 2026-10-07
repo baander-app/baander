@@ -13,6 +13,8 @@ use App\Transcode\Application\Exception\AudioRenditionFailedException;
 use App\Transcode\Application\Port\AudioRendition;
 use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Transcode\Application\Port\AudioRenditionPortInterface;
+use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use OpenApi\Attributes as OA;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use Symfony\Component\HttpFoundation\Request;
@@ -32,6 +34,7 @@ final class StreamController
         private readonly StreamPortInterface $streamService,
         private readonly MediaReadScopeProviderInterface $scopes,
         private readonly AudioRenditionPortInterface $renditions,
+        private readonly SystemSettingsPortInterface $settings,
     ) {
     }
 
@@ -48,12 +51,13 @@ final class StreamController
         parameters: [
             new OA\Parameter(name: 'id', description: 'PublicId of the track', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'format', description: 'Transcode to this audio format. Without it the original file is streamed.', in: 'query', required: false, schema: new OA\Schema(type: 'string', enum: ['opus', 'aac', 'mp3'])),
-            new OA\Parameter(name: 'bitrate', description: 'Target bitrate in bits per second; requires format. Fitted to the format\'s supported range (opus 32000-256000, aac and mp3 32000-320000) in whole kilobits. Defaults to 128000 for opus and 192000 for aac and mp3.', in: 'query', required: false, schema: new OA\Schema(type: 'integer', minimum: 1)),
+            new OA\Parameter(name: 'bitrate', description: 'Target bitrate in bits per second; requires format. Fitted to the format\'s supported range (opus 32000-256000, aac and mp3 32000-320000) in whole kilobits. Never above the server\'s transcode.max_bitrate, which also applies when no bitrate is given.', in: 'query', required: false, schema: new OA\Schema(type: 'integer', minimum: 1)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Full file (audio/video stream). A transcode that is still encoding streams progressively with Accept-Ranges: none.'),
             new OA\Response(response: '206', description: 'Partial content (single byte range request)'),
             new OA\Response(response: '400', description: 'Unsupported format or invalid bitrate', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '403', description: 'No access to the track, or a format was requested while transcode.enabled is off', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '416', description: 'Requested byte range is not satisfiable'),
             new OA\Response(response: '404', description: 'Track not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '500', description: 'Transcoding failed', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
@@ -118,9 +122,12 @@ final class StreamController
         if ($bitrate !== '' && (!ctype_digit($bitrate) || (int) $bitrate === 0)) {
             return $this->errorResponse($this->trans('errors.invalid_transcode_bitrate', domain: 'media'));
         }
-        // The server's transcode settings (enabled, maximum bitrate) apply here,
-        // before the rendition is opened.
-        $targetBitrate = $bitrate === '' ? $renditionFormat->defaultBitrate() : (int) $bitrate;
+        if ($this->settings->get(TranscodeSettingDefinitions::ENABLED) !== true) {
+            return $this->errorResponse($this->trans('errors.transcode_disabled', domain: 'media'), Response::HTTP_FORBIDDEN);
+        }
+        // transcode.max_bitrate is in kilobits; without a requested bitrate the cap applies.
+        $maxBitrate = (int) $this->settings->get(TranscodeSettingDefinitions::MAX_BITRATE) * 1000;
+        $targetBitrate = $bitrate === '' ? $maxBitrate : min((int) $bitrate, $maxBitrate);
 
         try {
             $rendition = $this->renditions->open($trackId->toString(), $fullPath, $renditionFormat, $targetBitrate);

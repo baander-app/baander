@@ -10,3 +10,4 @@ errors:
   unsupported_transcode_format: 'ไม่รองรับ "format" นี้ ใช้ opus, aac หรือ mp3'
   invalid_transcode_bitrate: '"bitrate" ต้องเป็นจำนวนเต็มบวกในหน่วยบิตต่อวินาที และต้องระบุ "format" ด้วย'
   transcode_failed: แปลงไฟล์เสียงไม่สำเร็จ
+  transcode_disabled: เซิร์ฟเวอร์นี้ปิดการแปลงไฟล์เสียงไว้

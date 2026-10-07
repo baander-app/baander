@@ -7,3 +7,4 @@ errors:
   unsupported_transcode_format: 'Ikke-understøttet "format". Brug opus, aac eller mp3.'
   invalid_transcode_bitrate: '"bitrate" skal være et positivt heltal i bit pr. sekund og kræver et "format".'
   transcode_failed: "Lydomkodningen mislykkedes."
+  transcode_disabled: "Lydomkodning er slået fra på denne server."

@@ -24,7 +24,6 @@ final class TranscodeSettingDefinitions implements SettingDefinitionProviderInte
             description: 'Allow on-the-fly transcoding of audio tracks',
             group: 'Media',
             default: false,
-            enforced: false,
         );
 
         yield new SettingDefinition(
@@ -37,7 +36,6 @@ final class TranscodeSettingDefinitions implements SettingDefinitionProviderInte
             default: 320,
             allowedValues: [128, 192, 256, 320],
             valueLabels: [128 => '128 kbps', 192 => '192 kbps', 256 => '256 kbps', 320 => '320 kbps'],
-            enforced: false,
         );
     }
 }

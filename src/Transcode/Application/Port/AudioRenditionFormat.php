@@ -35,15 +35,6 @@ enum AudioRenditionFormat: string
         };
     }
 
-    /** Bitrate in bits per second used when a request names no bitrate. */
-    public function defaultBitrate(): int
-    {
-        return match ($this) {
-            self::Opus => 128_000,
-            self::Aac, self::Mp3 => 192_000,
-        };
-    }
-
     /**
      * Fit a requested bitrate (bits per second) to what the encoder supports,
      * in whole kilobits so equivalent requests share one cached rendition.
