@@ -89,10 +89,3 @@ Write every report, summary, or handoff to the user through the `ce-noslop`
 skill. This applies when you are the top-level agent writing to the user, not when
 you are a subagent reporting to its caller. Do not apply it to code, config,
 verbatim quotes, or text the user asked to post as written.
-
-## Other local sessions
-
-When installed, use `/skill:pi-intercom` to coordinate relevant parallel or related-repository
-sessions. Prefer `send`; use `ask` only when blocked. Skip unrelated work,
-trivial questions, and tasks you can proceed with independently.
-

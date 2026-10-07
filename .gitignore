@@ -5,7 +5,6 @@ phpDocumentor.phar
 .phpdoc
 docs/html/
 .rpiv
-.pi
 /.claude/*
 !/.claude/skills
 !/.claude/agents
@@ -89,10 +88,6 @@ public/dsp/
 bin/baander
 /.idea/prettier.xml
 .deptrac.cache
-
-###> Pi ###
-.pi/
-###< Pi ###
 
 ###> rpiv ###
 .rpiv/

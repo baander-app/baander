@@ -14,7 +14,7 @@ skill; choose by section when a document mixes explanation, reference, and proce
 |---|---|
 | Chen | `README.md`; introductions and task explanations in `docs-book/part-1-operator-guide/`; tutorials, troubleshooting, and development guides in `docs-book/part-2-developer-guide/` and `dev-docs/` |
 | Knuth | Ordered deployment, upgrade, recovery, and key-management procedures, including procedural sections of `docs-book/part-1-operator-guide/getting-started.md`, `upgrading.md`, and `security.md` |
-| Stroustrup | Architecture, bounded-context descriptions, API and configuration references, coding conventions, and designs in `docs/plans/`, `STRATEGY.md`, and `SYSTEM.md` |
+| Stroustrup | Architecture, bounded-context descriptions, API and configuration references, coding conventions, and designs in `docs/plans/` and `STRATEGY.md` |
 | Mixed | CLI pages in `docs-book/part-1-operator-guide/commands/`: Stroustrup for arguments, options, and behavior; Knuth for ordered procedures; Chen for examples and troubleshooting. Contribution guides: Stroustrup for rules and Chen for workflow explanations. |
 
 A user-specified voice overrides these defaults.

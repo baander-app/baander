@@ -67,5 +67,4 @@ approval; ask only when the remaining action actually requires it.
 
 Report the implemented behavior, relevant files, checks and results, and remaining
 issues. For work spanning sessions, preserve a concise task summary and artifact
-paths using the available tools. Historical pi session directories or pipeline
-state files are not a supported resume protocol for the current agent tools.
+paths using the available tools.
