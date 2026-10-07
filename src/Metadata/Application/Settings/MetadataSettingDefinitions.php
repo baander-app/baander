@@ -20,10 +20,10 @@ final class MetadataSettingDefinitions implements SettingDefinitionProviderInter
             type: SettingValueType::Boolean,
             scope: SettingScope::System,
             label: 'Auto-sync metadata',
-            description: 'Automatically sync metadata from external sources (Discogs, MusicBrainz)',
+            description: 'Sync each new album from external sources (MusicBrainz, Discogs) after a scan adds it',
             group: 'Content',
             default: false,
-            enforced: false,
+            enforced: true,
         );
     }
 }

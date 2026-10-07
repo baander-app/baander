@@ -36,7 +36,7 @@ deptrac:
         Library: ['Library Read Scope Contract', 'Library Content Stats Contract', 'Library Files Discovered Contract', 'Library Provisioning Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
         Lyrics: ['Lyrics Fetch Request Contract', 'Lyrics Domain', 'Lyrics Application', 'Lyrics Infrastructure', 'Lyrics Resources', 'Lyrics Interface']
         Media: ['Media Domain', 'Media Application', 'Media Infrastructure', 'Media Resources', 'Media Interface']
-        Metadata: ['Metadata Domain', 'Metadata Application', 'Metadata Infrastructure', 'Metadata Interface']
+        Metadata: ['Metadata Album Sync Request Contract', 'Metadata Domain', 'Metadata Application', 'Metadata Infrastructure', 'Metadata Interface']
         Notification: ['Notification Domain', 'Notification Application', 'Notification Infrastructure', 'Notification Resources', 'Notification Interface']
         Party: ['Party Domain', 'Party Application', 'Party Infrastructure', 'Party Resources', 'Party Interface']
         Playlist: ['Playlist Deletion Preview Contract', 'Playlist Domain', 'Playlist Application', 'Playlist Infrastructure', 'Playlist Resources', 'Playlist Interface']
@@ -348,10 +348,20 @@ deptrac:
         - type: classLike
           value: '^App\\Metadata\\Domain\\'
 
-    - name: 'Metadata Application'
+    - name: 'Metadata Album Sync Request Contract'
       collectors:
         - type: classLike
-          value: '^App\\Metadata\\Application\\'
+          value: '^App\\Metadata\\Application\\Port\\AlbumMetadataSyncRequestInterface$'
+
+    - name: 'Metadata Application'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Metadata\\Application\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Metadata\\Application\\Port\\AlbumMetadataSyncRequestInterface$'
 
     - name: 'Metadata Infrastructure'
       collectors:
@@ -974,6 +984,7 @@ deptrac:
       - 'Shared Domain'
     'Catalog Application':
       - 'Lyrics Fetch Request Contract'
+      - 'Metadata Album Sync Request Contract'
       - 'Library Files Discovered Contract'
       - 'Library Provisioning Contract'
       - 'Scheduler Schedulable Contract'
@@ -1105,7 +1116,10 @@ deptrac:
     # --- Metadata ---
     'Metadata Domain':
       - 'Shared Domain'
+    'Metadata Album Sync Request Contract':
+      - 'Shared Domain'
     'Metadata Application':
+      - 'Metadata Album Sync Request Contract'
       - 'Metadata Domain'
       - 'Shared Domain'
       - 'Shared Application'

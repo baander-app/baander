@@ -22,9 +22,20 @@ The Metadata context enriches catalog entities with data from external music API
 | `SyncGenresMessage` | `SyncGenresHandler` | Sync genre data |
 | `SyncSongMessage` | `SyncSongHandler` | Enrich a single song |
 
+## Automatic Sync of New Albums
+
+While the `metadata.auto_sync` system setting is on, Catalog ingest asks Metadata to sync each album it creates. `FilesDiscoveredHandler` calls `AlbumMetadataSyncRequestInterface::requestSync()` once the flush that stores the new album has run, before it adds the album's songs or reports failed files. A retry or rescan finds the album and creates none, so it requests nothing.
+
+`AlbumMetadataSyncRequester` reads the setting on every call. When the setting is on, it calls `MetadataSyncOrchestrator::syncAlbum()` for each album. The orchestrator dispatches `SyncAlbumMessage`, which runs later from the `swoole_task` queue, or from the Redis `async` transport outside the Swoole server, so ingest does not wait for the external lookups. The setting is off by default.
+
+Admin and CLI syncs call the orchestrator directly and ignore the setting.
+
 ## Ports
 
-None. The Metadata context does not define application ports.
+| Port | Purpose |
+|------|---------|
+| `MetadataAdminPortInterface` | Sync status, manual sync trigger and provider list for the admin API |
+| `AlbumMetadataSyncRequestInterface` | Published contract for Catalog ingest: requests a sync of newly created albums while `metadata.auto_sync` is on |
 
 ## API Endpoints
 
@@ -57,7 +68,7 @@ Routes under `/api/admin/metadata` (controller `MetadataAdminController`, gated 
 | Depends on | Shared | Uses `Uuid` for identifiers |
 | Depends on | Catalog | Updates albums, artists, and songs with enriched data |
 | Depends on | Lyrics | Stores lyrics retrieved during enrichment |
-| Depended on by | Library | Triggers enrichment after file scanning completes |
+| Depended on by | Catalog | Ingest requests a sync of each new album through `AlbumMetadataSyncRequestInterface` (the `Metadata Album Sync Request Contract` Deptrac layer) |
 
 ## Infrastructure
 

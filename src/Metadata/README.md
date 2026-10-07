@@ -17,9 +17,14 @@ The enrichment pipeline flows: **extract** → **match** → **enrich**
 
 Sync is triggered by Library dispatching `ExtractAlbumCoverCommand`, or via Messenger messages (`SyncAlbumMessage`, `SyncArtistMessage`, etc.).
 
+- Automatic sync: while `metadata.auto_sync` is on, Catalog ingest queues one `SyncAlbumMessage` for each album it creates. The setting is off by default and does not gate the admin or CLI syncs.
+
 ## Ports
 
-None. Metadata is a pure downstream consumer — it calls Catalog and Media ports but exposes none of its own.
+| Port | Layer | Purpose |
+|------|-------|---------|
+| `MetadataAdminPortInterface` | Application | Sync status, manual sync trigger and provider list for the admin API |
+| `AlbumMetadataSyncRequestInterface` | Application (contract) | Lets Catalog ingest request syncs for new albums; reads `metadata.auto_sync` on every call |
 
 ## Events
 

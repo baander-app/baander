@@ -432,6 +432,11 @@ graph TD
 - **What:** `Notification\Domain\Service\EventCategoryResolver` maps `Auth\Domain\Event\OAuth\DeviceCodeApproved` to the Security category. Deptrac allows this through the `Auth Device Approval Event Contract` layer, which contains only that event class; the other Auth events the resolver maps are entries in `deptrac.baseline.yaml`.
 - **Why:** Approving a device request gives a device a token pair, so the user is notified. The narrow layer keeps the rest of Auth Domain out of Notification's reach.
 
+### Catalog -> Metadata (Application layer)
+
+- **What:** `Catalog\Application\CommandHandler\FilesDiscoveredHandler` calls `Metadata\Application\Port\AlbumMetadataSyncRequestInterface::requestSync()` for each album it creates, after the flush that stores it. The Metadata implementation queues a `SyncAlbumMessage` while `metadata.auto_sync` is on. Deptrac allows this through the `Metadata Album Sync Request Contract` layer, which contains only that interface.
+- **Why:** A sync started when the scan completes can run before Catalog has ingested the scan's albums. Requesting the sync from ingest means the album already exists when the sync looks it up.
+
 ### Metadata -> Catalog, Media (Application layer)
 
 - **What:** Metadata enrichers use Catalog ports to update domain models and Media ports for image storage
