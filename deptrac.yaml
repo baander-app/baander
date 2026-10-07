@@ -1264,6 +1264,7 @@ deptrac:
     'UserPreference Interface':
       - 'UserPreference Resources'
       - 'UserPreference Application'
+      - 'Auth Identity Contract'
       - 'Shared Domain'
       - 'Shared Application'
       - 'Shared Interface'
