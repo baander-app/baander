@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Interface\Controller;
 
+use App\Party\Application\Command\JoinPartySessionCommand;
 use App\Party\Application\Command\SyncPlaybackCommand;
+use App\Party\Domain\Model\PartyMember;
+use App\Party\Domain\ValueObject\MemberRole;
 use App\Shared\Application\Port\ListeningSessionInteractionInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Messenger\ResultStampMiddleware;
+use App\Shared\Infrastructure\Messenger\Stamp\PartyMemberResultStamp;
 use App\Shared\Infrastructure\Swoole\ReconnectionTokenService;
 use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
 use App\Shared\Infrastructure\Swoole\WebSocketPusher;
@@ -21,6 +26,7 @@ use Symfony\Component\Messenger\Handler\HandlersLocator;
 use Symfony\Component\Messenger\MessageBus;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Middleware\HandleMessageMiddleware;
+use Symfony\Component\Messenger\Middleware\MiddlewareInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class WebSocketControllerTest extends TestCase
@@ -77,6 +83,16 @@ final class WebSocketControllerTest extends TestCase
             $this->listeningSessions,
             $this->reconnectionTokens,
         );
+    }
+
+    /** @param callable(JoinPartySessionCommand): PartyMember $handler */
+    private function controllerWithJoinHandler(callable $handler, MiddlewareInterface ...$middleware): WebSocketController
+    {
+        $bus = new MessageBus([...$middleware, new HandleMessageMiddleware(new HandlersLocator([
+            JoinPartySessionCommand::class => [$handler],
+        ]))]);
+
+        return new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions);
     }
 
     /** @return array<string, mixed>|null */
@@ -410,6 +426,41 @@ final class WebSocketControllerTest extends TestCase
         ]));
 
         $this->assertLastPushMatches(1, 'error', ['message' => 'Invalid UUID format']);
+    }
+
+    public function testPartyJoinReportsTheRoleOfTheJoinedMember(): void
+    {
+        $userId = '01900000-0000-7000-8000-000000000001';
+        $sessionId = '01900000-0000-7000-8000-000000000002';
+        $controller = $this->controllerWithJoinHandler(static fn (JoinPartySessionCommand $command): PartyMember => PartyMember::create(
+            $command->getUserId(),
+            $command->getSessionId(),
+            MemberRole::Host,
+        ), new ResultStampMiddleware([PartyMemberResultStamp::class]));
+        $controller->onOpen(1, $userId);
+
+        $controller->onMessage(1, json_encode(['type' => 'party.join', 'sessionId' => $sessionId], JSON_THROW_ON_ERROR));
+
+        self::assertSame([1], $this->registry->getRoomMembers('party:' . $sessionId));
+        self::assertContains(['fd' => 1, 'payload' => ['type' => 'party.joined', 'sessionId' => $sessionId, 'role' => 'host']], $this->allPushedPayloads());
+    }
+
+    public function testPartyJoinWithoutAStampedResultSendsErrorAndKeepsConnectionUsable(): void
+    {
+        $sessionId = '01900000-0000-7000-8000-000000000002';
+        // Without ResultStampMiddleware the joined member never reaches the controller.
+        $controller = $this->controllerWithJoinHandler(static fn (JoinPartySessionCommand $command): PartyMember => PartyMember::create(
+            $command->getUserId(),
+            $command->getSessionId(),
+        ));
+        $controller->onOpen(1, '01900000-0000-7000-8000-000000000001');
+
+        $controller->onMessage(1, json_encode(['type' => 'party.join', 'sessionId' => $sessionId], JSON_THROW_ON_ERROR));
+
+        $this->assertLastPushMatches(1, 'error', ['message' => 'Failed to join party session']);
+        self::assertSame([], $this->registry->getRoomMembers('party:' . $sessionId));
+        $controller->onMessage(1, '{"type":"ping"}');
+        $this->assertLastPushMatches(1, 'pong');
     }
 
     /** @return iterable<string, array{string, string|null}> */

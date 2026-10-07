@@ -285,7 +285,9 @@ final class WebSocketController extends AbstractWebSocketController
             $envelope = $this->bus->dispatch(
                 new JoinPartySessionCommand($userUuid, $sessionUuid),
             );
-            $member = $envelope->last(PartyMemberResultStamp::class)?->getMember();
+            // ResultStampMiddleware on the default bus stamps the handler's PartyMember.
+            $member = $envelope->last(PartyMemberResultStamp::class)?->getMember()
+                ?? throw new \UnexpectedValueException('The join handler result carries no PartyMemberResultStamp.');
         } catch (HandlerFailedException $e) {
             $this->pusher->pushToConnection($fd, [
                 'type'    => 'error',
@@ -294,6 +296,7 @@ final class WebSocketController extends AbstractWebSocketController
 
             return;
         } catch (Throwable $e) {
+            $this->logger?->error('Party join failed', ['fd' => $fd, 'userId' => $userId, 'sessionId' => $sessionId, 'exception' => $e]);
             $this->pusher->pushToConnection($fd, [
                 'type'    => 'error',
                 'message' => 'Failed to join party session',

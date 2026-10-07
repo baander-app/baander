@@ -85,6 +85,25 @@ final class JobMonitorCursorPaginationTest extends TestCase
         self::assertSame($expected, $this->walkBackFromLastPage('createdAt', 'desc'));
     }
 
+    public function testJobsCreatedWithinOneSecondAreOrderedByTheirMicroseconds(): void
+    {
+        // Creation order runs against id order, so a cursor cut to whole seconds would bring
+        // back rows that an earlier page already returned.
+        $byId = array_keys(self::CREATED);
+        usort($byId, fn (string $left, string $right): int => $this->idOf($left) <=> $this->idOf($right));
+        $created = array_reverse($byId);
+        foreach ($created as $position => $jobId) {
+            $this->entityManager->getConnection()->executeStatement(
+                'UPDATE job_monitors SET created_at = :created WHERE job_id = :job',
+                ['created' => sprintf('2026-02-01 08:00:00.%06d+00', 100_000 + $position), 'job' => $jobId],
+            );
+        }
+
+        self::assertSame($created, $this->walkForward('createdAt', 'asc'));
+        self::assertSame($created, $this->walkBackFromLastPage('createdAt', 'asc'));
+        self::assertSame($byId, $this->walkForward('createdAt', 'desc'));
+    }
+
     public function testJobsThatNeverStartedAppearOnceWhenSortingByStartTime(): void
     {
         // Only job-b and job-d have started; the others have no start time and sort lowest.

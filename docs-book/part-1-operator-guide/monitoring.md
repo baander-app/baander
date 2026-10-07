@@ -143,7 +143,7 @@ curl -s -H "Authorization: Bearer $TOKEN" \
   "https://baander.test/api/monitor/analytics/summary?from=2026-04-24T00:00:00Z&to=2026-04-25T00:00:00Z" | jq .
 ```
 
-Defaults to the last 24 hours if `from` and `to` are omitted. Maximum range is 90 days.
+Each endpoint counts the jobs created from `from` up to but not including `to`, so the example covers exactly 24 April. Both take an RFC 3339 timestamp with a timezone; `to` must be after `from`. They default to the last 24 hours, and a range longer than 90 days ends 90 days after `from`.
 
 ### Timing
 

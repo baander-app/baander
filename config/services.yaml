@@ -17,25 +17,9 @@ parameters:
         - push.services.mozilla.com
         - web.push.apple.com
         - gcm.googleapis.com
+    # Handler results that ResultStampMiddleware copies into a typed stamp on the default bus.
     app.result_stamp_classes:
-        - App\Shared\Infrastructure\Messenger\Stamp\PlaylistResultStamp
         - App\Shared\Infrastructure\Messenger\Stamp\PartyMemberResultStamp
-        - App\Shared\Infrastructure\Messenger\Stamp\SyncedPartySessionResultStamp
-        - App\Shared\Infrastructure\Messenger\Stamp\TokenResponseResultStamp
-        - App\Shared\Infrastructure\Messenger\Stamp\UserResultStamp
-        - App\Shared\Infrastructure\Messenger\Stamp\PasskeyResultStamp
-        - App\Shared\Infrastructure\Messenger\Stamp\MediaActivityResultStamp
-        - App\Shared\Infrastructure\Messenger\Stamp\LibraryResultStamp
-        - App\Shared\Infrastructure\Messenger\Stamp\TranscodeSessionResultStamp
-        - App\Shared\Infrastructure\Messenger\Stamp\RecommendationResultStamp
-        - App\Shared\Infrastructure\Messenger\Stamp\IntResultStamp
-        - App\Shared\Infrastructure\Messenger\Stamp\FloatResultStamp
-        - App\Shared\Infrastructure\Messenger\Stamp\StringResultStamp
-        - App\Shared\Infrastructure\Messenger\Stamp\RadioSourceResultStamp
-        - App\Shared\Infrastructure\Messenger\Stamp\RadioStationResultStamp
-        - App\Shared\Infrastructure\Messenger\Stamp\RadioSessionResultStamp
-        - App\Shared\Infrastructure\Messenger\Stamp\CountrySubscriptionResultStamp
-        - App\Shared\Infrastructure\Messenger\Stamp\StarredStationResultStamp
 
 services:
     _defaults:
@@ -741,16 +725,10 @@ services:
             $transportSerializer: '@messenger.default_serializer'
 
     # --- Messenger Middleware ---
-    App\Shared\Infrastructure\Messenger\CorrelationIdMiddleware:
-        tags: [ 'messenger.middleware' ]
-
-    App\Shared\Infrastructure\Messenger\JobMonitoringMiddleware:
-        tags: [ 'messenger.middleware' ]
-
+    # Bus middleware is listed in config/packages/messenger.yaml; nothing reads a middleware tag.
     App\Shared\Infrastructure\Messenger\ResultStampMiddleware:
         arguments:
             $stampClasses: '%app.result_stamp_classes%'
-        tags: [ 'messenger.middleware' ]
 
     # --- Job Monitor Worker Events ---
     App\Shared\Infrastructure\Messenger\WorkerJobMonitorSubscriber:

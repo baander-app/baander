@@ -25,28 +25,42 @@ done
 docker exec "$run_id-postgres" pg_isready -U baander -d worker_test >/dev/null
 docker exec -e REDISCLI_AUTH=test-only "$run_id-redis" redis-cli ping | grep -qx PONG
 
-archive_paths=(vendor src tests config packages migrations bin docker/general phpunit.xml.dist
+archive_paths=(vendor src tests config packages migrations bin docker/general templates public phpunit.xml.dist
     .env .env.test composer.json composer.lock translations)
 if [ "${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" = 1 ]; then
     archive_paths=(--files-from /dev/null)
 fi
 tar -cf - "${archive_paths[@]}" |
     docker run --rm --name "$run_id-app" --privileged --network "$run_id" -i --entrypoint sh \
-        -e APP_ENV=prod -e APP_DEBUG=0 -e REDIS_PASSWORD=test-only \
+        -e BAANDER_TEST_CHECKOUT_IN_IMAGE="${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" \
+        -e APP_ENV=prod -e APP_DEBUG=0 -e XDEBUG_MODE=off -e REDIS_PASSWORD=test-only \
         -e REDIS_URL=redis://default:test-only@redis:6379 \
         -e MESSENGER_TRANSPORT_DSN=redis://default:test-only@redis:6379/messages \
         -e DATABASE_URL="postgresql://baander:test-only@postgres:5432/worker_test?serverVersion=18&charset=utf8" \
         "${BAANDER_TEST_IMAGE:-martinjuul/baander-app:latest}" -c '
             set -eu
-            cd /var/www/html
+            # The image owns /var/www/html/vendor as root, so a host checkout is unpacked into a
+            # directory the www-data user can write.
+            app_dir=/var/www/html
+            if [ "$BAANDER_TEST_CHECKOUT_IN_IMAGE" != 1 ]; then
+                app_dir=/tmp/baander-worker-runtime
+                mkdir -p "$app_dir"
+            fi
+            cd "$app_dir"
             tar -xf -
             php tests/Fixtures/messaging-runtime.php prepare
             # Exercise historical transport recovery without a deployed supervisor or HTTP server.
-            python3 - <<"PY"
+            python3 - "$app_dir" <<"PY"
 import configparser
+import sys
 config = configparser.RawConfigParser()
 config.read("tests/Fixtures/Worker/legacy-supervisord.conf")
 config.remove_section("program:swoole")
+# Run the consumers from the checkout under test.
+for section in config.sections():
+    for option in ("command", "directory"):
+        if config.has_option(section, option):
+            config.set(section, option, config.get(section, option).replace("/var/www/html", sys.argv[1]))
 with open("/tmp/worker-supervisord.conf", "w") as output:
     config.write(output)
 PY

@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Messaging;
 
+use App\Party\Domain\Model\PartyMember;
+use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Messenger\ResultStampMiddleware;
-use App\Shared\Infrastructure\Messenger\Stamp\IntResultStamp;
-use App\Shared\Infrastructure\Messenger\Stamp\StringResultStamp;
+use App\Shared\Infrastructure\Messenger\Stamp\PartyMemberResultStamp;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Messenger\Envelope;
@@ -21,10 +22,9 @@ final class ResultStampMiddlewareTest extends TestCase
     /** @return iterable<string, array{mixed}> */
     public static function results(): iterable
     {
-        yield 'string' => ['completed'];
-        yield 'integer' => [42];
+        yield 'party member' => [PartyMember::create(new Uuid(), new Uuid())];
         yield 'null' => [null];
-        yield 'unmatched' => [false];
+        yield 'unmatched' => ['completed'];
     }
 
     #[DataProvider('results')]
@@ -33,7 +33,7 @@ final class ResultStampMiddlewareTest extends TestCase
         $message = new \stdClass();
         $handled = 0;
         $bus = new MessageBus([
-            new ResultStampMiddleware([StringResultStamp::class, IntResultStamp::class]),
+            new ResultStampMiddleware([PartyMemberResultStamp::class]),
             new HandleMessageMiddleware(new HandlersLocator([
                 \stdClass::class => [static function (\stdClass $message) use (&$handled, $result): mixed {
                     ++$handled;
@@ -47,8 +47,7 @@ final class ResultStampMiddlewareTest extends TestCase
 
         self::assertSame(1, $handled);
         self::assertSame($message, $envelope->getMessage());
-        self::assertSame(is_string($result) ? $result : null, $envelope->last(StringResultStamp::class)?->getResult());
-        self::assertSame(is_int($result) ? $result : null, $envelope->last(IntResultStamp::class)?->getResult());
+        self::assertSame($result instanceof PartyMember ? $result : null, $envelope->last(PartyMemberResultStamp::class)?->getMember());
     }
 
     public function testNoHandlerResultLeavesTheEnvelopeUnchanged(): void
@@ -60,11 +59,11 @@ final class ResultStampMiddlewareTest extends TestCase
                 return $envelope;
             }
         };
-        $bus = new MessageBus([new ResultStampMiddleware([StringResultStamp::class]), $terminal]);
+        $bus = new MessageBus([new ResultStampMiddleware([PartyMemberResultStamp::class]), $terminal]);
 
         $dispatched = $bus->dispatch($envelope);
 
         self::assertSame($envelope->getMessage(), $dispatched->getMessage());
-        self::assertNull($dispatched->last(StringResultStamp::class));
+        self::assertNull($dispatched->last(PartyMemberResultStamp::class));
     }
 }

@@ -216,16 +216,21 @@ final class JobMonitorService
         );
     }
 
-    /** @return array<string, int> */
+    /**
+     * Counts the jobs created in [$from, $to): the range includes its start and excludes its
+     * end, so consecutive ranges count every job once. The analytics methods use the same range.
+     *
+     * @return array<string, int>
+     */
     public function countByStatusAndDateRange(\DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
         $qb = $this->entityManager
             ->getRepository(JobMonitorEntity::class)
             ->createQueryBuilder('j')
             ->select('j.status, COUNT(j.id) as count')
-            ->where('j.createdAt BETWEEN :from AND :to')
-            ->setParameter('from', $from)
-            ->setParameter('to', $to)
+            ->where('j.createdAt >= :from AND j.createdAt < :to')
+            ->setParameter('from', self::instant($from))
+            ->setParameter('to', self::instant($to))
             ->groupBy('j.status');
 
         $results = $qb->getQuery()->getResult();
@@ -263,9 +268,9 @@ final class JobMonitorService
             ->getRepository(JobMonitorEntity::class)
             ->createQueryBuilder('j')
             ->select('j.name, COUNT(j.id) as count')
-            ->where('j.createdAt BETWEEN :from AND :to')
-            ->setParameter('from', $from)
-            ->setParameter('to', $to)
+            ->where('j.createdAt >= :from AND j.createdAt < :to')
+            ->setParameter('from', self::instant($from))
+            ->setParameter('to', self::instant($to))
             ->groupBy('j.name')
             ->orderBy('count', 'DESC');
 
@@ -316,7 +321,7 @@ final class JobMonitorService
                        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (j.finished_at - j.started_at))) as median_time,
                        PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (j.finished_at - j.started_at))) as p95_time
                 FROM job_monitors j
-                WHERE j.created_at BETWEEN :from AND :to
+                WHERE j.created_at >= CAST(:from AS TIMESTAMPTZ) AND j.created_at < CAST(:to AS TIMESTAMPTZ)
                   AND j.status = :finished_status
                   AND j.started_at IS NOT NULL
                   AND j.finished_at IS NOT NULL
@@ -324,8 +329,8 @@ final class JobMonitorService
                 ORDER BY avg_time DESC
             SQL,
             [
-                'from' => $from->format('Y-m-d H:i:s.u'),
-                'to' => $to->format('Y-m-d H:i:s.u'),
+                'from' => self::instant($from),
+                'to' => self::instant($to),
                 'finished_status' => JobStatus::Finished->value,
             ],
         );
@@ -346,15 +351,15 @@ final class JobMonitorService
                 SELECT j.name,
                        AVG(EXTRACT(EPOCH FROM (j.started_at - j.created_at))) as avg_latency
                 FROM job_monitors j
-                WHERE j.created_at BETWEEN :from AND :to
+                WHERE j.created_at >= CAST(:from AS TIMESTAMPTZ) AND j.created_at < CAST(:to AS TIMESTAMPTZ)
                   AND j.status = :finished_status
                   AND j.started_at IS NOT NULL
                 GROUP BY j.name
                 ORDER BY avg_latency DESC
             SQL,
             [
-                'from' => $from->format('Y-m-d H:i:s.u'),
-                'to' => $to->format('Y-m-d H:i:s.u'),
+                'from' => self::instant($from),
+                'to' => self::instant($to),
                 'finished_status' => JobStatus::Finished->value,
             ],
         );
@@ -390,15 +395,15 @@ final class JobMonitorService
             <<<'SQL'
                 SELECT j.name, COUNT(j.id) as count
                 FROM job_monitors j
-                WHERE j.created_at BETWEEN :from AND :to
+                WHERE j.created_at >= CAST(:from AS TIMESTAMPTZ) AND j.created_at < CAST(:to AS TIMESTAMPTZ)
                   AND j.status = :failed_status
                 GROUP BY j.name
                 ORDER BY count DESC
                 LIMIT 10
             SQL,
             [
-                'from' => $from->format('Y-m-d H:i:s.u'),
-                'to' => $to->format('Y-m-d H:i:s.u'),
+                'from' => self::instant($from),
+                'to' => self::instant($to),
                 'failed_status' => JobStatus::Failed->value,
             ],
         );
@@ -416,7 +421,7 @@ final class JobMonitorService
             <<<'SQL'
                 SELECT j.exception_class, COUNT(j.id) as count
                 FROM job_monitors j
-                WHERE j.created_at BETWEEN :from AND :to
+                WHERE j.created_at >= CAST(:from AS TIMESTAMPTZ) AND j.created_at < CAST(:to AS TIMESTAMPTZ)
                   AND j.status = :failed_status
                   AND j.exception_class IS NOT NULL
                 GROUP BY j.exception_class
@@ -424,8 +429,8 @@ final class JobMonitorService
                 LIMIT 10
             SQL,
             [
-                'from' => $from->format('Y-m-d H:i:s.u'),
-                'to' => $to->format('Y-m-d H:i:s.u'),
+                'from' => self::instant($from),
+                'to' => self::instant($to),
                 'failed_status' => JobStatus::Failed->value,
             ],
         );
@@ -444,12 +449,12 @@ final class JobMonitorService
                 SELECT COUNT(*) FILTER (WHERE j.retried = true) as retried,
                        COUNT(*) as total
                 FROM job_monitors j
-                WHERE j.created_at BETWEEN :from AND :to
+                WHERE j.created_at >= CAST(:from AS TIMESTAMPTZ) AND j.created_at < CAST(:to AS TIMESTAMPTZ)
                   AND j.status = :failed_status
             SQL,
             [
-                'from' => $from->format('Y-m-d H:i:s.u'),
-                'to' => $to->format('Y-m-d H:i:s.u'),
+                'from' => self::instant($from),
+                'to' => self::instant($to),
                 'failed_status' => JobStatus::Failed->value,
             ],
         );
@@ -465,14 +470,14 @@ final class JobMonitorService
                        j.exception->>'message' as exception_message,
                        j.finished_at
                 FROM job_monitors j
-                WHERE j.created_at BETWEEN :from AND :to
+                WHERE j.created_at >= CAST(:from AS TIMESTAMPTZ) AND j.created_at < CAST(:to AS TIMESTAMPTZ)
                   AND j.status = :failed_status
                 ORDER BY j.finished_at DESC
                 LIMIT :limit
             SQL,
             [
-                'from' => $from->format('Y-m-d H:i:s.u'),
-                'to' => $to->format('Y-m-d H:i:s.u'),
+                'from' => self::instant($from),
+                'to' => self::instant($to),
                 'failed_status' => JobStatus::Failed->value,
                 'limit' => $limit,
             ],
@@ -485,7 +490,8 @@ final class JobMonitorService
                 'name' => $row['name'],
                 'exceptionClass' => $row['exception_class'],
                 'exceptionMessage' => $row['exception_message'],
-                'failedAt' => $row['finished_at'] ?? null,
+                // PostgreSQL's text form is not RFC 3339; give the same form as the job endpoints.
+                'failedAt' => is_string($row['finished_at']) ? (new \DateTimeImmutable($row['finished_at']))->format(\DateTimeInterface::ATOM) : null,
             ];
         }
 
@@ -550,7 +556,7 @@ final class JobMonitorService
             ->where('j.status IN (:statuses)')
             ->andWhere('j.createdAt < :olderThan')
             ->setParameter('statuses', [JobStatus::Finished, JobStatus::Failed, JobStatus::Cancelled])
-            ->setParameter('olderThan', $olderThan)
+            ->setParameter('olderThan', self::instant($olderThan))
             ->getQuery()
             ->execute();
     }
@@ -624,19 +630,34 @@ final class JobMonitorService
 
     private function now(): string
     {
-        return (new \DateTimeImmutable())->format('Y-m-d H:i:s.u');
+        return self::instant(new \DateTimeImmutable());
     }
 
     /**
-     * Extract the sort value from an entity for cursor-based pagination.
+     * An instant as a timestamptz literal. The offset makes it independent of the PHP and
+     * session time zones, and the microseconds survive the columns' full precision.
+     */
+    private static function instant(\DateTimeImmutable $at): string
+    {
+        return $at->format('Y-m-d H:i:s.uP');
+    }
+
+    /**
+     * Extract the sort value from an entity for cursor-based pagination. Instants keep their
+     * microseconds: a cursor cut to whole seconds would sort before its own row.
      */
     private function extractSortValue(JobMonitorEntity $entity, string $sort): ?string
     {
-        return match ($sort) {
-            'startedAt' => $entity->getStartedAt()?->format(\DateTimeInterface::ATOM),
-            'finishedAt' => $entity->getFinishedAt()?->format(\DateTimeInterface::ATOM),
-            'duration' => $entity->getDurationMicroseconds() === null ? null : (string) $entity->getDurationMicroseconds(),
-            default => $entity->getCreatedAt()->format(\DateTimeInterface::ATOM),
+        if ($sort === 'duration') {
+            return $entity->getDurationMicroseconds() === null ? null : (string) $entity->getDurationMicroseconds();
+        }
+
+        $instant = match ($sort) {
+            'startedAt' => $entity->getStartedAt(),
+            'finishedAt' => $entity->getFinishedAt(),
+            default => $entity->getCreatedAt(),
         };
+
+        return $instant === null ? null : self::instant($instant);
     }
 }

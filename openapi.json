@@ -13820,7 +13820,7 @@
                     {
                         "name": "from",
                         "in": "query",
-                        "description": "Start of time range (ISO 8601). Defaults to 24 hours ago.",
+                        "description": "Inclusive start of the job creation range (RFC 3339 with a timezone, up to six fractional digits). Defaults to 24 hours ago.",
                         "required": false,
                         "schema": {
                             "type": "string",
@@ -13830,7 +13830,7 @@
                     {
                         "name": "to",
                         "in": "query",
-                        "description": "End of time range (ISO 8601). Defaults to now.",
+                        "description": "Exclusive end of the job creation range (RFC 3339 with a timezone, up to six fractional digits); must be after from. Defaults to now. A range longer than 90 days ends 90 days after from.",
                         "required": false,
                         "schema": {
                             "type": "string",
@@ -13839,6 +13839,16 @@
                     }
                 ],
                 "responses": {
+                    "400": {
+                        "description": "Invalid time range",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "200": {
                         "description": "Analytics summary",
                         "content": {
@@ -13903,7 +13913,7 @@
                     {
                         "name": "from",
                         "in": "query",
-                        "description": "Start of time range (ISO 8601). Defaults to 24 hours ago.",
+                        "description": "Inclusive start of the job creation range (RFC 3339 with a timezone, up to six fractional digits). Defaults to 24 hours ago.",
                         "required": false,
                         "schema": {
                             "type": "string",
@@ -13913,7 +13923,7 @@
                     {
                         "name": "to",
                         "in": "query",
-                        "description": "End of time range (ISO 8601). Defaults to now.",
+                        "description": "Exclusive end of the job creation range (RFC 3339 with a timezone, up to six fractional digits); must be after from. Defaults to now. A range longer than 90 days ends 90 days after from.",
                         "required": false,
                         "schema": {
                             "type": "string",
@@ -13922,6 +13932,16 @@
                     }
                 ],
                 "responses": {
+                    "400": {
+                        "description": "Invalid time range",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "200": {
                         "description": "Timing analytics",
                         "content": {
@@ -13994,7 +14014,7 @@
                     {
                         "name": "from",
                         "in": "query",
-                        "description": "Start of time range (ISO 8601). Defaults to 24 hours ago.",
+                        "description": "Inclusive start of the job creation range (RFC 3339 with a timezone, up to six fractional digits). Defaults to 24 hours ago.",
                         "required": false,
                         "schema": {
                             "type": "string",
@@ -14004,7 +14024,7 @@
                     {
                         "name": "to",
                         "in": "query",
-                        "description": "End of time range (ISO 8601). Defaults to now.",
+                        "description": "Exclusive end of the job creation range (RFC 3339 with a timezone, up to six fractional digits); must be after from. Defaults to now. A range longer than 90 days ends 90 days after from.",
                         "required": false,
                         "schema": {
                             "type": "string",
@@ -14025,6 +14045,16 @@
                     }
                 ],
                 "responses": {
+                    "400": {
+                        "description": "Invalid time range",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "200": {
                         "description": "Failure analytics",
                         "content": {

@@ -272,7 +272,7 @@ The Shared kernel provides cross-cutting primitives used by every context. Impor
 | Component | Purpose |
 |-----------|---------|
 | `Doctrine/` | Custom types (`UuidType`, `PublicIdType`, `CitextType`, `JobStatusType`), `GeneratePublicIdListener`, `PgroongaSearchTrait` |
-| `Messenger/` | `JobIdStamp`, `JobMonitoringMiddleware`, `JobMonitorService`, `ResultStamp` variants, `PublicIdNormalizer`, `UuidNormalizer`, `SwooleTaskWithRedisFallbackSender` |
+| `Messenger/` | `JobIdStamp`, `JobMonitoringMiddleware`, `JobMonitorService`, `ResultStampMiddleware` with `PartyMemberResultStamp`, `PublicIdNormalizer`, `UuidNormalizer`, `SwooleTaskWithRedisFallbackSender` |
 | `Swoole/` | `Async::sleep()` (coroutine-aware), `ProcessPool`, `WebSocketConnectionRegistry`, `WebSocketPusher` |
 | `Cache/` | `CacheTags` for Redis tag-aware invalidation |
 | `Redis/` | `RedisClientFactory` |

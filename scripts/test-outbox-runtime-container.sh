@@ -26,20 +26,28 @@ done
 docker exec "$run_id-postgres" pg_isready -U baander -d outbox_test >/dev/null
 docker exec -e REDISCLI_AUTH=test-only "$run_id-redis" redis-cli ping | grep -qx PONG
 
-archive_paths=(vendor src tests config packages migrations bin docker/general phpunit.xml.dist
+archive_paths=(vendor src tests config packages migrations bin docker/general templates public phpunit.xml.dist
     .env .env.test composer.json composer.lock translations)
 if [ "${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" = 1 ]; then
     archive_paths=(--files-from /dev/null)
 fi
 tar -cf - "${archive_paths[@]}" |
     docker run --rm --name "$run_id-app" --privileged --network "$run_id" -i --entrypoint sh \
-        -e APP_ENV=prod -e APP_DEBUG=0 -e REDIS_PASSWORD=test-only \
+        -e BAANDER_TEST_CHECKOUT_IN_IMAGE="${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" \
+        -e APP_ENV=prod -e APP_DEBUG=0 -e XDEBUG_MODE=off -e REDIS_PASSWORD=test-only \
         -e REDIS_URL=redis://default:test-only@redis:6379 \
         -e MESSENGER_TRANSPORT_DSN=redis://default:test-only@redis:6379/messages \
         -e DATABASE_URL="postgresql://baander:test-only@postgres:5432/outbox_test?serverVersion=18&charset=utf8" \
         "${BAANDER_TEST_IMAGE:-martinjuul/baander-app:latest}" -c '
             set -eu
-            cd /var/www/html
+            # The image owns /var/www/html/vendor as root, so a host checkout is unpacked into a
+            # directory the www-data user can write.
+            if [ "$BAANDER_TEST_CHECKOUT_IN_IMAGE" = 1 ]; then
+                cd /var/www/html
+            else
+                mkdir -p /tmp/baander-outbox-runtime
+                cd /tmp/baander-outbox-runtime
+            fi
             tar -xf -
             php tests/Fixtures/outbox-runtime.php prepare
             php bin/console app:outbox:consume --once --no-interaction

@@ -4963,11 +4963,11 @@ export type GetDebugCoroutines200 = { [key: string]: unknown };
 
 export type GetMonitorAnalyticsSummaryParams = {
 /**
- * Start of time range (ISO 8601). Defaults to 24 hours ago.
+ * Inclusive start of the job creation range (RFC 3339 with a timezone, up to six fractional digits). Defaults to 24 hours ago.
  */
 from?: string;
 /**
- * End of time range (ISO 8601). Defaults to now.
+ * Exclusive end of the job creation range (RFC 3339 with a timezone, up to six fractional digits); must be after from. Defaults to now. A range longer than 90 days ends 90 days after from.
  */
 to?: string;
 };
@@ -4999,11 +4999,11 @@ export type GetMonitorAnalyticsSummary200 = {
 
 export type GetMonitorAnalyticsTimingParams = {
 /**
- * Start of time range (ISO 8601). Defaults to 24 hours ago.
+ * Inclusive start of the job creation range (RFC 3339 with a timezone, up to six fractional digits). Defaults to 24 hours ago.
  */
 from?: string;
 /**
- * End of time range (ISO 8601). Defaults to now.
+ * Exclusive end of the job creation range (RFC 3339 with a timezone, up to six fractional digits); must be after from. Defaults to now. A range longer than 90 days ends 90 days after from.
  */
 to?: string;
 };
@@ -5033,11 +5033,11 @@ export type GetMonitorAnalyticsTiming200 = {
 
 export type GetMonitorAnalyticsFailuresParams = {
 /**
- * Start of time range (ISO 8601). Defaults to 24 hours ago.
+ * Inclusive start of the job creation range (RFC 3339 with a timezone, up to six fractional digits). Defaults to 24 hours ago.
  */
 from?: string;
 /**
- * End of time range (ISO 8601). Defaults to now.
+ * Exclusive end of the job creation range (RFC 3339 with a timezone, up to six fractional digits); must be after from. Defaults to now. A range longer than 90 days ends 90 days after from.
  */
 to?: string;
 /**
@@ -23909,7 +23909,7 @@ export const getGetMonitorAnalyticsSummaryQueryKey = (params?: GetMonitorAnalyti
     }
 
 
-export const getGetMonitorAnalyticsSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError = ErrorType<unknown>>(params?: GetMonitorAnalyticsSummaryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetMonitorAnalyticsSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError = ErrorType<ApiError>>(params?: GetMonitorAnalyticsSummaryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -23928,10 +23928,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetMonitorAnalyticsSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>>
-export type GetMonitorAnalyticsSummaryQueryError = ErrorType<unknown>
+export type GetMonitorAnalyticsSummaryQueryError = ErrorType<ApiError>
 
 
-export function useGetMonitorAnalyticsSummary<TData = Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError = ErrorType<unknown>>(
+export function useGetMonitorAnalyticsSummary<TData = Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetMonitorAnalyticsSummaryParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>,
@@ -23941,7 +23941,7 @@ export function useGetMonitorAnalyticsSummary<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetMonitorAnalyticsSummary<TData = Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError = ErrorType<unknown>>(
+export function useGetMonitorAnalyticsSummary<TData = Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorAnalyticsSummaryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>,
@@ -23951,7 +23951,7 @@ export function useGetMonitorAnalyticsSummary<TData = Awaited<ReturnType<typeof 
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetMonitorAnalyticsSummary<TData = Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError = ErrorType<unknown>>(
+export function useGetMonitorAnalyticsSummary<TData = Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorAnalyticsSummaryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -23959,7 +23959,7 @@ export function useGetMonitorAnalyticsSummary<TData = Awaited<ReturnType<typeof 
  * @summary Get analytics summary for a time range
  */
 
-export function useGetMonitorAnalyticsSummary<TData = Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError = ErrorType<unknown>>(
+export function useGetMonitorAnalyticsSummary<TData = Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorAnalyticsSummaryParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsSummary>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -24018,7 +24018,7 @@ export const getGetMonitorAnalyticsTimingQueryKey = (params?: GetMonitorAnalytic
     }
 
 
-export const getGetMonitorAnalyticsTimingQueryOptions = <TData = Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError = ErrorType<unknown>>(params?: GetMonitorAnalyticsTimingParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetMonitorAnalyticsTimingQueryOptions = <TData = Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError = ErrorType<ApiError>>(params?: GetMonitorAnalyticsTimingParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -24037,10 +24037,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetMonitorAnalyticsTimingQueryResult = NonNullable<Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>>
-export type GetMonitorAnalyticsTimingQueryError = ErrorType<unknown>
+export type GetMonitorAnalyticsTimingQueryError = ErrorType<ApiError>
 
 
-export function useGetMonitorAnalyticsTiming<TData = Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError = ErrorType<unknown>>(
+export function useGetMonitorAnalyticsTiming<TData = Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetMonitorAnalyticsTimingParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>,
@@ -24050,7 +24050,7 @@ export function useGetMonitorAnalyticsTiming<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetMonitorAnalyticsTiming<TData = Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError = ErrorType<unknown>>(
+export function useGetMonitorAnalyticsTiming<TData = Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorAnalyticsTimingParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>,
@@ -24060,7 +24060,7 @@ export function useGetMonitorAnalyticsTiming<TData = Awaited<ReturnType<typeof g
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetMonitorAnalyticsTiming<TData = Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError = ErrorType<unknown>>(
+export function useGetMonitorAnalyticsTiming<TData = Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorAnalyticsTimingParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -24068,7 +24068,7 @@ export function useGetMonitorAnalyticsTiming<TData = Awaited<ReturnType<typeof g
  * @summary Get timing analytics for a time range
  */
 
-export function useGetMonitorAnalyticsTiming<TData = Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError = ErrorType<unknown>>(
+export function useGetMonitorAnalyticsTiming<TData = Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorAnalyticsTimingParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsTiming>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -24127,7 +24127,7 @@ export const getGetMonitorAnalyticsFailuresQueryKey = (params?: GetMonitorAnalyt
     }
 
 
-export const getGetMonitorAnalyticsFailuresQueryOptions = <TData = Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError = ErrorType<unknown>>(params?: GetMonitorAnalyticsFailuresParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetMonitorAnalyticsFailuresQueryOptions = <TData = Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError = ErrorType<ApiError>>(params?: GetMonitorAnalyticsFailuresParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -24146,10 +24146,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetMonitorAnalyticsFailuresQueryResult = NonNullable<Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>>
-export type GetMonitorAnalyticsFailuresQueryError = ErrorType<unknown>
+export type GetMonitorAnalyticsFailuresQueryError = ErrorType<ApiError>
 
 
-export function useGetMonitorAnalyticsFailures<TData = Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError = ErrorType<unknown>>(
+export function useGetMonitorAnalyticsFailures<TData = Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetMonitorAnalyticsFailuresParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>,
@@ -24159,7 +24159,7 @@ export function useGetMonitorAnalyticsFailures<TData = Awaited<ReturnType<typeof
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetMonitorAnalyticsFailures<TData = Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError = ErrorType<unknown>>(
+export function useGetMonitorAnalyticsFailures<TData = Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorAnalyticsFailuresParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>,
@@ -24169,7 +24169,7 @@ export function useGetMonitorAnalyticsFailures<TData = Awaited<ReturnType<typeof
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetMonitorAnalyticsFailures<TData = Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError = ErrorType<unknown>>(
+export function useGetMonitorAnalyticsFailures<TData = Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorAnalyticsFailuresParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -24177,7 +24177,7 @@ export function useGetMonitorAnalyticsFailures<TData = Awaited<ReturnType<typeof
  * @summary Get failure analytics for a time range
  */
 
-export function useGetMonitorAnalyticsFailures<TData = Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError = ErrorType<unknown>>(
+export function useGetMonitorAnalyticsFailures<TData = Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorAnalyticsFailuresParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorAnalyticsFailures>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {

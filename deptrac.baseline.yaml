@@ -310,26 +310,8 @@ deptrac:
       - App\Notification\Domain\Model\Notification
       - App\Notification\Domain\Repository\NotificationRepositoryInterface
       - App\Notification\Domain\ValueObject\NotificationCategory
-    App\Shared\Infrastructure\Messenger\Stamp\LibraryResultStamp:
-      - App\Library\Domain\Model\Library
-    App\Shared\Infrastructure\Messenger\Stamp\MediaActivityResultStamp:
-      - App\Activity\Domain\Model\MediaActivity
     App\Shared\Infrastructure\Messenger\Stamp\PartyMemberResultStamp:
       - App\Party\Domain\Model\PartyMember
-    App\Shared\Infrastructure\Messenger\Stamp\PasskeyResultStamp:
-      - App\Auth\Domain\Model\Passkey\Passkey
-    App\Shared\Infrastructure\Messenger\Stamp\PlaylistResultStamp:
-      - App\Playlist\Domain\Model\Playlist
-    App\Shared\Infrastructure\Messenger\Stamp\RecommendationResultStamp:
-      - App\Recommendation\Domain\Model\Recommendation
-    App\Shared\Infrastructure\Messenger\Stamp\SyncedPartySessionResultStamp:
-      - App\Party\Domain\Model\SyncedPartySession
-    App\Shared\Infrastructure\Messenger\Stamp\TokenResponseResultStamp:
-      - App\Auth\Application\DTO\TokenResponseDTO
-    App\Shared\Infrastructure\Messenger\Stamp\TranscodeSessionResultStamp:
-      - App\Transcode\Domain\Model\TranscodeSession
-    App\Shared\Infrastructure\Messenger\Stamp\UserResultStamp:
-      - App\Auth\Domain\Model\User
     App\Shared\Infrastructure\Security\WsQueryTokenAuthenticator:
       - App\Auth\Domain\Repository\UserRepositoryInterface
     App\Shared\Interface\Controller\SystemSettingsController:

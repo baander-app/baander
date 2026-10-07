@@ -110,6 +110,9 @@ framework:
                     - { id: 'App\Shared\Infrastructure\Messenger\CorrelationIdMiddleware' }
                     # Assigns the job ID before a transport stores the message.
                     - { id: 'App\Shared\Infrastructure\Messenger\JobMonitoringMiddleware' }
+                    # Copies a synchronous handler's result into a typed stamp (app.result_stamp_classes);
+                    # the WebSocket party.join reads PartyMemberResultStamp.
+                    - { id: 'App\Shared\Infrastructure\Messenger\ResultStampMiddleware' }
 
 when@test:
     framework:

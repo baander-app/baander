@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Controller;
 
 use App\Shared\Infrastructure\Messenger\JobMonitorService;
+use App\Shared\Interface\DTO\ApiError;
+use App\Shared\Interface\Exception\InvalidQueryParameter;
+use App\Shared\Interface\Request\QueryParameters;
+use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -34,10 +38,11 @@ final class JobAnalyticsController
         description: 'Returns status counts, job type breakdown, success rate, and throughput per hour.',
         summary: 'Get analytics summary for a time range',
         parameters: [
-            new OA\Parameter(name: 'from', description: 'Start of time range (ISO 8601). Defaults to 24 hours ago.', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date-time')),
-            new OA\Parameter(name: 'to', description: 'End of time range (ISO 8601). Defaults to now.', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date-time')),
+            new OA\Parameter(name: 'from', description: 'Inclusive start of the job creation range (RFC 3339 with a timezone, up to six fractional digits). Defaults to 24 hours ago.', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date-time')),
+            new OA\Parameter(name: 'to', description: 'Exclusive end of the job creation range (RFC 3339 with a timezone, up to six fractional digits); must be after from. Defaults to now. A range longer than 90 days ends 90 days after from.', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date-time')),
         ],
         responses: [
+            new OA\Response(response: '400', description: 'Invalid time range', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
             new OA\Response(response: '200', description: 'Analytics summary',
                 content: new OA\JsonContent(
                     properties: [new OA\Property(property: 'data', properties: [
@@ -75,10 +80,11 @@ final class JobAnalyticsController
         description: 'Returns average, median, and P95 execution times and queue latency per job type.',
         summary: 'Get timing analytics for a time range',
         parameters: [
-            new OA\Parameter(name: 'from', description: 'Start of time range (ISO 8601). Defaults to 24 hours ago.', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date-time')),
-            new OA\Parameter(name: 'to', description: 'End of time range (ISO 8601). Defaults to now.', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date-time')),
+            new OA\Parameter(name: 'from', description: 'Inclusive start of the job creation range (RFC 3339 with a timezone, up to six fractional digits). Defaults to 24 hours ago.', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date-time')),
+            new OA\Parameter(name: 'to', description: 'Exclusive end of the job creation range (RFC 3339 with a timezone, up to six fractional digits); must be after from. Defaults to now. A range longer than 90 days ends 90 days after from.', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date-time')),
         ],
         responses: [
+            new OA\Response(response: '400', description: 'Invalid time range', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
             new OA\Response(response: '200', description: 'Timing analytics',
                 content: new OA\JsonContent(
                     properties: [new OA\Property(property: 'data', properties: [
@@ -118,11 +124,12 @@ final class JobAnalyticsController
         description: 'Returns top failing job types, top exception classes, retry frequency, and recent failures.',
         summary: 'Get failure analytics for a time range',
         parameters: [
-            new OA\Parameter(name: 'from', description: 'Start of time range (ISO 8601). Defaults to 24 hours ago.', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date-time')),
-            new OA\Parameter(name: 'to', description: 'End of time range (ISO 8601). Defaults to now.', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date-time')),
+            new OA\Parameter(name: 'from', description: 'Inclusive start of the job creation range (RFC 3339 with a timezone, up to six fractional digits). Defaults to 24 hours ago.', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date-time')),
+            new OA\Parameter(name: 'to', description: 'Exclusive end of the job creation range (RFC 3339 with a timezone, up to six fractional digits); must be after from. Defaults to now. A range longer than 90 days ends 90 days after from.', in: 'query', required: false, schema: new OA\Schema(type: 'string', format: 'date-time')),
             new OA\Parameter(name: 'limit', description: 'Maximum number of recent failures to return (1-200)', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 50, maximum: 200, minimum: 1)),
         ],
         responses: [
+            new OA\Response(response: '400', description: 'Invalid time range', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
             new OA\Response(response: '200', description: 'Failure analytics',
                 content: new OA\JsonContent(
                     properties: [new OA\Property(property: 'data', properties: [
@@ -164,21 +171,22 @@ final class JobAnalyticsController
     }
 
     /**
-     * Parse and validate the time range from query parameters.
+     * Parse and validate the half-open job creation range [from, to).
      *
      * @return array{\DateTimeImmutable, \DateTimeImmutable}
      */
     private function parseTimeRange(Request $request): array
     {
-        $from = $request->query->get('from');
-        $to = $request->query->get('to');
+        $now = new \DateTimeImmutable();
+        $fromDate = QueryParameters::optionalDateTime($request->query, 'from') ?? $now->modify('-24 hours');
+        $toDate = QueryParameters::optionalDateTime($request->query, 'to') ?? $now;
 
-        $fromDate = $from !== null ? new \DateTimeImmutable($from) : new \DateTimeImmutable('-24 hours');
-        $toDate = $to !== null ? new \DateTimeImmutable($to) : new \DateTimeImmutable();
+        if ($toDate <= $fromDate) {
+            throw new InvalidQueryParameter('to', 'to must be after from.');
+        }
 
         // Clamp: maximum 90 days
-        $maxRange = new \DateInterval('P90D');
-        $maxTo = (clone $fromDate)->add($maxRange);
+        $maxTo = $fromDate->add(new \DateInterval('P90D'));
         if ($toDate > $maxTo) {
             $toDate = $maxTo;
         }
