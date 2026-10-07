@@ -232,7 +232,7 @@ final class OutboxNotificationReplayTest extends TestCase
             $connection->insert('replay_notifications', ['id' => $notificationId, 'kind' => $command->eventName]);
             $userId = Uuid::fromString($command->payload['user_id']);
             $category = NotificationCategory::Security;
-            $deliveryBus->dispatch(new SendEmailCommand($userId, $command->payload['email'], $category, 'Title', 'Body', new \DateTimeImmutable(), $notificationId));
+            $deliveryBus->dispatch(new SendEmailCommand($userId, $command->payload['email'], $category, 'Title', [], 'Body', [], new \DateTimeImmutable(), $notificationId));
             $deliveryBus->dispatch(new SendPushCommand($userId, $category, 'Title', 'Body', $notificationId));
             $deliveryBus->dispatch(new SendWebhookCommand($userId, $category, 'Title', 'Body', $notificationId));
         };

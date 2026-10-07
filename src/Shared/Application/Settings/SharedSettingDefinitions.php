@@ -28,7 +28,6 @@ final class SharedSettingDefinitions implements SettingDefinitionProviderInterfa
             allowedValues: SupportedLanguages::codes(),
             valueLabels: SupportedLanguages::NATIVE_NAMES,
             userVisible: true,
-            enforced: false,
         );
 
         yield new SettingDefinition(

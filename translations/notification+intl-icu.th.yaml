@@ -27,3 +27,17 @@ album:
   created:
     title: อัลบัมใหม่ในไลบรารี
     body: มีการเพิ่มอัลบัมใหม่ในไลบรารีของคุณ
+# Used when an event lacks the value.
+parameter:
+  unknown_passkey_name: ไม่ทราบชื่อ
+  unknown_user_name: ผู้ใช้
+  unknown_token_type: การเข้าถึง
+email:
+  header:
+    security: "การแจ้งเตือนความปลอดภัยจาก {appName}"
+    default: "{appName}"
+  view: "ดูใน {appName}"
+  footer:
+    security: "คุณได้รับอีเมลนี้เนื่องจากคุณเปิดการแจ้งเตือนด้านความปลอดภัยไว้ใน {appName}"
+    background_jobs: "คุณได้รับอีเมลนี้เนื่องจากคุณเปิดการแจ้งเตือนงานเบื้องหลังไว้ใน {appName}"
+    media_changes: "คุณได้รับอีเมลนี้เนื่องจากคุณเปิดการแจ้งเตือนการเปลี่ยนแปลงสื่อไว้ใน {appName}"

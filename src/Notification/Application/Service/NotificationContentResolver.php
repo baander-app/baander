@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Notification\Application\Service;
 
+use App\Notification\Application\DTO\TranslatableParameter;
 use App\Notification\Domain\ValueObject\NotificationCategory;
 
 final class NotificationContentResolver
 {
     /**
-     * Resolves translation keys and parameters from event data.
+     * Resolves translation keys and parameters from event data. A value the
+     * event lacks becomes a TranslatableParameter, so each reader gets it in
+     * their own language.
      *
      * @param array<string, mixed> $payload The event's toPayload() output
      * @return array{
@@ -32,7 +35,7 @@ final class NotificationContentResolver
                 'bodyKey' => 'user.passkey_registered.body',
                 'parameters' => [
                     'title' => [],
-                    'body' => ['name' => $payload['name'] ?? 'Unknown'],
+                    'body' => ['name' => $payload['name'] ?? new TranslatableParameter('parameter.unknown_passkey_name')],
                 ],
             ],
             'user.passkey_deleted' => [
@@ -45,7 +48,7 @@ final class NotificationContentResolver
                 'bodyKey' => 'token.revoked.body',
                 'parameters' => [
                     'title' => [],
-                    'body' => ['tokenType' => $payload['token_type'] ?? 'access'],
+                    'body' => ['tokenType' => $payload['token_type'] ?? new TranslatableParameter('parameter.unknown_token_type')],
                 ],
             ],
             'device_code.approved' => [
@@ -58,7 +61,7 @@ final class NotificationContentResolver
                 'bodyKey' => 'user.registered.body',
                 'parameters' => [
                     'title' => [],
-                    'body' => ['name' => $payload['name'] ?? 'User'],
+                    'body' => ['name' => $payload['name'] ?? new TranslatableParameter('parameter.unknown_user_name')],
                 ],
             ],
 

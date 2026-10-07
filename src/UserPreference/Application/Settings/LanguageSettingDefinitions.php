@@ -27,7 +27,6 @@ final class LanguageSettingDefinitions implements SettingDefinitionProviderInter
             allowedValues: SupportedLanguages::codes(),
             valueLabels: SupportedLanguages::NATIVE_NAMES,
             editRole: SettingDefinition::ROLE_USER,
-            enforced: false,
             fallbackKey: SharedSettingDefinitions::DEFAULT_LANGUAGE,
         );
     }

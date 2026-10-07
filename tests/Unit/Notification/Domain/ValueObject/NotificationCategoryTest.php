@@ -21,10 +21,12 @@ final class NotificationCategoryTest extends TestCase
         $this->assertStringStartsWith('#', $color);
     }
 
-    public function testAdminOperationsHeaderTitle(): void
+    public function testHeaderTitleIsATranslationKey(): void
     {
-        $title = NotificationCategory::AdminOperations->headerTitle('Baander');
-        $this->assertSame('Baander', $title);
+        $this->assertSame('email.header.security', NotificationCategory::Security->headerTitle());
+        $this->assertSame('email.header.default', NotificationCategory::BackgroundJobs->headerTitle());
+        $this->assertSame('email.header.default', NotificationCategory::MediaChanges->headerTitle());
+        $this->assertSame('email.header.default', NotificationCategory::AdminOperations->headerTitle());
     }
 
     public function testAllCategoriesHaveValues(): void

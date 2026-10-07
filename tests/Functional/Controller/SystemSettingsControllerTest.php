@@ -36,7 +36,20 @@ final class SystemSettingsControllerTest extends TestCase
         $this->assertSame('enum', $bitrate['type']);
         $this->assertSame('system', $bitrate['scope']);
         $this->assertSame(['value' => 192, 'label' => '192 kbps'], $bitrate['options'][1]);
-        $this->assertFalse($bitrate['enforced']);
+        $this->assertTrue($bitrate['enforced']);
+    }
+
+    public function testTheBackendHonoursEverySettingItDefines(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $response = $this->authenticatedRequest('GET', '/api/admin/settings/definitions', $admin);
+        $definitions = $this->assertJsonResponse($response, 200, 'data')['data'];
+
+        $this->assertSame([], array_column(
+            array_filter($definitions, static fn (array $definition): bool => $definition['enforced'] !== true),
+            'key',
+        ));
     }
 
     public function testPatchStoresTypedValuesAndReturnsTheSettings(): void

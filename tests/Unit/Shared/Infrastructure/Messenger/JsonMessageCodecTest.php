@@ -60,7 +60,7 @@ final class JsonMessageCodecTest extends TestCase
         yield [new SyncSongMessage($id, true)];
         yield [new SyncAlbumMessage($id)];
         yield [new SyncLibraryMessage($id, true, true, true)];
-        yield [new SendEmailCommand($id, 'test@baander.app', NotificationCategory::Security, 'title', 'body', new \DateTimeImmutable('2026-10-01T12:00:00.000+00:00'))];
+        yield [new SendEmailCommand($id, 'test@baander.app', NotificationCategory::Security, 'title', [], 'body', ['count' => 2], new \DateTimeImmutable('2026-10-01T12:00:00.000+00:00'))];
         yield [new SendPushCommand($id, NotificationCategory::Security, 'title', 'body', 'notification')];
         yield [new SendWebhookCommand($id, NotificationCategory::Security, 'title', 'body', 'notification')];
         yield [new PruneMissingImagesCommand()];
