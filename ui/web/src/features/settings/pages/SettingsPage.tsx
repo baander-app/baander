@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { PasskeyManagement } from '../components/PasskeyManagement';
 import { AccountManagement } from '../components/AccountManagement';
 import { AppearanceSection } from '../components/AppearanceSection';
+import { EmailLanguageSetting } from '../components/EmailLanguageSetting';
 import { DeviceManagement } from '@/features/session/components/DeviceManagement';
 import { useAdminCheck } from '@/features/auth/hooks/use-admin-check';
 
@@ -209,6 +210,7 @@ export function SettingsPage() {
               Account
             </SectionTitle>
             <AccountManagement/>
+            <EmailLanguageSetting/>
           </Section>
 
           {/* Security Section */}
