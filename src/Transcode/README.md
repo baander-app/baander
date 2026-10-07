@@ -31,6 +31,7 @@ Key infrastructure:
 | `FFmpegPortInterface` | FFmpeg process abstraction |
 | `SegmentCachePortInterface` | Segment caching |
 | `TranscodeStoragePortInterface` | File storage for segments |
+| `PlaybackAccessInterface` | Playback authority for other contexts: video access and a job's video (Deptrac contract) |
 
 ## Events
 
@@ -45,7 +46,7 @@ Key infrastructure:
 ## Interactions
 
 - **Catalog** — `TranscodeSessionSubscriber` looks up `VideoRepositoryInterface` to resolve video metadata
-- **Party** — consumes `PlaybackPositionChanged` for synchronized playback
+- **Party** — dispatches `PlaybackPositionChanged` to steer a party's transcode job, and checks a new party's video and job through `PlaybackAccessInterface`
 - **QoL** — Transcode Infrastructure calls QoL's stream-admission and allowed-tier contracts and implements its quality-ladder and encoder-profile contracts
 
 ---

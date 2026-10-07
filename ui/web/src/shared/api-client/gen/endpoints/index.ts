@@ -525,7 +525,11 @@ export interface TransferHostRequest {
 
 export interface CreatePartySessionRequest {
   videoId: string;
-  transcodeJobId: string;
+  /**
+     * Transcode job of the video that the host's playback steers
+     * @nullable
+     */
+  transcodeJobId?: string | null;
   /**
      * @minimum 2
      * @maximum 50
@@ -1615,6 +1619,54 @@ export interface NotificationResource {
   isRead: boolean;
   /** Creation timestamp */
   createdAt: string;
+}
+
+/**
+ * Playback state
+ */
+export type PartySessionResourcePlaybackState = typeof PartySessionResourcePlaybackState[keyof typeof PartySessionResourcePlaybackState];
+
+
+export const PartySessionResourcePlaybackState = {
+  playing: 'playing',
+  paused: 'paused',
+  stopped: 'stopped',
+} as const;
+
+export interface PartySessionResource {
+  /** Session UUID */
+  uuid: string;
+  /** Public identifier */
+  publicId: string;
+  /** Host user UUID */
+  hostUserId: string;
+  /** Video UUID */
+  videoId: string;
+  /**
+     * Transcode job that the host's playback steers; null when none was named or the job has been deleted
+     * @nullable
+     */
+  transcodeJobId?: string | null;
+  /** Maximum members allowed */
+  maxMembers: number;
+  /** Playback state */
+  playbackState: PartySessionResourcePlaybackState;
+  /**
+     * Wall clock position
+     * @nullable
+     */
+  wallClockPosition?: number | null;
+  /**
+     * Current playback position
+     * @nullable
+     */
+  currentPosition?: number | null;
+  /** Whether the session is active */
+  isActive: boolean;
+  /** Creation timestamp */
+  createdAt: string;
+  /** Last update timestamp */
+  updatedAt: string;
 }
 
 export interface PlaylistResource {
@@ -4168,24 +4220,8 @@ export type GetPartySessionIndex200 = {
   data?: GetPartySessionIndex200DataItem[];
 };
 
-export type PostPartySessionCreateBody = {
-  videoId: string;
-  transcodeJobId: string;
-  /**
-     * @minimum 2
-     * @maximum 50
-     */
-  maxMembers?: number;
-};
-
-export type PostPartySessionCreate201Data = {
-  uuid?: string;
-  publicId?: string;
-  videoId?: string;
-};
-
 export type PostPartySessionCreate201 = {
-  data?: PostPartySessionCreate201Data;
+  data?: PartySessionResource;
 };
 
 export type GetPartySessionShow200DataMembersItem = {
@@ -18433,23 +18469,23 @@ export const getPostPartySessionCreateUrl = () => {
 /**
  * @summary Create a new watch party session
  */
-export const postPartySessionCreate = async (postPartySessionCreateBody: PostPartySessionCreateBody, options?: RequestInit): Promise<PostPartySessionCreate201> => {
+export const postPartySessionCreate = async (createPartySessionRequest: CreatePartySessionRequest, options?: RequestInit): Promise<PostPartySessionCreate201> => {
 
   return customInstance<PostPartySessionCreate201>(getPostPartySessionCreateUrl(),
   {
     ...options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(postPartySessionCreateBody)
+    body: JSON.stringify(createPartySessionRequest)
   }
 );}
 
 
 
 
-export const getPostPartySessionCreateMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionCreate>>, TError,{data: BodyType<PostPartySessionCreateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postPartySessionCreate>>, TError,{data: BodyType<PostPartySessionCreateBody>}, TContext> => {
+export const getPostPartySessionCreateMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionCreate>>, TError,{data: BodyType<CreatePartySessionRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postPartySessionCreate>>, TError,{data: BodyType<CreatePartySessionRequest>}, TContext> => {
 
 const mutationKey = ['postPartySessionCreate'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -18461,7 +18497,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPartySessionCreate>>, {data: BodyType<PostPartySessionCreateBody>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPartySessionCreate>>, {data: BodyType<CreatePartySessionRequest>}> = (props) => {
           const {data} = props ?? {};
 
           return  postPartySessionCreate(data,requestOptions)
@@ -18475,18 +18511,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type PostPartySessionCreateMutationResult = NonNullable<Awaited<ReturnType<typeof postPartySessionCreate>>>
-    export type PostPartySessionCreateMutationBody = BodyType<PostPartySessionCreateBody>
-    export type PostPartySessionCreateMutationError = ErrorType<unknown>
+    export type PostPartySessionCreateMutationBody = BodyType<CreatePartySessionRequest>
+    export type PostPartySessionCreateMutationError = ErrorType<ApiError | ValidationError>
 
     /**
  * @summary Create a new watch party session
  */
-export const usePostPartySessionCreate = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionCreate>>, TError,{data: BodyType<PostPartySessionCreateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+export const usePostPartySessionCreate = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionCreate>>, TError,{data: BodyType<CreatePartySessionRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postPartySessionCreate>>,
         TError,
-        {data: BodyType<PostPartySessionCreateBody>},
+        {data: BodyType<CreatePartySessionRequest>},
         TContext
       > => {
       return useMutation(getPostPartySessionCreateMutationOptions(options), queryClient);

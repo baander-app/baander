@@ -17,6 +17,10 @@ POST /api/party/sessions
 
 The host creates a session by specifying the media to watch and an optional member limit. The response includes the session's public ID for sharing.
 
+The host must be allowed to play the video: administrators can play any video, other users only videos in libraries they have access to. The request may also name a transcode job, which must encode that video. A video or job that does not exist, or that the host may not play, returns `404 Not Found`. A job that encodes a different video returns `422 Unprocessable Entity`.
+
+Deleting a video ends its sessions. Deleting a transcode job, for example during orphaned-job cleanup, clears the session's `transcodeJobId`. The session continues and keeps its members in sync; play, pause and seek then no longer signal an encoder.
+
 ## Joining and Leaving
 
 - **Join**: `POST /api/party/sessions/{uuid}/join`

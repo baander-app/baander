@@ -22,6 +22,7 @@ WebSocket connection is handled through `Shared\Infrastructure\Swoole\WebSocketC
 |------|---------|
 | `PartySessionPortInterface` | Session lifecycle |
 | `PartyMemberPortInterface` | Member management |
+| `PartyMediaAccessPortInterface` | Checks that the host may play a new party's video and that its transcode job encodes it |
 
 ## Events
 
@@ -33,10 +34,13 @@ WebSocket connection is handled through `Shared\Infrastructure\Swoole\WebSocketC
 
 ## Interactions
 
-- **Transcode** — playback handlers reference `PlaybackPositionChanged` for sync coordination
+- **Transcode** — playback handlers send `PlaybackPositionChanged` to steer the session's transcode job; a session without a job sends none
+- **Transcode** — party creation checks the video and job through Transcode's `PlaybackAccessInterface`, the authority that also guards stream signing
 
 ---
 
 <!-- Everything below this line is hand-written. Edit freely. -->
 
 ## Notes
+
+`party_sessions.video_id` cascades from `videos`: deleting a video deletes its parties, their members and events. `party_sessions.transcode_job_id` is optional and set to NULL when the job is deleted, for example by orphaned-job cleanup. The party keeps running; synchronization does not depend on the job.

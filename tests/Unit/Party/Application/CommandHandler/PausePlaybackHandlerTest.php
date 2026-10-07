@@ -74,4 +74,16 @@ final class PausePlaybackHandlerTest extends TestCase
 
         ($this->handler)(new PausePlaybackCommand($session->getId(), $otherUser));
     }
+
+    public function testPauseWithoutTranscodeJobUpdatesThePartyButSteersNoEncoder(): void
+    {
+        $hostUserId = Uuid::v4();
+        $session = SyncedPartySession::create($hostUserId, Uuid::v4(), null);
+
+        $this->sessionPort->method('findByUuid')->willReturn($session);
+        $this->sessionPort->expects($this->once())->method('pausePlayback')->with($session->getId());
+        $this->eventDispatcher->expects($this->never())->method('dispatch');
+
+        ($this->handler)(new PausePlaybackCommand($session->getId(), $hostUserId));
+    }
 }

@@ -22,7 +22,7 @@ final class SyncedPartySessionState
         public readonly PublicId $publicId,
         public Uuid $hostUserId,
         public readonly Uuid $videoId,
-        public readonly Uuid $transcodeJobId,
+        public readonly ?Uuid $transcodeJobId,
         public readonly int $maxMembers,
         public PlaybackState $playbackState = PlaybackState::Stopped,
         public float $wallClockPosition = 0.0,

@@ -41,7 +41,7 @@ deptrac:
         Party: ['Party Domain', 'Party Application', 'Party Infrastructure', 'Party Resources', 'Party Interface']
         Playlist: ['Playlist Deletion Preview Contract', 'Playlist Domain', 'Playlist Application', 'Playlist Infrastructure', 'Playlist Resources', 'Playlist Interface']
         Recommendation: ['Recommendation Domain', 'Recommendation Application', 'Recommendation Infrastructure', 'Recommendation Resources', 'Recommendation Interface']
-        Transcode: ['Transcode Domain', 'Transcode Application', 'Transcode Infrastructure', 'Transcode Resources', 'Transcode Interface']
+        Transcode: ['Transcode Playback Access Contract', 'Transcode Domain', 'Transcode Application', 'Transcode Infrastructure', 'Transcode Resources', 'Transcode Interface']
         UserPreference: ['UserPreference Domain', 'UserPreference Application', 'UserPreference Infrastructure', 'UserPreference Resources', 'UserPreference Interface']
         Discovery: ['Discovery Domain', 'Discovery Application', 'Discovery Infrastructure', 'Discovery Resources', 'Discovery Interface']
         Favorites: ['Favorites Domain', 'Favorites Application', 'Favorites Infrastructure', 'Favorites Resources', 'Favorites Interface']
@@ -501,10 +501,20 @@ deptrac:
         - type: classLike
           value: '^App\\Transcode\\Domain\\'
 
-    - name: 'Transcode Application'
+    - name: 'Transcode Playback Access Contract'
       collectors:
         - type: classLike
-          value: '^App\\Transcode\\Application\\'
+          value: '^App\\Transcode\\Application\\Port\\PlaybackAccessInterface$'
+
+    - name: 'Transcode Application'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Transcode\\Application\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Transcode\\Application\\Port\\PlaybackAccessInterface$'
 
     - name: 'Transcode Infrastructure'
       collectors:
@@ -1097,6 +1107,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Party Infrastructure':
+      - 'Transcode Playback Access Contract'
       - 'Shared Application'
       - 'Party Domain'
       - 'Party Application'
@@ -1177,14 +1188,18 @@ deptrac:
       - 'Shared Interface'
 
     # --- Transcode ---
+    'Transcode Playback Access Contract':
+      - 'Shared Domain'
     'Transcode Domain':
       - 'Shared Domain'
     'Transcode Application':
+      - 'Transcode Playback Access Contract'
       - 'Scheduler Schedulable Contract'
       - 'Transcode Domain'
       - 'Shared Domain'
       - 'Shared Application'
     'Transcode Infrastructure':
+      - 'Transcode Playback Access Contract'
       - 'QoL Encoder Profile Contract'
       - 'QoL Quality Ladder Contract'
       - 'QoL Stream Admission Contract'
@@ -1201,6 +1216,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Transcode Interface':
+      - 'Transcode Playback Access Contract'
       - 'Scheduler Schedulable Contract'
       - 'Transcode Resources'
       - 'Auth Identity Contract'

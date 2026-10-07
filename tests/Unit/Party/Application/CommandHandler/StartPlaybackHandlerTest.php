@@ -97,4 +97,16 @@ final class StartPlaybackHandlerTest extends TestCase
 
         ($this->handler)(new StartPlaybackCommand($session->getId(), $otherUser, 50.0));
     }
+
+    public function testStartWithoutTranscodeJobUpdatesThePartyButSteersNoEncoder(): void
+    {
+        $hostUserId = Uuid::v4();
+        $session = SyncedPartySession::create($hostUserId, Uuid::v4(), null);
+
+        $this->sessionPort->method('findByUuid')->willReturn($session);
+        $this->sessionPort->expects($this->once())->method('startPlayback')->with($session->getId(), 30.0);
+        $this->eventDispatcher->expects($this->never())->method('dispatch');
+
+        ($this->handler)(new StartPlaybackCommand($session->getId(), $hostUserId, 30.0));
+    }
 }

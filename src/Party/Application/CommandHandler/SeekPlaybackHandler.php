@@ -32,8 +32,15 @@ final class SeekPlaybackHandler
 
         $this->sessionPort->seekTo($command->getSessionId(), $command->getPosition());
 
+        // Without a job (none was named, or it has been deleted) there is no encoder to steer;
+        // the party's own playback state above still synchronizes its members.
+        $jobId = $session->getTranscodeJobId();
+        if ($jobId === null) {
+            return;
+        }
+
         $this->eventDispatcher->dispatch(new PlaybackPositionChanged(
-            jobId: $session->getTranscodeJobId(),
+            jobId: $jobId,
             position: $command->getPosition(),
             action: 'seek',
         ));

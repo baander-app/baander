@@ -13,6 +13,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\UniqueConstraint(name: 'uniq_party_sessions_public_id', columns: ['public_id'])]
 #[ORM\Index(name: 'idx_party_sessions_is_active', columns: ['is_active'])]
 #[ORM\Index(name: 'idx_party_sessions_video_id', columns: ['video_id'])]
+#[ORM\Index(name: 'idx_party_sessions_transcode_job_id', columns: ['transcode_job_id'])]
 #[ORM\Index(name: 'idx_party_sessions_host_user_id', columns: ['host_user_id'])]
 class SyncedPartySessionEntity
 {
@@ -30,8 +31,9 @@ class SyncedPartySessionEntity
     #[ORM\Column(type: 'uuid')]
     private Uuid $videoId;
 
-    #[ORM\Column(type: 'uuid')]
-    private Uuid $transcodeJobId;
+    /** Cleared by fk_party_sessions_transcode_job_id when the job is deleted. */
+    #[ORM\Column(type: 'uuid', nullable: true)]
+    private ?Uuid $transcodeJobId;
 
     #[ORM\Column(type: 'integer', options: ['default' => 10])]
     private int $maxMembers;
@@ -61,7 +63,7 @@ class SyncedPartySessionEntity
         PublicId $publicId,
         Uuid $hostUserId,
         Uuid $videoId,
-        Uuid $transcodeJobId,
+        ?Uuid $transcodeJobId,
         int $maxMembers = 10,
         ?Uuid $id = null,
     ) {
@@ -84,7 +86,7 @@ class SyncedPartySessionEntity
     public function getPublicId(): PublicId { return $this->publicId; }
     public function getHostUserId(): Uuid { return $this->hostUserId; }
     public function getVideoId(): Uuid { return $this->videoId; }
-    public function getTranscodeJobId(): Uuid { return $this->transcodeJobId; }
+    public function getTranscodeJobId(): ?Uuid { return $this->transcodeJobId; }
     public function getMaxMembers(): int { return $this->maxMembers; }
     public function getPlaybackState(): string { return $this->playbackState; }
     public function getWallClockPosition(): float { return $this->wallClockPosition; }

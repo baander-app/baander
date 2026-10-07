@@ -12,6 +12,8 @@ use App\Party\Application\Command\EndPartySessionCommand;
 use App\Party\Application\Command\JoinPartySessionCommand;
 use App\Party\Application\Command\LeavePartySessionCommand;
 use App\Party\Application\Command\SyncPlaybackCommand;
+use App\Party\Application\Exception\PartyMediaNotFoundException;
+use App\Party\Application\Exception\TranscodeJobVideoMismatchException;
 use App\Party\Application\Port\PartyMemberPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
 use App\Party\Interface\Request\CreatePartySessionRequest;
@@ -21,8 +23,10 @@ use App\Party\Interface\Resource\PartySessionResource;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
@@ -58,31 +62,41 @@ final class PartySessionController
             required: true,
             content: new OA\MediaType(
                 mediaType: 'application/json',
-                schema: new OA\Schema(
-                    required: ['videoId', 'transcodeJobId'],
-                    properties: [
-                        new OA\Property(property: 'videoId', type: 'string', format: 'uuid'),
-                        new OA\Property(property: 'transcodeJobId', type: 'string', format: 'uuid'),
-                        new OA\Property(property: 'maxMembers', type: 'integer', maximum: 50, minimum: 2),
-                    ],
-                ),
+                schema: new OA\Schema(ref: new Model(type: CreatePartySessionRequest::class)),
             ),
         ),
         responses: [
-            new OA\Response(response: '201', description: 'Created', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'uuid', type: 'string'), new OA\Property(property: 'publicId', type: 'string'), new OA\Property(property: 'videoId', type: 'string')])])),
+            new OA\Response(response: '201', description: 'Created', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', ref: new Model(type: PartySessionResource::class))])),
+            new OA\Response(response: '404', description: 'The video or transcode job does not exist, or the user may not play its video', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'Validation error, including a transcode job of another video', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
     #[Route('/', name: 'create', methods: ['POST'])]
     public function create(#[MapRequestPayload] CreatePartySessionRequest $payload, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
-        $session = $this->unwrapResult($this->commandBus->dispatch(new CreatePartySessionCommand(
-            hostUserId: Uuid::fromString($user->getId()),
-            videoId: Uuid::fromString($payload->videoId),
-            transcodeJobId: Uuid::fromString($payload->transcodeJobId),
-            maxMembers: $payload->maxMembers,
-        )));
+        try {
+            $envelope = $this->commandBus->dispatch(new CreatePartySessionCommand(
+                hostUserId: Uuid::fromString($user->getId()),
+                videoId: Uuid::fromString($payload->videoId),
+                transcodeJobId: $payload->transcodeJobId === null ? null : Uuid::fromString($payload->transcodeJobId),
+                maxMembers: $payload->maxMembers,
+            ));
+        } catch (HandlerFailedException $exception) {
+            $failures = $exception->getWrappedExceptions();
+            $failure = count($failures) === 1 ? reset($failures) : null;
+            if ($failure instanceof PartyMediaNotFoundException) {
+                return $this->notFound($failure->getMessage());
+            }
+            if ($failure instanceof TranscodeJobVideoMismatchException) {
+                return $this->errorResponse('Validation failed.', Response::HTTP_UNPROCESSABLE_ENTITY, [
+                    'transcodeJobId' => [$failure->getMessage()],
+                ]);
+            }
 
-        return $this->created(['data' => PartySessionResource::from($session)]);
+            throw $exception;
+        }
+
+        return $this->created(['data' => PartySessionResource::from($this->unwrapResult($envelope))]);
     }
 
     #[OA\Get(

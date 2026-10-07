@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Party\Domain\Model\PartyMember;
+use App\Party\Domain\Model\SyncedPartySession;
+use App\Party\Infrastructure\Doctrine\Repository\PartyMemberRepository;
+use App\Party\Infrastructure\Doctrine\Repository\SyncedPartySessionRepository;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\ArrayParameterType;
@@ -52,8 +56,6 @@ final class ReferentialIntegrityTest extends TestCase
         'pairing_sessions.server_public_id' => 'copy of server_instances.public_id; server_id carries the foreign key',
         'party_members.audio_profile_id' => 'identifier within the video\'s probe data',
         'party_members.subtitle_track_id' => 'identifier within the video\'s probe data',
-        'party_sessions.transcode_job_id' => 'pending decision: orphaned-job cleanup deletes jobs a party still names',
-        'party_sessions.video_id' => 'pending decision: party creation accepts an unvalidated video ID',
         'passkeys.credential_id' => 'the credential\'s own WebAuthn identifier',
         'password_reset_tokens.email' => 'pending decision: a token must not survive an email change or account deletion',
         'radio_stations.external_id' => 'external station directory identifier',
@@ -96,6 +98,12 @@ final class ReferentialIntegrityTest extends TestCase
         'fk_transcode_sessions_video_id' => 'CASCADE',
         'fk_user_favorites_user_id' => 'CASCADE',
         'fk_user_theme_moods_user_id' => 'CASCADE',
+    ];
+
+    /** ON DELETE rules for a party's video and transcode job (Version20261006310000). */
+    private const PARTY_MEDIA_RULES = [
+        'fk_party_sessions_transcode_job_id' => 'SET NULL',
+        'fk_party_sessions_video_id' => 'CASCADE',
     ];
 
     public function testEveryReferenceColumnHasAForeignKeyOrADocumentedReason(): void
@@ -155,15 +163,18 @@ final class ReferentialIntegrityTest extends TestCase
 
     public function testForeignKeysChosenByTheAuditHaveTheirDeleteRules(): void
     {
+        $expected = [...self::RULES, ...self::PARTY_MEDIA_RULES];
+        ksort($expected);
         $rules = $this->manager->getConnection()->fetchAllKeyValue(<<<'SQL'
             SELECT conname, CASE confdeltype WHEN 'c' THEN 'CASCADE' WHEN 'n' THEN 'SET NULL'
                    WHEN 'r' THEN 'RESTRICT' WHEN 'a' THEN 'NO ACTION' ELSE confdeltype::text END
               FROM pg_constraint
              WHERE contype = 'f' AND conname IN (:names)
              ORDER BY 1
-            SQL, ['names' => array_keys(self::RULES)], ['names' => ArrayParameterType::STRING]);
+            SQL, ['names' => array_keys($expected)], ['names' => ArrayParameterType::STRING]);
 
-        self::assertSame(self::RULES, $rules);
+        ksort($rules);
+        self::assertSame($expected, $rules);
     }
 
     public function testDeletingAUserRemovesTheirFavoritesAndThemeMood(): void
@@ -225,6 +236,52 @@ final class ReferentialIntegrityTest extends TestCase
         self::assertSame(0, $this->countOwnedRows('transcode_sessions', 'job_id', $jobs[0]));
         self::assertSame(1, $this->countOwnedRows('transcode_jobs', 'video_id', $kept));
         self::assertSame(1, $this->countOwnedRows('transcode_sessions', 'job_id', $jobs[1]));
+    }
+
+    public function testDeletingAVideoRemovesItsPartiesAndTheirMembers(): void
+    {
+        $host = $this->createUser();
+        $guest = $this->createUser();
+        $deleted = $this->createVideo();
+        $kept = $this->createVideo();
+        $sessions = new SyncedPartySessionRepository($this->manager);
+        $members = new PartyMemberRepository($this->manager);
+        $parties = [];
+        foreach ([$deleted, $kept] as $video) {
+            $parties[] = $party = SyncedPartySession::create($host, $video, $this->createTranscodeJob($video));
+            $sessions->save($party);
+            $members->save(PartyMember::create($guest, $party->getId()));
+        }
+        $this->manager->clear();
+
+        $this->manager->getConnection()->executeStatement('DELETE FROM videos WHERE id = :id', ['id' => $deleted->toString()]);
+
+        self::assertSame(0, $this->countOwnedRows('party_sessions', 'video_id', $deleted));
+        self::assertSame(0, $this->countOwnedRows('party_members', 'session_id', $parties[0]->getId()));
+        self::assertSame(1, $this->countOwnedRows('party_sessions', 'video_id', $kept));
+        self::assertSame(1, $this->countOwnedRows('party_members', 'session_id', $parties[1]->getId()));
+    }
+
+    public function testDeletingATranscodeJobLeavesItsPartiesWithoutAJob(): void
+    {
+        $host = $this->createUser();
+        $video = $this->createVideo();
+        $deleted = $this->createTranscodeJob($video, '720p');
+        $kept = $this->createTranscodeJob($video, '1080p');
+        $sessions = new SyncedPartySessionRepository($this->manager);
+        $withDeletedJob = SyncedPartySession::create($host, $video, $deleted);
+        $withKeptJob = SyncedPartySession::create($host, $video, $kept);
+        $sessions->save($withDeletedJob);
+        $sessions->save($withKeptJob);
+        $this->manager->clear();
+
+        $this->manager->getConnection()->executeStatement('DELETE FROM transcode_jobs WHERE id = :id', ['id' => $deleted->toString()]);
+
+        $reloaded = $sessions->findByUuid($withDeletedJob->getId());
+        self::assertNotNull($reloaded);
+        self::assertTrue($reloaded->isActive());
+        self::assertNull($reloaded->getTranscodeJobId());
+        self::assertTrue($sessions->findByUuid($withKeptJob->getId())?->getTranscodeJobId()?->equals($kept));
     }
 
     public function testDeletingAStarredStationRemovesItsStarsAndStopsPointingRadioSessionsAtIt(): void
@@ -356,6 +413,17 @@ final class ReferentialIntegrityTest extends TestCase
             SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = current_schema()
              ORDER BY 1
             SQL);
+    }
+
+    private function createTranscodeJob(Uuid $video, string $tier = '1080p'): Uuid
+    {
+        return $this->insert('transcode_jobs', [
+            'video_id' => $video->toString(),
+            'public_id' => (new PublicId())->toString(),
+            'quality_tier_name' => $tier,
+            'created_at' => '2026-10-07 12:00:00+00',
+            'updated_at' => '2026-10-07 12:00:00+00',
+        ]);
     }
 
     /** @param array<string, string> $row */

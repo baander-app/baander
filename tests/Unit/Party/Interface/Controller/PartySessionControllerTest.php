@@ -66,7 +66,7 @@ final class PartySessionControllerTest extends TestCase
 
         $payload = new CreatePartySessionRequest(
             videoId: $session->getVideoId()->toString(),
-            transcodeJobId: $session->getTranscodeJobId()->toString(),
+            transcodeJobId: $session->getTranscodeJobId()?->toString(),
             maxMembers: 5,
         );
 

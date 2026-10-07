@@ -9693,26 +9693,7 @@
                     "content": {
                         "application/json": {
                             "schema": {
-                                "required": [
-                                    "videoId",
-                                    "transcodeJobId"
-                                ],
-                                "properties": {
-                                    "videoId": {
-                                        "type": "string",
-                                        "format": "uuid"
-                                    },
-                                    "transcodeJobId": {
-                                        "type": "string",
-                                        "format": "uuid"
-                                    },
-                                    "maxMembers": {
-                                        "type": "integer",
-                                        "maximum": 50,
-                                        "minimum": 2
-                                    }
-                                },
-                                "type": "object"
+                                "$ref": "#/components/schemas/CreatePartySessionRequest"
                             }
                         }
                     }
@@ -9725,21 +9706,30 @@
                                 "schema": {
                                     "properties": {
                                         "data": {
-                                            "properties": {
-                                                "uuid": {
-                                                    "type": "string"
-                                                },
-                                                "publicId": {
-                                                    "type": "string"
-                                                },
-                                                "videoId": {
-                                                    "type": "string"
-                                                }
-                                            },
-                                            "type": "object"
+                                            "$ref": "#/components/schemas/PartySessionResource"
                                         }
                                     },
                                     "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The video or transcode job does not exist, or the user may not play its video",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error, including a transcode job of another video",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
                                 }
                             }
                         }
@@ -19718,8 +19708,7 @@
             },
             "CreatePartySessionRequest": {
                 "required": [
-                    "videoId",
-                    "transcodeJobId"
+                    "videoId"
                 ],
                 "properties": {
                     "videoId": {
@@ -19728,9 +19717,11 @@
                         "default": ""
                     },
                     "transcodeJobId": {
+                        "description": "Transcode job of the video that the host's playback steers",
                         "type": "string",
                         "format": "uuid",
-                        "default": ""
+                        "nullable": true,
+                        "default": null
                     },
                     "maxMembers": {
                         "type": "integer",
@@ -21641,6 +21632,85 @@
                     },
                     "createdAt": {
                         "description": "Creation timestamp",
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "PartySessionResource": {
+                "required": [
+                    "uuid",
+                    "publicId",
+                    "hostUserId",
+                    "videoId",
+                    "maxMembers",
+                    "playbackState",
+                    "isActive",
+                    "createdAt",
+                    "updatedAt"
+                ],
+                "properties": {
+                    "uuid": {
+                        "description": "Session UUID",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "publicId": {
+                        "description": "Public identifier",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "hostUserId": {
+                        "description": "Host user UUID",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "videoId": {
+                        "description": "Video UUID",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "transcodeJobId": {
+                        "description": "Transcode job that the host's playback steers; null when none was named or the job has been deleted",
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
+                    "maxMembers": {
+                        "description": "Maximum members allowed",
+                        "type": "integer"
+                    },
+                    "playbackState": {
+                        "description": "Playback state",
+                        "type": "string",
+                        "enum": [
+                            "playing",
+                            "paused",
+                            "stopped"
+                        ]
+                    },
+                    "wallClockPosition": {
+                        "description": "Wall clock position",
+                        "type": "number",
+                        "nullable": true
+                    },
+                    "currentPosition": {
+                        "description": "Current playback position",
+                        "type": "number",
+                        "nullable": true
+                    },
+                    "isActive": {
+                        "description": "Whether the session is active",
+                        "type": "boolean"
+                    },
+                    "createdAt": {
+                        "description": "Creation timestamp",
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updatedAt": {
+                        "description": "Last update timestamp",
                         "type": "string",
                         "format": "date-time"
                     }

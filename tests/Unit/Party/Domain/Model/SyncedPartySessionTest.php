@@ -46,6 +46,13 @@ final class SyncedPartySessionTest extends TestCase
         $this->assertSame(25, $session->getMaxMembers());
     }
 
+    public function testCreateWithoutATranscodeJob(): void
+    {
+        $session = SyncedPartySession::create(Uuid::v4(), Uuid::v4(), null);
+
+        $this->assertNull($session->getTranscodeJobId());
+    }
+
     public function testCreateThrowsOnMaxMembersBelowTwo(): void
     {
         $this->expectException(InvalidArgumentException::class);

@@ -805,6 +805,8 @@ services:
         alias: App\Transcode\Infrastructure\FFmpeg\HardwareTranscodeDiagnostics
     App\Transcode\Application\Port\PlaybackPortInterface:
         alias: App\Transcode\Infrastructure\Auth\AuthorizedPlayback
+    App\Transcode\Application\Port\PlaybackAccessInterface:
+        alias: App\Transcode\Infrastructure\Auth\AuthorizedPlayback
     App\Transcode\Application\Port\TranscodeSessionPortInterface:
         alias: App\Transcode\Infrastructure\Transcode\TranscodeSessionService
     App\Transcode\Application\Port\TranscodeJobPortInterface:
@@ -981,6 +983,8 @@ services:
         alias: App\Party\Infrastructure\PartySessionService
     App\Party\Application\Port\PartyMemberPortInterface:
         alias: App\Party\Infrastructure\PartyMemberService
+    App\Party\Application\Port\PartyMediaAccessPortInterface:
+        alias: App\Party\Infrastructure\PartyMediaAccess
 
     # --- Party Infrastructure ---
     App\Party\Infrastructure\Doctrine\Repository\PartyEventRepository:

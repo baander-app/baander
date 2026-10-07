@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Party\Application\CommandHandler;
 
 use App\Party\Application\Command\CreatePartySessionCommand;
+use App\Party\Application\Port\PartyMediaAccessPortInterface;
 use App\Party\Application\Port\PartyMemberPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
 use App\Party\Domain\Event\MemberJoined;
@@ -20,12 +21,15 @@ final class CreatePartySessionHandler
         private readonly PartySessionPortInterface $sessionPort,
         private readonly PartyMemberPortInterface $memberPort,
         private readonly EventDispatcherInterface $eventDispatcher,
+        private readonly PartyMediaAccessPortInterface $mediaAccess,
     ) {
     }
 
     #[AsMessageHandler]
     public function __invoke(CreatePartySessionCommand $command): SyncedPartySession
     {
+        $this->mediaAccess->assertHostCanPlay($command->getVideoId(), $command->getTranscodeJobId());
+
         $session = $this->sessionPort->createSession(
             $command->getHostUserId(),
             $command->getVideoId(),

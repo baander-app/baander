@@ -17,7 +17,7 @@ final readonly class PartySessionService implements PartySessionPortInterface
     ) {
     }
 
-    public function createSession(Uuid $hostUserId, Uuid $videoId, Uuid $transcodeJobId, int $maxMembers = 10): SyncedPartySession
+    public function createSession(Uuid $hostUserId, Uuid $videoId, ?Uuid $transcodeJobId, int $maxMembers = 10): SyncedPartySession
     {
         $session = SyncedPartySession::create($hostUserId, $videoId, $transcodeJobId, $maxMembers);
         $this->sessionRepository->save($session);

@@ -65,4 +65,21 @@ final class AuthorizedPlaybackTest extends TestCase
         yield ['admin', false, false];
         yield ['member', false, false];
     }
+
+    public function testFindsTheVideoATranscodeJobEncodes(): void
+    {
+        $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
+        $connection->executeStatement('CREATE TABLE transcode_jobs (id TEXT PRIMARY KEY, video_id TEXT NOT NULL)');
+        $jobId = new Uuid();
+        $videoId = new Uuid();
+        $connection->insert('transcode_jobs', ['id' => $jobId->toString(), 'video_id' => $videoId->toString()]);
+        $playback = new AuthorizedPlayback($this->createStub(Security::class), $connection, $this->createStub(MessageBusInterface::class));
+
+        try {
+            self::assertTrue($playback->findTranscodeJobVideoId($jobId)?->equals($videoId));
+            self::assertNull($playback->findTranscodeJobVideoId(new Uuid()));
+        } finally {
+            $connection->close();
+        }
+    }
 }

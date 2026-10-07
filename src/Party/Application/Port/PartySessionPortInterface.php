@@ -13,7 +13,7 @@ interface PartySessionPortInterface
     public function createSession(
         Uuid $hostUserId,
         Uuid $videoId,
-        Uuid $transcodeJobId,
+        ?Uuid $transcodeJobId,
         int $maxMembers = 10,
     ): SyncedPartySession;
 

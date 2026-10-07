@@ -93,4 +93,16 @@ final class SeekPlaybackHandlerTest extends TestCase
 
         ($this->handler)(new SeekPlaybackCommand($session->getId(), $hostUserId));
     }
+
+    public function testSeekWithoutTranscodeJobUpdatesThePartyButSteersNoEncoder(): void
+    {
+        $hostUserId = Uuid::v4();
+        $session = SyncedPartySession::create($hostUserId, Uuid::v4(), null);
+
+        $this->sessionPort->method('findByUuid')->willReturn($session);
+        $this->sessionPort->expects($this->once())->method('seekTo')->with($session->getId(), 45.0);
+        $this->eventDispatcher->expects($this->never())->method('dispatch');
+
+        ($this->handler)(new SeekPlaybackCommand($session->getId(), $hostUserId, 45.0));
+    }
 }

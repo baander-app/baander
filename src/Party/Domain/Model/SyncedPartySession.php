@@ -24,7 +24,7 @@ final class SyncedPartySession
     public static function create(
         Uuid $hostUserId,
         Uuid $videoId,
-        Uuid $transcodeJobId,
+        ?Uuid $transcodeJobId,
         int $maxMembers = 10,
     ): self {
         if ($maxMembers < 2) {
@@ -194,7 +194,10 @@ final class SyncedPartySession
         return $this->state->videoId;
     }
 
-    public function getTranscodeJobId(): Uuid
+    /**
+     * The job the host's playback steers, or null when none was named or it has since been deleted.
+     */
+    public function getTranscodeJobId(): ?Uuid
     {
         return $this->state->transcodeJobId;
     }
