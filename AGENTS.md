@@ -5,7 +5,7 @@
 Use subagents proactively for substantial, separable work; no further user request
 is needed. Keep small or tightly coupled tasks local. Start useful workers early,
 with at most eight active workers across the team; the lead continues independent
-work. Claude Code delegates through its Agent tool under these limits.
+work.
 
 - Give concise briefs: objective, owned files or read-only scope, dependencies,
   checks, and deliverable. Fork full history only when needed. All workers follow
@@ -49,8 +49,7 @@ build, or deployment preparation.
 
 ## PostgreSQL delegation
 
-Delegate substantial PostgreSQL work to the [postgres specialist](.agents/agents/postgres.md),
-registered as `.codex/agents/postgres.toml` (Codex) and `.claude/agents/postgres.md` (Claude Code).
+Delegate substantial PostgreSQL work to the [postgres specialist](.agents/agents/postgres.md).
 If named roles are unavailable, give a worker that profile's instructions. It
 maintains the skill's extension inventory from verified discoveries during tasks;
 coordinate a single writer and review those updates with the implementation.
@@ -67,8 +66,8 @@ and the relevant `ddd-*.md` reference in `.agents/rules/`. For web changes, read
 [frontend rules](.agents/rules/frontend.md) and `ui/DESIGN.md`. Use the
 [testing guide](docs-book/part-2-developer-guide/testing.md) for current runners.
 Treat documented exceptions narrowly; existing violations and baselines do not
-authorize new ones. Project skills live in `.agents/skills/`; `.claude/skills`
-links there for Claude Code. Edit skills, rules, and agents only under `.agents/`.
+authorize new ones. Project skills live in `.agents/skills/`.
+Edit skills, rules, and agents only under `.agents/`.
 
 Documented solutions to past problems (bugs, best practices, workflow patterns)
 live in `docs/solutions/`, organized by category with YAML frontmatter (`module`,
