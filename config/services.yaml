@@ -73,6 +73,8 @@ services:
             tags: ['scheduler.console_command']
         App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclarationProviderInterface:
             tags: ['baander.doctrine.foreign_key_declarations']
+        App\Shared\Application\Port\SettingDefinitionProviderInterface:
+            tags: ['baander.setting_definition_provider']
 
     # --- Swoole DBAL Alive Keepers ---
     # Replaces swoole-bundle/resetter-bundle. Wired by DBALAliveKeeperCompilerPass
@@ -161,6 +163,10 @@ services:
         arguments:
             $providers: !tagged_iterator baander.doctrine.foreign_key_declarations
         tags: [ { name: 'doctrine.event_listener', event: 'postGenerateSchema' } ]
+
+    App\Shared\Application\Service\SettingDefinitionRegistry:
+        arguments:
+            $providers: !tagged_iterator baander.setting_definition_provider
 
     # --- Doctrine Platform Extensions ---
 
