@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Notification\Application\Handler;
 
 use App\Notification\Application\DTO\SendPushCommand;
+use App\Notification\Application\Settings\NotificationSettingDefinitions;
 use App\Notification\Infrastructure\Doctrine\Entity\PushSubscriptionEntity;
 use App\Notification\Infrastructure\Push\PushSubscriptionRepositoryInterface;
 use App\Notification\Domain\Repository\NotificationPreferenceRepositoryInterface;
 use App\Notification\Domain\ValueObject\NotificationChannel;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use Minishlink\WebPush\Subscription;
 use Minishlink\WebPush\WebPush;
 use Psr\Log\LoggerInterface;
@@ -24,6 +26,7 @@ final class SendPushHandler
         private readonly LoggerInterface $logger,
         private readonly string $appDomain,
         private readonly JsonEncoder $jsonEncoder,
+        private readonly SystemSettingsPortInterface $systemSettings,
     ) {
     }
 
@@ -31,6 +34,18 @@ final class SendPushHandler
     #[AsMessageHandler(fromTransport: 'async')]
     public function __invoke(SendPushCommand $command): void
     {
+        // The notification already exists; only its browser push is skipped. Push has no
+        // stored per-delivery outcome, so the log entry is the record of the skip.
+        if ($this->systemSettings->get(NotificationSettingDefinitions::PUSH_ENABLED) !== true) {
+            $this->logger->info('Push delivery skipped because push notifications are turned off for this server.', [
+                'channel' => 'notification.push',
+                'notification_id' => $command->notificationPublicId,
+                'setting' => NotificationSettingDefinitions::PUSH_ENABLED,
+            ]);
+
+            return;
+        }
+
         if (!$this->preferenceRepository->isEnabled(
             $command->userId,
             $command->category,

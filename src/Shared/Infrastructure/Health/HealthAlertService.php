@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Health;
 
 use App\Shared\Application\Port\AdminAlertPortInterface;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
+use App\Shared\Application\Settings\SharedSettingDefinitions;
 use Psr\Log\LoggerInterface;
 
 /**
  * Monitors health check results and fires admin alerts when component status changes.
  *
  * Tracks previous health state in memory (per-worker) and compares against
- * current state on each check call.
+ * current state on each check call. The `notifications.admin_alerts` setting
+ * turns these alerts off; the degradation is still logged.
  */
 final class HealthAlertService
 {
@@ -22,6 +25,7 @@ final class HealthAlertService
         private readonly HealthCheckService $healthCheckService,
         private readonly AdminAlertPortInterface $adminAlertPort,
         private readonly LoggerInterface $logger,
+        private readonly SystemSettingsPortInterface $systemSettings,
     ) {
     }
 
@@ -50,7 +54,6 @@ final class HealthAlertService
      */
     private function evaluate(array $results): void
     {
-
         foreach ($results as $result) {
             $component = $result->component;
             $currentStatus = $result->status->value;
@@ -72,6 +75,15 @@ final class HealthAlertService
                     'from' => $previousStatus,
                     'to' => $currentStatus,
                 ]);
+
+                if ($this->systemSettings->get(SharedSettingDefinitions::ADMIN_ALERTS) !== true) {
+                    $this->logger->info('Health degradation alert for {component} skipped because admin alerts are turned off.', [
+                        'component' => $component,
+                        'setting' => SharedSettingDefinitions::ADMIN_ALERTS,
+                    ]);
+
+                    continue;
+                }
 
                 $this->adminAlertPort->alertAdmins(
                     title: "{$component} health degraded",

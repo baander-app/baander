@@ -6,10 +6,12 @@ namespace App\Tests\Unit\Notification\Application\Handler;
 
 use App\Notification\Application\DTO\SendPushCommand;
 use App\Notification\Application\Handler\SendPushHandler;
+use App\Notification\Application\Settings\NotificationSettingDefinitions;
 use App\Notification\Domain\Repository\NotificationPreferenceRepositoryInterface;
 use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Notification\Infrastructure\Doctrine\Entity\PushSubscriptionEntity;
 use App\Notification\Infrastructure\Push\PushSubscriptionRepositoryInterface;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use Minishlink\WebPush\MessageSentReport;
 use Minishlink\WebPush\SubscriptionInterface;
@@ -18,6 +20,7 @@ use Nyholm\Psr7\Request;
 use Nyholm\Psr7\Response;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
@@ -135,6 +138,42 @@ final class SendPushHandlerTest extends TestCase
         $this->handler($repository, $webPush, false)($this->command());
     }
 
+    public function testServerWidePushToggleOffSkipsDeliveryAndRecordsTheSkip(): void
+    {
+        $repository = $this->createMock(PushSubscriptionRepositoryInterface::class);
+        $repository->expects($this->never())->method('findByUser');
+        $webPush = $this->createMock(WebPush::class);
+        $webPush->expects($this->never())->method('sendOneNotification');
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('info')->with(
+            $this->stringContains('push notifications are turned off'),
+            $this->callback(static fn (array $context): bool => $context['notification_id'] === 'notification-1'
+                && $context['setting'] === NotificationSettingDefinitions::PUSH_ENABLED),
+        );
+
+        $this->handler($repository, $webPush, pushEnabled: false, logger: $logger)($this->command());
+    }
+
+    public function testServerWidePushToggleIsReadForEveryMessage(): void
+    {
+        $repository = $this->createStub(PushSubscriptionRepositoryInterface::class);
+        $repository->method('findByUser')->willReturn([$this->subscription('healthy')]);
+        $webPush = $this->createMock(WebPush::class);
+        $webPush->expects($this->once())->method('sendOneNotification')->willReturn(
+            new MessageSentReport(new Request('POST', 'https://push.baander.app/healthy'), new Response(201)),
+        );
+        $settings = $this->createMock(SystemSettingsPortInterface::class);
+        $settings->expects($this->exactly(2))->method('get')
+            ->with(NotificationSettingDefinitions::PUSH_ENABLED)
+            ->willReturnOnConsecutiveCalls(false, true);
+        $preferences = $this->createStub(NotificationPreferenceRepositoryInterface::class);
+        $preferences->method('isEnabled')->willReturn(true);
+        $handler = new SendPushHandler($preferences, $repository, $webPush, new NullLogger(), 'baander.app', new JsonEncoder(), $settings);
+
+        $handler($this->command());
+        $handler($this->command());
+    }
+
     public function testNoSubscriptionsSkipsDelivery(): void
     {
         $repository = $this->createStub(PushSubscriptionRepositoryInterface::class);
@@ -144,11 +183,19 @@ final class SendPushHandlerTest extends TestCase
         $this->handler($repository, $webPush)($this->command());
     }
 
-    private function handler(PushSubscriptionRepositoryInterface $repository, WebPush $webPush, bool $enabled = true): SendPushHandler
-    {
+    private function handler(
+        PushSubscriptionRepositoryInterface $repository,
+        WebPush $webPush,
+        bool $enabled = true,
+        bool $pushEnabled = true,
+        ?LoggerInterface $logger = null,
+    ): SendPushHandler {
         $preferences = $this->createStub(NotificationPreferenceRepositoryInterface::class);
         $preferences->method('isEnabled')->willReturn($enabled);
-        return new SendPushHandler($preferences, $repository, $webPush, new NullLogger(), 'baander.app', new JsonEncoder());
+        $settings = $this->createStub(SystemSettingsPortInterface::class);
+        $settings->method('get')->willReturnMap([[NotificationSettingDefinitions::PUSH_ENABLED, $pushEnabled]]);
+
+        return new SendPushHandler($preferences, $repository, $webPush, $logger ?? new NullLogger(), 'baander.app', new JsonEncoder(), $settings);
     }
 
     private function subscription(string $name): PushSubscriptionEntity
