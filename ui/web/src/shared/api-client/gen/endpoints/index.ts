@@ -842,6 +842,11 @@ export interface UpdateTranscodeSessionRequest {
   audioProfile?: UpdateTranscodeSessionRequestAudioProfile;
 }
 
+export interface SetUserSettingRequest {
+  /** New value; validated against the setting definition */
+  value: boolean | number | string;
+}
+
 /**
  * Additional error details, omitted when empty
  */
@@ -2525,6 +2530,29 @@ export interface SavePlayerPreferencesRequest {
   payload: SavePlayerPreferencesRequestPayload;
   /** @minimum 0 */
   version: number;
+}
+
+export type UserSettingResourceSource = typeof UserSettingResourceSource[keyof typeof UserSettingResourceSource];
+
+
+export const UserSettingResourceSource = {
+  user: 'user',
+  server_default: 'server_default',
+  default: 'default',
+} as const;
+
+export interface UserSettingResource {
+  key: string;
+  /** The user's explicit choice; null when they have none */
+  choice: boolean | number | string | null;
+  /** Effective value */
+  value: boolean | number | string;
+  /** The value the setting would have after a reset */
+  resetValue: boolean | number | string;
+  source: UserSettingResourceSource;
+  /** Whether the user may change the setting themselves */
+  editable: boolean;
+  definition: SettingDefinitionResource;
 }
 
 export type AcceptLanguageParameter = typeof AcceptLanguageParameter[keyof typeof AcceptLanguageParameter];
@@ -6511,6 +6539,18 @@ export type PutThemeMoodUpdateBody = {
 
 export type PutThemeMoodUpdate200 = {
   mood?: string;
+};
+
+export type GetUserSettingsIndex200 = {
+  data?: UserSettingResource[];
+};
+
+export type PutUserSettingsSet200 = {
+  data?: UserSettingResource;
+};
+
+export type DeleteUserSettingsReset200 = {
+  data?: UserSettingResource;
 };
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
@@ -32066,4 +32106,246 @@ export const usePutThemeMoodUpdate = <TError = ErrorType<ApiError | ValidationEr
         TContext
       > => {
       return useMutation(getPutThemeMoodUpdateMutationOptions(options), queryClient);
+    }
+
+export const getGetUserSettingsIndexUrl = () => {
+
+
+
+
+  return `/api/user/settings`
+}
+
+/**
+ * @summary Get the signed-in user's settings with their effective values
+ */
+export const getUserSettingsIndex = async ( options?: RequestInit): Promise<GetUserSettingsIndex200> => {
+
+  return customInstance<GetUserSettingsIndex200>(getGetUserSettingsIndexUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUserSettingsIndexQueryKey = () => {
+    return [
+    `/api/user/settings`
+    ] as const;
+    }
+
+
+export const getGetUserSettingsIndexQueryOptions = <TData = Awaited<ReturnType<typeof getUserSettingsIndex>>, TError = ErrorType<ApiError>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserSettingsIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUserSettingsIndexQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserSettingsIndex>>> = ({ signal }) => getUserSettingsIndex({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUserSettingsIndex>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetUserSettingsIndexQueryResult = NonNullable<Awaited<ReturnType<typeof getUserSettingsIndex>>>
+export type GetUserSettingsIndexQueryError = ErrorType<ApiError>
+
+
+export function useGetUserSettingsIndex<TData = Awaited<ReturnType<typeof getUserSettingsIndex>>, TError = ErrorType<ApiError>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserSettingsIndex>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUserSettingsIndex>>,
+          TError,
+          Awaited<ReturnType<typeof getUserSettingsIndex>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUserSettingsIndex<TData = Awaited<ReturnType<typeof getUserSettingsIndex>>, TError = ErrorType<ApiError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserSettingsIndex>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getUserSettingsIndex>>,
+          TError,
+          Awaited<ReturnType<typeof getUserSettingsIndex>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetUserSettingsIndex<TData = Awaited<ReturnType<typeof getUserSettingsIndex>>, TError = ErrorType<ApiError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserSettingsIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary Get the signed-in user's settings with their effective values
+ */
+
+export function useGetUserSettingsIndex<TData = Awaited<ReturnType<typeof getUserSettingsIndex>>, TError = ErrorType<ApiError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getUserSettingsIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetUserSettingsIndexQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPutUserSettingsSetUrl = (key: string,) => {
+
+
+
+
+  return `/api/user/settings/${key}`
+}
+
+/**
+ * @summary Set the signed-in user's choice for a setting
+ */
+export const putUserSettingsSet = async (key: string,
+    setUserSettingRequest: SetUserSettingRequest, options?: RequestInit): Promise<PutUserSettingsSet200> => {
+
+  return customInstance<PutUserSettingsSet200>(getPutUserSettingsSetUrl(key),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(setUserSettingRequest)
+  }
+);}
+
+
+
+
+export const getPutUserSettingsSetMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putUserSettingsSet>>, TError,{key: string;data: BodyType<SetUserSettingRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof putUserSettingsSet>>, TError,{key: string;data: BodyType<SetUserSettingRequest>}, TContext> => {
+
+const mutationKey = ['putUserSettingsSet'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putUserSettingsSet>>, {key: string;data: BodyType<SetUserSettingRequest>}> = (props) => {
+          const {key,data} = props ?? {};
+
+          return  putUserSettingsSet(key,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutUserSettingsSetMutationResult = NonNullable<Awaited<ReturnType<typeof putUserSettingsSet>>>
+    export type PutUserSettingsSetMutationBody = BodyType<SetUserSettingRequest>
+    export type PutUserSettingsSetMutationError = ErrorType<ApiError | ValidationError>
+
+    /**
+ * @summary Set the signed-in user's choice for a setting
+ */
+export const usePutUserSettingsSet = <TError = ErrorType<ApiError | ValidationError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putUserSettingsSet>>, TError,{key: string;data: BodyType<SetUserSettingRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof putUserSettingsSet>>,
+        TError,
+        {key: string;data: BodyType<SetUserSettingRequest>},
+        TContext
+      > => {
+      return useMutation(getPutUserSettingsSetMutationOptions(options), queryClient);
+    }
+
+export const getDeleteUserSettingsResetUrl = (key: string,) => {
+
+
+
+
+  return `/api/user/settings/${key}`
+}
+
+/**
+ * @summary Remove the signed-in user's choice so the setting follows its default
+ */
+export const deleteUserSettingsReset = async (key: string, options?: RequestInit): Promise<DeleteUserSettingsReset200> => {
+
+  return customInstance<DeleteUserSettingsReset200>(getDeleteUserSettingsResetUrl(key),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteUserSettingsResetMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteUserSettingsReset>>, TError,{key: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteUserSettingsReset>>, TError,{key: string}, TContext> => {
+
+const mutationKey = ['deleteUserSettingsReset'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteUserSettingsReset>>, {key: string}> = (props) => {
+          const {key} = props ?? {};
+
+          return  deleteUserSettingsReset(key,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteUserSettingsResetMutationResult = NonNullable<Awaited<ReturnType<typeof deleteUserSettingsReset>>>
+
+    export type DeleteUserSettingsResetMutationError = ErrorType<ApiError>
+
+    /**
+ * @summary Remove the signed-in user's choice so the setting follows its default
+ */
+export const useDeleteUserSettingsReset = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteUserSettingsReset>>, TError,{key: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteUserSettingsReset>>,
+        TError,
+        {key: string},
+        TContext
+      > => {
+      return useMutation(getDeleteUserSettingsResetMutationOptions(options), queryClient);
     }

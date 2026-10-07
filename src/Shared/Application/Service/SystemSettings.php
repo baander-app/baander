@@ -73,8 +73,7 @@ final readonly class SystemSettings implements SystemSettingsPortInterface
 
     private function effective(SettingDefinition $definition, mixed $storedValue): bool|int|string
     {
-        if ($storedValue !== null && $definition->allows($storedValue)) {
-            /** @var bool|int|string $storedValue */
+        if ((is_bool($storedValue) || is_int($storedValue) || is_string($storedValue)) && $definition->allows($storedValue)) {
             return $storedValue;
         }
 

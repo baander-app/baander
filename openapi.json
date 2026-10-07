@@ -19679,6 +19679,197 @@
                     }
                 }
             }
+        },
+        "/api/user/settings": {
+            "get": {
+                "tags": [
+                    "User Preferences"
+                ],
+                "summary": "Get the signed-in user's settings with their effective values",
+                "operationId": "get_user_settings_index",
+                "responses": {
+                    "200": {
+                        "description": "User settings",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/UserSettingResource"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/user/settings/{key}": {
+            "put": {
+                "tags": [
+                    "User Preferences"
+                ],
+                "summary": "Set the signed-in user's choice for a setting",
+                "operationId": "put_user_settings_set",
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "[a-z0-9_.]+"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SetUserSettingRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The setting after the change",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/UserSettingResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The setting is not one the user may change",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown setting",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid value",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "User Preferences"
+                ],
+                "summary": "Remove the signed-in user's choice so the setting follows its default",
+                "operationId": "delete_user_settings_reset",
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "[a-z0-9_.]+"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The setting after the reset",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/UserSettingResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The setting is not one the user may change",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Unknown setting",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "components": {
@@ -21313,6 +21504,28 @@
                             "broadcast_5.1",
                             "hifi_stereo",
                             "opus_stereo"
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "SetUserSettingRequest": {
+                "required": [
+                    "value"
+                ],
+                "properties": {
+                    "value": {
+                        "description": "New value; validated against the setting definition",
+                        "oneOf": [
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "string"
+                            }
                         ]
                     }
                 },
@@ -24136,6 +24349,82 @@
                         "type": "integer",
                         "example": 0,
                         "minimum": 0
+                    }
+                },
+                "type": "object"
+            },
+            "UserSettingResource": {
+                "required": [
+                    "key",
+                    "choice",
+                    "value",
+                    "resetValue",
+                    "source",
+                    "editable",
+                    "definition"
+                ],
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "example": "language"
+                    },
+                    "choice": {
+                        "description": "The user's explicit choice; null when they have none",
+                        "nullable": true,
+                        "oneOf": [
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "value": {
+                        "description": "Effective value",
+                        "oneOf": [
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "resetValue": {
+                        "description": "The value the setting would have after a reset",
+                        "oneOf": [
+                            {
+                                "type": "boolean"
+                            },
+                            {
+                                "type": "integer"
+                            },
+                            {
+                                "type": "string"
+                            }
+                        ]
+                    },
+                    "source": {
+                        "type": "string",
+                        "enum": [
+                            "user",
+                            "server_default",
+                            "default"
+                        ]
+                    },
+                    "editable": {
+                        "description": "Whether the user may change the setting themselves",
+                        "type": "boolean"
+                    },
+                    "definition": {
+                        "$ref": "#/components/schemas/SettingDefinitionResource"
                     }
                 },
                 "type": "object"

@@ -1319,6 +1319,9 @@ when@test:
             tags: ['baander.message_payload_codec']
         App\Tests\Fixtures\Messaging\FailureTransportProbeHandler:
             tags: [{ name: 'messenger.message_handler' }]
+        # User settings that only the user settings API tests use.
+        App\Tests\Fixtures\Settings\TestUserSettingDefinitions:
+            tags: ['baander.setting_definition_provider']
         test.scheduler_manual_recorder:
             alias: App\Scheduler\Application\Port\SchedulerManualOccurrenceRecorderInterface
             public: true
