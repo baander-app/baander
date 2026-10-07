@@ -26,6 +26,7 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 
 final class ExecuteScheduledJobHandlerTest extends TestCase
 {
@@ -253,6 +254,57 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
         $this->assertSame(1, $job->getRunCount());
         $this->assertSame('dispatched', $job->getLastResult());
         $this->assertNull($job->getLastError());
+    }
+
+    public function testSynchronousHandlerStringResultBecomesTheLastResult(): void
+    {
+        $job = ScheduledJob::create(
+            name: 'Skipping Messenger',
+            expression: '* * * * *',
+            jobType: JobType::Messenger,
+            command: TestMessengerCommand::class,
+        );
+        $command = new ExecuteScheduledJobCommand(
+            jobId: $job->getId()->toString(),
+            jobType: JobType::Messenger->value,
+            command: TestMessengerCommand::class,
+            parameters: [],
+        );
+
+        $this->jobService->method('getById')->willReturn($job);
+        $this->messageBus->method('dispatch')->willReturnCallback(
+            static fn (object $message): Envelope => new Envelope($message, [new HandledStamp('skipped: toggle is off', 'handler')]),
+        );
+
+        $this->executeOccurrence($this->createHandler(), $command);
+
+        $this->assertSame('skipped: toggle is off', $job->getLastResult());
+        $this->assertNull($job->getLastError());
+    }
+
+    public function testSynchronousHandlerNonStringResultIsRecordedAsDispatched(): void
+    {
+        $job = ScheduledJob::create(
+            name: 'Counting Messenger',
+            expression: '* * * * *',
+            jobType: JobType::Messenger,
+            command: TestMessengerCommand::class,
+        );
+        $command = new ExecuteScheduledJobCommand(
+            jobId: $job->getId()->toString(),
+            jobType: JobType::Messenger->value,
+            command: TestMessengerCommand::class,
+            parameters: [],
+        );
+
+        $this->jobService->method('getById')->willReturn($job);
+        $this->messageBus->method('dispatch')->willReturnCallback(
+            static fn (object $message): Envelope => new Envelope($message, [new HandledStamp(['genre' => 3], 'handler')]),
+        );
+
+        $this->executeOccurrence($this->createHandler(), $command);
+
+        $this->assertSame('dispatched', $job->getLastResult());
     }
 
     // --- Messenger dispatch with missing class ---

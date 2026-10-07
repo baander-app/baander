@@ -1215,6 +1215,7 @@ deptrac:
     'Recommendation Domain':
       - 'Shared Domain'
     'Recommendation Application':
+      - 'Scheduler Schedulable Contract'
       - 'Recommendation Domain'
       - 'Shared Domain'
       - 'Shared Application'

@@ -18,6 +18,7 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Throwable;
 
 #[AsMessageHandler]
@@ -140,9 +141,10 @@ final class ExecuteScheduledJobHandler
         }
 
         $message = new ($messageClass)(...$command->parameters);
-        $this->messageBus->dispatch($message);
+        $handled = $this->messageBus->dispatch($message)->last(HandledStamp::class)?->getResult();
 
-        return 'dispatched';
+        // A synchronous handler may describe its run, such as a skip, as a string.
+        return is_string($handled) ? $handled : 'dispatched';
     }
 
 }
