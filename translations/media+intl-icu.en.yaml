@@ -10,3 +10,4 @@ errors:
   unsupported_transcode_format: 'Unsupported "format". Use opus, aac or mp3.'
   invalid_transcode_bitrate: '"bitrate" must be a positive whole number of bits per second and needs a "format".'
   transcode_failed: "Audio transcoding failed."
+  transcode_disabled: "Audio transcoding is turned off on this server."

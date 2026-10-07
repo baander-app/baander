@@ -12,6 +12,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Domain\ValueObject\MediaReadScope;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Transcode\Application\Port\AudioRenditionPortInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -46,7 +47,7 @@ final class StreamControllerRangeTest extends TestCase
             new Uuid(),
             LibraryReadScope::unrestricted(),
         ));
-        $this->controller = new StreamController($stream, $scopes, $this->createStub(AudioRenditionPortInterface::class));
+        $this->controller = new StreamController($stream, $scopes, $this->createStub(AudioRenditionPortInterface::class), $this->createStub(SystemSettingsPortInterface::class));
     }
 
     protected function tearDown(): void

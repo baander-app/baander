@@ -12,6 +12,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Domain\ValueObject\MediaReadScope;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Transcode\Application\Port\AudioRenditionPortInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\Stub;
@@ -197,6 +198,7 @@ final class StreamControllerSecurityTest extends TestCase
             streamService: $this->streamService,
             scopes: $scopes,
             renditions: $this->createStub(AudioRenditionPortInterface::class),
+            settings: $this->createStub(SystemSettingsPortInterface::class),
         );
         $translator = $this->createStub(TranslatorInterface::class);
         $translator->method('trans')->willReturnArgument(0);
