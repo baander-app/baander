@@ -36,10 +36,10 @@ final class SharedSettingDefinitions implements SettingDefinitionProviderInterfa
             type: SettingValueType::Boolean,
             scope: SettingScope::System,
             label: 'Admin alerts',
-            description: 'Send alerts for critical system events (scan failures, health changes)',
+            description: 'Alert admins when a health check (database, Redis, message workers, Swoole or memory) stops reporting healthy. Other admin alerts, such as new user registrations, are always sent.',
             group: 'Notifications',
             default: true,
-            enforced: false,
+            enforced: true,
         );
     }
 }

@@ -14,6 +14,7 @@ use App\Notification\Domain\Repository\NotificationPreferenceRepositoryInterface
 use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Notification\Infrastructure\Doctrine\Entity\PushSubscriptionEntity;
 use App\Notification\Infrastructure\Push\PushSubscriptionRepositoryInterface;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
@@ -69,7 +70,7 @@ final class PushSubscriptionRegistrationRepositoryTest extends TestCase
             },
         );
         $handler = new SendPushHandler($preferences, static::getContainer()->get(PushSubscriptionRepositoryInterface::class),
-            $webPush, new NullLogger(), 'baander.app', new JsonEncoder());
+            $webPush, new NullLogger(), 'baander.app', new JsonEncoder(), static::getContainer()->get(SystemSettingsPortInterface::class));
         $handler(new SendPushCommand($owner->getId(), NotificationCategory::Security, 'Title', 'Body', 'rotation'));
         $after = $connection->fetchAssociative('SELECT * FROM push_subscriptions WHERE endpoint = :endpoint', ['endpoint' => $endpoint]);
         $this->assertIsArray($after);

@@ -23,7 +23,7 @@ final class NotificationSettingDefinitions implements SettingDefinitionProviderI
             description: 'Enable browser push notifications',
             group: 'Notifications',
             default: true,
-            enforced: false,
+            enforced: true,
         );
     }
 }
