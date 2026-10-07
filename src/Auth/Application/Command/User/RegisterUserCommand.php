@@ -12,7 +12,16 @@ final readonly class RegisterUserCommand
         private Email $email,
         private string $name,
         private string $plainPassword,
+        private ?string $browserLanguage = null,
     ) {
+    }
+
+    /**
+     * The supported language the browser ranked highest, if any.
+     */
+    public function getBrowserLanguage(): ?string
+    {
+        return $this->browserLanguage;
     }
 
     public function getEmail(): Email
