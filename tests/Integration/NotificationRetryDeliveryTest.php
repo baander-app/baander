@@ -12,6 +12,7 @@ use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
+use App\UserPreference\Application\Port\UserSettingsContractInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -38,6 +39,7 @@ use Symfony\Component\Messenger\Stamp\SentToFailureTransportStamp;
 use Symfony\Component\Messenger\Transport\Sender\SendersLocator;
 use Symfony\Component\Messenger\Worker;
 use Symfony\Component\Mime\Email;
+use Symfony\Component\Translation\IdentityTranslator;
 use Twig\Environment;
 
 final class NotificationRetryDeliveryTest extends TestCase
@@ -71,7 +73,9 @@ final class NotificationRetryDeliveryTest extends TestCase
                     throw new TransportException('SMTP unavailable');
                 }
             });
-        $handler = new SendEmailHandler($preferences, $mailer, $twig, new NullLogger(), 'baander.app', 'Baander');
+        $userSettings = $this->createStub(UserSettingsContractInterface::class);
+        $userSettings->method('resolveLanguage')->willReturn('en');
+        $handler = new SendEmailHandler($preferences, $userSettings, $mailer, $twig, new IdentityTranslator(), new NullLogger(), 'baander.app', 'Baander');
         $bus = new MessageBus([
             new SendMessageMiddleware(new SendersLocator(
                 [SendEmailCommand::class => ['async']],
@@ -83,8 +87,10 @@ final class NotificationRetryDeliveryTest extends TestCase
             Uuid::v4(),
             'user@baander.app',
             NotificationCategory::Security,
-            'Password changed',
-            'Your password was updated.',
+            'user.password_changed.title',
+            [],
+            'user.password_changed.body',
+            [],
             new \DateTimeImmutable('2026-10-02T12:00:00.123+00:00'),
             (new PublicId())->toString(),
         );

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="{{ locale }}">
 <body style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
     <div style="background: {{ headerColor }}; color: #fff; padding: 20px; border-radius: 8px 8px 0 0;">
         <h1 style="margin: 0;">{{ headerTitle }}</h1>
@@ -11,17 +11,17 @@
         {% if notificationPublicId %}
         <a href="https://{{ appDomain }}/notifications/{{ notificationPublicId }}"
            style="display: inline-block; background: {{ headerColor }}; color: #fff; padding: 10px 20px; text-decoration: none; border-radius: 4px; margin-top: 10px;">
-            View in {{ appName }}
+            {{ 'email.view'|trans({appName: appName}, 'notification', locale) }}
         </a>
         {% endif %}
     </div>
     <p style="color: #999; font-size: 11px; text-align: center; margin-top: 20px;">
         {% if category == 'security' %}
-            You received this email because you have security notifications enabled in {{ appName }}.
+            {{ 'email.footer.security'|trans({appName: appName}, 'notification', locale) }}
         {% elseif category == 'background_jobs' %}
-            You received this email because you have background job notifications enabled in {{ appName }}.
+            {{ 'email.footer.background_jobs'|trans({appName: appName}, 'notification', locale) }}
         {% elseif category == 'media_changes' %}
-            You received this email because you have media change notifications enabled in {{ appName }}.
+            {{ 'email.footer.media_changes'|trans({appName: appName}, 'notification', locale) }}
         {% endif %}
     </p>
 </body>

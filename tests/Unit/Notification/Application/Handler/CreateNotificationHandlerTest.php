@@ -9,6 +9,8 @@ use App\Auth\Domain\Model\UserState;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Library\Application\Query\LibraryMembershipQueryPort;
 use App\Notification\Application\DTO\CreateNotificationCommand;
+use App\Notification\Application\DTO\SendEmailCommand;
+use App\Notification\Application\DTO\TranslatableParameter;
 use App\Notification\Application\Handler\CreateNotificationHandler;
 use App\Notification\Application\Service\NotificationContentResolver;
 use App\Notification\Domain\Model\Notification;
@@ -19,13 +21,15 @@ use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Translation\Loader\ArrayLoader;
+use Symfony\Component\Translation\Translator;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 final class CreateNotificationHandlerTest extends TestCase
 {
     private EventCategoryResolver $categoryResolver;
     private NotificationContentResolver $contentResolver;
-    private TranslatorInterface&Stub $translator;
+    private TranslatorInterface $translator;
     private NotificationRepositoryInterface&Stub $notificationRepository;
     private LibraryMembershipQueryPort&Stub $libraryMembershipQuery;
     private UserRepositoryInterface&Stub $userRepository;
@@ -35,15 +39,16 @@ final class CreateNotificationHandlerTest extends TestCase
     {
         $this->categoryResolver = new EventCategoryResolver();
         $this->contentResolver = new NotificationContentResolver();
-        $this->translator = $this->createStub(TranslatorInterface::class);
+        $translator = $this->createStub(TranslatorInterface::class);
         $this->notificationRepository = $this->createStub(NotificationRepositoryInterface::class);
         $this->libraryMembershipQuery = $this->createStub(LibraryMembershipQueryPort::class);
         $this->userRepository = $this->createStub(UserRepositoryInterface::class);
         $this->bus = $this->createStub(MessageBusInterface::class);
 
-        $this->translator->method('trans')->willReturnCallback(
+        $translator->method('trans')->willReturnCallback(
             fn (string $id, array $params = [], ?string $domain = null, ?string $locale = null) => $id,
         );
+        $this->translator = $translator;
     }
 
     private function createHandler(): CreateNotificationHandler
@@ -264,5 +269,85 @@ final class CreateNotificationHandlerTest extends TestCase
             ->willReturnCallback(fn (object $m) => new Envelope($m));
 
         $this->createHandler()($command);
+    }
+
+    public function testEmailCommandCarriesTranslationKeysAndParametersInsteadOfText(): void
+    {
+        $userId = Uuid::generate();
+        $this->userRepository->method('findByUuid')->willReturn($this->verifiedUser($userId));
+
+        $emails = [];
+        $this->bus->method('dispatch')->willReturnCallback(function (object $m) use (&$emails): Envelope {
+            if ($m instanceof SendEmailCommand) {
+                $emails[] = $m;
+            }
+
+            return new Envelope($m);
+        });
+
+        ($this->createHandler())(new CreateNotificationCommand(
+            eventClass: \App\Auth\Domain\Event\Passkey\PasskeyRegistered::class,
+            payload: ['user_id' => $userId->toString(), 'name' => null, 'occurred_at' => '2026-10-07T00:00:00+00:00'],
+            eventName: 'user.passkey_registered',
+        ));
+
+        $this->assertCount(1, $emails);
+        $this->assertSame('user.passkey_registered.title', $emails[0]->titleKey);
+        $this->assertSame([], $emails[0]->titleParameters);
+        $this->assertSame('user.passkey_registered.body', $emails[0]->bodyKey);
+        $this->assertEquals(['name' => new TranslatableParameter('parameter.unknown_passkey_name')], $emails[0]->bodyParameters);
+    }
+
+    public function testInAppNotificationStaysEnglishWhateverTheTranslatorLocale(): void
+    {
+        $this->notificationRepository = $this->createMock(NotificationRepositoryInterface::class);
+        $translator = new Translator('en');
+        $translator->addLoader('array', new ArrayLoader());
+        $translator->addResource('array', [
+            'user.passkey_registered.title' => 'Passkey registered',
+            'user.passkey_registered.body' => 'A new passkey "{name}" was registered on your account.',
+            'parameter.unknown_passkey_name' => 'Unknown',
+        ], 'en', 'notification+intl-icu');
+        $translator->addResource('array', [
+            'user.passkey_registered.title' => 'Adgangsnøgle registreret',
+            'user.passkey_registered.body' => 'En ny adgangsnøgle "{name}" blev registreret på din konto.',
+            'parameter.unknown_passkey_name' => 'Ukendt',
+        ], 'da', 'notification+intl-icu');
+        // A request in Danish may have left the shared translator on its locale.
+        $translator->setLocale('da');
+        $this->translator = $translator;
+
+        $userId = Uuid::generate();
+        $this->bus->method('dispatch')->willReturnCallback(fn (object $m) => new Envelope($m));
+
+        $this->notificationRepository->expects($this->once())->method('save')
+            ->with($this->callback(function (Notification $notification): bool {
+                $this->assertSame('Passkey registered', $notification->getTitle());
+                $this->assertSame('A new passkey "Unknown" was registered on your account.', $notification->getBody());
+                $this->assertSame(['title' => [], 'body' => ['name' => 'Unknown']], $notification->getParameters());
+
+                return true;
+            }));
+
+        ($this->createHandler())(new CreateNotificationCommand(
+            eventClass: \App\Auth\Domain\Event\Passkey\PasskeyRegistered::class,
+            payload: ['user_id' => $userId->toString(), 'name' => null, 'occurred_at' => '2026-10-07T00:00:00+00:00'],
+            eventName: 'user.passkey_registered',
+        ));
+    }
+
+    private function verifiedUser(Uuid $userId): User
+    {
+        return User::reconstitute(new UserState(
+            id: $userId,
+            publicId: new \App\Shared\Domain\Model\PublicId(),
+            name: 'Test',
+            email: 'user@baander.app',
+            password: 'hashed',
+            totpSecret: null,
+            createdAt: new \DateTimeImmutable(),
+            updatedAt: new \DateTimeImmutable(),
+            emailVerifiedAt: new \DateTimeImmutable('-1 day'),
+        ));
     }
 }

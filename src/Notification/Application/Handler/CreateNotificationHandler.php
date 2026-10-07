@@ -15,9 +15,12 @@ use App\Notification\Application\Service\NotificationContentResolver;
 use App\Notification\Domain\Model\Notification;
 use App\Notification\Domain\Repository\NotificationRepositoryInterface;
 use App\Notification\Domain\Service\EventCategoryResolver;
+use App\Notification\Domain\ValueObject\NotificationCategory;
+use App\Shared\Domain\Model\Setting\SupportedLanguages;
 use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use Symfony\Contracts\Translation\TranslatableInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 final class CreateNotificationHandler
@@ -46,8 +49,13 @@ final class CreateNotificationHandler
         $referenceData = $this->extractReferenceData($command->eventName, $command->payload);
         $recipientUserIds = $this->resolveRecipients($command->eventName, $command->payload);
 
-        $title = $this->translator->trans($resolved['titleKey'], $resolved['parameters']['title'], 'notification');
-        $body = $this->translator->trans($resolved['bodyKey'], $resolved['parameters']['body'], 'notification');
+        // In-app, push and webhook text stays English; each email is translated when it is sent.
+        $englishParameters = [
+            'title' => $this->inEnglish($resolved['parameters']['title']),
+            'body' => $this->inEnglish($resolved['parameters']['body']),
+        ];
+        $title = $this->translator->trans($resolved['titleKey'], $englishParameters['title'], 'notification', SupportedLanguages::FALLBACK);
+        $body = $this->translator->trans($resolved['bodyKey'], $englishParameters['body'], 'notification', SupportedLanguages::FALLBACK);
 
         foreach ($recipientUserIds as $userIdString) {
             $userId = Uuid::fromString($userIdString);
@@ -59,22 +67,38 @@ final class CreateNotificationHandler
                 title: $title,
                 body: $body,
                 referenceData: $referenceData,
-                parameters: $resolved['parameters'],
+                parameters: $englishParameters,
             );
 
             $this->notificationRepository->save($notification);
 
-            $this->dispatchEmailCommand($userId, $category, $title, $body, $notification);
+            $this->dispatchEmailCommand($userId, $category, $resolved, $notification);
             $this->dispatchPushCommand($userId, $category, $title, $body, $notification);
             $this->dispatchWebhookCommand($userId, $category, $title, $body, $notification);
         }
     }
 
+    /**
+     * @param array<string, mixed> $parameters
+     * @return array<string, mixed>
+     */
+    private function inEnglish(array $parameters): array
+    {
+        return array_map(
+            fn (mixed $value): mixed => $value instanceof TranslatableInterface
+                ? $value->trans($this->translator, SupportedLanguages::FALLBACK)
+                : $value,
+            $parameters,
+        );
+    }
+
+    /**
+     * @param array{titleKey: string, bodyKey: string, parameters: array{title: array<string, mixed>, body: array<string, mixed>}} $content
+     */
     private function dispatchEmailCommand(
         Uuid $userId,
-        \App\Notification\Domain\ValueObject\NotificationCategory $category,
-        string $title,
-        string $body,
+        NotificationCategory $category,
+        array $content,
         Notification $notification,
     ): void {
         try {
@@ -91,8 +115,10 @@ final class CreateNotificationHandler
             userId: $userId,
             userEmail: $user->getEmail(),
             category: $category,
-            title: $title,
-            body: $body,
+            titleKey: $content['titleKey'],
+            titleParameters: $content['parameters']['title'],
+            bodyKey: $content['bodyKey'],
+            bodyParameters: $content['parameters']['body'],
             createdAt: $notification->getCreatedAt(),
             notificationPublicId: $notification->getPublicId()->toString(),
         ));
@@ -100,7 +126,7 @@ final class CreateNotificationHandler
 
     private function dispatchPushCommand(
         Uuid $userId,
-        \App\Notification\Domain\ValueObject\NotificationCategory $category,
+        NotificationCategory $category,
         string $title,
         string $body,
         Notification $notification,
@@ -116,7 +142,7 @@ final class CreateNotificationHandler
 
     private function dispatchWebhookCommand(
         Uuid $userId,
-        \App\Notification\Domain\ValueObject\NotificationCategory $category,
+        NotificationCategory $category,
         string $title,
         string $body,
         Notification $notification,

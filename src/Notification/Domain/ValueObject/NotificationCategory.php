@@ -21,13 +21,16 @@ enum NotificationCategory: string
         };
     }
 
-    public function headerTitle(string $appName): string
+    /**
+     * The notification-domain message key of the email header, which takes the `appName` parameter.
+     */
+    public function headerTitle(): string
     {
         return match ($this) {
-            self::Security => "$appName Security Alert",
+            self::Security => 'email.header.security',
             self::BackgroundJobs,
             self::MediaChanges,
-            self::AdminOperations => $appName,
+            self::AdminOperations => 'email.header.default',
         };
     }
 }

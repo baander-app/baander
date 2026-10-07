@@ -31,3 +31,19 @@ album:
   created:
     title: "Nyt album i biblioteket"
     body: "Et nyt album blev tilføjet til dit bibliotek."
+
+# Used when an event lacks the value.
+parameter:
+  unknown_passkey_name: "Ukendt"
+  unknown_user_name: "Bruger"
+  unknown_token_type: "adgangs"
+
+email:
+  header:
+    security: "Sikkerhedsadvarsel fra {appName}"
+    default: "{appName}"
+  view: "Se i {appName}"
+  footer:
+    security: "Du modtager denne e-mail, fordi du har slået sikkerhedsnotifikationer til i {appName}."
+    background_jobs: "Du modtager denne e-mail, fordi du har slået notifikationer om baggrundsjob til i {appName}."
+    media_changes: "Du modtager denne e-mail, fordi du har slået notifikationer om medieændringer til i {appName}."

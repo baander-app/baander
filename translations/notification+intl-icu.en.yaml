@@ -31,3 +31,19 @@ album:
   created:
     title: "New album in library"
     body: "A new album was added to your library."
+
+# Used when an event lacks the value.
+parameter:
+  unknown_passkey_name: "Unknown"
+  unknown_user_name: "User"
+  unknown_token_type: "access"
+
+email:
+  header:
+    security: "{appName} Security Alert"
+    default: "{appName}"
+  view: "View in {appName}"
+  footer:
+    security: "You received this email because you have security notifications enabled in {appName}."
+    background_jobs: "You received this email because you have background job notifications enabled in {appName}."
+    media_changes: "You received this email because you have media change notifications enabled in {appName}."

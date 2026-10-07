@@ -62,7 +62,7 @@ final class NotificationDeliveryTest extends TestCase
             'envelope stamps' => new Envelope(self::message('push'), [new DelayStamp(100)]),
             'blank ID' => new SendPushCommand(Uuid::v4(), NotificationCategory::Security, 'title', 'body', '   '),
             'overlong ID' => new SendWebhookCommand(Uuid::v4(), NotificationCategory::Security, 'title', 'body', str_repeat('x', 65)),
-            'missing ID' => new SendEmailCommand(Uuid::v4(), 'user@baander.app', NotificationCategory::Security, 'title', 'body', new \DateTimeImmutable()),
+            'missing ID' => new SendEmailCommand(Uuid::v4(), 'user@baander.app', NotificationCategory::Security, 'title', [], 'body', [], new \DateTimeImmutable()),
             default => self::message('push'),
         };
         $this->expectException(\InvalidArgumentException::class);
@@ -119,7 +119,7 @@ final class NotificationDeliveryTest extends TestCase
             'malformed' => '{',
             'wrong channel' => $codec->encode(self::message('email')),
             'wrong ID' => $codec->encode(new SendPushCommand(Uuid::v4(), NotificationCategory::Security, 'title', 'body', 'notification-2')),
-            'missing ID' => $codec->encode(new SendEmailCommand(Uuid::v4(), 'user@baander.app', NotificationCategory::Security, 'title', 'body', new \DateTimeImmutable())),
+            'missing ID' => $codec->encode(new SendEmailCommand(Uuid::v4(), 'user@baander.app', NotificationCategory::Security, 'title', [], 'body', [], new \DateTimeImmutable())),
             'unsupported' => $codec->encode(new \App\Shared\Domain\Event\Outbox\RelayOutboxCommand()),
             default => $codec->encode($message),
         };
@@ -249,7 +249,7 @@ final class NotificationDeliveryTest extends TestCase
     {
         $user = Uuid::fromString('0198ebcf-8b2a-7110-8f07-174f3359b428');
         return match ($channel) {
-            'email' => new SendEmailCommand($user, 'user@baander.app', NotificationCategory::Security, 'title', 'body', new \DateTimeImmutable(), 'notification-1'),
+            'email' => new SendEmailCommand($user, 'user@baander.app', NotificationCategory::Security, 'title', [], 'body', [], new \DateTimeImmutable(), 'notification-1'),
             'push' => new SendPushCommand($user, NotificationCategory::Security, 'title', 'body', 'notification-1'),
             'webhook' => new SendWebhookCommand($user, NotificationCategory::Security, 'title', 'body', 'notification-1'),
         };

@@ -13,11 +13,13 @@ use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Notification\Infrastructure\Webhook\HmacSigner;
 use App\Notification\Infrastructure\Webhook\WebhookDeliveryService;
 use App\Shared\Domain\Model\Uuid;
+use App\UserPreference\Application\Port\UserSettingsContractInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Mailer\Exception\TransportException;
 use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\Translation\IdentityTranslator;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Twig\Environment;
 
@@ -33,7 +35,7 @@ final class ChannelFailurePropagationTest extends TestCase
         $mailer = $this->createStub(MailerInterface::class);
         $mailer->method('send')->willThrowException($failure);
 
-        $handler = new SendEmailHandler($preferences, $mailer, $twig, new NullLogger(), 'baander.app', 'Baander');
+        $handler = new SendEmailHandler($preferences, $this->userSettings(), $mailer, $twig, new IdentityTranslator(), new NullLogger(), 'baander.app', 'Baander');
 
         $this->expectExceptionObject($failure);
         $handler($this->emailCommand());
@@ -49,7 +51,7 @@ final class ChannelFailurePropagationTest extends TestCase
         $mailer = $this->createMock(MailerInterface::class);
         $mailer->expects($this->never())->method('send');
 
-        $handler = new SendEmailHandler($preferences, $mailer, $twig, new NullLogger(), 'baander.app', 'Baander');
+        $handler = new SendEmailHandler($preferences, $this->userSettings(), $mailer, $twig, new IdentityTranslator(), new NullLogger(), 'baander.app', 'Baander');
 
         $this->expectExceptionObject($failure);
         $handler($this->emailCommand());
@@ -64,7 +66,7 @@ final class ChannelFailurePropagationTest extends TestCase
         $mailer = $this->createMock(MailerInterface::class);
         $mailer->expects($this->never())->method('send');
 
-        $handler = new SendEmailHandler($preferences, $mailer, $twig, new NullLogger(), 'baander.app', 'Baander');
+        $handler = new SendEmailHandler($preferences, $this->userSettings(), $mailer, $twig, new IdentityTranslator(), new NullLogger(), 'baander.app', 'Baander');
         $handler($this->emailCommand());
     }
 
@@ -89,14 +91,24 @@ final class ChannelFailurePropagationTest extends TestCase
         $handler(new SendWebhookCommand(Uuid::generate(), NotificationCategory::Security, 'Title', 'Body', 'notification-1'));
     }
 
+    private function userSettings(): UserSettingsContractInterface
+    {
+        $settings = $this->createStub(UserSettingsContractInterface::class);
+        $settings->method('resolveLanguage')->willReturn('en');
+
+        return $settings;
+    }
+
     private function emailCommand(): SendEmailCommand
     {
         return new SendEmailCommand(
             Uuid::generate(),
             'user@baander.app',
             NotificationCategory::Security,
-            'Title',
-            'Body',
+            'user.password_changed.title',
+            [],
+            'user.password_changed.body',
+            [],
             new \DateTimeImmutable(),
             'notification-1',
         );
