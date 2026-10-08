@@ -10,6 +10,7 @@ use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
+use App\Transcode\Application\Exception\AudioRenditionBusyException;
 use App\Transcode\Application\Exception\AudioRenditionFailedException;
 use App\Transcode\Application\Port\AudioRendition;
 use App\Transcode\Application\Port\AudioRenditionFormat;
@@ -29,6 +30,9 @@ final class StreamController
 {
     use ApiResponsesTrait;
     use TranslatorTrait;
+
+    /** Most track encodes finish within seconds, freeing a slot. */
+    private const int TRANSCODE_BUSY_RETRY_SECONDS = 5;
 
     public function __construct(
         private readonly StreamPortInterface $streamService,
@@ -51,7 +55,7 @@ final class StreamController
         parameters: [
             new OA\Parameter(name: 'id', description: 'PublicId of the track', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'format', description: 'Transcode to this audio format. Without it the original file is streamed.', in: 'query', required: false, schema: new OA\Schema(type: 'string', enum: ['opus', 'aac', 'mp3'])),
-            new OA\Parameter(name: 'bitrate', description: 'Target bitrate in bits per second; requires format. Fitted to the format\'s supported range (opus 32000-256000, aac and mp3 32000-320000) in whole kilobits. Never above the server\'s transcode.max_bitrate, which also applies when no bitrate is given.', in: 'query', required: false, schema: new OA\Schema(type: 'integer', minimum: 1)),
+            new OA\Parameter(name: 'bitrate', description: 'Target bitrate in bits per second; requires format. Capped at the server\'s transcode.max_bitrate (which also applies when no bitrate is given), then snapped down to the nearest of 64000, 96000, 128000, 160000, 192000, 256000 and 320000 that the format supports (opus at most 256000). A value below 64000 gets 64000.', in: 'query', required: false, schema: new OA\Schema(type: 'integer', minimum: 1)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Full file (audio/video stream). A transcode that is still encoding streams progressively with Accept-Ranges: none.'),
@@ -61,6 +65,12 @@ final class StreamController
             new OA\Response(response: '416', description: 'Requested byte range is not satisfiable'),
             new OA\Response(response: '404', description: 'Track not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '500', description: 'Transcoding failed', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '503',
+                description: 'The server already runs as many audio encodes as it allows and this rendition needs a new one; retry after the Retry-After delay',
+                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 5))],
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ),
         ],
     )]
     #[Route('/track', name: 'track', methods: ['GET'])]
@@ -131,6 +141,14 @@ final class StreamController
 
         try {
             $rendition = $this->renditions->open($trackId->toString(), $fullPath, $renditionFormat, $targetBitrate);
+        } catch (AudioRenditionBusyException) {
+            $response = $this->errorResponse(
+                $this->trans('errors.transcode_busy', domain: 'media'),
+                Response::HTTP_SERVICE_UNAVAILABLE,
+            );
+            $response->headers->set('Retry-After', (string) self::TRANSCODE_BUSY_RETRY_SECONDS);
+
+            return $response;
         } catch (AudioRenditionFailedException) {
             return $this->errorResponse(
                 $this->trans('errors.transcode_failed', domain: 'media'),

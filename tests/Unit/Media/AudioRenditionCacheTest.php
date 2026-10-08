@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Media;
 
 use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPoolInterface;
+use App\Transcode\Application\Exception\AudioRenditionBusyException;
 use App\Transcode\Application\Exception\AudioRenditionFailedException;
 use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
@@ -16,6 +17,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 use Stringable;
 use Swoole\Table;
+use Symfony\Component\Process\Process;
 
 /**
  * The cached audio rendition behind the transcoding track stream: one encode
@@ -38,6 +40,12 @@ final class AudioRenditionCacheTest extends TestCase
     /** @var array<string, array{data: string, status: string}> */
     private array $results = [];
     private ?Closure $onDispatch = null;
+    /** Whether the stand-in pool refuses limited jobs, as when the encode limit is reached. */
+    private bool $poolAtLimit = false;
+    /** @var list<array{key: string, limit: int}> */
+    private array $limits = [];
+    /** A stand-in for an encoder in another process; stopped after each test. */
+    private ?Process $otherEncoder = null;
 
     protected function setUp(): void
     {
@@ -50,6 +58,7 @@ final class AudioRenditionCacheTest extends TestCase
 
     protected function tearDown(): void
     {
+        $this->otherEncoder?->stop(0);
         $entries = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($this->root, \FilesystemIterator::SKIP_DOTS),
             \RecursiveIteratorIterator::CHILD_FIRST,
@@ -143,6 +152,137 @@ final class AudioRenditionCacheTest extends TestCase
         self::assertStringContainsString('Invalid data found', (string) $this->logs[0]['context']['reason']);
     }
 
+    public function testANewEncodeIsRefusedWithoutDispatchWhenTheEncodeLimitIsReached(): void
+    {
+        $this->poolAtLimit = true;
+
+        try {
+            $this->cache()->open(self::TRACK, $this->source, AudioRenditionFormat::Mp3, 192_000);
+            self::fail('An encode beyond the limit must not start.');
+        } catch (AudioRenditionBusyException) {
+        }
+
+        self::assertSame([], $this->dispatched);
+        self::assertSame([['key' => AudioRenditionPoolWorker::JOB_TYPE, 'limit' => 3]], $this->limits);
+        self::assertSame([], $this->logs);
+    }
+
+    public function testAListenerStillJoinsARunningEncodeWhenTheEncodeLimitIsReached(): void
+    {
+        $output = $this->renditionPath(AudioRenditionFormat::Aac, 160);
+        self::assertTrue(mkdir(dirname($output), 0700, true));
+        $lock = fopen(substr($output, 0, -strlen('.aac')) . '.lock', 'c');
+        self::assertNotFalse($lock);
+        self::assertTrue(flock($lock, LOCK_EX));
+        file_put_contents($output . '.part', 'running-');
+        $this->poolAtLimit = true;
+
+        $joiner = $this->cache()->open(self::TRACK, $this->source, AudioRenditionFormat::Aac, 160_000);
+
+        self::assertSame([], $this->limits, 'joining a running encode does not count against the limit');
+        self::assertSame('running-', $this->generator($joiner->chunks())->current());
+        flock($lock, LOCK_UN);
+        fclose($lock);
+    }
+
+    public function testAStalePartialFromADeadEncoderIsRemovedBeforeTheNewEncodeStarts(): void
+    {
+        $output = $this->renditionPath(AudioRenditionFormat::Mp3, 192);
+        self::assertTrue(mkdir(dirname($output), 0700, true));
+        file_put_contents($output . '.part', 'stale bytes of a dead encoder');
+        $this->writeEncoder("printf 'fresh' > \"\$out\"");
+        $partialAtDispatch = null;
+        $this->onDispatch = function (string $payload, string $key) use ($output, &$partialAtDispatch): void {
+            // A queued pool job has not started yet, so listeners must not see the stale bytes.
+            clearstatcache(true, $output . '.part');
+            $partialAtDispatch = is_file($output . '.part');
+            $this->runWorker($payload, $key);
+        };
+
+        $rendition = $this->cache()->open(self::TRACK, $this->source, AudioRenditionFormat::Mp3, 192_000);
+
+        self::assertFalse($partialAtDispatch);
+        self::assertSame('fresh', implode('', iterator_to_array($rendition->chunks(), false)));
+    }
+
+    public function testThePoolWorkerReturnsAtOnceWhenAnotherEncodeHoldsTheRenditionLock(): void
+    {
+        $this->writeEncoder("printf 'duplicate' > \"\$out\"");
+        $output = $this->renditionPath(AudioRenditionFormat::Opus, 96);
+        self::assertTrue(mkdir(dirname($output), 0700, true));
+        $lockPath = substr($output, 0, -strlen('.opus')) . '.lock';
+        $this->startOtherEncoder($lockPath, $output, holdSeconds: 5.0);
+
+        $started = microtime(true);
+        $result = (new AudioRenditionPoolWorker())->handle(json_encode([
+            'type' => AudioRenditionPoolWorker::JOB_TYPE,
+            'ffmpeg_path' => $this->encoder,
+            'source_path' => $this->source,
+            'output_path' => $output,
+            'lock_path' => $lockPath,
+            'format' => 'opus',
+            'bitrate' => 96_000,
+        ], JSON_THROW_ON_ERROR));
+
+        self::assertLessThan(1.0, microtime(true) - $started, 'a duplicate job must not wait for the running encode');
+        self::assertSame('running', json_decode($result, true, 512, JSON_THROW_ON_ERROR)['status']);
+        self::assertSame(0, $this->encoderRuns());
+    }
+
+    public function testARequestWhoseJobFoundAnEncodeRunningStreamsThatEncode(): void
+    {
+        $this->onDispatch = function (string $payload, string $key): void {
+            // Another request's encode took the lock first, so this job returned at once.
+            $job = json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
+            $this->startOtherEncoder($job['lock_path'], $job['output_path'], holdSeconds: 0.0);
+            $this->results[$key] = ['status' => 'ok', 'data' => '{"status":"running"}'];
+        };
+
+        $rendition = $this->cache()->open(self::TRACK, $this->source, AudioRenditionFormat::Aac, 128_000);
+
+        self::assertFalse($rendition->isComplete());
+        self::assertSame('first-second', implode('', iterator_to_array($rendition->chunks(), false)));
+        self::assertCount(1, $this->dispatched);
+        self::assertSame([], $this->results);
+        self::assertSame([], $this->logs);
+    }
+
+    private function renditionPath(AudioRenditionFormat $format, int $kilobits): string
+    {
+        clearstatcache(true, $this->source);
+        $fingerprint = hash('xxh64', sprintf('%d:%d', filemtime($this->source), filesize($this->source)));
+
+        return (new SegmentFileResolver($this->root . '/cache'))->resolveAudioRenditionPath(
+            self::TRACK,
+            sprintf('%s-%dk-%s.%s', $format->value, $kilobits, $fingerprint, $format->extension()),
+        );
+    }
+
+    /**
+     * Start an encoder in another process: it takes the rendition lock, writes
+     * `first-` then `second` to the partial file and publishes the rendition,
+     * then keeps the lock for `$holdSeconds` more, standing in for a long encode.
+     */
+    private function startOtherEncoder(string $lockPath, string $output, float $holdSeconds): void
+    {
+        $script = <<<'PHP'
+            [, $lockPath, $output, $hold] = $argv;
+            $lock = fopen($lockPath, 'c');
+            flock($lock, LOCK_EX);
+            echo "locked\n";
+            usleep(100_000);
+            file_put_contents($output . '.part', 'first-');
+            usleep(100_000);
+            file_put_contents($output . '.part', 'second', FILE_APPEND);
+            rename($output . '.part', $output);
+            usleep((int) ((float) $hold * 1_000_000));
+            PHP;
+        $this->otherEncoder = new Process([PHP_BINARY, '-r', $script, $lockPath, $output, (string) $holdSeconds]);
+        $this->otherEncoder->setTimeout(10);
+        $this->otherEncoder->start();
+        $this->otherEncoder->waitUntil(static fn (string $type, string $output): bool => str_contains($output, 'locked'));
+    }
+
     private function cache(): AudioRenditionCache
     {
         $test = $this;
@@ -158,7 +298,12 @@ final class AudioRenditionCacheTest extends TestCase
 
             public function dispatch(string $payload, string $resultKey): void
             {
-                $this->test->recordDispatch($payload, $resultKey);
+                throw new \LogicException('Rendition encodes must be dispatched within the encode limit.');
+            }
+
+            public function dispatchWithinLimit(string $payload, string $resultKey, string $limitKey, int $limit): bool
+            {
+                return $this->test->recordLimitedDispatch($payload, $resultKey, $limitKey, $limit);
             }
 
             public function getResultTable(): ?Table
@@ -189,9 +334,22 @@ final class AudioRenditionCacheTest extends TestCase
             new AudioRenditionPoolWorker(),
             $logger,
             $this->encoder,
+            maxConcurrentEncodes: 3,
             pollIntervalSeconds: 0.001,
             startTimeoutSeconds: 2.0,
         );
+    }
+
+    /** @internal called by the stand-in pool */
+    public function recordLimitedDispatch(string $payload, string $key, string $limitKey, int $limit): bool
+    {
+        $this->limits[] = ['key' => $limitKey, 'limit' => $limit];
+        if ($this->poolAtLimit) {
+            return false;
+        }
+        $this->recordDispatch($payload, $key);
+
+        return true;
     }
 
     /**
@@ -242,7 +400,7 @@ final class AudioRenditionCacheTest extends TestCase
 
     private function encoderRuns(): int
     {
-        return count(file($this->root . '/runs') ?: []);
+        return is_file($this->root . '/runs') ? count(file($this->root . '/runs') ?: []) : 0;
     }
 
     /**

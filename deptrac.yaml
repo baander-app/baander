@@ -532,7 +532,7 @@ deptrac:
     - name: 'Transcode Audio Rendition Contract'
       collectors:
         - type: classLike
-          value: '^App\\Transcode\\Application\\(Port\\AudioRendition(PortInterface|Format)?|Exception\\AudioRenditionFailedException|Settings\\TranscodeSettingDefinitions)$'
+          value: '^App\\Transcode\\Application\\(Port\\AudioRendition(PortInterface|Format)?|Exception\\AudioRendition(Failed|Busy)Exception|Settings\\TranscodeSettingDefinitions)$'
 
     - name: 'Transcode Application'
       collectors:
@@ -544,7 +544,7 @@ deptrac:
             - type: classLike
               value: '^App\\Transcode\\Application\\Port\\PlaybackAccessInterface$'
             - type: classLike
-              value: '^App\\Transcode\\Application\\(Port\\AudioRendition(PortInterface|Format)?|Exception\\AudioRenditionFailedException|Settings\\TranscodeSettingDefinitions)$'
+              value: '^App\\Transcode\\Application\\(Port\\AudioRendition(PortInterface|Format)?|Exception\\AudioRendition(Failed|Busy)Exception|Settings\\TranscodeSettingDefinitions)$'
 
     - name: 'Transcode Infrastructure'
       collectors:

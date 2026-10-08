@@ -28,6 +28,8 @@ use Throwable;
 final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
 {
     private const string SHUTDOWN_MESSAGE = "\0baander:cpu-pool:shutdown";
+    /** Distinct dispatch limit keys the pool can track (a few job kinds use one). */
+    private const int LIMIT_KEYS = 64;
     private ?int $ownerPid = null;
     private ?int $healthTimerId = null;
     private ?int $healthTimerOwnerPid = null;
@@ -40,6 +42,8 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
     private ?Table $resultTable = null;
     private int $nextWorker = 0;
     private ?Table $healthTable = null;
+    /** Jobs queued or running per dispatch limit key, shared with every forked process. */
+    private ?Table $limitTable = null;
     private int $bootGeneration = 0;
 
     /** @var array<string, ProcessPoolWorkerInterface> */
@@ -133,6 +137,14 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
             $this->resultTable->column('status', Table::TYPE_STRING, 32);
             $this->resultTable->create();
 
+            // Limit counters start at zero with each generation: a stopped
+            // generation's workers are gone, and so are the jobs they held.
+            $this->limitTable = new Table(self::LIMIT_KEYS);
+            $this->limitTable->column('count', Table::TYPE_INT);
+            if (!$this->limitTable->create()) {
+                throw new RuntimeException('Unable to create CPU pool limit table.');
+            }
+
             // Results are also persisted as files: Swoole\Table can return corrupted
             // or empty data under concurrent access, so the file acts as the source
             // of truth. The table is kept as a fast hint for backwards compatibility.
@@ -143,8 +155,9 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
             for ($i = 0; $i < $this->workerCount; $i++) {
                 $registry = $this->handlerRegistry;
                 $table = $this->resultTable;
+                $limits = $this->limitTable;
 
-                $process = new Process(function (Process $worker) use ($registry, $table): void {
+                $process = new Process(function (Process $worker) use ($registry, $table, $limits): void {
                     $worker->name(sprintf('cpu-pool-worker-%d', $worker->id));
 
                     $handlers = json_decode($registry, true, 512, JSON_THROW_ON_ERROR);
@@ -164,11 +177,13 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
                         }
 
                         $resultKey = '';
+                        $limitKey = '';
 
                         try {
                             $job = json_decode($data, true, 512, JSON_THROW_ON_ERROR);
                             $type = $job['type'] ?? '';
                             $resultKey = $job['_result_key'] ?? '';
+                            $limitKey = $job['_limit_key'] ?? '';
 
                             $entry = $handlers[$type] ?? null;
                             if ($entry === null) {
@@ -188,6 +203,10 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
                             $this->writeResult($table, $resultKey, 'ok', $result);
                         } catch (Throwable $e) {
                             $this->writeResult($table, $resultKey, 'error', $e->getMessage());
+                        } finally {
+                            if (is_string($limitKey) && $limitKey !== '') {
+                                $limits->decr($limitKey, 'count');
+                            }
                         }
                     }
                 }, false, SWOOLE_IPC_UNIXSOCK);
@@ -310,6 +329,40 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
 
     public function dispatch(string $payload, string $key): void
     {
+        $this->send($payload, ['_result_key' => $key]);
+    }
+
+    public function dispatchWithinLimit(string $payload, string $resultKey, string $limitKey, int $limit): bool
+    {
+        if ($limit < 1 || $limitKey === '') {
+            throw new \InvalidArgumentException('A dispatch limit needs a key and at least one slot.');
+        }
+        $limits = $this->limitTable;
+        if ($limits === null || !$this->isRunning()) {
+            throw new RuntimeException('CPU process pool is not running. Call boot() first.');
+        }
+
+        // incr is atomic across processes, so concurrent dispatchers never both
+        // take the last slot. The table has room for far more keys than use it.
+        if ($limits->incr($limitKey, 'count') > $limit) {
+            $limits->decr($limitKey, 'count');
+
+            return false;
+        }
+
+        try {
+            $this->send($payload, ['_result_key' => $resultKey, '_limit_key' => $limitKey]);
+        } catch (Throwable $error) {
+            $limits->decr($limitKey, 'count');
+            throw $error;
+        }
+
+        return true;
+    }
+
+    /** @param array<string, string> $fields added to the payload's JSON object */
+    private function send(string $payload, array $fields): void
+    {
         if (!$this->isRunning()) {
             throw new RuntimeException('CPU process pool is not running. Call boot() first.');
         }
@@ -318,15 +371,17 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
             throw new RuntimeException('CPU process pool is shutting down');
         }
 
-        // Inject _result_key without full decode/re-encode cycle.
+        // Inject the pool's fields without a full decode/re-encode cycle.
         $payload = rtrim($payload);
         if (!str_ends_with($payload, '}')) {
             throw new RuntimeException('Invalid payload format: expected JSON object');
         }
 
-        $payload = substr($payload, 0, -1)
-            . sprintf(',"_result_key":"%s"', addcslashes($key, '"\\'))
-            . '}';
+        $injected = '';
+        foreach ($fields as $name => $value) {
+            $injected .= sprintf(',"%s":%s', $name, json_encode($value, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+        }
+        $payload = substr($payload, 0, -1) . $injected . '}';
 
         // Round-robin with dead-worker skip
         $workerId = $this->nextWorker % $this->workerCount;
@@ -422,6 +477,10 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
             if ($this->resultTable !== null) {
                 $this->resultTable->destroy();
                 $this->resultTable = null;
+            }
+            if ($this->limitTable !== null) {
+                $this->limitTable->destroy();
+                $this->limitTable = null;
             }
             $this->ownerPid = null;
             $this->logger->info('CPU process pool shut down');

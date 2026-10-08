@@ -8776,7 +8776,7 @@
                     {
                         "name": "bitrate",
                         "in": "query",
-                        "description": "Target bitrate in bits per second; requires format. Fitted to the format's supported range (opus 32000-256000, aac and mp3 32000-320000) in whole kilobits. Never above the server's transcode.max_bitrate, which also applies when no bitrate is given.",
+                        "description": "Target bitrate in bits per second; requires format. Capped at the server's transcode.max_bitrate (which also applies when no bitrate is given), then snapped down to the nearest of 64000, 96000, 128000, 160000, 192000, 256000 and 320000 that the format supports (opus at most 256000). A value below 64000 gets 64000.",
                         "required": false,
                         "schema": {
                             "type": "integer",
@@ -8826,6 +8826,25 @@
                     },
                     "500": {
                         "description": "Transcoding failed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The server already runs as many audio encodes as it allows and this rendition needs a new one; retry after the Retry-After delay",
+                        "headers": {
+                            "Retry-After": {
+                                "description": "Seconds to wait before retrying",
+                                "schema": {
+                                    "type": "integer",
+                                    "example": 5
+                                }
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
