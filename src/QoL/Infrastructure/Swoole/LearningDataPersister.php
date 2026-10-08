@@ -8,11 +8,16 @@ use App\QoL\Application\Port\EncoderProfileFingerprintPortInterface;
 use App\QoL\Domain\Service\StreamGovernor;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncode;
+use RuntimeException;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 /**
  * Persists governor learning state to JSON files.
  * Follows the JobStatePersister pattern: file-per-entity, dual-throttle writes.
+ *
+ * Every HTTP worker writes the same file, so each write goes to a temporary file
+ * that is renamed into place. The saved state holds the learning state and model
+ * only; the profile has its own file (AlgorithmProfileTable).
  */
 final class LearningDataPersister
 {
@@ -49,24 +54,40 @@ final class LearningDataPersister
 
     public function persist(): void
     {
-        $data = [
-            'encoder_profile' => $this->fingerprint->getName(),
-            'governor' => $this->governor->exportState(),
-        ];
-        $filePath = $this->stateFilePath();
-
-        file_put_contents(
-            $filePath,
-            $this->jsonEncoder->encode($data, 'json', [JsonEncode::OPTIONS => JSON_PRETTY_PRINT]),
-        );
-
-        $this->sampleCounter = 0;
-        $this->lastPersistTime = microtime(true);
+        $this->save();
 
         $this->logger->debug('Persisted QoL learning state', [
             'samples' => $this->governor->getModel()->sampleCount(),
             'state' => $this->governor->getState()->value,
         ]);
+    }
+
+    /**
+     * Writes the learning state now. Unlike persist() it does not log, so server
+     * control operations, which must not touch pooled services, can call it.
+     *
+     * @throws RuntimeException when the state cannot be written
+     */
+    public function save(): void
+    {
+        $data = [
+            'encoder_profile' => $this->fingerprint->getName(),
+            'governor' => $this->governor->exportState(),
+        ];
+        $filePath = $this->stateFilePath();
+        $temporary = sprintf('%s.%s.tmp', $filePath, bin2hex(random_bytes(6)));
+        $json = $this->jsonEncoder->encode($data, 'json', [JsonEncode::OPTIONS => JSON_PRETTY_PRINT]);
+
+        if (file_put_contents($temporary, $json) === false || !rename($temporary, $filePath)) {
+            if (is_file($temporary)) {
+                unlink($temporary);
+            }
+
+            throw new RuntimeException(sprintf('Cannot save the QoL learning state to %s.', $filePath));
+        }
+
+        $this->sampleCounter = 0;
+        $this->lastPersistTime = microtime(true);
     }
 
     private function stateFilePath(): string

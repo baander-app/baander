@@ -11,7 +11,11 @@ use Psr\Log\LoggerInterface;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerStartedEvent;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
-/** Starts governor monitoring and restores learning only in worker zero. */
+/**
+ * Restores the saved learning state in every HTTP worker, and starts the sampler
+ * and mid-stream monitor in worker zero. Saved state carries no active streams and
+ * no profile: the profile is shared through AlgorithmProfileTable.
+ */
 final class QoLWorkerStartupSubscriber implements EventSubscriberInterface
 {
     public function __construct(
@@ -27,16 +31,17 @@ final class QoLWorkerStartupSubscriber implements EventSubscriberInterface
 
     public function onWorkerStarted(WorkerStartedEvent $event): void
     {
-        if ($event->getWorkerId() !== 0) {
+        if ($event->getServer()->taskworker) {
             return;
         }
+        $firstWorker = $event->getWorkerId() === 0;
 
         try {
-            if ($this->services->has(CpuGpuSampler::class)) {
+            if ($firstWorker && $this->services->has(CpuGpuSampler::class)) {
                 $this->services->get(CpuGpuSampler::class)->startSampling();
             }
 
-            if ($this->services->has(MidStreamMonitor::class)) {
+            if ($firstWorker && $this->services->has(MidStreamMonitor::class)) {
                 $this->services->get(MidStreamMonitor::class)->startMonitoring();
             }
 
@@ -52,7 +57,10 @@ final class QoLWorkerStartupSubscriber implements EventSubscriberInterface
 
                 if ($savedProfile !== null && $currentProfile !== $savedProfile) {
                     $governor->resetLearning();
-                    $persister->cleanup();
+                    // Every worker sees the mismatch; one removes the stale file.
+                    if ($firstWorker) {
+                        $persister->cleanup();
+                    }
                     $savedState = null;
                 }
             }

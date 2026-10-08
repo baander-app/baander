@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Infrastructure\QoL;
 
+use App\Tests\Fixtures\QoL\InMemoryAlgorithmProfileStore;
 use App\QoL\Application\Port\EncoderProfileFingerprintPortInterface;
 use App\QoL\Domain\Service\LearningModel;
 use App\QoL\Domain\Service\StreamGovernor;
@@ -32,7 +33,7 @@ final class StreamCompletionListenerTest extends TestCase
     protected function setUp(): void
     {
         $this->directory = sys_get_temp_dir() . '/baander-completion-' . bin2hex(random_bytes(8));
-        $this->governor = new StreamGovernor(new LearningModel(), new QualityLadderPort());
+        $this->governor = new StreamGovernor(new LearningModel(), new QualityLadderPort(), new InMemoryAlgorithmProfileStore());
     }
 
     protected function tearDown(): void

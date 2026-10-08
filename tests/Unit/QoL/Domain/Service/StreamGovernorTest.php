@@ -6,6 +6,7 @@ namespace App\Tests\Unit\QoL\Domain\Service;
 
 use App\QoL\Domain\Exception\StreamBudgetExhausted;
 use App\QoL\Domain\Model\GovernorState;
+use App\Tests\Fixtures\QoL\InMemoryAlgorithmProfileStore;
 use App\QoL\Domain\Service\LearningModel;
 use App\QoL\Domain\Service\StreamGovernor;
 use App\QoL\Domain\ValueObject\AlgorithmProfile;
@@ -78,7 +79,7 @@ class StreamGovernorTest extends TestCase
     public function testActivateTransitionsToActiveWhenModelReady(): void
     {
         $model = $this->createReadyModel();
-        $governor = new StreamGovernor($model, $this->qualityLadderPort());
+        $governor = new StreamGovernor($model, $this->qualityLadderPort(), new InMemoryAlgorithmProfileStore());
 
         $this->assertSame(GovernorState::Learning, $governor->getState());
 
@@ -166,7 +167,7 @@ class StreamGovernorTest extends TestCase
     public function testResetLearningReturnsToLearningState(): void
     {
         $model = $this->createReadyModel();
-        $governor = new StreamGovernor($model, $this->qualityLadderPort());
+        $governor = new StreamGovernor($model, $this->qualityLadderPort(), new InMemoryAlgorithmProfileStore());
         $governor->activate();
         $governor->allocateStream(new Uuid(), '1080p', 30.0);
 
@@ -180,31 +181,48 @@ class StreamGovernorTest extends TestCase
         $this->assertFalse($governor->getModel()->isReady());
     }
 
-    public function testExportStateAndImportStateRoundTrip(): void
+    public function testExportStateAndImportStateRoundTripLearningWithoutProfileOrStreams(): void
     {
         $model = $this->createReadyModel();
-        $governor = new StreamGovernor($model, $this->qualityLadderPort());
+        $governor = new StreamGovernor($model, $this->qualityLadderPort(), new InMemoryAlgorithmProfileStore());
         $governor->activate();
         $governor->setProfile(AlgorithmProfile::Aggressive);
         $governor->allocateStream(Uuid::fromString('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'), '4K', 55.0);
 
         $exported = $governor->exportState();
 
-        $newGovernor = new StreamGovernor(new LearningModel(), $this->qualityLadderPort());
-        $newGovernor->importState($exported);
+        $newGovernor = new StreamGovernor(new LearningModel(), $this->qualityLadderPort(), new InMemoryAlgorithmProfileStore());
+        $newGovernor->importState($exported + ['profile' => 'conservative', 'active_streams' => [[
+            'job_id' => 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+            'quality_tier' => '4K',
+            'predicted_cost' => 55.0,
+        ]]]);
 
+        $this->assertSame(['state', 'model'], array_keys($exported));
         $this->assertSame(GovernorState::Active->value, $exported['state']);
-        $this->assertSame('aggressive', $exported['profile']);
         $this->assertSame(GovernorState::Active, $newGovernor->getState());
-        $this->assertSame(AlgorithmProfile::Aggressive, $newGovernor->getProfile());
-        $this->assertSame(1, $newGovernor->getActiveStreamCount());
+        $this->assertSame(LearningModel::MIN_SAMPLES, $newGovernor->getModel()->sampleCount());
+        $this->assertSame(AlgorithmProfile::Balanced, $newGovernor->getProfile());
+        $this->assertSame(0, $newGovernor->getActiveStreamCount());
+    }
+
+    public function testProfileIsReadFromAndWrittenToTheProfileStore(): void
+    {
+        $store = new InMemoryAlgorithmProfileStore();
+        $first = new StreamGovernor(new LearningModel(), $this->qualityLadderPort(), $store);
+        $second = new StreamGovernor(new LearningModel(), $this->qualityLadderPort(), $store);
+
+        $first->setProfile(AlgorithmProfile::Aggressive);
+
+        $this->assertSame(AlgorithmProfile::Aggressive, $store->get());
+        $this->assertSame(AlgorithmProfile::Aggressive, $second->getProfile());
     }
 
     // --- Helpers ---
 
     private function createGovernor(): StreamGovernor
     {
-        return new StreamGovernor(new LearningModel(), $this->qualityLadderPort());
+        return new StreamGovernor(new LearningModel(), $this->qualityLadderPort(), new InMemoryAlgorithmProfileStore());
     }
 
     private function qualityLadderPort(): QualityLadderPortInterface
@@ -254,7 +272,7 @@ class StreamGovernorTest extends TestCase
             'coefficients' => $coefficients,
         ]);
 
-        $governor = new StreamGovernor($model, $this->qualityLadderPort());
+        $governor = new StreamGovernor($model, $this->qualityLadderPort(), new InMemoryAlgorithmProfileStore());
         $governor->setProfile($profile);
         $governor->activate();
 

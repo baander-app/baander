@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Infrastructure\QoL;
 
+use App\Tests\Fixtures\QoL\InMemoryAlgorithmProfileStore;
 use App\QoL\Application\Port\EncoderProfileFingerprintPortInterface;
 use App\QoL\Domain\Exception\StreamBudgetExhausted;
 use App\QoL\Domain\Service\LearningModel;
@@ -242,7 +243,7 @@ final class StreamAdmissionVetoTest extends TestCase
             ));
         }
         $model->restoreState(['samples' => $model->getState()['samples'], 'coefficients' => $coefficients]);
-        $governor = new StreamGovernor($model, new QualityLadderPort());
+        $governor = new StreamGovernor($model, new QualityLadderPort(), new InMemoryAlgorithmProfileStore());
         $governor->activate();
 
         return $governor;

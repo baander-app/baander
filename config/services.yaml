@@ -1322,6 +1322,17 @@ services:
 
     App\QoL\Domain\Service\LearningModel: ~
 
+    # QoL algorithm profile shared by every HTTP worker — Bootable (Table created
+    # before fork and filled from its own file, so it survives reloads and restarts)
+    App\QoL\Infrastructure\Swoole\AlgorithmProfileTable:
+        arguments:
+            $stateDir: '%kernel.project_dir%/var/qol_state'
+        tags:
+            - { name: 'swoole_bundle.bootable_service' }
+
+    App\QoL\Domain\Port\AlgorithmProfileStoreInterface:
+        alias: App\QoL\Infrastructure\Swoole\AlgorithmProfileTable
+
     # QoL CPU/GPU sampler — Bootable (Table created before fork)
     App\QoL\Infrastructure\Swoole\CpuGpuSampler:
         tags:
