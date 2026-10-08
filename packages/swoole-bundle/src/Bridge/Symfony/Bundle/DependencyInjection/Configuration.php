@@ -93,7 +93,7 @@ final readonly class Configuration implements ConfigurationInterface
                                 )
                                 ->then(static fn($v): array => [
                                     'enabled' => (bool) $v,
-                                    'host' => '0.0.0.0',
+                                    'host' => '127.0.0.1',
                                     'port' => 9200,
                                 ])
                             ->end()
@@ -103,7 +103,7 @@ final readonly class Configuration implements ConfigurationInterface
                                 ->end()
                                 ->scalarNode('host')
                                     ->cannotBeEmpty()
-                                    ->defaultValue('0.0.0.0')
+                                    ->defaultValue('127.0.0.1')
                                 ->end()
                                 ->scalarNode('port')
                                     ->cannotBeEmpty()

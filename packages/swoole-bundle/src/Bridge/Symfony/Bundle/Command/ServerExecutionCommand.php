@@ -150,7 +150,15 @@ abstract class ServerExecutionCommand extends Command
             $apiPort = $input->getOption('api-port');
             Assertion::numeric($apiPort, 'Port must be a number.');
 
-            $sockets->changeApiSocket(new Socket('0.0.0.0', (int)$apiPort));
+            // The management API is unauthenticated: keep the configured host
+            // (loopback by default) and only apply the port option.
+            if ($sockets->hasApiSocket()) {
+                $sockets->changeApiSocket($sockets->getApiSocket()->withPort((int)$apiPort));
+            } else {
+                $apiHost = $this->parameterBag->get('swoole.http_server.api.host');
+                Assertion::string($apiHost, 'API host must be a string.');
+                $sockets->changeApiSocket(new Socket($apiHost, (int)$apiPort));
+            }
         }
 
         if (!filter_var($input->getOption('serve-static'), FILTER_VALIDATE_BOOLEAN)) {

@@ -62,7 +62,6 @@ services:
         ports:
             - "41234:41234/udp"
             - "127.0.0.1:9501:9501"
-            - "9200:9200"
         volumes:
             - /home/martin/dev/baander-musik:/home/martin/dev/baander-musik:ro
             - ./:/var/www/html:cached
