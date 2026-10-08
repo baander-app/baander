@@ -16,6 +16,7 @@ use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
+use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Domain\Service\TokenChainValidator;
 use DateInterval;
 use Doctrine\ORM\EntityManagerInterface;
@@ -30,8 +31,8 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  *
  * A revoked client answers invalid_client (OAuthProtocolException); every other
  * rejection is a plain RuntimeException, which the token endpoint reports as
- * invalid_grant. The rotation holds the client's row lock against a concurrent
- * revocation, as TokenPairIssuer does.
+ * invalid_grant; a token of a disabled account is one of them. The rotation holds
+ * the client's row lock against a concurrent revocation, as TokenPairIssuer does.
  */
 final class RefreshTokenHandler
 {
@@ -46,6 +47,7 @@ final class RefreshTokenHandler
         private readonly JwtGeneratorInterface $jwtGenerator,
         private readonly TokenMetadataRepositoryInterface $tokenMetadataRepository,
         private readonly ClientRepositoryInterface $clientRepository,
+        private readonly UserRepositoryInterface $userRepository,
         int $accessTokenTtl,
         int $refreshTokenTtl,
     ) {
@@ -83,6 +85,17 @@ final class RefreshTokenHandler
         // loaded state; the transaction below repeats it under the row lock.
         if ($tokenClient->isRevoked()) {
             throw self::clientRevoked();
+        }
+
+        // A disabled account's sessions end. Disabling revokes the tokens; this also
+        // rejects a pair that a refresh racing the disable rotated past that revocation.
+        // The user loaded with the token does not carry the flag, so ask the repository.
+        $tokenUser = $refreshToken->getAccessToken()->getUser();
+        if ($tokenUser !== null) {
+            $user = $this->userRepository->findByUuid($tokenUser->getId());
+            if ($user === null || $user->isDisabled()) {
+                throw new RuntimeException('Refresh token belongs to a disabled or deleted account.');
+            }
         }
 
         // RFC 9449 §5: a refresh token is redeemable only with the DPoP key its

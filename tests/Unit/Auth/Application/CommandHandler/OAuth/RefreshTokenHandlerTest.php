@@ -15,6 +15,7 @@ use App\Auth\Domain\Model\OAuth\RefreshTokenState;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\TokenMetadata;
 use App\Auth\Domain\Model\User;
+use App\Auth\Domain\Model\UserState;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
@@ -22,8 +23,10 @@ use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
+use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Domain\Service\TokenChainValidator;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -51,6 +54,8 @@ final class RefreshTokenHandlerTest extends TestCase
     private array $savedMetadata = [];
     /** What the rotation transaction finds when it locks the client's row. */
     private bool $clientActiveAtIssuance = true;
+    /** @var array<string, true> IDs of the users the user repository reports as disabled */
+    private array $disabledUserIds = [];
     private RefreshTokenHandler $handler;
 
     protected function setUp(): void
@@ -108,6 +113,7 @@ final class RefreshTokenHandlerTest extends TestCase
             $this->jwtGenerator,
             $this->tokenMetadataRepository,
             $this->activeClients(),
+            $this->users(),
             accessTokenTtl: 3600,
             refreshTokenTtl: 2592000,
         );
@@ -345,6 +351,26 @@ final class RefreshTokenHandlerTest extends TestCase
             self::assertSame('invalid_client', $exception->error);
         }
         self::assertFalse($refreshToken->hasBeenUsed());
+    }
+
+    public function testATokenOfADisabledAccountCannotBeRefreshed(): void
+    {
+        $refreshToken = $this->boundRefreshToken();
+        // The stored account is disabled; the user loaded with the token does not say so.
+        $this->disabledUserIds[$refreshToken->getAccessToken()->getUser()?->getId()->toString() ?? ''] = true;
+
+        $rejection = null;
+        try {
+            ($this->handler)(new RefreshTokenCommand(refreshTokenId: $refreshToken->getTokenId()->toString(), dpopJkt: self::JKT));
+        } catch (RuntimeException $exception) {
+            $rejection = $exception;
+        }
+
+        // A plain RuntimeException, which the token endpoint reports as invalid_grant.
+        self::assertNotNull($rejection, 'A disabled account must not refresh.');
+        self::assertSame(RuntimeException::class, $rejection::class);
+        self::assertFalse($refreshToken->hasBeenUsed());
+        self::assertSame([], $this->savedAccessTokens);
     }
 
     public function testAClientRevokedAfterLoadingFailsUnderTheRowLockWithoutRotating(): void
@@ -763,6 +789,7 @@ final class RefreshTokenHandlerTest extends TestCase
             $jwtGenerator,
             $this->createStub(TokenMetadataRepositoryInterface::class),
             $this->activeClients(),
+            $this->users(),
             accessTokenTtl: 3600,
             refreshTokenTtl: 2592000,
         );
@@ -786,6 +813,24 @@ final class RefreshTokenHandlerTest extends TestCase
         $clients->method('lockActiveClientForIssuance')->willReturnCallback(fn (): bool => $this->clientActiveAtIssuance);
 
         return $clients;
+    }
+
+    private function users(): UserRepositoryInterface
+    {
+        $users = $this->createStub(UserRepositoryInterface::class);
+        $users->method('findByUuid')->willReturnCallback(fn (Uuid $id): User => User::reconstitute(new UserState(
+            id: $id,
+            publicId: new PublicId(),
+            name: 'Test User',
+            email: 'user@baander.app',
+            password: 'hashed-pw',
+            totpSecret: null,
+            createdAt: new \DateTimeImmutable(),
+            updatedAt: new \DateTimeImmutable(),
+            disabled: isset($this->disabledUserIds[$id->toString()]),
+        )));
+
+        return $users;
     }
 
     private function createConfidentialClient(): Client

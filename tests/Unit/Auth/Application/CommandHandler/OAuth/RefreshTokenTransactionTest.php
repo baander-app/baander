@@ -15,6 +15,7 @@ use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
+use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Domain\Service\TokenChainValidator;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\ORM\EntityManagerInterface;
@@ -54,7 +55,7 @@ final class RefreshTokenTransactionTest extends TestCase
         $jwt->method('generate')->willThrowException(new RuntimeException('sign failed'));
         $clients = $this->createStub(ClientRepositoryInterface::class);
         $clients->method('lockActiveClientForIssuance')->willReturn(true);
-        $handler = new RefreshTokenHandler($access, $refresh, new TokenChainValidator($access, $refresh), $manager, $jwt, $this->createStub(TokenMetadataRepositoryInterface::class), $clients, 3600, 86400);
+        $handler = new RefreshTokenHandler($access, $refresh, new TokenChainValidator($access, $refresh), $manager, $jwt, $this->createStub(TokenMetadataRepositoryInterface::class), $clients, $this->createStub(UserRepositoryInterface::class), 3600, 86400);
         $command = new RefreshTokenCommand($token->getTokenId()->toString(), dpopJkt: 'bound-proof-key-thumbprint');
         try {
             $handler($command);

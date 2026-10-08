@@ -149,6 +149,33 @@ final class WsQueryTokenAuthenticatorTest extends TestCase
         $this->assertNull($result);
     }
 
+    public function testAuthenticateRefusesADisabledAccount(): void
+    {
+        $uuid = Uuid::fromString('00000000-0000-7000-8000-000000000002');
+        $this->psrHttpFactory->method('createRequest')->willReturn(
+            $this->psr17Factory->createServerRequest('GET', 'http://localhost/api/ws?token=valid-token'),
+        );
+        $this->resourceServer->method('validateAuthenticatedRequest')->willReturn(
+            $this->psr17Factory->createServerRequest('GET', 'http://localhost/api/ws')
+                ->withAttribute('oauth_user_id', $uuid->toString()),
+        );
+
+        $user = User::reconstitute(new \App\Auth\Domain\Model\UserState(
+            id: $uuid,
+            publicId: new PublicId(),
+            name: 'Disabled User',
+            email: 'disabled@baander.app',
+            password: 'hashed-password',
+            totpSecret: null,
+            createdAt: new \DateTimeImmutable(),
+            updatedAt: new \DateTimeImmutable(),
+            disabled: true,
+        ));
+        $this->userRepository->method('findByUuid')->willReturn($user);
+
+        self::assertNull($this->authenticator->authenticate($this->createSwooleRequest(['token' => 'valid-token'])));
+    }
+
     public function testAuthenticateReturnsUserIdOnSuccess(): void
     {
         $this->userRepository = $this->createMock(UserRepositoryInterface::class);

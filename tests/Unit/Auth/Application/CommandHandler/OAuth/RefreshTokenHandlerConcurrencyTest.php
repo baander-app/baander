@@ -16,6 +16,7 @@ use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ClientSecret;
 use App\Auth\Domain\Model\OAuth\ValueObject\Scope;
 use App\Auth\Domain\Model\User;
+use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
@@ -76,6 +77,7 @@ final class RefreshTokenHandlerConcurrencyTest extends TestCase
             $jwtGenerator,
             $this->createStub(TokenMetadataRepositoryInterface::class),
             $this->activeClients(),
+            $this->users(),
             accessTokenTtl: 3600,
             refreshTokenTtl: 2592000,
         );
@@ -168,6 +170,14 @@ final class RefreshTokenHandlerConcurrencyTest extends TestCase
     }
 
     /** Every client is still active when its row is locked for issuance. */
+    private function users(): UserRepositoryInterface
+    {
+        $users = $this->createStub(UserRepositoryInterface::class);
+        $users->method('findByUuid')->willReturn(User::register(new Email('user@baander.app'), 'hashed-pw', 'Test User'));
+
+        return $users;
+    }
+
     private function activeClients(): ClientRepositoryInterface
     {
         $clients = $this->createStub(ClientRepositoryInterface::class);

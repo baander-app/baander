@@ -5,43 +5,34 @@ declare(strict_types=1);
 namespace App\Auth\Application\CommandHandler\User;
 
 use App\Auth\Application\Command\User\EnableUserCommand;
-use App\Auth\Application\Port\UserPortInterface;
-use App\Shared\Domain\Model\Email;
-use App\Shared\Domain\Model\Uuid;
+use App\Auth\Application\Exception\UserNotFoundException;
+use App\Auth\Application\Service\UserLookup;
+use App\Auth\Domain\Repository\UserRepositoryInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
-final class EnableUserHandler
+/**
+ * Enables a disabled account. Enabling an enabled account succeeds without change.
+ *
+ * Sessions revoked when the account was disabled stay revoked; the user signs in again.
+ */
+final readonly class EnableUserHandler
 {
     public function __construct(
-        private readonly UserPortInterface $userService,
+        private UserLookup $userLookup,
+        private UserRepositoryInterface $userRepository,
     ) {
     }
 
+    /** @throws UserNotFoundException when no user has the email address or UUID */
     #[AsMessageHandler]
     public function __invoke(EnableUserCommand $command): void
     {
-        $user = $this->resolveUser($command->getIdentifier());
-
+        $user = $this->userLookup->byIdentifier($command->getIdentifier());
         if (!$user->isDisabled()) {
-            throw new \RuntimeException('User is not disabled.');
+            return;
         }
 
         $user->enable();
-        $this->userService->save($user);
-    }
-
-    private function resolveUser(string $identifier): \App\Auth\Domain\Model\User
-    {
-        if (str_contains($identifier, '@')) {
-            $user = $this->userService->findByEmail(new Email($identifier));
-        } else {
-            $user = $this->userService->findByUuid(Uuid::fromString($identifier));
-        }
-
-        if ($user === null) {
-            throw new \RuntimeException(sprintf('User "%s" not found.', $identifier));
-        }
-
-        return $user;
+        $this->userRepository->save($user);
     }
 }
