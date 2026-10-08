@@ -6,11 +6,14 @@ namespace App\Shared\Interface\Controller;
 
 use App\Shared\Application\FailedMessageRetryException;
 use App\Shared\Application\FailureTransportUnavailableException;
+use App\Shared\Application\Port\AsyncTransportUnavailableException;
 use App\Shared\Application\Port\FailedMessageAdministrationInterface;
-use App\Shared\Infrastructure\Redis\RedisClientFactory;
+use App\Shared\Application\Port\TransportStatusInterface;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\ValidationError;
 use App\Shared\Interface\Resource\FailedMessageResource;
+use App\Shared\Interface\Resource\TransportStatusResource;
 use OpenApi\Attributes as OA;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -18,7 +21,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
-use Throwable;
 
 #[IsGranted('ROLE_ADMIN')]
 #[OA\Tag(name: 'System', description: 'System utilities and background job monitoring')]
@@ -28,11 +30,9 @@ final class TransportController
     use ApiResponsesTrait;
 
     public function __construct(
-        private readonly RedisClientFactory $redisClientFactory,
-        private readonly string $consumerName,
+        private readonly TransportStatusInterface $transportStatus,
         private readonly FailedMessageAdministrationInterface $failedMessages,
-    )
-    {
+    ) {
     }
 
     private const string ID_REQUIREMENT = '[1-9][0-9]{0,17}';
@@ -42,10 +42,12 @@ final class TransportController
      *
      * Returns queue depth for async and failed transports, consumer name,
      * and whether the consumer is currently running (best-effort).
+     *
+     * CLI counterpart: app:monitor:transport.
      */
     #[OA\Get(
         path: '/api/monitor/transport/status',
-        description: 'Returns queue depths, consumer name, and consumer running status for the messenger transports.',
+        description: 'Returns queue depths, consumer name, and consumer running status for the messenger transports. CLI counterpart: app:monitor:transport.',
         summary: 'Get transport status',
         responses: [
             new OA\Response(response: '200', description: 'Transport status',
@@ -68,63 +70,28 @@ final class TransportController
         ],
     )]
     #[Route('/status', name: 'status', methods: ['GET'])]
+    #[CliCounterpart('app:monitor:transport')]
     public function status(): JsonResponse
     {
         try {
-            $result = $this->redisClientFactory->borrow(function (\Redis $redis): array {
-                // Async queue depth: XLEN on the Redis stream
-                $asyncQueueDepth = (int)$redis->xlen('messages');
-
-                // Consumer running: check XINFO CONSUMERS for our group/consumer
-                $consumerRunning = false;
-                try {
-                    // phpredis returns false when the stream or group does not exist.
-                    $consumers = $redis->xinfo('CONSUMERS', 'messages', 'baander');
-                    foreach (is_array($consumers) ? $consumers : [] as $consumer) {
-                        if (($consumer['name'] ?? null) === $this->consumerName) {
-                            $consumerRunning = true;
-                            break;
-                        }
-                    }
-                } catch (Throwable) {
-                    // XINFO may fail if the consumer group has no active consumers
-                    // or the stream/group doesn't exist yet
-                }
-
-                return [
-                    'asyncQueueDepth'  => $asyncQueueDepth,
-                    'consumerRunning'  => $consumerRunning,
-                ];
-            });
-        } catch (Throwable $e) {
-            return $this->errorResponse(
-                sprintf('Redis unavailable: %s', $e->getMessage()),
-                Response::HTTP_SERVICE_UNAVAILABLE,
-            );
-        }
-
-        try {
-            $failedQueueDepth = $this->failedMessages->count();
+            $status = $this->transportStatus->status();
+        } catch (AsyncTransportUnavailableException $e) {
+            return $this->errorResponse($e->getMessage(), Response::HTTP_SERVICE_UNAVAILABLE);
         } catch (FailureTransportUnavailableException $e) {
             return $this->transportUnavailable($e);
         }
 
-        return $this->successResponse([
-            'asyncQueueDepth'  => $result['asyncQueueDepth'],
-            'failedQueueDepth' => $failedQueueDepth,
-            'consumerName'     => $this->consumerName,
-            'consumerRunning'  => $result['consumerRunning'],
-        ]);
+        return $this->successResponse(TransportStatusResource::from($status));
     }
 
     /**
      * List the messages held by the failure transport, newest first.
      *
-     * CLI counterpart: messenger:failed:show.
+     * CLI counterpart: app:failed-message:list.
      */
     #[OA\Get(
         path: '/api/monitor/transport/failed',
-        description: 'Lists the messages held by the failure transport, newest first. CLI counterpart: messenger:failed:show.',
+        description: 'Lists the messages held by the failure transport, newest first, including messages waiting out a retry delay. CLI counterpart: app:failed-message:list.',
         summary: 'List failed messages',
         parameters: [
             new OA\Parameter(name: 'page', description: 'Page number', in: 'query', required: false, schema: new OA\Schema(type: 'integer', default: 1, minimum: 1)),
@@ -144,6 +111,7 @@ final class TransportController
         ],
     )]
     #[Route('/failed', name: 'failed_list', methods: ['GET'])]
+    #[CliCounterpart('app:failed-message:list')]
     public function listFailed(Request $request): JsonResponse
     {
         $page = max(1, (int) $request->query->get('page', 1));
@@ -185,6 +153,7 @@ final class TransportController
         ],
     )]
     #[Route('/failed/{id}', name: 'failed_show', requirements: ['id' => self::ID_REQUIREMENT], methods: ['GET'])]
+    #[CliCounterpart('messenger:failed:show')]
     public function showFailed(string $id): JsonResponse
     {
         try {
@@ -204,11 +173,11 @@ final class TransportController
      * Flush all messages from the failed transport.
      *
      * Requires ?confirm=true query parameter to prevent accidental invocation.
-     * CLI counterpart: messenger:failed:remove --all --force.
+     * CLI counterpart: app:failed-message:flush.
      */
     #[OA\Post(
         path: '/api/monitor/transport/failed/flush',
-        description: 'Removes all messages from the failed transport. Requires ?confirm=true query parameter. CLI counterpart: messenger:failed:remove --all --force.',
+        description: 'Removes all messages from the failed transport, including messages waiting out a retry delay. Requires ?confirm=true query parameter. CLI counterpart: app:failed-message:flush.',
         summary: 'Flush all failed messages',
         parameters: [
             new OA\Parameter(name: 'confirm', description: 'Must be set to "true" to confirm the operation', in: 'query', required: true, schema: new OA\Schema(type: 'string', enum: ['true'])),
@@ -226,6 +195,7 @@ final class TransportController
         ],
     )]
     #[Route('/failed/flush', name: 'failed_flush', methods: ['POST'])]
+    #[CliCounterpart('app:failed-message:flush')]
     public function flushFailed(Request $request): JsonResponse
     {
         if ($request->query->get('confirm') !== 'true') {
@@ -272,6 +242,7 @@ final class TransportController
         ],
     )]
     #[Route('/failed/{id}/retry', name: 'failed_retry', requirements: ['id' => self::ID_REQUIREMENT], methods: ['POST'])]
+    #[CliCounterpart('messenger:failed:retry')]
     public function retryFailed(string $id): JsonResponse
     {
         try {
@@ -319,6 +290,7 @@ final class TransportController
         ],
     )]
     #[Route('/failed/{id}', name: 'failed_remove', requirements: ['id' => self::ID_REQUIREMENT], methods: ['DELETE'])]
+    #[CliCounterpart('messenger:failed:remove')]
     public function removeFailed(string $id): JsonResponse
     {
         try {

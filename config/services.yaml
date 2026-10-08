@@ -279,9 +279,8 @@ services:
             $dsn: '%env(REDIS_URL)%'
 
     # --- Transport Management ---
-    App\Shared\Interface\Controller\TransportController:
+    App\Shared\Infrastructure\Messenger\RedisTransportStatus:
         arguments:
-            $redisClientFactory: '@App\Shared\Infrastructure\Redis\RedisClientFactory'
             $consumerName: '%env(MESSENGER_CONSUMER_NAME)%'
 
     App\Shared\Infrastructure\Messenger\FailureTransportAdministration:

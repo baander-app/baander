@@ -101,9 +101,21 @@ curl -X POST -s -H "Authorization: Bearer $TOKEN" \
 
 Cancellation is cooperative -- the job handler must check for the cancellation flag at its next checkpoint. Queued jobs are flagged before the worker picks them up.
 
+### Transport status
+
+The admin **Transport Health** card shows the number of entries in the async Redis stream, the number of messages in the failure transport, and whether the consumer this container is configured with is registered on the stream. The same figures come from the API and the console:
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" "https://baander.test/api/monitor/transport/status" | jq .
+
+make exec cmd="php bin/console app:monitor:transport"
+```
+
+See [app:monitor:transport](commands/app-monitor-transport.md).
+
 ### Failed messages
 
-A message that exhausts its retries moves to the failure transport, the `failed_messages` PostgreSQL table. The endpoints below list and manage it. Each one has a console counterpart that uses the same receiver.
+A message that exhausts its retries moves to the failure transport, the `failed_messages` PostgreSQL table. The endpoints below list and manage it. Each one has a console counterpart that reads the same table, including messages waiting out a retry delay.
 
 ```bash
 # List failed messages, newest first (page and limit are optional; limit is at most 100)
@@ -122,13 +134,13 @@ curl -X POST -s -H "Authorization: Bearer $TOKEN" \
 
 | Endpoint | Console counterpart |
 |----------|---------------------|
-| `GET /api/monitor/transport/failed` | `messenger:failed:show` |
+| `GET /api/monitor/transport/failed` | [`app:failed-message:list`](commands/app-failed-message-list.md) |
 | `GET /api/monitor/transport/failed/{id}` | `messenger:failed:show <id>` |
 | `POST /api/monitor/transport/failed/{id}/retry` | `messenger:failed:retry <id> --force` |
 | `DELETE /api/monitor/transport/failed/{id}` | `messenger:failed:remove <id> --force` |
-| `POST /api/monitor/transport/failed/flush?confirm=true` | `messenger:failed:remove --all --force` |
+| `POST /api/monitor/transport/failed/flush?confirm=true` | [`app:failed-message:flush`](commands/app-failed-message-flush.md) |
 
-Retrying runs `messenger:failed:retry` in a child process, which handles the message before the request returns. A message that fails again goes back to the failure transport under a new ID with its retry count increased, including after an unrecoverable exception. It stays listed until a retry succeeds or you remove it. The list and flush endpoints include messages waiting out a retry delay; `messenger:failed:show` without an ID and `messenger:failed:remove --all` skip them until the delay ends. `GET /api/monitor/transport/status` reports the number of failed messages as `failedQueueDepth`.
+Retrying runs `messenger:failed:retry` in a child process, which handles the message before the request returns. A message that fails again goes back to the failure transport under a new ID with its retry count increased, including after an unrecoverable exception. It stays listed until a retry succeeds or you remove it. `GET /api/monitor/transport/status` and `app:monitor:transport` report the number of failed messages as `failedQueueDepth`.
 
 ## Job Analytics
 
@@ -376,6 +388,9 @@ make exec cmd="tail -100 /var/log/nginx/access.log"
 | `POST /api/monitor/transport/failed/{id}/retry` | Retry a failed message (admin) |
 | `DELETE /api/monitor/transport/failed/{id}` | Remove a failed message (admin) |
 | `POST /api/monitor/transport/failed/flush?confirm=true` | Remove all failed messages (admin) |
+| `make exec cmd="php bin/console app:monitor:transport"` | CLI transport queue depths and consumer state |
+| `make exec cmd="php bin/console app:failed-message:list"` | CLI failed message list |
+| `make exec cmd="php bin/console app:failed-message:flush"` | CLI removal of all failed messages |
 | `GET /api/monitor/analytics/summary` | Job analytics summary (admin) |
 | `GET /api/monitor/analytics/timing` | Job timing analytics (admin) |
 | `GET /api/monitor/analytics/failures` | Job failure analytics (admin) |
@@ -393,4 +408,7 @@ make exec cmd="tail -100 /var/log/nginx/access.log"
 
 - [CLI Reference: app:health:check](commands/app-health-check.md)
 - [CLI Reference: app:config:validate](commands/app-config-validate.md)
+- [CLI Reference: app:monitor:transport](commands/app-monitor-transport.md)
+- [CLI Reference: app:failed-message:list](commands/app-failed-message-list.md)
+- [CLI Reference: app:failed-message:flush](commands/app-failed-message-flush.md)
 - [Troubleshooting](troubleshooting.md)
