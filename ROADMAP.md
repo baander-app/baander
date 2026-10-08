@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-10-06. This is the working delivery record for the remediation,
+Updated: 2026-10-07. This is the working delivery record for the remediation,
 registry, and web-state plans. Update it when scope changes or a stage is verified.
 Completed code is not proof of production or performance qualification.
 
@@ -18,43 +18,92 @@ roadmap records scope and acceptance; the linked design documents, current sourc
 and CI workflow are the executable detail. Measurements in later historical
 batches describe their own checkpoints; the current gate below takes precedence.
 
-The web-store refactor and first debugger are locally complete. Continue with a
-bounded backend release-gate package: reproduce the current Deptrac report, remove
-violations through application ports, and run its affected behavior tests without
-baseline expansion. Also rerun the *whole* sharded PHPUnit/coverage gate on the
-final 512 MiB CI image: use the `PHPUnit with coverage` step in
-[the CI workflow](.forgejo/workflows/ci.yaml), with its disposable PostgreSQL and
-Redis services and `scripts/run-phpunit-shards.php`. Record the checkout commit,
-image digest, command, merged report, shard count, and any failures. The previous
-143-shard pass and later Shared-only pass do not establish that final-image gate.
-Verify that an intentionally failing test blocks the publication job.
+The backend release-gate package is complete (see the next two sections). Three
+plans come next, in this order:
+
+1. [General settings and email language](docs/plans/2026-10-07-1736-feat-general-settings-email-language-plan.md):
+   one definition-driven settings mechanism, the per-user email language, and the
+   features behind the existing admin toggles. Written and reviewed; not started.
+2. Admin/CLI parity: every admin-panel action gets a CLI command. The inventory
+   found 76 admin actions, 7 covered, 7 drifting and 62 missing. Not yet planned.
+3. Timestamp convention: 130 `timestamptz(0)` columns, 13 `timestamp without time
+   zone` columns, and ORM writes without offset or fraction. Not yet planned.
 
 Other local work can proceed independently: finish the browser credential/session
 integration below; qualify the registry's remaining failure, fixed-runner load,
 resource, and soak gates. Regional hosts and the S3 destination remain external
 blockers. Do not mark deployment or restore acceptance complete from local cluster
-tests. React Native and Android remain deferred.
+tests. React Native and Android remain deferred; Android's device login posts to a
+pairing endpoint that does not exist and needs a decision when that work resumes.
 
 ## Current quality-gate checkpoint
 
-Fresh-process PHPUnit sharding keeps the 512 MiB PHP limit and completes the full
-Unit/StaticAnalysisRules (4,603 tests, 19,444 assertions), Functional (1,020 tests,
-8,030 assertions), and Integration (736 tests, 8,487 assertions) suites. The CI
-image now includes nginx; real development and production config syntax checks
-pass and reject malformed config or a missing binary. The startup-unavailable 503
-OpenAPI responses match the shared error envelope, the generated web client is
-updated, specification drift and web typechecking pass, and full PHPStan has zero
-errors at the last full scan. Subsequent focused PHPStan checks for the QoL
-boundary pass. Hardware diagnostics, Scheduler administration, and notification
-delivery-intent extraction lowered Deptrac to 200 active violations; the subsequent
-song lookup repair, Library voter extraction, WebSocket Session boundary, and email
-verification exception placement and QoL budget-listener extraction lowered it to
-185 without baseline changes. Release quality gates are not fully green.
-The locked CI image completed
-all 143 full-suite PHPUnit shards with Xdebug coverage and a merged report:
-6,368 tests were discovered, and no shard failed. The final 512 MiB child-process
-image separately passed its Shared unit coverage run; the entire suite has not yet
-been rerun in that final image.
+{{FINAL_GATE}}
+
+## Backend release-gate package (2026-10-06 to 2026-10-07)
+
+Plan: [backend release gates](docs/plans/2026-10-06-1612-refactor-backend-release-gates-plan.md).
+The package removed every Deptrac violation and ran the whole suite in the final CI
+image. It also fixed the defects found on the way, which the user chose to fix
+rather than defer.
+
+**Boundaries.** Deptrac went from 185 active violations to 0 through application
+ports and narrow named contract layers, with no baseline growth.
+
+**Defects fixed.**
+
+- Authentication:
+  - password login always failed (token metadata looked up the wrong column);
+  - refresh tokens were not bound to the DPoP key;
+  - passkey login was unregistered;
+  - client fingerprint binding was not enforced;
+  - a password change left every session working;
+  - password reset tokens were stored in plain text, never expired, never sent and never redeemable;
+  - email verification tokens were stored in plain text and never sent;
+  - user lookups by email could not use the unique index.
+- Authorization:
+  - any user could create libraries, validate paths and create radio sources;
+  - party creation accepted any video or job;
+  - the API limiters were configured but not enforced.
+- Data:
+  - missing foreign keys and indexes;
+  - redundant indexes;
+  - VARCHAR columns;
+  - schema-wide constraint naming, with a PGroonga naming standard;
+  - jobless transcode sessions;
+  - duplicate job-monitor rows on retry;
+  - second-precision job timestamps;
+  - closed date ranges in analytics.
+- Behavior:
+  - the "flush failed" admin action;
+  - library scans from the CLI;
+  - artist sort counts;
+  - DESC and null-year pagination;
+  - job-monitor DESC paging and duration sorting;
+  - admin-created users without notification preferences;
+  - double processing in debug ingest;
+  - WebSocket `party.join`;
+  - the failure transport, which is now a listable PostgreSQL table whose failed retries stay listed.
+
+**OAuth.** The authorization-code (PKCE S256), device-authorization (RFC 8628) and
+refresh grants and personal-access clients run on Baander's own DPoP-bound token
+pipeline; League remains only the resource server. Introspection is removed. The
+OAuth endpoints answer in RFC 6749/8628 form. Operators manage clients from the
+admin Security page and `app:oauth:client:*`. The web app has `/device` and
+`/oauth/authorize` pages for device apps such as a future Apple TV client.
+
+**Self-service account flows.** Password reset and email verification now send
+email after the response, redeem hashed single-use tokens, and have web pages.
+
+**History.** The repository history was rewritten to start on 2026-08-01, and the
+listed dates were replaced everywhere in it.
+
+**Decisions recorded for later.**
+
+- Disabled accounts cannot redeem reset tokens.
+- Reset requests and redemptions share one per-IP limit.
+- Party references do not keep transcode jobs alive.
+- The per-account reset limit stays at 10 per 15 minutes.
 
 ## Latest verified backend batches
 
@@ -854,7 +903,8 @@ the agreed host budget.
   checked-in specification; keep automated drift checks blocking thereafter.
 - [x] Eliminate the configured PHPStan diagnostics, including the old baseline,
   without new suppressions; verify the full scan and combined unit/rule suites.
-- [ ] Eliminate remaining Deptrac boundary violations using application ports.
+- [x] Eliminate remaining Deptrac boundary violations using application ports
+  (0 active violations on 2026-10-07, baseline not expanded).
   No blanket suppressions or inflated baselines. Verify the
   correct Symfony/Vite artifacts, Composer extensions, isolated CI networks,
   matching Redis credentials, and explicitly failing readiness timeouts. Use the
