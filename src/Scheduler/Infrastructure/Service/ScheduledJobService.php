@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Scheduler\Infrastructure\Service;
 
 use App\Scheduler\Application\DTO\ScheduledJobInput;
+use App\Scheduler\Application\Exception\InvalidScheduledJob;
 use App\Scheduler\Application\Exception\ScheduledJobConflict as AdministrationConflict;
+use App\Scheduler\Application\Exception\ScheduledJobStatusConflict;
 use App\Scheduler\Application\Port\ScheduledJobAdministrationInterface;
 use App\Scheduler\Application\Port\ScheduledJobPortInterface;
+use App\Scheduler\Domain\Exception\DisabledScheduledJob;
 use App\Scheduler\Domain\Exception\ScheduledJobConflict;
 use App\Scheduler\Domain\Model\ScheduledJob;
 use App\Scheduler\Domain\Repository\ScheduledJobRepositoryInterface;
@@ -16,7 +19,6 @@ use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Domain\ValueObject\ScheduleStatus;
 use App\Shared\Domain\Model\Uuid;
 use Cron\CronExpression;
-use InvalidArgumentException;
 
 final class ScheduledJobService implements ScheduledJobPortInterface, ScheduledJobAdministrationInterface
 {
@@ -127,54 +129,22 @@ final class ScheduledJobService implements ScheduledJobPortInterface, ScheduledJ
 
     public function pause(Uuid $id): ?ScheduledJob
     {
-        $job = $this->getById($id);
-        if ($job === null) {
-            return null;
-        }
-
-        $job->pause();
-        $this->saveAdministrationJob($job);
-
-        return $job;
+        return $this->changeStatus($id, static fn (ScheduledJob $job) => $job->pause());
     }
 
     public function resume(Uuid $id): ?ScheduledJob
     {
-        $job = $this->getById($id);
-        if ($job === null) {
-            return null;
-        }
-
-        $job->resume();
-        $this->saveAdministrationJob($job);
-
-        return $job;
+        return $this->changeStatus($id, static fn (ScheduledJob $job) => $job->resume());
     }
 
     public function enable(Uuid $id): ?ScheduledJob
     {
-        $job = $this->getById($id);
-        if ($job === null) {
-            return null;
-        }
-
-        $job->enable();
-        $this->saveAdministrationJob($job);
-
-        return $job;
+        return $this->changeStatus($id, static fn (ScheduledJob $job) => $job->enable());
     }
 
     public function disable(Uuid $id): ?ScheduledJob
     {
-        $job = $this->getById($id);
-        if ($job === null) {
-            return null;
-        }
-
-        $job->disable();
-        $this->saveAdministrationJob($job);
-
-        return $job;
+        return $this->changeStatus($id, static fn (ScheduledJob $job) => $job->disable());
     }
 
     public function availableCommands(): array
@@ -183,6 +153,31 @@ final class ScheduledJobService implements ScheduledJobPortInterface, ScheduledJ
             'messenger' => $this->registry->getMessengerCommands(),
             'console' => $this->registry->getConsoleCommands(),
         ];
+    }
+
+    /**
+     * Applies a status change and saves it; a job already in the requested status is returned unwritten.
+     *
+     * @param \Closure(ScheduledJob): void $change
+     */
+    private function changeStatus(Uuid $id, \Closure $change): ?ScheduledJob
+    {
+        $job = $this->getById($id);
+        if ($job === null) {
+            return null;
+        }
+
+        $status = $job->getStatus();
+        try {
+            $change($job);
+        } catch (DisabledScheduledJob $refused) {
+            throw new ScheduledJobStatusConflict($refused);
+        }
+        if ($job->getStatus() !== $status) {
+            $this->saveAdministrationJob($job);
+        }
+
+        return $job;
     }
 
     private function saveAdministrationJob(ScheduledJob $job): void
@@ -197,15 +192,15 @@ final class ScheduledJobService implements ScheduledJobPortInterface, ScheduledJ
     private function validateAdministrationInput(ScheduledJobInput $input): JobType
     {
         if (trim($input->name) === '' || mb_strlen($input->name) > 255) {
-            throw new InvalidArgumentException(
+            throw new InvalidScheduledJob(
                 'Scheduled job name must contain between 1 and 255 characters.',
             );
         }
         if (!CronExpression::isValidExpression($input->expression)) {
-            throw new InvalidArgumentException('Invalid cron expression.');
+            throw new InvalidScheduledJob('Invalid cron expression.');
         }
         return JobType::tryFrom($input->jobType)
-            ?? throw new InvalidArgumentException('Invalid scheduled job type.');
+            ?? throw new InvalidScheduledJob('Invalid scheduled job type.');
     }
 
     /** @param array<string, mixed> $parameters */
@@ -219,7 +214,7 @@ final class ScheduledJobService implements ScheduledJobPortInterface, ScheduledJ
         $allowedKeys = array_keys($schema);
         foreach ($parameters as $key => $value) {
             if (!in_array($key, $allowedKeys, true)) {
-                throw new InvalidArgumentException(sprintf(
+                throw new InvalidScheduledJob(sprintf(
                     'Invalid parameters for command "%s": "%s" is not in the allowed schema.',
                     $command,
                     $key,
@@ -231,7 +226,7 @@ final class ScheduledJobService implements ScheduledJobPortInterface, ScheduledJ
 
         foreach ($schema as $key => $definition) {
             if ($definition['required'] && !array_key_exists($key, $parameters)) {
-                throw new InvalidArgumentException(sprintf(
+                throw new InvalidScheduledJob(sprintf(
                     'Missing required parameter "%s" for command "%s".',
                     $key,
                     $command,
@@ -246,7 +241,7 @@ final class ScheduledJobService implements ScheduledJobPortInterface, ScheduledJ
     private function validateMessengerCommand(string $command): array
     {
         if (!$this->registry->isMessengerCommandAllowed($command)) {
-            throw new InvalidArgumentException(sprintf(
+            throw new InvalidScheduledJob(sprintf(
                 'Command "%s" is not registered as a schedulable messenger command.',
                 $command,
             ));
@@ -261,7 +256,7 @@ final class ScheduledJobService implements ScheduledJobPortInterface, ScheduledJ
     private function validateConsoleCommand(string $command): array
     {
         if (!$this->registry->isConsoleCommandAllowed($command)) {
-            throw new InvalidArgumentException(sprintf(
+            throw new InvalidScheduledJob(sprintf(
                 'Command "%s" is not registered as a schedulable console command.',
                 $command,
             ));
@@ -282,7 +277,7 @@ final class ScheduledJobService implements ScheduledJobPortInterface, ScheduledJ
         };
 
         if ($actualType !== $expectedType) {
-            throw new InvalidArgumentException(sprintf(
+            throw new InvalidScheduledJob(sprintf(
                 'Invalid parameter "%s": expected %s, got %s.',
                 $key,
                 $expectedType,
