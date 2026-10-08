@@ -52,6 +52,11 @@ final class CountrySubscriptionService implements CountrySubscriptionPortInterfa
         return array_map($this->subscriptionToArray(...), $subscriptions);
     }
 
+    public function listSubscribedCountryCodes(): array
+    {
+        return $this->repository->findSubscribedCountryCodes();
+    }
+
     public function subscribe(Uuid $userId, ?Uuid $sourceId, string $countryCode): array
     {
         // If no sourceId provided, auto-resolve to an active source (creating one if needed)

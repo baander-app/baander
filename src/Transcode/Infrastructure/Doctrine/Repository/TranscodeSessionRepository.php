@@ -18,6 +18,13 @@ use Doctrine\ORM\EntityManagerInterface;
 
 final class TranscodeSessionRepository implements TranscodeSessionRepositoryInterface
 {
+    private const array ACTIVE_STATES = [
+        SessionState::Pending->value,
+        SessionState::Preparing->value,
+        SessionState::Active->value,
+        SessionState::Paused->value,
+    ];
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
     ) {
@@ -96,8 +103,18 @@ final class TranscodeSessionRepository implements TranscodeSessionRepositoryInte
             ->getRepository(TranscodeSessionEntity::class)
             ->findBy([
                 'userId' => $userId,
-                'state' => [SessionState::Pending->value, SessionState::Preparing->value, SessionState::Active->value, SessionState::Paused->value],
+                'state' => self::ACTIVE_STATES,
             ]);
+
+        return array_map(fn(TranscodeSessionEntity $e) => $this->toDomain($e), $entities);
+    }
+
+    /** @return TranscodeSession[] */
+    public function findAllActiveSessions(): array
+    {
+        $entities = $this->entityManager
+            ->getRepository(TranscodeSessionEntity::class)
+            ->findBy(['state' => self::ACTIVE_STATES], ['createdAt' => 'ASC', 'id' => 'ASC']);
 
         return array_map(fn(TranscodeSessionEntity $e) => $this->toDomain($e), $entities);
     }

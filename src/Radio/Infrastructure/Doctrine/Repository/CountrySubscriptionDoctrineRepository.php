@@ -36,6 +36,20 @@ final class CountrySubscriptionDoctrineRepository implements CountrySubscription
         return array_map($this->toDomain(...), $entities);
     }
 
+    /** @return list<string> */
+    public function findSubscribedCountryCodes(): array
+    {
+        /** @var list<string> $codes */
+        $codes = $this->entityManager->createQueryBuilder()
+            ->select('DISTINCT s.countryCode')
+            ->from(CountrySubscriptionEntity::class, 's')
+            ->orderBy('s.countryCode', 'ASC')
+            ->getQuery()
+            ->getSingleColumnResult();
+
+        return $codes;
+    }
+
     public function findByUserAndSourceAndCountry(Uuid $userId, Uuid $sourceId, string $countryCode): ?CountrySubscription
     {
         $entity = $this->entityManager

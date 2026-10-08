@@ -119,6 +119,11 @@ final class RadioOwnershipPersistenceTest extends TestCase
         }
 
         self::assertNull($subscriptions->findByUserAndSourceAndCountry($second, $source, 'SE'));
+        $subscribed = $subscriptions->findSubscribedCountryCodes();
+        self::assertSame(['DK' => 1, 'SE' => 1], array_intersect_key(array_count_values($subscribed), ['DK' => true, 'SE' => true]));
+        $sorted = $subscribed;
+        sort($sorted);
+        self::assertSame($sorted, $subscribed);
         self::assertNull($starred->findByUserIdAndStationId($second, $two));
     }
 

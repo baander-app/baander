@@ -14,6 +14,13 @@ interface CountrySubscriptionPortInterface
     public function listSubscriptions(Uuid $userId): array;
 
     /**
+     * The country codes any user subscribes to, each once, in alphabetical order.
+     *
+     * @return list<string>
+     */
+    public function listSubscribedCountryCodes(): array;
+
+    /**
      * @return array<string, mixed>
      */
     public function subscribe(Uuid $userId, ?Uuid $sourceId, string $countryCode): array;

@@ -7,6 +7,7 @@ namespace App\Transcode\Interface\Controller;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Transcode\Application\Command\CleanupOrphanedJobsCommand;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
@@ -81,6 +82,7 @@ final class TranscodeJobController
     )]
     #[Route('/cleanup', name: 'cleanup', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
+    #[CliCounterpart('app:transcode:job:cleanup')]
     public function cleanup(): JsonResponse
     {
         $stamp = $this->commandBus->dispatch(new CleanupOrphanedJobsCommand())->last(HandledStamp::class);
