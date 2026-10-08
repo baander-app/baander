@@ -49,11 +49,12 @@ final class AdminUserSettingsController
             new OA\Response(response: '200', description: "The user's settings", content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: AdminUserSettingResource::class))),
             ])),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '403', description: 'Forbidden; admins need the admin.can_view_users setting, as for the user list', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('', name: 'index', methods: ['GET'])]
+    #[IsGranted('USER_MANAGEMENT_LIST')]
     public function index(string $id): JsonResponse
     {
         if (!self::isUuid($id)) {

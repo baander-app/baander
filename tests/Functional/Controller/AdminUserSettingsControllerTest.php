@@ -45,6 +45,17 @@ final class AdminUserSettingsControllerTest extends TestCase
         $this->assertSame([], $this->changeRecords());
     }
 
+    public function testAnAdminWhoMayNotViewUsersCannotReadTheirSettings(): void
+    {
+        $admin = $this->createAdminUser();
+        $superAdmin = $this->createSuperAdminUser();
+        $alice = $this->createTestUser('alice@baander.app');
+        static::getContainer()->get(SystemSettingStoreInterface::class)->save(['admin.can_view_users' => false]);
+
+        $this->assertSame(403, $this->authenticatedRequest('GET', $this->url($alice), $admin)->getStatusCode());
+        $this->assertSame(200, $this->authenticatedRequest('GET', $this->url($alice), $superAdmin)->getStatusCode());
+    }
+
     public function testARegularUserCannotReadAnotherUsersSettings(): void
     {
         $user = $this->createTestUser();

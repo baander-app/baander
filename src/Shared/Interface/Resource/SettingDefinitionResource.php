@@ -32,7 +32,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'min', type: 'integer', nullable: true),
         new OA\Property(property: 'max', type: 'integer', nullable: true),
         new OA\Property(property: 'editRole', type: 'string', enum: ['ROLE_USER', 'ROLE_SUPER_ADMIN']),
-        new OA\Property(property: 'userVisible', type: 'boolean', description: 'Whether signed-in users can read this system setting'),
+        new OA\Property(property: 'userVisible', type: 'boolean', description: 'Whether user settings may follow this system setting, which shows its value to signed-in users as their default'),
         new OA\Property(property: 'enforced', type: 'boolean', description: 'False while the backend does not yet honour the setting'),
         new OA\Property(property: 'fallbackKey', type: 'string', nullable: true, description: 'System setting a user setting follows when unset'),
     ],
