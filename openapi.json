@@ -24843,15 +24843,11 @@
             "Accept-Language": {
                 "name": "Accept-Language",
                 "in": "header",
-                "description": "Locale for response messages. Supported: `en` (default), `da`.",
+                "description": "Read only at registration: the supported language the browser ranks highest (`en`, `da` or `th`) becomes the new user's email language when it differs from the server default. Response messages are in English.",
                 "required": false,
                 "schema": {
                     "type": "string",
-                    "default": "en",
-                    "enum": [
-                        "en",
-                        "da"
-                    ]
+                    "example": "da-DK,da;q=0.9,en;q=0.5"
                 }
             }
         },
