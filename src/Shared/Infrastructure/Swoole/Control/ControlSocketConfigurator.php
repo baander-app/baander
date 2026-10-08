@@ -8,6 +8,7 @@ use App\Shared\Application\Port\ServerControlException;
 use RuntimeException;
 use Swoole\Server;
 use Swoole\Server\Port;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\CoWrapper;
 use SwooleBundle\SwooleBundle\Server\Configurator\Configurator;
 use Throwable;
 
@@ -26,6 +27,9 @@ final readonly class ControlSocketConfigurator implements Configurator
         private SwooleServerWorkers $workers,
         private ServerControlCoordinator $coordinator,
         private ControlPipeMessageHandler $pipeMessages,
+        // Releases the pooled services an operation borrows when its coroutine ends;
+        // the bundle does this only for requests and coroutines it starts itself.
+        private ?CoWrapper $coWrapper = null,
     ) {
     }
 
@@ -63,6 +67,7 @@ final readonly class ControlSocketConfigurator implements Configurator
     /** Answers one request line; a rejected line leaves the connection and the listener open. */
     private function receive(Server $server, int $fd, int $reactorId, string $line): void
     {
+        $this->coWrapper?->defer();
         $server->send($fd, $this->respond($line));
     }
 
