@@ -6,6 +6,7 @@ namespace App\QoL\Domain\Service;
 
 use App\QoL\Domain\Exception\StreamBudgetExhausted;
 use App\QoL\Domain\Model\GovernorState;
+use App\QoL\Domain\Port\AlgorithmProfileStoreInterface;
 use App\QoL\Domain\Port\QualityLadderPortInterface;
 use App\QoL\Domain\ValueObject\AlgorithmProfile;
 use App\QoL\Domain\ValueObject\StreamAllocation;
@@ -16,13 +17,14 @@ use App\Shared\Domain\Model\Uuid;
  * Core domain service for adaptive stream governance.
  *
  * Owns budget evaluation, tier selection, active stream tracking,
- * and learning model coordination. All state is in-memory; persistence
- * is handled by infrastructure subscribers.
+ * and learning model coordination. Learning state and active streams are
+ * in-memory per worker; persistence is handled by infrastructure subscribers.
+ * The algorithm profile lives in the profile store, which the web server shares
+ * between its workers.
  */
 final class StreamGovernor
 {
     private GovernorState $state = GovernorState::Learning;
-    private AlgorithmProfile $profile = AlgorithmProfile::Balanced;
 
     /** @var array<string, StreamAllocation> jobId.toString() → allocation */
     private array $activeStreams = [];
@@ -30,6 +32,7 @@ final class StreamGovernor
     public function __construct(
         private readonly LearningModel $model,
         private readonly QualityLadderPortInterface $qualityLadderPort,
+        private readonly AlgorithmProfileStoreInterface $profiles,
     )
     {
     }
@@ -64,7 +67,7 @@ final class StreamGovernor
             $predictedCost = $this->model->averageCostForTier($requestedTier) ?? 50.0;
         }
 
-        $budgetCap = $this->profile->budgetCap() * 100.0; // e.g., 80.0
+        $budgetCap = $this->profiles->get()->budgetCap() * 100.0; // e.g., 80.0
         $usedBudget = $this->calculateUsedBudget();
         $remainingBudget = $budgetCap - $usedBudget;
 
@@ -156,7 +159,7 @@ final class StreamGovernor
             return $this->qualityLadderPort->defaultTierNames();
         }
 
-        $budgetCap = $this->profile->budgetCap() * 100.0;
+        $budgetCap = $this->profiles->get()->budgetCap() * 100.0;
         $usedBudget = $this->calculateUsedBudget();
         $remainingBudget = $budgetCap - $usedBudget;
 
@@ -197,12 +200,12 @@ final class StreamGovernor
 
     public function getProfile(): AlgorithmProfile
     {
-        return $this->profile;
+        return $this->profiles->get();
     }
 
     public function setProfile(AlgorithmProfile $profile): void
     {
-        $this->profile = $profile;
+        $this->profiles->set($profile);
     }
 
     /**
@@ -244,18 +247,16 @@ final class StreamGovernor
     }
 
     /**
-     * Serialize full governor state for persistence.
-     * @return array<string, mixed>
+     * Serialize the learning state for persistence. The profile has its own store,
+     * and active streams are left out: only the worker that served a stream sees it
+     * released, so a saved stream would outlive it after a restart.
+     *
+     * @return array{state: string, model: array<string, mixed>}
      */
     public function exportState(): array
     {
         return [
             'state' => $this->state->value,
-            'profile' => $this->profile->value,
-            'active_streams' => array_map(
-                static fn(StreamAllocation $a): array => $a->jsonSerialize(),
-                $this->activeStreams,
-            ),
             'model' => $this->model->getState(),
         ];
     }
@@ -266,19 +267,12 @@ final class StreamGovernor
     }
 
     /**
-     * Restore governor state from persistence.
+     * Restore the learning state from persistence.
      * @param array<string, mixed> $state
      */
     public function importState(array $state): void
     {
         $this->state = GovernorState::from($state['state'] ?? 'learning');
-        $this->profile = AlgorithmProfile::from($state['profile'] ?? 'balanced');
-
-        $this->activeStreams = [];
-        foreach ($state['active_streams'] ?? [] as $streamData) {
-            $allocation = StreamAllocation::fromArray($streamData);
-            $this->activeStreams[$allocation->jobId->toString()] = $allocation;
-        }
 
         if (isset($state['model'])) {
             $this->model->restoreState($state['model']);

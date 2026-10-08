@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\QoL\Infrastructure\Swoole;
 
+use App\Tests\Fixtures\QoL\InMemoryAlgorithmProfileStore;
 use App\QoL\Application\Port\EncoderProfileFingerprintPortInterface;
 use App\QoL\Domain\Model\GovernorState;
 use App\QoL\Domain\Service\LearningModel;
 use App\QoL\Domain\Service\StreamGovernor;
-use App\QoL\Domain\ValueObject\AlgorithmProfile;
 use App\QoL\Domain\ValueObject\UtilizationSample;
 use App\QoL\Infrastructure\Swoole\CpuGpuSampler;
 use App\QoL\Infrastructure\Swoole\LearningDataPersister;
@@ -54,42 +54,88 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
         rmdir($this->directory);
     }
 
-    public function testOtherWorkersDoNotResolveQoLServices(): void
+    public function testEveryHttpWorkerRestoresLearningButOnlyWorkerZeroStartsTimers(): void
+    {
+        [$subscriber, $governor, $persister] = $this->fixture();
+        $governor->getModel()->addSample(new UtilizationSample(10.0, 0.0, 30.0, 1080, 'h264', false, 1000000, 'high', 1));
+        $governor->importState(['state' => 'active']);
+        $persister->persist();
+        $governor->resetLearning();
+
+        $subscriber->onWorkerStarted(new WorkerStartedEvent(new Server('127.0.0.1', 0), 2));
+
+        self::assertSame(GovernorState::Active, $governor->getState());
+        self::assertSame(1, $governor->getModel()->sampleCount());
+        self::assertSame(0, Timer::stats()['num']);
+    }
+
+    public function testTaskWorkersDoNotResolveQoLServices(): void
     {
         $locator = $this->createMock(ContainerInterface::class);
         $locator->expects(self::never())->method('get');
         $locator->expects(self::never())->method('has');
         $subscriber = new QoLWorkerStartupSubscriber($locator, new NullLogger());
+        $server = new Server('127.0.0.1', 0);
+        $server->taskworker = true;
 
-        $subscriber->onWorkerStarted(new WorkerStartedEvent(new Server('127.0.0.1', 0), 1));
+        $subscriber->onWorkerStarted(new WorkerStartedEvent($server, 4));
 
         self::assertSame(0, Timer::stats()['num']);
     }
 
-    public function testMatchingProfileRestoresStateAndStartsBothTimers(): void
+    public function testSavedActiveStreamsAreNotRestored(): void
+    {
+        [$subscriber, $governor] = $this->fixture();
+        file_put_contents($this->directory . '/governor_state.json', json_encode([
+            'encoder_profile' => 'software',
+            'governor' => ['state' => 'learning', 'active_streams' => [[
+                'job_id' => 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+                'quality_tier' => '1080p',
+                'predicted_cost' => 30.0,
+            ]]],
+        ], JSON_THROW_ON_ERROR));
+
+        $subscriber->onWorkerStarted(new WorkerStartedEvent(new Server('127.0.0.1', 0), 0));
+
+        self::assertSame(0, $governor->getActiveStreamCount());
+    }
+
+    public function testChangedEncoderInAnotherWorkerResetsLearningAndKeepsTheFileForWorkerZero(): void
+    {
+        [$subscriber, $governor] = $this->fixture();
+        file_put_contents($this->directory . '/governor_state.json', json_encode([
+            'encoder_profile' => 'previous-encoder',
+            'governor' => ['state' => 'active'],
+        ], JSON_THROW_ON_ERROR));
+
+        $subscriber->onWorkerStarted(new WorkerStartedEvent(new Server('127.0.0.1', 0), 1));
+
+        self::assertSame(GovernorState::Learning, $governor->getState());
+        self::assertFileExists($this->directory . '/governor_state.json');
+    }
+
+    public function testMatchingEncoderRestoresStateAndStartsBothTimers(): void
     {
         [$subscriber, $governor, $persister] = $this->fixture();
-        $governor->importState(['state' => 'active', 'profile' => 'aggressive']);
+        $governor->importState(['state' => 'active']);
         $persister->persist();
         $governor->resetLearning();
-        $governor->setProfile(AlgorithmProfile::Balanced);
 
         $subscriber->onWorkerStarted(new WorkerStartedEvent(new Server('127.0.0.1', 0), 0));
 
         self::assertSame(GovernorState::Active, $governor->getState());
-        self::assertSame('aggressive', $governor->getProfile()->value);
         self::assertFileExists($this->directory . '/governor_state.json');
         self::assertSame(2, Timer::stats()['num']);
     }
 
-    public function testChangedProfileResetsLearningAndRemovesStaleState(): void
+    public function testChangedEncoderResetsLearningAndRemovesStaleState(): void
     {
         [$subscriber, $governor] = $this->fixture();
         $governor->getModel()->addSample(new UtilizationSample(10.0, 0.0, 30.0, 1080, 'h264', false, 1000000, 'high', 1));
         $governor->importState(['state' => 'active']);
         file_put_contents($this->directory . '/governor_state.json', json_encode([
             'encoder_profile' => 'previous-encoder',
-            'governor' => ['state' => 'active', 'profile' => 'aggressive'],
+            'governor' => ['state' => 'active'],
         ], JSON_THROW_ON_ERROR));
 
         $subscriber->onWorkerStarted(new WorkerStartedEvent(new Server('127.0.0.1', 0), 0));
@@ -100,7 +146,7 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
         self::assertSame(2, Timer::stats()['num']);
     }
 
-    public function testMissingSavedProfileRetainsExistingRestorationBehavior(): void
+    public function testMissingSavedEncoderRetainsExistingRestorationBehavior(): void
     {
         [$subscriber, $governor] = $this->fixture();
         file_put_contents($this->directory . '/governor_state.json', '{"governor":{"state":"active"}}');
@@ -164,7 +210,7 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
         } else {
             $fingerprint->method('getName')->willReturn('software');
         }
-        $governor = new StreamGovernor(new LearningModel(), $this->createStub(QualityLadderPortInterface::class));
+        $governor = new StreamGovernor(new LearningModel(), $this->createStub(QualityLadderPortInterface::class), new InMemoryAlgorithmProfileStore());
         $persister = new LearningDataPersister($governor, $fingerprint, new NullLogger(), $this->directory, new JsonEncoder());
         $sampler = new CpuGpuSampler(new NullLogger());
         $sampler->boot();

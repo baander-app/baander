@@ -8,6 +8,7 @@ use App\QoL\Domain\Exception\StreamBudgetExhausted;
 use App\QoL\Domain\Model\GovernorState;
 use App\QoL\Domain\Service\LearningModel;
 use App\QoL\Domain\Service\StreamGovernor;
+use App\Tests\Fixtures\QoL\InMemoryAlgorithmProfileStore;
 use App\QoL\Domain\ValueObject\UtilizationSample;
 use App\QoL\Infrastructure\Swoole\CpuGpuSampler;
 use App\QoL\Infrastructure\Transcode\BudgetGuard;
@@ -65,7 +66,7 @@ final class BudgetGuardTest extends TestCase
                 activeStreams: 1,
             ));
         }
-        $governor = new StreamGovernor($model, new QualityLadderPort());
+        $governor = new StreamGovernor($model, new QualityLadderPort(), new InMemoryAlgorithmProfileStore());
         $governor->activate();
 
         return $governor;
