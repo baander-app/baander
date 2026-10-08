@@ -44,6 +44,11 @@ final readonly class RecommendationType implements Stringable, JsonSerializable
         return new self($normalized);
     }
 
+    public static function song(): self
+    {
+        return new self('song');
+    }
+
     public function equals(self $other): bool
     {
         return $this->value === $other->value;

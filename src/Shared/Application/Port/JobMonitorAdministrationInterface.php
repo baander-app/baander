@@ -101,7 +101,7 @@ interface JobMonitorAdministrationInterface
      * was cancelled and stopped at a checkpoint. The record has no queue, so retrying it from
      * the monitor dispatches the message through its normal routing.
      *
-     * Console commands use it to run long work inline (KTD4).
+     * Console commands use it to run long work inline.
      *
      * @throws JobCancelledException when the job was cancelled and stopped at a checkpoint
      * @throws \Throwable the handler's own exception, unwrapped from HandlerFailedException

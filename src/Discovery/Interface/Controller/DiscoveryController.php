@@ -65,7 +65,7 @@ final class DiscoveryController
     )]
     #[Route('/register', name: 'register', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
-    #[CliParityExemption('deferred: no admin page; follow-up plan')]
+    #[CliParityExemption(CliParityExemption::DEFERRED_NO_ADMIN_PAGE)]
     public function register(#[MapRequestPayload] RegisterServerRequest $payload): JsonResponse
     {
         $envelope = $this->commandBus->dispatch(new RegisterServerCommand(

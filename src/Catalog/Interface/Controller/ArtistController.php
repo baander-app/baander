@@ -68,7 +68,7 @@ final class ArtistController
     )]
     #[Route('/', name: 'store', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
-    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
+    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
     public function store(#[MapRequestPayload] CreateArtistRequest $payload): JsonResponse
     {
         try {
@@ -225,7 +225,7 @@ final class ArtistController
     )]
     #[Route('/{publicId}', name: 'update', methods: ['PATCH'])]
     #[IsGranted('ROLE_ADMIN')]
-    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
+    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
     public function update(string $publicId, #[MapRequestPayload] UpdateArtistRequest $payload): JsonResponse
     {
         try {
@@ -279,7 +279,7 @@ final class ArtistController
     )]
     #[Route('/{publicId}', name: 'destroy', methods: ['DELETE'])]
     #[IsGranted('ROLE_ADMIN')]
-    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
+    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
     public function destroy(string $publicId): JsonResponse
     {
         try {
@@ -320,7 +320,7 @@ final class ArtistController
     )]
     #[Route('/{publicId}/songs', name: 'add_song', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
-    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
+    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
     public function addSong(string $publicId, #[MapRequestPayload] ArtistSongRequest $payload): JsonResponse
     {
         $artist = $this->resolveArtist($publicId);
@@ -361,7 +361,7 @@ final class ArtistController
     )]
     #[Route('/{publicId}/songs/{songId}', name: 'remove_song', methods: ['DELETE'])]
     #[IsGranted('ROLE_ADMIN')]
-    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
+    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
     public function removeSong(string $publicId, string $songId): JsonResponse
     {
         $artist = $this->resolveArtist($publicId);
@@ -402,7 +402,7 @@ final class ArtistController
     )]
     #[Route('/{publicId}/songs/{songId}', name: 'update_song_role', methods: ['PATCH'])]
     #[IsGranted('ROLE_ADMIN')]
-    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
+    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
     public function updateSongRole(string $publicId, string $songId, #[MapRequestPayload] UpdateRoleRequest $payload): JsonResponse
     {
         $artist = $this->resolveArtist($publicId);
@@ -447,7 +447,7 @@ final class ArtistController
     )]
     #[Route('/{publicId}/albums', name: 'add_album', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
-    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
+    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
     public function addAlbum(string $publicId, #[MapRequestPayload] ArtistAlbumRequest $payload): JsonResponse
     {
         $artist = $this->resolveArtist($publicId);
@@ -488,7 +488,7 @@ final class ArtistController
     )]
     #[Route('/{publicId}/albums/{albumId}', name: 'remove_album', methods: ['DELETE'])]
     #[IsGranted('ROLE_ADMIN')]
-    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
+    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
     public function removeAlbum(string $publicId, string $albumId): JsonResponse
     {
         $artist = $this->resolveArtist($publicId);
@@ -529,7 +529,7 @@ final class ArtistController
     )]
     #[Route('/{publicId}/albums/{albumId}', name: 'update_album_role', methods: ['PATCH'])]
     #[IsGranted('ROLE_ADMIN')]
-    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
+    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
     public function updateAlbumRole(string $publicId, string $albumId, #[MapRequestPayload] UpdateRoleRequest $payload): JsonResponse
     {
         $artist = $this->resolveArtist($publicId);

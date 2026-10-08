@@ -68,7 +68,7 @@ final class AlbumCoverController
         ],
     )]
     #[Route('', name: 'upload', methods: ['POST'])]
-    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
+    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
     public function upload(string $publicId, Request $request): JsonResponse
     {
         $resolvedPublicId = $this->resolvePublicId($publicId);
@@ -159,7 +159,7 @@ final class AlbumCoverController
         ],
     )]
     #[Route('', name: 'delete', methods: ['DELETE'])]
-    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
+    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
     public function delete(string $publicId): JsonResponse
     {
         $resolvedPublicId = $this->resolvePublicId($publicId);

@@ -73,7 +73,7 @@ final class AdminAlbumController
         ],
     )]
     #[Route('/{publicId}/delete-preview', name: 'delete_preview', methods: ['GET'])]
-    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
+    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
     public function deletePreview(string $publicId): JsonResponse
     {
         $resolvedPublicId = $this->resolvePublicId($publicId);
@@ -132,7 +132,7 @@ final class AdminAlbumController
         ],
     )]
     #[Route('/{publicId}', name: 'delete', methods: ['DELETE'])]
-    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
+    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
     public function delete(string $publicId, Request $request): JsonResponse
     {
         $resolvedPublicId = $this->resolvePublicId($publicId);

@@ -16,7 +16,7 @@ use Symfony\Component\Routing\RouteCollection;
 use Symfony\Component\Routing\RouterInterface;
 
 /**
- * Every admin-guarded route has a console command or a recorded exemption (R1, R10).
+ * Every admin-guarded route has a console command or a recorded exemption.
  *
  * Mark the controller method with `#[CliCounterpart('app:...')]` or
  * `#[CliParityExemption('reason')]` from `App\Shared\Interface\Attribute`.

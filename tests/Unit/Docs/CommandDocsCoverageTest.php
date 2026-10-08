@@ -10,8 +10,7 @@ use PHPUnit\Framework\TestCase;
 
 /**
  * Every console command Baander defines has an operator docs page and a row in
- * the commands index, and every page and index row names a command that exists
- * (R10).
+ * the commands index, and every page and index row names a command that exists.
  *
  * A command defined under `src/` needs its own page or an index row linking to a
  * section of a family page (see {@see CommandDocsLocator}). Framework commands,
