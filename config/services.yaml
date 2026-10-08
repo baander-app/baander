@@ -252,10 +252,6 @@ services:
         arguments:
             $dsn: '%env(REDIS_URL)%'
 
-    App\Shared\Interface\Controller\JobMonitorController:
-        arguments:
-            $redisClientFactory: '@App\Shared\Infrastructure\Redis\RedisClientFactory'
-
     # --- Transport Management ---
     App\Shared\Interface\Controller\TransportController:
         arguments:
