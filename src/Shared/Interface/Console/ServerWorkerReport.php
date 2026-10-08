@@ -7,9 +7,19 @@ namespace App\Shared\Interface\Console;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
-/** Names the workers a per-worker diagnostics read could not cover. */
+/** Prints the figures of per-worker diagnostics reads and names the workers a read could not cover. */
 final class ServerWorkerReport
 {
+    /** A figure as a table cell: yes or no for a flag, the value for another scalar, otherwise "-". */
+    public static function scalar(mixed $value): string
+    {
+        return match (true) {
+            is_bool($value) => AdminCommandSupport::yesNo($value),
+            is_scalar($value) => (string) $value,
+            default => '-',
+        };
+    }
+
     /**
      * Prints, on stderr, each worker that did not answer and each worker whose read failed.
      *

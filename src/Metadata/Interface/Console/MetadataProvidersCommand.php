@@ -48,8 +48,8 @@ final class MetadataProvidersCommand extends Command
             ['Provider', 'Enabled', 'Configured'],
             static fn (array $provider): array => [
                 $provider['name'],
-                $provider['enabled'] === true ? 'yes' : 'no',
-                $provider['configured'] === true ? 'yes' : 'no',
+                AdminCommandSupport::yesNo($provider['enabled'] === true),
+                AdminCommandSupport::yesNo($provider['configured'] === true),
             ],
             'No metadata providers are registered.',
         );

@@ -7,7 +7,6 @@ namespace App\Auth\Interface\Console;
 use App\Auth\Application\DTO\LoginBlockPage;
 use App\Auth\Application\Query\LoginBlock\ListLoginBlocksQuery;
 use App\Auth\Interface\Resource\LoginBlockResource;
-use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -43,8 +42,11 @@ final class LoginBlockListCommand extends Command
         $io = new SymfonyStyle($input, $output);
 
         try {
-            $offset = self::integer($input, 'offset');
-            $page = $this->support->dispatch(new ListLoginBlocksQuery(self::integer($input, 'limit'), $offset));
+            $offset = AdminCommandSupport::integerOption($input, 'offset') ?? 0;
+            $page = $this->support->dispatch(new ListLoginBlocksQuery(
+                AdminCommandSupport::integerOption($input, 'limit') ?? ListLoginBlocksQuery::DEFAULT_LIMIT,
+                $offset,
+            ));
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
         }
@@ -72,15 +74,5 @@ final class LoginBlockListCommand extends Command
         }
 
         return $exitCode;
-    }
-
-    private static function integer(InputInterface $input, string $name): int
-    {
-        $value = filter_var($input->getOption($name), FILTER_VALIDATE_INT);
-        if ($value === false) {
-            throw new InvalidInputException(sprintf('--%s must be an integer.', $name));
-        }
-
-        return $value;
     }
 }

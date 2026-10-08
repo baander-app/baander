@@ -6,6 +6,7 @@ namespace App\Scheduler\Interface\Console;
 
 use App\Scheduler\Application\Port\ScheduledJobAdministrationInterface;
 use App\Scheduler\Interface\Resource\ScheduledJobResource;
+use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -39,7 +40,7 @@ final class SchedulerCreateCommand extends Command
         try {
             $job = ScheduledJobResource::from($this->jobs->createJob($this->reader->forCreate($input)));
         } catch (Throwable $failure) {
-            return ScheduledJobConsole::fail($io, $failure);
+            return AdminCommandSupport::fail($io, $failure);
         }
 
         $io->success(sprintf('Created scheduled job "%s".', $job['name']));

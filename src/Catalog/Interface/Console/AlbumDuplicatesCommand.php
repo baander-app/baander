@@ -6,9 +6,7 @@ namespace App\Catalog\Interface\Console;
 
 use App\Catalog\Application\Port\AlbumDuplicatePortInterface;
 use App\Catalog\Interface\Resource\DuplicateGroupResource;
-use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Console\AdminCommandSupport;
-use InvalidArgumentException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\TableSeparator;
@@ -44,14 +42,7 @@ final class AlbumDuplicatesCommand extends Command
         $io = new SymfonyStyle($input, $output);
 
         try {
-            $library = Uuid::fromString((string) $input->getArgument('library'));
-        } catch (InvalidArgumentException $exception) {
-            $io->getErrorStyle()->error($exception->getMessage());
-
-            return Command::INVALID;
-        }
-
-        try {
+            $library = AdminCommandSupport::uuid($input->getArgument('library'), 'The library ID');
             $groups = DuplicateGroupResource::collection($this->duplicates->findDuplicates($library));
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);

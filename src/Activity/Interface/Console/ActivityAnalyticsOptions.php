@@ -82,8 +82,9 @@ final class ActivityAnalyticsOptions
     {
         $values = [];
         foreach (['from', 'to', 'limit'] as $name) {
-            if ($input->hasOption($name) && is_string($input->getOption($name))) {
-                $values[$name] = $input->getOption($name);
+            $value = $input->hasOption($name) ? AdminCommandSupport::stringOption($input, $name) : null;
+            if ($value !== null) {
+                $values[$name] = $value;
             }
         }
 

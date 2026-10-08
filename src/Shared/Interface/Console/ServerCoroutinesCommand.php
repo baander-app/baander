@@ -54,9 +54,9 @@ final class ServerCoroutinesCommand extends Command
 
                 return [
                     $worker['worker_id'],
-                    self::scalar($stats['coroutine_num'] ?? null),
-                    self::scalar($stats['coroutine_peak_num'] ?? null),
-                    self::scalar($stats['coroutine_last_cid'] ?? null),
+                    ServerWorkerReport::scalar($stats['coroutine_num'] ?? null),
+                    ServerWorkerReport::scalar($stats['coroutine_peak_num'] ?? null),
+                    ServerWorkerReport::scalar($stats['coroutine_last_cid'] ?? null),
                     is_array($worker['active_cids'] ?? null) ? count($worker['active_cids']) : '-',
                     is_array($worker['channels'] ?? null) ? count($worker['channels']) : '-',
                 ];
@@ -69,12 +69,12 @@ final class ServerCoroutinesCommand extends Command
                 if (is_array($channel)) {
                     $channels[] = [
                         $worker['worker_id'],
-                        self::scalar($channel['name'] ?? null),
-                        self::scalar($channel['queue_num'] ?? null),
-                        self::scalar($channel['capacity'] ?? null),
-                        self::scalar($channel['consumer_num'] ?? null),
-                        self::scalar($channel['producer_num'] ?? null),
-                        ($channel['closed'] ?? false) === true ? 'yes' : 'no',
+                        ServerWorkerReport::scalar($channel['name'] ?? null),
+                        ServerWorkerReport::scalar($channel['queue_num'] ?? null),
+                        ServerWorkerReport::scalar($channel['capacity'] ?? null),
+                        ServerWorkerReport::scalar($channel['consumer_num'] ?? null),
+                        ServerWorkerReport::scalar($channel['producer_num'] ?? null),
+                        AdminCommandSupport::yesNo(($channel['closed'] ?? false) === true),
                     ];
                 }
             }
@@ -84,10 +84,5 @@ final class ServerCoroutinesCommand extends Command
         }
 
         return ServerWorkerReport::finish($io, $coroutines['missing_workers'], $coroutines['worker_errors']);
-    }
-
-    private static function scalar(mixed $value): string
-    {
-        return is_scalar($value) ? (string) $value : '-';
     }
 }

@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace App\Transcode\Interface\Console;
 
-use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
-use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
 use App\Transcode\Interface\Resource\TranscodeSessionResource;
@@ -47,7 +45,7 @@ final class TranscodeSessionShowCommand extends Command
         $io = new SymfonyStyle($input, $output);
 
         try {
-            $session = $this->sessions->findByUuid($this->sessionId($input))
+            $session = $this->sessions->findByUuid(AdminCommandSupport::uuid($input->getArgument('uuid'), 'The session ID'))
                 ?? throw new NotFoundException('Session not found.');
         } catch (Throwable $failure) {
             return AdminCommandSupport::fail($io, $failure);
@@ -74,15 +72,5 @@ final class TranscodeSessionShowCommand extends Command
         );
 
         return Command::SUCCESS;
-    }
-
-    /** @throws InvalidInputException when the argument is not a UUID */
-    private function sessionId(InputInterface $input): Uuid
-    {
-        try {
-            return Uuid::fromString((string) $input->getArgument('uuid'));
-        } catch (\InvalidArgumentException $error) {
-            throw new InvalidInputException('The session ID must be a UUID.', previous: $error);
-        }
     }
 }

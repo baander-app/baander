@@ -28,11 +28,7 @@ final class ScheduledJobConsole
     /** @throws InvalidInputException when the argument is not a UUID */
     public static function id(InputInterface $input): Uuid
     {
-        try {
-            return Uuid::fromString((string) $input->getArgument(self::ID_ARGUMENT));
-        } catch (\InvalidArgumentException $error) {
-            throw new InvalidInputException('The job ID must be a UUID.', previous: $error);
-        }
+        return AdminCommandSupport::uuid($input->getArgument(self::ID_ARGUMENT), 'The job ID');
     }
 
     /** The outcome the admin API reports as 404 for the same job. */
@@ -79,28 +75,11 @@ final class ScheduledJobConsole
         try {
             $job = ScheduledJobResource::from($change(self::id($input)) ?? throw self::notFound());
         } catch (Throwable $failure) {
-            return self::fail($io, $failure);
+            return AdminCommandSupport::fail($io, $failure);
         }
 
         $io->success(sprintf('%s scheduled job "%s". Its status is %s.', $done, $job['name'], $job['status']));
 
         return Command::SUCCESS;
-    }
-
-    /** Reports a failure like AdminCommandSupport::fail, followed by the messages per field of rejected input. */
-    public static function fail(SymfonyStyle $io, Throwable $failure): int
-    {
-        $exitCode = AdminCommandSupport::fail($io, $failure);
-        if ($failure instanceof InvalidInputException && $failure->details !== []) {
-            $lines = [];
-            foreach ($failure->details as $field => $messages) {
-                foreach ((array) $messages as $message) {
-                    $lines[] = sprintf('%s: %s', $field, $message);
-                }
-            }
-            $io->getErrorStyle()->listing($lines);
-        }
-
-        return $exitCode;
     }
 }

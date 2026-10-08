@@ -8,6 +8,7 @@ use App\Scheduler\Application\DTO\ScheduledJobInput;
 use App\Scheduler\Interface\Request\CreateScheduledJobRequest;
 use App\Scheduler\Interface\Request\UpdateScheduledJobRequest;
 use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -53,12 +54,12 @@ final readonly class ScheduledJobInputReader
     public function forCreate(InputInterface $input): ScheduledJobInput
     {
         $request = new CreateScheduledJobRequest(
-            name: $this->string($input, self::NAME) ?? '',
-            expression: $this->string($input, self::EXPRESSION) ?? '',
-            jobType: $this->string($input, self::TYPE) ?? '',
-            command: $this->string($input, self::COMMAND) ?? '',
+            name: AdminCommandSupport::stringOption($input, self::NAME) ?? '',
+            expression: AdminCommandSupport::stringOption($input, self::EXPRESSION) ?? '',
+            jobType: AdminCommandSupport::stringOption($input, self::TYPE) ?? '',
+            command: AdminCommandSupport::stringOption($input, self::COMMAND) ?? '',
             description: $this->description($input, null),
-            parameters: $this->parameters($input) ?? [],
+            parameters: AdminCommandSupport::jsonObjectOption($input, self::PARAMETERS) ?? [],
         );
         $this->validate($request);
 
@@ -83,12 +84,12 @@ final readonly class ScheduledJobInputReader
         /** @var array<string, mixed> $parameters */
         $parameters = (array) $current['parameters'];
         $request = new UpdateScheduledJobRequest(
-            name: $this->string($input, self::NAME) ?? (string) $current['name'],
-            expression: $this->string($input, self::EXPRESSION) ?? (string) $current['expression'],
-            jobType: $this->string($input, self::TYPE) ?? (string) $current['jobType'],
-            command: $this->string($input, self::COMMAND) ?? (string) $current['command'],
+            name: AdminCommandSupport::stringOption($input, self::NAME) ?? (string) $current['name'],
+            expression: AdminCommandSupport::stringOption($input, self::EXPRESSION) ?? (string) $current['expression'],
+            jobType: AdminCommandSupport::stringOption($input, self::TYPE) ?? (string) $current['jobType'],
+            command: AdminCommandSupport::stringOption($input, self::COMMAND) ?? (string) $current['command'],
             description: $this->description($input, is_string($description) ? $description : null),
-            parameters: $this->parameters($input) ?? $parameters,
+            parameters: AdminCommandSupport::jsonObjectOption($input, self::PARAMETERS) ?? $parameters,
         );
         $this->validate($request);
 
@@ -102,46 +103,14 @@ final readonly class ScheduledJobInputReader
         );
     }
 
-    private function string(InputInterface $input, string $option): ?string
-    {
-        $value = $input->getOption($option);
-
-        return is_string($value) ? $value : null;
-    }
-
     private function description(InputInterface $input, ?string $current): ?string
     {
-        $value = $this->string($input, self::DESCRIPTION);
+        $value = AdminCommandSupport::stringOption($input, self::DESCRIPTION);
         if ($value === null) {
             return $current;
         }
 
         return $value === '' ? null : $value;
-    }
-
-    /**
-     * @return array<string, mixed>|null null when the option is omitted
-     *
-     * @throws InvalidInputException when the option is not a JSON object
-     */
-    private function parameters(InputInterface $input): ?array
-    {
-        $json = $this->string($input, self::PARAMETERS);
-        if ($json === null) {
-            return null;
-        }
-
-        try {
-            $decoded = json_decode($json, false, 32, JSON_THROW_ON_ERROR);
-        } catch (\JsonException) {
-            $decoded = null;
-        }
-        if (!$decoded instanceof \stdClass) {
-            throw new InvalidInputException('The --parameters option must be a JSON object.');
-        }
-
-        /** @var array<string, mixed> */
-        return json_decode($json, true, 32, JSON_THROW_ON_ERROR);
     }
 
     /** @throws InvalidInputException with the API's validation message and the messages per field */

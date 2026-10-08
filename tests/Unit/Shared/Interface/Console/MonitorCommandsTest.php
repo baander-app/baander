@@ -100,6 +100,14 @@ final class MonitorCommandsTest extends TestCase
         self::assertSame(Command::INVALID, $tester->execute(['--status' => 'stuck']));
     }
 
+    public function testJobsRejectsALimitThatIsNotAnIntegerAsInvalid(): void
+    {
+        $tester = new CommandTester(new MonitorJobsCommand($this->monitor));
+
+        self::assertSame(Command::INVALID, $tester->execute(['--limit' => 'abc']));
+        self::assertNull($this->monitor->query);
+    }
+
     public function testShowPrintsTheApiDetailAsJson(): void
     {
         $tester = new CommandTester(new MonitorJobShowCommand($this->monitor));
@@ -184,6 +192,7 @@ final class MonitorCommandsTest extends TestCase
         yield 'unknown section' => [['--section' => 'everything']];
         yield 'from without a timezone' => [['--from' => '2026-03-15T10:00:00']];
         yield 'empty range' => [['--from' => '2026-03-15T10:00:00Z', '--to' => '2026-03-15T10:00:00Z']];
+        yield 'limit that is not an integer' => [['--section' => 'failures', '--limit' => 'abc']];
     }
 
     /** @param array<string, string> $input */

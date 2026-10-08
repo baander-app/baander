@@ -49,13 +49,13 @@ final class MonitorJobsCommand extends Command
 
         try {
             $page = JobMonitorResource::page($this->jobMonitor->jobs(new JobMonitorQuery(
-                status: self::optional($input, 'status'),
-                name: self::optional($input, 'type'),
-                queue: self::optional($input, 'queue'),
+                status: AdminCommandSupport::stringOption($input, 'status'),
+                name: AdminCommandSupport::stringOption($input, 'type'),
+                queue: AdminCommandSupport::stringOption($input, 'queue'),
                 sort: (string) $input->getOption('sort'),
                 direction: (string) $input->getOption('direction'),
-                limit: (int) $input->getOption('limit'),
-                cursor: self::optional($input, 'cursor'),
+                limit: AdminCommandSupport::integerOption($input, 'limit') ?? JobMonitorQuery::DEFAULT_LIMIT,
+                cursor: AdminCommandSupport::stringOption($input, 'cursor'),
             )));
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
@@ -87,12 +87,5 @@ final class MonitorJobsCommand extends Command
         }
 
         return Command::SUCCESS;
-    }
-
-    private static function optional(InputInterface $input, string $name): ?string
-    {
-        $value = $input->getOption($name);
-
-        return is_string($value) ? $value : null;
     }
 }

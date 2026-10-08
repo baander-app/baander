@@ -50,10 +50,10 @@ final class LibraryValidatePathCommand extends Command
             $io->horizontalTable(
                 ['Valid', 'Resolved path', 'Exists', 'Readable', 'Error'],
                 [[
-                    $result['valid'] ? 'yes' : 'no',
+                    AdminCommandSupport::yesNo($result['valid']),
                     $result['resolvedPath'] ?? '-',
-                    $result['exists'] ? 'yes' : 'no',
-                    $result['readable'] ? 'yes' : 'no',
+                    AdminCommandSupport::yesNo($result['exists']),
+                    AdminCommandSupport::yesNo($result['readable']),
                     $result['error'] ?? '-',
                 ]],
             );

@@ -41,7 +41,7 @@ final class SchedulerDeleteCommand extends Command
             $id = ScheduledJobConsole::id($input);
             $job = ScheduledJobResource::from($this->jobs->getById($id) ?? throw ScheduledJobConsole::notFound());
         } catch (Throwable $failure) {
-            return ScheduledJobConsole::fail($io, $failure);
+            return AdminCommandSupport::fail($io, $failure);
         }
 
         $refused = AdminCommandSupport::confirm($input, $io, sprintf('Delete scheduled job "%s"?', $job['name']));
@@ -54,7 +54,7 @@ final class SchedulerDeleteCommand extends Command
                 throw ScheduledJobConsole::notFound();
             }
         } catch (Throwable $failure) {
-            return ScheduledJobConsole::fail($io, $failure);
+            return AdminCommandSupport::fail($io, $failure);
         }
 
         $io->success(sprintf('Deleted scheduled job "%s".', $job['name']));

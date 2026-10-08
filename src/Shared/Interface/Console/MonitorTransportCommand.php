@@ -55,7 +55,7 @@ final class MonitorTransportCommand extends Command
             ['Async queue' => $status->asyncQueueDepth],
             ['Failed queue' => $status->failedQueueDepth],
             ['Consumer' => $status->consumerName],
-            ['Consumer running' => $status->consumerRunning ? 'yes' : 'no'],
+            ['Consumer running' => AdminCommandSupport::yesNo($status->consumerRunning)],
         );
 
         return Command::SUCCESS;

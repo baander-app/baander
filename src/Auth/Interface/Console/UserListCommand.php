@@ -45,11 +45,12 @@ final class UserListCommand extends Command
         $io = new SymfonyStyle($input, $output);
 
         try {
+            $offset = AdminCommandSupport::integerOption($input, 'offset') ?? 0;
             $page = $this->support->dispatch(new ListUsersQuery(
                 role: self::role($input),
                 disabled: self::disabled($input),
-                limit: self::integer($input, 'limit'),
-                offset: self::integer($input, 'offset'),
+                limit: AdminCommandSupport::integerOption($input, 'limit') ?? ListUsersQuery::DEFAULT_LIMIT,
+                offset: $offset,
             ));
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
@@ -66,7 +67,7 @@ final class UserListCommand extends Command
                 $user['email'],
                 $user['name'],
                 implode(', ', $user['roles']),
-                $user['disabled'] ? 'yes' : 'no',
+                AdminCommandSupport::yesNo($user['disabled']),
                 $user['id'],
                 $user['createdAt'],
             ],
@@ -74,7 +75,6 @@ final class UserListCommand extends Command
         );
 
         if (!AdminCommandSupport::wantsJson($input) && $users !== []) {
-            $offset = self::integer($input, 'offset');
             $io->text(sprintf('Users %d-%d of %d.', $offset + 1, $offset + count($users), $page->total));
         }
 
@@ -101,15 +101,5 @@ final class UserListCommand extends Command
 
         return filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE)
             ?? throw new InvalidInputException('--disabled must be true or false.');
-    }
-
-    private static function integer(InputInterface $input, string $name): int
-    {
-        $value = filter_var($input->getOption($name), FILTER_VALIDATE_INT);
-        if ($value === false) {
-            throw new InvalidInputException(sprintf('--%s must be an integer.', $name));
-        }
-
-        return $value;
     }
 }

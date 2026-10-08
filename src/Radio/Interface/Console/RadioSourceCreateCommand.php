@@ -62,7 +62,7 @@ final class RadioSourceCreateCommand extends Command
                 syncSchedule: $request->syncSchedule,
             );
         } catch (Throwable $failure) {
-            return $this->fail($io, $failure);
+            return AdminCommandSupport::fail($io, $failure);
         }
 
         $io->success(sprintf('Created radio source "%s" (%s).', $source['name'], $source['id']));
@@ -74,11 +74,11 @@ final class RadioSourceCreateCommand extends Command
     private function request(InputInterface $input): CreateRadioSourceRequest
     {
         $request = new CreateRadioSourceRequest(
-            name: self::string($input, 'name') ?? '',
-            type: self::string($input, 'type') ?? '',
-            syncUrl: self::string($input, 'sync-url') ?? '',
-            syncConfig: self::syncConfig($input),
-            syncSchedule: self::string($input, 'sync-schedule'),
+            name: AdminCommandSupport::stringOption($input, 'name') ?? '',
+            type: AdminCommandSupport::stringOption($input, 'type') ?? '',
+            syncUrl: AdminCommandSupport::stringOption($input, 'sync-url') ?? '',
+            syncConfig: AdminCommandSupport::jsonObjectOption($input, 'sync-config') ?? [],
+            syncSchedule: AdminCommandSupport::stringOption($input, 'sync-schedule'),
         );
 
         $violations = $this->validator->validate($request);
@@ -92,54 +92,5 @@ final class RadioSourceCreateCommand extends Command
         }
 
         throw new InvalidInputException($this->translator->trans('errors.validation.failed'), $details);
-    }
-
-    private static function string(InputInterface $input, string $option): ?string
-    {
-        $value = $input->getOption($option);
-
-        return is_string($value) ? $value : null;
-    }
-
-    /**
-     * @return array<string, mixed>
-     *
-     * @throws InvalidInputException when the option is not a JSON object
-     */
-    private static function syncConfig(InputInterface $input): array
-    {
-        $json = self::string($input, 'sync-config');
-        if ($json === null) {
-            return [];
-        }
-
-        try {
-            $decoded = json_decode($json, false, 32, JSON_THROW_ON_ERROR);
-        } catch (\JsonException) {
-            $decoded = null;
-        }
-        if (!$decoded instanceof \stdClass) {
-            throw new InvalidInputException('The --sync-config option must be a JSON object.');
-        }
-
-        /** @var array<string, mixed> */
-        return json_decode($json, true, 32, JSON_THROW_ON_ERROR);
-    }
-
-    /** Reports a failure like AdminCommandSupport::fail, followed by the messages per field of rejected input. */
-    private function fail(SymfonyStyle $io, Throwable $failure): int
-    {
-        $exitCode = AdminCommandSupport::fail($io, $failure);
-        if ($failure instanceof InvalidInputException && $failure->details !== []) {
-            $lines = [];
-            foreach ($failure->details as $field => $messages) {
-                foreach ((array) $messages as $message) {
-                    $lines[] = sprintf('%s: %s', $field, $message);
-                }
-            }
-            $io->getErrorStyle()->listing($lines);
-        }
-
-        return $exitCode;
     }
 }

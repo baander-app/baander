@@ -53,7 +53,7 @@ final readonly class OAuthClientMessageDispatcher
             ['Name', $client['name'] ?? ''],
             ['Type', $client['type'] ?? ''],
             ['Redirect URIs', $redirectUris === [] ? '-' : implode("\n", $redirectUris)],
-            ['Revoked', ($client['revoked'] ?? false) === true ? 'yes' : 'no'],
+            ['Revoked', AdminCommandSupport::yesNo(($client['revoked'] ?? false) === true)],
         ];
         $secret = $client['clientSecret'] ?? null;
         if (is_string($secret)) {
