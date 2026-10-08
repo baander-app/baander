@@ -4,19 +4,32 @@ declare(strict_types=1);
 
 namespace App\Metadata\Infrastructure\Admin;
 
+use App\Metadata\Application\Command\SyncMetadataCommand;
+use App\Metadata\Application\Message\SyncAlbumMessage;
+use App\Metadata\Application\Message\SyncArtistMessage;
 use App\Metadata\Application\Message\SyncGenresMessage;
+use App\Metadata\Application\Message\SyncLibraryMessage;
+use App\Metadata\Application\Message\SyncSongMessage;
 use App\Metadata\Application\Port\MetadataAdminPortInterface;
-use App\Shared\Infrastructure\Doctrine\Entity\JobMonitorEntity;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
-use Psr\Log\LoggerInterface;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 final class MetadataAdminService implements MetadataAdminPortInterface
 {
+    /**
+     * The metadata jobs the job monitor records, by the short class name it stores as the job name.
+     */
+    private const array JOB_CLASSES = [
+        SyncMetadataCommand::class,
+        SyncLibraryMessage::class,
+        SyncGenresMessage::class,
+        SyncAlbumMessage::class,
+        SyncSongMessage::class,
+        SyncArtistMessage::class,
+    ];
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
-        private readonly MessageBusInterface $bus,
-        private readonly LoggerInterface $logger,
         private readonly string $discogsToken = '',
         private readonly string $lastFmApiKey = '',
         private readonly string $spotifyClientId = '',
@@ -28,47 +41,38 @@ final class MetadataAdminService implements MetadataAdminPortInterface
     public function getSyncStatus(): array
     {
         $conn = $this->entityManager->getConnection();
+        $jobs = ['names' => self::jobNames()];
+        $types = ['names' => ArrayParameterType::STRING];
 
         $totalTracks = (int) $conn->fetchOne('SELECT COUNT(*) FROM songs');
         $syncedTracks = (int) $conn->fetchOne('SELECT COUNT(DISTINCT song_id) FROM genre_song');
         $failedTracks = (int) $conn->fetchOne(
-            "SELECT COUNT(*) FROM job_monitors WHERE name LIKE '%metadata%' AND status = 'failed'",
+            "SELECT COUNT(*) FROM job_monitors WHERE name IN (:names) AND status = 'failed'",
+            $jobs,
+            $types,
         );
         $pendingTracks = max(0, $totalTracks - $syncedTracks - $failedTracks);
 
-        $lastJobQb = $this->entityManager->getRepository(JobMonitorEntity::class)->createQueryBuilder('j');
-        $lastJob = $lastJobQb
-            ->select('j.createdAt')
-            ->where('j.name LIKE :pattern')
-            ->setParameter('pattern', '%metadata%')
-            ->orderBy('j.createdAt', 'DESC')
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
-
-        $lastSyncAt = null;
-        if ($lastJob !== null && isset($lastJob['createdAt'])) {
-            $lastSyncAt = $lastJob['createdAt'] instanceof \DateTimeInterface
-                ? $lastJob['createdAt']->format(\DateTimeInterface::ATOM)
-                : (string) $lastJob['createdAt'];
-        }
+        $lastCreatedAt = $conn->fetchOne('SELECT MAX(created_at) FROM job_monitors WHERE name IN (:names)', $jobs, $types);
+        $lastSyncAt = is_string($lastCreatedAt)
+            ? (new \DateTimeImmutable($lastCreatedAt))->format(\DateTimeInterface::ATOM)
+            : null;
 
         $sources = [];
         $sourceRows = $conn->fetchAllAssociative(
-            "SELECT name, SUM(CASE WHEN status = 'finished' THEN 1 ELSE 0 END) as synced,
-                    SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) as failed
+            "SELECT name, COUNT(*) FILTER (WHERE status = 'finished') AS synced,
+                    COUNT(*) FILTER (WHERE status = 'failed') AS failed
              FROM job_monitors
-             WHERE name LIKE '%metadata%'
+             WHERE name IN (:names)
              GROUP BY name
              ORDER BY name",
+            $jobs,
+            $types,
         );
 
         foreach ($sourceRows as $row) {
-            $name = (string) ($row['name'] ?? 'unknown');
-            $parts = explode('.', $name);
-            $providerName = end($parts);
             $sources[] = [
-                'name' => $providerName,
+                'name' => (string) $row['name'],
                 'synced' => (int) $row['synced'],
                 'failed' => (int) $row['failed'],
             ];
@@ -82,26 +86,6 @@ final class MetadataAdminService implements MetadataAdminPortInterface
             'failedTracks' => $failedTracks,
             'sources' => $sources,
         ];
-    }
-
-    public function triggerSync(?string $source): int
-    {
-        $this->logger->info('Metadata sync triggered via admin', [
-            'source' => $source ?? 'all',
-        ]);
-
-        try {
-            $this->bus->dispatch(new SyncGenresMessage(
-                forceUpdate: $source === 'genres',
-                includeSongs: true,
-            ));
-        } catch (\Throwable $e) {
-            $this->logger->warning('Failed to dispatch sync message', [
-                'error' => $e->getMessage(),
-            ]);
-        }
-
-        return 1;
     }
 
     public function getProviders(): array
@@ -138,5 +122,14 @@ final class MetadataAdminService implements MetadataAdminPortInterface
                 'configured' => true,
             ],
         ];
+    }
+
+    /** @return list<string> */
+    private static function jobNames(): array
+    {
+        return array_map(
+            static fn (string $class): string => substr($class, (int) strrpos($class, '\\') + 1),
+            self::JOB_CLASSES,
+        );
     }
 }

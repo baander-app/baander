@@ -39,12 +39,6 @@ final class AdminCliParityTest extends KernelTestCase
      * routes here; the test fails while a marked route stays on the list.
      */
     public const array PENDING = [
-        'admin_lyrics_bulk_fetch',
-        'admin_lyrics_coverage',
-        'admin_lyrics_sync_status',
-        'admin_metadata_providers',
-        'admin_metadata_sync_status',
-        'admin_metadata_trigger_sync',
         'library_index',
         'library_show',
         'library_stats',

@@ -244,11 +244,11 @@ export function MetadataPage() {
         />
       </StatsGrid>
 
-      {/* Provider breakdown */}
+      {/* Sync jobs by type, as the job monitor records them */}
       {syncStatus?.sources && syncStatus.sources.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Providers</CardTitle>
+            <CardTitle>Sync Jobs</CardTitle>
           </CardHeader>
           <Divider>
             {syncStatus!.sources.map((source: { name: string; synced: number; failed: number }) => (

@@ -22,8 +22,9 @@ final class SyncGenresHandler
     ) {
     }
 
+    /** @return int the album and song syncs queued */
     #[AsMessageHandler]
-    public function __invoke(SyncGenresMessage $message): void
+    public function __invoke(SyncGenresMessage $message): int
     {
         $totalAlbums = $this->albumService->count();
 
@@ -37,6 +38,7 @@ final class SyncGenresHandler
         $offset = 0;
         $limit = 100;
         $dispatched = 0;
+        $songsDispatched = 0;
 
         while (true) {
             $options = SearchOptions::create(query: '', limit: $limit, offset: $offset);
@@ -62,6 +64,7 @@ final class SyncGenresHandler
                                 $song->getId(),
                                 $message->forceUpdate,
                             ));
+                            $songsDispatched++;
                         }
                     }
                 }
@@ -76,6 +79,9 @@ final class SyncGenresHandler
 
         $this->logger->info('Genre sync dispatch complete', [
             'albums_dispatched' => $dispatched,
+            'songs_dispatched' => $songsDispatched,
         ]);
+
+        return $dispatched + $songsDispatched;
     }
 }

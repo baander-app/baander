@@ -12,6 +12,7 @@ use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 
 final class MetadataSyncOrchestrator
 {
@@ -79,17 +80,26 @@ final class MetadataSyncOrchestrator
         ));
     }
 
-    public function syncGenres(bool $forceUpdate = false, bool $includeSongs = true): void
+    /**
+     * @return int the album and song syncs the genre sync queued, or 1 when the genre sync
+     *             itself was queued instead of handled during the dispatch
+     */
+    public function syncGenres(bool $forceUpdate = false, bool $includeSongs = true): int
     {
-        $this->bus->dispatch(new SyncGenresMessage(
+        $envelope = $this->bus->dispatch(new SyncGenresMessage(
             forceUpdate: $forceUpdate,
             includeSongs: $includeSongs,
         ));
 
         $this->logger->info('Genre sync dispatched');
+
+        $queued = $envelope->last(HandledStamp::class)?->getResult();
+
+        return is_int($queued) ? $queued : 1;
     }
 
-    public function syncAll(bool $forceUpdate = false, bool $includeSongs = false): void
+    /** @return int the library syncs queued, one per library */
+    public function syncAll(bool $forceUpdate = false, bool $includeSongs = false): int
     {
         $libraries = $this->libraryService->findAllOrdered();
 
@@ -104,5 +114,7 @@ final class MetadataSyncOrchestrator
                 $includeSongs,
             ));
         }
+
+        return count($libraries);
     }
 }

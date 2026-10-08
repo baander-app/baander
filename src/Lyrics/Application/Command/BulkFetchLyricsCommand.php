@@ -8,13 +8,14 @@ use App\Scheduler\Domain\Model\SchedulableCommandInterface;
 use App\Scheduler\Domain\Model\SchedulerParameterSchema;
 
 /**
- * Command to bulk-fetch lyrics for songs that don't have them yet.
+ * Queues a lyrics fetch for each song that has no lyrics yet, up to the limit (null: every
+ * such song), with the fetches spaced by the delay.
  */
 final readonly class BulkFetchLyricsCommand implements SchedulableCommandInterface
 {
     use SchedulerParameterSchema;
 
-    /** Pause between lyrics fetches, which keeps LRCLIB from throttling us. */
+    /** Spacing between the queued lyrics fetches, which keeps LRCLIB from throttling us. */
     public const int DEFAULT_DELAY_MS = 500;
 
     public function __construct(

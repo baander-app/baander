@@ -17,15 +17,15 @@ The Lyrics context stores song lyrics and fetches them from [LRCLIB](https://lrc
 | Command | Handler | Purpose |
 |---------|---------|---------|
 | `FetchLyricsCommand` | `FetchLyricsHandler` | Fetch and store the lyrics of one song from LRCLIB |
-| `BulkFetchLyricsCommand` | `BulkFetchLyricsHandler` | Walk songs without lyrics and dispatch a fetch for each (`baander:lyrics:fetch`, the admin bulk fetch and admin-created schedules) |
+| `BulkFetchLyricsCommand` | `BulkFetchLyricsHandler` | Walk songs without lyrics and queue a fetch for each, up to an optional limit (`app:lyrics:fetch`, the admin bulk fetch and admin-created schedules); returns the number queued |
 
-`FetchLyricsCommand` has no transport route, so the bulk fetch handles it synchronously. Only the automatic requests below go to the `async` transport.
+`FetchLyricsCommand` has no transport route, so the on-demand fetch of one song handles it synchronously. The bulk fetch and the automatic requests below queue it on the `async` transport with a `TransportNamesStamp`, spaced by a `DelayStamp`; the bulk fetch spaces its fetches by the command's delay, 500 ms by default. The bulk fetch handler therefore returns once the fetches are queued, so the admin request does not wait for LRCLIB. Without a limit, both the admin page and `app:lyrics:fetch` queue every song without lyrics. `app:lyrics:fetch` runs the bulk fetch through `JobMonitorAdministrationInterface::runInline()`, which records the run in the job monitor.
 
 ## Automatic Fetch for New Songs
 
 While the `lyrics.auto_fetch` system setting is on, Catalog ingest asks Lyrics to fetch the lyrics of each new song. `FilesDiscoveredHandler` collects the songs it creates that have no sidecar `.lrc` file, and calls `LyricsFetchRequestInterface::requestFetch()` after each flush that commits them, so a fetch never looks up a song that is not stored yet. A song with a sidecar file gets its lyrics from that file during ingest. The request is best-effort. If it throws, ingest logs the error and keeps the songs pending, and the next flush requests them again. Songs still pending after the last flush are left for the bulk fetch.
 
-`LyricsFetchRequester` reads the setting on every call. When the setting is on, it dispatches one `FetchLyricsCommand` per song with a `TransportNamesStamp` for the `async` transport; `LyricsMessagePayloadCodec` encodes it there. Each command also carries a `DelayStamp` that spaces the fetches `BulkFetchLyricsCommand::DEFAULT_DELAY_MS` (500 ms) apart, the same pace as the bulk fetch, so LRCLIB does not throttle a large scan. The requester keeps its schedule between calls in the same worker, so the fetches for the albums of one scan queue behind each other. The setting is off by default (`LyricsSettingDefinitions`).
+`LyricsFetchRequester` reads the setting on every call. When the setting is on, it dispatches one `FetchLyricsCommand` per song with a `TransportNamesStamp` for the `async` transport; `LyricsMessagePayloadCodec` encodes it there. Each command also carries a `DelayStamp` that spaces the fetches `BulkFetchLyricsCommand::DEFAULT_DELAY_MS` (500 ms) apart, the bulk fetch's default pace, so LRCLIB does not throttle a large scan. The requester keeps its schedule between calls in the same worker, so the fetches for the albums of one scan queue behind each other. The setting is off by default (`LyricsSettingDefinitions`).
 
 The bulk fetch, the on-demand fetch and the LRCLIB search are not gated by the setting, because a user or administrator starts them.
 
@@ -34,7 +34,7 @@ The bulk fetch, the on-demand fetch and the LRCLIB search are not gated by the s
 | Port | Purpose |
 |------|---------|
 | `LyricsPortInterface` | Find, fetch and store, search LRCLIB, and apply a search result |
-| `LyricsAdminPortInterface` | Lyrics coverage, bulk fetch trigger and sync status for the admin API |
+| `LyricsAdminPortInterface` | Lyrics coverage and sync status for the admin API and `app:lyrics:coverage` and `app:lyrics:status` |
 | `LrclibClientInterface` | LRCLIB HTTP API contract, implemented by `LrclibClient` (anti-corruption layer) |
 | `LyricsFetchRequestInterface` | Published contract for Catalog ingest: requests fetches for new songs while `lyrics.auto_fetch` is on (the `Lyrics Fetch Request Contract` Deptrac layer) |
 
@@ -47,8 +47,8 @@ The bulk fetch, the on-demand fetch and the LRCLIB search are not gated by the s
 | GET | `/api/lyrics/search` | Signed in | Search LRCLIB |
 | POST | `/api/lyrics/search/{resultId}/apply` | `ROLE_ADMIN` | Apply a search result to a song |
 | GET | `/api/admin/lyrics/coverage` | `ROLE_ADMIN` | How many songs have lyrics |
-| POST | `/api/admin/lyrics/bulk-fetch` | `ROLE_SUPER_ADMIN` | Start a bulk fetch |
-| GET | `/api/admin/lyrics/sync-status` | `ROLE_ADMIN` | Bulk fetch status |
+| POST | `/api/admin/lyrics/bulk-fetch` | `ROLE_SUPER_ADMIN` | Queue a fetch for every song without lyrics, or up to the body's optional `limit`; an empty body is accepted |
+| GET | `/api/admin/lyrics/sync-status` | `ROLE_ADMIN` | Counts of the `FetchLyricsCommand` and `BulkFetchLyricsCommand` jobs in the job monitor |
 
 ## Infrastructure
 
@@ -57,7 +57,7 @@ The bulk fetch, the on-demand fetch and the LRCLIB search are not gated by the s
 | `LyricsService` | Implements `LyricsPortInterface`: LRCLIB lookups by song signature and search, and persistence through the repository |
 | `LrclibClient` | Symfony HttpClient adapter for the LRCLIB API |
 | `LyricsRepository`, `LyricsAdminRepository` | Doctrine persistence and admin statistics |
-| `LyricsMessagePayloadCodec` | Encodes `FetchLyricsCommand` for the `async` transport |
+| `LyricsMessagePayloadCodec` | Encodes `FetchLyricsCommand` for the `async` transport, and `BulkFetchLyricsCommand` for the job monitor's stored payload |
 
 ## Cross-Context Dependencies
 

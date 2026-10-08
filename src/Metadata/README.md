@@ -23,7 +23,7 @@ Catalog ingest dispatches `ExtractAlbumCoverCommand` for an album without a cove
 
 | Port | Layer | Purpose |
 |------|-------|---------|
-| `MetadataAdminPortInterface` | Application | Sync status, manual sync trigger and provider list for the admin API |
+| `MetadataAdminPortInterface` | Application | Sync status and provider list for the admin API, `app:metadata:status` and `app:metadata:providers`; the admin sync and `app:metadata:sync` dispatch `SyncMetadataCommand` |
 | `AlbumMetadataSyncRequestInterface` | Application (contract) | Lets Catalog ingest request syncs for new albums; reads `metadata.auto_sync` on every call |
 
 ## Events
