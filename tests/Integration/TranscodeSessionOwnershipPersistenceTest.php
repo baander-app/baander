@@ -78,6 +78,11 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         self::assertSame($expected($secondShared), $ids($repository->findByUser($second)));
         self::assertSame($expected($firstShared, $firstOwn), $ids($repository->findActiveSessions($first)));
         self::assertSame($expected($firstShared, $secondShared), $ids($repository->findByJob($shared)));
+        $created = $ids([$firstShared, $secondShared, $firstOwn, $firstDone]);
+        self::assertSame(
+            $expected($firstShared, $secondShared, $firstOwn),
+            array_values(array_intersect($ids($repository->findAllActiveSessions()), $created)),
+        );
 
         foreach ($repository->findByJob($own) as $session) {
             self::assertTrue($session->getUserId()->equals($first));

@@ -8,6 +8,7 @@ use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Radio\Application\Port\CountrySubscriptionPortInterface;
 use App\Radio\Application\Port\RadioStationPortInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -44,6 +45,7 @@ final class RadioStationController
         ],
     )]
     #[Route('/countries', name: 'countries', methods: ['GET'])]
+    #[CliCounterpart('app:radio:country:list')]
     public function countries(): JsonResponse
     {
         $user = $this->getCurrentSecurityUser();
@@ -79,6 +81,7 @@ final class RadioStationController
         ],
     )]
     #[Route('/stations', name: 'stations', methods: ['GET'])]
+    #[CliCounterpart('app:radio:station:list')]
     public function stations(Request $request): JsonResponse
     {
         $user = $this->getCurrentSecurityUser();

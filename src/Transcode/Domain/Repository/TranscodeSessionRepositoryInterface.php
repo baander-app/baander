@@ -29,6 +29,13 @@ interface TranscodeSessionRepositoryInterface
     /** @return TranscodeSession[] */
     public function findActiveSessions(Uuid $userId): array;
 
+    /**
+     * The pending, preparing, active and paused sessions of every user, oldest first.
+     *
+     * @return TranscodeSession[]
+     */
+    public function findAllActiveSessions(): array;
+
     public function count(): int;
 
     public function delete(TranscodeSession $session): void;

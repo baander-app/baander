@@ -7,6 +7,7 @@ namespace App\Radio\Interface\Controller;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Radio\Application\Port\RadioSourcePortInterface;
 use App\Radio\Interface\Request\CreateRadioSourceRequest;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -90,6 +91,7 @@ final class RadioSourceController
     )]
     #[Route('', name: 'create', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
+    #[CliCounterpart('app:radio:source:create')]
     public function create(#[MapRequestPayload] CreateRadioSourceRequest $payload): JsonResponse
     {
         $user = $this->getCurrentSecurityUser();

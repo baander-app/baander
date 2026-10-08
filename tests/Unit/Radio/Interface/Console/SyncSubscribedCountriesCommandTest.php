@@ -7,7 +7,6 @@ namespace App\Tests\Unit\Radio\Interface\Console;
 use App\Radio\Application\Port\CountrySubscriptionPortInterface;
 use App\Radio\Application\Port\RadioSourcePortInterface;
 use App\Radio\Application\Port\RadioStationPortInterface;
-use App\Radio\Application\Port\StationSyncPortInterface;
 use App\Radio\Interface\Console\SyncSubscribedCountriesCommand;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\TestCase;
@@ -56,7 +55,6 @@ final class SyncSubscribedCountriesCommandTest extends TestCase
         $tester = new CommandTester(new SyncSubscribedCountriesCommand(
             $sourcePort,
             $this->createStub(CountrySubscriptionPortInterface::class),
-            $this->createStub(StationSyncPortInterface::class),
             $stationPort,
         ));
 
@@ -90,7 +88,6 @@ final class SyncSubscribedCountriesCommandTest extends TestCase
         $tester = new CommandTester(new SyncSubscribedCountriesCommand(
             $sourcePort,
             $this->createStub(CountrySubscriptionPortInterface::class),
-            $this->createStub(StationSyncPortInterface::class),
             $stationPort,
         ));
 
@@ -98,5 +95,50 @@ final class SyncSubscribedCountriesCommandTest extends TestCase
 
         self::assertSame(Command::SUCCESS, $exitCode);
         self::assertStringContainsString('No radio sources configured', $tester->getDisplay());
+    }
+
+    public function testSyncsOnlyTheCountriesSomeUserSubscribedTo(): void
+    {
+        $sourceId = Uuid::v7();
+        $sourcePort = $this->createStub(RadioSourcePortInterface::class);
+        $sourcePort->method('listSources')->willReturn([
+            ['id' => $sourceId->toString(), 'name' => 'IPRD', 'isActive' => true],
+        ]);
+        $subscriptionPort = $this->createMock(CountrySubscriptionPortInterface::class);
+        $subscriptionPort->expects(self::once())->method('listSubscribedCountryCodes')->willReturn(['DK', 'SE']);
+        $subscriptionPort->expects(self::never())->method('listSubscriptions');
+        $synced = [];
+        $stationPort = $this->createMock(RadioStationPortInterface::class);
+        $stationPort->expects(self::exactly(2))
+            ->method('syncCountryStations')
+            ->willReturnCallback(static function (Uuid $id, string $country) use ($sourceId, &$synced): int {
+                self::assertTrue($id->equals($sourceId));
+                $synced[] = $country;
+
+                return 5;
+            });
+
+        $tester = new CommandTester(new SyncSubscribedCountriesCommand($sourcePort, $subscriptionPort, $stationPort));
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+        self::assertSame(['DK', 'SE'], $synced);
+        self::assertStringContainsString('Total stations synced: 10', $tester->getDisplay());
+    }
+
+    public function testWithoutSubscriptionsNothingIsSynced(): void
+    {
+        $sourcePort = $this->createStub(RadioSourcePortInterface::class);
+        $sourcePort->method('listSources')->willReturn([
+            ['id' => Uuid::v7()->toString(), 'name' => 'IPRD', 'isActive' => true],
+        ]);
+        $subscriptionPort = $this->createStub(CountrySubscriptionPortInterface::class);
+        $subscriptionPort->method('listSubscribedCountryCodes')->willReturn([]);
+        $stationPort = $this->createMock(RadioStationPortInterface::class);
+        $stationPort->expects(self::never())->method('syncCountryStations');
+
+        $tester = new CommandTester(new SyncSubscribedCountriesCommand($sourcePort, $subscriptionPort, $stationPort));
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+        self::assertStringContainsString('No user subscribes to a country', $tester->getDisplay());
     }
 }

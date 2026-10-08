@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Transcode\Interface\Controller;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Transcode\Application\Command\CancelTranscodeSessionCommand;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
@@ -108,6 +109,7 @@ final class TranscodeSessionController
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
+    #[CliCounterpart('app:transcode:session:list')]
     public function index(): JsonResponse
     {
         $user = $this->security->getUser();

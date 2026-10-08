@@ -31,6 +31,13 @@ interface TranscodeSessionPortInterface
     /** @return TranscodeSession[] */
     public function findActiveByUser(Uuid $userId): array;
 
+    /**
+     * The active sessions of every user, oldest first; for operators, who see the whole server.
+     *
+     * @return TranscodeSession[]
+     */
+    public function findActive(): array;
+
     /** @return TranscodeSession[] */
     public function findByJob(Uuid $jobId): array;
 

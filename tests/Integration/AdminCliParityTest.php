@@ -50,11 +50,6 @@ final class AdminCliParityTest extends KernelTestCase
         'library_stats',
         'library_store',
         'library_validate_path',
-        'radio_countries',
-        'radio_source_create',
-        'radio_stations',
-        'transcode_job_cleanup',
-        'transcode_session_index',
     ];
 
     private const array FIXTURE_ACCESS_CONTROL = [

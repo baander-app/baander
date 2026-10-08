@@ -7,7 +7,6 @@ namespace App\Radio\Interface\Console;
 use App\Radio\Application\Port\CountrySubscriptionPortInterface;
 use App\Radio\Application\Port\RadioSourcePortInterface;
 use App\Radio\Application\Port\RadioStationPortInterface;
-use App\Radio\Application\Port\StationSyncPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -18,7 +17,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 
 #[AsCommand(
     name: 'app:radio:sync',
-    description: 'Sync stations for all subscribed countries.',
+    description: 'Sync stations for every country a user subscribes to.',
 )]
 final class SyncSubscribedCountriesCommand extends Command
 {
@@ -28,7 +27,6 @@ final class SyncSubscribedCountriesCommand extends Command
     public function __construct(
         private readonly RadioSourcePortInterface $sourcePort,
         private readonly CountrySubscriptionPortInterface $subscriptionPort,
-        private readonly StationSyncPortInterface $syncAdapter,
         private readonly RadioStationPortInterface $stationPort,
     ) {
         parent::__construct();
@@ -84,23 +82,15 @@ final class SyncSubscribedCountriesCommand extends Command
 
         $sourceId = Uuid::fromString($activeSource['id']);
 
-        // Determine which countries to sync
         if ($filterCountry !== null) {
-            // Explicit country filter — sync just that one
-            $countries = [['countryCode' => $filterCountry]];
+            $countries = [$filterCountry];
         } else {
-            // Sync from all subscriptions across all users
-            $subscriptions = $this->subscriptionPort->listSubscriptions(
-                Uuid::fromString('00000000-0000-0000-0000-000000000000'),
-            );
+            $countries = $this->subscriptionPort->listSubscribedCountryCodes();
 
-            if (empty($subscriptions)) {
-                // No subscriptions yet — sync all available countries from the source
-                $io->note('No subscriptions found. Syncing all available countries from source...');
-                $available = $this->syncAdapter->fetchCountries();
-                $countries = array_map(fn (array $c) => ['countryCode' => $c['code']], $available);
-            } else {
-                $countries = $subscriptions;
+            if ($countries === []) {
+                $io->note('No user subscribes to a country, so there is nothing to sync. Use --country to sync one country.');
+
+                return Command::SUCCESS;
             }
         }
 
@@ -108,9 +98,7 @@ final class SyncSubscribedCountriesCommand extends Command
 
         $totalSynced = 0;
 
-        foreach ($countries as $entry) {
-            $countryCode = $entry['countryCode'];
-
+        foreach ($countries as $countryCode) {
             if ($dryRun) {
                 $io->text(sprintf('Would sync: %s (source: %s)', $countryCode, $activeSource['name']));
                 continue;
