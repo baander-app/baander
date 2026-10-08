@@ -2603,13 +2603,10 @@ export interface UserSettingResource {
   definition: SettingDefinitionResource;
 }
 
-export type AcceptLanguageParameter = typeof AcceptLanguageParameter[keyof typeof AcceptLanguageParameter];
-
-
-export const AcceptLanguageParameter = {
-  en: 'en',
-  da: 'da',
-} as const;
+/**
+ * Read only at registration: the supported language the browser ranks highest (`en`, `da` or `th`) becomes the new user's email language when it differs from the server default. Response messages are in English.
+ */
+export type AcceptLanguageParameter = string;
 
 export type GetAdminActivitySummaryParams = {
 /**
