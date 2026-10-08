@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-10-07. This is the working delivery record for the remediation,
+Updated: 2026-10-08. This is the working delivery record for the remediation,
 registry, and web-state plans. Update it when scope changes or a stage is verified.
 Completed code is not proof of production or performance qualification.
 
@@ -23,9 +23,17 @@ plans come next, in this order:
 
 1. [General settings and email language](docs/plans/2026-10-07-1736-feat-general-settings-email-language-plan.md):
    one definition-driven settings mechanism, the per-user email language, and the
-   features behind the existing admin toggles. Written and reviewed; not started.
-2. Admin/CLI parity: every admin-panel action gets a CLI command. The inventory
-   found 76 admin actions, 7 covered, 7 drifting and 62 missing. Not yet planned.
+   features behind the existing admin toggles. Delivered on 2026-10-08. Still open:
+   - health alerts run in the worker's scheduler consumer, so they cannot see outages
+     that stop the worker; the recommended fix raises them from the web server's
+     health endpoint
+     ([learning](docs/solutions/architecture-patterns/health-checks-run-in-a-messenger-consumer-cannot-see-outages-that-stop-it.md));
+   - the Swoole runtime checks for credential email at `kernel.terminate` and
+     progressive audio streaming were run by hand; no script under `scripts/` repeats them;
+   - Safari playback of a transcoded rendition that is still encoding is unverified.
+2. Admin/CLI parity: every admin-panel action gets a CLI command. An earlier count
+   found 76 admin actions, 7 covered, 7 drifting and 62 missing; the plan rebuilds
+   the inventory. Planning in progress.
 3. Timestamp convention: 130 `timestamptz(0)` columns, 13 `timestamp without time
    zone` columns, and ORM writes without offset or fraction. Not yet planned.
 
@@ -38,7 +46,20 @@ pairing endpoint that does not exist and needs a decision when that work resumes
 
 ## Current quality-gate checkpoint
 
-{{FINAL_GATE}}
+Last recorded on 2026-10-08, at the end of the general-settings work and the OAuth
+web pages (`master` at `0802baac`):
+
+- Unit suite: 5,063 tests pass.
+- Web: the full suite passed 1,796 tests at `93814191`, with typecheck and lint at
+  zero errors; the later `0802baac` change was checked with the auth and admin
+  suites (190 tests), typecheck and lint.
+- Deptrac: 0 violations. Container lint passes. The OpenAPI specification check
+  passes in the CI image.
+- Functional (1,280) and Integration (924) suites ran during the work. Their only
+  failures came from a local `vendor/` missing `symfony/doctrine-messenger`
+  (failed-transport tests), not from the code under test; a clean CI-image run is
+  still to be recorded.
+- A full PHPStan scan was not rerun for this checkpoint.
 
 ## Backend release-gate package (2026-10-06 to 2026-10-07)
 
