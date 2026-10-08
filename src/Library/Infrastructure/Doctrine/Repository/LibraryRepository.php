@@ -150,7 +150,53 @@ final class LibraryRepository implements LibraryRepositoryInterface
         }
     }
 
+    public function claimScan(Uuid $libraryId): bool
+    {
+        // READ COMMITTED re-checks the condition after a concurrent claim commits, so a second
+        // claimer that waited on the row lock updates nothing.
+        $claimed = $this->entityManager->getConnection()->executeStatement(
+            "UPDATE libraries SET scan_status = 'scanning', updated_at = now()
+             WHERE id = :id AND scan_status IS DISTINCT FROM 'scanning'",
+            ['id' => $libraryId->toString()],
+        ) === 1;
+
+        if ($claimed) {
+            $this->refreshManaged($libraryId);
+        }
+
+        return $claimed;
+    }
+
+    public function releaseScanClaim(Uuid $libraryId): bool
+    {
+        $released = $this->entityManager->getConnection()->executeStatement(
+            "UPDATE libraries SET scan_status = 'failed', updated_at = now()
+             WHERE id = :id AND scan_status = 'scanning'",
+            ['id' => $libraryId->toString()],
+        ) === 1;
+
+        if ($released) {
+            $this->refreshManaged($libraryId);
+        }
+
+        return $released;
+    }
+
     // --- Internal ---
+
+    /** The claim bypasses the unit of work; a library it already loaded must not keep the old status. */
+    private function refreshManaged(Uuid $libraryId): void
+    {
+        // A failed flush closes the manager; the claim must still be releasable then.
+        if (!$this->entityManager->isOpen()) {
+            return;
+        }
+
+        $entity = $this->entityManager->getUnitOfWork()->tryGetById(['id' => $libraryId], LibraryEntity::class);
+        if ($entity instanceof LibraryEntity) {
+            $this->entityManager->refresh($entity);
+        }
+    }
 
     private function findEntityOrCreate(Library $library): LibraryEntity
     {

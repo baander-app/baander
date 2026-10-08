@@ -132,19 +132,6 @@ deptrac:
       - App\Library\Infrastructure\Scanner\MediaFile
     App\Library\Application\Port\DirectoryScannerPortInterface:
       - App\Library\Infrastructure\Scanner\MediaFile
-    App\Library\Interface\Console\CreateLibraryCommand:
-      - App\Library\Domain\Model\Library
-      - App\Library\Domain\ValueObject\LibraryPath
-      - App\Library\Domain\ValueObject\LibrarySlug
-      - App\Library\Domain\ValueObject\LibraryType
-    App\Library\Interface\Console\ScanLibraryCommand:
-      - App\Library\Domain\Model\Library
-      - App\Library\Domain\ValueObject\LibrarySlug
-    App\Library\Interface\Controller\LibraryController:
-      - App\Library\Domain\Model\Library
-      - App\Library\Domain\ValueObject\LibraryPath
-      - App\Library\Domain\ValueObject\LibrarySlug
-      - App\Library\Domain\ValueObject\LibraryType
     App\Media\Infrastructure\Doctrine\Entity\ImageEntity:
       - App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity
       - App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity

@@ -10,6 +10,8 @@ use App\Library\Domain\Model\Library;
 use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
+use App\Shared\Application\Port\JobMonitorAdministrationInterface;
+use App\Shared\Domain\Model\JobStatus;
 use App\Shared\Domain\ValueObject\FilesystemType;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -52,11 +54,19 @@ final class LibraryScanCommandTest extends KernelTestCase
         ));
 
         $tester = new CommandTester((new Application($kernel))->find('app:library:scan'));
-        $exitCode = $tester->execute(['slug' => $slug]);
+        $exitCode = $tester->execute(['library' => $slug]);
 
         self::assertSame(Command::SUCCESS, $exitCode, $tester->getDisplay());
-        self::assertStringContainsString('Library scan completed successfully.', $tester->getDisplay());
-        self::assertStringContainsString($slug, $tester->getDisplay());
+        $display = (string) preg_replace('/\s+/', ' ', $tester->getDisplay());
+        self::assertStringContainsString(sprintf('Claimed "CLI scan" (%s); scanning...', $slug), $display);
+        self::assertStringContainsString(sprintf('Scanned "%s": 1 files discovered', $slug), $display);
+        self::assertStringContainsString('1 directories queued for ingestion', $display);
+
+        // The inline run leaves the same job-monitor record as a queued scan.
+        self::assertSame(1, preg_match('/Job ID: (\S+)/', $display, $job), $display);
+        $record = $container->get(JobMonitorAdministrationInterface::class)->job(rtrim($job[1], '.'));
+        self::assertSame('ScanLibraryCommand', $record->name);
+        self::assertSame(JobStatus::Finished, $record->status);
 
         $scanned = $libraries->findBySlug(new LibrarySlug($slug));
         self::assertNotNull($scanned);

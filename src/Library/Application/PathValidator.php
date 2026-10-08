@@ -5,9 +5,31 @@ declare(strict_types=1);
 namespace App\Library\Application;
 
 use App\Library\Domain\ValueObject\LibraryPath;
+use App\Shared\Application\Exception\InvalidInputException;
 
 final class PathValidator
 {
+    /**
+     * Checks a path an operator entered, before a library is created with it:
+     * POST /api/libraries/validate-path and `app:library:validate-path`.
+     *
+     * @throws InvalidInputException when the path is blank
+     */
+    public function validateInput(string $path): PathValidationResult
+    {
+        if (trim($path) === '') {
+            throw new InvalidInputException('Path is required.');
+        }
+
+        try {
+            $libraryPath = new LibraryPath($path);
+        } catch (\InvalidArgumentException $exception) {
+            return new PathValidationResult(valid: false, error: $exception->getMessage());
+        }
+
+        return $this->validate($libraryPath);
+    }
+
     public function validate(LibraryPath $path): PathValidationResult
     {
         $rawPath = $path->toString();

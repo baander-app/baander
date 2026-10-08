@@ -4,50 +4,30 @@ declare(strict_types=1);
 
 namespace App\Library\Application\Command;
 
-use App\Shared\Domain\ValueObject\FilesystemType;
-use App\Library\Domain\ValueObject\LibraryPath;
-use App\Library\Domain\ValueObject\LibrarySlug;
-use App\Library\Domain\ValueObject\LibraryType;
+use App\Shared\Domain\Model\Uuid;
 
+/**
+ * Creates a library: the admin panel's POST /api/libraries and `app:library:create`.
+ * The handler validates every field.
+ */
 final readonly class CreateLibraryCommand
 {
     public function __construct(
-        private string $name,
-        private LibrarySlug $slug,
-        private LibraryPath $path,
-        private LibraryType $type,
-        private FilesystemType $filesystemType,
-        private int $sortOrder = 0,
+        public string $name,
+        /** An absolute path inside the container. */
+        public string $path,
+        /** A LibraryType value, such as `music`. */
+        public string $type,
+        /** A FilesystemType value. */
+        public string $filesystemType = 'local',
+        /** Generated from the name when null. */
+        public ?string $slug = null,
+        public int $sortOrder = 0,
+        /**
+         * The user granted access to the new library, which also makes them a recipient of its
+         * scan notifications: the creating admin on the web, nobody from the shell.
+         */
+        public ?Uuid $grantTo = null,
     ) {
-    }
-
-    public function getName(): string
-    {
-        return $this->name;
-    }
-
-    public function getSlug(): LibrarySlug
-    {
-        return $this->slug;
-    }
-
-    public function getPath(): LibraryPath
-    {
-        return $this->path;
-    }
-
-    public function getType(): LibraryType
-    {
-        return $this->type;
-    }
-
-    public function getFilesystemType(): FilesystemType
-    {
-        return $this->filesystemType;
-    }
-
-    public function getSortOrder(): int
-    {
-        return $this->sortOrder;
     }
 }

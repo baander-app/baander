@@ -10,7 +10,9 @@ use App\Library\Application\LibraryProvisioner;
 use App\Library\Application\MovieScanner;
 use App\Library\Application\MusicScanner;
 use App\Library\Application\Port\DirectoryScannerPortInterface;
+use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Domain\Model\Library;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Library\Domain\Repository\LibraryFileIndexRepositoryInterface;
 use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Library\Domain\ValueObject\LibraryType;
@@ -106,7 +108,12 @@ final class LibraryProvisionerTest extends TestCase
 
         return new LibraryProvisioner(
             $libraries,
-            new CreateLibraryHandler($libraries),
+            new CreateLibraryHandler($libraries, $this->createStub(LibraryAccessPortInterface::class), new class () implements TransactionPortInterface {
+                public function run(callable $operation): mixed
+                {
+                    return $operation();
+                }
+            }),
             new LibraryDiscovery($libraries, new MusicScanner($directoryScanner, $fileIndex, $logger), $movieScanner, $events, $logger),
             $movieScanner,
         );

@@ -43,7 +43,7 @@ final class LibraryControllerTest extends TestCase
             'type' => 'invalid_type',
         ]);
 
-        $this->assertJsonResponse($response, 400);
+        $this->assertJsonResponse($response, 422);
     }
 
     public function testStoreRejectsRelativePath(): void
@@ -56,7 +56,7 @@ final class LibraryControllerTest extends TestCase
             'type' => 'music',
         ]);
 
-        $this->assertJsonResponse($response, 400);
+        $this->assertJsonResponse($response, 422);
     }
 
     public function testStoreGrantsCreatorAccess(): void

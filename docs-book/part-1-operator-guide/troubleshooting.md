@@ -261,7 +261,7 @@ docker compose ps
 
 2. Re-run the scan:
    ```bash
-   make exec cmd="php bin/console app:library:scan"
+   make exec cmd="php bin/console app:library:scan my-music"
    ```
 
 3. Check scan logs for errors:

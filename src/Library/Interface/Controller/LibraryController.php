@@ -4,24 +4,26 @@ declare(strict_types=1);
 
 namespace App\Library\Interface\Controller;
 
-use App\Library\Application\Command\ScanLibraryCommand;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
+use App\Library\Application\Command\CreateLibraryCommand;
+use App\Library\Application\Command\DeleteLibraryCommand;
+use App\Library\Application\Command\ScanAllLibrariesCommand;
+use App\Library\Application\Command\StartLibraryScanCommand;
+use App\Library\Application\Command\UpdateLibraryCommand;
 use App\Library\Application\PathValidator;
-use App\Library\Application\Port\LibraryPortInterface;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
-use App\Library\Application\Query\LibraryStatsQueryPort;
-use App\Library\Application\Port\LibraryAccessPortInterface;
-use App\Library\Domain\Model\Library;
-use App\Shared\Domain\Model\Uuid;
-use App\Shared\Domain\ValueObject\FilesystemType;
-use App\Library\Domain\ValueObject\LibraryPath;
-use App\Library\Domain\ValueObject\LibrarySlug;
-use App\Library\Domain\ValueObject\LibraryType;
+use App\Library\Application\Query\GetLibraryQuery;
+use App\Library\Application\Query\GetLibraryStatsQuery;
+use App\Library\Application\Query\ListLibrariesQuery;
 use App\Library\Interface\Request\CreateLibraryRequest;
 use App\Library\Interface\Request\UpdateLibraryRequest;
 use App\Library\Interface\Resource\LibraryResource;
+use App\Library\Interface\Resource\LibraryScanAllResource;
+use App\Library\Interface\Resource\PathValidationResource;
+use App\Shared\Domain\Model\Uuid;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
-use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -30,6 +32,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -41,13 +44,10 @@ final class LibraryController
     use TranslatorTrait;
 
     public function __construct(
-        private readonly LibraryPortInterface $libraryService,
-        private readonly LibraryStatsQueryPort $statsQuery,
-        private readonly PathValidator $pathValidator,
         private readonly MessageBusInterface $commandBus,
         private readonly LibraryReadScopeProviderInterface $readScopes,
+        private readonly PathValidator $pathValidator,
         private readonly ?Security $security = null,
-        private readonly ?LibraryAccessPortInterface $libraryAccess = null,
     ) {
     }
 
@@ -62,24 +62,15 @@ final class LibraryController
                 properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: LibraryResource::class)))], type: 'object',
             )),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '400', description: 'Invalid type filter', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'Invalid type filter', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('', name: 'index', methods: ['GET'])]
+    #[CliCounterpart('app:library:list')]
     public function index(Request $request): JsonResponse
     {
-        $typeFilter = $request->query->get('type');
-
-        if ($typeFilter !== null) {
-            try {
-                $type = LibraryType::from($typeFilter);
-                $libraries = $this->libraryService->findVisible($this->readScopes->current(), $type);
-            } catch (\ValueError) {
-                return $this->errorResponse($this->trans('errors.invalid_type', domain: 'library'), Response::HTTP_BAD_REQUEST);
-            }
-        } else {
-            $libraries = $this->libraryService->findVisible($this->readScopes->current());
-        }
+        $type = $request->query->get('type');
+        $libraries = $this->dispatch(new ListLibrariesQuery($this->readScopes->current(), $type !== null ? (string) $type : null));
 
         return $this->successResponse(LibraryResource::collection($libraries));
     }
@@ -102,7 +93,6 @@ final class LibraryController
                 properties: [new OA\Property(property: 'data', ref: new Model(type: LibraryResource::class))], type: 'object',
             )),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '400', description: 'Bad request', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '409', description: 'Slug already exists', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
@@ -110,6 +100,7 @@ final class LibraryController
     )]
     #[Route('', name: 'store', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
+    #[CliCounterpart('app:library:create')]
     public function store(#[MapRequestPayload] CreateLibraryRequest $payload): JsonResponse
     {
         $user = $this->security?->getUser();
@@ -117,56 +108,21 @@ final class LibraryController
             return $this->unauthorized($this->trans('errors.unauthorized.default', domain: 'messages'));
         }
 
-        $userId = $this->parseUuid($user->getId());
-        if ($userId === null) {
+        try {
+            $userId = Uuid::fromString($user->getId());
+        } catch (\InvalidArgumentException) {
             return $this->unauthorized($this->trans('errors.unauthorized.default', domain: 'messages'));
         }
 
-        try {
-            $libraryType = LibraryType::from($payload->type);
-        } catch (\ValueError) {
-            return $this->errorResponse(
-                $this->trans('errors.invalid_type_with_allowed', ['{type}' => $payload->type, '{allowed}' => implode(', ', array_column(LibraryType::cases(), 'value'))], 'library'),
-                Response::HTTP_BAD_REQUEST,
-            );
-        }
-
-        try {
-            $filesystemType = FilesystemType::from($payload->filesystemType);
-        } catch (\ValueError) {
-            return $this->errorResponse(
-                sprintf('Invalid filesystem type "%s". Allowed: %s', $payload->filesystemType, implode(', ', array_column(FilesystemType::cases(), 'value'))),
-                Response::HTTP_BAD_REQUEST,
-            );
-        }
-
-        try {
-            $libraryPath = new LibraryPath($payload->path);
-            $librarySlug = $payload->slug !== null ? new LibrarySlug($payload->slug) : LibrarySlug::fromName($payload->name);
-        } catch (\InvalidArgumentException $e) {
-            return $this->errorResponse($e->getMessage(), Response::HTTP_BAD_REQUEST);
-        }
-
-        $existing = $this->libraryService->findBySlug($librarySlug);
-        if ($existing !== null) {
-            return $this->errorResponse($this->trans('errors.slug_exists', domain: 'library'), Response::HTTP_CONFLICT);
-        }
-
-        $library = Library::create(
-            $payload->name,
-            $librarySlug,
-            $libraryPath,
-            $libraryType,
-            $filesystemType,
-            $payload->sortOrder,
-        );
-
-        $this->libraryService->save($library);
-
-        $this->libraryAccess?->grant(
-            $userId,
-            $library->getId(),
-        );
+        $library = $this->dispatch(new CreateLibraryCommand(
+            name: $payload->name,
+            path: $payload->path,
+            type: $payload->type,
+            filesystemType: $payload->filesystemType,
+            slug: $payload->slug,
+            sortOrder: $payload->sortOrder,
+            grantTo: $userId,
+        ));
 
         return $this->successResponse(LibraryResource::from($library), Response::HTTP_CREATED);
     }
@@ -175,7 +131,7 @@ final class LibraryController
         path: '/api/libraries/{id}',
         summary: 'Get a single library',
         parameters: [
-            new OA\Parameter(name: 'id', description: 'Library UUID', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'id', description: 'Library UUID or slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
@@ -186,25 +142,15 @@ final class LibraryController
         ],
     )]
     #[Route('/{id}', name: 'show', methods: ['GET'])]
+    #[CliCounterpart('app:library:show')]
     public function show(string $id): JsonResponse
     {
-        $uuid = $this->parseUuid($id);
-        if ($uuid === null) {
-            return $this->errorResponse($this->trans('errors.invalid_id', domain: 'library'), Response::HTTP_BAD_REQUEST);
-        }
-
-        $library = $this->libraryService->findVisibleByUuid($uuid, $this->readScopes->current());
-
-        if ($library === null) {
-            return $this->notFound($this->trans('errors.not_found', domain: 'library'));
-        }
-
-        return $this->successResponse(LibraryResource::from($library));
+        return $this->successResponse(LibraryResource::from($this->dispatch(new GetLibraryQuery($id, $this->readScopes->current()))));
     }
 
     #[OA\Patch(
         path: '/api/libraries/{id}',
-        summary: 'Update a library',
+        summary: 'Rename or reorder a library (admin)',
         requestBody: new OA\RequestBody(required: true, content: new OA\MediaType(mediaType: 'application/json', schema: new OA\Schema(
                 properties: [
                     new OA\Property(property: 'name', type: 'string', nullable: true),
@@ -212,141 +158,78 @@ final class LibraryController
                 ],
             ))),
         parameters: [
-            new OA\Parameter(name: 'id', description: 'Library UUID', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'id', description: 'Library UUID or slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', ref: new Model(type: LibraryResource::class))], type: 'object',
             )),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '400', description: 'Bad request', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
     #[Route('/{id}', name: 'update', methods: ['PATCH'])]
+    #[IsGranted('ROLE_ADMIN')]
+    #[CliCounterpart('app:library:update')]
     public function update(#[MapRequestPayload] UpdateLibraryRequest $payload, string $id): JsonResponse
     {
-        $uuid = $this->parseUuid($id);
-        if ($uuid === null) {
-            return $this->errorResponse($this->trans('errors.invalid_id', domain: 'library'), Response::HTTP_BAD_REQUEST);
-        }
-
-        $library = $this->libraryService->findByUuid($uuid);
-
-        if ($library === null) {
-            return $this->notFound($this->trans('errors.not_found', domain: 'library'));
-        }
-
-        $authResponse = $this->denyUnlessLibraryOwnerOrAdmin($library);
-        if ($authResponse !== null) {
-            return $authResponse;
-        }
-
-        try {
-            $library->updateMetadata(
-                name: $payload->name,
-                sortOrder: $payload->sortOrder,
-            );
-        } catch (\InvalidArgumentException $e) {
-            return $this->errorResponse($e->getMessage(), Response::HTTP_BAD_REQUEST);
-        }
-
-        $this->libraryService->save($library);
+        $library = $this->dispatch(new UpdateLibraryCommand($id, $payload->name, $payload->sortOrder));
 
         return $this->successResponse(LibraryResource::from($library));
     }
 
     #[OA\Delete(
         path: '/api/libraries/{id}',
-        summary: 'Delete a library',
+        summary: 'Delete a library (admin)',
         parameters: [
-            new OA\Parameter(name: 'id', description: 'Library UUID', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'id', description: 'Library UUID or slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Deleted', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', example: null, nullable: true)], type: 'object',
             )),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
+    #[IsGranted('ROLE_ADMIN')]
+    #[CliCounterpart('app:library:delete')]
     public function destroy(string $id): JsonResponse
     {
-        $uuid = $this->parseUuid($id);
-        if ($uuid === null) {
-            return $this->errorResponse($this->trans('errors.invalid_id', domain: 'library'), Response::HTTP_BAD_REQUEST);
-        }
-
-        $library = $this->libraryService->findByUuid($uuid);
-
-        if ($library === null) {
-            return $this->notFound($this->trans('errors.not_found', domain: 'library'));
-        }
-
-        $authResponse = $this->denyUnlessLibraryOwnerOrAdmin($library);
-        if ($authResponse !== null) {
-            return $authResponse;
-        }
-
-        $this->libraryService->delete($library);
+        $this->dispatch(new DeleteLibraryCommand($id));
 
         return $this->json(['data' => null]);
     }
 
     #[OA\Post(
         path: '/api/libraries/{id}/scan',
-        summary: 'Trigger a library scan',
-        description: 'Dispatches an asynchronous scan job. The scan runs in the background and progress is reported via SSE.',
+        summary: 'Trigger a library scan (admin)',
+        description: 'Claims the library for a scan and dispatches an asynchronous scan job. The scan runs in the background and progress is reported via SSE. A library that is already scanning answers 409.',
         parameters: [
-            new OA\Parameter(name: 'id', description: 'Library UUID', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'id', description: 'Library UUID or slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(response: '202', description: 'Scan dispatched', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', ref: new Model(type: LibraryResource::class))], type: 'object',
             )),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '409', description: 'Scan already in progress', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/{id}/scan', name: 'scan', methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    #[CliCounterpart('app:library:scan')]
     public function scan(string $id, Request $request): JsonResponse
     {
-        $uuid = $this->parseUuid($id);
-        if ($uuid === null) {
-            return $this->errorResponse($this->trans('errors.invalid_id', domain: 'library'), Response::HTTP_BAD_REQUEST);
-        }
-
-        $library = $this->libraryService->findByUuid($uuid);
-
-        if ($library === null) {
-            return $this->notFound($this->trans('errors.not_found', domain: 'library'));
-        }
-
-        $authResponse = $this->denyUnlessLibraryOwnerOrAdmin($library);
-        if ($authResponse !== null) {
-            return $authResponse;
-        }
-
-        if ($library->getDiscoveryStatus() === 'scanning') {
-            return $this->errorResponse(
-                $this->trans('errors.scan_in_progress', domain: 'library'),
-                Response::HTTP_CONFLICT,
-            );
-        }
-
         // Read from payload so it works for both JSON bodies (axios) and form data.
         $rescan = $request->getPayload()->getBoolean('rescan', false);
-
-        $library->markDiscoveryStarted();
-        $this->libraryService->save($library);
-
-        $this->commandBus->dispatch(new ScanLibraryCommand(
-            librarySlug: $library->getSlug(),
-            rescan: $rescan,
-        ));
+        $library = $this->dispatch(new StartLibraryScanCommand($id, $rescan));
 
         return $this->successResponse(LibraryResource::from($library), Response::HTTP_ACCEPTED);
     }
@@ -355,7 +238,7 @@ final class LibraryController
         path: '/api/libraries/{id}/stats',
         summary: 'Get library statistics',
         parameters: [
-            new OA\Parameter(name: 'id', description: 'Library UUID', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'id', description: 'Library UUID or slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
@@ -375,22 +258,10 @@ final class LibraryController
         ],
     )]
     #[Route('/{id}/stats', name: 'stats', methods: ['GET'])]
+    #[CliCounterpart('app:library:stats')]
     public function stats(string $id): JsonResponse
     {
-        $uuid = $this->parseUuid($id);
-        if ($uuid === null) {
-            return $this->errorResponse($this->trans('errors.invalid_id', domain: 'library'), Response::HTTP_BAD_REQUEST);
-        }
-
-        $library = $this->libraryService->findVisibleByUuid($uuid, $this->readScopes->current());
-
-        if ($library === null) {
-            return $this->notFound($this->trans('errors.not_found', domain: 'library'));
-        }
-
-        $stats = $this->statsQuery->getStatsForLibrary($uuid);
-
-        return $this->successResponse($stats);
+        return $this->successResponse($this->dispatch(new GetLibraryStatsQuery($id, $this->readScopes->current())));
     }
 
     #[OA\Post(
@@ -417,44 +288,22 @@ final class LibraryController
             )),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'Path is missing', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/validate-path', name: 'validate_path', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
+    #[CliCounterpart('app:library:validate-path')]
     public function validatePath(Request $request): JsonResponse
     {
         $path = $request->getPayload()->get('path');
 
-        if (!is_string($path) || trim($path) === '') {
-            return $this->errorResponse('Path is required.', Response::HTTP_BAD_REQUEST);
-        }
-
-        try {
-            $libraryPath = new LibraryPath($path);
-        } catch (\InvalidArgumentException $e) {
-            return $this->successResponse([
-                'valid' => false,
-                'error' => $e->getMessage(),
-                'resolvedPath' => null,
-                'exists' => false,
-                'readable' => false,
-            ]);
-        }
-
-        $result = $this->pathValidator->validate($libraryPath);
-
-        return $this->successResponse([
-            'valid' => $result->valid,
-            'error' => $result->error,
-            'resolvedPath' => $result->resolvedPath,
-            'exists' => $result->exists,
-            'readable' => $result->readable,
-        ]);
+        return $this->successResponse(PathValidationResource::from($this->pathValidator->validateInput(is_string($path) ? $path : '')));
     }
 
     #[OA\Post(
         path: '/api/libraries/scan-all',
-        summary: 'Trigger scan for all libraries',
+        summary: 'Trigger scan for all libraries (admin)',
         description: 'Dispatches an asynchronous scan job for every library. Skips libraries already scanning.',
         responses: [
             new OA\Response(response: '202', description: 'Scans dispatched', content: new OA\JsonContent(
@@ -466,70 +315,20 @@ final class LibraryController
                 ], type: 'object',
             )),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '403', description: 'Administrator role required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/scan-all', name: 'scan_all', methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
+    #[CliCounterpart('app:library:scan')]
     public function scanAll(): JsonResponse
     {
-        $user = $this->security?->getUser();
-        if (!$user instanceof AuthenticatedUserIdentityInterface || !in_array('ROLE_ADMIN', $user->getRoles(), true)) {
-            return $this->forbidden();
-        }
-
-        $libraries = $this->libraryService->findVisible($this->readScopes->current());
-        $dispatched = 0;
-        $skipped = 0;
-
-        foreach ($libraries as $library) {
-            if ($library->getDiscoveryStatus() === 'scanning') {
-                $skipped++;
-                continue;
-            }
-
-            $library->markDiscoveryStarted();
-            $this->libraryService->save($library);
-
-            $this->commandBus->dispatch(new ScanLibraryCommand(
-                librarySlug: $library->getSlug(),
-            ));
-
-            $dispatched++;
-        }
-
-        return $this->successResponse([
-            'dispatched' => $dispatched,
-            'skipped' => $skipped,
-        ], Response::HTTP_ACCEPTED);
+        return $this->successResponse(LibraryScanAllResource::from($this->dispatch(new ScanAllLibrariesCommand())), Response::HTTP_ACCEPTED);
     }
 
-    private function denyUnlessLibraryOwnerOrAdmin(Library $library): ?JsonResponse
+    /** A handler's exception reaches ExceptionSubscriber, which unwraps it to its 404, 409 or 422 response. */
+    private function dispatch(object $message): mixed
     {
-        $user = $this->security?->getUser();
-
-        if (!$user instanceof AuthenticatedUserIdentityInterface) {
-            return $this->forbidden();
-        }
-
-        if (in_array('ROLE_ADMIN', $user->getRoles(), true)) {
-            return null;
-        }
-
-        if ($this->libraryAccess !== null && $this->libraryAccess->hasAccess(
-            Uuid::fromString($user->getId()),
-            $library->getId(),
-        )) {
-            return null;
-        }
-
-        return $this->forbidden();
-    }
-
-    private function parseUuid(string $id): ?\App\Shared\Domain\Model\Uuid
-    {
-        try {
-            return \App\Shared\Domain\Model\Uuid::fromString($id);
-        } catch (\InvalidArgumentException) {
-            return null;
-        }
+        return $this->commandBus->dispatch($message)->last(HandledStamp::class)?->getResult();
     }
 }
