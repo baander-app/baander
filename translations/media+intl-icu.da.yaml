@@ -8,3 +8,4 @@ errors:
   invalid_transcode_bitrate: '"bitrate" skal være et positivt heltal i bit pr. sekund og kræver et "format".'
   transcode_failed: "Lydomkodningen mislykkedes."
   transcode_disabled: "Lydomkodning er slået fra på denne server."
+  transcode_busy: "Serveren er optaget af at omkode anden lyd. Prøv igen om lidt."

@@ -11,3 +11,4 @@ errors:
   invalid_transcode_bitrate: '"bitrate" must be a positive whole number of bits per second and needs a "format".'
   transcode_failed: "Audio transcoding failed."
   transcode_disabled: "Audio transcoding is turned off on this server."
+  transcode_busy: "The server is busy transcoding other audio. Try again shortly."

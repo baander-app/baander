@@ -969,6 +969,10 @@ services:
         arguments:
             $pool: '@App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool'
             $ffmpegPath: '%env(FFMPEG_PATH)%'
+            # Rendition encodes queued or running at once, server-wide. Keep it
+            # below the CPU pool's $workerCount (6) so video transcodes and
+            # recommendation jobs always have workers left.
+            $maxConcurrentEncodes: 4
 
     App\Transcode\Application\Port\AudioRenditionPortInterface:
         alias: App\Transcode\Infrastructure\Transcode\AudioRenditionCache

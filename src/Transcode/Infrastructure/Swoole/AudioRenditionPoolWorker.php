@@ -16,7 +16,8 @@ use Throwable;
  *
  * The encode holds an exclusive lock on the rendition's lock file for its whole
  * run, so only one encode runs per rendition at a time, across every HTTP worker
- * and pool process. The kernel releases the lock if this process dies. FFmpeg
+ * and pool process. A job that finds the lock held returns at once with status
+ * `running` instead of waiting. The kernel releases the lock if this process dies. FFmpeg
  * writes the `.part` file that listeners read while it grows; a successful encode
  * renames it to the final rendition while still holding the lock, and a failed
  * one removes it.
@@ -61,7 +62,12 @@ final class AudioRenditionPoolWorker implements ProcessPoolWorkerInterface
         }
 
         try {
-            if (!flock($lock, LOCK_EX)) {
+            if (!flock($lock, LOCK_EX | LOCK_NB, $wouldBlock)) {
+                if ($wouldBlock === 1) {
+                    // Another encode of this rendition is running and will publish
+                    // it; waiting for it here would only hold a pool worker.
+                    return json_encode(['status' => 'running', 'output_path' => $output], JSON_THROW_ON_ERROR);
+                }
                 throw new RuntimeException('Unable to lock the audio rendition.');
             }
             clearstatcache(true, $output);

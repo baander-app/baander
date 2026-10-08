@@ -7,6 +7,7 @@ namespace App\Transcode\Infrastructure\Transcode;
 use App\Shared\Infrastructure\Swoole\Async;
 use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool;
 use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPoolInterface;
+use App\Transcode\Application\Exception\AudioRenditionBusyException;
 use App\Transcode\Application\Exception\AudioRenditionFailedException;
 use App\Transcode\Application\Port\AudioRendition;
 use App\Transcode\Application\Port\AudioRenditionFormat;
@@ -31,6 +32,12 @@ use Throwable;
  * encoder's exclusive lock marks a running encode, the `.part` file is what
  * listeners read while it grows, and the final file appears (by rename, under
  * the lock) only when the rendition is complete.
+ *
+ * The pool is shared with video transcodes and other CPU work, so at most
+ * `$maxConcurrentEncodes` rendition encodes are queued or running at once,
+ * counted by the pool across every HTTP worker. A request that needs one more
+ * gets {@see AudioRenditionBusyException}; joining a running encode is always
+ * allowed.
  */
 final class AudioRenditionCache implements AudioRenditionPortInterface
 {
@@ -48,6 +55,7 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
         private readonly AudioRenditionPoolWorker $inlineWorker,
         private readonly LoggerInterface $logger,
         private readonly string $ffmpegPath,
+        private readonly int $maxConcurrentEncodes,
         private readonly float $pollIntervalSeconds = 0.05,
         private readonly float $startTimeoutSeconds = 60.0,
     ) {
@@ -64,7 +72,16 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
             return AudioRendition::complete($format, $files['output']);
         }
 
-        $jobKey = $this->isEncoding($files['lock']) ? null : $this->startEncode($sourcePath, $format, $bitrate, $files, $context);
+        $jobKey = null;
+        if (!$this->isEncoding($files['lock'])) {
+            // A partial file left by an encoder that died must not be streamed
+            // while the new encode waits in the pool's queue.
+            clearstatcache(true, $files['partial']);
+            if (is_file($files['partial'])) {
+                @unlink($files['partial']);
+            }
+            $jobKey = $this->startEncode($sourcePath, $format, $bitrate, $files, $context);
+        }
         $this->awaitFirstBytes($files, $jobKey, $context);
 
         return AudioRendition::progressive($format, $this->follow($files, $jobKey, $context));
@@ -144,9 +161,15 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
 
         if ($this->pool->isRunning()) {
             try {
-                $this->pool->dispatch($payload, $key);
+                $dispatched = $this->pool->dispatchWithinLimit($payload, $key, AudioRenditionPoolWorker::JOB_TYPE, $this->maxConcurrentEncodes);
             } catch (Throwable $error) {
                 $this->fail($context, 'the CPU process pool rejected the encode: ' . $error->getMessage());
+            }
+            if (!$dispatched) {
+                throw new AudioRenditionBusyException(sprintf(
+                    'The server already runs %d audio rendition encodes.',
+                    $this->maxConcurrentEncodes,
+                ));
             }
 
             return $key;
@@ -190,12 +213,9 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
                     if ($result['status'] !== 'ok') {
                         $this->fail($context, $result['data']);
                     }
-                    clearstatcache(true, $files['output']);
-                    if (!is_file($files['output'])) {
-                        $this->fail($context, 'the encode finished without a rendition');
-                    }
-
-                    return;
+                    // Without a rendition the job found another encode holding
+                    // the lock and left the work to it: follow that encode.
+                    continue;
                 }
             } elseif (!$this->isEncoding($files['lock'])) {
                 clearstatcache(true, $files['output']);

@@ -4177,7 +4177,7 @@ id: string;
  */
 format?: GetStreamTrackFormat;
 /**
- * Target bitrate in bits per second; requires format. Fitted to the format's supported range (opus 32000-256000, aac and mp3 32000-320000) in whole kilobits. Never above the server's transcode.max_bitrate, which also applies when no bitrate is given.
+ * Target bitrate in bits per second; requires format. Capped at the server's transcode.max_bitrate (which also applies when no bitrate is given), then snapped down to the nearest of 64000, 96000, 128000, 160000, 192000, 256000 and 320000 that the format supports (opus at most 256000). A value below 64000 gets 64000.
  * @minimum 1
  */
 bitrate?: number;

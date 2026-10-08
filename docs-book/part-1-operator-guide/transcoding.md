@@ -136,9 +136,11 @@ Two [server settings](configuration.md#server-settings) govern audio transcoding
 | `transcode.enabled` | `false` | While off, a request that names a format gets `403` saying transcoding is turned off, and no encode starts. Requests without a format stream the original either way. |
 | `transcode.max_bitrate` | `320` | The highest bitrate, in kbps: `128`, `192`, `256` or `320`. A higher requested bitrate is lowered to it, and a request without a bitrate gets it. |
 
-Baander then fits the bitrate to the format's range, 32 to 256 kbps for Opus and 32 to 320 kbps for AAC and MP3, in whole kilobits. An Opus stream therefore never exceeds 256 kbps, whatever the maximum.
+Baander then lowers the bitrate to the nearest step of a fixed ladder: 64, 96, 128, 160, 192, 256 and 320 kbps. Opus stops at 256 kbps, so an Opus stream never exceeds it, whatever the maximum. A request below 64 kbps gets 64 kbps. The ladder keeps each track to at most seven renditions per format.
 
 An unsupported format, a bitrate that is not a positive whole number, or a bitrate without a format gets `400`. A failed encode gets `500` and is logged with the track, format and bitrate.
+
+At most four rendition encodes are queued or running at once across the server, so video transcodes and other work in the [CPU process pool](#cpu-process-pool) always have workers left. A request that needs a fifth encode gets `503` with a `Retry-After` header; joining an encode that is already running, or streaming a cached rendition, is never refused. The limit is `$maxConcurrentEncodes` on `AudioRenditionCache` in `config/services.yaml`; keep it below the pool's `$workerCount`.
 
 ### Cached renditions
 
