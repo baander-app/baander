@@ -28,6 +28,7 @@ use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Messenger\Stamp\ReceivedStamp;
+use Symfony\Component\Messenger\Transport\Sender\SendersLocatorInterface;
 use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
 use Throwable;
 
@@ -46,6 +47,7 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
         private JobMessageSerializer $messageSerializer,
         private RedisClientFactory $redisClientFactory,
         private LoggerInterface $logger,
+        private SendersLocatorInterface $sendersLocator,
     ) {
     }
 
@@ -197,8 +199,13 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
     public function runInline(object $message): InlineJobRun
     {
         $jobId = (new PublicId())->toString();
-        // A received envelope is handled here instead of being sent, as Messenger's sync transport does.
-        $envelope = new Envelope($message, [new JobIdStamp(PublicId::fromString($jobId)), new ReceivedStamp('sync')]);
+        // A received envelope is handled here instead of being sent. It is marked as received
+        // from the transport the message is routed to, so handlers bound to that transport
+        // (fromTransport) run as they would in a worker; an unrouted message is 'sync'.
+        $envelope = new Envelope($message, [
+            new JobIdStamp(PublicId::fromString($jobId)),
+            new ReceivedStamp($this->routedTransport($message)),
+        ]);
         $serialized = $this->messageSerializer->serialize($envelope);
         $attempt = $this->jobMonitorService->startAttempt(
             jobId: $jobId,
@@ -227,6 +234,16 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
         $this->jobMonitorService->markFinished($jobId, $attempt);
 
         return new InlineJobRun($jobId, $result);
+    }
+
+    /** The first transport the message is routed to, or 'sync' when it is handled synchronously. */
+    private function routedTransport(object $message): string
+    {
+        foreach ($this->sendersLocator->getSenders(new Envelope($message)) as $transport => $sender) {
+            return (string) $transport;
+        }
+
+        return 'sync';
     }
 
     /** @throws NotFoundException */

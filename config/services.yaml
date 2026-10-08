@@ -278,6 +278,12 @@ services:
         arguments:
             $dsn: '%env(REDIS_URL)%'
 
+    # Inline runs mark the message as received from its routed transport, so
+    # transport-bound handlers run; the senders locator knows the routing.
+    App\Shared\Infrastructure\Messenger\JobMonitorAdministration:
+        arguments:
+            $sendersLocator: '@messenger.senders_locator'
+
     # --- Transport Management ---
     App\Shared\Infrastructure\Messenger\RedisTransportStatus:
         arguments:
