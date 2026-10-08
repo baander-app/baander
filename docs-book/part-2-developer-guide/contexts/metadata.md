@@ -24,7 +24,7 @@ The Metadata context enriches catalog entities with data from external music API
 
 ## Automatic Sync of New Albums
 
-While the `metadata.auto_sync` system setting is on, Catalog ingest asks Metadata to sync each album it creates. `FilesDiscoveredHandler` calls `AlbumMetadataSyncRequestInterface::requestSync()` once the flush that stores the new album has run, before it adds the album's songs or reports failed files. A retry or rescan finds the album and creates none, so it requests nothing. The request is therefore best-effort: if it throws, ingest logs the error with the album ID and carries on, and a full library metadata sync from the admin panel picks the album up.
+While the `metadata.auto_sync` system setting is on, Catalog ingest asks Metadata to sync each album it creates. `FilesDiscoveredHandler` calls `AlbumMetadataSyncRequestInterface::requestSync()` once the flush that stores the new album has run, before it adds the album's songs or reports failed files. A retry or rescan finds the album and creates none, so it requests nothing. Because a retry would not request the sync again, the request is best-effort: if it throws, ingest logs the error with the album ID and carries on. A full library metadata sync from the admin panel picks the album up.
 
 `AlbumMetadataSyncRequester` reads the setting on every call. When the setting is on, it calls `MetadataSyncOrchestrator::syncAlbum()` for each album. The orchestrator dispatches `SyncAlbumMessage`, which runs later from the `swoole_task` queue, or from the Redis `async` transport outside the Swoole server, so ingest does not wait for the external lookups. The setting is off by default.
 
