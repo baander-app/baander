@@ -17,6 +17,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
+use Symfony\Component\Translation\IdentityTranslator;
 use Throwable;
 
 /** The scheduler's failures give the same outcome over HTTP and on the console. */
@@ -34,7 +35,7 @@ final class ScheduledJobOutcomesTest extends TestCase
             $failure,
         );
 
-        (new ExceptionSubscriber($logger))($event);
+        (new ExceptionSubscriber($logger, new IdentityTranslator()))($event);
 
         $response = $event->getResponse();
         self::assertNotNull($response);

@@ -18,6 +18,9 @@ use App\Tests\Functional\TestCase;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\HttpKernel\Event\RequestEvent;
+use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Messenger\MessageBusInterface;
 
@@ -225,6 +228,34 @@ final class LibraryAdministrationTest extends TestCase
         self::assertSame(Command::INVALID, $this->command('app:library:update')->execute(['library' => $library['slug'], '--name' => ' ']));
         self::assertSame(Command::FAILURE, $this->command('app:library:update')->execute(['library' => 'no-such-library', '--name' => 'X']));
         $this->assertJsonResponse($this->authenticatedRequest('PATCH', '/api/libraries/' . Uuid::v7()->toString(), $admin, ['name' => 'X']), 404);
+    }
+
+    public function testLibraryErrorsAreReportedInTheRequestLocale(): void
+    {
+        $admin = $this->createAdminUser();
+        $library = $this->createThroughApi('locale-' . bin2hex(random_bytes(3)), $admin);
+        $missing = Uuid::v7()->toString();
+        $duplicate = ['name' => 'Again', 'path' => $this->directory, 'type' => 'music', 'slug' => $library['slug']];
+
+        $english = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries', $admin, $duplicate), 409);
+        self::assertSame(sprintf('A library with the slug "%s" already exists.', $library['slug']), $english['error']['message']);
+        $english = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/libraries/' . $missing, $admin), 404);
+        self::assertSame(sprintf('Library "%s" not found.', $missing), $english['error']['message']);
+
+        // The app's LocaleListener (priority 240) hands the request locale to the translator.
+        $events = $this->service(EventDispatcherInterface::class);
+        $danish = static fn (RequestEvent $event) => $event->getRequest()->setLocale('da');
+        $events->addListener(KernelEvents::REQUEST, $danish, 250);
+        try {
+            $conflict = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries', $admin, $duplicate), 409);
+            $notFound = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/libraries/' . $missing, $admin), 404);
+        } finally {
+            $events->removeListener(KernelEvents::REQUEST, $danish);
+        }
+
+        self::assertSame(sprintf('Et bibliotek med slug "%s" findes allerede.', $library['slug']), $conflict['error']['message']);
+        self::assertSame(['reason' => 'slug_exists'], $conflict['error']['details']);
+        self::assertSame(sprintf('Biblioteket "%s" blev ikke fundet.', $missing), $notFound['error']['message']);
     }
 
     /** @return array<string, mixed> the created LibraryResource */

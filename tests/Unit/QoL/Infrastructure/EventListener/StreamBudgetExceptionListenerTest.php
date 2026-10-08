@@ -14,6 +14,7 @@ use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
+use Symfony\Component\Translation\IdentityTranslator;
 use Symfony\Component\HttpKernel\KernelEvents;
 
 final class StreamBudgetExceptionListenerTest extends TestCase
@@ -73,7 +74,7 @@ final class StreamBudgetExceptionListenerTest extends TestCase
     private function dispatcher(LoggerInterface $logger): EventDispatcher
     {
         $dispatcher = new EventDispatcher();
-        foreach ([new ExceptionSubscriber($logger), new StreamBudgetExceptionListener()] as $listener) {
+        foreach ([new ExceptionSubscriber($logger, new IdentityTranslator()), new StreamBudgetExceptionListener()] as $listener) {
             $attribute = (new \ReflectionClass($listener))
                 ->getAttributes(AsEventListener::class)[0]
                 ->newInstance();

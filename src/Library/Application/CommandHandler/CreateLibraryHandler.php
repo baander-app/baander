@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Library\Application\CommandHandler;
 
 use App\Library\Application\Command\CreateLibraryCommand;
+use App\Library\Application\Exception\InvalidLibraryTypeException;
 use App\Library\Application\Exception\LibrarySlugTakenException;
 use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Domain\Model\Library;
@@ -53,11 +54,7 @@ final readonly class CreateLibraryHandler
 
     private function library(CreateLibraryCommand $command): Library
     {
-        $type = LibraryType::tryFrom($command->type) ?? throw new InvalidInputException(sprintf(
-            'Invalid library type "%s". Allowed: %s.',
-            $command->type,
-            implode(', ', array_column(LibraryType::cases(), 'value')),
-        ));
+        $type = LibraryType::tryFrom($command->type) ?? throw InvalidLibraryTypeException::forType($command->type);
         $filesystemType = FilesystemType::tryFrom($command->filesystemType) ?? throw new InvalidInputException(sprintf(
             'Invalid filesystem type "%s". Allowed: %s.',
             $command->filesystemType,

@@ -15,6 +15,7 @@ use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
+use Symfony\Component\Translation\IdentityTranslator;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\HandlerFailedException;
@@ -27,7 +28,7 @@ final class TranscodeStartupUnavailableListenerTest extends TestCase
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects(self::never())->method('error');
         $dispatcher = new EventDispatcher();
-        foreach ([new ExceptionSubscriber($logger), new TranscodeStartupUnavailableListener()] as $listener) {
+        foreach ([new ExceptionSubscriber($logger, new IdentityTranslator()), new TranscodeStartupUnavailableListener()] as $listener) {
             $attribute = (new \ReflectionClass($listener))->getAttributes(AsEventListener::class)[0]->newInstance();
             $dispatcher->addListener(KernelEvents::EXCEPTION, $listener, $attribute->priority);
         }
