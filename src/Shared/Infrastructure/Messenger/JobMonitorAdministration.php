@@ -34,6 +34,8 @@ use Throwable;
 
 /**
  * The job monitor over JobMonitorService, the Messenger bus and the Redis cancellation flag.
+ *
+ * @phpstan-import-type JobMonitorSummary from JobMonitorService
  */
 final readonly class JobMonitorAdministration implements JobMonitorAdministrationInterface, CancellableJobInterface
 {
@@ -55,7 +57,7 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
     {
         return new JobMonitorOverview(
             $this->jobMonitorService->countByStatus(),
-            array_map(self::record(...), $this->jobMonitorService->getRunning()),
+            array_map(self::summary(...), $this->jobMonitorService->getRunning()),
         );
     }
 
@@ -78,11 +80,11 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
             $query->direction,
         );
 
-        /** @var list<JobMonitorEntity> $items */
+        /** @var list<JobMonitorSummary> $items */
         $items = array_values($result->items);
 
         return new JobMonitorPage(
-            array_map(self::record(...), $items),
+            array_map(self::summary(...), $items),
             $result->nextCursor === null ? null : $this->cursorCodec->encode($result->nextCursor),
             $result->hasNextPage,
             $result->perPage,
@@ -141,13 +143,14 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
 
     public function cancel(string $jobId): void
     {
-        $job = $this->entity($jobId);
+        $status = $this->jobMonitorService->findStatus($jobId)
+            ?? throw new NotFoundException('Job not found.', ['jobId' => $jobId]);
 
-        if ($job->getStatus() === JobStatus::Finished) {
+        if ($status === JobStatus::Finished) {
             throw new ConflictException('Finished jobs cannot be cancelled.', ['reason' => 'finished']);
         }
 
-        if ($job->getStatus() === JobStatus::Failed) {
+        if ($status === JobStatus::Failed) {
             throw new ConflictException('Failed jobs cannot be cancelled.', ['reason' => 'failed']);
         }
 
@@ -292,6 +295,33 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
             data: $job->getData(),
             dataTruncated: $job->getDataTruncated(),
             durationMicroseconds: $job->getDurationMicroseconds(),
+        );
+    }
+
+    /**
+     * A job as the job list and the running jobs show it, without the stored message and the error detail.
+     *
+     * @param JobMonitorSummary $job
+     */
+    private static function summary(array $job): JobMonitorRecord
+    {
+        return new JobMonitorRecord(
+            jobId: $job['jobId'],
+            name: $job['name'],
+            queue: $job['queue'],
+            status: $job['status'],
+            progress: $job['progress'],
+            attempt: $job['attempt'],
+            retried: $job['retried'],
+            startedAt: $job['startedAt'],
+            finishedAt: $job['finishedAt'],
+            createdAt: $job['createdAt'],
+            updatedAt: $job['updatedAt'],
+            exceptionClass: $job['exceptionClass'],
+            exception: null,
+            data: null,
+            dataTruncated: $job['dataTruncated'],
+            durationMicroseconds: $job['durationMicroseconds'],
         );
     }
 }

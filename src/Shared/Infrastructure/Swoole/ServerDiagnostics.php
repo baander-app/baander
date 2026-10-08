@@ -97,7 +97,8 @@ final readonly class ServerDiagnostics implements ServerDiagnosticsInterface
     {
         try {
             return $this->redisClientFactory->borrow(static function (Redis $redis): array {
-                $info = $redis->info();
+                // Only the sections read below; INFO with several sections needs Redis 7.
+                $info = $redis->info('clients', 'memory');
                 // phpredis answers a bare PING with true; older versions return "+PONG".
                 $pong = $redis->ping();
 
@@ -123,8 +124,10 @@ final readonly class ServerDiagnostics implements ServerDiagnosticsInterface
                 $total = 0;
                 $iterator = null;
                 while (($keys = $redis->scan($iterator, 'sse:connections:*', 100)) !== false) {
-                    foreach ($keys as $key) {
-                        $total += (int) $redis->get($key);
+                    // A page can be empty while the scan goes on; MGET needs at least one key.
+                    $counts = $keys === [] ? [] : $redis->mget($keys);
+                    foreach (is_array($counts) ? $counts : [] as $count) {
+                        $total += (int) $count;
                     }
                     if ($iterator === null || $iterator === 0 || $iterator === '0') {
                         break;
