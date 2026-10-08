@@ -10,6 +10,7 @@ use App\Shared\Application\Exception\InvalidSettingValuesException;
 use App\Shared\Application\Exception\UnknownSettingException;
 use App\Shared\Application\Service\SettingDefinitionRegistry;
 use App\Shared\Application\Service\SystemSettings;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Request\UpdateSystemSettingsRequest;
 use App\Shared\Interface\Resource\SettingDefinitionResource;
 use App\Shared\Interface\Resource\SystemSettingResource;
@@ -49,6 +50,7 @@ final class SystemSettingsController
         ],
     )]
     #[Route('', name: 'index', methods: ['GET'])]
+    #[CliCounterpart('app:settings:list')]
     public function index(): JsonResponse
     {
         return $this->successResponse(SystemSettingResource::collection($this->settings->entries()));
@@ -93,6 +95,7 @@ final class SystemSettingsController
     )]
     #[Route('', name: 'update', methods: ['PATCH'])]
     #[IsGranted('SYSTEM_SETTINGS')]
+    #[CliCounterpart('app:settings:set')]
     public function update(#[MapRequestPayload] UpdateSystemSettingsRequest $request): JsonResponse
     {
         try {
@@ -123,6 +126,7 @@ final class SystemSettingsController
     )]
     #[Route('/{key}', name: 'reset', requirements: ['key' => '[a-z0-9_.]+'], methods: ['DELETE'])]
     #[IsGranted('SYSTEM_SETTINGS')]
+    #[CliCounterpart('app:settings:reset')]
     public function reset(string $key): JsonResponse
     {
         try {

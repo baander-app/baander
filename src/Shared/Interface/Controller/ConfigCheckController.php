@@ -6,6 +6,7 @@ namespace App\Shared\Interface\Controller;
 
 use App\Shared\Infrastructure\Health\HealthCheckService;
 use App\Shared\Infrastructure\Health\HealthStatus;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
@@ -55,6 +56,7 @@ final class ConfigCheckController
         ],
     )]
     #[Route('/config-check', name: 'config_check', methods: ['GET'])]
+    #[CliCounterpart('app:config:validate')]
     public function __invoke(): JsonResponse
     {
         $limiter = $this->configCheckLimiter->create('config-check');

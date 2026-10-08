@@ -15,6 +15,7 @@ use App\Discovery\Interface\Request\RegisterServerRequest;
 use App\Discovery\Interface\Resource\PairingSessionResource;
 use App\Discovery\Interface\Resource\ServerInstanceResource;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Interface\Attribute\CliParityExemption;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -64,6 +65,7 @@ final class DiscoveryController
     )]
     #[Route('/register', name: 'register', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
+    #[CliParityExemption('deferred: no admin page; follow-up plan')]
     public function register(#[MapRequestPayload] RegisterServerRequest $payload): JsonResponse
     {
         $envelope = $this->commandBus->dispatch(new RegisterServerCommand(

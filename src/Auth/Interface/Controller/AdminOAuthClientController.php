@@ -15,6 +15,7 @@ use App\Auth\Interface\Request\Admin\AdminCreateOAuthClientRequest;
 use App\Auth\Interface\Resource\AdminOAuthClientCredentialsResource;
 use App\Auth\Interface\Resource\AdminOAuthClientResource;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\ValidationError;
@@ -63,6 +64,7 @@ final class AdminOAuthClientController
         ],
     )]
     #[Route('', name: 'list', methods: ['GET'])]
+    #[CliCounterpart('app:oauth:client:list')]
     public function list(): JsonResponse
     {
         $clients = $this->dispatch(new ListRegisteredClientsQuery());
@@ -88,6 +90,7 @@ final class AdminOAuthClientController
     )]
     #[Route('', name: 'create', methods: ['POST'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
+    #[CliCounterpart('app:oauth:client:create')]
     public function create(#[MapRequestPayload] AdminCreateOAuthClientRequest $payload): JsonResponse
     {
         try {
@@ -122,6 +125,7 @@ final class AdminOAuthClientController
     )]
     #[Route('/{clientId}/rotate-secret', name: 'rotate_secret', methods: ['POST'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
+    #[CliCounterpart('app:oauth:client:rotate-secret')]
     public function rotateSecret(string $clientId): JsonResponse
     {
         $publicId = self::publicId($clientId);
@@ -159,6 +163,7 @@ final class AdminOAuthClientController
     )]
     #[Route('/{clientId}/revoke', name: 'revoke', methods: ['POST'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
+    #[CliCounterpart('app:oauth:client:revoke')]
     public function revoke(string $clientId): JsonResponse
     {
         $publicId = self::publicId($clientId);

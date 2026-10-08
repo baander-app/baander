@@ -13,6 +13,7 @@ use App\Lyrics\Interface\Resource\LyricsResource;
 use App\Lyrics\Interface\Resource\LrclibSearchResource;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Interface\Attribute\CliParityExemption;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -98,6 +99,7 @@ final class LyricsController
     )]
     #[Route('/songs/{publicId}/lyrics/fetch', name: 'song_lyrics_fetch', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
+    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
     public function fetch(string $publicId): JsonResponse
     {
         $songId = $this->resolveSongId($publicId);
@@ -162,6 +164,7 @@ final class LyricsController
     )]
     #[Route('/lyrics/search/{resultId}/apply', name: 'apply', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
+    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
     public function apply(int $resultId, #[MapRequestPayload] ApplyLyricsRequest $payload): JsonResponse
     {
         try {

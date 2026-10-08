@@ -38,7 +38,7 @@ fi
 archive_paths=(
     vendor src tests config packages migrations bin scripts/run-phpunit-shards.php scripts/e2e-ingest-video.php
     docker/general docker/dev docker/prod templates public phpunit.xml.dist
-    .env .env.test .forgejo composer.json composer.lock deptrac.yaml deptrac.baseline.yaml translations
+    .env .env.test .forgejo composer.json composer.lock deptrac.yaml deptrac.baseline.yaml translations docs-book
 )
 if [ "${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" = 1 ]; then
     archive_paths=(--files-from /dev/null)

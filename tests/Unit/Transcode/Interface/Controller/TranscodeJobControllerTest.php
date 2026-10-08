@@ -10,7 +10,6 @@ use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Query\TranscodeJobQueryPort;
 use App\Transcode\Interface\Controller\TranscodeJobController;
 use PHPUnit\Framework\TestCase;
-use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\ControllerMetadata\ArgumentMetadata;
 use Symfony\Component\HttpKernel\ControllerMetadata\ArgumentMetadataFactory;
@@ -57,7 +56,6 @@ final class TranscodeJobControllerTest extends TestCase
         return new TranscodeJobController(
             $this->createStub(MessageBusInterface::class),
             $this->createStub(TranscodeJobPortInterface::class),
-            $this->createStub(Security::class),
         );
     }
 
