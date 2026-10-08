@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Metadata\Infrastructure\Messaging;
 
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
+use App\Metadata\Application\Command\SyncMetadataCommand;
 use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
@@ -18,6 +19,7 @@ final readonly class MetadataMessagePayloadCodec implements MessagePayloadCodecI
         'metadata.sync_song' => ['song_id', 'force_update'],
         'metadata.sync_album' => ['album_id', 'force_update'],
         'metadata.sync_library' => ['library_id', 'force_update', 'include_songs', 'include_artists'],
+        'metadata.sync' => ['source'],
     ];
 
     public function types(): array
@@ -27,6 +29,7 @@ final readonly class MetadataMessagePayloadCodec implements MessagePayloadCodecI
             'metadata.sync_song' => SyncSongMessage::class,
             'metadata.sync_album' => SyncAlbumMessage::class,
             'metadata.sync_library' => SyncLibraryMessage::class,
+            'metadata.sync' => SyncMetadataCommand::class,
         ];
     }
 
@@ -42,6 +45,7 @@ final readonly class MetadataMessagePayloadCodec implements MessagePayloadCodecI
             $message instanceof SyncSongMessage => [$message->songId->toString(), $message->forceUpdate],
             $message instanceof SyncAlbumMessage => [$message->albumId->toString(), $message->forceUpdate],
             $message instanceof SyncLibraryMessage => [$message->libraryId->toString(), $message->forceUpdate, $message->includeSongs, $message->includeArtists],
+            $message instanceof SyncMetadataCommand => [$message->source],
             default => throw new \InvalidArgumentException('Unsupported message type.'),
         };
     }
@@ -53,6 +57,7 @@ final readonly class MetadataMessagePayloadCodec implements MessagePayloadCodecI
             'metadata.sync_song' => new SyncSongMessage(Uuid::fromString($p['song_id']), $p['force_update']),
             'metadata.sync_album' => new SyncAlbumMessage(Uuid::fromString($p['album_id']), $p['force_update']),
             'metadata.sync_library' => new SyncLibraryMessage(Uuid::fromString($p['library_id']), $p['force_update'], $p['include_songs'], $p['include_artists']),
+            'metadata.sync' => new SyncMetadataCommand($p['source']),
             default => throw new \InvalidArgumentException('Unsupported message type.'),
         };
     }

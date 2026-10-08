@@ -44,7 +44,9 @@ No domain events published yet.
 
 | Command | Description |
 |---------|-------------|
-| `baander:lyrics:fetch` | Bulk-fetch lyrics from LRCLIB for songs missing them |
+| `app:lyrics:fetch` | Queue a lyrics fetch from LRCLIB for every song without lyrics, or up to `--limit` |
+| `app:lyrics:coverage` | Lyrics coverage, as the admin coverage endpoint returns it |
+| `app:lyrics:status` | Lyrics job counts, as the admin sync-status endpoint returns them |
 
 ### Cross-Context Dependencies
 

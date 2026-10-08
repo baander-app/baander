@@ -8,17 +8,21 @@ use App\Catalog\Application\Port\SongLookupInterface;
 use App\Lyrics\Application\Command\BulkFetchLyricsCommand;
 use App\Lyrics\Application\Command\FetchLyricsCommand;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
-use App\Shared\Application\Port\SleeperInterface;
+use App\Shared\Application\Exception\InvalidInputException;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\DelayStamp;
+use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
 
 /**
- * Handles BulkFetchLyricsCommand.
+ * Handles BulkFetchLyricsCommand, which the admin bulk fetch, `app:lyrics:fetch` and
+ * admin-created schedules dispatch.
  *
- * Walks song IDs and dispatches individual FetchLyricsCommand instances
- * for those without lyrics. Applies a configurable delay between dispatches
- * for respectful crawling.
+ * Walks song IDs and queues one FetchLyricsCommand for each song without lyrics, up to
+ * the limit, on the durable async transport that the workers consume. The fetches are
+ * spaced by the command's delay through DelayStamp, so they reach LRCLIB at that pace
+ * while the handler itself returns as soon as they are queued.
  */
 #[AsMessageHandler]
 final class BulkFetchLyricsHandler
@@ -30,53 +34,46 @@ final class BulkFetchLyricsHandler
         private readonly LyricsRepositoryInterface $lyricsRepository,
         private readonly MessageBusInterface $bus,
         private readonly LoggerInterface $logger,
-        private readonly SleeperInterface $sleeper,
     ) {
     }
 
+    /**
+     * @return int the number of songs queued for fetching
+     *
+     * @throws InvalidInputException for a limit below 1 or a negative delay
+     */
     public function __invoke(BulkFetchLyricsCommand $command): int
     {
         $limit = $command->getLimit();
         $delayMs = $command->getDelayMs() ?? BulkFetchLyricsCommand::DEFAULT_DELAY_MS;
-        $dispatched = 0;
+        if ($limit !== null && $limit < 1) {
+            throw new InvalidInputException('The limit must be at least 1.', ['limit' => $limit]);
+        }
+        if ($delayMs < 0) {
+            throw new InvalidInputException('The delay must not be negative.', ['delayMs' => $delayMs]);
+        }
+
+        $queued = 0;
         $after = null;
 
-        while (true) {
-            if ($limit !== null && $dispatched >= $limit) {
-                break;
-            }
-
-            $remaining = $limit !== null ? min(self::BATCH_SIZE, $limit - $dispatched) : self::BATCH_SIZE;
+        while ($limit === null || $queued < $limit) {
+            $remaining = $limit !== null ? min(self::BATCH_SIZE, $limit - $queued) : self::BATCH_SIZE;
             $songIds = $this->songs->songIdsAfter($after, $remaining);
 
-            if ($songIds === []) {
-                break;
-            }
-
             foreach ($songIds as $songId) {
-                if ($limit !== null && $dispatched >= $limit) {
+                if ($limit !== null && $queued >= $limit) {
                     break 2;
                 }
 
-                $existing = $this->lyricsRepository->findBySongId($songId);
-                if ($existing !== null) {
+                if ($this->lyricsRepository->findBySongId($songId) !== null) {
                     continue;
                 }
 
-                try {
-                    $this->bus->dispatch(new FetchLyricsCommand($songId));
-                    ++$dispatched;
-
-                    if ($delayMs > 0) {
-                        $this->sleeper->sleep($delayMs / 1000);
-                    }
-                } catch (\Throwable $e) {
-                    $this->logger->warning('Failed to dispatch lyrics fetch for song', [
-                        'song_id' => $songId->toString(),
-                        'error' => $e->getMessage(),
-                        'dispatched' => $dispatched,
-                    ]);
-                }
+                $this->bus->dispatch(new FetchLyricsCommand($songId), [
+                    new TransportNamesStamp(['async']),
+                    new DelayStamp($queued * $delayMs),
+                ]);
+                ++$queued;
             }
 
             if (count($songIds) < $remaining) {
@@ -85,10 +82,11 @@ final class BulkFetchLyricsHandler
             $after = $songIds[array_key_last($songIds)];
         }
 
-        $this->logger->info('Bulk lyrics fetch completed', [
-            'dispatched' => $dispatched,
+        $this->logger->info('Bulk lyrics fetch queued', [
+            'queued' => $queued,
+            'delay_ms' => $delayMs,
         ]);
 
-        return $dispatched;
+        return $queued;
     }
 }

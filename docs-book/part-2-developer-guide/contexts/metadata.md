@@ -16,10 +16,11 @@ The Metadata context enriches catalog entities with data from external music API
 | Command / Message | Handler | Purpose |
 |---------|---------|---------|
 | `ExtractAlbumCoverCommand` | `ExtractAlbumCoverHandler` | Extract and store cover art from an album |
+| `SyncMetadataCommand` | `SyncMetadataHandler` | The admin sync: without a source, one `SyncLibraryMessage` per library; with the `genres` source, only `SyncGenresMessage`. Returns the number of jobs queued |
 | `SyncLibraryMessage` | `SyncLibraryHandler` | Enrich all entities in a library |
 | `SyncAlbumMessage` | `SyncAlbumHandler` | Enrich a single album |
 | `SyncArtistMessage` | `SyncArtistHandler` | Enrich a single artist |
-| `SyncGenresMessage` | `SyncGenresHandler` | Sync genre data |
+| `SyncGenresMessage` | `SyncGenresHandler` | Queue a forced sync of every album and its songs; returns the number queued |
 | `SyncSongMessage` | `SyncSongHandler` | Enrich a single song |
 
 ## Automatic Sync of New Albums
@@ -28,13 +29,13 @@ While the `metadata.auto_sync` system setting is on, Catalog ingest asks Metadat
 
 `AlbumMetadataSyncRequester` reads the setting on every call. When the setting is on, it calls `MetadataSyncOrchestrator::syncAlbum()` for each album. The orchestrator dispatches `SyncAlbumMessage`, which runs later from the `swoole_task` queue, or from the Redis `async` transport outside the Swoole server, so ingest does not wait for the external lookups. The setting is off by default.
 
-The admin sync, `POST /api/admin/metadata/trigger-sync`, dispatches its own message and ignores the setting. No console command starts a sync.
+The admin sync, `POST /api/admin/metadata/trigger-sync`, and `app:metadata:sync` dispatch `SyncMetadataCommand` and ignore the setting. The command runs it through `JobMonitorAdministrationInterface::runInline()`, which records the run in the job monitor. An unknown source is rejected with a 422 response or an invalid-input exit.
 
 ## Ports
 
 | Port | Purpose |
 |------|---------|
-| `MetadataAdminPortInterface` | Sync status, manual sync trigger and provider list for the admin API |
+| `MetadataAdminPortInterface` | Sync status and provider list for the admin API and `app:metadata:status` and `app:metadata:providers` |
 | `AlbumMetadataSyncRequestInterface` | Published contract for Catalog ingest: requests a sync of newly created albums while `metadata.auto_sync` is on |
 
 ## API Endpoints
@@ -58,7 +59,7 @@ Routes under `/api/admin/metadata` (controller `MetadataAdminController`, gated 
 | Method | Path | Controller | Purpose |
 |--------|------|------------|---------|
 | GET | `/api/admin/metadata/sync-status` | `MetadataAdminController` | Current enrichment/sync status |
-| POST | `/api/admin/metadata/trigger-sync` | `MetadataAdminController` | Trigger a metadata sync run |
+| POST | `/api/admin/metadata/trigger-sync` | `MetadataAdminController` | Queue a sync for every library, or with `source: genres` only the genre sync; returns the number of jobs queued |
 | GET | `/api/admin/metadata/providers` | `MetadataAdminController` | List configured metadata providers |
 
 ## Cross-Context Dependencies

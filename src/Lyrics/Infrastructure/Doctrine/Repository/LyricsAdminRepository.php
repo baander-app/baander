@@ -4,19 +4,17 @@ declare(strict_types=1);
 
 namespace App\Lyrics\Infrastructure\Doctrine\Repository;
 
-use App\Lyrics\Application\Port\LyricsAdminPortInterface;
 use App\Lyrics\Application\Command\BulkFetchLyricsCommand;
-use App\Shared\Infrastructure\Doctrine\Entity\JobMonitorEntity;
+use App\Lyrics\Application\Command\FetchLyricsCommand;
+use App\Lyrics\Application\Port\LyricsAdminPortInterface;
+use Doctrine\DBAL\ArrayParameterType;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
-use Psr\Log\LoggerInterface;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 final class LyricsAdminRepository implements LyricsAdminPortInterface
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
-        private readonly MessageBusInterface $bus,
-        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -55,78 +53,45 @@ final class LyricsAdminRepository implements LyricsAdminPortInterface
         ];
     }
 
-    public function triggerBulkFetch(array $trackIds = [], ?int $limit = null): int
-    {
-        $command = new BulkFetchLyricsCommand(
-            limit: $limit,
-            delayMs: 500,
-        );
-
-        $this->bus->dispatch($command);
-
-        $this->logger->info('Bulk lyrics fetch triggered via admin', [
-            'trackIds' => count($trackIds),
-            'limit' => $limit,
-        ]);
-
-        return 1; // One bulk job dispatched
-    }
-
     public function getSyncStatus(): array
     {
-        $qb = $this->entityManager->getRepository(JobMonitorEntity::class)->createQueryBuilder('j');
+        $conn = $this->entityManager->getConnection();
+        $jobs = ['names' => self::jobNames()];
+        $types = ['names' => ArrayParameterType::STRING];
 
-        $recentJobs = (int) $qb
-            ->select('COUNT(j.jobId)')
-            ->where('j.name LIKE :pattern')
-            ->setParameter('pattern', '%lyrics%')
-            ->andWhere('j.createdAt >= :since')
-            ->setParameter('since', new \DateTimeImmutable('-7 days'))
-            ->getQuery()
-            ->getSingleScalarResult();
+        $row = $conn->fetchAssociative(
+            "SELECT COUNT(*) FILTER (WHERE created_at >= :since) AS recent,
+                    COUNT(*) FILTER (WHERE status = 'failed') AS failed,
+                    COUNT(*) FILTER (WHERE status = 'finished') AS finished,
+                    MAX(created_at) AS last_created_at
+             FROM job_monitors
+             WHERE name IN (:names)",
+            $jobs + ['since' => new \DateTimeImmutable('-7 days')],
+            $types + ['since' => Types::DATETIME_IMMUTABLE],
+        );
 
-        $failedQb = $this->entityManager->getRepository(JobMonitorEntity::class)->createQueryBuilder('j');
-        $failedJobs = (int) $failedQb
-            ->select('COUNT(j.jobId)')
-            ->where('j.name LIKE :pattern')
-            ->setParameter('pattern', '%lyrics%')
-            ->andWhere('j.status = :status')
-            ->setParameter('status', 'failed')
-            ->getQuery()
-            ->getSingleScalarResult();
-
-        $completedQb = $this->entityManager->getRepository(JobMonitorEntity::class)->createQueryBuilder('j');
-        $completedJobs = (int) $completedQb
-            ->select('COUNT(j.jobId)')
-            ->where('j.name LIKE :pattern')
-            ->setParameter('pattern', '%lyrics%')
-            ->andWhere('j.status = :status')
-            ->setParameter('status', 'finished')
-            ->getQuery()
-            ->getSingleScalarResult();
-
-        $lastJobQb = $this->entityManager->getRepository(JobMonitorEntity::class)->createQueryBuilder('j');
-        $lastJob = $lastJobQb
-            ->select('j.createdAt')
-            ->where('j.name LIKE :pattern')
-            ->setParameter('pattern', '%lyrics%')
-            ->orderBy('j.createdAt', 'DESC')
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
-
-        $lastSyncAt = null;
-        if ($lastJob !== null && isset($lastJob['createdAt'])) {
-            $lastSyncAt = $lastJob['createdAt'] instanceof \DateTimeInterface
-                ? $lastJob['createdAt']->format(\DateTimeInterface::ATOM)
-                : (string) $lastJob['createdAt'];
-        }
+        $lastCreatedAt = $row['last_created_at'] ?? null;
 
         return [
-            'lastSyncAt' => $lastSyncAt,
-            'recentJobs' => $recentJobs,
-            'failedJobs' => $failedJobs,
-            'completedJobs' => $completedJobs,
+            'lastSyncAt' => is_string($lastCreatedAt)
+                ? (new \DateTimeImmutable($lastCreatedAt))->format(\DateTimeInterface::ATOM)
+                : null,
+            'recentJobs' => (int) ($row['recent'] ?? 0),
+            'failedJobs' => (int) ($row['failed'] ?? 0),
+            'completedJobs' => (int) ($row['finished'] ?? 0),
         ];
+    }
+
+    /**
+     * The lyrics jobs by the short class name the job monitor stores as the job name.
+     *
+     * @return list<string>
+     */
+    private static function jobNames(): array
+    {
+        return array_map(
+            static fn (string $class): string => substr($class, (int) strrpos($class, '\\') + 1),
+            [BulkFetchLyricsCommand::class, FetchLyricsCommand::class],
+        );
     }
 }

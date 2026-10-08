@@ -215,6 +215,7 @@ export function LyricsAdminPage() {
   const bulkFetch = useBulkFetchLyrics()
   const roles = useAuthStore((s) => s.user?.roles) ?? []
   const isSuperAdmin = roles.includes('ROLE_SUPER_ADMIN')
+  const sources = coverage ? Object.entries(coverage.bySource) : []
 
   if (coverageLoading || syncLoading) {
     return (
@@ -282,12 +283,12 @@ export function LyricsAdminPage() {
                 />
               </RowStack>
 
-              {coverage.bySource.length > 0 && (
+              {sources.length > 0 && (
                 <div style={{ paddingTop: '0.5rem' }}>
                   <SectionLabel>By source</SectionLabel>
                   <RowStack>
-                    {coverage.bySource.map((s) => (
-                      <Row key={s.source} label={s.source} value={s.count.toLocaleString()} />
+                    {sources.map(([source, count]) => (
+                      <Row key={source} label={source} value={count.toLocaleString()} />
                     ))}
                   </RowStack>
                 </div>
@@ -312,7 +313,7 @@ export function LyricsAdminPage() {
                   }
                   muted={!syncStatus.lastSyncAt}
                 />
-                <Row label="Pending jobs" value={syncStatus.pendingJobs} muted={syncStatus.pendingJobs === 0} />
+                <Row label="Jobs in the past 7 days" value={syncStatus.recentJobs} muted={syncStatus.recentJobs === 0} />
                 <Row label="Completed jobs" value={syncStatus.completedJobs} />
                 <Row label="Failed jobs" value={syncStatus.failedJobs} muted={syncStatus.failedJobs === 0} />
               </RowStack>

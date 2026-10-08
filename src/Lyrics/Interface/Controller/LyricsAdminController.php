@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace App\Lyrics\Interface\Controller;
 
+use App\Lyrics\Application\Command\BulkFetchLyricsCommand;
 use App\Lyrics\Application\Port\LyricsAdminPortInterface;
+use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use OpenApi\Attributes as OA;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -22,6 +27,7 @@ final class LyricsAdminController
 
     public function __construct(
         private readonly LyricsAdminPortInterface $lyricsAdmin,
+        private readonly MessageBusInterface $bus,
     ) {
     }
 
@@ -48,6 +54,7 @@ final class LyricsAdminController
         ],
     )]
     #[Route('/coverage', name: 'coverage', methods: ['GET'])]
+    #[CliCounterpart('app:lyrics:coverage')]
     public function coverage(): JsonResponse
     {
         return $this->successResponse($this->lyricsAdmin->getCoverage());
@@ -55,11 +62,12 @@ final class LyricsAdminController
 
     #[OA\Post(
         path: '/api/admin/lyrics/bulk-fetch',
-        summary: 'Trigger bulk lyrics fetch (SUPER_ADMIN only)',
+        summary: 'Queue a lyrics fetch for every song without lyrics (SUPER_ADMIN only)',
         requestBody: new OA\RequestBody(
+            required: false,
             content: new OA\JsonContent(
                 properties: [
-                    new OA\Property(property: 'limit', type: 'integer', description: 'Max number of jobs to enqueue'),
+                    new OA\Property(property: 'limit', type: 'integer', minimum: 1, nullable: true, description: 'Most songs to queue; absent or null queues every song without lyrics'),
                 ],
             ),
         ),
@@ -70,25 +78,31 @@ final class LyricsAdminController
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'jobsEnqueued', type: 'integer'),
+                            new OA\Property(property: 'jobsEnqueued', description: 'Songs queued for fetching', type: 'integer'),
                         ], type: 'object'),
                     ],
                 ),
             ),
+            new OA\Response(response: '422', description: 'Limit is not an integer of at least 1', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '403', description: 'Forbidden — SUPER_ADMIN only', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/bulk-fetch', name: 'bulk_fetch', methods: ['POST'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
+    #[CliCounterpart('app:lyrics:fetch')]
     public function bulkFetch(Request $request): JsonResponse
     {
-        $body = json_decode($request->getContent(), true, 512, JSON_THROW_ON_ERROR) ?? [];
+        // The admin page posts no body: that queues every song without lyrics.
+        $content = $request->getContent();
+        $body = $content !== '' ? json_decode($content, true, 512, JSON_THROW_ON_ERROR) : null;
+        $limit = is_array($body) ? ($body['limit'] ?? null) : null;
+        if ($limit !== null && !is_int($limit)) {
+            throw new InvalidInputException('The limit must be an integer.', ['limit' => $limit]);
+        }
 
-        $limit = isset($body['limit']) && is_int($body['limit']) ? $body['limit'] : null;
+        $queued = $this->bus->dispatch(new BulkFetchLyricsCommand(limit: $limit))->last(HandledStamp::class)?->getResult();
 
-        $count = $this->lyricsAdmin->triggerBulkFetch([], $limit);
-
-        return $this->successResponse(['jobsEnqueued' => $count]);
+        return $this->successResponse(['jobsEnqueued' => $queued]);
     }
 
     #[OA\Get(
@@ -113,6 +127,7 @@ final class LyricsAdminController
         ],
     )]
     #[Route('/sync-status', name: 'sync_status', methods: ['GET'])]
+    #[CliCounterpart('app:lyrics:status')]
     public function syncStatus(): JsonResponse
     {
         return $this->successResponse($this->lyricsAdmin->getSyncStatus());

@@ -18,8 +18,9 @@ use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
 /**
  * Queues automatic lyrics fetches for new songs while `lyrics.auto_fetch` is on.
  *
- * FetchLyricsCommand has no transport route, so the bulk fetch keeps handling it
- * synchronously; only these automatic requests go to the durable async transport.
+ * FetchLyricsCommand has no transport route, so a fetch an administrator starts for one
+ * song is handled synchronously; these automatic requests, like the bulk fetch's, go to
+ * the durable async transport.
  *
  * Each fetch is delayed so that fetches run at the bulk fetch's pace, one per
  * BulkFetchLyricsCommand::DEFAULT_DELAY_MS. The schedule carries over between

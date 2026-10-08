@@ -52,7 +52,7 @@ The scan hands the files it finds to the catalog, which adds the new albums and 
 | `metadata.auto_sync` | Each new album is queued for a metadata sync from the [external services](external-apis.md), right after the catalog stores it. |
 | `lyrics.auto_fetch` | Each new track without an `.lrc` lyrics file beside it is queued for a lyrics fetch from LRCLIB, once the catalog has stored the track. A track with an `.lrc` file takes its lyrics from that file. |
 
-Both act only on albums and tracks that a scan creates. A rescan of music Baander already has queues nothing. The bulk lyrics fetch, [`baander:lyrics:fetch`](commands/baander-lyrics-fetch.md), and the syncs and fetches an administrator starts are not affected by either setting.
+Both act only on albums and tracks that a scan creates. A rescan of music Baander already has queues nothing. The bulk lyrics fetch, [`app:lyrics:fetch`](commands/app-lyrics-fetch.md), and the syncs and fetches an administrator starts are not affected by either setting.
 
 ## File Watching
 
