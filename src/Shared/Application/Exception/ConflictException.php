@@ -11,7 +11,9 @@ use Throwable;
  * The target's current state does not allow the change, such as a scan that is already running.
  *
  * HTTP reports it as 409 and console commands exit with FAILURE. A context exception
- * for such a state may extend it to get the same outcome on both paths.
+ * for such a state may extend it to get the same outcome on both paths. If it also implements
+ * TranslatableInterface, HTTP reports its translation in the request locale; getMessage()
+ * stays English for console output and logs.
  */
 class ConflictException extends RuntimeException
 {

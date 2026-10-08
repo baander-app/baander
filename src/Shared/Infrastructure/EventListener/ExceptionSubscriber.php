@@ -16,6 +16,8 @@ use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\Messenger\Exception\HandlerFailedException;
+use Symfony\Contracts\Translation\TranslatableInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 use Throwable;
 
 #[AsEventListener(event: KernelEvents::EXCEPTION, priority: 0)]
@@ -23,6 +25,7 @@ final class ExceptionSubscriber
 {
     public function __construct(
         private readonly LoggerInterface $logger,
+        private readonly TranslatorInterface $translator,
     )
     {
     }
@@ -68,7 +71,11 @@ final class ExceptionSubscriber
         ));
     }
 
-    /** The shared use case outcomes are client errors: 404, 409 or 422 with the message and details. */
+    /**
+     * The shared use case outcomes are client errors: 404, 409 or 422 with the message and details.
+     * An outcome that is also TranslatableInterface is reported in the translator's locale, which
+     * LocaleListener sets from the API request; getMessage() stays English for the console and logs.
+     */
     private function respondWithOutcome(ExceptionEvent $event, Throwable $exception): bool
     {
         [$status, $details] = match (true) {
@@ -81,7 +88,8 @@ final class ExceptionSubscriber
             return false;
         }
 
-        $error = new ApiError($exception->getMessage(), $status, $details);
+        $message = $exception instanceof TranslatableInterface ? $exception->trans($this->translator) : $exception->getMessage();
+        $error = new ApiError($message, $status, $details);
         $event->setResponse(new JsonResponse($error->toArray(), $status));
 
         return true;

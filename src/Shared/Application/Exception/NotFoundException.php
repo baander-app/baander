@@ -11,7 +11,9 @@ use Throwable;
  * The use case's target does not exist. The message names the target.
  *
  * HTTP reports it as 404 and console commands exit with FAILURE. A context exception
- * for a missing target may extend it to get the same outcome on both paths.
+ * for a missing target may extend it to get the same outcome on both paths. If it also implements
+ * TranslatableInterface, HTTP reports its translation in the request locale; getMessage()
+ * stays English for console output and logs.
  */
 class NotFoundException extends RuntimeException
 {

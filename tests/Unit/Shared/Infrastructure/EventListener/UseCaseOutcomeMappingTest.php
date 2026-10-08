@@ -25,12 +25,25 @@ use Symfony\Component\Messenger\Handler\HandlersLocator;
 use Symfony\Component\Messenger\MessageBus;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Middleware\HandleMessageMiddleware;
+use Symfony\Component\Translation\Loader\ArrayLoader;
+use Symfony\Component\Translation\Translator;
+use Symfony\Contracts\Translation\TranslatableInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 use stdClass;
 use Throwable;
 
 /** The shared use case outcomes reach the HTTP client as 404, 409 and 422 with the shared error envelope. */
 final class UseCaseOutcomeMappingTest extends TestCase
 {
+    private Translator $translator;
+
+    protected function setUp(): void
+    {
+        $this->translator = new Translator('en');
+        $this->translator->addLoader('array', new ArrayLoader());
+        $this->translator->addResource('array', ['errors.slug_exists' => 'Et bibliotek med slug "{slug}" findes allerede.'], 'da', 'library+intl-icu');
+    }
+
     /** @return iterable<string, array{Throwable, int}> */
     public static function outcomes(): iterable
     {
@@ -78,6 +91,27 @@ final class UseCaseOutcomeMappingTest extends TestCase
         $this->assertSame(['error' => ['message' => 'No library has the ID "music".', 'code' => 404]], $this->body($response));
     }
 
+    public function testATranslatableOutcomeFromAHandlerIsReportedInTheTranslatorsLocale(): void
+    {
+        $this->translator->setLocale('da');
+        $bus = $this->bus(static function (): never {
+            throw new class ('A library with the slug "jazz" already exists.', ['reason' => 'slug_exists']) extends ConflictException implements TranslatableInterface {
+                public function trans(TranslatorInterface $translator, ?string $locale = null): string
+                {
+                    return $translator->trans('errors.slug_exists', ['slug' => 'jazz'], 'library', $locale);
+                }
+            };
+        });
+
+        $response = $this->handle($this->dispatching($bus));
+
+        $this->assertSame(Response::HTTP_CONFLICT, $response->getStatusCode());
+        $this->assertSame(
+            ['error' => ['message' => 'Et bibliotek med slug "jazz" findes allerede.', 'code' => 409, 'details' => ['reason' => 'slug_exists']]],
+            $this->body($response),
+        );
+    }
+
     public function testAnHttpExceptionFromAHandlerIsPassedOnUnwrappedForTheFrameworkToRender(): void
     {
         $bus = $this->bus(static function (): never {
@@ -92,7 +126,7 @@ final class UseCaseOutcomeMappingTest extends TestCase
     private function handle(callable $controller): Response
     {
         $events = new EventDispatcher();
-        $events->addListener(KernelEvents::EXCEPTION, new ExceptionSubscriber(new NullLogger()));
+        $events->addListener(KernelEvents::EXCEPTION, new ExceptionSubscriber(new NullLogger(), $this->translator));
         $controllers = new class ($controller) implements ControllerResolverInterface {
             /** @param callable $controller */
             public function __construct(private $controller)
