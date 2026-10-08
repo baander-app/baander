@@ -274,7 +274,7 @@ final class ServerDiagnosticsCommandsTest extends TestCase
         $redis->method('ping')->willReturn(true);
         $redis->method('dbSize')->willReturn(42);
         $redis->method('scan')->willReturn(['sse:connections:node-a']);
-        $redis->method('get')->willReturn('5');
+        $redis->method('mget')->willReturn(['5']);
 
         return new ServerDiagnostics($port, new RedisClientFactory('redis://127.0.0.1:6379', connectionFactory: static fn (): Redis => $redis));
     }

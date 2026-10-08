@@ -58,7 +58,7 @@ final class JobMonitorCursorPaginationTest extends TestCase
         do {
             $page = $service->findWithCursor($filter, $cursor, 2, 'createdAt', 'asc');
             self::assertSame($pages !== [], $page->hasPreviousPage);
-            $pages[] = array_map(static fn (JobMonitorEntity $job): string => $job->getJobId(), $page->items);
+            $pages[] = array_map(static fn (array $job): string => $job['jobId'], $page->items);
             $cursor = $page->nextCursor;
         } while ($page->hasNextPage && count($pages) <= count(self::CREATED));
 
@@ -70,7 +70,7 @@ final class JobMonitorCursorPaginationTest extends TestCase
         while ($cursor !== null) {
             $page = $service->findWithCursor($filter, $cursor, 2, 'createdAt', 'asc');
             self::assertTrue($page->hasNextPage);
-            $seen = array_merge(array_map(static fn (JobMonitorEntity $job): string => $job->getJobId(), $page->items), $seen);
+            $seen = array_merge(array_map(static fn (array $job): string => $job['jobId'], $page->items), $seen);
             $cursor = $page->hasPreviousPage ? $page->prevCursor : null;
         }
 
@@ -180,7 +180,7 @@ final class JobMonitorCursorPaginationTest extends TestCase
         do {
             $page = $service->findWithCursor($filter, $cursor, 2, $sort, $direction);
             self::assertSame($pages > 0, $page->hasPreviousPage, 'Only pages after the first have a previous page.');
-            $seen = [...$seen, ...array_map(static fn (JobMonitorEntity $job): string => $job->getJobId(), $page->items)];
+            $seen = [...$seen, ...array_map(static fn (array $job): string => $job['jobId'], $page->items)];
             $cursor = $page->nextCursor;
             ++$pages;
         } while ($page->hasNextPage && $pages <= count(self::CREATED));
@@ -199,11 +199,11 @@ final class JobMonitorCursorPaginationTest extends TestCase
             $cursor = $page->nextCursor;
         } while ($page->hasNextPage);
 
-        $seen = array_map(static fn (JobMonitorEntity $job): string => $job->getJobId(), $page->items);
+        $seen = array_map(static fn (array $job): string => $job['jobId'], $page->items);
         $cursor = $page->prevCursor;
         while ($cursor !== null) {
             $page = $service->findWithCursor($filter, $cursor, 2, $sort, $direction);
-            $seen = [...array_map(static fn (JobMonitorEntity $job): string => $job->getJobId(), $page->items), ...$seen];
+            $seen = [...array_map(static fn (array $job): string => $job['jobId'], $page->items), ...$seen];
             $cursor = $page->hasPreviousPage ? $page->prevCursor : null;
         }
 

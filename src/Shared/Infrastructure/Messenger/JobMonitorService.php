@@ -15,8 +15,34 @@ use Doctrine\DBAL\ParameterType;
 use RuntimeException;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
+/**
+ * @phpstan-type JobMonitorSummary array{
+ *     id: Uuid,
+ *     jobId: string,
+ *     name: string|null,
+ *     queue: string|null,
+ *     status: JobStatus,
+ *     progress: int|null,
+ *     attempt: int,
+ *     retried: bool,
+ *     startedAt: \DateTimeImmutable|null,
+ *     finishedAt: \DateTimeImmutable|null,
+ *     createdAt: \DateTimeImmutable,
+ *     updatedAt: \DateTimeImmutable,
+ *     exceptionClass: string|null,
+ *     dataTruncated: bool,
+ *     durationMicroseconds: int|null,
+ * }
+ */
 final class JobMonitorService
 {
+    /**
+     * The fields the job list and the running jobs show. The stored message and the error
+     * detail are left out; only a single job's detail reads them.
+     */
+    private const string SUMMARY_FIELDS = 'j.id, j.jobId, j.name, j.queue, j.status, j.progress, j.attempt, j.retried, '
+        . 'j.startedAt, j.finishedAt, j.createdAt, j.updatedAt, j.exceptionClass, j.dataTruncated, j.durationMicroseconds';
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly CursorPaginator $cursorPaginator,
@@ -122,12 +148,19 @@ final class JobMonitorService
             ->findBy([], ['createdAt' => 'DESC'], $limit);
     }
 
-    /** @return list<JobMonitorEntity> */
+    /** @return list<JobMonitorSummary> */
     public function getRunning(): array
     {
+        /** @var list<JobMonitorSummary> */
         return $this->entityManager
             ->getRepository(JobMonitorEntity::class)
-            ->findBy(['status' => JobStatus::Running], ['startedAt' => 'ASC']);
+            ->createQueryBuilder('j')
+            ->select(self::SUMMARY_FIELDS)
+            ->where('j.status = :status')
+            ->setParameter('status', JobStatus::Running)
+            ->orderBy('j.startedAt', 'ASC')
+            ->getQuery()
+            ->getResult();
     }
 
     public function setData(string $jobId, ?string $data, bool $dataTruncated): void
@@ -169,6 +202,7 @@ final class JobMonitorService
         return $monitor;
     }
 
+    /** A page of jobs; its items are JobMonitorSummary rows. */
     public function findWithCursor(
         JobMonitorFilter $filter,
         ?Cursor $cursor,
@@ -178,7 +212,8 @@ final class JobMonitorService
     ): CursorResult {
         $qb = $this->entityManager
             ->getRepository(JobMonitorEntity::class)
-            ->createQueryBuilder('j');
+            ->createQueryBuilder('j')
+            ->select(self::SUMMARY_FIELDS);
 
         // Apply filters
         if ($filter->status !== null) {
@@ -213,8 +248,9 @@ final class JobMonitorService
             'j.id',
             $cursor,
             $limit,
-            function (JobMonitorEntity $entity) use ($sort): array {
-                return ['sort' => $this->extractSortValue($entity, $sort), 'id' => $entity->getId()->toString()];
+            /** @param JobMonitorSummary $job */
+            static function (array $job) use ($sort): array {
+                return ['sort' => self::extractSortValue($job, $sort), 'id' => $job['id']->toString()];
             },
             withCount: false,
             descending: strtolower($direction) === 'desc',
@@ -605,6 +641,17 @@ final class JobMonitorService
             ->setParameter('olderThan', self::instant($olderThan));
     }
 
+    /** The job's status, or null when there is no such job. */
+    public function findStatus(string $jobId): ?JobStatus
+    {
+        $status = $this->entityManager->getConnection()->fetchOne(
+            'SELECT status FROM job_monitors WHERE job_id = :job_id',
+            ['job_id' => $jobId],
+        );
+
+        return is_string($status) ? JobStatus::from($status) : null;
+    }
+
     public function findByJobId(string $jobId): ?JobMonitorEntity
     {
         return $this->entityManager
@@ -689,19 +736,21 @@ final class JobMonitorService
     }
 
     /**
-     * Extract the sort value from an entity for cursor-based pagination. Instants keep their
+     * Extract the sort value from a job for cursor-based pagination. Instants keep their
      * microseconds: a cursor cut to whole seconds would sort before its own row.
+     *
+     * @param JobMonitorSummary $job
      */
-    private function extractSortValue(JobMonitorEntity $entity, string $sort): ?string
+    private static function extractSortValue(array $job, string $sort): ?string
     {
         if ($sort === 'duration') {
-            return $entity->getDurationMicroseconds() === null ? null : (string) $entity->getDurationMicroseconds();
+            return $job['durationMicroseconds'] === null ? null : (string) $job['durationMicroseconds'];
         }
 
         $instant = match ($sort) {
-            'startedAt' => $entity->getStartedAt(),
-            'finishedAt' => $entity->getFinishedAt(),
-            default => $entity->getCreatedAt(),
+            'startedAt' => $job['startedAt'],
+            'finishedAt' => $job['finishedAt'],
+            default => $job['createdAt'],
         };
 
         return $instant === null ? null : self::instant($instant);

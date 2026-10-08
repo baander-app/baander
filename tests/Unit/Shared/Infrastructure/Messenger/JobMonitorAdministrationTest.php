@@ -25,6 +25,8 @@ use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
+use Doctrine\ORM\Query;
+use Doctrine\ORM\QueryBuilder;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -50,6 +52,15 @@ final class JobMonitorAdministrationTest extends TestCase
 
     /** @var array<string, string> the Redis keys that were set */
     private array $redisKeys = [];
+
+    /** How often a whole job row was loaded. */
+    private int $entityLoads = 0;
+
+    /** @var list<string> DQL queries run */
+    private array $dql = [];
+
+    /** @var list<array<string, mixed>> rows the DQL queries answer */
+    private array $rows = [];
 
     /** @return iterable<string, array{string|null}> */
     public static function queues(): iterable
@@ -173,6 +184,8 @@ final class JobMonitorAdministrationTest extends TestCase
         $administration->cancel('running-job');
 
         self::assertSame(['job_cancel:running-job' => '1'], $this->redisKeys);
+        self::assertSame(0, $this->entityLoads, 'Cancelling reads only the status, not the stored message.');
+        self::assertSame([['SELECT status FROM job_monitors WHERE job_id = :job_id', ['job_id' => 'running-job']]], $this->statements);
         $this->expectException(JobCancelledException::class);
         $administration->checkCancellation('running-job');
     }
@@ -198,6 +211,54 @@ final class JobMonitorAdministrationTest extends TestCase
         }
 
         self::assertSame([], $this->redisKeys);
+        self::assertSame(0, $this->entityLoads);
+    }
+
+    public function testTheJobListLeavesOutTheStoredMessageAndTheError(): void
+    {
+        $this->rows = [$this->summaryRow('listed-job', JobStatus::Failed)];
+
+        $page = $this->administration(null, $this->createStub(MessageBusInterface::class), expectFlush: false)
+            ->jobs(new JobMonitorQuery(limit: 10));
+
+        self::assertCount(1, $page->items);
+        $job = $page->items[0];
+        self::assertSame('listed-job', $job->jobId);
+        self::assertSame('ExtractAlbumCoverCommand', $job->name);
+        self::assertSame('async', $job->queue);
+        self::assertSame(JobStatus::Failed, $job->status);
+        self::assertSame(40, $job->progress);
+        self::assertSame(2, $job->attempt);
+        self::assertTrue($job->retried);
+        self::assertEquals(new \DateTimeImmutable('2026-10-08 10:00:01.250000+00:00'), $job->startedAt);
+        self::assertEquals(new \DateTimeImmutable('2026-10-08 10:00:03.500000+00:00'), $job->finishedAt);
+        self::assertEquals(new \DateTimeImmutable('2026-10-08 10:00:00+00:00'), $job->createdAt);
+        self::assertEquals(new \DateTimeImmutable('2026-10-08 10:00:04+00:00'), $job->updatedAt);
+        self::assertSame(\DomainException::class, $job->exceptionClass);
+        self::assertTrue($job->dataTruncated);
+        self::assertSame(2_250_000, $job->durationMicroseconds);
+        self::assertNull($job->data);
+        self::assertNull($job->exception);
+        self::assertSame(0, $this->entityLoads);
+        self::assertCount(1, $this->dql);
+        self::assertDoesNotMatchRegularExpression('/SELECT j FROM|j\.data\b(?!Truncated)|j\.exception\b(?!Class)|j\.auditLog/', $this->dql[0]);
+    }
+
+    public function testTheRunningJobsLeaveOutTheStoredMessageAndTheError(): void
+    {
+        $this->rows = [$this->summaryRow('running-job', JobStatus::Running)];
+
+        $overview = $this->administration(null, $this->createStub(MessageBusInterface::class), expectFlush: false)->overview();
+
+        self::assertCount(1, $overview->running);
+        self::assertSame('running-job', $overview->running[0]->jobId);
+        self::assertSame(JobStatus::Running, $overview->running[0]->status);
+        self::assertNull($overview->running[0]->data);
+        self::assertNull($overview->running[0]->exception);
+        self::assertSame(0, $this->entityLoads);
+        $running = $this->dql[array_key_last($this->dql)];
+        self::assertStringContainsString('WHERE j.status = :status ORDER BY j.startedAt ASC', $running);
+        self::assertDoesNotMatchRegularExpression('/SELECT j FROM|j\.data\b(?!Truncated)|j\.exception\b(?!Class)|j\.auditLog/', $running);
     }
 
     public function testAnUnknownStatusFilterIsInvalidInput(): void
@@ -301,6 +362,28 @@ final class JobMonitorAdministrationTest extends TestCase
         self::assertSame(1, $handled);
     }
 
+    /** @return array<string, mixed> a row as the summary query hydrates it */
+    private function summaryRow(string $jobId, JobStatus $status): array
+    {
+        return [
+            'id' => Uuid::generate(),
+            'jobId' => $jobId,
+            'name' => 'ExtractAlbumCoverCommand',
+            'queue' => 'async',
+            'status' => $status,
+            'progress' => 40,
+            'attempt' => 2,
+            'retried' => true,
+            'startedAt' => new \DateTimeImmutable('2026-10-08 10:00:01.250000+00:00'),
+            'finishedAt' => new \DateTimeImmutable('2026-10-08 10:00:03.500000+00:00'),
+            'createdAt' => new \DateTimeImmutable('2026-10-08 10:00:00+00:00'),
+            'updatedAt' => new \DateTimeImmutable('2026-10-08 10:00:04+00:00'),
+            'exceptionClass' => \DomainException::class,
+            'dataTruncated' => true,
+            'durationMicroseconds' => 2_250_000,
+        ];
+    }
+
     private function failedJob(?string $queue): JobMonitorEntity
     {
         $job = new JobMonitorEntity('original-job', queue: $queue);
@@ -315,20 +398,42 @@ final class JobMonitorAdministrationTest extends TestCase
     /** @param array<class-string, list<string>> $routing message class => transport names */
     private function administration(?JobMonitorEntity $job, MessageBusInterface $bus, bool $expectFlush = true, array $routing = []): JobMonitorAdministration
     {
+        $entityManager = $this->createMock(EntityManagerInterface::class);
         $repository = $this->createStub(EntityRepository::class);
-        $repository->method('findOneBy')->willReturn($job);
+        $repository->method('findOneBy')->willReturnCallback(function () use ($job): ?JobMonitorEntity {
+            ++$this->entityLoads;
+
+            return $job;
+        });
+        $repository->method('createQueryBuilder')->willReturnCallback(
+            static fn (string $alias): QueryBuilder => (new QueryBuilder($entityManager))->select($alias)->from(JobMonitorEntity::class, $alias),
+        );
         $connection = $this->createStub(Connection::class);
         $connection->method('executeStatement')->willReturnCallback(function (string $sql, array $params = []): int {
             $this->statements[] = [$sql, $params];
 
             return str_contains($sql, 'retried = true') ? $this->claimResult : 1;
         });
-        $connection->method('fetchOne')->willReturnCallback(function (string $sql, array $params = []): int {
+        $connection->method('fetchOne')->willReturnCallback(function (string $sql, array $params = []) use ($job): int|string|false {
             $this->statements[] = [$sql, $params];
+
+            if (str_starts_with($sql, 'SELECT status')) {
+                return $job?->getStatus()->value ?? false;
+            }
 
             return 1;
         });
-        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->method('createQuery')->willReturnCallback(function (string $dql): Query {
+            $this->dql[] = $dql;
+            $query = $this->createStub(Query::class);
+            $query->method('setParameters')->willReturnSelf();
+            $query->method('setFirstResult')->willReturnSelf();
+            $query->method('setMaxResults')->willReturnSelf();
+            // The status counts answer nothing; the job rows answer the summary queries.
+            $query->method('getResult')->willReturn(str_contains($dql, 'COUNT(') ? [] : $this->rows);
+
+            return $query;
+        });
         $entityManager->method('getRepository')->willReturn($repository);
         $entityManager->method('getConnection')->willReturn($connection);
         $entityManager->expects($expectFlush ? $this->once() : $this->never())->method('flush');

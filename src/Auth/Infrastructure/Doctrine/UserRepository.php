@@ -15,6 +15,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\ParameterType;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Query\ResultSetMappingBuilder;
 
 final class UserRepository implements UserRepositoryInterface
 {
@@ -105,41 +106,40 @@ final class UserRepository implements UserRepositoryInterface
 
     public function findAll(?string $roleFilter = null, ?bool $disabledFilter = null, int $limit = 50, int $offset = 0): array
     {
-        $sql = 'SELECT id FROM users WHERE 1=1';
+        // One query hydrates the page. The role filter needs jsonb containment, which DQL cannot
+        // express, so this is native SQL mapped onto the entity. Users already in the identity
+        // map come back as those managed instances, as find() returns them.
+        $rsm = new ResultSetMappingBuilder($this->entityManager);
+        $rsm->addRootEntityFromClassMetadata(UserEntity::class, 'u');
+
+        $sql = sprintf('SELECT %s FROM users u WHERE 1=1', $rsm->generateSelectClause());
         $params = [];
         $types = ['limit' => ParameterType::INTEGER, 'offset' => ParameterType::INTEGER];
 
         if ($roleFilter !== null) {
-            $sql .= ' AND roles @> :role';
+            $sql .= ' AND u.roles @> :role';
             $params['role'] = json_encode([$roleFilter]);
         }
 
         if ($disabledFilter !== null) {
-            $sql .= ' AND disabled = :disabled';
+            $sql .= ' AND u.disabled = :disabled';
             $params['disabled'] = $disabledFilter;
             $types['disabled'] = ParameterType::BOOLEAN;
         }
 
-        $sql .= ' ORDER BY created_at DESC LIMIT :limit OFFSET :offset';
+        // created_at keeps whole seconds, so users created together tie; the id makes the order
+        // total, or a page boundary between them could repeat one user and skip another.
+        $sql .= ' ORDER BY u.created_at DESC, u.id DESC LIMIT :limit OFFSET :offset';
 
-        $conn = $this->entityManager->getConnection();
-        $stmt = $conn->executeQuery(
-            $sql,
-            [...$params, 'limit' => $limit, 'offset' => $offset],
-            $types,
-        );
-
-        $ids = array_map(static fn(array $row) => Uuid::fromString($row['id']), $stmt->fetchAllAssociative());
-
-        $users = [];
-        foreach ($ids as $id) {
-            $entity = $this->entityManager->find(UserEntity::class, $id);
-            if ($entity !== null) {
-                $users[] = $this->toDomain($entity);
-            }
+        $query = $this->entityManager->createNativeQuery($sql, $rsm);
+        foreach ([...$params, 'limit' => $limit, 'offset' => $offset] as $name => $value) {
+            $query->setParameter($name, $value, $types[$name] ?? null);
         }
 
-        return $users;
+        /** @var list<UserEntity> $entities */
+        $entities = $query->getResult();
+
+        return array_map($this->toDomain(...), $entities);
     }
 
     public function count(?string $roleFilter = null, ?bool $disabledFilter = null): int

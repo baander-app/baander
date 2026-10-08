@@ -6,7 +6,12 @@ namespace App\Shared\Application\DTO;
 
 use App\Shared\Domain\Model\JobStatus;
 
-/** One job of the job monitor: every delivery of a message shares its job's record. */
+/**
+ * One job of the job monitor: every delivery of a message shares its job's record.
+ *
+ * The records of a job list and of the running jobs leave out the error detail and the
+ * stored message, so their $exception and $data are null; a single job's record has them.
+ */
 final readonly class JobMonitorRecord
 {
     /**
