@@ -19,7 +19,7 @@ use Throwable;
  * The CLI counterpart of POST /api/albums/covers/extract.
  *
  * The batch that pages the coverless albums runs inline and is recorded in the job
- * monitor (KTD4); it queues one extraction job per album on the async queue, as the
+ * monitor; it queues one extraction job per album on the async queue, as the
  * batch does when the web path queues it.
  */
 #[AsCommand(

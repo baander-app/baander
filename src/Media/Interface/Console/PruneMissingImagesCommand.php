@@ -20,7 +20,7 @@ use Throwable;
  * The CLI counterpart of POST /api/admin/media/prune-missing, and with `--dry-run` of
  * GET /api/admin/media/missing-check.
  *
- * The prune runs inline and is recorded in the job monitor (KTD4): the web path queues it
+ * The prune runs inline and is recorded in the job monitor: the web path queues it
  * on the Swoole task workers, which a console process cannot reach.
  */
 #[AsCommand(

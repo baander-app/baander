@@ -18,7 +18,7 @@ use Doctrine\ORM\Tools\SchemaTool;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Starting a scan claims the library with one conditional update (KTD13, R14). Two sessions
+ * Starting a scan claims the library with one conditional update. Two sessions
  * race on PostgreSQL: the second waits on the row lock of the first and, once that commits,
  * updates nothing.
  */

@@ -28,7 +28,7 @@ use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 
-/** A console scan holds its claim only while it runs (KTD13, R7). */
+/** A console scan holds its claim only while it runs. */
 final class ScanLibraryCommandTest extends TestCase
 {
     /** @var list<string> */

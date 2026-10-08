@@ -11,7 +11,7 @@ use App\Library\Domain\Model\Library;
 use App\Library\Domain\Repository\LibraryRepositoryInterface;
 
 /**
- * Starting a scan claims the library first (KTD13): one conditional update that only
+ * Starting a scan claims the library first: one conditional update that only
  * succeeds while no scan runs. The web and console paths both start scans through it.
  */
 final readonly class LibraryScanClaims

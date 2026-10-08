@@ -28,7 +28,7 @@ use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
-/** Who may call the library endpoints, and what the creating admin is granted (R11, KTD12). */
+/** Who may call the library endpoints, and what the creating admin is granted. */
 final class LibraryControllerSecurityTest extends TestCase
 {
     /** @param list<string> $expected */

@@ -48,7 +48,7 @@ final class WebhookController
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
-    #[CliParityExemption('deferred: no admin page; follow-up plan')]
+    #[CliParityExemption(CliParityExemption::DEFERRED_NO_ADMIN_PAGE)]
     public function index(): JsonResponse
     {
         $webhooks = $this->entityManager
@@ -92,7 +92,7 @@ final class WebhookController
         ],
     )]
     #[Route('/', name: 'create', methods: ['POST'])]
-    #[CliParityExemption('deferred: no admin page; follow-up plan')]
+    #[CliParityExemption(CliParityExemption::DEFERRED_NO_ADMIN_PAGE)]
     public function create(Request $request): JsonResponse
     {
         $data = $request->toArray();
@@ -160,7 +160,7 @@ final class WebhookController
         ],
     )]
     #[Route('/{id}', name: 'update', methods: ['PUT'])]
-    #[CliParityExemption('deferred: no admin page; follow-up plan')]
+    #[CliParityExemption(CliParityExemption::DEFERRED_NO_ADMIN_PAGE)]
     public function update(string $id, Request $request): JsonResponse
     {
         $webhook = $this->findWebhook($id);
@@ -221,7 +221,7 @@ final class WebhookController
         ],
     )]
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
-    #[CliParityExemption('deferred: no admin page; follow-up plan')]
+    #[CliParityExemption(CliParityExemption::DEFERRED_NO_ADMIN_PAGE)]
     public function delete(string $id): JsonResponse
     {
         $webhook = $this->findWebhook($id);
@@ -253,7 +253,7 @@ final class WebhookController
         ],
     )]
     #[Route('/{id}/rotate-secret', name: 'rotate_secret', methods: ['POST'])]
-    #[CliParityExemption('deferred: no admin page; follow-up plan')]
+    #[CliParityExemption(CliParityExemption::DEFERRED_NO_ADMIN_PAGE)]
     public function rotateSecret(string $id): JsonResponse
     {
         $webhook = $this->findWebhook($id);

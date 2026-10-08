@@ -25,8 +25,8 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
- * The admin API and the `app:library:*` commands reach the same use cases (R2), only admins
- * change libraries (R11), and a scan claim admits one scan at a time on both paths (R14).
+ * The admin API and the `app:library:*` commands reach the same use cases, only admins
+ * change libraries, and a scan claim admits one scan at a time on both paths.
  */
 final class LibraryAdministrationTest extends TestCase
 {

@@ -99,7 +99,7 @@ final class LyricsController
     )]
     #[Route('/songs/{publicId}/lyrics/fetch', name: 'song_lyrics_fetch', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
-    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
+    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
     public function fetch(string $publicId): JsonResponse
     {
         $songId = $this->resolveSongId($publicId);
@@ -164,7 +164,7 @@ final class LyricsController
     )]
     #[Route('/lyrics/search/{resultId}/apply', name: 'apply', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
-    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
+    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
     public function apply(int $resultId, #[MapRequestPayload] ApplyLyricsRequest $payload): JsonResponse
     {
         try {

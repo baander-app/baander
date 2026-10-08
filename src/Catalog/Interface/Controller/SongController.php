@@ -162,7 +162,7 @@ final class SongController
         ],
     )]
     #[Route('/{publicId}', name: 'update', methods: ['PATCH'])]
-    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
+    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
     public function update(string $publicId, #[MapRequestPayload] UpdateSongRequest $payload): JsonResponse
     {
         try {
@@ -218,7 +218,7 @@ final class SongController
         ],
     )]
     #[Route('/{publicId}', name: 'destroy', methods: ['DELETE'])]
-    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
+    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
     public function destroy(string $publicId): JsonResponse
     {
         try {

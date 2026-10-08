@@ -23,7 +23,7 @@ use PHPUnit\Framework\TestCase;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 
-/** The web starts scans through the claim and gives the claim back when it cannot queue the scan (KTD13). */
+/** The web starts scans through the claim and gives the claim back when it cannot queue the scan. */
 final class LibraryScanStartTest extends TestCase
 {
     /** @var array<string, Library> */

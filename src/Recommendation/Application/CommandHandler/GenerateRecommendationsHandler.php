@@ -18,6 +18,7 @@ use App\Recommendation\Domain\Service\ContentSimilarityCalculator;
 use App\Recommendation\Domain\Service\GenreSimilarityCalculator;
 use App\Recommendation\Domain\ValueObject\RecommendationJobStatus;
 use App\Recommendation\Domain\ValueObject\RecommendationType;
+use App\Shared\Application\Actor;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
@@ -104,7 +105,7 @@ final class GenerateRecommendationsHandler
                 userId: $command->getUserId(),
                 metadata: [
                     'mode' => $command->getMode(),
-                    'triggered_by' => $command->getActor() ?? 'system',
+                    'triggered_by' => $command->getActor() ?? Actor::SYSTEM,
                     'triggered_at' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
                     'database_url_hash' => hash('xxh128', $this->databaseUrl),
                 ],
@@ -191,7 +192,7 @@ final class GenerateRecommendationsHandler
 
         foreach ($songs as $song) {
             $this->commandBus->dispatch(new DeleteRecommendationsBySourceCommand(
-                sourceType: RecommendationType::fromString('song')->__toString(),
+                sourceType: (string) RecommendationType::song(),
                 sourceId: $song->getId()->toString(),
             ));
         }
@@ -263,6 +264,7 @@ final class GenerateRecommendationsHandler
     private function generateCollaborativeRecommendations(array $songs, array $listeningHistories, ?Uuid $userId): array
     {
         $commands = [];
+        $songType = RecommendationType::song();
 
         foreach ($songs as $sourceSong) {
             $sourceId = $sourceSong->getId()->toString();
@@ -282,9 +284,9 @@ final class GenerateRecommendationsHandler
                 }
 
                 $commands[] = new SaveRecommendationCommand(
-                    sourceType: RecommendationType::fromString('song'),
+                    sourceType: $songType,
                     sourceId: $sourceId,
-                    targetType: RecommendationType::fromString('song'),
+                    targetType: $songType,
                     targetId: $targetId,
                     score: $score,
                     userId: $userId,
@@ -303,6 +305,7 @@ final class GenerateRecommendationsHandler
     private function generateContentRecommendations(array $songs): array
     {
         $commands = [];
+        $songType = RecommendationType::song();
 
         foreach ($songs as $sourceSong) {
             $sourceId = $sourceSong->getId()->toString();
@@ -330,9 +333,9 @@ final class GenerateRecommendationsHandler
                 }
 
                 $commands[] = new SaveRecommendationCommand(
-                    sourceType: RecommendationType::fromString('song'),
+                    sourceType: $songType,
                     sourceId: $sourceId,
-                    targetType: RecommendationType::fromString('song'),
+                    targetType: $songType,
                     targetId: $targetId,
                     score: $score,
                     userId: null,
@@ -356,6 +359,7 @@ final class GenerateRecommendationsHandler
             return $commands;
         }
 
+        $songType = RecommendationType::song();
         $songIds = array_map(fn ($s) => $s->getId(), $songs);
         $genreMap = $this->songRepository->getGenreNamesForSongs($songIds);
 
@@ -377,9 +381,9 @@ final class GenerateRecommendationsHandler
                 }
 
                 $commands[] = new SaveRecommendationCommand(
-                    sourceType: RecommendationType::fromString('song'),
+                    sourceType: $songType,
                     sourceId: $sourceId,
-                    targetType: RecommendationType::fromString('song'),
+                    targetType: $songType,
                     targetId: $targetId,
                     score: $similarity,
                     userId: null,

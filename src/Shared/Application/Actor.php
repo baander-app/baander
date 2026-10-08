@@ -12,6 +12,9 @@ final class Actor
     /** A change made with a console command, which acts with full authority while nobody is signed in. */
     public const string CLI = 'cli';
 
+    /** A change the application made on its own, such as a scheduled run. */
+    public const string SYSTEM = 'system';
+
     private function __construct()
     {
     }
