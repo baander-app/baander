@@ -119,19 +119,18 @@ Baander detects file types by reading magic bytes from the file header, falling 
 After scanning a music library, extract embedded cover art from audio files:
 
 ```bash
-make exec cmd="php bin/console app:albums:extract-covers"
+make exec cmd="php bin/console app:album:extract-covers"
 ```
 
-The command queries the database for albums without cover art and dispatches an asynchronous job for each one. Each job reads embedded image data (typically from ID3v2 APIC frames in MP3 files or Vorbis COMMENT blocks in FLAC/OGG files) and stores it as the album cover.
+The command finds the albums without cover art and queues an extraction job for each one. Each job reads embedded image data (typically from ID3v2 APIC frames in MP3 files or Vorbis COMMENT blocks in FLAC/OGG files) and stores it as the album cover.
 
 Key points:
 
-- Processing is asynchronous via the message bus. The command returns after dispatching all jobs.
-- Albums are processed in batches of 500.
+- The queue workers extract the covers. The command returns once every job is queued and prints the job ID of its batch.
+- Albums are queued in batches of 500.
 - The command is safe to run repeatedly -- it only targets albums that do not already have a cover.
-- If all albums already have cover art, the command exits immediately.
 
-See the [command reference](commands/app-albums-extract-covers.md) for details.
+See the [command reference](commands/app-album-extract-covers.md) for details.
 
 ## Next Steps
 

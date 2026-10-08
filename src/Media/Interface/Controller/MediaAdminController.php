@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Media\Interface\Controller;
 
 use App\Media\Application\Port\MediaAdminPortInterface;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use OpenApi\Attributes as OA;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -51,6 +52,7 @@ final class MediaAdminController
         ],
     )]
     #[Route('/storage-stats', name: 'storage_stats', methods: ['GET'])]
+    #[CliCounterpart('app:image:stats')]
     public function storageStats(): JsonResponse
     {
         return $this->successResponse($this->mediaAdmin->getStorageStats());
@@ -75,6 +77,7 @@ final class MediaAdminController
         ],
     )]
     #[Route('/prune-missing', name: 'prune_missing', methods: ['POST'])]
+    #[CliCounterpart('app:image:prune-missing')]
     public function pruneMissing(): JsonResponse
     {
         return $this->successResponse($this->mediaAdmin->pruneMissingImages());
@@ -107,6 +110,7 @@ final class MediaAdminController
         ],
     )]
     #[Route('/missing-check', name: 'missing_check', methods: ['GET'])]
+    #[CliCounterpart('app:image:prune-missing')]
     public function missingCheck(): JsonResponse
     {
         return $this->successResponse($this->mediaAdmin->checkMissingImages());

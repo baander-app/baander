@@ -91,9 +91,6 @@ deptrac:
       - App\Library\Infrastructure\Doctrine\Entity\LibraryEntity
     App\Catalog\Infrastructure\SongService:
       - App\Media\Application\Port\StoragePortInterface
-    App\Catalog\Interface\Console\ExtractAlbumCoversCommand:
-      - App\Catalog\Domain\Repository\AlbumRepositoryInterface
-      - App\Metadata\Application\Command\ExtractAlbumCoverCommand
     App\Catalog\Interface\Controller\AlbumController:
       - App\Catalog\Domain\Model\Album
       - App\Media\Application\Port\ImagePortInterface

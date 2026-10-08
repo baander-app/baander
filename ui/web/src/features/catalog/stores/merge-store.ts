@@ -4,29 +4,29 @@ import { create } from 'zustand'
 
 interface MergeState {
   isOpen: boolean
-  sourceId: string | null
-  targetId: string | null
+  sourcePublicId: string | null
+  targetPublicId: string | null
   sourceTitle: string | null
   targetTitle: string | null
-  openMerge: (sourceId: string, sourceTitle: string, targetId?: string, targetTitle?: string) => void
-  setTarget: (targetId: string, targetTitle: string) => void
+  openMerge: (sourcePublicId: string, sourceTitle: string, targetPublicId?: string, targetTitle?: string) => void
+  setTarget: (targetPublicId: string, targetTitle: string) => void
   closeMerge: () => void
 }
 
 export const useMergeStore = create<MergeState>()(withStoreDebug('catalog.merge', withNoopGuard((set) => ({
   isOpen: false,
-  sourceId: null,
-  targetId: null,
+  sourcePublicId: null,
+  targetPublicId: null,
   sourceTitle: null,
   targetTitle: null,
-  openMerge: (sourceId, sourceTitle, targetId, targetTitle) =>
+  openMerge: (sourcePublicId, sourceTitle, targetPublicId, targetTitle) =>
     set({
       isOpen: true,
-      sourceId,
+      sourcePublicId,
       sourceTitle,
-      targetId: targetId ?? null,
+      targetPublicId: targetPublicId ?? null,
       targetTitle: targetTitle ?? null,
     }),
-  setTarget: (targetId, targetTitle) => set({ targetId, targetTitle }),
-  closeMerge: () => set({ isOpen: false, sourceId: null, targetId: null, sourceTitle: null, targetTitle: null }),
+  setTarget: (targetPublicId, targetTitle) => set({ targetPublicId, targetTitle }),
+  closeMerge: () => set({ isOpen: false, sourcePublicId: null, targetPublicId: null, sourceTitle: null, targetTitle: null }),
 }))))

@@ -113,7 +113,7 @@ export function AlbumDetailPage() {
         <DuplicateWarningBanner
           duplicateGroups={duplicateGroups}
           albumTitle={album.title ?? ''}
-          albumUuid={album.uuid ?? ''}
+          albumPublicId={publicId}
           onDismiss={() => setWarningDismissed(true)}
         />
       )}

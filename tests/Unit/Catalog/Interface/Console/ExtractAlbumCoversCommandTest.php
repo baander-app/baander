@@ -4,109 +4,61 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Catalog\Interface\Console;
 
-use App\Catalog\Domain\Repository\AlbumRepositoryInterface;
+use App\Catalog\Application\Command\BatchExtractCoversCommand;
+use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Interface\Console\ExtractAlbumCoversCommand;
-use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
-use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\Attributes\DataProvider;
+use App\Shared\Application\DTO\InlineJobRun;
+use App\Shared\Application\Port\JobMonitorAdministrationInterface;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
-use Symfony\Component\Messenger\Envelope;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 final class ExtractAlbumCoversCommandTest extends TestCase
 {
-    #[DataProvider('coverlessSetChanges')]
-    public function testEveryOriginalAlbumIsDispatchedOnceWhileTheCoverlessSetChanges(bool $shrinks): void
+    public function testRunsOneBatchMessageInlineAndReportsTheQueuedJobs(): void
     {
-        $ids = array_map(static fn (): Uuid => Uuid::v7(), range(1, 501));
-        usort($ids, static fn (Uuid $left, Uuid $right): int => strcmp($left->toString(), $right->toString()));
-        $remaining = array_combine(array_map(static fn (Uuid $id): string => $id->toString(), $ids), $ids);
-        $repository = $this->createMock(AlbumRepositoryInterface::class);
-        $repository->expects($this->never())->method('findCoverlessAlbumIds');
-        $cursors = [];
-        $repository->expects($this->exactly(3))->method('findCoverlessAlbumIdsAfter')->willReturnCallback(
-            static function (?Uuid $after, int $limit) use (&$remaining, &$cursors): array {
-                self::assertSame(500, $limit);
-                $cursors[] = $after;
-                $page = array_values(array_filter($remaining, static fn (Uuid $id): bool => $after === null || strcmp($id->toString(), $after->toString()) > 0));
-                return array_slice($page, 0, $limit);
-            },
-        );
-        $repository->method('countCoverlessAlbums')->willReturn(501);
-        $accepted = [];
-        $bus = $this->createMock(MessageBusInterface::class);
-        $bus->expects($this->exactly(501))->method('dispatch')->willReturnCallback(
-            static function (object $message) use (&$accepted, &$remaining, $shrinks): Envelope {
-                self::assertInstanceOf(ExtractAlbumCoverCommand::class, $message);
-                $id = $message->getAlbumId()->toString();
-                $accepted[] = $id;
-                if ($shrinks) {
-                    unset($remaining[$id]);
-                }
-                return new Envelope($message);
-            },
-        );
-        $tester = new CommandTester(new ExtractAlbumCoversCommand($repository, $bus));
-        self::assertSame(Command::SUCCESS, $tester->execute([]));
-        self::assertStringContainsString('Dispatched 501 cover extraction job(s).', $tester->getDisplay());
-        self::assertSame(array_map(static fn (Uuid $id): string => $id->toString(), $ids), $accepted);
-        self::assertSame([null, $ids[499], $ids[500]], $cursors);
-    }
+        $albums = $this->createMock(AlbumPortInterface::class);
+        $albums->expects(self::once())->method('countCoverlessAlbums')->willReturn(3);
+        $jobs = $this->createMock(JobMonitorAdministrationInterface::class);
+        $jobs->expects(self::once())
+            ->method('runInline')
+            ->with(self::isInstanceOf(BatchExtractCoversCommand::class))
+            ->willReturn(new InlineJobRun('batch-job-1', 3));
 
-    /** @return iterable<string, array{bool}> */
-    public static function coverlessSetChanges(): iterable
-    {
-        yield 'accepted jobs immediately acquire covers' => [true];
-        yield 'albums permanently remain coverless' => [false];
-    }
-    public function testNoCoverlessAlbumsSkipsPaginationAndDispatch(): void
-    {
-        $repository = $this->createMock(AlbumRepositoryInterface::class);
-        $repository->expects($this->once())->method('countCoverlessAlbums')->willReturn(0);
-        $repository->expects($this->never())->method('findCoverlessAlbumIds');
-        $repository->expects($this->never())->method('findCoverlessAlbumIdsAfter');
-        $bus = $this->createMock(MessageBusInterface::class);
-        $bus->expects($this->never())->method('dispatch');
-        $tester = new CommandTester(new ExtractAlbumCoversCommand($repository, $bus));
+        $tester = new CommandTester(new ExtractAlbumCoversCommand($albums, $jobs));
 
         self::assertSame(Command::SUCCESS, $tester->execute([]));
-        self::assertStringContainsString('Nothing to do.', $tester->getDisplay());
+        $display = preg_replace('/\s+/', ' ', $tester->getDisplay(true)) ?? '';
+        self::assertStringContainsString('3 album(s) have no cover art.', $display);
+        self::assertStringContainsString('Queued 3 cover extraction job(s)', $display);
+        self::assertStringContainsString('batch-job-1', $display);
     }
 
-    public function testDispatchFailureStopsTheWalkAndPreservesTheOriginalException(): void
+    public function testRunsTheBatchAlsoWhenNoAlbumLacksACoverLikeTheApiRoute(): void
     {
-        $ids = [Uuid::v7(), Uuid::v7(), Uuid::v7()];
-        $repository = $this->createMock(AlbumRepositoryInterface::class);
-        $repository->expects($this->once())->method('countCoverlessAlbums')->willReturn(3);
-        $repository->expects($this->never())->method('findCoverlessAlbumIds');
-        $repository->expects($this->once())->method('findCoverlessAlbumIdsAfter')->with(null, 500)->willReturn($ids);
-        $failure = new RuntimeException('Cover queue unavailable');
-        $attempted = [];
-        $bus = $this->createMock(MessageBusInterface::class);
-        $bus->expects($this->exactly(2))->method('dispatch')->willReturnCallback(
-            static function (object $message) use (&$attempted, $ids, $failure): Envelope {
-                self::assertInstanceOf(ExtractAlbumCoverCommand::class, $message);
-                $attempted[] = $message->getAlbumId();
-                if ($message->getAlbumId()->equals($ids[1])) {
-                    throw $failure;
-                }
-                return new Envelope($message);
-            },
-        );
-        $tester = new CommandTester(new ExtractAlbumCoversCommand($repository, $bus));
+        $albums = $this->createStub(AlbumPortInterface::class);
+        $albums->method('countCoverlessAlbums')->willReturn(0);
+        $jobs = $this->createMock(JobMonitorAdministrationInterface::class);
+        $jobs->expects(self::once())->method('runInline')->willReturn(new InlineJobRun('batch-job-2', 0));
 
-        try {
-            $tester->execute([]);
-        } catch (RuntimeException $actual) {
-            self::assertSame($failure, $actual);
-            self::assertSame([$ids[0], $ids[1]], $attempted);
-            self::assertStringNotContainsString('cover extraction job(s).', $tester->getDisplay());
-            return;
-        }
-        self::fail('A rejected cover dispatch must stop the console walk.');
+        $tester = new CommandTester(new ExtractAlbumCoversCommand($albums, $jobs));
+
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+        self::assertStringContainsString('Queued 0 cover extraction job(s)', preg_replace('/\s+/', ' ', $tester->getDisplay(true)) ?? '');
     }
 
+    public function testFailedBatchExitsWithTheHandlersMessage(): void
+    {
+        $albums = $this->createStub(AlbumPortInterface::class);
+        $albums->method('countCoverlessAlbums')->willReturn(2);
+        $jobs = $this->createStub(JobMonitorAdministrationInterface::class);
+        $jobs->method('runInline')->willThrowException(new RuntimeException('Cover queue unavailable'));
+
+        $tester = new CommandTester(new ExtractAlbumCoversCommand($albums, $jobs));
+
+        self::assertSame(Command::FAILURE, $tester->execute([]));
+        self::assertStringContainsString('Cover queue unavailable', $tester->getDisplay());
+        self::assertStringNotContainsString('Queued', $tester->getDisplay());
+    }
 }

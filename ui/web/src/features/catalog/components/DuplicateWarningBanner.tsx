@@ -50,14 +50,14 @@ const Actions = styled.div`
 interface DuplicateWarningBannerProps {
   duplicateGroups: DuplicateGroup[]
   albumTitle: string
-  albumUuid: string
+  albumPublicId: string
   onDismiss?: () => void
 }
 
 export function DuplicateWarningBanner({
   duplicateGroups,
   albumTitle,
-  albumUuid,
+  albumPublicId,
   onDismiss,
 }: DuplicateWarningBannerProps) {
   const openMerge = useMergeStore((s) => s.openMerge)
@@ -67,16 +67,16 @@ export function DuplicateWarningBanner({
   }
 
   const totalDuplicates = duplicateGroups.reduce(
-    (sum, group) => sum + group.albumIds.filter(id => id !== albumUuid).length,
+    (sum, group) => sum + group.albums.filter(album => album.publicId !== albumPublicId).length,
     0
   )
 
   const handleMerge = () => {
     const firstGroup = duplicateGroups[0]
-    const firstDuplicate = firstGroup.albums.find(a => a.uuid !== albumUuid)
+    const firstDuplicate = firstGroup.albums.find(a => a.publicId !== albumPublicId)
 
     if (firstDuplicate) {
-      openMerge(albumUuid, albumTitle, firstDuplicate.uuid, firstDuplicate.title)
+      openMerge(albumPublicId, albumTitle, firstDuplicate.publicId, firstDuplicate.title)
     }
   }
 

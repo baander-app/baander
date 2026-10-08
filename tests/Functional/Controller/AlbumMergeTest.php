@@ -9,6 +9,9 @@ use App\Catalog\Domain\Repository\SongRepositoryInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Tester\CommandTester;
 
 final class AlbumMergeTest extends TestCase
 {
@@ -191,6 +194,74 @@ final class AlbumMergeTest extends TestCase
         ]);
 
         $this->assertSame(404, $response->getStatusCode());
+    }
+
+    public function testConsoleMergeMatchesTheApiMerge(): void
+    {
+        $user = $this->createAdminUser();
+        $outcomes = [];
+
+        foreach (['api', 'console'] as $path) {
+            $libraryId = $this->createLibraryFixture();
+            $targetAlbumId = $this->createAlbumFixture($libraryId, 'Target Album');
+            $sourceAlbumId = $this->createAlbumFixture($libraryId, 'Source Album');
+            $this->createSongFixture($targetAlbumId, $path . '-1.mp3', $path . '-shared', 'Song 1');
+            $this->createSongFixture($sourceAlbumId, $path . '-1-dup.mp3', $path . '-shared', 'Song 1 Duplicate');
+            $this->createSongFixture($sourceAlbumId, $path . '-2.mp3', $path . '-2', 'Song 2');
+            $target = $this->albumRepository->findByUuid($targetAlbumId);
+            $source = $this->albumRepository->findByUuid($sourceAlbumId);
+            $this->assertNotNull($target);
+            $this->assertNotNull($source);
+
+            if ($path === 'api') {
+                $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/albums/merge', $user, [
+                    'targetPublicId' => $target->getPublicId()->toString(),
+                    'sourcePublicId' => $source->getPublicId()->toString(),
+                ]), 200, 'data');
+            } else {
+                $merge = new CommandTester((new Application($this->client->getKernel()))->find('app:album:merge'));
+                $this->assertSame(Command::SUCCESS, $merge->execute([
+                    'target' => $target->getPublicId()->toString(),
+                    'source' => $source->getPublicId()->toString(),
+                    '--force' => true,
+                ], ['interactive' => false]), $merge->getDisplay());
+            }
+
+            $this->entityManager->clear();
+            $merged = $this->albumRepository->findByUuid($targetAlbumId);
+            $this->assertNotNull($merged);
+            $outcomes[$path] = [
+                'sourceDeleted' => $this->albumRepository->findByUuid($sourceAlbumId) === null,
+                'songs' => count($this->songRepository->findByAlbum($targetAlbumId)),
+                'mergedFrom' => array_map(
+                    static fn (array $record): array => [$record['id'] === $sourceAlbumId->toString(), $record['title']],
+                    $merged->getMergedFrom(),
+                ),
+            ];
+        }
+
+        $this->assertSame(['sourceDeleted' => true, 'songs' => 2, 'mergedFrom' => [[true, 'Source Album']]], $outcomes['api']);
+        $this->assertSame($outcomes['api'], $outcomes['console']);
+    }
+
+    public function testConsoleMergeRefusesAlbumsInDifferentLibrariesLikeTheApi(): void
+    {
+        $album1Id = $this->createAlbumFixture($this->createLibraryFixture(), 'Album 1');
+        $album2Id = $this->createAlbumFixture($this->createLibraryFixture(), 'Album 2');
+        $album1 = $this->albumRepository->findByUuid($album1Id);
+        $album2 = $this->albumRepository->findByUuid($album2Id);
+        $this->assertNotNull($album1);
+        $this->assertNotNull($album2);
+
+        $merge = new CommandTester((new Application($this->client->getKernel()))->find('app:album:merge'));
+
+        $this->assertSame(Command::INVALID, $merge->execute([
+            'target' => $album1->getPublicId()->toString(),
+            'source' => $album2->getPublicId()->toString(),
+            '--force' => true,
+        ], ['interactive' => false]));
+        $this->assertStringContainsString('Albums must be in the same library to merge.', $merge->getDisplay());
+        $this->assertNotNull($this->albumRepository->findByUuid($album2Id));
     }
 
     // --- Fixture helpers ---

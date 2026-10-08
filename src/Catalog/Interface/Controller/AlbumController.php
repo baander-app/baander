@@ -17,6 +17,7 @@ use App\Catalog\Interface\Resource\DuplicateGroupResource;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Attribute\CliParityExemption;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
@@ -394,6 +395,7 @@ final class AlbumController
         ],
     )]
     #[Route('/merge', name: 'merge', methods: ['POST'])]
+    #[CliCounterpart('app:album:merge')]
     public function merge(#[MapRequestPayload] MergeAlbumsRequest $payload): JsonResponse
     {
         try {

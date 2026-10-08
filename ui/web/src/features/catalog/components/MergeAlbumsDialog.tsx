@@ -74,12 +74,12 @@ const SpinningIcon = styled(Loader2)`
 `
 
 export function MergeAlbumsDialog() {
-  const { isOpen, sourceId, sourceTitle, targetId, targetTitle, closeMerge } = useMergeStore(
+  const { isOpen, sourcePublicId, sourceTitle, targetPublicId, targetTitle, closeMerge } = useMergeStore(
     useShallow((s) => ({
       isOpen: s.isOpen,
-      sourceId: s.sourceId,
+      sourcePublicId: s.sourcePublicId,
       sourceTitle: s.sourceTitle,
-      targetId: s.targetId,
+      targetPublicId: s.targetPublicId,
       targetTitle: s.targetTitle,
       closeMerge: s.closeMerge,
     }))
@@ -88,10 +88,10 @@ export function MergeAlbumsDialog() {
   const queryClient = useQueryClient()
 
   const mergeMutation = useMutation({
-    mutationFn: ({ sourceId, targetId }: { sourceId: string; targetId: string }) =>
+    mutationFn: ({ sourcePublicId, targetPublicId }: { sourcePublicId: string; targetPublicId: string }) =>
       AXIOS_INSTANCE.post('/api/albums/merge', {
-        targetPublicId: targetId,
-        sourcePublicId: sourceId,
+        targetPublicId,
+        sourcePublicId,
       }),
     onSuccess: () => {
       toast.success('Albums merged successfully')
@@ -106,13 +106,13 @@ export function MergeAlbumsDialog() {
     },
   })
 
-  if (!isOpen || !sourceId) {
+  if (!isOpen || !sourcePublicId) {
     return null
   }
 
   const handleMerge = () => {
-    if (!targetId) return
-    mergeMutation.mutate({ sourceId, targetId })
+    if (!targetPublicId) return
+    mergeMutation.mutate({ sourcePublicId, targetPublicId })
   }
 
   return (
@@ -159,7 +159,7 @@ export function MergeAlbumsDialog() {
           </Button>
           <Button
             onClick={handleMerge}
-            disabled={!targetId || mergeMutation.isPending}
+            disabled={!targetPublicId || mergeMutation.isPending}
           >
             {mergeMutation.isPending && <SpinningIcon size={16} />}
             Merge Albums
