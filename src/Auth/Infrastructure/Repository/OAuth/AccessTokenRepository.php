@@ -173,7 +173,8 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
             createdAt: $entity->getCreatedAt(),
             updatedAt: $entity->getUpdatedAt(),
             emailVerifiedAt: $entity->getEmailVerifiedAt(),
-            roles: ['ROLE_USER'],
+            roles: $entity->getRoles(),
+            disabled: $entity->isDisabled(),
         ));
     }
 

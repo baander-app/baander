@@ -281,7 +281,8 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
                 createdAt: $entity->getUser()->getCreatedAt(),
                 updatedAt: $entity->getUser()->getUpdatedAt(),
                 emailVerifiedAt: $entity->getUser()->getEmailVerifiedAt(),
-                roles: ['ROLE_USER'],
+                roles: $entity->getUser()->getRoles(),
+                disabled: $entity->getUser()->isDisabled(),
             ))
             : null;
 

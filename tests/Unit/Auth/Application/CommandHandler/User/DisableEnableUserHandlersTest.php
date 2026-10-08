@@ -53,8 +53,9 @@ final class DisableEnableUserHandlersTest extends TestCase
     {
         $this->user->disable();
 
-        $this->disableHandler()(new DisableUserCommand('member@baander.app'));
+        $returned = $this->disableHandler()(new DisableUserCommand('member@baander.app'));
 
+        self::assertSame($this->user, $returned, 'The admin API renders the returned user.');
         self::assertTrue($this->user->isDisabled());
         self::assertSame([], $this->log);
     }
@@ -79,8 +80,9 @@ final class DisableEnableUserHandlersTest extends TestCase
     {
         $this->user->disable();
 
-        $this->enableHandler()(new EnableUserCommand('member@baander.app'));
+        $returned = $this->enableHandler()(new EnableUserCommand('member@baander.app'));
 
+        self::assertSame($this->user, $returned, 'The admin API renders the returned user.');
         self::assertFalse($this->user->isDisabled());
         self::assertSame(['save'], $this->log);
     }

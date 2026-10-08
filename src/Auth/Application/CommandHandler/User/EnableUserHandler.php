@@ -7,6 +7,7 @@ namespace App\Auth\Application\CommandHandler\User;
 use App\Auth\Application\Command\User\EnableUserCommand;
 use App\Auth\Application\Exception\UserNotFoundException;
 use App\Auth\Application\Service\UserLookup;
+use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
@@ -23,16 +24,22 @@ final readonly class EnableUserHandler
     ) {
     }
 
-    /** @throws UserNotFoundException when no user has the email address or UUID */
+    /**
+     * @return User the enabled user
+     *
+     * @throws UserNotFoundException when no user has the email address or UUID
+     */
     #[AsMessageHandler]
-    public function __invoke(EnableUserCommand $command): void
+    public function __invoke(EnableUserCommand $command): User
     {
         $user = $this->userLookup->byIdentifier($command->getIdentifier());
         if (!$user->isDisabled()) {
-            return;
+            return $user;
         }
 
         $user->enable();
         $this->userRepository->save($user);
+
+        return $user;
     }
 }

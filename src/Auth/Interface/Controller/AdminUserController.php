@@ -6,17 +6,22 @@ namespace App\Auth\Interface\Controller;
 
 use App\Auth\Application\Command\User\ChangeEmailCommand;
 use App\Auth\Application\Command\User\CreateUserCommand;
+use App\Auth\Application\Command\User\DeleteUserCommand;
+use App\Auth\Application\Command\User\DisableUserCommand;
+use App\Auth\Application\Command\User\EnableUserCommand;
+use App\Auth\Application\Command\User\RenameUserCommand;
 use App\Auth\Application\Command\User\SetUserPasswordCommand;
-use App\Auth\Application\Exception\EmailAddressInUseException;
+use App\Auth\Application\Command\User\SetUserRolesCommand;
+use App\Auth\Application\DTO\UserPage;
 use App\Auth\Application\Port\UserPortInterface;
-use App\Auth\Domain\Model\User;
+use App\Auth\Application\Query\User\ListUsersQuery;
+use App\Auth\Application\Service\UserLookup;
 use App\Auth\Interface\Request\Admin\AdminAssignRolesRequest;
 use App\Auth\Interface\Request\Admin\AdminCreateUserRequest;
 use App\Auth\Interface\Request\Admin\AdminResetPasswordRequest;
 use App\Auth\Interface\Request\Admin\AdminUpdateUserRequest;
 use App\Auth\Interface\Resource\AdminUserResource;
 use App\Shared\Domain\Model\Email;
-use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Request\QueryParameters;
@@ -27,12 +32,17 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
-use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
+/**
+ * User administration. Every action dispatches the Application message its `app:user:*`
+ * command dispatches; the role checks and `admin.can_*` settings here apply to HTTP only.
+ * A handler's not-found, conflict or invalid-input exception reaches ExceptionSubscriber,
+ * which answers 404, 409 or 422.
+ */
 #[OA\Tag(name: 'Admin / Users', description: 'User management for administrators')]
 #[Route('/api/admin/users', name: 'admin_users_')]
 #[IsGranted('ROLE_ADMIN')]
@@ -42,6 +52,7 @@ final class AdminUserController
 
     public function __construct(
         private readonly UserPortInterface $userService,
+        private readonly UserLookup $userLookup,
         private readonly MessageBusInterface $commandBus,
         private readonly Security $security,
     ) {
@@ -77,19 +88,20 @@ final class AdminUserController
     )]
     #[Route('', name: 'list', methods: ['GET'])]
     #[IsGranted('USER_MANAGEMENT_LIST')]
+    #[CliCounterpart('app:user:list')]
     public function list(Request $request): JsonResponse
     {
         $role = QueryParameters::optionalChoice($request->query, 'role', ['ROLE_USER', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN']);
         $disabled = QueryParameters::optionalBoolean($request->query, 'disabled');
-        $pagination = QueryParameters::pagination($request->query);
+        $pagination = QueryParameters::pagination($request->query, ListUsersQuery::DEFAULT_LIMIT, ListUsersQuery::MAX_LIMIT);
 
-        $users = $this->userService->findAll($role, $disabled, $pagination->limit, $pagination->offset);
-        $total = $this->userService->count($role, $disabled);
+        $page = $this->dispatch(new ListUsersQuery($role, $disabled, $pagination->limit, $pagination->offset));
+        assert($page instanceof UserPage);
 
         return new JsonResponse([
-            'data' => AdminUserResource::collection($users),
+            'data' => AdminUserResource::collection($page->users),
             'meta' => [
-                'total' => $total,
+                'total' => $page->total,
                 'limit' => $pagination->limit,
                 'offset' => $pagination->offset,
             ],
@@ -113,6 +125,7 @@ final class AdminUserController
         ],
     )]
     #[Route('', name: 'create', methods: ['POST'])]
+    #[CliCounterpart('app:user:create')]
     public function create(
         #[MapRequestPayload] AdminCreateUserRequest $request,
     ): JsonResponse {
@@ -129,15 +142,12 @@ final class AdminUserController
         }
 
         // The same use case as app:user:create, so both seed default preferences and announce the user.
-        $user = $this->commandBus->dispatch(new CreateUserCommand(
+        $user = $this->dispatch(new CreateUserCommand(
             email: $email,
             name: $request->name,
             plainPassword: $request->password,
             roles: $request->roles,
-        ))->last(HandledStamp::class)?->getResult();
-        if (!$user instanceof User) {
-            throw new \LogicException('CreateUserCommand did not return the created user.');
-        }
+        ));
 
         return $this->successResponse(AdminUserResource::from($user), Response::HTTP_CREATED);
     }
@@ -145,7 +155,7 @@ final class AdminUserController
     #[OA\Patch(
         path: '/api/admin/users/{id}',
         summary: 'Update a user',
-        description: 'A new email address starts unverified and is sent a verification link.',
+        description: 'A new email address starts unverified and is sent a verification link. The CLI counterparts are app:user:rename and app:user:change-email.',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(ref: new Model(type: AdminUpdateUserRequest::class)),
@@ -156,40 +166,28 @@ final class AdminUserController
             ])),
             new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '409', description: 'Email already taken', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
     #[Route('/{id}', name: 'update', methods: ['PATCH'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
+    #[CliCounterpart('app:user:rename')]
     public function update(string $id, #[MapRequestPayload] AdminUpdateUserRequest $request): JsonResponse
     {
-        $user = $this->findUserOr404($id);
-        if ($user === null) {
-            return $this->notFound('User not found.');
-        }
+        $user = null;
 
         // The same use case as the user's own change and `app:user:change-email`: the new
         // address starts unverified and is sent a verification link.
         if ($request->email !== null) {
-            try {
-                $user = $this->commandBus->dispatch(new ChangeEmailCommand($user->getId()->toString(), $request->email))
-                    ->last(HandledStamp::class)?->getResult();
-            } catch (HandlerFailedException $e) {
-                if ($e->getPrevious() instanceof EmailAddressInUseException) {
-                    return $this->errorResponse('This email address is already in use.', Response::HTTP_CONFLICT);
-                }
-                throw $e;
-            }
-            if (!$user instanceof User) {
-                throw new \LogicException('ChangeEmailCommand did not return the user.');
-            }
+            $user = $this->dispatch(new ChangeEmailCommand($id, $request->email));
         }
 
+        // The same use case as `app:user:rename`.
         if ($request->name !== null) {
-            $user->updateName($request->name);
-            $this->userService->save($user);
+            $user = $this->dispatch(new RenameUserCommand($id, $request->name));
         }
 
-        return $this->successResponse(AdminUserResource::from($user));
+        return $this->successResponse(AdminUserResource::from($user ?? $this->userLookup->byIdentifier($id)));
     }
 
     #[OA\Delete(
@@ -202,14 +200,10 @@ final class AdminUserController
     )]
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
+    #[CliCounterpart('app:user:delete')]
     public function delete(string $id): JsonResponse
     {
-        $user = $this->findUserOr404($id);
-        if ($user === null) {
-            return $this->notFound('User not found.');
-        }
-
-        $this->userService->delete($user->getId());
+        $this->dispatch(new DeleteUserCommand($id));
 
         return $this->noContent();
     }
@@ -226,21 +220,15 @@ final class AdminUserController
                 new OA\Property(property: 'data', ref: new Model(type: AdminUserResource::class)),
             ])),
             new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
     #[Route('/{id}/roles', name: 'assign_roles', methods: ['POST'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
+    #[CliCounterpart('app:user:roles')]
     public function assignRoles(string $id, #[MapRequestPayload] AdminAssignRolesRequest $request): JsonResponse
     {
-        $user = $this->findUserOr404($id);
-        if ($user === null) {
-            return $this->notFound('User not found.');
-        }
-
-        $user->getState()->roles = $request->roles;
-        $user->getState()->updatedAt = new \DateTimeImmutable();
-
-        $this->userService->save($user);
+        $user = $this->dispatch(new SetUserRolesCommand($id, array_values($request->roles)));
 
         return $this->successResponse(AdminUserResource::from($user));
     }
@@ -267,13 +255,8 @@ final class AdminUserController
     #[CliCounterpart('app:user:reset-password')]
     public function resetPassword(string $id, #[MapRequestPayload] AdminResetPasswordRequest $request): JsonResponse
     {
-        $user = $this->findUserOr404($id);
-        if ($user === null) {
-            return $this->notFound('User not found.');
-        }
-
         // The same use case as `app:user:reset-password`: it also signs the user out everywhere.
-        $this->commandBus->dispatch(new SetUserPasswordCommand($user->getId()->toString(), $request->password));
+        $this->dispatch(new SetUserPasswordCommand($id, $request->password));
 
         return $this->successResponse(['message' => 'Password reset successfully.']);
     }
@@ -290,15 +273,12 @@ final class AdminUserController
     )]
     #[Route('/{id}/disable', name: 'disable', methods: ['POST'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
+    #[CliCounterpart('app:user:disable')]
     public function disable(string $id): JsonResponse
     {
-        $user = $this->findUserOr404($id);
-        if ($user === null) {
-            return $this->notFound('User not found.');
-        }
-
-        $user->disable();
-        $this->userService->save($user);
+        // The same use case as `app:user:disable`: it also ends the user's sessions, and
+        // disabling a disabled user succeeds without change.
+        $user = $this->dispatch(new DisableUserCommand($id));
 
         return $this->successResponse(AdminUserResource::from($user));
     }
@@ -315,27 +295,17 @@ final class AdminUserController
     )]
     #[Route('/{id}/enable', name: 'enable', methods: ['POST'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
+    #[CliCounterpart('app:user:enable')]
     public function enable(string $id): JsonResponse
     {
-        $user = $this->findUserOr404($id);
-        if ($user === null) {
-            return $this->notFound('User not found.');
-        }
-
-        $user->enable();
-        $this->userService->save($user);
+        $user = $this->dispatch(new EnableUserCommand($id));
 
         return $this->successResponse(AdminUserResource::from($user));
     }
 
-    private function findUserOr404(string $id): ?User
+    /** Dispatches synchronously and returns the handler's result. */
+    private function dispatch(object $message): mixed
     {
-        try {
-            $uuid = Uuid::fromString($id);
-        } catch (\InvalidArgumentException) {
-            return null;
-        }
-
-        return $this->userService->findByUuid($uuid);
+        return $this->commandBus->dispatch($message)->last(HandledStamp::class)?->getResult();
     }
 }

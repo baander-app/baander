@@ -43,8 +43,6 @@ deptrac:
       - App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface
     App\Auth\Interface\Controller\AdminLoginBlockController:
       - App\Auth\Domain\Repository\LoginBlockRepositoryInterface
-    App\Auth\Interface\Controller\AdminUserController:
-      - App\Auth\Domain\Model\User
     App\Auth\Interface\Controller\Passkey\PasskeyController:
       - App\Auth\Domain\Model\Passkey\Passkey
       - App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface

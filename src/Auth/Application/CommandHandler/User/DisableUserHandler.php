@@ -7,6 +7,7 @@ namespace App\Auth\Application\CommandHandler\User;
 use App\Auth\Application\Command\User\DisableUserCommand;
 use App\Auth\Application\Exception\UserNotFoundException;
 use App\Auth\Application\Service\UserLookup;
+use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
@@ -32,13 +33,17 @@ final readonly class DisableUserHandler
     ) {
     }
 
-    /** @throws UserNotFoundException when no user has the email address or UUID */
+    /**
+     * @return User the disabled user
+     *
+     * @throws UserNotFoundException when no user has the email address or UUID
+     */
     #[AsMessageHandler]
-    public function __invoke(DisableUserCommand $command): void
+    public function __invoke(DisableUserCommand $command): User
     {
         $user = $this->userLookup->byIdentifier($command->getIdentifier());
         if ($user->isDisabled()) {
-            return;
+            return $user;
         }
 
         $this->transaction->run(function () use ($user): void {
@@ -47,5 +52,7 @@ final readonly class DisableUserHandler
             $this->accessTokenRepository->revokeForUser($user->getId());
             $this->refreshTokenRepository->revokeForUser($user->getId());
         });
+
+        return $user;
     }
 }
