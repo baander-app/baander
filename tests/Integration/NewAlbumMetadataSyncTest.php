@@ -116,7 +116,7 @@ final class NewAlbumMetadataSyncTest extends KernelTestCase
     private function scanAndIngest(Library $library): array
     {
         $tester = new CommandTester((new Application(self::$kernel))->find('app:library:scan'));
-        $exitCode = $tester->execute(['slug' => $library->getSlug()->toString()]);
+        $exitCode = $tester->execute(['library' => $library->getSlug()->toString()]);
         self::assertSame(Command::SUCCESS, $exitCode, $tester->getDisplay());
 
         $async = static::getContainer()->get('messenger.transport.async');

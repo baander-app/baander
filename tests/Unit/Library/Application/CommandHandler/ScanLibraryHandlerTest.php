@@ -50,7 +50,10 @@ final class ScanLibraryHandlerTest extends TestCase
     {
         $result = ($this->handler(publishFails: false))(new ScanLibraryCommand(new LibrarySlug('movies')));
 
-        self::assertSame($this->library, $result);
+        self::assertSame($this->library->getId()->toString(), $result->libraryId);
+        self::assertSame('movies', $result->slug);
+        self::assertSame(1, $result->filesDiscovered);
+        self::assertSame(1, $result->directoriesQueued);
         self::assertSame(['saved scanning', 'published ' . $this->directory . '/Fixture Movie', 'saved completed', 'event completed'], $this->timeline);
     }
 

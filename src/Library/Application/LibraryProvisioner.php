@@ -10,7 +10,6 @@ use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Application\Port\LibraryProvisioningInterface;
 use App\Library\Application\Port\ProvisionedLibraryScan;
 use App\Library\Domain\Repository\LibraryRepositoryInterface;
-use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Shared\Domain\ValueObject\FilesystemType;
@@ -33,11 +32,10 @@ final class LibraryProvisioner implements LibraryProvisioningInterface
         if ($this->libraryRepository->findBySlug($librarySlug) === null) {
             ($this->createLibraryHandler)(new CreateLibraryCommand(
                 name: $name,
-                slug: $librarySlug,
-                path: new LibraryPath($path),
-                type: LibraryType::Movie,
-                filesystemType: FilesystemType::Local,
-                sortOrder: 0,
+                path: $path,
+                type: LibraryType::Movie->value,
+                filesystemType: FilesystemType::Local->value,
+                slug: $librarySlug->toString(),
             ));
             $created = true;
         }

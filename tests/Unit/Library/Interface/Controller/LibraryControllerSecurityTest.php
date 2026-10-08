@@ -4,250 +4,127 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Library\Interface\Controller;
 
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Library\Application\Command\CreateLibraryCommand;
 use App\Library\Application\PathValidator;
-use App\Library\Application\Port\LibraryAccessPortInterface;
-use App\Library\Application\Port\LibraryPortInterface;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
-use App\Shared\Domain\ValueObject\LibraryReadScope;
-use App\Library\Application\Query\LibraryStatsQueryPort;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Library\Interface\Controller\LibraryController;
 use App\Library\Interface\Request\CreateLibraryRequest;
-use App\Library\Interface\Request\UpdateLibraryRequest;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\FilesystemType;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
+use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
-/**
- * Security-focused tests for LibraryController mutating endpoints.
- *
- * The controller currently performs no ownership or admin authorization
- * checks before updating, deleting, or scanning libraries. These tests
- * assert the expected secure behaviour and fail against the current
- * production code.
- */
+/** Who may call the library endpoints, and what the creating admin is granted (R11, KTD12). */
 final class LibraryControllerSecurityTest extends TestCase
 {
-    private LibraryPortInterface $libraryService;
-    private LibraryStatsQueryPort $statsQuery;
-    private PathValidator $pathValidator;
-    private MessageBusInterface $commandBus;
-    private LibraryController $controller;
-
-    protected function setUp(): void
+    /** @param list<string> $expected */
+    #[DataProvider('actions')]
+    public function testOnlyAdminsChangeLibraries(string $method, array $expected): void
     {
-        $this->libraryService = $this->createStub(LibraryPortInterface::class);
-        $this->statsQuery = $this->createStub(LibraryStatsQueryPort::class);
-        $this->pathValidator = new PathValidator();
-        $this->commandBus = $this->createStub(MessageBusInterface::class);
-
-        $this->controller = $this->createLibraryControllerFixture();
-    }
-
-    private function createLibraryControllerFixture(): LibraryController
-    {
-        $fixture = new LibraryController(
-            libraryService: $this->libraryService,
-            statsQuery: $this->statsQuery,
-            pathValidator: $this->pathValidator,
-            commandBus: $this->commandBus,
-            readScopes: $this->readScopes(),
+        $grants = array_map(
+            static fn (\ReflectionAttribute $attribute): mixed => $attribute->newInstance()->attribute,
+            (new \ReflectionMethod(LibraryController::class, $method))->getAttributes(IsGranted::class),
         );
 
-        $translator = $this->createStub(TranslatorInterface::class);
-        $translator->method('trans')->willReturnArgument(0);
-        $fixture->setTranslator($translator);
-        return $fixture;
+        self::assertSame($expected, $grants);
     }
 
-    private function readScopes(): LibraryReadScopeProviderInterface
+    /** @return array<string, array{string, list<string>}> */
+    public static function actions(): array
     {
-        $provider = $this->createStub(LibraryReadScopeProviderInterface::class);
-        $provider->method('current')->willReturn(LibraryReadScope::none());
-        return $provider;
+        return [
+            'list' => ['index', []],
+            'show' => ['show', []],
+            'stats' => ['stats', []],
+            'create' => ['store', ['ROLE_ADMIN']],
+            'rename' => ['update', ['ROLE_ADMIN']],
+            'delete' => ['destroy', ['ROLE_ADMIN']],
+            'scan' => ['scan', ['ROLE_ADMIN']],
+            'scan all' => ['scanAll', ['ROLE_ADMIN']],
+            'validate path' => ['validatePath', ['ROLE_ADMIN']],
+        ];
     }
 
-    public function testStoreGrantsCreatorAccess(): void
+    public function testCreationGrantsTheCreatingAdminAccess(): void
     {
-        $this->libraryService = $this->createMock(LibraryPortInterface::class);
-        $this->controller = $this->createLibraryControllerFixture();
+        $adminId = Uuid::v7();
+        $dispatched = [];
+        $bus = $this->createStub(MessageBusInterface::class);
+        $bus->method('dispatch')->willReturnCallback(static function (object $message) use (&$dispatched): Envelope {
+            $dispatched[] = $message;
 
-        $userId = Uuid::fromString('6ba7b810-9dad-11d1-80b4-00c04fd430c8');
-        $library = $this->createLibrary();
-
-        $this->libraryService->method('findBySlug')->willReturn(null);
-        $this->libraryService->expects($this->once())->method('save');
-
-        $libraryAccess = $this->createMock(LibraryAccessPortInterface::class);
-        $libraryAccess
-            ->expects($this->once())
-            ->method('grant')
-            ->with($userId, self::isInstanceOf(Uuid::class));
-
+            return new Envelope($message, [new HandledStamp(
+                Library::create('Music', new LibrarySlug('music'), new LibraryPath('/media/music'), LibraryType::Music, FilesystemType::Local),
+                'handler',
+            )]);
+        });
         $security = $this->createStub(Security::class);
-        $security->method('getUser')->willReturn(new SecurityUser(
-            id: $userId->toString(),
-            email: 'creator@baander.app',
-            password: 'password',
-        ));
+        $security->method('getUser')->willReturn(new SecurityUser($adminId->toString(), 'admin@baander.app', 'hash', ['ROLE_ADMIN']));
 
+        $response = $this->controller($bus, $security)->store(new CreateLibraryRequest(name: 'Music', path: '/media/music', type: 'music'));
+
+        self::assertSame(Response::HTTP_CREATED, $response->getStatusCode());
+        self::assertCount(1, $dispatched);
+        self::assertInstanceOf(CreateLibraryCommand::class, $dispatched[0]);
+        self::assertTrue($adminId->equals($dispatched[0]->grantTo ?? Uuid::v7()));
+    }
+
+    #[DataProvider('invalidCreators')]
+    public function testCreationRejectsPrincipalsWithoutAUserIdBeforeDispatching(string $principal): void
+    {
+        $security = $this->createStub(Security::class);
+        $user = null;
+        if ($principal === 'unsupported') {
+            $user = $this->createStub(UserInterface::class);
+        } elseif ($principal === 'malformed identifier') {
+            $user = $this->createStubForIntersectionOfInterfaces([UserInterface::class, AuthenticatedUserIdentityInterface::class]);
+            $user->method('getId')->willReturn('invalid-user-uuid');
+        }
+        $security->method('getUser')->willReturn($user);
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects($this->never())->method('dispatch');
+
+        $response = $this->controller($bus, $security)->store(new CreateLibraryRequest(name: 'Music', path: '/media/music', type: 'music'));
+
+        self::assertSame(Response::HTTP_UNAUTHORIZED, $response->getStatusCode());
+    }
+
+    /** @return array<string, array{string}> */
+    public static function invalidCreators(): array
+    {
+        return [
+            'no authenticated principal' => ['absent'],
+            'no application identity contract' => ['unsupported'],
+            'invalid UUID identity' => ['malformed identifier'],
+        ];
+    }
+
+    private function controller(MessageBusInterface $bus, Security $security): LibraryController
+    {
         $controller = new LibraryController(
-            libraryService: $this->libraryService,
-            statsQuery: $this->statsQuery,
-            pathValidator: $this->pathValidator,
-            commandBus: $this->commandBus,
-            readScopes: $this->readScopes(),
+            commandBus: $bus,
+            readScopes: $this->createStub(LibraryReadScopeProviderInterface::class),
+            pathValidator: new PathValidator(),
             security: $security,
-            libraryAccess: $libraryAccess,
         );
-
         $translator = $this->createStub(TranslatorInterface::class);
         $translator->method('trans')->willReturnArgument(0);
         $controller->setTranslator($translator);
 
-        $payload = new CreateLibraryRequest(
-            name: $library->getName(),
-            path: $library->getPath()->toString(),
-            type: $library->getType()->value,
-            filesystemType: $library->getFilesystemType()->value,
-        );
-
-        $response = $controller->store($payload);
-
-        $this->assertSame(Response::HTTP_CREATED, $response->getStatusCode());
-    }
-
-    public function testStoreRequiresAuthentication(): void
-    {
-        $this->libraryService = $this->createMock(LibraryPortInterface::class);
-        $this->controller = $this->createLibraryControllerFixture();
-
-        $this->libraryService->expects($this->never())->method('findBySlug');
-        $this->libraryService->expects($this->never())->method('save');
-
-        $libraryAccess = $this->createMock(LibraryAccessPortInterface::class);
-        $libraryAccess->expects($this->never())->method('grant');
-
-        $controller = new LibraryController(
-            libraryService: $this->libraryService,
-            statsQuery: $this->statsQuery,
-            pathValidator: $this->pathValidator,
-            commandBus: $this->commandBus,
-            readScopes: $this->readScopes(),
-            security: null,
-            libraryAccess: $libraryAccess,
-        );
-
-        $translator = $this->createStub(TranslatorInterface::class);
-        $translator->method('trans')->willReturnArgument(0);
-        $controller->setTranslator($translator);
-
-        $library = $this->createLibrary();
-        $payload = new CreateLibraryRequest(
-            name: $library->getName(),
-            path: $library->getPath()->toString(),
-            type: $library->getType()->value,
-            filesystemType: $library->getFilesystemType()->value,
-        );
-
-        $response = $controller->store($payload);
-
-        $this->assertSame(Response::HTTP_UNAUTHORIZED, $response->getStatusCode());
-    }
-
-    public function testUpdateRequiresOwnershipOrAdmin(): void
-    {
-        $this->libraryService = $this->createMock(LibraryPortInterface::class);
-        $this->controller = $this->createLibraryControllerFixture();
-
-        $library = $this->createLibrary();
-
-        $this->libraryService->method('findByUuid')->willReturn($library);
-
-        // Authorization should be checked before the aggregate is mutated or
-        // persisted. Currently the controller saves without any checks.
-        $this->libraryService->expects($this->never())->method('save');
-
-        $payload = new UpdateLibraryRequest(name: 'Hijacked Library');
-        $response = $this->controller->update($payload, $library->getId()->toString());
-
-        $this->assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode());
-        $this->assertNotSame('Hijacked Library', $library->getName());
-    }
-
-    public function testDestroyRequiresOwnershipOrAdmin(): void
-    {
-        $this->libraryService = $this->createMock(LibraryPortInterface::class);
-        $this->controller = $this->createLibraryControllerFixture();
-
-        $library = $this->createLibrary();
-
-        $this->libraryService->method('findByUuid')->willReturn($library);
-
-        // Authorization should be checked before the library is deleted.
-        // Currently the controller deletes without any checks.
-        $this->libraryService->expects($this->never())->method('delete');
-
-        $response = $this->controller->destroy($library->getId()->toString());
-
-        $this->assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode());
-    }
-
-    public function testAuthorizedDeleteReturnsDocumentedEmptyData(): void
-    {
-        $library = $this->createLibrary();
-        $libraries = $this->createMock(LibraryPortInterface::class);
-        $libraries->method('findByUuid')->willReturn($library);
-        $libraries->expects($this->once())->method('delete')->with($library);
-        $security = $this->createStub(Security::class);
-        $security->method('getUser')->willReturn(new SecurityUser(Uuid::v7()->toString(), 'admin@baander.app', 'hash', ['ROLE_ADMIN']));
-        $controller = new LibraryController($libraries, $this->statsQuery, $this->pathValidator, $this->commandBus, $this->readScopes(), $security);
-
-        $response = $controller->destroy($library->getId()->toString());
-
-        self::assertSame(200, $response->getStatusCode());
-        self::assertSame('{"data":null}', $response->getContent());
-    }
-
-    public function testScanRequiresOwnershipOrAdmin(): void
-    {
-        $this->commandBus = $this->createMock(MessageBusInterface::class);
-        $this->libraryService = $this->createMock(LibraryPortInterface::class);
-        $this->controller = $this->createLibraryControllerFixture();
-
-        $library = $this->createLibrary();
-
-        $this->libraryService->method('findByUuid')->willReturn($library);
-
-        // Authorization should be checked before dispatching a scan command.
-        // Currently the controller dispatches without any checks.
-        $this->commandBus->expects($this->never())->method('dispatch');
-        $this->libraryService->expects($this->never())->method('save');
-
-        $request = new \Symfony\Component\HttpFoundation\Request();
-        $response = $this->controller->scan($library->getId()->toString(), $request);
-
-        $this->assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode());
-        $this->assertNotSame('scanning', $library->getDiscoveryStatus());
-    }
-
-    private function createLibrary(): Library
-    {
-        return Library::create(
-            name: 'Original Library',
-            slug: LibrarySlug::fromName('original-library'),
-            path: new LibraryPath('/media/music'),
-            type: LibraryType::Music,
-            filesystemType: FilesystemType::Local,
-            sortOrder: 0,
-        );
+        return $controller;
     }
 }
