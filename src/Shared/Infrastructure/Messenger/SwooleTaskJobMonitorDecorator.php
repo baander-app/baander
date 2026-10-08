@@ -16,7 +16,8 @@ use Symfony\Component\Messenger\Transport\Serialization\SerializerInterface;
  * Decorates the Swoole ServerTaskTransportHandler to track async jobs.
  *
  * Starts an attempt of the message's job before bus->dispatch() runs, then
- * marks that attempt finished or failed when the handler completes. The job ID
+ * marks that attempt finished or failed when the handler completes; a job that
+ * stopped at a cancellation checkpoint keeps its `cancelled` row. The job ID
  * comes from the message (JobMonitoringMiddleware assigns it at dispatch), so a
  * repeated task delivery restarts the same job_monitors row; a message without
  * one gets an ID here.
@@ -75,12 +76,21 @@ final readonly class SwooleTaskJobMonitorDecorator implements TaskHandler
         try {
             $this->decorated->handle($server, $task);
 
-            $this->jobMonitorService->markFinished($jobIdStr, $attempt);
-
-            $this->logger->info('Job completed', [
-                'job_id' => $jobIdStr,
-                'job_type' => $message::class,
-            ]);
+            // The inner handler does not return the bus's envelope, so its JobCancelledStamp is
+            // out of reach; a job JobCancellationMiddleware cancelled (and logged) is no longer
+            // running, and neither is an attempt a later delivery took over.
+            if ($this->jobMonitorService->markFinished($jobIdStr, $attempt)) {
+                $this->logger->info('Job completed', [
+                    'job_id' => $jobIdStr,
+                    'job_type' => $message::class,
+                ]);
+            } else {
+                $this->logger->info('Job ended without finishing its attempt: it was cancelled or superseded', [
+                    'job_id' => $jobIdStr,
+                    'job_type' => $message::class,
+                    'attempt' => $attempt,
+                ]);
+            }
         } catch (\Throwable $e) {
             try {
                 $this->jobMonitorService->markFailed($jobIdStr, $attempt, $e);

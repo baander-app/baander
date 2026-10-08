@@ -17,6 +17,7 @@ use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Library\Interface\Console\ScanLibraryCommand;
 use App\Shared\Application\DTO\InlineJobRun;
+use App\Shared\Application\JobCancelledException;
 use App\Shared\Application\Port\JobMonitorAdministrationInterface;
 use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Shared\Interface\Console\AdminCommandSupport;
@@ -45,6 +46,17 @@ final class ScanLibraryCommandTest extends TestCase
 
         self::assertSame([$music->getId()->toString()], $this->released);
         self::assertStringContainsString('The scan of "music" failed: disk gone', $this->display($tester));
+    }
+
+    public function testAScanCancelledFromTheJobMonitorReleasesItsClaimAndSaysSo(): void
+    {
+        $music = $this->library('music');
+        $tester = $this->tester([$music], fn () => throw JobCancelledException::forJob('job-1'));
+
+        self::assertSame(Command::FAILURE, $tester->execute(['library' => 'music']));
+
+        self::assertSame([$music->getId()->toString()], $this->released);
+        self::assertStringContainsString('The scan of "music" was cancelled: Job "job-1" has been cancelled.', $this->display($tester));
     }
 
     public function testAnInterruptedScanFailsItsJobAndReleasesItsClaim(): void

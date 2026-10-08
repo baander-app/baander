@@ -23,7 +23,7 @@ The Library context manages media libraries -- collections of media files organi
 | Command | Handler | Purpose |
 |---------|---------|---------|
 | `CreateLibraryCommand` | `CreateLibraryHandler` | Creates a new library with a name, type, and filesystem path. Validates the path and generates a slug. |
-| `ScanLibraryCommand` | `ScanLibraryHandler` | Walks the library's filesystem path to discover new, changed, or removed media files. Dispatches `LibraryScanCompleted` when finished. |
+| `ScanLibraryCommand` | `ScanLibraryHandler` | Walks the library's filesystem path to discover new, changed, or removed media files, and publishes `FilesDiscovered` for each directory with new or changed files. Dispatches `LibraryScanCompleted` when finished. A cancelled job stops before its next directory and marks the scan `failed`. |
 
 ## Ports
 

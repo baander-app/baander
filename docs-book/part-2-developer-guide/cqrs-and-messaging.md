@@ -120,6 +120,10 @@ Events are dispatched via Symfony's `EventDispatcherInterface` inside handlers. 
 
 Every dispatched message gets a `JobIdStamp` from `JobMonitoringMiddleware` before a transport stores it. The job ID travels with the message, so each delivery of it (a Messenger retry, a retry from the failure transport, or a redelivery after a worker died) is an attempt of the same job. `WorkerJobMonitorSubscriber` and `SwooleTaskJobMonitorDecorator` record each attempt with `JobMonitorService::startAttempt()`, which upserts the job's single `job_monitors` row, and complete only the attempt they started. See [Monitoring](../part-1-operator-guide/monitoring.md) for details.
 
+A long-running handler lets an operator cancel its job. It calls `JobCancellationCheckpointInterface::check()` (a Shared Application port) between items of its work, outside any `catch` that would swallow the exception. `check()` throws `JobCancelledException` when the job monitor's Cancel action, or `app:monitor:job:cancel`, has set the job's cancellation flag; outside a job run it does nothing. Each check costs a Redis `EXISTS`, so place checkpoints per item of real work (an album, a directory, a page), not inside a tight loop.
+
+`JobCancellationMiddleware` runs each received job as the current job of its coroutine, so the checkpoint finds the job ID without the handler passing it, on Messenger workers, Swoole task workers and inline runs alike. When the handler stops at a checkpoint, the middleware marks the row `cancelled` and returns the envelope with a `JobCancelledStamp`, so the transport acknowledges the delivery: it is not retried and does not reach the failure transport. An inline run (`JobMonitorAdministrationInterface::runInline()`) rethrows `JobCancelledException` to its console command.
+
 ## Async Processing
 
 In production, the Messenger transport is Redis (`MESSENGER_TRANSPORT_DSN`). Workers consume commands from the Redis queue:

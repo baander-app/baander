@@ -18,6 +18,7 @@ use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Library\Infrastructure\Scanner\MediaFile;
 use App\Shared\Domain\ValueObject\FilesystemType;
+use App\Tests\Fixtures\Messaging\CancelAtCheckpoint;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -102,7 +103,7 @@ final class LibraryProvisionerTest extends TestCase
     {
         $fileIndex = $this->createStub(LibraryFileIndexRepositoryInterface::class);
         $logger = new NullLogger();
-        $movieScanner = new MovieScanner($directoryScanner, $fileIndex, $logger);
+        $movieScanner = new MovieScanner($directoryScanner, $fileIndex, $logger, new CancelAtCheckpoint());
         $events = $this->createStub(EventDispatcherInterface::class);
         $events->method('dispatch')->willReturnArgument(0);
 
@@ -114,7 +115,7 @@ final class LibraryProvisionerTest extends TestCase
                     return $operation();
                 }
             }),
-            new LibraryDiscovery($libraries, new MusicScanner($directoryScanner, $fileIndex, $logger), $movieScanner, $events, $logger),
+            new LibraryDiscovery($libraries, new MusicScanner($directoryScanner, $fileIndex, $logger, new CancelAtCheckpoint()), $movieScanner, $events, $logger),
             $movieScanner,
         );
     }

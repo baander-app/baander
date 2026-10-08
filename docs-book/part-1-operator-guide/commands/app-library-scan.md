@@ -44,6 +44,10 @@ With `--all`, the command claims every library that is not scanning, prints the 
 
 A scan that fails ends its claim and marks the scan `failed`, so the next scan can start. Ctrl+C (SIGINT) or SIGTERM interrupts the running scan the same way, records it as failed in the job monitor, and releases the claims of libraries `--all` has not reached.
 
+A scan works one directory at a time: it reads every file of the directory to tell new and changed files from known ones, then queues the directory for ingestion. Cancelling the scan's job in the job monitor, or with [app:monitor:job:cancel](app-monitor-job-cancel.md), stops the scan before its next directory. The job ID appears in the job monitor while the scan runs. The command prints `The scan of "<library>" was cancelled: Job "<jobId>" has been cancelled.`, the job's status becomes `cancelled`, and the library's scan becomes `failed`, which ends its claim. Directories queued before the scan stopped are still ingested, and the next scan picks up the rest.
+
+With `--all`, a cancelled scan stops only its own library: the command goes on with the next one and exits with code 1 at the end.
+
 A process killed with SIGKILL, or a web server that stops in the middle of a scan, leaves the claim in place, and every new scan of the library is refused. Check that no scan of the library is still running, then clear the claim with `--release`. Releasing a library that holds no claim changes nothing and succeeds.
 
 ## Exit codes
@@ -51,7 +55,7 @@ A process killed with SIGKILL, or a web server that stops in the middle of a sca
 | Code | Meaning |
 |------|---------|
 | 0 | Every scan started completed; with `--release`, the claim is released or there was none |
-| 1 | The library is already scanning, no library has the UUID or slug, or a scan failed; the message says why |
+| 1 | The library is already scanning, no library has the UUID or slug, or a scan failed or was cancelled; the message says why |
 | 2 | Invalid options: no library and no `--all`, both, or `--release` with another option |
 | 130 | Interrupted by SIGINT; the unfinished scans are released |
 | 143 | Interrupted by SIGTERM; the unfinished scans are released |

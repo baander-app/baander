@@ -197,11 +197,12 @@ final class JobMonitorServiceTest extends TestCase
                     && $params['attempt'] === 2
                     && $params['exception'] === null
                     && $params['exception_class'] === null),
-            );
+            )
+            ->willReturn(1);
 
         $this->entityManager->method('getConnection')->willReturn($connection);
 
-        $this->service->markFinished('job-finish', 2);
+        self::assertTrue($this->service->markFinished('job-finish', 2));
     }
 
     public function testMarkFailedRecordsTheErrorOfTheGivenAttempt(): void

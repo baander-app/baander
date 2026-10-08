@@ -18,7 +18,8 @@ use App\Tests\Fixtures\Messaging\CancellationProbe;
 use App\Tests\Fixtures\Messaging\CancellationProbeHandler;
 use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Tests\Functional\TestCase;
-use Psr\Log\NullLogger;
+use Monolog\Handler\TestHandler;
+use Monolog\Logger;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Messenger\SwooleServerTaskTransportHandler;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
@@ -127,11 +128,12 @@ final class JobCancellationTest extends TestCase
     {
         $container = static::getContainer();
         $serializer = new JsonTransportSerializer(MessageCodecFactory::create());
+        $logs = new TestHandler();
         $decorator = new SwooleTaskJobMonitorDecorator(
             new SwooleServerTaskTransportHandler($container->get(MessageBusInterface::class), $serializer),
             $container->get(JobMonitorService::class),
             $container->get(JobMessageSerializer::class),
-            new NullLogger(),
+            new Logger('test', [$logs]),
             $serializer,
         );
         $task = new \Swoole\Server\Task();
@@ -141,6 +143,8 @@ final class JobCancellationTest extends TestCase
 
         self::assertSame(['task:1'], CancellationProbeHandler::$handled);
         $this->assertCancelled($this->jobIds[0], 'swoole_task');
+        self::assertFalse($logs->hasInfoThatContains('Job completed'), 'A cancelled task is not logged as completed.');
+        self::assertTrue($logs->hasInfoThatContains('Job ended without finishing its attempt'));
     }
 
     private function runningJobId(): string

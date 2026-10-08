@@ -13,7 +13,11 @@ use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Library\Infrastructure\Scanner\MediaFile;
+use App\Library\Application\Message\DiscoveredFile;
+use App\Shared\Application\JobCancelledException;
+use App\Shared\Application\Port\JobCancellationCheckpointInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Fixtures\Messaging\CancelAtCheckpoint;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -41,12 +45,13 @@ final class MusicScannerTest extends TestCase
         @exec("rm -rf {$this->tmpDir}");
     }
 
-    private function createScanner(): MusicScanner
+    private function createScanner(JobCancellationCheckpointInterface $cancellation = new CancelAtCheckpoint()): MusicScanner
     {
         return new MusicScanner(
             directoryScanner: $this->directoryScanner,
             fileIndexRepository: $this->fileIndexRepository,
             logger: $this->logger,
+            cancellation: $cancellation,
         );
     }
 
@@ -212,5 +217,67 @@ final class MusicScannerTest extends TestCase
         // Only 1 audio file discovered
         $this->assertSame(1, $result->filesDiscovered);
         $this->assertSame(1, $result->filesProcessed);
+    }
+
+    public function testACancelledScanStopsBeforeItsNextDirectoryAndKeepsTheIndexOfTheRest(): void
+    {
+        mkdir($this->tmpDir . '/Album3');
+        $library = $this->createLibrary();
+        $this->directoryScanner->method('scan')->willReturn([
+            $this->createAudioFile('Album1', 'track01.mp3'),
+            $this->createAudioFile('Album1', 'track02.mp3'),
+            $this->createAudioFile('Album2', 'track01.mp3'),
+            $this->createAudioFile('Album3', 'track01.mp3'),
+        ]);
+        $indexed = [];
+        $removed = [];
+        $this->fileIndexRepository->method('findIndexPathMapByLibrary')
+            ->willReturn(["{$this->tmpDir}/Gone/track01.mp3" => 'old_hash']);
+        $this->fileIndexRepository->method('upsert')
+            ->willReturnCallback(function (Uuid $libraryId, string $path) use (&$indexed): void {
+                $indexed[] = $path;
+            });
+        $this->fileIndexRepository->method('removeByPath')
+            ->willReturnCallback(function (Uuid $libraryId, string $path) use (&$removed): void {
+                $removed[] = $path;
+            });
+        $published = [];
+        // The job is cancelled while the scan hashes its second directory.
+        $cancellation = new CancelAtCheckpoint(passes: 2);
+
+        try {
+            $this->createScanner($cancellation)->scan($library, publishDirectory: function (string $directory, array $files) use (&$published): void {
+                $published[$directory] = array_map(static fn (DiscoveredFile $file): string => basename($file->absolutePath), $files);
+            });
+            self::fail('A cancelled scan must stop.');
+        } catch (JobCancelledException) {
+        }
+
+        self::assertSame(3, $cancellation->checks, 'One checkpoint before each directory.');
+        self::assertSame([
+            "{$this->tmpDir}/Album1" => ['track01.mp3', 'track02.mp3'],
+            "{$this->tmpDir}/Album2" => ['track01.mp3'],
+        ], $published);
+        self::assertSame([
+            "{$this->tmpDir}/Album1/track01.mp3",
+            "{$this->tmpDir}/Album1/track02.mp3",
+            "{$this->tmpDir}/Album2/track01.mp3",
+        ], $indexed, 'Album3 stays unindexed, so the next scan picks it up.');
+        self::assertSame([], $removed, 'A stopped scan has not seen every file, so it removes no index entry.');
+    }
+
+    public function testADirectoryWhosePublicationFailsStaysUnindexed(): void
+    {
+        $library = $this->createLibrary();
+        $this->directoryScanner->method('scan')->willReturn([$this->createAudioFile('Album1', 'track01.mp3')]);
+        $this->fileIndexRepository = $this->createMock(LibraryFileIndexRepositoryInterface::class);
+        $this->fileIndexRepository->method('findIndexPathMapByLibrary')->willReturn([]);
+        $this->fileIndexRepository->expects($this->never())->method('upsert');
+
+        $this->expectExceptionMessage('transport down');
+
+        $this->createScanner()->scan($library, publishDirectory: static function (): void {
+            throw new \RuntimeException('transport down');
+        });
     }
 }
