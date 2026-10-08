@@ -80,13 +80,16 @@ final class JobMonitorService
         return (int) $attempt;
     }
 
-    /** Finishes the given attempt; a stale attempt leaves a newer one untouched. */
+    /**
+     * Finishes the given attempt; a stale attempt leaves a newer one untouched. Only a running
+     * attempt completes, so a job cancelled at a checkpoint stays cancelled.
+     */
     public function markFinished(string $jobId, int $attempt): void
     {
         $this->completeAttempt($jobId, $attempt, JobStatus::Finished, null);
     }
 
-    /** Fails the given attempt; a stale attempt leaves a newer one untouched. */
+    /** Fails the given attempt; a stale or no longer running attempt leaves the row untouched. */
     public function markFailed(string $jobId, int $attempt, \Throwable $exception): void
     {
         $this->completeAttempt($jobId, $attempt, JobStatus::Failed, $exception);
@@ -508,12 +511,16 @@ final class JobMonitorService
         ];
     }
 
+    /**
+     * Ends the job's running attempt as cancelled, after its handler stopped at a cancellation
+     * checkpoint. A job that is not running is left as it is.
+     */
     public function markCancelled(string $jobId): void
     {
         $now = $this->now();
         $this->entityManager->getConnection()->executeStatement(
-            'UPDATE job_monitors SET status = :status, finished_at = GREATEST(CAST(:now AS TIMESTAMPTZ), started_at), updated_at = :now WHERE job_id = :job_id',
-            ['status' => JobStatus::Cancelled->value, 'now' => $now, 'job_id' => $jobId],
+            'UPDATE job_monitors SET status = :status, finished_at = GREATEST(CAST(:now AS TIMESTAMPTZ), started_at), updated_at = :now WHERE job_id = :job_id AND status = :running',
+            ['status' => JobStatus::Cancelled->value, 'now' => $now, 'job_id' => $jobId, 'running' => JobStatus::Running->value],
         );
     }
 
@@ -619,10 +626,11 @@ final class JobMonitorService
                     exception_class = :exception_class,
                     exception = CAST(:exception AS JSONB),
                     updated_at = :now
-                WHERE job_id = :job_id AND attempt = :attempt
+                WHERE job_id = :job_id AND attempt = :attempt AND status = :running
             SQL,
             [
                 'status' => $status->value,
+                'running' => JobStatus::Running->value,
                 'now' => $now,
                 'exception_class' => $exception === null ? null : $exception::class,
                 'exception' => $exception === null ? null : json_encode([

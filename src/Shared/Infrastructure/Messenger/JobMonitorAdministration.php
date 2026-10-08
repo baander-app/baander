@@ -216,7 +216,7 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
         );
 
         try {
-            $result = $this->messageBus->dispatch($envelope)->last(HandledStamp::class)?->getResult();
+            $handled = $this->messageBus->dispatch($envelope);
         } catch (Throwable $exception) {
             $cause = self::cause($exception);
             try {
@@ -231,9 +231,14 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
             throw $cause;
         }
 
+        // JobCancellationMiddleware has already recorded the cancellation.
+        if ($handled->last(JobCancelledStamp::class) !== null) {
+            throw JobCancelledException::forJob($jobId);
+        }
+
         $this->jobMonitorService->markFinished($jobId, $attempt);
 
-        return new InlineJobRun($jobId, $result);
+        return new InlineJobRun($jobId, $handled->last(HandledStamp::class)?->getResult());
     }
 
     /** The first transport the message is routed to, or 'sync' when it is handled synchronously. */

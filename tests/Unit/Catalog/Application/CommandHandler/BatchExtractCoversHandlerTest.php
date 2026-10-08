@@ -8,7 +8,9 @@ use App\Catalog\Application\Command\BatchExtractCoversCommand;
 use App\Catalog\Application\CommandHandler\BatchExtractCoversHandler;
 use App\Catalog\Domain\Repository\AlbumRepositoryInterface;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
+use App\Shared\Application\JobCancelledException;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Fixtures\Messaging\CancelAtCheckpoint;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -49,7 +51,7 @@ final class BatchExtractCoversHandlerTest extends TestCase
         $logger->expects($this->never())->method('info');
 
         try {
-            (new BatchExtractCoversHandler($repository, $bus, $logger))(new BatchExtractCoversCommand());
+            (new BatchExtractCoversHandler($repository, $bus, $logger, new CancelAtCheckpoint()))(new BatchExtractCoversCommand());
             self::fail('Failed fanout must not return a successful dispatch count.');
         } catch (RuntimeException $actual) {
             self::assertSame($failure, $actual);
@@ -91,12 +93,27 @@ final class BatchExtractCoversHandlerTest extends TestCase
         $logger->expects($this->never())->method('warning');
         $logger->expects($this->once())->method('info')->with('Batch cover extraction completed', ['dispatched' => 501]);
 
-        $count = (new BatchExtractCoversHandler($repository, $bus, $logger))(new BatchExtractCoversCommand());
+        $count = (new BatchExtractCoversHandler($repository, $bus, $logger, new CancelAtCheckpoint()))(new BatchExtractCoversCommand());
 
         self::assertSame(501, $count);
         self::assertSame($ids, $accepted);
         self::assertSame([null, $ids[499], $ids[500]], $cursors);
     }
+    public function testACancelledJobStopsBeforeItsNextPage(): void
+    {
+        $ids = array_map(static fn (): Uuid => Uuid::v7(), range(1, 501));
+        $repository = $this->createMock(AlbumRepositoryInterface::class);
+        $repository->expects($this->once())->method('findCoverlessAlbumIdsAfter')->with(null, 500)->willReturn(array_slice($ids, 0, 500));
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects($this->exactly(500))->method('dispatch')->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->never())->method('info');
+
+        $this->expectException(JobCancelledException::class);
+
+        (new BatchExtractCoversHandler($repository, $bus, $logger, new CancelAtCheckpoint(passes: 1)))(new BatchExtractCoversCommand());
+    }
+
     #[DataProvider('coverlessSetChanges')]
     public function testEveryOriginalAlbumIsDispatchedOnceWhileTheCoverlessSetChanges(bool $shrinks): void
     {
@@ -127,7 +144,7 @@ final class BatchExtractCoversHandlerTest extends TestCase
                 return new Envelope($message);
             },
         );
-        $count = (new BatchExtractCoversHandler($repository, $bus, new \Psr\Log\NullLogger()))(new BatchExtractCoversCommand());
+        $count = (new BatchExtractCoversHandler($repository, $bus, new \Psr\Log\NullLogger(), new CancelAtCheckpoint()))(new BatchExtractCoversCommand());
         self::assertSame(501, $count);
         self::assertSame(array_map(static fn (Uuid $id): string => $id->toString(), $ids), $accepted);
         self::assertSame([null, $ids[499], $ids[500]], $cursors);

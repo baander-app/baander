@@ -9,6 +9,8 @@ use App\Lyrics\Application\Command\BulkFetchLyricsCommand;
 use App\Lyrics\Application\Command\FetchLyricsCommand;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
 use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Application\JobCancelledException;
+use App\Shared\Application\Port\JobCancellationCheckpointInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -34,6 +36,7 @@ final class BulkFetchLyricsHandler
         private readonly LyricsRepositoryInterface $lyricsRepository,
         private readonly MessageBusInterface $bus,
         private readonly LoggerInterface $logger,
+        private readonly JobCancellationCheckpointInterface $cancellation,
     ) {
     }
 
@@ -41,6 +44,7 @@ final class BulkFetchLyricsHandler
      * @return int the number of songs queued for fetching
      *
      * @throws InvalidInputException for a limit below 1 or a negative delay
+     * @throws JobCancelledException when the job is cancelled; the fetches queued so far stay queued
      */
     public function __invoke(BulkFetchLyricsCommand $command): int
     {
@@ -64,6 +68,9 @@ final class BulkFetchLyricsHandler
                 if ($limit !== null && $queued >= $limit) {
                     break 2;
                 }
+
+                // A cancelled job stops before its next song.
+                $this->cancellation->check();
 
                 if ($this->lyricsRepository->findBySongId($songId) !== null) {
                     continue;

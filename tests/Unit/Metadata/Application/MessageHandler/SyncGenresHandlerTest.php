@@ -11,8 +11,10 @@ use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\Message\SyncGenresMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
 use App\Metadata\Application\MessageHandler\SyncGenresHandler;
+use App\Shared\Application\JobCancelledException;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Fixtures\Messaging\CancelAtCheckpoint;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Messenger\Envelope;
@@ -40,13 +42,40 @@ final class SyncGenresHandlerTest extends TestCase
             return new Envelope($message);
         });
 
-        $queued = (new SyncGenresHandler($catalog, $bus, new NullLogger()))(
+        $queued = (new SyncGenresHandler($catalog, $bus, new NullLogger(), new CancelAtCheckpoint()))(
             new SyncGenresMessage(forceUpdate: true, includeSongs: true),
         );
 
         self::assertSame(5, $queued);
         self::assertSame(2, count(array_keys($dispatched, SyncAlbumMessage::class, true)));
         self::assertSame(3, count(array_keys($dispatched, SyncSongMessage::class, true)));
+    }
+
+    public function testACancelledJobStopsBeforeItsNextAlbum(): void
+    {
+        $albums = [Album::create(Uuid::v7(), 'Kind of Blue', 'Album'), Album::create(Uuid::v7(), 'Blue Train', 'Album')];
+        $catalog = $this->createStub(AlbumPortInterface::class);
+        $catalog->method('search')->willReturn(SearchResult::create($albums, 2));
+        $catalog->method('findWithSongs')->willReturnCallback(static fn (Uuid $id): array => [null, [self::song($albums[0])]]);
+        $dispatched = [];
+        $bus = $this->createStub(MessageBusInterface::class);
+        $bus->method('dispatch')->willReturnCallback(static function (object $message) use (&$dispatched): Envelope {
+            $dispatched[] = $message;
+
+            return new Envelope($message);
+        });
+
+        try {
+            (new SyncGenresHandler($catalog, $bus, new NullLogger(), new CancelAtCheckpoint(passes: 1)))(
+                new SyncGenresMessage(forceUpdate: true, includeSongs: true),
+            );
+            self::fail('A cancelled genre sync must stop.');
+        } catch (JobCancelledException) {
+        }
+
+        self::assertCount(2, $dispatched, 'Only the first album and its song were queued.');
+        self::assertInstanceOf(SyncAlbumMessage::class, $dispatched[0]);
+        self::assertTrue($dispatched[0]->albumId->equals($albums[0]->getId()));
     }
 
     private static function song(Album $album): Song

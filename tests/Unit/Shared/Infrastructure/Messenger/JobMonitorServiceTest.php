@@ -133,14 +133,18 @@ final class JobMonitorServiceTest extends TestCase
 
     // ── markCancelled tests ──────────────────────────────────────────────
 
-    public function testMarkCancelledFinishesNoEarlierThanTheStartAndDoesNotFlush(): void
+    public function testMarkCancelledEndsOnlyARunningJobNoEarlierThanItsStartAndDoesNotFlush(): void
     {
         $connection = $this->createMock(Connection::class);
         $connection->expects($this->once())
             ->method('executeStatement')
             ->with(
-                $this->stringContains('finished_at = GREATEST(CAST(:now AS TIMESTAMPTZ), started_at)'),
+                $this->logicalAnd(
+                    $this->stringContains('finished_at = GREATEST(CAST(:now AS TIMESTAMPTZ), started_at)'),
+                    $this->stringContains('AND status = :running'),
+                ),
                 $this->callback(static fn (array $params): bool => $params['status'] === JobStatus::Cancelled->value
+                    && $params['running'] === JobStatus::Running->value
                     && $params['job_id'] === 'job-cancel'
                     && isset($params['now'])),
             );

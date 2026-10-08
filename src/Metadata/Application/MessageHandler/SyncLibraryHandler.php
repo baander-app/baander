@@ -8,6 +8,7 @@ use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Metadata\Application\Message\SyncAlbumMessage;
 use App\Metadata\Application\Message\SyncLibraryMessage;
 use App\Metadata\Application\Message\SyncSongMessage;
+use App\Shared\Application\Port\JobCancellationCheckpointInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -18,6 +19,7 @@ final class SyncLibraryHandler
         private readonly AlbumPortInterface $albumService,
         private readonly MessageBusInterface $bus,
         private readonly LoggerInterface $logger,
+        private readonly JobCancellationCheckpointInterface $cancellation,
     ) {
     }
 
@@ -36,6 +38,9 @@ final class SyncLibraryHandler
         ]);
 
         foreach ($albums as $album) {
+            // A cancelled job stops before its next album.
+            $this->cancellation->check();
+
             $this->bus->dispatch(new SyncAlbumMessage(
                 $album->getId(),
                 $message->forceUpdate,

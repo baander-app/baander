@@ -110,6 +110,9 @@ framework:
                     - { id: 'App\Shared\Infrastructure\Messenger\CorrelationIdMiddleware' }
                     # Assigns the job ID before a transport stores the message.
                     - { id: 'App\Shared\Infrastructure\Messenger\JobMonitoringMiddleware' }
+                    # Gives a received job's handlers its job ID for cancellation checkpoints,
+                    # and ends a job cancelled at one without a retry or the failure transport.
+                    - { id: 'App\Shared\Infrastructure\Messenger\JobCancellationMiddleware' }
                     # Copies a synchronous handler's result into a typed stamp (app.result_stamp_classes);
                     # the WebSocket party.join reads PartyMemberResultStamp.
                     - { id: 'App\Shared\Infrastructure\Messenger\ResultStampMiddleware' }

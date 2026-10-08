@@ -7,6 +7,7 @@ namespace App\Catalog\Application\CommandHandler;
 use App\Catalog\Application\Command\BatchExtractCoversCommand;
 use App\Catalog\Domain\Repository\AlbumRepositoryInterface;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
+use App\Shared\Application\Port\JobCancellationCheckpointInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -17,6 +18,7 @@ final class BatchExtractCoversHandler
         private readonly AlbumRepositoryInterface $albumRepository,
         private readonly MessageBusInterface $bus,
         private readonly LoggerInterface $logger,
+        private readonly JobCancellationCheckpointInterface $cancellation,
     ) {
     }
 
@@ -28,6 +30,9 @@ final class BatchExtractCoversHandler
         $dispatched = 0;
 
         while (true) {
+            // A cancelled job stops before its next page of albums.
+            $this->cancellation->check();
+
             $ids = $this->albumRepository->findCoverlessAlbumIdsAfter($after, $limit);
 
             if ($ids === []) {

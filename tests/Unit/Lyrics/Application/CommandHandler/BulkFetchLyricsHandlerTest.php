@@ -11,7 +11,9 @@ use App\Lyrics\Application\CommandHandler\BulkFetchLyricsHandler;
 use App\Lyrics\Domain\Model\Lyrics;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
 use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Application\JobCancelledException;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Fixtures\Messaging\CancelAtCheckpoint;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -118,8 +120,26 @@ final class BulkFetchLyricsHandlerTest extends TestCase
         $this->handler($songs)($command);
     }
 
-    private function handler(SongLookupInterface $songs, ?LyricsRepositoryInterface $lyrics = null): BulkFetchLyricsHandler
+    public function testACancelledJobStopsBeforeItsNextSongAndKeepsWhatItQueued(): void
     {
+        $songIds = [Uuid::v7(), Uuid::v7(), Uuid::v7()];
+        $songs = $this->createStub(SongLookupInterface::class);
+        $songs->method('songIdsAfter')->willReturn($songIds);
+
+        try {
+            $this->handler($songs, cancellation: new CancelAtCheckpoint(passes: 2))(new BulkFetchLyricsCommand(delayMs: 0));
+            self::fail('A cancelled bulk fetch must stop.');
+        } catch (JobCancelledException) {
+        }
+
+        self::assertSame([$songIds[0]->toString(), $songIds[1]->toString()], $this->queuedSongIds());
+    }
+
+    private function handler(
+        SongLookupInterface $songs,
+        ?LyricsRepositoryInterface $lyrics = null,
+        CancelAtCheckpoint $cancellation = new CancelAtCheckpoint(),
+    ): BulkFetchLyricsHandler {
         if ($lyrics === null) {
             $lyrics = $this->createStub(LyricsRepositoryInterface::class);
             $lyrics->method('findBySongId')->willReturn(null);
@@ -132,7 +152,7 @@ final class BulkFetchLyricsHandlerTest extends TestCase
             return $envelope;
         });
 
-        return new BulkFetchLyricsHandler($songs, $lyrics, $bus, new NullLogger());
+        return new BulkFetchLyricsHandler($songs, $lyrics, $bus, new NullLogger(), $cancellation);
     }
 
     /** @return list<string> */

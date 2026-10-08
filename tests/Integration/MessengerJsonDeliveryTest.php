@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Tests\Fixtures\Messaging\CancelAtCheckpoint;
 use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\GenrePortInterface;
@@ -258,7 +259,7 @@ final class MessengerJsonDeliveryTest extends TestCase
                 ->willReturnCallback(static function () use (&$effects): array { ++$effects; return []; });
             $nestedBus = $this->createMock(MessageBusInterface::class);
             $nestedBus->expects($this->never())->method('dispatch');
-            $handler = new SyncLibraryHandler($albums, $nestedBus, $logger);
+            $handler = new SyncLibraryHandler($albums, $nestedBus, $logger, new CancelAtCheckpoint());
         } else {
             $message = new SyncCountryStationsCommand($id, 'DK');
             $stations = $this->createMock(RadioStationPortInterface::class);
