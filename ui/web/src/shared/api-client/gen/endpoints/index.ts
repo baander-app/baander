@@ -107,7 +107,6 @@ export interface AdminUpdateUserRequest {
   /** @nullable */
   email?: string | null;
   /**
-     * @minLength 1
      * @maxLength 255
      * @nullable
      */
@@ -1996,6 +1995,47 @@ export interface PlaylistResource {
   songCount: number;
   /** Creation timestamp */
   createdAt: string;
+}
+
+export type RecommendationJobResourceStatus = typeof RecommendationJobResourceStatus[keyof typeof RecommendationJobResourceStatus];
+
+
+export const RecommendationJobResourceStatus = {
+  pending: 'pending',
+  in_progress: 'in_progress',
+  completed: 'completed',
+  failed: 'failed',
+  cancelled: 'cancelled',
+} as const;
+
+/**
+ * Recommendations saved per strategy
+ */
+export type RecommendationJobResourceStrategyCounts = { [key: string]: unknown };
+
+export type RecommendationJobResourceMetadata = { [key: string]: unknown };
+
+export interface RecommendationJobResource {
+  id: string;
+  public_id: string;
+  status: RecommendationJobResourceStatus;
+  is_full: boolean;
+  total_songs: number;
+  completed_songs: number;
+  current_strategy: string;
+  /** Recommendations saved per strategy */
+  strategy_counts: RecommendationJobResourceStrategyCounts;
+  progress_percentage: number;
+  created_at: string;
+  /** @nullable */
+  started_at?: string | null;
+  /** @nullable */
+  completed_at?: string | null;
+  /** @nullable */
+  fail_reason?: string | null;
+  metadata: RecommendationJobResourceMetadata;
+  /** @nullable */
+  original_job_id?: string | null;
 }
 
 export interface RecommendationResource {
@@ -4034,11 +4074,16 @@ export type GetAdminLyricsCoverage200 = {
 };
 
 export type PostAdminLyricsBulkFetchBody = {
-  /** Max number of jobs to enqueue */
-  limit?: number;
+  /**
+     * Most songs to queue; absent or null queues every song without lyrics
+     * @minimum 1
+     * @nullable
+     */
+  limit?: number | null;
 };
 
 export type PostAdminLyricsBulkFetch200Data = {
+  /** Songs queued for fetching */
   jobsEnqueued?: number;
 };
 
@@ -4209,15 +4254,27 @@ export type GetAdminMetadataSyncStatus200 = {
   data?: GetAdminMetadataSyncStatus200Data;
 };
 
+/**
+ * genres for the genre sync only; null or absent for one sync per library
+ * @nullable
+ */
+export type PostAdminMetadataTriggerSyncBodySource = typeof PostAdminMetadataTriggerSyncBodySource[keyof typeof PostAdminMetadataTriggerSyncBodySource] | null;
+
+
+export const PostAdminMetadataTriggerSyncBodySource = {
+  genres: 'genres',
+} as const;
+
 export type PostAdminMetadataTriggerSyncBody = {
   /**
-     * Sync source: genres or null for full library sync
+     * genres for the genre sync only; null or absent for one sync per library
      * @nullable
      */
-  source?: string | null;
+  source?: PostAdminMetadataTriggerSyncBodySource;
 };
 
 export type PostAdminMetadataTriggerSync200Data = {
+  /** Jobs queued: one per library, or one per album and song for the genre sync */
   jobsDispatched?: number;
 };
 
@@ -5093,6 +5150,22 @@ export type GetAdminRecommendationsFreshness200 = {
   data?: GetAdminRecommendationsFreshness200Data;
 };
 
+export type PostAdminRecommendationsGenerate200DataMode = typeof PostAdminRecommendationsGenerate200DataMode[keyof typeof PostAdminRecommendationsGenerate200DataMode];
+
+
+export const PostAdminRecommendationsGenerate200DataMode = {
+  full: 'full',
+  incremental: 'incremental',
+} as const;
+
+export type PostAdminRecommendationsGenerate200DataStatus = typeof PostAdminRecommendationsGenerate200DataStatus[keyof typeof PostAdminRecommendationsGenerate200DataStatus];
+
+
+export const PostAdminRecommendationsGenerate200DataStatus = {
+  completed: 'completed',
+  cancelled: 'cancelled',
+} as const;
+
 export type PostAdminRecommendationsGenerate200DataCounts = { [key: string]: unknown };
 
 export type PostAdminRecommendationsGenerate200DataExecution = typeof PostAdminRecommendationsGenerate200DataExecution[keyof typeof PostAdminRecommendationsGenerate200DataExecution];
@@ -5103,6 +5176,10 @@ export const PostAdminRecommendationsGenerate200DataExecution = {
 } as const;
 
 export type PostAdminRecommendationsGenerate200Data = {
+  job_id?: string;
+  public_id?: string;
+  mode?: PostAdminRecommendationsGenerate200DataMode;
+  status?: PostAdminRecommendationsGenerate200DataStatus;
   counts?: PostAdminRecommendationsGenerate200DataCounts;
   execution?: PostAdminRecommendationsGenerate200DataExecution;
 };
@@ -5124,7 +5201,6 @@ export type PostAdminRecommendationsGenerate202DataExecution = typeof PostAdminR
 
 export const PostAdminRecommendationsGenerate202DataExecution = {
   async: 'async',
-  sync: 'sync',
 } as const;
 
 export type PostAdminRecommendationsGenerate202Data = {
@@ -5139,40 +5215,8 @@ export type PostAdminRecommendationsGenerate202 = {
   data?: PostAdminRecommendationsGenerate202Data;
 };
 
-export type GetAdminRecommendationsJobStatus200DataStatus = typeof GetAdminRecommendationsJobStatus200DataStatus[keyof typeof GetAdminRecommendationsJobStatus200DataStatus];
-
-
-export const GetAdminRecommendationsJobStatus200DataStatus = {
-  pending: 'pending',
-  in_progress: 'in_progress',
-  completed: 'completed',
-  failed: 'failed',
-  cancelled: 'cancelled',
-} as const;
-
-export type GetAdminRecommendationsJobStatus200DataStrategyCounts = { [key: string]: unknown };
-
-export type GetAdminRecommendationsJobStatus200Data = {
-  id?: string;
-  public_id?: string;
-  status?: GetAdminRecommendationsJobStatus200DataStatus;
-  is_full?: boolean;
-  total_songs?: number;
-  completed_songs?: number;
-  current_strategy?: string;
-  strategy_counts?: GetAdminRecommendationsJobStatus200DataStrategyCounts;
-  progress_percentage?: number;
-  created_at?: string;
-  /** @nullable */
-  started_at?: string | null;
-  /** @nullable */
-  completed_at?: string | null;
-  /** @nullable */
-  fail_reason?: string | null;
-};
-
 export type GetAdminRecommendationsJobStatus200 = {
-  data?: GetAdminRecommendationsJobStatus200Data;
+  data?: RecommendationJobResource;
 };
 
 export type PostAdminRecommendationsJobRequeue201DataMode = typeof PostAdminRecommendationsJobRequeue201DataMode[keyof typeof PostAdminRecommendationsJobRequeue201DataMode];
@@ -5183,11 +5227,27 @@ export const PostAdminRecommendationsJobRequeue201DataMode = {
   incremental: 'incremental',
 } as const;
 
+export type PostAdminRecommendationsJobRequeue201DataExecution = typeof PostAdminRecommendationsJobRequeue201DataExecution[keyof typeof PostAdminRecommendationsJobRequeue201DataExecution];
+
+
+export const PostAdminRecommendationsJobRequeue201DataExecution = {
+  async: 'async',
+  sync: 'sync',
+} as const;
+
+/**
+ * Only when the job ran during the request
+ */
+export type PostAdminRecommendationsJobRequeue201DataCounts = { [key: string]: unknown };
+
 export type PostAdminRecommendationsJobRequeue201Data = {
   job_id?: string;
   public_id?: string;
   mode?: PostAdminRecommendationsJobRequeue201DataMode;
   status?: string;
+  execution?: PostAdminRecommendationsJobRequeue201DataExecution;
+  /** Only when the job ran during the request */
+  counts?: PostAdminRecommendationsJobRequeue201DataCounts;
 };
 
 export type PostAdminRecommendationsJobRequeue201 = {
@@ -5196,7 +5256,7 @@ export type PostAdminRecommendationsJobRequeue201 = {
 
 export type GetAdminRecommendationsJobsListParams = {
 /**
- * Max jobs to return
+ * Max jobs to return, 1-100
  */
 limit?: number;
 /**
@@ -5216,15 +5276,8 @@ export const GetAdminRecommendationsJobsListStatus = {
   cancelled: 'cancelled',
 } as const;
 
-export type GetAdminRecommendationsJobsList200DataItem = {
-  id?: string;
-  public_id?: string;
-  status?: string;
-  created_at?: string;
-};
-
 export type GetAdminRecommendationsJobsList200 = {
-  data?: GetAdminRecommendationsJobsList200DataItem[];
+  data?: RecommendationJobResource[];
 };
 
 export type GetRecommendationIndexParams = {
@@ -5513,7 +5566,20 @@ export type GetDebugConfigCheck200 = {
   data?: GetDebugConfigCheck200Data;
 };
 
-export type GetDebugCoroutines200 = { [key: string]: unknown };
+export type GetDebugCoroutines200WorkersItem = { [key: string]: unknown };
+
+export type GetDebugCoroutines200WorkerErrorsItem = {
+  worker_id?: number;
+  error?: string;
+};
+
+export type GetDebugCoroutines200 = {
+  /** One entry per HTTP worker that answered: worker_id, coroutines, active_cids, channels */
+  workers?: GetDebugCoroutines200WorkersItem[];
+  /** Workers that did not answer in time */
+  missing_workers?: number[];
+  worker_errors?: GetDebugCoroutines200WorkerErrorsItem[];
+};
 
 export type GetMonitorAnalyticsSummaryParams = {
 /**
@@ -5973,10 +6039,40 @@ export type DeleteMonitorRatelimitersClear200 = {
   data?: DeleteMonitorRatelimitersClear200Data;
 };
 
-export type GetDebugStats200Data = { [key: string]: unknown };
+export type GetDebugStats200DataWorkersItem = { [key: string]: unknown };
+
+export type GetDebugStats200DataWorkerErrorsItem = {
+  worker_id?: number;
+  error?: string;
+};
+
+export type GetDebugStats200DataRedis = { [key: string]: unknown };
+
+export type GetDebugStats200DataSse = {
+  active_connections?: number;
+};
+
+export type GetDebugStats200Data = {
+  /** One entry per HTTP worker that answered: worker_id, memory, process, swoole, coroutines, pools */
+  workers?: GetDebugStats200DataWorkersItem[];
+  /** Workers that did not answer in time */
+  missing_workers?: number[];
+  worker_errors?: GetDebugStats200DataWorkerErrorsItem[];
+  redis?: GetDebugStats200DataRedis;
+  sse?: GetDebugStats200DataSse;
+};
 
 export type GetDebugStats200 = {
   data?: GetDebugStats200Data;
+};
+
+export type GetDebugSpansParams = {
+/**
+ * Number of spans to return, at most 500
+ * @minimum 0
+ * @maximum 500
+ */
+limit?: number;
 };
 
 export type GetDebugSpans200Item = { [key: string]: unknown };
@@ -8334,7 +8430,7 @@ export const getPatchAdminUsersUpdateUrl = (id: string,) => {
 }
 
 /**
- * A new email address starts unverified and is sent a verification link.
+ * A new email address starts unverified and is sent a verification link. The CLI counterparts are app:user:rename and app:user:change-email.
  * @summary Update a user
  */
 export const patchAdminUsersUpdate = async (id: string,
@@ -8352,7 +8448,7 @@ export const patchAdminUsersUpdate = async (id: string,
 
 
 
-export const getPatchAdminUsersUpdateMutationOptions = <TError = ErrorType<ApiError>,
+export const getPatchAdminUsersUpdateMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchAdminUsersUpdate>>, TError,{id: string;data: BodyType<AdminUpdateUserRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof patchAdminUsersUpdate>>, TError,{id: string;data: BodyType<AdminUpdateUserRequest>}, TContext> => {
 
@@ -8381,12 +8477,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PatchAdminUsersUpdateMutationResult = NonNullable<Awaited<ReturnType<typeof patchAdminUsersUpdate>>>
     export type PatchAdminUsersUpdateMutationBody = BodyType<AdminUpdateUserRequest>
-    export type PatchAdminUsersUpdateMutationError = ErrorType<ApiError>
+    export type PatchAdminUsersUpdateMutationError = ErrorType<ApiError | ValidationError>
 
     /**
  * @summary Update a user
  */
-export const usePatchAdminUsersUpdate = <TError = ErrorType<ApiError>,
+export const usePatchAdminUsersUpdate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchAdminUsersUpdate>>, TError,{id: string;data: BodyType<AdminUpdateUserRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof patchAdminUsersUpdate>>,
@@ -8423,7 +8519,7 @@ export const postAdminUsersAssignRoles = async (id: string,
 
 
 
-export const getPostAdminUsersAssignRolesMutationOptions = <TError = ErrorType<ApiError>,
+export const getPostAdminUsersAssignRolesMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersAssignRoles>>, TError,{id: string;data: BodyType<AdminAssignRolesRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersAssignRoles>>, TError,{id: string;data: BodyType<AdminAssignRolesRequest>}, TContext> => {
 
@@ -8452,12 +8548,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostAdminUsersAssignRolesMutationResult = NonNullable<Awaited<ReturnType<typeof postAdminUsersAssignRoles>>>
     export type PostAdminUsersAssignRolesMutationBody = BodyType<AdminAssignRolesRequest>
-    export type PostAdminUsersAssignRolesMutationError = ErrorType<ApiError>
+    export type PostAdminUsersAssignRolesMutationError = ErrorType<ApiError | ValidationError>
 
     /**
  * @summary Assign roles to a user
  */
-export const usePostAdminUsersAssignRoles = <TError = ErrorType<ApiError>,
+export const usePostAdminUsersAssignRoles = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersAssignRoles>>, TError,{id: string;data: BodyType<AdminAssignRolesRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postAdminUsersAssignRoles>>,
@@ -13783,7 +13879,7 @@ export const postGenreStore = async (postGenreStoreBody: PostGenreStoreBody, opt
 
 
 
-export const getPostGenreStoreMutationOptions = <TError = ErrorType<ValidationError>,
+export const getPostGenreStoreMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postGenreStore>>, TError,{data: BodyType<PostGenreStoreBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postGenreStore>>, TError,{data: BodyType<PostGenreStoreBody>}, TContext> => {
 
@@ -13812,12 +13908,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostGenreStoreMutationResult = NonNullable<Awaited<ReturnType<typeof postGenreStore>>>
     export type PostGenreStoreMutationBody = BodyType<PostGenreStoreBody>
-    export type PostGenreStoreMutationError = ErrorType<ValidationError>
+    export type PostGenreStoreMutationError = ErrorType<ApiError | ValidationError>
 
     /**
  * @summary Create a new genre
  */
-export const usePostGenreStore = <TError = ErrorType<ValidationError>,
+export const usePostGenreStore = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postGenreStore>>, TError,{data: BodyType<PostGenreStoreBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postGenreStore>>,
@@ -15903,7 +15999,7 @@ export const getDeleteLibraryDeleteUrl = (id: string,) => {
 }
 
 /**
- * @summary Delete a library
+ * @summary Delete a library (admin)
  */
 export const deleteLibraryDelete = async (id: string, options?: RequestInit): Promise<DeleteLibraryDelete200> => {
 
@@ -15951,7 +16047,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteLibraryDeleteMutationError = ErrorType<ApiError>
 
     /**
- * @summary Delete a library
+ * @summary Delete a library (admin)
  */
 export const useDeleteLibraryDelete = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteLibraryDelete>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -15973,7 +16069,7 @@ export const getPatchLibraryUpdateUrl = (id: string,) => {
 }
 
 /**
- * @summary Update a library
+ * @summary Rename or reorder a library (admin)
  */
 export const patchLibraryUpdate = async (id: string,
     patchLibraryUpdateBody: PatchLibraryUpdateBody, options?: RequestInit): Promise<PatchLibraryUpdate200> => {
@@ -16022,7 +16118,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PatchLibraryUpdateMutationError = ErrorType<ApiError | ValidationError>
 
     /**
- * @summary Update a library
+ * @summary Rename or reorder a library (admin)
  */
 export const usePatchLibraryUpdate = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchLibraryUpdate>>, TError,{id: string;data: BodyType<PatchLibraryUpdateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -16044,8 +16140,8 @@ export const getPostLibraryScanUrl = (id: string,) => {
 }
 
 /**
- * Dispatches an asynchronous scan job. The scan runs in the background and progress is reported via SSE.
- * @summary Trigger a library scan
+ * Claims the library for a scan and dispatches an asynchronous scan job. The scan runs in the background and progress is reported via SSE. A library that is already scanning answers 409.
+ * @summary Trigger a library scan (admin)
  */
 export const postLibraryScan = async (id: string, options?: RequestInit): Promise<PostLibraryScan202> => {
 
@@ -16093,7 +16189,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostLibraryScanMutationError = ErrorType<ApiError>
 
     /**
- * @summary Trigger a library scan
+ * @summary Trigger a library scan (admin)
  */
 export const usePostLibraryScan = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postLibraryScan>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -16288,7 +16384,7 @@ export const getPostLibraryScanAllUrl = () => {
 
 /**
  * Dispatches an asynchronous scan job for every library. Skips libraries already scanning.
- * @summary Trigger scan for all libraries
+ * @summary Trigger scan for all libraries (admin)
  */
 export const postLibraryScanAll = async ( options?: RequestInit): Promise<PostLibraryScanAll202> => {
 
@@ -16336,7 +16432,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostLibraryScanAllMutationError = ErrorType<ApiError>
 
     /**
- * @summary Trigger scan for all libraries
+ * @summary Trigger scan for all libraries (admin)
  */
 export const usePostLibraryScanAll = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postLibraryScanAll>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -16459,7 +16555,7 @@ export const getPostAdminLyricsBulkFetchUrl = () => {
 }
 
 /**
- * @summary Trigger bulk lyrics fetch (SUPER_ADMIN only)
+ * @summary Queue a lyrics fetch for every song without lyrics (SUPER_ADMIN only)
  */
 export const postAdminLyricsBulkFetch = async (postAdminLyricsBulkFetchBody?: PostAdminLyricsBulkFetchBody, options?: RequestInit): Promise<PostAdminLyricsBulkFetch200> => {
 
@@ -16507,7 +16603,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminLyricsBulkFetchMutationError = ErrorType<ApiError>
 
     /**
- * @summary Trigger bulk lyrics fetch (SUPER_ADMIN only)
+ * @summary Queue a lyrics fetch for every song without lyrics (SUPER_ADMIN only)
  */
 export const usePostAdminLyricsBulkFetch = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminLyricsBulkFetch>>, TError,{data?: BodyType<PostAdminLyricsBulkFetchBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -21225,7 +21321,7 @@ export const getGetAdminQolStatusUrl = () => {
 }
 
 /**
- * @summary Get stream governor status
+ * @summary Get the stream governor status of every web server worker
  */
 export const getAdminQolStatus = async ( options?: RequestInit): Promise<void> => {
 
@@ -21296,7 +21392,7 @@ export function useGetAdminQolStatus<TData = Awaited<ReturnType<typeof getAdminQ
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get stream governor status
+ * @summary Get the stream governor status of every web server worker
  */
 
 export function useGetAdminQolStatus<TData = Awaited<ReturnType<typeof getAdminQolStatus>>, TError = ErrorType<ApiError>>(
@@ -21326,7 +21422,7 @@ export const getGetAdminQolStreamsUrl = () => {
 }
 
 /**
- * @summary List active streams with budget allocations
+ * @summary List the active streams of every web server worker with their budget allocations
  */
 export const getAdminQolStreams = async ( options?: RequestInit): Promise<void> => {
 
@@ -21397,7 +21493,7 @@ export function useGetAdminQolStreams<TData = Awaited<ReturnType<typeof getAdmin
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary List active streams with budget allocations
+ * @summary List the active streams of every web server worker with their budget allocations
  */
 
 export function useGetAdminQolStreams<TData = Awaited<ReturnType<typeof getAdminQolStreams>>, TError = ErrorType<ApiError>>(
@@ -21427,7 +21523,7 @@ export const getPatchAdminQolProfileUrl = () => {
 }
 
 /**
- * @summary Update algorithm profile
+ * @summary Set the algorithm profile in every web server worker
  */
 export const patchAdminQolProfile = async (patchAdminQolProfileBody?: PatchAdminQolProfileBody, options?: RequestInit): Promise<void> => {
 
@@ -21475,7 +21571,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PatchAdminQolProfileMutationError = ErrorType<ApiError>
 
     /**
- * @summary Update algorithm profile
+ * @summary Set the algorithm profile in every web server worker
  */
 export const usePatchAdminQolProfile = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchAdminQolProfile>>, TError,{data?: BodyType<PatchAdminQolProfileBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -21497,7 +21593,7 @@ export const getPostAdminQolResetUrl = () => {
 }
 
 /**
- * @summary Reset learning data and return to Learning state
+ * @summary Reset learning data in every web server worker and return each to the Learning state
  */
 export const postAdminQolReset = async ( options?: RequestInit): Promise<void> => {
 
@@ -21545,7 +21641,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAdminQolResetMutationError = ErrorType<ApiError>
 
     /**
- * @summary Reset learning data and return to Learning state
+ * @summary Reset learning data in every web server worker and return each to the Learning state
  */
 export const usePostAdminQolReset = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminQolReset>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -23043,7 +23139,7 @@ export const getPostAdminRecommendationsGenerateUrl = () => {
 }
 
 /**
- * Starts a new recommendation generation job. Returns immediately with job ID for async execution, or results for synchronous execution.
+ * Creates a recommendation job. In the web server the job runs on the CPU process pool and the response returns at once with the pending job; without the pool the job runs during the request and the response carries its counts.
  * @summary Trigger recommendation generation
  */
 export const postAdminRecommendationsGenerate = async ( options?: RequestInit): Promise<PostAdminRecommendationsGenerate200 | PostAdminRecommendationsGenerate202> => {
@@ -23215,6 +23311,7 @@ export const getDeleteAdminRecommendationsJobCancelUrl = (publicId: string,) => 
 }
 
 /**
+ * Cancelling a cancelled job succeeds without change.
  * @summary Cancel a recommendation job
  */
 export const deleteAdminRecommendationsJobCancel = async (publicId: string, options?: RequestInit): Promise<void> => {
@@ -23285,7 +23382,7 @@ export const getPostAdminRecommendationsJobRequeueUrl = (publicId: string,) => {
 }
 
 /**
- * Creates a new job with the same parameters as the original
+ * Creates a new job with the same parameters as the original and starts it like a generated job.
  * @summary Requeue a failed or cancelled recommendation job
  */
 export const postAdminRecommendationsJobRequeue = async (publicId: string, options?: RequestInit): Promise<PostAdminRecommendationsJobRequeue201> => {
@@ -24258,7 +24355,7 @@ export const postAdminSchedulerCreate = async (createScheduledJobRequest: Create
 
 
 
-export const getPostAdminSchedulerCreateMutationOptions = <TError = ErrorType<unknown>,
+export const getPostAdminSchedulerCreateMutationOptions = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminSchedulerCreate>>, TError,{data: BodyType<CreateScheduledJobRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postAdminSchedulerCreate>>, TError,{data: BodyType<CreateScheduledJobRequest>}, TContext> => {
 
@@ -24287,12 +24384,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostAdminSchedulerCreateMutationResult = NonNullable<Awaited<ReturnType<typeof postAdminSchedulerCreate>>>
     export type PostAdminSchedulerCreateMutationBody = BodyType<CreateScheduledJobRequest>
-    export type PostAdminSchedulerCreateMutationError = ErrorType<unknown>
+    export type PostAdminSchedulerCreateMutationError = ErrorType<ApiError>
 
     /**
  * @summary Create a scheduled job
  */
-export const usePostAdminSchedulerCreate = <TError = ErrorType<unknown>,
+export const usePostAdminSchedulerCreate = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminSchedulerCreate>>, TError,{data: BodyType<CreateScheduledJobRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postAdminSchedulerCreate>>,
@@ -25731,7 +25828,7 @@ export const getGetDebugCoroutinesUrl = () => {
 }
 
 /**
- * @summary Swoole coroutine and channel statistics
+ * @summary Swoole coroutine and channel statistics of every HTTP worker
  */
 export const getDebugCoroutines = async ( options?: RequestInit): Promise<GetDebugCoroutines200> => {
 
@@ -25802,7 +25899,7 @@ export function useGetDebugCoroutines<TData = Awaited<ReturnType<typeof getDebug
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Swoole coroutine and channel statistics
+ * @summary Swoole coroutine and channel statistics of every HTTP worker
  */
 
 export function useGetDebugCoroutines<TData = Awaited<ReturnType<typeof getDebugCoroutines>>, TError = ErrorType<unknown>>(
@@ -26291,7 +26388,7 @@ export const getGetMonitorJobsQueryKey = (params?: GetMonitorJobsParams,) => {
     }
 
 
-export const getGetMonitorJobsQueryOptions = <TData = Awaited<ReturnType<typeof getMonitorJobs>>, TError = ErrorType<unknown>>(params?: GetMonitorJobsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorJobs>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetMonitorJobsQueryOptions = <TData = Awaited<ReturnType<typeof getMonitorJobs>>, TError = ErrorType<ApiError>>(params?: GetMonitorJobsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorJobs>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -26310,10 +26407,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetMonitorJobsQueryResult = NonNullable<Awaited<ReturnType<typeof getMonitorJobs>>>
-export type GetMonitorJobsQueryError = ErrorType<unknown>
+export type GetMonitorJobsQueryError = ErrorType<ApiError>
 
 
-export function useGetMonitorJobs<TData = Awaited<ReturnType<typeof getMonitorJobs>>, TError = ErrorType<unknown>>(
+export function useGetMonitorJobs<TData = Awaited<ReturnType<typeof getMonitorJobs>>, TError = ErrorType<ApiError>>(
  params: undefined |  GetMonitorJobsParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorJobs>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getMonitorJobs>>,
@@ -26323,7 +26420,7 @@ export function useGetMonitorJobs<TData = Awaited<ReturnType<typeof getMonitorJo
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetMonitorJobs<TData = Awaited<ReturnType<typeof getMonitorJobs>>, TError = ErrorType<unknown>>(
+export function useGetMonitorJobs<TData = Awaited<ReturnType<typeof getMonitorJobs>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorJobsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorJobs>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getMonitorJobs>>,
@@ -26333,7 +26430,7 @@ export function useGetMonitorJobs<TData = Awaited<ReturnType<typeof getMonitorJo
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetMonitorJobs<TData = Awaited<ReturnType<typeof getMonitorJobs>>, TError = ErrorType<unknown>>(
+export function useGetMonitorJobs<TData = Awaited<ReturnType<typeof getMonitorJobs>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorJobsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorJobs>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -26341,7 +26438,7 @@ export function useGetMonitorJobs<TData = Awaited<ReturnType<typeof getMonitorJo
  * @summary Get background jobs with filtering, sorting, and pagination
  */
 
-export function useGetMonitorJobs<TData = Awaited<ReturnType<typeof getMonitorJobs>>, TError = ErrorType<unknown>>(
+export function useGetMonitorJobs<TData = Awaited<ReturnType<typeof getMonitorJobs>>, TError = ErrorType<ApiError>>(
  params?: GetMonitorJobsParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getMonitorJobs>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -26486,7 +26583,7 @@ export const postMonitorPrune = async (postMonitorPruneBody?: PostMonitorPruneBo
 
 
 
-export const getPostMonitorPruneMutationOptions = <TError = ErrorType<ValidationError>,
+export const getPostMonitorPruneMutationOptions = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postMonitorPrune>>, TError,{data?: BodyType<PostMonitorPruneBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postMonitorPrune>>, TError,{data?: BodyType<PostMonitorPruneBody>}, TContext> => {
 
@@ -26515,12 +26612,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostMonitorPruneMutationResult = NonNullable<Awaited<ReturnType<typeof postMonitorPrune>>>
     export type PostMonitorPruneMutationBody = BodyType<PostMonitorPruneBody> | undefined
-    export type PostMonitorPruneMutationError = ErrorType<ValidationError>
+    export type PostMonitorPruneMutationError = ErrorType<ApiError>
 
     /**
  * @summary Prune old job monitors
  */
-export const usePostMonitorPrune = <TError = ErrorType<ValidationError>,
+export const usePostMonitorPrune = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postMonitorPrune>>, TError,{data?: BodyType<PostMonitorPruneBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postMonitorPrune>>,
@@ -26557,7 +26654,7 @@ export const postMonitorJobsRetry = async (jobId: string, options?: RequestInit)
 
 
 
-export const getPostMonitorJobsRetryMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+export const getPostMonitorJobsRetryMutationOptions = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postMonitorJobsRetry>>, TError,{jobId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postMonitorJobsRetry>>, TError,{jobId: string}, TContext> => {
 
@@ -26586,12 +26683,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostMonitorJobsRetryMutationResult = NonNullable<Awaited<ReturnType<typeof postMonitorJobsRetry>>>
 
-    export type PostMonitorJobsRetryMutationError = ErrorType<ApiError | ValidationError>
+    export type PostMonitorJobsRetryMutationError = ErrorType<ApiError>
 
     /**
  * @summary Retry a failed background job
  */
-export const usePostMonitorJobsRetry = <TError = ErrorType<ApiError | ValidationError>,
+export const usePostMonitorJobsRetry = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postMonitorJobsRetry>>, TError,{jobId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postMonitorJobsRetry>>,
@@ -26628,7 +26725,7 @@ export const postMonitorJobsCancel = async (jobId: string, options?: RequestInit
 
 
 
-export const getPostMonitorJobsCancelMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
+export const getPostMonitorJobsCancelMutationOptions = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postMonitorJobsCancel>>, TError,{jobId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postMonitorJobsCancel>>, TError,{jobId: string}, TContext> => {
 
@@ -26657,12 +26754,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostMonitorJobsCancelMutationResult = NonNullable<Awaited<ReturnType<typeof postMonitorJobsCancel>>>
 
-    export type PostMonitorJobsCancelMutationError = ErrorType<ApiError | ValidationError>
+    export type PostMonitorJobsCancelMutationError = ErrorType<ApiError>
 
     /**
  * @summary Cancel a running or queued background job
  */
-export const usePostMonitorJobsCancel = <TError = ErrorType<ApiError | ValidationError>,
+export const usePostMonitorJobsCancel = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postMonitorJobsCancel>>, TError,{jobId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postMonitorJobsCancel>>,
@@ -26941,7 +27038,7 @@ export const getGetDebugStatsUrl = () => {
 }
 
 /**
- * @summary Internal server diagnostics with coroutine and channel stats
+ * @summary Per-worker server diagnostics with the shared Redis and SSE figures
  */
 export const getDebugStats = async ( options?: RequestInit): Promise<GetDebugStats200> => {
 
@@ -27012,7 +27109,7 @@ export function useGetDebugStats<TData = Awaited<ReturnType<typeof getDebugStats
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Internal server diagnostics with coroutine and channel stats
+ * @summary Per-worker server diagnostics with the shared Redis and SSE figures
  */
 
 export function useGetDebugStats<TData = Awaited<ReturnType<typeof getDebugStats>>, TError = ErrorType<unknown>>(
@@ -27033,20 +27130,27 @@ export function useGetDebugStats<TData = Awaited<ReturnType<typeof getDebugStats
 
 
 
-export const getGetDebugSpansUrl = () => {
+export const getGetDebugSpansUrl = (params?: GetDebugSpansParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/debug/spans`
+  return stringifiedParams.length > 0 ? `/api/debug/spans?${stringifiedParams}` : `/api/debug/spans`
 }
 
 /**
- * @summary Recent OpenTelemetry spans
+ * @summary Recent server spans, newest first
  */
-export const getDebugSpans = async ( options?: RequestInit): Promise<GetDebugSpans200Item[]> => {
+export const getDebugSpans = async (params?: GetDebugSpansParams, options?: RequestInit): Promise<GetDebugSpans200Item[]> => {
 
-  return customInstance<GetDebugSpans200Item[]>(getGetDebugSpansUrl(),
+  return customInstance<GetDebugSpans200Item[]>(getGetDebugSpansUrl(params),
   {
     ...options,
     method: 'GET'
@@ -27059,23 +27163,23 @@ export const getDebugSpans = async ( options?: RequestInit): Promise<GetDebugSpa
 
 
 
-export const getGetDebugSpansQueryKey = () => {
+export const getGetDebugSpansQueryKey = (params?: GetDebugSpansParams,) => {
     return [
-    `/api/debug/spans`
+    `/api/debug/spans`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetDebugSpansQueryOptions = <TData = Awaited<ReturnType<typeof getDebugSpans>>, TError = ErrorType<unknown>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugSpans>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetDebugSpansQueryOptions = <TData = Awaited<ReturnType<typeof getDebugSpans>>, TError = ErrorType<unknown>>(params?: GetDebugSpansParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugSpans>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetDebugSpansQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetDebugSpansQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDebugSpans>>> = ({ signal }) => getDebugSpans({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDebugSpans>>> = ({ signal }) => getDebugSpans(params, { signal, ...requestOptions });
 
 
 
@@ -27089,7 +27193,7 @@ export type GetDebugSpansQueryError = ErrorType<unknown>
 
 
 export function useGetDebugSpans<TData = Awaited<ReturnType<typeof getDebugSpans>>, TError = ErrorType<unknown>>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugSpans>>, TError, TData>> & Pick<
+ params: undefined |  GetDebugSpansParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugSpans>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getDebugSpans>>,
           TError,
@@ -27099,7 +27203,7 @@ export function useGetDebugSpans<TData = Awaited<ReturnType<typeof getDebugSpans
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetDebugSpans<TData = Awaited<ReturnType<typeof getDebugSpans>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugSpans>>, TError, TData>> & Pick<
+ params?: GetDebugSpansParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugSpans>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getDebugSpans>>,
           TError,
@@ -27109,19 +27213,19 @@ export function useGetDebugSpans<TData = Awaited<ReturnType<typeof getDebugSpans
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetDebugSpans<TData = Awaited<ReturnType<typeof getDebugSpans>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugSpans>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ params?: GetDebugSpansParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugSpans>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Recent OpenTelemetry spans
+ * @summary Recent server spans, newest first
  */
 
 export function useGetDebugSpans<TData = Awaited<ReturnType<typeof getDebugSpans>>, TError = ErrorType<unknown>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugSpans>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ params?: GetDebugSpansParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getDebugSpans>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetDebugSpansQueryOptions(options)
+  const queryOptions = getGetDebugSpansQueryOptions(params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -27143,7 +27247,7 @@ export const getDeleteDebugSpansClearUrl = () => {
 }
 
 /**
- * @summary Clear in-memory spans
+ * @summary Clear the span buffer of every worker
  */
 export const deleteDebugSpansClear = async ( options?: RequestInit): Promise<DeleteDebugSpansClear200> => {
 
@@ -27191,7 +27295,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteDebugSpansClearMutationError = ErrorType<unknown>
 
     /**
- * @summary Clear in-memory spans
+ * @summary Clear the span buffer of every worker
  */
 export const useDeleteDebugSpansClear = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteDebugSpansClear>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -27555,7 +27659,7 @@ export const getGetMonitorTransportStatusUrl = () => {
 }
 
 /**
- * Returns queue depths, consumer name, and consumer running status for the messenger transports.
+ * Returns queue depths, consumer name, and consumer running status for the messenger transports. CLI counterpart: app:monitor:transport.
  * @summary Get transport status
  */
 export const getMonitorTransportStatus = async ( options?: RequestInit): Promise<GetMonitorTransportStatus200> => {
@@ -27664,7 +27768,7 @@ export const getGetMonitorTransportFailedListUrl = (params?: GetMonitorTransport
 }
 
 /**
- * Lists the messages held by the failure transport, newest first. CLI counterpart: messenger:failed:show.
+ * Lists the messages held by the failure transport, newest first, including messages waiting out a retry delay. CLI counterpart: app:failed-message:list.
  * @summary List failed messages
  */
 export const getMonitorTransportFailedList = async (params?: GetMonitorTransportFailedListParams, options?: RequestInit): Promise<GetMonitorTransportFailedList200> => {
@@ -27946,7 +28050,7 @@ export const getPostMonitorTransportFailedFlushUrl = (params: PostMonitorTranspo
 }
 
 /**
- * Removes all messages from the failed transport. Requires ?confirm=true query parameter. CLI counterpart: messenger:failed:remove --all --force.
+ * Removes all messages from the failed transport, including messages waiting out a retry delay. Requires ?confirm=true query parameter. CLI counterpart: app:failed-message:flush.
  * @summary Flush all failed messages
  */
 export const postMonitorTransportFailedFlush = async (params: PostMonitorTransportFailedFlushParams, options?: RequestInit): Promise<PostMonitorTransportFailedFlush200> => {
