@@ -7,6 +7,7 @@ namespace App\Recommendation\Infrastructure;
 use App\Recommendation\Application\Port\RecommendationJobPortInterface;
 use App\Recommendation\Domain\Model\RecommendationJob;
 use App\Recommendation\Domain\Repository\RecommendationJobRepositoryInterface;
+use App\Recommendation\Domain\ValueObject\RecommendationJobStatus;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 
@@ -46,5 +47,10 @@ final class RecommendationJobService implements RecommendationJobPortInterface
     public function save(RecommendationJob $job): void
     {
         $this->repository->save($job);
+    }
+
+    public function isCancelled(Uuid $id): bool
+    {
+        return $this->repository->findStoredStatus($id) === RecommendationJobStatus::Cancelled;
     }
 }

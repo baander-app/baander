@@ -290,9 +290,6 @@ deptrac:
       - App\Auth\Infrastructure\Doctrine\Entity\UserEntity
     App\Recommendation\Infrastructure\Doctrine\Repository\RecommendationRepository:
       - App\Auth\Infrastructure\Doctrine\Entity\UserEntity
-    App\Recommendation\Interface\Controller\RecommendationAdminController:
-      - App\Recommendation\Domain\Model\RecommendationJob
-      - App\Recommendation\Domain\ValueObject\RecommendationJobStatus
     App\Recommendation\Interface\Controller\RecommendationController:
       - App\Recommendation\Domain\ValueObject\RecommendationType
     App\Shared\Infrastructure\EventListener\ExceptionSubscriber:

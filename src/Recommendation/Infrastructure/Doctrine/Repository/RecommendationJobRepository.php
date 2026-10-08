@@ -58,6 +58,17 @@ final class RecommendationJobRepository implements RecommendationJobRepositoryIn
         return $entity !== null ? $this->toDomain($entity) : null;
     }
 
+    public function findStoredStatus(Uuid $uuid): ?RecommendationJobStatus
+    {
+        // DBAL instead of the ORM, whose identity map would return the status this process loaded.
+        $status = $this->entityManager->getConnection()->fetchOne(
+            'SELECT status FROM recommendation_jobs WHERE id = ?',
+            [$uuid->toString()],
+        );
+
+        return is_string($status) ? RecommendationJobStatus::from($status) : null;
+    }
+
     public function findPendingJobs(): array
     {
         $entities = $this->entityManager

@@ -87,7 +87,7 @@ final class RecommendationScheduleTest extends TestCase
         self::assertSame(GenerateRecommendationsHandler::SKIPPED_AUTO_GENERATE_OFF, $this->lastResult());
 
         $console = new Application($this->kernel);
-        $tester = new CommandTester($console->find('app:recommendations:generate'));
+        $tester = new CommandTester($console->find('app:recommendation:generate'));
         self::assertSame(Command::SUCCESS, $tester->execute([]));
         self::assertGreaterThan(0, $this->recommendationsFrom($songs));
     }
