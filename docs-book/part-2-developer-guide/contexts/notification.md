@@ -50,7 +50,7 @@ In-app notifications, push and webhook text stay in English. `CreateNotification
 
 `NotificationSettingDefinitions` contributes `notifications.push_enabled` (default `true`). While it is off, `SendPushHandler` skips the push and logs the skip; the notification itself is still created and the other channels are unaffected.
 
-`notifications.admin_alerts` (default `true`) is defined in Shared's `SharedSettingDefinitions`, because the health monitor that reads it lives in Shared. While it is off, `HealthAlertService` logs a health degradation without alerting administrators. Other admin alerts, such as new user registrations, are always sent.
+`notifications.admin_alerts` (default `true`) is defined in Shared's `SharedSettingDefinitions`, because the health monitor that reads it lives in Shared. While it is off, `HealthAlertService` logs a health degradation without alerting administrators. Other admin alerts, such as new user registrations, are always sent. Migration `Version20261007140000` seeds the **Check system health** job, which dispatches Shared's `CheckHealthCommand` every five minutes; `CheckHealthHandler` calls `HealthAlertService` through `HealthAlertPortInterface`. The service remembers each component's previous status in memory, so it alerts on a change from healthy, not on every run.
 
 Both handlers read the setting for every message, so a change applies without a restart. See [Settings](shared.md#settings) for the mechanism.
 

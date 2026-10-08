@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Health;
 
 use App\Shared\Application\Port\AdminAlertPortInterface;
+use App\Shared\Application\Port\HealthAlertPortInterface;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Application\Settings\SharedSettingDefinitions;
 use Psr\Log\LoggerInterface;
@@ -13,10 +14,14 @@ use Psr\Log\LoggerInterface;
  * Monitors health check results and fires admin alerts when component status changes.
  *
  * Tracks previous health state in memory (per-worker) and compares against
- * current state on each check call. The `notifications.admin_alerts` setting
- * turns these alerts off; the degradation is still logged.
+ * current state on each check call, so a component alerts once when it leaves
+ * healthy and again only after it has recovered. The first check in a process
+ * records a baseline and never alerts. The scheduled CheckHealthCommand calls
+ * checkAndAlert() every five minutes in the Messenger consumer. The
+ * `notifications.admin_alerts` setting turns these alerts off; the degradation
+ * is still logged.
  */
-final class HealthAlertService
+final class HealthAlertService implements HealthAlertPortInterface
 {
     /** @var array<string, string> Component → last known status */
     private array $previousState = [];

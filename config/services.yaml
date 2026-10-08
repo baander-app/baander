@@ -1119,6 +1119,8 @@ services:
         alias: App\UserPreference\Infrastructure\UserSettingsContract
     App\Shared\Application\Port\AdminAlertPortInterface:
         alias: App\Shared\Infrastructure\Event\AdminAlertService
+    App\Shared\Application\Port\HealthAlertPortInterface:
+        alias: App\Shared\Infrastructure\Health\HealthAlertService
 
     App\Shared\Application\Port\TransactionPortInterface:
         alias: App\Shared\Infrastructure\Doctrine\DoctrineTransaction

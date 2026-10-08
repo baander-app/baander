@@ -156,6 +156,14 @@ Two [server settings](configuration.md#server-settings) switch parts of notifica
 | `notifications.push_enabled` | `true` | No browser push is sent. The notification is still created and delivered in the app and by any other channel, and each skipped push is logged. |
 | `notifications.admin_alerts` | `true` | A health check that stops reporting healthy no longer alerts administrators; the degradation is still logged. Other admin alerts, such as new user registrations, are always sent. |
 
+### Health alerts
+
+A scheduled job, **Check system health**, runs the health checks every five minutes. A fresh install creates it, and you can reschedule or pause it in the scheduler admin. While it is paused, no health alert is sent, whatever `notifications.admin_alerts` says.
+
+The job runs in the worker, which keeps each component's status from the previous check in memory. A component alerts once when it stops reporting healthy and alerts again only after it has reported healthy in between. The first check after the worker starts records the statuses without alerting.
+
+The job sees the components from the worker; it does not check the web server. An outage that keeps the worker from running the job, such as a stopped worker or an unreachable PostgreSQL or Redis, also prevents the alert. Use the [health endpoints](monitoring.md#health-checks) to detect those.
+
 ## Scope
 
 This page covers admin-configurable notification channels: push key setup, webhook management, and mailer configuration. User-facing notification preference toggling (per-category, per-channel opt-in/out) is not documented here because access control on those endpoints has not been verified for the current release.
