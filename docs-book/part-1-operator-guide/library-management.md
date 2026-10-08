@@ -38,11 +38,21 @@ The scan performs these steps:
 
 1. **File discovery** -- recursively walks the library directory and collects all files with recognized media extensions
 2. **Metadata extraction** -- reads tags from audio files (title, artist, album, track number, duration) and video files (title, duration, resolution)
-3. **External enrichment** -- queries external APIs to fill in missing metadata such as genre, year, cover art URLs, and artist biographies
 
 Scanning is idempotent. Running it multiple times on the same library will update existing records and add new files without creating duplicates. Removed files are cleaned up on subsequent scans.
 
-See the [command reference](commands/app-library-scan.md) for details. Metadata enrichment depends on the [External APIs](external-apis.md) configuration.
+See the [command reference](commands/app-library-scan.md) for details.
+
+### What happens to new music
+
+The scan hands the files it finds to the catalog, which adds the new albums and tracks in the background. Two [server settings](configuration.md#server-settings), both off by default, add work for each new item. Baander reads them each time it adds an album or tracks, so a change applies to the next scan without a restart.
+
+| Setting | While it is on |
+|---------|----------------|
+| `metadata.auto_sync` | Each new album is queued for a metadata sync from the [external services](external-apis.md), right after the catalog stores it. |
+| `lyrics.auto_fetch` | Each new track without an `.lrc` lyrics file beside it is queued for a lyrics fetch from LRCLIB, once the catalog has stored the track. A track with an `.lrc` file takes its lyrics from that file. |
+
+Both act only on albums and tracks that a scan creates. A rescan of music Baander already has queues nothing. The bulk lyrics fetch, [`baander:lyrics:fetch`](commands/baander-lyrics-fetch.md), and the syncs and fetches an administrator starts are not affected by either setting.
 
 ## File Watching
 
@@ -125,6 +135,6 @@ See the [command reference](commands/app-albums-extract-covers.md) for details.
 
 ## Next Steps
 
-- [External APIs](external-apis.md) -- configure Discogs, Last.fm, Spotify, MusicBrainz, and TasteDive for metadata enrichment during scans
+- [External APIs](external-apis.md) -- configure Discogs, Last.fm, Spotify, MusicBrainz, and TasteDive for metadata enrichment
 - [Transcoding](transcoding.md) -- set up on-demand media conversion for streaming and quality tiers
 - [CLI Reference](commands/README.md) -- full list of available console commands

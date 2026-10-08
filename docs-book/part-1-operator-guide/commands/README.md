@@ -120,6 +120,16 @@ own exit code without JSON. Error output contains no credentials or raw diagnost
 | [app:user:disable](app-user-disable.md) | Disable a user account |
 | [app:user:enable](app-user-enable.md) | Enable a previously disabled user account |
 | [app:user:reset-password](app-user-reset-password.md) | Set a new password for a user and sign them out everywhere |
+| [app:user:setting](app-user-setting.md) | Show, set or reset a user's setting, such as their email language |
+
+## Server Settings
+
+| Command | Description |
+|---------|-------------|
+| [app:settings:get](app-settings.md#appsettingsget) | Show a server setting: its value, default and stored value |
+| [app:settings:list](app-settings.md#appsettingslist) | List every server setting with its value, default and enforcement |
+| [app:settings:reset](app-settings.md#appsettingsreset) | Reset a server setting to its default |
+| [app:settings:set](app-settings.md#appsettingsset) | Set a server setting |
 
 ## Libraries & Catalog
 

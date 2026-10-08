@@ -36,9 +36,17 @@ Each domain service implements one recommendation algorithm:
 | Command | Handler | Purpose |
 |---------|---------|---------|
 | `SaveRecommendationCommand` | `SaveRecommendationHandler` | Persist a single computed recommendation |
-| `GenerateRecommendationsCommand` | `GenerateRecommendationsHandler` | Run recommendation generation (console wrapper dispatches this) |
+| `GenerateRecommendationsCommand` | `GenerateRecommendationsHandler` | Run recommendation generation (dispatched by the console command, the admin action and the scheduler) |
 | `DeleteRecommendationCommand` | `DeleteRecommendationHandler` | Remove one recommendation by UUID |
 | `DeleteRecommendationsBySourceCommand` | `DeleteRecommendationsBySourceHandler` | Remove all recommendations originating from a source entity |
+
+## Scheduled Generation
+
+`GenerateRecommendationsCommand` implements the Scheduler's `SchedulableCommandInterface`, with the scheduler parameters `mode` (`full` or `incremental`) and `automatic`. Migration `Version20261007130000` seeds an active scheduled job, **Generate recommendations**, that dispatches it daily at 04:00 UTC with `{"mode":"incremental","automatic":true}`.
+
+The handler reads the system setting `recommendations.auto_generate` (off by default, contributed by `RecommendationSettingDefinitions`) when a command with `automatic: true` arrives. While the setting is off, the handler logs at info level and returns `skipped: recommendations.auto_generate is off`, which the scheduler records as the job's last result. Commands without `automatic`, from `app:recommendations:generate`, the admin action or a schedule an administrator creates, always generate. An unknown mode throws instead of falling back to incremental.
+
+The command has no transport route, so the handler runs in the dispatching process: the scheduler worker for scheduled runs. There the CPU process pool is not running, and the handler generates synchronously. An incremental run loads the songs updated in the last seven days; a full run loads every song. Both load every user's listening history, so a full run on a large library can exhaust the scheduler worker's memory or time, which is why the seeded job is incremental.
 
 ## Queries & Query Handlers
 
@@ -75,6 +83,8 @@ All endpoints live under `RecommendationController` with the `/api/recommendatio
 |-----------|---------|---------|
 | Depends on | Shared | `Uuid`, `PublicId` |
 | Depends on | Catalog | Artist and genre references (read-only) |
+| Depends on | Scheduler | `GenerateRecommendationsCommand` is schedulable through the `Scheduler Schedulable Contract` Deptrac layer |
+| Depends on | Shared | `SystemSettingsPortInterface` for `recommendations.auto_generate` |
 | Depended on by | — | No contexts depend on Recommendation directly |
 
 ## Infrastructure

@@ -1,6 +1,6 @@
 # app:recommendations:generate
 
-Generate music recommendations using all available strategies. Dispatches a generation command onto the message bus, where registered recommendation strategies run asynchronously.
+Generate music recommendations using all available strategies. The command runs the generation itself and returns when it has finished.
 
 ## Quick start
 
@@ -25,17 +25,19 @@ make exec cmd="php bin/console app:recommendations:generate --mode incremental -
 
 ## Details
 
-The command validates `--mode` and parses `--user-id` as a UUID before dispatching. It dispatches a `GenerateRecommendationsCommand` onto the command bus; the actual strategy work runs in the message handler, not inline. The reported duration covers only the dispatch path — strategy runtime happens after the console command returns.
+The command validates `--mode` and parses `--user-id` as a UUID before dispatching. It dispatches a `GenerateRecommendationsCommand` onto the command bus. That command has no transport route, and the CPU process pool does not run in a console process, so the handler runs every strategy inline in the command's own process. The reported duration covers the whole generation. An incremental run recomputes recommendations for songs updated in the last seven days; a full run loads every song.
+
+The command always generates, whatever the `recommendations.auto_generate` [server setting](../configuration.md#server-settings) says. That setting governs only the daily **Generate recommendations** scheduled job; see [Scheduled recommendations](../configuration.md#scheduled-recommendations).
 
 ## Exit codes
 
 | Code | Meaning |
 |------|---------|
-| 0 | Generation command dispatched successfully |
-| 1 | Invalid `--mode` value, invalid `--user-id` UUID format, or dispatch threw |
+| 0 | Generation finished |
+| 1 | Invalid `--mode` value, invalid `--user-id` UUID format, or generation threw |
 
 ## Tips
 
 - Use `--mode incremental` for routine refreshes; reserve `full` for when the underlying data or strategies change.
 - Scope a regeneration to one user with `--user-id` when investigating per-user results.
-- The command returns once dispatched — monitor the worker queue for actual completion.
+- A full run on a large library can take long and use a lot of memory, because it loads every song and every user's listening history.

@@ -208,11 +208,11 @@ graph TD
 
 | Attribute | Detail |
 |-----------|--------|
-| **Responsibility** | Per-user UI and playback preferences. Manages accent color, sidebar configuration, audio/layout/player preferences (versioned with history and rollback), EQ device profiles, and theme mood. |
+| **Responsibility** | Per-user UI and playback preferences and the per-user settings store. Manages accent color, sidebar configuration, audio/layout/player preferences (versioned with history and rollback), EQ device profiles, theme mood, and user settings such as the email language. |
 | **Namespace** | `App\UserPreference` |
 | **Aggregates** | `SidebarConfig` |
 | **Repositories** | Doctrine repository per preference entity |
-| **Ports** | `AccentColorPortInterface`, `SidebarConfigPortInterface`, `AudioPreferencesPortInterface`, `LayoutPreferencesPortInterface`, `PlayerPreferencesPortInterface`, `EqDeviceProfilePortInterface`, `ThemeMoodPortInterface` |
+| **Ports** | `AccentColorPortInterface`, `SidebarConfigPortInterface`, `AudioPreferencesPortInterface`, `LayoutPreferencesPortInterface`, `PlayerPreferencesPortInterface`, `PreferenceWriterPortInterface`, `EqDeviceProfilePortInterface`, `ThemeMoodPortInterface`, `UserSettingStoreInterface`, `UserSettingsContractInterface` (published contract) |
 | **Events** | None |
 | **Value Objects** | `SidebarItem`, `SidebarItemType` |
 
@@ -235,7 +235,7 @@ graph TD
 | **Namespace** | `App\Lyrics` |
 | **Aggregates** | `Lyrics` (state object) |
 | **Repositories** | `LyricsRepositoryInterface` |
-| **Ports** | `LyricsPortInterface`, `LrclibClientInterface` |
+| **Ports** | `LyricsPortInterface`, `LyricsAdminPortInterface`, `LrclibClientInterface`, `LyricsFetchRequestInterface` (published contract) |
 | **Commands** | `FetchLyricsCommand`, `BulkFetchLyricsCommand` |
 | **Events** | None |
 | **Tech** | LRCLIB API (anti-corruption layer via `LrclibClient`), Symfony HttpClient |
@@ -266,6 +266,9 @@ The Shared kernel provides cross-cutting primitives used by every context. Impor
 |-----------|---------|
 | `CancellableJobInterface` | Contract for jobs that support cancellation |
 | `JobCancelledException` | Signal for cancelled jobs |
+| `SettingDefinitionProviderInterface`, `SettingDefinitionRegistry` | Setting definitions contributed by each context, collected by container tag |
+| `SettingValueParser` | The only path from CLI or JSON input to a typed setting value |
+| `SystemSettings` / `SystemSettingsPortInterface` | Effective values of server-wide settings, read fresh through DBAL |
 
 ### Infrastructure Layer
 
@@ -290,7 +293,7 @@ The Shared kernel provides cross-cutting primitives used by every context. Impor
 | `Controller/` | Shared controllers (SPA, health, SSE, WebSocket, job monitor, metrics, config) |
 | `DTO/` | `ApiError`, `OAuthError`, `ValidationError`, `PaginatedResponse`, `CursorPaginatedResponse` |
 | `Resource/` | `AbstractResource` -- base for API response transformation |
-| `Console/` | `HealthCheckCommand`, `ConfigValidateCommand` |
+| `Console/` | `HealthCheckCommand`, `ConfigValidateCommand`, `app:settings:list`, `get`, `set` and `reset` |
 | Traits | `ApiResponsesTrait`, `TranslatorTrait` |
 
 ---
@@ -400,6 +403,11 @@ graph TD
     Party -->|"playback sync"| Transcode
     Transcode -->|"video lookup"| Catalog
     Lyrics -->|"song/album metadata"| Catalog
+    Catalog -->|"album sync request<br/><small>Application</small>"| Metadata
+    Catalog -->|"lyrics fetch request<br/><small>Application</small>"| Lyrics
+    Auth -->|"settings contract<br/><small>Application, Infrastructure, Interface</small>"| UserPreference
+    Notification -->|"settings contract<br/><small>Application</small>"| UserPreference
+    Media -->|"audio renditions<br/><small>Interface</small>"| Transcode
 ```
 
 ### Library -> Auth (Infrastructure layer)
@@ -436,6 +444,26 @@ graph TD
 
 - **What:** `Catalog\Application\CommandHandler\FilesDiscoveredHandler` calls `Metadata\Application\Port\AlbumMetadataSyncRequestInterface::requestSync()` for each album it creates, after the flush that stores it. The Metadata implementation queues a `SyncAlbumMessage` while `metadata.auto_sync` is on. Deptrac allows this through the `Metadata Album Sync Request Contract` layer, which contains only that interface.
 - **Why:** A sync started when the scan completes can run before Catalog has ingested the scan's albums. Requesting the sync from ingest means the album already exists when the sync looks it up.
+
+### Catalog -> Lyrics (Application layer)
+
+- **What:** `Catalog\Application\CommandHandler\FilesDiscoveredHandler` calls `Lyrics\Application\Port\LyricsFetchRequestInterface::requestFetch()` for the new songs without a sidecar `.lrc` file, after each flush that commits them. The Lyrics implementation queues a `FetchLyricsCommand` on the `async` transport per song while `lyrics.auto_fetch` is on. Deptrac allows this through the `Lyrics Fetch Request Contract` layer, which contains only that interface.
+- **Why:** New songs get lyrics without a bulk fetch, and requesting after the commit means the fetch finds the song.
+
+### Auth -> UserPreference (Application, Infrastructure and Interface layers)
+
+- **What:** `RegisterUserHandler` seeds the email language from `Accept-Language`, `AfterResponseMailer` resolves it for password reset and verification emails, and `AdminUserSettings` (behind `AdminUserSettingsController` and `app:user:setting`) reads, sets and resets a user's settings. All go through `UserPreference\Application\Port\UserSettingsContractInterface` and its DTO `UserSettingView`, which form the `UserPreference Settings Contract` Deptrac layer.
+- **Why:** The email language is a user setting owned by UserPreference, but Auth sends the credential emails and owns the admin user endpoints. Dispatching UserPreference commands from Auth would reach into its Application layer; the narrow contract keeps the rest of UserPreference out of reach.
+
+### Notification -> UserPreference (Application layer)
+
+- **What:** `SendEmailHandler` calls `UserSettingsContractInterface::resolveLanguage()` for each recipient when the worker sends a notification email.
+- **Why:** The email is written in the recipient's language as it stands when it is sent, through the same `UserPreference Settings Contract` layer.
+
+### Media -> Transcode (Interface layer)
+
+- **What:** `Media\Interface\Controller\StreamController` transcodes a track through `Transcode\Application\Port\AudioRenditionPortInterface` and reads `transcode.enabled` and `transcode.max_bitrate` by the constants of `TranscodeSettingDefinitions`. Deptrac allows this through the `Transcode Audio Rendition Contract` layer: the port, `AudioRendition`, `AudioRenditionFormat`, `AudioRenditionFailedException` and the settings class.
+- **Why:** Media owns the track stream and its access checks; Transcode owns FFmpeg, the CPU process pool and the transcode cache.
 
 ### Metadata -> Catalog, Media (Application layer)
 
@@ -588,14 +616,14 @@ graph TD
 | Catalog | Full 4-layer | State objects | Core domain. PGroonga search on `SongRepository`. 6 aggregates. |
 | Library | Full 4-layer | No state object | Orchestrates scanning pipeline. Heaviest cross-context coupling. |
 | Media | Full 4-layer | No state object | Storage/streaming abstraction. |
-| Metadata | Partial | No aggregates | Operates on Catalog data. No Port layer. 6 external APIs. |
+| Metadata | Partial | No aggregates | Operates on Catalog data. Admin port and the published album sync request contract. 6 external APIs. |
 | Playlist | Full 4-layer | No state object | Manual + smart playlists. |
 | Recommendation | Full 4-layer | Old positional-arg pattern | Has CQRS queries. Candidate for state-object migration. |
 | Activity | Full 4-layer | No state object | Simple record/play model. |
 | Notification | Full 4-layer | No state object | Event-driven consumer. Multi-channel delivery. |
 | Transcode | Full 4-layer | State objects | Heaviest infrastructure. Swoole process pool for FFmpeg. 6 ports. |
 | Party | Full 4-layer | State objects | WebSocket-driven. Real-time sync. 9 CQRS handlers. |
-| UserPreference | Full 4-layer | State object | Simple CRUD context. No CQRS handlers. |
+| UserPreference | Full 4-layer | State object | Simple CRUD context for the preference subsystems. User settings are written through two command handlers and published to Auth and Notification through a narrow contract. |
 | Filesystem | Partial (no 4-layer) | None | Utility: MIME detection + file watcher. |
 | Lyrics | Full 4-layer | State object | LRCLIB integration with cached-first strategy. REST API + console command. Anti-corruption layer for LRCLIB. |
 

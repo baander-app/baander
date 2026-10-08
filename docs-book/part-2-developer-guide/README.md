@@ -47,8 +47,8 @@ Understand the architecture, write code following project conventions, and contr
 | [Scheduler](contexts/scheduler.md) | Cron-like scheduled job execution |
 | [Session](contexts/session.md) | Listening sessions and registered devices |
 | [Transcode](contexts/transcode.md) | CMAF video transcoding via FFmpeg and Swoole |
-| [User Preference](contexts/user-preference.md) | Accent color, sidebar, audio/layout/player preferences, EQ profiles, and theme mood |
-| [Shared](contexts/shared.md) | Cross-cutting kernel: UUID, Swoole, caching, SSE, WebSocket |
+| [User Preference](contexts/user-preference.md) | Accent color, sidebar, audio/layout/player preferences, EQ profiles, theme mood, and user settings |
+| [Shared](contexts/shared.md) | Cross-cutting kernel: UUID, Swoole, caching, SSE, WebSocket, and settings |
 
 ## Contributing
 

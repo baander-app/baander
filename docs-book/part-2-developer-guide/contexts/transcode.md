@@ -56,6 +56,13 @@ This context defines the following port interfaces, among others:
 | `TranscodeStoragePortInterface` | Persistent storage of segment files |
 | `TranscodeStreamingPortInterface` | Streaming segment delivery to clients |
 | `StreamAuthPortInterface` | Stream signing/authentication |
+| `AudioRenditionPortInterface` | Cached on-the-fly audio transcoding of a track to a format and bitrate; published to Media through the `Transcode Audio Rendition Contract` Deptrac layer with `AudioRenditionFormat`, `AudioRenditionFailedException` and `TranscodeSettingDefinitions` |
+
+## Audio Renditions
+
+Media's `GET /api/stream/track` streams a track transcoded to Opus, AAC or MP3 when the request names a `format`. Media checks library access and reads the system settings `transcode.enabled` (off by default) and `transcode.max_bitrate` (kbps, default `320`) on every request; `TranscodeSettingDefinitions` contributes both. With transcoding off, a request with a format is `403` and no encode starts. Otherwise Media caps the requested bitrate at the maximum, or uses the maximum when none is requested, and calls `AudioRenditionPortInterface::open()`. `AudioRenditionFormat::supportedBitrate()` then fits the bitrate to the format's range in whole kilobits, so equivalent requests share one rendition.
+
+`AudioRenditionCache` keeps one rendition per track, format and bitrate in `audio-renditions/<track>/` under the transcode storage root, named with a fingerprint of the source file. A complete rendition is served as a file with Range support. Otherwise the call starts the encode, or joins the one already running, and returns a progressive stream that Media sends with `Accept-Ranges: none`. Coordination goes through the filesystem, so it holds across HTTP workers: `AudioRenditionPoolWorker` holds an exclusive lock on the rendition's lock file for the whole encode, FFmpeg writes a `.part` file that listeners read while it grows, and the encode renames it to the final file under the lock. Encodes run in the CPU process pool; outside the Swoole server (CLI, tests) the encode runs in the calling process before streaming. `SweepTranscodeCacheHandler` treats each track's rendition directory as one cache unit (`audio-renditions/<track>`) under the same TTL and size budget as video directories.
 
 ## Domain Events
 
@@ -113,6 +120,7 @@ Endpoints are split between session management and streaming delivery.
 |-----------|---------|---------|
 | Depends on | Shared | `Uuid`, `PublicId`, `ProcessPool`, `Async`, `JobMonitoringMiddleware` |
 | Depended on by | Party | References transcode jobs for synchronized playback |
+| Depended on by | Media | The track stream transcodes audio through `AudioRenditionPortInterface` and reads `TranscodeSettingDefinitions` keys (the `Transcode Audio Rendition Contract` Deptrac layer) |
 | Depended on by | Notification | Listens to transcode domain events for user notifications |
 | Depends on | QoL | QoL contracts only. `StreamAdmissionListener` (on `TranscodeSessionAttached`, priority 1) and `StreamCompletionListener` (on `TranscodeJobCompleted`) call the stream-admission contract; `QualityFilteringStreamingDecorator` filters manifests by the allowed-tier contract (decoration priority -1, below the cache decorator); `QualityLadderPort` and `EncoderProfileFingerprintAdapter` implement QoL contracts |
 

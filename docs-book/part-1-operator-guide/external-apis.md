@@ -1,6 +1,6 @@
 # External APIs
 
-Baander enriches your media library by querying external metadata services during library scans. No API key is strictly required -- the application works without them -- but metadata quality depends on which services are configured.
+Baander enriches your media library by querying external metadata services. No API key is strictly required -- the application works without them -- but metadata quality depends on which services are configured.
 
 ## Supported APIs
 
@@ -28,7 +28,7 @@ The table below shows what each API contributes and what you lose when its crede
 
 ## How Enrichment Works
 
-Metadata enrichment runs as part of the library scan pipeline. When Baander processes a media file during a scan, it queries external services in this order:
+A metadata sync runs in the background, either when an administrator starts one or, while the `metadata.auto_sync` [server setting](configuration.md#server-settings) is on, for each new album a scan adds. The setting is off by default, so a fresh install makes no external lookups after a scan until you turn it on. A sync queries external services in this order:
 
 1. **MusicBrainz** is queried first. It provides structured identifiers (MBIDs), release groups, and canonical artist/release data. This is the authoritative source for music metadata.
 
@@ -36,9 +36,9 @@ Metadata enrichment runs as part of the library scan pipeline. When Baander proc
 
 3. **Last.fm** supplements the results. When its API key is configured, Baander fetches artist biographies, similar artists, tags, and top tracks from Last.fm regardless of whether MusicBrainz or Discogs returned results.
 
-Enrichment results are stored in the database and served to clients on subsequent requests. Re-scanning a library refreshes metadata from all configured services.
+Enrichment results are stored in the database and served to clients on subsequent requests. Re-scanning a library does not sync albums Baander already has; only new albums are queued, and only while `metadata.auto_sync` is on.
 
-For details on how scans are triggered, see [Library Management](library-management.md).
+For details on how scans are triggered and what happens to new music, see [Library Management](library-management.md#what-happens-to-new-music).
 
 ## Configuration
 
