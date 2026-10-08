@@ -11,6 +11,7 @@ import {
   type PendingDeviceAuthorization,
   decideDeviceAuthorization,
   lookupDeviceAuthorization,
+  userCodeErrorReason,
 } from '../api/device-authorization-api'
 import { useRetryCountdown } from '../hooks/use-retry-countdown'
 import { parseApiError } from '../lib/parse-api-error'
@@ -39,6 +40,7 @@ type Step =
 
 type Problem =
   | { kind: 'invalid' }
+  | { kind: 'alreadyProcessed' }
   | { kind: 'rateLimited' }
   | { kind: 'failed'; message: string }
 
@@ -110,8 +112,15 @@ export function DeviceAuthorization({ initialCode }: DeviceAuthorizationProps) {
       return
     }
 
-    // Unknown, expired, already used (400), or malformed (422): ask for the code again.
-    if (err instanceof AxiosError && (err.response?.status === 400 || err.response?.status === 422)) {
+    const reason = userCodeErrorReason(err)
+    if (reason === 'device_already_processed') {
+      setStep({ name: 'enter' })
+      setProblem({ kind: 'alreadyProcessed' })
+      return
+    }
+
+    // Unknown, expired, or missing (400), or malformed (422): ask for the code again.
+    if (reason !== null || (err instanceof AxiosError && err.response?.status === 422)) {
       setStep({ name: 'enter' })
       setProblem({ kind: 'invalid' })
       return
@@ -153,8 +162,8 @@ export function DeviceAuthorization({ initialCode }: DeviceAuthorizationProps) {
   const decide = async (userCode: string, decision: DeviceDecision) => {
     setProblem(null)
     try {
-      await sendDecision({ userCode, decision })
-      setStep(decision === 'approve' ? { name: 'approved' } : { name: 'denied' })
+      const recorded = await sendDecision({ userCode, decision })
+      setStep(recorded === 'approved' ? { name: 'approved' } : { name: 'denied' })
     } catch (err: unknown) {
       report(err)
     }
@@ -170,6 +179,7 @@ export function DeviceAuthorization({ initialCode }: DeviceAuthorizationProps) {
   const alert = problem && (
     <ErrorAlert role="alert">
       {problem.kind === 'invalid' && t('auth.device.invalidCode')}
+      {problem.kind === 'alreadyProcessed' && t('auth.device.alreadyProcessed')}
       {problem.kind === 'rateLimited' && waiting && t('auth.device.rateLimited', { count: secondsLeft })}
       {problem.kind === 'failed' && problem.message}
     </ErrorAlert>

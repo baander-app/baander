@@ -1,5 +1,6 @@
 import { cleanup, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { AxiosError, AxiosHeaders } from 'axios'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { customInstance } from '@/shared/api-client/axios-instance'
 import { DeviceAuthorizationPage } from '../DeviceAuthorizationPage'
@@ -11,10 +12,27 @@ const mockRequest = vi.mocked(customInstance)
 
 const PENDING = {
   userCode: 'BCDF-GHJK',
-  clientId: 'V1StGXR8_Z5jdHi6B-myT',
+  clientId: 'tv-app',
   clientName: 'Bånder TV',
   scopes: ['library', 'playlist'],
-  expiresAt: '2026-10-08T12:15:00+00:00',
+  expiresAt: '2026-10-07T12:15:00+00:00',
+}
+
+/** A 400 answer naming why the server refused the user code. */
+function userCodeError(reason: string) {
+  return new AxiosError('Request failed', 'ERR_BAD_REQUEST', undefined, undefined, {
+    data: { error: { code: 400, message: 'Refused.', details: { reason } } },
+    status: 400,
+    statusText: 'Bad Request',
+    headers: {},
+    config: { headers: new AxiosHeaders() },
+  })
+}
+
+/** The answer approve gives for the decision in the request body. */
+function recorded(options: RequestInit) {
+  const { decision } = JSON.parse(String(options.body)) as { decision: string }
+  return { data: { decision: decision === 'approve' ? 'approved' : 'denied', message: 'Done.' } }
 }
 
 function mount(entry = '/device') {
@@ -34,12 +52,12 @@ function approveCalls() {
 
 /** Answers verify with the pending request and approve with success, unless overridden. */
 function serve(overrides: { verify?: () => unknown; approve?: () => unknown } = {}) {
-  mockRequest.mockImplementation(async (url: string) => {
+  mockRequest.mockImplementation(async (url: string, options: RequestInit) => {
     if (url.startsWith('/api/oauth/device/verify')) {
       return overrides.verify ? overrides.verify() : { data: PENDING }
     }
     if (url === '/api/oauth/device/approve') {
-      return overrides.approve ? overrides.approve() : { data: { message: 'Done.' } }
+      return overrides.approve ? overrides.approve() : recorded(options)
     }
 
     throw new Error(`Unexpected request to ${url}`)
@@ -123,7 +141,7 @@ describe('DeviceAuthorizationPage', () => {
   })
 
   it('explains an unknown or expired code and keeps the input', async () => {
-    serve({ verify: () => { throw httpError(400, 'Invalid or expired user code.') } })
+    serve({ verify: () => { throw userCodeError('invalid_user_code') } })
     mount('/device?user_code=BCDF-GHJK')
 
     expect(await screen.findByRole('alert')).toHaveTextContent('This code is unknown or has expired.')
@@ -132,13 +150,24 @@ describe('DeviceAuthorizationPage', () => {
   })
 
   it('returns to code entry when the request expires before approval', async () => {
-    serve({ approve: () => { throw httpError(400, 'Invalid or expired user code.') } })
+    serve({ approve: () => { throw userCodeError('invalid_user_code') } })
     mount('/device?user_code=BCDF-GHJK')
 
     const user = userEvent.setup()
     await user.click(await screen.findByRole('button', { name: 'Approve' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('This code is unknown or has expired.')
+    expect(screen.getByLabelText('Device code')).toBeInTheDocument()
+  })
+
+  it('says when the request was already approved or denied', async () => {
+    serve({ approve: () => { throw userCodeError('device_already_processed') } })
+    mount('/device?user_code=BCDF-GHJK')
+
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('button', { name: 'Approve' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('This request was already approved or denied.')
     expect(screen.getByLabelText('Device code')).toBeInTheDocument()
   })
 
@@ -170,7 +199,7 @@ describe('DeviceAuthorizationPage', () => {
     serve({
       approve: () => {
         if (failing) throw httpError(500, 'The server could not record the decision.')
-        return { data: { message: 'Done.' } }
+        return { data: { decision: 'approved', message: 'Done.' } }
       },
     })
     mount('/device?user_code=BCDF-GHJK')
