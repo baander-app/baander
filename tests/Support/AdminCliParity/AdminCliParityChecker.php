@@ -15,10 +15,9 @@ use Symfony\Component\Routing\RouteCollection;
  *
  * Every admin-guarded route, and every declared non-admin route the admin pages
  * call, needs `#[CliCounterpart]` or `#[CliParityExemption]` on its controller
- * method, unless it is on the pending list. A counterpart must name an existing
- * command, and a project command must have an operator docs page. Pending and
- * declared entries must name live routes, a pending entry must still need a
- * marking, and a marking must sit on a method that a route reaches.
+ * method. A counterpart must name an existing command, and a project command must
+ * have an operator docs page. Declared entries must name live routes, and a
+ * marking must sit on a method that a route reaches.
  */
 final readonly class AdminCliParityChecker
 {
@@ -35,15 +34,13 @@ final readonly class AdminCliParityChecker
 
     /**
      * @param list<string>       $declaredRoutes non-admin routes the admin pages call
-     * @param list<string>       $pending        routes still waiting for their marking
      * @param list<class-string> $markedClasses  classes whose methods carry a marking
      *
      * @return list<string> one message per violation
      */
-    public function violations(RouteCollection $routes, array $declaredRoutes, array $pending, array $markedClasses): array
+    public function violations(RouteCollection $routes, array $declaredRoutes, array $markedClasses): array
     {
         $violations = [];
-        $needsMarking = [];
         $routedMethods = [];
 
         foreach ($routes as $name => $route) {
@@ -61,22 +58,12 @@ final readonly class AdminCliParityChecker
             if (!$required) {
                 continue;
             }
-            $needsMarking[$name] = true;
-
-            $violations = [...$violations, ...$this->routeViolations($name, $route, $method, in_array($name, $pending, true))];
+            $violations = [...$violations, ...$this->routeViolations($name, $route, $method)];
         }
 
         foreach ($declaredRoutes as $name) {
             if ($routes->get($name) === null) {
                 $violations[] = sprintf('Declared admin-page route "%s" does not exist; remove it from the declared list.', $name);
-            }
-        }
-
-        foreach ($pending as $name) {
-            if ($routes->get($name) === null) {
-                $violations[] = sprintf('Pending route "%s" does not exist; remove it from the pending list.', $name);
-            } elseif (!isset($needsMarking[$name])) {
-                $violations[] = sprintf('Pending route "%s" is neither admin-guarded nor declared; remove it from the pending list.', $name);
             }
         }
 
@@ -98,25 +85,18 @@ final readonly class AdminCliParityChecker
     }
 
     /** @return list<string> */
-    private function routeViolations(string $name, Route $route, ?\ReflectionMethod $method, bool $pending): array
+    private function routeViolations(string $name, Route $route, ?\ReflectionMethod $method): array
     {
         $label = sprintf('Route "%s" (%s %s)', $name, implode('|', $route->getMethods()) ?: 'ANY', $route->getPath());
         $marking = $method === null ? null : $this->marking($method);
 
         if ($marking === null) {
-            if ($pending) {
-                return [];
-            }
-
             return [$method === null
                 ? sprintf('%s needs a CLI parity marking, but its controller is not a class method that can carry one.', $label)
                 : sprintf('%s has neither #[CliCounterpart] nor #[CliParityExemption] on %s::%s().', $label, $method->class, $method->name)];
         }
 
         $violations = [];
-        if ($pending) {
-            $violations[] = sprintf('%s is marked; remove it from the pending list.', $label);
-        }
 
         if ($marking instanceof CliParityExemption) {
             if (trim($marking->reason) === '') {

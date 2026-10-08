@@ -34,13 +34,6 @@ final class AdminCliParityTest extends KernelTestCase
         'transcode_session_index',
     ];
 
-    /**
-     * Routes that still need a marking. Each unit that adds a command removes its
-     * routes here; the test fails while a marked route stays on the list.
-     */
-    public const array PENDING = [
-    ];
-
     private const array FIXTURE_ACCESS_CONTROL = [
         ['path' => '^/api/admin', 'roles' => 'ROLE_ADMIN'],
         ['path' => '^/api/monitor', 'roles' => 'ROLE_ADMIN'],
@@ -67,7 +60,6 @@ final class AdminCliParityTest extends KernelTestCase
         $violations = $checker->violations(
             $router->getRouteCollection(),
             self::ADMIN_PAGE_ROUTES,
-            self::PENDING,
             $this->markedClasses(self::$kernel->getProjectDir() . '/src'),
         );
 
@@ -135,30 +127,6 @@ final class AdminCliParityTest extends KernelTestCase
         self::assertStringContainsString('"library_index"', $violations[0]);
     }
 
-    public function test_a_pending_entry_for_a_marked_route_fails(): void
-    {
-        $routes = ['fixture_documented' => $this->route('/api/things', 'documented')];
-
-        self::assertSame([], $this->fixtureViolations($routes));
-        self::assertSame(
-            ['Route "fixture_documented" (POST /api/things) is marked; remove it from the pending list.'],
-            $this->fixtureViolations($routes, pending: ['fixture_documented']),
-        );
-    }
-
-    public function test_a_pending_entry_that_needs_no_marking_fails(): void
-    {
-        $violations = $this->fixtureViolations(
-            ['fixture_open' => $this->route('/api/things', 'authenticated')],
-            pending: ['fixture_open', 'fixture_gone'],
-        );
-
-        self::assertSame([
-            'Pending route "fixture_open" is neither admin-guarded nor declared; remove it from the pending list.',
-            'Pending route "fixture_gone" does not exist; remove it from the pending list.',
-        ], $violations);
-    }
-
     public function test_a_counterpart_without_a_docs_page_fails_naming_the_command(): void
     {
         $violations = $this->fixtureViolations([
@@ -172,12 +140,11 @@ final class AdminCliParityTest extends KernelTestCase
     /**
      * @param array<string, Route> $routes
      * @param list<string>         $declared
-     * @param list<string>         $pending
      * @param list<class-string>   $markedClasses
      *
      * @return list<string>
      */
-    private function fixtureViolations(array $routes, array $declared = [], array $pending = [], array $markedClasses = []): array
+    private function fixtureViolations(array $routes, array $declared = [], array $markedClasses = []): array
     {
         $collection = new RouteCollection();
         foreach ($routes as $name => $route) {
@@ -190,7 +157,7 @@ final class AdminCliParityTest extends KernelTestCase
             ['app:fixture:documented' => true, 'app:fixture:undocumented' => true, 'messenger:failed:retry' => false],
         );
 
-        return $checker->violations($collection, $declared, $pending, $markedClasses);
+        return $checker->violations($collection, $declared, $markedClasses);
     }
 
     private function route(string $path, string $action, string $method = 'POST'): Route
