@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Recommendation\Domain\Repository;
 
 use App\Recommendation\Domain\Model\RecommendationJob;
+use App\Recommendation\Domain\ValueObject\RecommendationJobStatus;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 
@@ -19,6 +20,9 @@ interface RecommendationJobRepositoryInterface
     public function findByUuid(Uuid $uuid): ?RecommendationJob;
 
     public function findByPublicId(PublicId $publicId): ?RecommendationJob;
+
+    /** The status as stored now, not as a copy loaded earlier in this process; null for an unknown job. */
+    public function findStoredStatus(Uuid $uuid): ?RecommendationJobStatus;
 
     /** @return RecommendationJob[] */
     public function findPendingJobs(): array;

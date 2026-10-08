@@ -8,13 +8,16 @@ use App\Activity\Application\Port\ActivityPortInterface;
 use App\Catalog\Domain\Repository\SongRepositoryInterface;
 use App\Recommendation\Application\Command\GenerateRecommendationsCommand;
 use App\Recommendation\Application\CommandHandler\GenerateRecommendationsHandler;
+use App\Recommendation\Application\DTO\RecommendationGenerationResult;
 use App\Recommendation\Application\Port\RecommendationJobPortInterface;
 use App\Recommendation\Application\Settings\RecommendationSettingDefinitions;
 use App\Recommendation\Domain\Service\CollaborativeFilteringCalculator;
 use App\Recommendation\Domain\Service\ContentSimilarityCalculator;
 use App\Recommendation\Domain\Service\GenreSimilarityCalculator;
 use App\Scheduler\Domain\Model\SchedulableCommandInterface;
+use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
+use App\Tests\Unit\Recommendation\InMemoryRecommendationJobs;
 use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
@@ -81,7 +84,9 @@ final class ScheduledGenerationTest extends TestCase
             new GenerateRecommendationsCommand(mode: GenerateRecommendationsCommand::MODE_FULL, automatic: true),
         );
 
-        self::assertSame(['collaborative' => 0, 'content' => 0, 'genre' => 0], $result);
+        self::assertInstanceOf(RecommendationGenerationResult::class, $result);
+        self::assertSame('completed', $result->status);
+        self::assertSame(['collaborative' => 0, 'content' => 0, 'genre' => 0], $result->counts);
         self::assertSame([], $this->logger->infoLines);
     }
 
@@ -94,7 +99,8 @@ final class ScheduledGenerationTest extends TestCase
 
         $result = $this->handler($songs, $settings)(new GenerateRecommendationsCommand(mode: GenerateRecommendationsCommand::MODE_FULL));
 
-        self::assertSame(['collaborative' => 0, 'content' => 0, 'genre' => 0], $result);
+        self::assertInstanceOf(RecommendationGenerationResult::class, $result);
+        self::assertSame(['collaborative' => 0, 'content' => 0, 'genre' => 0], $result->counts);
     }
 
     public function testUnknownModeIsRejectedInsteadOfRunningIncrementally(): void
@@ -102,7 +108,7 @@ final class ScheduledGenerationTest extends TestCase
         $songs = $this->createMock(SongRepositoryInterface::class);
         $songs->expects(self::never())->method('findUpdatedAfter');
 
-        $this->expectException(\InvalidArgumentException::class);
+        $this->expectException(InvalidInputException::class);
         $this->handler($songs, $this->createStub(SystemSettingsPortInterface::class))(new GenerateRecommendationsCommand(mode: 'Full', automatic: true));
     }
 
@@ -131,7 +137,7 @@ final class ScheduledGenerationTest extends TestCase
             new CollaborativeFilteringCalculator(),
             new ContentSimilarityCalculator(),
             new GenreSimilarityCalculator(),
-            $jobs ?? $this->createStub(RecommendationJobPortInterface::class),
+            $jobs ?? new InMemoryRecommendationJobs(),
             // Never started, so isRunning() is false and generation runs synchronously.
             new CpuProcessPool([], 1, new NullLogger()),
             new JsonEncoder(),

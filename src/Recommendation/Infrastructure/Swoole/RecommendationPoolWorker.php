@@ -39,14 +39,18 @@ final class RecommendationPoolWorker implements ProcessPoolWorkerInterface
 
         try {
             $pdo = $this->createPdo($databaseUrl);
+            // Only a pending job starts: one cancelled before a worker picked it up stays cancelled.
+            if ($this->updateJobStatus($pdo, $jobId, 'in_progress', from: ['pending']) === 0) {
+                return json_encode(['success' => false, 'skipped' => 'job is no longer pending'], JSON_THROW_ON_ERROR);
+            }
             $result = $this->generateRecommendations($pdo, $jobId, $isFull);
 
             return json_encode(['success' => true, 'counts' => $result]);
         } catch (\Throwable $e) {
-            // Mark job as failed
+            // Mark job as failed, unless it stopped because an admin cancelled it
             try {
                 $pdo = $this->createPdo($databaseUrl);
-                $this->updateJobStatus($pdo, $jobId, 'failed', $e->getMessage());
+                $this->updateJobStatus($pdo, $jobId, 'failed', $e->getMessage(), from: ['pending', 'in_progress']);
             } catch (\Throwable) {
                 // Ignore failure updates
             }
@@ -60,9 +64,6 @@ final class RecommendationPoolWorker implements ProcessPoolWorkerInterface
      */
     private function generateRecommendations(\PDO $pdo, string $jobId, bool $isFull): array
     {
-        // Mark job as in progress
-        $this->updateJobStatus($pdo, $jobId, 'in_progress');
-
         // Get all songs with features
         $songs = $this->fetchAllSongs($pdo);
 
@@ -102,7 +103,7 @@ final class RecommendationPoolWorker implements ProcessPoolWorkerInterface
 
         // Mark job as completed
         $this->updateJobProgress($pdo, $jobId, $totalSongs, $totalSongs, 'completed');
-        $this->updateJobStatus($pdo, $jobId, 'completed', null, $counts);
+        $this->updateJobStatus($pdo, $jobId, 'completed', null, $counts, from: ['in_progress']);
 
         return $counts;
     }
@@ -312,8 +313,13 @@ final class RecommendationPoolWorker implements ProcessPoolWorkerInterface
         $pdo->exec("DELETE FROM recommendations WHERE source_type = 'song' AND target_type = 'song'");
     }
 
-    /** @param array<string, int>|null $strategyCounts */
-    private function updateJobStatus(\PDO $pdo, string $jobId, string $status, ?string $failReason = null, ?array $strategyCounts = null): void
+    /**
+     * @param array<string, int>|null $strategyCounts
+     * @param non-empty-list<string>  $from           the statuses the job may move from; a cancelled job is never among them
+     *
+     * @return int 1 when the job moved, 0 when its status was not one of $from
+     */
+    private function updateJobStatus(\PDO $pdo, string $jobId, string $status, ?string $failReason = null, ?array $strategyCounts = null, array $from = ['pending']): int
     {
         $fields = ['status' => $status, 'updated_at' => new \DateTime()];
         if ($failReason !== null) {
@@ -339,9 +345,16 @@ final class RecommendationPoolWorker implements ProcessPoolWorkerInterface
             }
         }
         $params[] = $jobId;
+        array_push($params, ...$from);
 
-        $stmt = $pdo->prepare("UPDATE recommendation_jobs SET " . implode(', ', $setParts) . " WHERE id = ?");
+        $stmt = $pdo->prepare(sprintf(
+            'UPDATE recommendation_jobs SET %s WHERE id = ? AND status IN (%s)',
+            implode(', ', $setParts),
+            implode(', ', array_fill(0, count($from), '?')),
+        ));
         $stmt->execute($params);
+
+        return $stmt->rowCount();
     }
 
     private function updateJobProgress(\PDO $pdo, string $jobId, int $totalSongs, int $completedSongs, string $currentStrategy): void

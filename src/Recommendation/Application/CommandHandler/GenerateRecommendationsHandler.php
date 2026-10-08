@@ -9,13 +9,18 @@ use App\Catalog\Domain\Repository\SongRepositoryInterface;
 use App\Recommendation\Application\Command\DeleteRecommendationsBySourceCommand;
 use App\Recommendation\Application\Command\GenerateRecommendationsCommand;
 use App\Recommendation\Application\Command\SaveRecommendationCommand;
+use App\Recommendation\Application\DTO\RecommendationGenerationResult;
 use App\Recommendation\Application\Port\RecommendationJobPortInterface;
 use App\Recommendation\Application\Settings\RecommendationSettingDefinitions;
 use App\Recommendation\Domain\Model\RecommendationJob;
 use App\Recommendation\Domain\Service\CollaborativeFilteringCalculator;
 use App\Recommendation\Domain\Service\ContentSimilarityCalculator;
 use App\Recommendation\Domain\Service\GenreSimilarityCalculator;
+use App\Recommendation\Domain\ValueObject\RecommendationJobStatus;
 use App\Recommendation\Domain\ValueObject\RecommendationType;
+use App\Shared\Application\Exception\ConflictException;
+use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool;
@@ -23,7 +28,14 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
+use Throwable;
 
+/**
+ * Runs a recommendation job: the job record is created first on every path, so each run
+ * shows in the admin job list and can be cancelled. In the web server the job goes to the
+ * CPU process pool; elsewhere, such as from the console or the scheduler worker, it runs
+ * here and the record follows each stage.
+ */
 final class GenerateRecommendationsHandler
 {
     /** The scheduler records this as the run's last result. */
@@ -49,12 +61,21 @@ final class GenerateRecommendationsHandler
     ) {
     }
 
-    /** @return array<string, int>|RecommendationJob|string the string is the skip of an automatic run */
+    /**
+     * @return RecommendationGenerationResult|string the string is the skip of an automatic run
+     *
+     * @throws InvalidInputException for an unknown mode
+     * @throws NotFoundException     for an unknown job ID
+     * @throws ConflictException     when the given job is no longer pending
+     */
     #[AsMessageHandler]
-    public function __invoke(GenerateRecommendationsCommand $command): array|RecommendationJob|string
+    public function __invoke(GenerateRecommendationsCommand $command): RecommendationGenerationResult|string
     {
         if (!$command->isFull() && !$command->isIncremental()) {
-            throw new \InvalidArgumentException(sprintf('Unknown recommendation generation mode "%s".', $command->getMode()));
+            throw new InvalidInputException(
+                sprintf('Unknown recommendation generation mode "%s". Use "full" or "incremental".', $command->getMode()),
+                ['mode' => $command->getMode()],
+            );
         }
 
         // Read when the run fires, so an admin's change applies to the next run.
@@ -64,114 +85,104 @@ final class GenerateRecommendationsHandler
             return self::SKIPPED_AUTO_GENERATE_OFF;
         }
 
-        $isFull = $command->isFull();
+        $job = $this->job($command);
 
         // Use pool worker if available (Swoole context)
         if ($this->cpuProcessPool->isRunning()) {
-            return $this->dispatchToPool($isFull, $command->getUserId());
+            return $this->dispatchToPool($job);
         }
 
-        // Fallback to synchronous execution (CLI context)
-        return $this->executeSynchronously($command);
+        return $this->runHere($job);
     }
 
-    private function dispatchToPool(bool $isFull, ?Uuid $userId): RecommendationJob
+    private function job(GenerateRecommendationsCommand $command): RecommendationJob
     {
-        $metadata = [
-            'mode' => $isFull ? 'full' : 'incremental',
-            'triggered_by' => $userId?->toString() ?? 'system',
-            'triggered_at' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
-            'database_url_hash' => hash('xxh128', $this->databaseUrl),
-        ];
+        $jobId = $command->getJobId();
+        if ($jobId === null) {
+            return $this->jobPort->create(
+                isFull: $command->isFull(),
+                userId: $command->getUserId(),
+                metadata: [
+                    'mode' => $command->getMode(),
+                    'triggered_by' => $command->getActor() ?? 'system',
+                    'triggered_at' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
+                    'database_url_hash' => hash('xxh128', $this->databaseUrl),
+                ],
+            );
+        }
 
-        $job = $this->jobPort->create(
-            isFull: $isFull,
-            userId: $userId,
-            metadata: $metadata,
-        );
-
-        $key = CpuProcessPool::resultKey('generate_recommendations', $job->getId()->toString());
-        $payload = $this->jsonEncoder->encode([
-            'type' => 'generate_recommendations',
-            'job_id' => $job->getId()->toString(),
-            'is_full' => $isFull,
-            'database_url' => $this->databaseUrl,
-            'metadata' => $metadata,
-        ], 'json');
-
-        $this->cpuProcessPool->dispatch($payload, $key);
+        $job = $this->jobPort->getById($jobId)
+            ?? throw new NotFoundException('Recommendation job not found.', ['jobId' => $jobId->toString()]);
+        if ($job->getStatus() !== RecommendationJobStatus::Pending) {
+            throw new ConflictException(
+                sprintf('Only a pending recommendation job can be run; this one is %s.', $job->getStatus()->value),
+                ['status' => $job->getStatus()->value],
+            );
+        }
 
         return $job;
     }
 
-    /** @return array<string, int> */
-    private function executeSynchronously(GenerateRecommendationsCommand $command): array
+    private function dispatchToPool(RecommendationJob $job): RecommendationGenerationResult
     {
-        $userId = $command->getUserId();
+        $key = CpuProcessPool::resultKey('generate_recommendations', $job->getId()->toString());
+        $payload = $this->jsonEncoder->encode([
+            'type' => 'generate_recommendations',
+            'job_id' => $job->getId()->toString(),
+            'is_full' => $job->isFull(),
+            'database_url' => $this->databaseUrl,
+            'metadata' => $job->getMetadata(),
+        ], 'json');
 
-        if ($command->isFull()) {
-            return $this->generateFull($userId);
-        }
+        $this->cpuProcessPool->dispatch($payload, $key);
 
-        return $this->generateIncremental($userId);
+        return $this->result($job, RecommendationGenerationResult::EXECUTION_ASYNC);
     }
 
     /**
-     * @return array<string, int> Number of recommendations per strategy
+     * Runs the job in this process. The record moves to in progress, names each strategy as
+     * it starts, and ends completed, failed with the error, or cancelled when an admin
+     * cancelled it between strategies.
      */
-    private function generateFull(?Uuid $userId): array
+    private function runHere(RecommendationJob $job): RecommendationGenerationResult
     {
-        $songs = $this->songRepository->findAllForRecommendations();
-        $listeningHistories = $this->activityPort->getAllListeningHistories();
-
-        $counts = [
-            self::STRATEGY_COLLABORATIVE => 0,
-            self::STRATEGY_CONTENT => 0,
-            self::STRATEGY_GENRE => 0,
-        ];
-
-        // Clear existing recommendations for all songs
-        foreach ($songs as $song) {
-            $this->commandBus->dispatch(new DeleteRecommendationsBySourceCommand(
-                sourceType: RecommendationType::fromString('song')->__toString(),
-                sourceId: $song->getId()->toString(),
-            ));
+        if ($this->jobPort->isCancelled($job->getId())) {
+            return $this->result($job, RecommendationGenerationResult::EXECUTION_SYNC, RecommendationJobStatus::Cancelled);
         }
 
-        // Collaborative filtering (song-based)
-        $collaborativeRecs = $this->generateCollaborativeRecommendations($songs, $listeningHistories, $userId);
-        foreach ($collaborativeRecs as $rec) {
-            $this->commandBus->dispatch($rec);
-            $counts[self::STRATEGY_COLLABORATIVE]++;
+        try {
+            $songs = $job->isFull()
+                ? $this->songRepository->findAllForRecommendations()
+                : $this->songRepository->findUpdatedAfter(new \DateTimeImmutable('7 days ago'));
+            $job->markInProgress(count($songs));
+            $this->jobPort->save($job);
+
+            [$counts, $cancelled] = $this->generate($job, $songs);
+            if ($cancelled || $this->jobPort->isCancelled($job->getId())) {
+                return $this->result($job, RecommendationGenerationResult::EXECUTION_SYNC, RecommendationJobStatus::Cancelled, $counts);
+            }
+
+            $job->markCompleted($counts);
+            $this->jobPort->save($job);
+        } catch (Throwable $failure) {
+            $this->recordFailure($job, $failure);
+
+            throw $failure;
         }
 
-        // Content similarity (song-based)
-        $contentRecs = $this->generateContentRecommendations($songs);
-        foreach ($contentRecs as $rec) {
-            $this->commandBus->dispatch($rec);
-            $counts[self::STRATEGY_CONTENT]++;
-        }
-
-        // Genre similarity (song-based)
-        $genreRecs = $this->generateGenreRecommendations($songs);
-        foreach ($genreRecs as $rec) {
-            $this->commandBus->dispatch($rec);
-            $counts[self::STRATEGY_GENRE]++;
-        }
-
-        return $counts;
+        return $this->result($job, RecommendationGenerationResult::EXECUTION_SYNC, counts: $counts);
     }
 
     /**
-     * @return array<string, int>
+     * Replaces the recommendations of the given songs, one strategy after another.
+     *
+     * @param \App\Catalog\Domain\Model\Song[] $songs
+     *
+     * @return array{0: array<string, int>, 1: bool} the counts per strategy, and whether the job was cancelled
      */
-    private function generateIncremental(?Uuid $userId): array
+    private function generate(RecommendationJob $job, array $songs): array
     {
-        $since = new \DateTimeImmutable('7 days ago');
-
-        $songs = $this->songRepository->findUpdatedAfter($since);
-        $listeningHistories = $this->activityPort->getAllListeningHistories();
-
+        $userId = $job->getUserId();
         $counts = [
             self::STRATEGY_COLLABORATIVE => 0,
             self::STRATEGY_CONTENT => 0,
@@ -185,25 +196,63 @@ final class GenerateRecommendationsHandler
             ));
         }
 
-        $collaborativeRecs = $this->generateCollaborativeRecommendations($songs, $listeningHistories, $userId);
-        foreach ($collaborativeRecs as $rec) {
-            $this->commandBus->dispatch($rec);
-            $counts[self::STRATEGY_COLLABORATIVE]++;
+        $strategies = [
+            self::STRATEGY_COLLABORATIVE => fn (): array => $this->generateCollaborativeRecommendations(
+                $songs,
+                $this->activityPort->getAllListeningHistories(),
+                $userId,
+            ),
+            self::STRATEGY_CONTENT => fn (): array => $this->generateContentRecommendations($songs),
+            self::STRATEGY_GENRE => fn (): array => $this->generateGenreRecommendations($songs),
+        ];
+
+        foreach ($strategies as $strategy => $recommendations) {
+            if ($this->jobPort->isCancelled($job->getId())) {
+                return [$counts, true];
+            }
+
+            $job->updateProgress($strategy, 0, $counts);
+            $this->jobPort->save($job);
+
+            foreach ($recommendations() as $recommendation) {
+                $this->commandBus->dispatch($recommendation);
+                $counts[$strategy]++;
+            }
         }
 
-        $contentRecs = $this->generateContentRecommendations($songs);
-        foreach ($contentRecs as $rec) {
-            $this->commandBus->dispatch($rec);
-            $counts[self::STRATEGY_CONTENT]++;
-        }
+        return [$counts, false];
+    }
 
-        $genreRecs = $this->generateGenreRecommendations($songs);
-        foreach ($genreRecs as $rec) {
-            $this->commandBus->dispatch($rec);
-            $counts[self::STRATEGY_GENRE]++;
+    /** Marks the job failed without hiding the run's own error if recording it fails too. */
+    private function recordFailure(RecommendationJob $job, Throwable $failure): void
+    {
+        try {
+            $job->markFailed($failure->getMessage());
+            $this->jobPort->save($job);
+        } catch (Throwable $recordFailure) {
+            $this->logger->error('Could not mark the recommendation job failed.', [
+                'job_id' => $job->getId()->toString(),
+                'error' => $failure->getMessage(),
+                'record_error' => $recordFailure->getMessage(),
+            ]);
         }
+    }
 
-        return $counts;
+    /** @param array<string, int> $counts */
+    private function result(
+        RecommendationJob $job,
+        string $execution,
+        ?RecommendationJobStatus $status = null,
+        array $counts = [],
+    ): RecommendationGenerationResult {
+        return new RecommendationGenerationResult(
+            jobId: $job->getId()->toString(),
+            publicId: $job->getPublicId()->toString(),
+            mode: $job->isFull() ? GenerateRecommendationsCommand::MODE_FULL : GenerateRecommendationsCommand::MODE_INCREMENTAL,
+            status: ($status ?? $job->getStatus())->value,
+            execution: $execution,
+            counts: $counts,
+        );
     }
 
     /**

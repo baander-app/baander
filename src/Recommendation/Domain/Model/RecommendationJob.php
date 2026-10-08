@@ -107,17 +107,37 @@ final class RecommendationJob
         $this->state->updatedAt = new DateTimeImmutable();
     }
 
+    /** True once the job completed or failed; such a job can no longer be cancelled. */
+    public function isFinished(): bool
+    {
+        return $this->state->status === RecommendationJobStatus::Completed
+            || $this->state->status === RecommendationJobStatus::Failed;
+    }
+
+    /** Cancelling a cancelled job changes nothing; a finished job cannot be cancelled. */
     public function markCancelled(): void
     {
-        if ($this->state->status === RecommendationJobStatus::Completed
-            || $this->state->status === RecommendationJobStatus::Failed
-        ) {
+        if ($this->state->status === RecommendationJobStatus::Cancelled) {
             return;
+        }
+
+        if ($this->isFinished()) {
+            throw new RuntimeException(sprintf(
+                'Cannot cancel a job with status "%s".',
+                $this->state->status->value,
+            ));
         }
 
         $this->state->status = RecommendationJobStatus::Cancelled;
         $this->state->completedAt = new DateTimeImmutable();
         $this->state->updatedAt = new DateTimeImmutable();
+    }
+
+    /** Only a failed or cancelled job may be run again as a new job. */
+    public function canBeRequeued(): bool
+    {
+        return $this->state->status === RecommendationJobStatus::Failed
+            || $this->state->status === RecommendationJobStatus::Cancelled;
     }
 
     public function getState(): RecommendationJobState

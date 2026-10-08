@@ -362,7 +362,7 @@ Every setting in the table is enforced. Four features arrived with server settin
 
 A fresh install has an active scheduled job, **Generate recommendations**, that runs every day at 04:00 UTC in incremental mode, which recomputes recommendations for songs updated in the last seven days. Each run reads `recommendations.auto_generate` when it fires. While the setting is off, the run generates nothing, logs that it was skipped, and records `skipped: recommendations.auto_generate is off` as the job's last result.
 
-The setting governs only that job. [`app:recommendations:generate`](commands/app-recommendations-generate.md), the admin action and schedules an administrator creates always generate.
+The setting governs only that job. [`app:recommendation:generate`](commands/app-recommendation-generate.md), the admin action and schedules an administrator creates always generate.
 
 You can change the job's schedule, pause it, or switch it to full mode in the scheduler admin. A full run loads every song and the listening history of every user, and it runs inside the scheduler worker, whose memory is limited (the [worker deployment manifest](commands/README.md#worker-deployment) requires a reservation of at least 320 MiB for it). On a large library it may run out of memory or time, which is why the seeded job is incremental.
 

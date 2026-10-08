@@ -26,4 +26,10 @@ interface RecommendationJobPortInterface
     public function findRecent(int $limit = 20, ?string $status = null): array;
 
     public function save(RecommendationJob $job): void;
+
+    /**
+     * Reads the stored status, bypassing any copy of the job this process holds, so a run
+     * sees a cancellation made from another process.
+     */
+    public function isCancelled(Uuid $id): bool;
 }
