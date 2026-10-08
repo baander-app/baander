@@ -4,22 +4,27 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Controller;
 
+use App\Catalog\Application\Command\Genre\CreateGenreCommand;
+use App\Catalog\Application\Command\Genre\DeleteGenreCommand;
+use App\Catalog\Application\Command\Genre\UpdateGenreCommand;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
-use App\Catalog\Domain\Model\Genre;
 use App\Catalog\Interface\Request\CreateGenreRequest;
 use App\Catalog\Interface\Request\GenreAlbumRequest;
 use App\Catalog\Interface\Request\GenreSongRequest;
 use App\Catalog\Interface\Request\UpdateGenreRequest;
 use App\Catalog\Interface\Resource\GenreResource;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -28,11 +33,11 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class GenreController
 {
     use ApiResponsesTrait;
-    use TranslatorTrait;
 
     public function __construct(
         private readonly GenrePortInterface $genreService,
         private readonly LibraryReadScopeProviderInterface $libraryReadScopeProvider,
+        private readonly MessageBusInterface $bus,
     ) {
     }
 
@@ -55,6 +60,7 @@ final class GenreController
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
+    #[CliCounterpart('app:genre:list')]
     public function index(Request $request): JsonResponse
     {
         $scope = $this->libraryReadScopeProvider->current();
@@ -84,33 +90,23 @@ final class GenreController
                 properties: [new OA\Property(property: 'data', ref: new Model(type: GenreResource::class))],
                 type: 'object',
             )),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '409', description: 'Another genre has the slug', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'Invalid name, slug or MusicBrainz ID, or a parent that is not an existing genre', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
     #[Route('/', name: 'store', methods: ['POST'])]
+    #[CliCounterpart('app:genre:create')]
     #[IsGranted('ROLE_ADMIN')]
     public function store(#[MapRequestPayload] CreateGenreRequest $payload): JsonResponse
     {
-        try {
-            $parent = $payload->parentId !== null
-                ? Uuid::fromString($payload->parentId)
-                : null;
+        $genre = $this->dispatch(new CreateGenreCommand(
+            name: $payload->name,
+            slug: $payload->slug,
+            parentId: $payload->parentId,
+            mbid: $payload->mbid,
+        ));
 
-            $genre = Genre::create(
-                name: $payload->name,
-                slug: $payload->slug,
-                parent: $parent,
-                mbid: $payload->mbid,
-            );
-        } catch (\InvalidArgumentException) {
-            return $this->errorResponse($this->trans('errors.invalid_input'), 422);
-        } catch (\Throwable) {
-            return $this->errorResponse($this->trans('errors.invalid_parent_id'));
-        }
-
-        $this->genreService->save($genre);
-
-        return $this->created(GenreResource::from($genre));
+        return $this->successResponse(GenreResource::from($genre), Response::HTTP_CREATED);
     }
 
     /**
@@ -178,45 +174,22 @@ final class GenreController
                 type: 'object',
             )),
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '409', description: 'Another genre has the new slug', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'Invalid name, slug or MusicBrainz ID, a parent that is not an existing genre, or a parent that would create a circular reference', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
     #[Route('/{slug}', name: 'update', methods: ['PATCH'])]
+    #[CliCounterpart('app:genre:update')]
     #[IsGranted('ROLE_ADMIN')]
     public function update(string $slug, #[MapRequestPayload] UpdateGenreRequest $payload): JsonResponse
     {
-        $genre = $this->genreService->findBySlug($slug);
-
-        if ($genre === null) {
-            return $this->notFound();
-        }
-
-        try {
-            $updateName = $payload->name ?? $genre->getName();
-            $updateSlug = $payload->slug ?? $genre->getSlug();
-
-            if ($payload->name !== null || $payload->slug !== null) {
-                $genre->update($updateName, $updateSlug);
-            }
-
-            if ($payload->parentId !== null) {
-                $parentId = Uuid::fromString($payload->parentId);
-                if ($this->genreService->isDescendantOf($genre->getId(), $parentId)) {
-                    return $this->errorResponse('Cannot set parent: would create a circular reference.');
-                }
-                $genre->setParentId($parentId);
-            }
-
-            if ($payload->mbid !== null) {
-                $genre->updateMbid($payload->mbid);
-            }
-        } catch (\InvalidArgumentException) {
-            return $this->errorResponse($this->trans('errors.invalid_input'), 422);
-        } catch (\Throwable) {
-            return $this->errorResponse($this->trans('errors.invalid_parent_id'));
-        }
-
-        $this->genreService->save($genre);
+        $genre = $this->dispatch(new UpdateGenreCommand(
+            slug: $slug,
+            name: $payload->name,
+            newSlug: $payload->slug,
+            parentId: $payload->parentId,
+            mbid: $payload->mbid,
+        ));
 
         return $this->successResponse(GenreResource::from($genre));
     }
@@ -236,16 +209,11 @@ final class GenreController
         ],
     )]
     #[Route('/{slug}', name: 'destroy', methods: ['DELETE'])]
+    #[CliCounterpart('app:genre:delete')]
     #[IsGranted('ROLE_ADMIN')]
     public function destroy(string $slug): JsonResponse
     {
-        $genre = $this->genreService->findBySlug($slug);
-
-        if ($genre === null) {
-            return $this->notFound();
-        }
-
-        $this->genreService->delete($genre);
+        $this->dispatch(new DeleteGenreCommand($slug));
 
         return $this->noContent();
     }
@@ -268,6 +236,7 @@ final class GenreController
         ],
     )]
     #[Route('/{slug}/songs', name: 'add_song', methods: ['POST'])]
+    #[CliCounterpart('app:genre:song:add')]
     #[IsGranted('ROLE_ADMIN')]
     public function addSong(string $slug, #[MapRequestPayload] GenreSongRequest $payload): JsonResponse
     {
@@ -283,7 +252,9 @@ final class GenreController
             return $this->errorResponse('Invalid song ID format.');
         }
 
-        $this->genreService->addSongToGenre($genre->getId(), $songId);
+        if (!$this->genreService->addSongToGenre($genre->getId(), $songId)) {
+            return $this->notFound('Song not found.');
+        }
 
         return $this->noContent();
     }
@@ -300,10 +271,11 @@ final class GenreController
         ],
         responses: [
             new OA\Response(response: '204', description: 'Song removed from genre'),
-            new OA\Response(response: '404', description: 'Genre not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '404', description: 'Genre or song not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/{slug}/songs/{songId}', name: 'remove_song', methods: ['DELETE'])]
+    #[CliCounterpart('app:genre:song:remove')]
     #[IsGranted('ROLE_ADMIN')]
     public function removeSong(string $slug, string $songId): JsonResponse
     {
@@ -319,7 +291,9 @@ final class GenreController
             return $this->errorResponse('Invalid song ID format.');
         }
 
-        $this->genreService->removeSongFromGenre($genre->getId(), $resolvedSongId);
+        if (!$this->genreService->removeSongFromGenre($genre->getId(), $resolvedSongId)) {
+            return $this->notFound('Song not found.');
+        }
 
         return $this->noContent();
     }
@@ -342,6 +316,7 @@ final class GenreController
         ],
     )]
     #[Route('/{slug}/albums', name: 'add_album', methods: ['POST'])]
+    #[CliCounterpart('app:genre:album:add')]
     #[IsGranted('ROLE_ADMIN')]
     public function addAlbum(string $slug, #[MapRequestPayload] GenreAlbumRequest $payload): JsonResponse
     {
@@ -357,7 +332,9 @@ final class GenreController
             return $this->errorResponse('Invalid album ID format.');
         }
 
-        $this->genreService->addAlbumToGenre($genre->getId(), $albumId);
+        if (!$this->genreService->addAlbumToGenre($genre->getId(), $albumId)) {
+            return $this->notFound('Album not found.');
+        }
 
         return $this->noContent();
     }
@@ -374,10 +351,11 @@ final class GenreController
         ],
         responses: [
             new OA\Response(response: '204', description: 'Album removed from genre'),
-            new OA\Response(response: '404', description: 'Genre not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '404', description: 'Genre or album not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/{slug}/albums/{albumId}', name: 'remove_album', methods: ['DELETE'])]
+    #[CliCounterpart('app:genre:album:remove')]
     #[IsGranted('ROLE_ADMIN')]
     public function removeAlbum(string $slug, string $albumId): JsonResponse
     {
@@ -393,8 +371,16 @@ final class GenreController
             return $this->errorResponse('Invalid album ID format.');
         }
 
-        $this->genreService->removeAlbumFromGenre($genre->getId(), $resolvedAlbumId);
+        if (!$this->genreService->removeAlbumFromGenre($genre->getId(), $resolvedAlbumId)) {
+            return $this->notFound('Album not found.');
+        }
 
         return $this->noContent();
+    }
+
+    /** A handler's exception reaches ExceptionSubscriber, which unwraps it to its 404 or 422 response. */
+    private function dispatch(object $message): mixed
+    {
+        return $this->bus->dispatch($message)->last(HandledStamp::class)?->getResult();
     }
 }

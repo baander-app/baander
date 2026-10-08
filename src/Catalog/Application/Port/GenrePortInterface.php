@@ -59,13 +59,17 @@ interface GenrePortInterface
 
     public function delete(Genre $genre): void;
 
-    public function addSongToGenre(Uuid $genreId, Uuid $songId): void;
+    /** @return bool false, changing nothing, when the genre or the song does not exist */
+    public function addSongToGenre(Uuid $genreId, Uuid $songId): bool;
 
-    public function removeSongFromGenre(Uuid $genreId, Uuid $songId): void;
+    /** @return bool false, changing nothing, when the genre or the song does not exist */
+    public function removeSongFromGenre(Uuid $genreId, Uuid $songId): bool;
 
-    public function addAlbumToGenre(Uuid $genreId, Uuid $albumId): void;
+    /** @return bool false, changing nothing, when the genre or the album does not exist */
+    public function addAlbumToGenre(Uuid $genreId, Uuid $albumId): bool;
 
-    public function removeAlbumFromGenre(Uuid $genreId, Uuid $albumId): void;
+    /** @return bool false, changing nothing, when the genre or the album does not exist */
+    public function removeAlbumFromGenre(Uuid $genreId, Uuid $albumId): bool;
 
     public function addMovieToGenre(Uuid $genreId, Uuid $movieId): void;
 

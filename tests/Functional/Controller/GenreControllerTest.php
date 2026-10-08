@@ -110,8 +110,8 @@ final class GenreControllerTest extends TestCase
         $this->assertSame(201, $response->getStatusCode());
 
         $data = json_decode($response->getContent(), true, 512, JSON_THROW_ON_ERROR);
-        $this->assertSame('Electronic', $data['name']);
-        $this->assertSame('electronic', $data['slug']);
+        $this->assertSame('Electronic', $data['data']['name']);
+        $this->assertSame('electronic', $data['data']['slug']);
     }
 
     public function testStoreWithBlankNameFailsValidation(): void
@@ -134,7 +134,7 @@ final class GenreControllerTest extends TestCase
     {
         $admin = $this->createAdminUser();
         $user = $this->createTestUser();
-        $root = $this->assertJsonResponse($this->createGenre($admin, 'Rock', 'rock'), 201);
+        $root = $this->assertJsonResponse($this->createGenre($admin, 'Rock', 'rock'), 201, 'data')['data'];
         $this->assertJsonResponse(
             $this->authenticatedRequest('POST', '/api/genres/', $admin, [
                 'name' => 'Hard Rock',

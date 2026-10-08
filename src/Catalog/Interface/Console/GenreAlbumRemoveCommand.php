@@ -1,0 +1,58 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Catalog\Interface\Console;
+
+use App\Catalog\Application\Port\GenrePortInterface;
+use App\Shared\Application\Exception\NotFoundException;
+use App\Shared\Interface\Console\AdminCommandSupport;
+use Symfony\Component\Console\Attribute\AsCommand;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Style\SymfonyStyle;
+use Throwable;
+
+/**
+ * The CLI counterpart of DELETE /api/genres/{slug}/albums/{albumId}.
+ */
+#[AsCommand(
+    name: 'app:genre:album:remove',
+    description: 'Remove a genre from an album.',
+)]
+final class GenreAlbumRemoveCommand extends Command
+{
+    public function __construct(
+        private readonly GenrePortInterface $genres,
+    ) {
+        parent::__construct();
+    }
+
+    protected function configure(): void
+    {
+        $this
+            ->addArgument('slug', InputArgument::REQUIRED, 'The genre slug')
+            ->addArgument('album-id', InputArgument::REQUIRED, 'The album UUID');
+    }
+
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $io = new SymfonyStyle($input, $output);
+        $slug = (string) $input->getArgument('slug');
+
+        try {
+            $link = GenreLinkTarget::resolve($this->genres, $slug, (string) $input->getArgument('album-id'), 'album');
+            if (!$this->genres->removeAlbumFromGenre($link->genreId, $link->targetId)) {
+                throw new NotFoundException('Album not found.');
+            }
+        } catch (Throwable $exception) {
+            return AdminCommandSupport::fail($io, $exception);
+        }
+
+        $io->success(sprintf('Album %s no longer has the genre "%s".', $link->targetId->toString(), $slug));
+
+        return Command::SUCCESS;
+    }
+}

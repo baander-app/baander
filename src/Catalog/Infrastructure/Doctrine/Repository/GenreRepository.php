@@ -391,13 +391,13 @@ final class GenreRepository implements GenreRepositoryInterface
         }
     }
 
-    public function addSongToGenre(Uuid $genreId, Uuid $songId): void
+    public function addSongToGenre(Uuid $genreId, Uuid $songId): bool
     {
         $genreEntity = $this->entityManager->getRepository(GenreEntity::class)->find($genreId);
         $songEntity = $this->entityManager->getRepository(SongEntity::class)->find($songId);
 
         if ($genreEntity === null || $songEntity === null) {
-            return;
+            return false;
         }
 
         $existing = $this->entityManager->getRepository(GenreSongEntity::class)->findOneBy([
@@ -406,20 +406,22 @@ final class GenreRepository implements GenreRepositoryInterface
         ]);
 
         if ($existing !== null) {
-            return;
+            return true;
         }
 
         $this->entityManager->persist(new GenreSongEntity($genreEntity, $songEntity));
         $this->entityManager->flush();
+
+        return true;
     }
 
-    public function removeSongFromGenre(Uuid $genreId, Uuid $songId): void
+    public function removeSongFromGenre(Uuid $genreId, Uuid $songId): bool
     {
         $genreEntity = $this->entityManager->getRepository(GenreEntity::class)->find($genreId);
         $songEntity = $this->entityManager->getRepository(SongEntity::class)->find($songId);
 
         if ($genreEntity === null || $songEntity === null) {
-            return;
+            return false;
         }
 
         $existing = $this->entityManager->getRepository(GenreSongEntity::class)->findOneBy([
@@ -431,15 +433,17 @@ final class GenreRepository implements GenreRepositoryInterface
             $this->entityManager->remove($existing);
             $this->entityManager->flush();
         }
+
+        return true;
     }
 
-    public function addAlbumToGenre(Uuid $genreId, Uuid $albumId): void
+    public function addAlbumToGenre(Uuid $genreId, Uuid $albumId): bool
     {
         $genreEntity = $this->entityManager->getRepository(GenreEntity::class)->find($genreId);
         $albumEntity = $this->entityManager->getRepository(AlbumEntity::class)->find($albumId);
 
         if ($genreEntity === null || $albumEntity === null) {
-            return;
+            return false;
         }
 
         $existing = $this->entityManager->getRepository(GenreAlbumEntity::class)->findOneBy([
@@ -448,20 +452,22 @@ final class GenreRepository implements GenreRepositoryInterface
         ]);
 
         if ($existing !== null) {
-            return;
+            return true;
         }
 
         $this->entityManager->persist(new GenreAlbumEntity($genreEntity, $albumEntity));
         $this->entityManager->flush();
+
+        return true;
     }
 
-    public function removeAlbumFromGenre(Uuid $genreId, Uuid $albumId): void
+    public function removeAlbumFromGenre(Uuid $genreId, Uuid $albumId): bool
     {
         $genreEntity = $this->entityManager->getRepository(GenreEntity::class)->find($genreId);
         $albumEntity = $this->entityManager->getRepository(AlbumEntity::class)->find($albumId);
 
         if ($genreEntity === null || $albumEntity === null) {
-            return;
+            return false;
         }
 
         $existing = $this->entityManager->getRepository(GenreAlbumEntity::class)->findOneBy([
@@ -473,6 +479,8 @@ final class GenreRepository implements GenreRepositoryInterface
             $this->entityManager->remove($existing);
             $this->entityManager->flush();
         }
+
+        return true;
     }
 
     public function addMovieToGenre(Uuid $genreId, Uuid $movieId): void
