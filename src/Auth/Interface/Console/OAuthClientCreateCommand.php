@@ -7,6 +7,7 @@ namespace App\Auth\Interface\Console;
 use App\Auth\Application\Command\OAuth\RegisterClientCommand;
 use App\Auth\Application\DTO\RegisteredClientDTO;
 use App\Auth\Interface\Resource\AdminOAuthClientCredentialsResource;
+use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -41,7 +42,7 @@ final class OAuthClientCreateCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $type = (string) $input->getOption('type');
         if (!in_array($type, ['device', 'public', 'confidential'], true)) {
-            $io->error('The --type option must be device, public or confidential.');
+            $io->getErrorStyle()->error('The --type option must be device, public or confidential.');
 
             return Command::INVALID;
         }
@@ -56,9 +57,7 @@ final class OAuthClientCreateCommand extends Command
                 redirectUris: $redirectUris,
             ));
         } catch (Throwable $exception) {
-            $io->error($exception->getMessage());
-
-            return Command::FAILURE;
+            return AdminCommandSupport::fail($io, $exception);
         }
         assert($registered instanceof RegisteredClientDTO);
 

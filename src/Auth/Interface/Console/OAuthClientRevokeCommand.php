@@ -6,6 +6,7 @@ namespace App\Auth\Interface\Console;
 
 use App\Auth\Application\Command\OAuth\RevokeRegisteredClientCommand;
 use App\Auth\Interface\Resource\AdminOAuthClientResource;
+use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -40,9 +41,7 @@ final class OAuthClientRevokeCommand extends Command
                 OAuthClientMessageDispatcher::publicId((string) $input->getArgument('client-id')),
             ));
         } catch (Throwable $exception) {
-            $io->error($exception->getMessage());
-
-            return Command::FAILURE;
+            return AdminCommandSupport::fail($io, $exception);
         }
         $revoked = AdminOAuthClientResource::from($client);
 

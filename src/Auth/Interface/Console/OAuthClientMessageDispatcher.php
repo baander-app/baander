@@ -5,20 +5,19 @@ declare(strict_types=1);
 namespace App\Auth\Interface\Console;
 
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Interface\Console\AdminCommandSupport;
 use InvalidArgumentException;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Messenger\Exception\HandlerFailedException;
-use Symfony\Component\Messenger\MessageBusInterface;
-use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Throwable;
 
 /**
- * Shared plumbing of the app:oauth:client:* commands: synchronous dispatch and client output.
+ * Plumbing of the app:oauth:client:* commands: dispatch through the shared admin
+ * command support, client IDs and client output.
  */
 final readonly class OAuthClientMessageDispatcher
 {
     public function __construct(
-        private MessageBusInterface $bus,
+        private AdminCommandSupport $support,
     ) {
     }
 
@@ -29,13 +28,7 @@ final readonly class OAuthClientMessageDispatcher
      */
     public function dispatch(object $message): mixed
     {
-        try {
-            return $this->bus->dispatch($message)->last(HandledStamp::class)?->getResult();
-        } catch (HandlerFailedException $exception) {
-            $wrapped = $exception->getWrappedExceptions();
-
-            throw count($wrapped) === 1 ? reset($wrapped) : $exception;
-        }
+        return $this->support->dispatch($message);
     }
 
     public static function publicId(string $value): PublicId
