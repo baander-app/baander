@@ -32,9 +32,9 @@ final class JobMonitorService
      * died) restarts that row: it runs again from the new start time, without the previous
      * attempt's finish time, progress or error. The row keeps its creation time and the
      * queue it was first received from. The upsert is atomic, so concurrent deliveries
-     * still share one row.
+     * still share one row. A job handled inline, outside any transport, has no queue.
      */
-    public function startAttempt(string $jobId, string $name, string $queue, ?string $data, bool $dataTruncated): int
+    public function startAttempt(string $jobId, string $name, ?string $queue, ?string $data, bool $dataTruncated): int
     {
         $now = $this->now();
         $attempt = $this->entityManager->getConnection()->fetchOne(
@@ -67,6 +67,7 @@ final class JobMonitorService
                 'data_truncated' => $dataTruncated,
             ],
             [
+                'queue' => $queue === null ? ParameterType::NULL : ParameterType::STRING,
                 'data' => $data === null ? ParameterType::NULL : ParameterType::STRING,
                 'data_truncated' => ParameterType::BOOLEAN,
             ],
@@ -516,6 +517,29 @@ final class JobMonitorService
         );
     }
 
+    /**
+     * Claims a failed job for its one retry. The conditional update lets only one of two
+     * concurrent retries through, so the job's message is dispatched again at most once.
+     *
+     * @return bool false when the job is not failed or was already retried
+     */
+    public function claimRetry(string $jobId): bool
+    {
+        return $this->entityManager->getConnection()->executeStatement(
+            'UPDATE job_monitors SET retried = true, updated_at = :now WHERE job_id = :job_id AND status = :status AND retried = false',
+            ['now' => $this->now(), 'job_id' => $jobId, 'status' => JobStatus::Failed->value],
+        ) === 1;
+    }
+
+    /** Gives back a retry claim whose dispatch failed, so the job can be retried again. */
+    public function releaseRetry(string $jobId): void
+    {
+        $this->entityManager->getConnection()->executeStatement(
+            'UPDATE job_monitors SET retried = false, updated_at = :now WHERE job_id = :job_id',
+            ['now' => $this->now(), 'job_id' => $jobId],
+        );
+    }
+
     public function markRetriedWithAudit(string $jobId, string $newJobId, string $userId): void
     {
         $monitor = $this->findByJobIdOrFail($jobId);
@@ -550,15 +574,26 @@ final class JobMonitorService
      */
     public function prune(\DateTimeImmutable $olderThan): int
     {
-        $qb = $this->entityManager->createQueryBuilder();
+        return (int) $this->prunable($this->entityManager->createQueryBuilder()->delete(JobMonitorEntity::class, 'j'), $olderThan)
+            ->getQuery()
+            ->execute();
+    }
 
-        return (int) $qb->delete(JobMonitorEntity::class, 'j')
+    /** Counts the job monitors prune() would delete. */
+    public function countPrunable(\DateTimeImmutable $olderThan): int
+    {
+        return (int) $this->prunable($this->entityManager->createQueryBuilder()->select('COUNT(j.id)')->from(JobMonitorEntity::class, 'j'), $olderThan)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    private function prunable(\Doctrine\ORM\QueryBuilder $qb, \DateTimeImmutable $olderThan): \Doctrine\ORM\QueryBuilder
+    {
+        return $qb
             ->where('j.status IN (:statuses)')
             ->andWhere('j.createdAt < :olderThan')
             ->setParameter('statuses', [JobStatus::Finished, JobStatus::Failed, JobStatus::Cancelled])
-            ->setParameter('olderThan', self::instant($olderThan))
-            ->getQuery()
-            ->execute();
+            ->setParameter('olderThan', self::instant($olderThan));
     }
 
     public function findByJobId(string $jobId): ?JobMonitorEntity

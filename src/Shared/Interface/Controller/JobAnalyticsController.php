@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Shared\Interface\Controller;
 
-use App\Shared\Infrastructure\Messenger\JobMonitorService;
+use App\Shared\Application\DTO\JobAnalyticsRange;
+use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Application\Port\JobMonitorAdministrationInterface;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\Exception\InvalidQueryParameter;
 use App\Shared\Interface\Request\QueryParameters;
@@ -23,9 +26,8 @@ final class JobAnalyticsController
     use ApiResponsesTrait;
 
     public function __construct(
-        private readonly JobMonitorService $jobMonitorService,
-    )
-    {
+        private readonly JobMonitorAdministrationInterface $jobMonitor,
+    ) {
     }
 
     /**
@@ -59,14 +61,11 @@ final class JobAnalyticsController
             ),
         ],
     )]
+    #[CliCounterpart('app:monitor:analytics')]
     #[Route('/summary', name: 'summary', methods: ['GET'])]
     public function summary(Request $request): JsonResponse
     {
-        [$from, $to] = $this->parseTimeRange($request);
-
-        return $this->successResponse(
-            $this->jobMonitorService->getAnalyticsSummary($from, $to),
-        );
+        return $this->successResponse($this->jobMonitor->analyticsSummary($this->range($request)));
     }
 
     /**
@@ -104,14 +103,11 @@ final class JobAnalyticsController
             ),
         ],
     )]
+    #[CliCounterpart('app:monitor:analytics')]
     #[Route('/timing', name: 'timing', methods: ['GET'])]
     public function timing(Request $request): JsonResponse
     {
-        [$from, $to] = $this->parseTimeRange($request);
-
-        return $this->successResponse(
-            $this->jobMonitorService->getAnalyticsTiming($from, $to),
-        );
+        return $this->successResponse($this->jobMonitor->analyticsTiming($this->range($request)));
     }
 
     /**
@@ -159,43 +155,29 @@ final class JobAnalyticsController
             ),
         ],
     )]
+    #[CliCounterpart('app:monitor:analytics')]
     #[Route('/failures', name: 'failures', methods: ['GET'])]
     public function failures(Request $request): JsonResponse
     {
-        [$from, $to] = $this->parseTimeRange($request);
-        $limit = $this->parseLimit($request);
-
-        return $this->successResponse(
-            $this->jobMonitorService->getAnalyticsFailures($from, $to, $limit),
-        );
+        return $this->successResponse($this->jobMonitor->analyticsFailures(
+            $this->range($request),
+            (int) ($request->query->get('limit') ?? 50),
+        ));
     }
 
     /**
-     * Parse and validate the half-open job creation range [from, to).
-     *
-     * @return array{\DateTimeImmutable, \DateTimeImmutable}
+     * The half-open job creation range [from, to). A malformed instant and an end that is
+     * not after the start are both bad requests that name the parameter.
      */
-    private function parseTimeRange(Request $request): array
+    private function range(Request $request): JobAnalyticsRange
     {
-        $now = new \DateTimeImmutable();
-        $fromDate = QueryParameters::optionalDateTime($request->query, 'from') ?? $now->modify('-24 hours');
-        $toDate = QueryParameters::optionalDateTime($request->query, 'to') ?? $now;
-
-        if ($toDate <= $fromDate) {
-            throw new InvalidQueryParameter('to', 'to must be after from.');
+        try {
+            return JobAnalyticsRange::resolve(
+                QueryParameters::optionalDateTime($request->query, 'from'),
+                QueryParameters::optionalDateTime($request->query, 'to'),
+            );
+        } catch (InvalidInputException $exception) {
+            throw new InvalidQueryParameter('to', $exception->getMessage());
         }
-
-        // Clamp: maximum 90 days
-        $maxTo = $fromDate->add(new \DateInterval('P90D'));
-        if ($toDate > $maxTo) {
-            $toDate = $maxTo;
-        }
-
-        return [$fromDate, $toDate];
-    }
-
-    private function parseLimit(Request $request, int $default = 50, int $max = 200): int
-    {
-        return max(1, min((int)($request->query->get('limit') ?? $default), $max));
     }
 }

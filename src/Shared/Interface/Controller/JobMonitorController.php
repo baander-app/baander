@@ -4,27 +4,18 @@ declare(strict_types=1);
 
 namespace App\Shared\Interface\Controller;
 
-use App\Shared\Domain\Model\JobStatus;
-use App\Shared\Domain\Model\PublicId;
-use App\Shared\Infrastructure\Doctrine\Entity\JobMonitorEntity;
-use App\Shared\Infrastructure\Messenger\JobIdStamp;
-use App\Shared\Infrastructure\Messenger\JobMessageSerializer;
-use App\Shared\Infrastructure\Messenger\JobMonitorFilter;
-use App\Shared\Infrastructure\Messenger\JobMonitorService;
-use App\Shared\Infrastructure\Pagination\CursorCodec;
-use App\Shared\Infrastructure\Redis\RedisClientFactory;
-use DateTimeInterface;
-use OpenApi\Attributes as OA;
+use App\Shared\Application\DTO\JobMonitorQuery;
+use App\Shared\Application\Port\JobMonitorAdministrationInterface;
+use App\Shared\Interface\Attribute\CliCounterpart;
+use App\Shared\Interface\DTO\ApiError;
+use App\Shared\Interface\Resource\JobMonitorResource;
 use Nelmio\ApiDocBundle\Attribute\Model;
-use RuntimeException;
+use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Messenger\Envelope;
-use Symfony\Component\Messenger\MessageBusInterface;
-use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
+use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
-use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_ADMIN')]
@@ -35,11 +26,7 @@ final class JobMonitorController
     use ApiResponsesTrait;
 
     public function __construct(
-        private readonly JobMonitorService $jobMonitorService,
-        private readonly CursorCodec $cursorCodec,
-        private readonly MessageBusInterface $messageBus,
-        private readonly JobMessageSerializer $messageSerializer,
-        private readonly RedisClientFactory $redisClientFactory,
+        private readonly JobMonitorAdministrationInterface $jobMonitor,
     ) {
     }
 
@@ -67,27 +54,11 @@ final class JobMonitorController
             ),
         ],
     )]
+    #[CliCounterpart('app:monitor:status')]
     #[Route('/status', name: 'status', methods: ['GET'])]
     public function status(): JsonResponse
     {
-        $counts = $this->jobMonitorService->countByStatus();
-        $running = $this->jobMonitorService->getRunning();
-
-        $runningData = array_map(
-            static fn(JobMonitorEntity $job): array => [
-                'jobId'     => $job->getJobId(),
-                'name'      => $job->getName(),
-                'queue'     => $job->getQueue(),
-                'startedAt' => $job->getStartedAt()?->format(DateTimeInterface::ATOM),
-                'progress'  => $job->getProgress(),
-            ],
-            $running,
-        );
-
-        return $this->successResponse([
-            'counts'  => $counts,
-            'running' => $runningData,
-        ]);
+        return $this->successResponse(JobMonitorResource::overview($this->jobMonitor->overview()));
     }
 
     /**
@@ -138,54 +109,25 @@ final class JobMonitorController
                     type: 'object',
                 ),
             ),
+            new OA\Response(response: '422', description: 'Unknown status', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
         ],
     )]
+    #[CliCounterpart('app:monitor:jobs')]
     #[Route('/jobs', name: 'jobs', methods: ['GET'])]
     public function jobs(Request $request): JsonResponse
     {
-        $limit = max(1, min((int)($request->query->get('limit') ?? 50), 200));
-        $sort = $request->query->get('sort', 'createdAt');
-        $direction = $request->query->get('direction', 'desc');
-        $cursorString = $request->query->get('cursor');
+        $query = $request->query;
+        $optional = static fn (string $name): ?string => $query->has($name) ? $query->getString($name) : null;
 
-        $filter = new JobMonitorFilter(
-            status: $request->query->get('status'),
-            name: $request->query->get('name'),
-            queue: $request->query->get('queue'),
-        );
-
-        $cursor = ($cursorString !== null) ? $this->cursorCodec->decode($cursorString) : null;
-
-        $result = $this->jobMonitorService->findWithCursor($filter, $cursor, $limit, $sort, $direction);
-
-        $items = array_map(
-            static fn(JobMonitorEntity $job): array => [
-                'jobId'          => $job->getJobId(),
-                'name'           => $job->getName(),
-                'queue'          => $job->getQueue(),
-                'status'         => $job->getStatus()->value,
-                'progress'       => $job->getProgress(),
-                'attempt'        => $job->getAttempt(),
-                'retried'        => $job->isRetried(),
-                'startedAt'      => $job->getStartedAt()?->format(DateTimeInterface::ATOM),
-                'finishedAt'     => $job->getFinishedAt()?->format(DateTimeInterface::ATOM),
-                'createdAt'      => $job->getCreatedAt()->format(DateTimeInterface::ATOM),
-                'updatedAt'      => $job->getUpdatedAt()->format(DateTimeInterface::ATOM),
-                'exceptionClass' => $job->getStatus()->value === 'failed'
-                    ? $job->getExceptionClass()
-                    : null,
-            ],
-            $result->items,
-        );
-
-        return $this->successResponse([
-            'items'         => $items,
-            'next_cursor'   => $result->nextCursor !== null
-                ? $this->cursorCodec->encode($result->nextCursor)
-                : null,
-            'has_next_page' => $result->hasNextPage,
-            'per_page'      => $result->perPage,
-        ]);
+        return $this->successResponse(JobMonitorResource::page($this->jobMonitor->jobs(new JobMonitorQuery(
+            status: $optional('status'),
+            name: $optional('name'),
+            queue: $optional('queue'),
+            sort: $query->getString('sort', 'createdAt'),
+            direction: $query->getString('direction', 'desc'),
+            limit: (int) ($query->get('limit') ?? JobMonitorQuery::DEFAULT_LIMIT),
+            cursor: $optional('cursor'),
+        ))));
     }
 
     /**
@@ -225,43 +167,14 @@ final class JobMonitorController
                     type: 'object',
                 ),
             ),
-            new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
         ],
     )]
+    #[CliCounterpart('app:monitor:job:show')]
     #[Route('/jobs/{jobId}', name: 'jobs_detail', methods: ['GET'])]
     public function detail(string $jobId): JsonResponse
     {
-        try {
-            $job = $this->jobMonitorService->findByJobIdOrFail($jobId);
-        } catch (RuntimeException) {
-            return $this->notFound('Job not found.');
-        }
-
-        // The generated duration column, so the detail agrees with the list's duration sort.
-        $durationMicroseconds = $job->getDurationMicroseconds();
-
-        return $this->successResponse([
-            'jobId'          => $job->getJobId(),
-            'name'           => $job->getName(),
-            'queue'          => $job->getQueue(),
-            'status'         => $job->getStatus()->value,
-            'progress'       => $job->getProgress(),
-            'attempt'        => $job->getAttempt(),
-            'retried'        => $job->isRetried(),
-            'startedAt'      => $job->getStartedAt()?->format(DateTimeInterface::ATOM),
-            'finishedAt'     => $job->getFinishedAt()?->format(DateTimeInterface::ATOM),
-            'createdAt'      => $job->getCreatedAt()->format(DateTimeInterface::ATOM),
-            'updatedAt'      => $job->getUpdatedAt()->format(DateTimeInterface::ATOM),
-            'exceptionClass' => $job->getStatus()->value === 'failed'
-                ? $job->getExceptionClass()
-                : null,
-            'exception'      => $job->getStatus()->value === 'failed'
-                ? $job->getException()
-                : null,
-            'data'           => $job->getData(),
-            'dataTruncated'  => $job->getDataTruncated(),
-            'duration'       => $durationMicroseconds === null ? null : $durationMicroseconds / 1e6,
-        ]);
+        return $this->successResponse(JobMonitorResource::detail($this->jobMonitor->job($jobId)));
     }
 
     /**
@@ -288,24 +201,18 @@ final class JobMonitorController
                     type: 'object',
                 ),
             ),
-            new OA\Response(response: '422', description: 'Invalid input', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '422', description: 'Days is less than 1', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
         ],
     )]
+    #[CliCounterpart('app:monitor:prune')]
     #[Route('/prune', name: 'prune', methods: ['POST'])]
     public function prune(Request $request): JsonResponse
     {
-        $days = (int) ($request->toArray()['days'] ?? 7);
-
-        if ($days < 1) {
-            return $this->errorResponse('Days must be at least 1.', 422);
-        }
-
-        $olderThan = new \DateTimeImmutable(sprintf('-%d days', $days));
-        $count = $this->jobMonitorService->prune($olderThan);
+        $result = $this->jobMonitor->prune((int) ($request->toArray()['days'] ?? 7));
 
         return $this->successResponse([
-            'pruned' => $count,
-            'olderThan' => $olderThan->format(DateTimeInterface::ATOM),
+            'pruned' => $result->count,
+            'olderThan' => $result->olderThan->format(\DateTimeInterface::ATOM),
         ]);
     }
 
@@ -328,47 +235,16 @@ final class JobMonitorController
                     type: 'object',
                 ),
             ),
-            new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Job cannot be retried', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '409', description: 'Job cannot be retried: it has not failed, was already retried, or has no readable stored message', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
         ],
     )]
+    #[CliCounterpart('app:monitor:job:retry')]
     #[Route('/jobs/{jobId}/retry', name: 'jobs_retry', methods: ['POST'])]
     public function retry(string $jobId, #[CurrentUser] UserInterface $user): JsonResponse
     {
-        try {
-            $job = $this->jobMonitorService->findByJobIdOrFail($jobId);
-        } catch (RuntimeException) {
-            return $this->notFound('Job not found.');
-        }
-
-        if ($job->getStatus() !== JobStatus::Failed) {
-            return $this->errorResponse('Only failed jobs can be retried.', 422);
-        }
-
-        if ($job->isRetried()) {
-            return $this->errorResponse('This job has already been retried.', 422);
-        }
-
-        if ($job->getData() === null) {
-            return $this->errorResponse('No message payload stored for this job.', 422);
-        }
-
-        $message = $this->messageSerializer->deserialize($job->getData());
-        if ($message === null) {
-            return $this->errorResponse('Failed to deserialize the stored message payload.', 422);
-        }
-
-        $newJobId = new PublicId();
-        $envelope = new Envelope($message, [new JobIdStamp($newJobId)]);
-        if ($job->getQueue() !== null) {
-            $envelope = $envelope->with(new TransportNamesStamp([$job->getQueue()]));
-        }
-
-        $this->messageBus->dispatch($envelope);
-        $this->jobMonitorService->markRetriedWithAudit($jobId, $newJobId->toString(), $user->getUserIdentifier());
-
         return $this->successResponse([
-            'newJobId' => $newJobId->toString(),
+            'newJobId' => $this->jobMonitor->retry($jobId, $user->getUserIdentifier()),
         ]);
     }
 
@@ -396,29 +272,15 @@ final class JobMonitorController
                     type: 'object',
                 ),
             ),
-            new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Job cannot be cancelled', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '409', description: 'Job cannot be cancelled because it has finished or failed', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
         ],
     )]
+    #[CliCounterpart('app:monitor:job:cancel')]
     #[Route('/jobs/{jobId}/cancel', name: 'jobs_cancel', methods: ['POST'])]
     public function cancel(string $jobId): JsonResponse
     {
-        try {
-            $job = $this->jobMonitorService->findByJobIdOrFail($jobId);
-        } catch (RuntimeException) {
-            return $this->notFound('Job not found.');
-        }
-
-        if ($job->getStatus() === JobStatus::Finished) {
-            return $this->errorResponse('Finished jobs cannot be cancelled.', 422);
-        }
-
-        if ($job->getStatus() === JobStatus::Failed) {
-            return $this->errorResponse('Failed jobs cannot be cancelled.', 422);
-        }
-
-        // Set cooperative cancellation flag in Redis with 1-hour TTL
-        $this->redisClientFactory->borrow(fn(\Redis $redis) => $redis->setex("job_cancel:{$jobId}", 3600, '1'));
+        $this->jobMonitor->cancel($jobId);
 
         return $this->successResponse([
             'cancelled' => true,

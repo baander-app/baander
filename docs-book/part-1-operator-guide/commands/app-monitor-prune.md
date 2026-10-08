@@ -1,6 +1,6 @@
 # app:monitor:prune
 
-Prune completed job monitors older than a given age. Removes finished, failed, and cancelled job monitor records to keep the monitor table from growing unbounded.
+Prune completed job monitors older than a given age. Removes finished, failed, and cancelled job monitor records to keep the monitor table from growing unbounded. The command does what `POST /api/monitor/prune` does in the admin API, with the same rules.
 
 ## Quick start
 
@@ -25,14 +25,15 @@ make exec cmd="php bin/console app:monitor:prune --dry-run"
 
 ## Details
 
-The command computes a cutoff timestamp from `--days` and deletes finished, failed, and cancelled job monitors older than that cutoff. In dry-run mode it reports the count of completed monitors that would be eligible; it does not apply the age filter to the dry-run count.
+The command computes a cutoff timestamp from `--days` and deletes finished, failed, and cancelled job monitors created before that cutoff. In dry-run mode it counts the same monitors and deletes nothing.
 
 ## Exit codes
 
 | Code | Meaning |
 |------|---------|
 | 0 | Prune completed (or dry-run report shown) |
-| 1 | `--days` was set to a value less than 1 |
+| 1 | The job monitor could not be changed; the message says why |
+| 2 | `--days` was set to a value less than 1 |
 
 ## Tips
 
