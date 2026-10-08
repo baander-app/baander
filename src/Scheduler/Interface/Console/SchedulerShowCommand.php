@@ -42,7 +42,7 @@ final class SchedulerShowCommand extends Command
                 $this->jobs->getById(ScheduledJobConsole::id($input)) ?? throw ScheduledJobConsole::notFound(),
             );
         } catch (Throwable $failure) {
-            return ScheduledJobConsole::fail($io, $failure);
+            return AdminCommandSupport::fail($io, $failure);
         }
 
         if (AdminCommandSupport::wantsJson($input)) {

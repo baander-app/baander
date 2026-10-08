@@ -48,10 +48,10 @@ final class GenreUpdateCommand extends Command
         try {
             $genre = GenreResource::from($this->support->dispatch(new UpdateGenreCommand(
                 slug: (string) $input->getArgument('slug'),
-                name: self::option($input, 'name'),
-                newSlug: self::option($input, 'slug'),
-                parentId: self::option($input, 'parent'),
-                mbid: self::option($input, 'mbid'),
+                name: AdminCommandSupport::stringOption($input, 'name'),
+                newSlug: AdminCommandSupport::stringOption($input, 'slug'),
+                parentId: AdminCommandSupport::stringOption($input, 'parent'),
+                mbid: AdminCommandSupport::stringOption($input, 'mbid'),
             )));
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
@@ -60,12 +60,5 @@ final class GenreUpdateCommand extends Command
         $io->success(sprintf('Genre "%s" (%s) updated.', $genre['name'], $genre['slug']));
 
         return Command::SUCCESS;
-    }
-
-    private static function option(InputInterface $input, string $name): ?string
-    {
-        $value = $input->getOption($name);
-
-        return is_string($value) ? $value : null;
     }
 }

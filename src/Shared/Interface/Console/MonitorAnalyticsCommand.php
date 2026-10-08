@@ -28,6 +28,7 @@ use Throwable;
 final class MonitorAnalyticsCommand extends Command
 {
     private const array SECTIONS = ['summary', 'timing', 'failures'];
+    private const int DEFAULT_FAILURE_LIMIT = 50;
 
     public function __construct(
         private readonly JobMonitorAdministrationInterface $jobMonitor,
@@ -41,7 +42,7 @@ final class MonitorAnalyticsCommand extends Command
             ->addOption('section', null, InputOption::VALUE_REQUIRED, 'summary, timing or failures', 'summary')
             ->addOption('from', null, InputOption::VALUE_REQUIRED, 'Inclusive start of the job creation range, RFC 3339 with a timezone (default: 24 hours ago)')
             ->addOption('to', null, InputOption::VALUE_REQUIRED, 'Exclusive end of the range, RFC 3339 with a timezone (default: now); at most 90 days after the start')
-            ->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Recent failures to list with --section=failures, 1-200', '50');
+            ->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Recent failures to list with --section=failures, 1-200', (string) self::DEFAULT_FAILURE_LIMIT);
         AdminCommandSupport::addJsonOption($this);
     }
 
@@ -59,7 +60,10 @@ final class MonitorAnalyticsCommand extends Command
             $data = match ($section) {
                 'summary' => $this->jobMonitor->analyticsSummary($range),
                 'timing' => $this->jobMonitor->analyticsTiming($range),
-                default => $this->jobMonitor->analyticsFailures($range, (int) $input->getOption('limit')),
+                default => $this->jobMonitor->analyticsFailures(
+                    $range,
+                    AdminCommandSupport::integerOption($input, 'limit') ?? self::DEFAULT_FAILURE_LIMIT,
+                ),
             };
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);

@@ -59,21 +59,12 @@ final class ServerWorkersCommand extends Command
             }
             $io->section($title);
             $io->table(['Figure', 'Value'], array_map(
-                static fn (string|int $name, mixed $value): array => [str_replace('_', ' ', (string) $name), self::scalar($value)],
+                static fn (string|int $name, mixed $value): array => [str_replace('_', ' ', (string) $name), ServerWorkerReport::scalar($value)],
                 array_keys($values),
                 array_values($values),
             ));
         }
 
         return Command::SUCCESS;
-    }
-
-    private static function scalar(mixed $value): string
-    {
-        return match (true) {
-            is_bool($value) => $value ? 'yes' : 'no',
-            is_scalar($value) => (string) $value,
-            default => '-',
-        };
     }
 }

@@ -65,14 +65,14 @@ final class ServerStatsCommand extends Command
         $io->section('Redis');
         $redis = $stats['redis'];
         if (($redis['connected'] ?? false) !== true) {
-            $io->text(sprintf('Disconnected: %s', self::scalar($redis['error'] ?? 'unknown error')));
+            $io->text(sprintf('Disconnected: %s', ServerWorkerReport::scalar($redis['error'] ?? 'unknown error')));
         } else {
             $io->definitionList(
                 ['Ping' => ($redis['ping'] ?? false) === true ? 'PONG' : 'failed'],
-                ['DB size' => self::scalar($redis['db_size'] ?? null)],
-                ['Connected clients' => self::scalar($redis['connected_clients'] ?? null)],
-                ['Used memory (MB)' => self::scalar($redis['used_memory'] ?? null)],
-                ['Max memory (MB)' => self::scalar($redis['maxmemory'] ?? null)],
+                ['DB size' => ServerWorkerReport::scalar($redis['db_size'] ?? null)],
+                ['Connected clients' => ServerWorkerReport::scalar($redis['connected_clients'] ?? null)],
+                ['Used memory (MB)' => ServerWorkerReport::scalar($redis['used_memory'] ?? null)],
+                ['Max memory (MB)' => ServerWorkerReport::scalar($redis['maxmemory'] ?? null)],
             );
         }
 
@@ -87,11 +87,6 @@ final class ServerStatsCommand extends Command
     {
         $values = $worker[$group] ?? null;
 
-        return self::scalar(is_array($values) ? ($values[$key] ?? null) : null);
-    }
-
-    private static function scalar(mixed $value): string
-    {
-        return is_scalar($value) ? (string) $value : '-';
+        return ServerWorkerReport::scalar(is_array($values) ? ($values[$key] ?? null) : null);
     }
 }

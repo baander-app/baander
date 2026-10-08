@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Lyrics\Interface\Console;
 
 use App\Lyrics\Application\Command\BulkFetchLyricsCommand;
-use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Port\JobMonitorAdministrationInterface;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -47,8 +46,8 @@ final class LyricsFetchCommand extends Command
         $io = new SymfonyStyle($input, $output);
 
         try {
-            $limit = $input->getOption('limit') === null ? null : self::integer($input, 'limit');
-            $delay = self::integer($input, 'delay');
+            $limit = AdminCommandSupport::integerOption($input, 'limit');
+            $delay = AdminCommandSupport::integerOption($input, 'delay') ?? BulkFetchLyricsCommand::DEFAULT_DELAY_MS;
 
             $io->text(sprintf(
                 'Queuing lyrics fetches for %s, %d ms apart...',
@@ -75,16 +74,6 @@ final class LyricsFetchCommand extends Command
         ));
 
         return Command::SUCCESS;
-    }
-
-    private static function integer(InputInterface $input, string $name): int
-    {
-        $value = filter_var($input->getOption($name), FILTER_VALIDATE_INT);
-        if ($value === false) {
-            throw new InvalidInputException(sprintf('--%s must be an integer.', $name));
-        }
-
-        return $value;
     }
 
     private static function duration(int $milliseconds): string

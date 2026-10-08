@@ -74,7 +74,7 @@ final class AlbumDuplicateCommandsTest extends TestCase
         $tester = new CommandTester(new AlbumDuplicatesCommand($duplicates));
 
         self::assertSame(Command::INVALID, $tester->execute(['library' => 'jazz']));
-        self::assertStringContainsString('not a valid UUID', $tester->getDisplay());
+        self::assertStringContainsString('The library ID must be a UUID.', $tester->getDisplay());
     }
 
     public function testMergeMergesTheSourceIntoTheTargetThroughTheMergePort(): void

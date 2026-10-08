@@ -70,7 +70,7 @@ final class RecommendationJobShowCommand extends Command
 
         if ($job['metadata'] !== []) {
             $io->text('Metadata:');
-            $io->writeln(json_encode($job['metadata'], JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+            $io->writeln(AdminCommandSupport::prettyJson($job['metadata']));
         }
 
         return Command::SUCCESS;

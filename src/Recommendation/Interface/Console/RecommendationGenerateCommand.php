@@ -126,10 +126,6 @@ final class RecommendationGenerateCommand extends Command
             return null;
         }
 
-        try {
-            return new Uuid((string) $value);
-        } catch (\InvalidArgumentException) {
-            throw new InvalidInputException(sprintf('--user-id must be a UUID, "%s" is not.', (string) $value));
-        }
+        return AdminCommandSupport::uuid($value, '--user-id');
     }
 }

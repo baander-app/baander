@@ -6,7 +6,6 @@ namespace App\Recommendation\Interface\Console;
 
 use App\Recommendation\Application\Query\ListRecommendationJobsQuery;
 use App\Recommendation\Interface\Resource\RecommendationJobResource;
-use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -42,10 +41,7 @@ final class RecommendationJobListCommand extends Command
         $io = new SymfonyStyle($input, $output);
 
         try {
-            $limit = filter_var($input->getOption('limit'), FILTER_VALIDATE_INT);
-            if ($limit === false) {
-                throw new InvalidInputException('--limit must be an integer.');
-            }
+            $limit = AdminCommandSupport::integerOption($input, 'limit') ?? ListRecommendationJobsQuery::DEFAULT_LIMIT;
             $status = $input->getOption('status');
             $jobs = $this->support->dispatch(new ListRecommendationJobsQuery($limit, is_string($status) ? $status : null));
         } catch (Throwable $exception) {

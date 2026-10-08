@@ -46,7 +46,7 @@ final class LibraryUpdateCommand extends Command
             $library = LibraryResource::from($this->support->dispatch(new UpdateLibraryCommand(
                 library: (string) $input->getArgument('library'),
                 name: is_string($name) ? $name : null,
-                sortOrder: LibraryTable::integerOption($input, 'sort-order'),
+                sortOrder: AdminCommandSupport::integerOption($input, 'sort-order'),
             )));
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\QoL\Interface\Console;
 
 use App\QoL\Application\Port\QoLAdminPortInterface;
+use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Helper\TableSeparator;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
@@ -24,7 +25,7 @@ final class QoLStatusTable
             $worker['profile'],
             $worker['active_streams'],
             $worker['sample_count'],
-            $worker['model_ready'] ? 'yes' : 'no',
+            AdminCommandSupport::yesNo($worker['model_ready']),
             sprintf('%d%%', (int) round($worker['budget_cap'] * 100)),
         ], $report['workers']);
         $rows[] = new TableSeparator();

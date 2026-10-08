@@ -91,10 +91,10 @@ final class TranscodeSessionListCommand extends Command
     private function userId(string $identifier): Uuid
     {
         try {
-            $email = str_contains($identifier, '@') ? new Email($identifier) : null;
-            if ($email === null) {
+            if (!str_contains($identifier, '@')) {
                 return Uuid::fromString($identifier);
             }
+            $email = new Email($identifier);
         } catch (\InvalidArgumentException $error) {
             throw new InvalidInputException('The user must be an email address or a UUID.', previous: $error);
         }

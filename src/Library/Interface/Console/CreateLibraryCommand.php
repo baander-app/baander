@@ -52,7 +52,7 @@ final class CreateLibraryCommand extends Command
                 type: (string) $input->getArgument('type'),
                 filesystemType: (string) $input->getOption('filesystem-type'),
                 slug: is_string($slug) ? $slug : null,
-                sortOrder: LibraryTable::integerOption($input, 'sort-order') ?? 0,
+                sortOrder: AdminCommandSupport::integerOption($input, 'sort-order') ?? 0,
             )));
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);

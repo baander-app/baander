@@ -18,7 +18,10 @@ use App\Shared\Interface\Console\AdminCommandSupport;
 use PHPUnit\Framework\TestCase;
 use stdClass;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Input\InputDefinition;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -50,6 +53,47 @@ final class AdminCommandSupportTest extends TestCase
 
         $this->assertSame(Command::INVALID, $exitCode);
         $this->assertStringContainsString('The cron expression is not valid.', $tester->getErrorOutput());
+    }
+
+    public function testInvalidInputPrintsTheMessagesPerFieldAfterTheMessage(): void
+    {
+        $tester = new CommandTester($this->actionCommand(new InvalidInputException(
+            'Validation failed.',
+            ['name' => ['This value should not be blank.'], 'expression' => ['Not a cron expression.', 'Too long.']],
+        )));
+
+        $exitCode = $tester->execute([], ['capture_stderr_separately' => true]);
+
+        $this->assertSame(Command::INVALID, $exitCode);
+        $errors = $tester->getErrorOutput();
+        $this->assertStringContainsString('Validation failed.', $errors);
+        $this->assertStringContainsString('name: This value should not be blank.', $errors);
+        $this->assertStringContainsString('expression: Not a cron expression.', $errors);
+        $this->assertStringContainsString('expression: Too long.', $errors);
+    }
+
+    public function testIntegerOptionIsNullWhenAbsentAndRejectsANonInteger(): void
+    {
+        $definition = new InputDefinition([new InputOption('limit', null, InputOption::VALUE_REQUIRED)]);
+
+        $this->assertNull(AdminCommandSupport::integerOption(new ArrayInput([], $definition), 'limit'));
+        $this->assertSame(25, AdminCommandSupport::integerOption(new ArrayInput(['--limit' => '25'], $definition), 'limit'));
+
+        $this->expectException(InvalidInputException::class);
+        $this->expectExceptionMessage('--limit must be an integer.');
+        AdminCommandSupport::integerOption(new ArrayInput(['--limit' => 'abc'], $definition), 'limit');
+    }
+
+    public function testUuidRejectsAMalformedValueNamingIt(): void
+    {
+        $this->assertSame(
+            '0192f3c4-0000-7000-8000-000000000001',
+            AdminCommandSupport::uuid('0192f3c4-0000-7000-8000-000000000001', 'The job ID')->toString(),
+        );
+
+        $this->expectException(InvalidInputException::class);
+        $this->expectExceptionMessage('The job ID must be a UUID.');
+        AdminCommandSupport::uuid('jazz', 'The job ID');
     }
 
     public function testAnUnknownTargetFailsNamingTheTarget(): void

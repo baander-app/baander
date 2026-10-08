@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Library\Interface\Console;
 
-use App\Shared\Application\Exception\InvalidInputException;
-use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 /** How the `app:library:*` commands print a library, from the API's LibraryResource. */
@@ -50,21 +48,5 @@ final class LibraryTable
                 $library['updatedAt'],
             ]],
         );
-    }
-
-    /** The value of an integer option, or null when it is absent. */
-    public static function integerOption(InputInterface $input, string $name): ?int
-    {
-        $value = $input->getOption($name);
-        if ($value === null) {
-            return null;
-        }
-
-        $integer = filter_var($value, FILTER_VALIDATE_INT);
-        if ($integer === false) {
-            throw new InvalidInputException(sprintf('--%s must be an integer.', $name));
-        }
-
-        return $integer;
     }
 }

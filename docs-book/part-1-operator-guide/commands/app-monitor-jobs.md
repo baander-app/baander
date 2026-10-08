@@ -55,4 +55,4 @@ Console commands that run long work inline record each run as a job without a qu
 |------|---------|
 | 0 | List printed, possibly empty |
 | 1 | The job monitor could not be read; the message says why |
-| 2 | `--status` is not a known status |
+| 2 | `--status` is not a known status, or `--limit` is not an integer |

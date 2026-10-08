@@ -52,7 +52,7 @@ final class OAuthClientListCommand extends Command
                 $client['name'],
                 $client['type'],
                 $client['redirectUris'] === [] ? '-' : implode("\n", $client['redirectUris']),
-                $client['revoked'] ? 'yes' : 'no',
+                AdminCommandSupport::yesNo($client['revoked']),
                 $client['createdAt'],
             ],
             'No OAuth clients are registered.',

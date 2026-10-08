@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Console;
 
 use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -72,12 +73,89 @@ final readonly class AdminCommandSupport
      */
     public static function json(SymfonyStyle $io, mixed $data): int
     {
-        $io->writeln(
-            json_encode($data, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
-            OutputInterface::OUTPUT_RAW,
-        );
+        $io->writeln(self::prettyJson($data), OutputInterface::OUTPUT_RAW);
 
         return Command::SUCCESS;
+    }
+
+    /** The data as indented JSON, with slashes and Unicode unescaped. */
+    public static function prettyJson(mixed $data): string
+    {
+        return json_encode($data, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    }
+
+    public static function yesNo(bool $value): string
+    {
+        return $value ? 'yes' : 'no';
+    }
+
+    /** The value of a string option, or null when it is absent. */
+    public static function stringOption(InputInterface $input, string $name): ?string
+    {
+        $value = $input->getOption($name);
+
+        return is_string($value) ? $value : null;
+    }
+
+    /**
+     * The value of an integer option, or null when it is absent.
+     *
+     * @throws InvalidInputException when the value is not an integer
+     */
+    public static function integerOption(InputInterface $input, string $name): ?int
+    {
+        $value = $input->getOption($name);
+        if ($value === null) {
+            return null;
+        }
+
+        $integer = filter_var($value, FILTER_VALIDATE_INT);
+        if ($integer === false) {
+            throw new InvalidInputException(sprintf('--%s must be an integer.', $name));
+        }
+
+        return $integer;
+    }
+
+    /**
+     * The value of an option that holds a JSON object, decoded, or null when the option is absent.
+     *
+     * @return array<string, mixed>|null
+     *
+     * @throws InvalidInputException when the value is not a JSON object
+     */
+    public static function jsonObjectOption(InputInterface $input, string $option): ?array
+    {
+        $json = self::stringOption($input, $option);
+        if ($json === null) {
+            return null;
+        }
+
+        try {
+            $decoded = json_decode($json, false, 32, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            $decoded = null;
+        }
+        if (!$decoded instanceof \stdClass) {
+            throw new InvalidInputException(sprintf('The --%s option must be a JSON object.', $option));
+        }
+
+        /** @var array<string, mixed> */
+        return json_decode($json, true, 32, JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * @param string $label what the value identifies, such as "The job ID", as the error message names it
+     *
+     * @throws InvalidInputException when the value is not a UUID
+     */
+    public static function uuid(mixed $value, string $label): Uuid
+    {
+        try {
+            return Uuid::fromString(is_scalar($value) ? (string) $value : '');
+        } catch (\InvalidArgumentException $error) {
+            throw new InvalidInputException(sprintf('%s must be a UUID.', $label), previous: $error);
+        }
     }
 
     /**
@@ -131,10 +209,24 @@ final readonly class AdminCommandSupport
         return Command::FAILURE;
     }
 
-    /** Prints the failure's message on stderr and returns its exit code. */
+    /**
+     * Prints the failure's message on stderr, followed by the messages per field of rejected
+     * input as the API's 422 response details them, and returns its exit code.
+     */
     public static function fail(SymfonyStyle $io, Throwable $failure): int
     {
-        $io->getErrorStyle()->error($failure->getMessage());
+        $errors = $io->getErrorStyle();
+        $errors->error($failure->getMessage());
+
+        if ($failure instanceof InvalidInputException && $failure->details !== []) {
+            $lines = [];
+            foreach ($failure->details as $field => $messages) {
+                foreach ((array) $messages as $message) {
+                    $lines[] = sprintf('%s: %s', $field, $message);
+                }
+            }
+            $errors->listing($lines);
+        }
 
         return self::exitCode($failure);
     }

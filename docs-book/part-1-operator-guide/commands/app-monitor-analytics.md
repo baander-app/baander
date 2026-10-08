@@ -42,4 +42,4 @@ With `--json` the output is the API's `data` object for that section.
 |------|---------|
 | 0 | Analytics printed |
 | 1 | The job monitor could not be read; the message says why |
-| 2 | `--section` is unknown, `--from` or `--to` is not a valid timestamp, or `--to` is not after `--from` |
+| 2 | `--section` is unknown, `--limit` is not an integer, `--from` or `--to` is not a valid timestamp, or `--to` is not after `--from` |
