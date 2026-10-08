@@ -138,7 +138,7 @@ Baander has one settings mechanism for both server-wide settings (system scope) 
 | `allowedValues`, `valueLabels` | Enum only: the allowed values, all strings or all integers, and an optional display label for each |
 | `min`, `max` | Integer only: optional bounds |
 | `editRole` | `ROLE_SUPER_ADMIN` (default) or `ROLE_USER`. A user setting with `ROLE_USER` is one users may change themselves; administrators may change every user setting |
-| `userVisible` | System only. Marks a system setting signed-in users may read. No endpoint serves system settings to users; today a user sees one only as the `resetValue` of a user setting that follows it |
+| `userVisible` | System only. Marks a system setting that user settings may follow. No endpoint serves system settings to users; a user sees one only as the `resetValue` of a user setting that follows it, and the registry refuses a fallback that is not user-visible |
 | `enforced` | `true` (default) when the server acts on the setting. Declare `false` while the setting is defined but nothing reads it yet: the admin page shows a **Not yet enforced** badge and `app:settings:list` shows `not yet` |
 | `fallbackKey` | User only. The system setting this user setting follows; the user setting then has no default of its own, and its default is that system setting's current value |
 

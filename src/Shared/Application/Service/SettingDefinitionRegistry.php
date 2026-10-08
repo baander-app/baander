@@ -82,6 +82,14 @@ final class SettingDefinitionRegistry
                     $definition->fallbackKey,
                 ));
             }
+            // A user setting shows its fallback's value to the user, so that value must be visible to users.
+            if (!$fallback->userVisible) {
+                throw new LogicException(sprintf(
+                    'Setting "%s" follows "%s", which is not visible to users.',
+                    $definition->key,
+                    $definition->fallbackKey,
+                ));
+            }
             if ($fallback->type !== $definition->type) {
                 throw new LogicException(sprintf(
                     'Setting "%s" follows "%s", which has a different value type.',

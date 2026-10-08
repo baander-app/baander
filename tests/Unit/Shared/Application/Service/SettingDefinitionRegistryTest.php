@@ -78,6 +78,26 @@ final class SettingDefinitionRegistryTest extends TestCase
         $registry->all();
     }
 
+    public function testFallbackToASystemSettingUsersMayNotSeeFails(): void
+    {
+        $hidden = new SettingDefinition(
+            key: 'i18n.default_language',
+            type: SettingValueType::Enum,
+            scope: SettingScope::System,
+            label: 'Default email language',
+            description: 'Language for users without a choice.',
+            group: 'Language',
+            default: 'en',
+            allowedValues: ['en', 'da', 'th'],
+        );
+        $registry = new SettingDefinitionRegistry([$this->provider($hidden, $this->userLanguage())]);
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('not visible to users');
+
+        $registry->all();
+    }
+
     private function systemLanguage(): SettingDefinition
     {
         return new SettingDefinition(
