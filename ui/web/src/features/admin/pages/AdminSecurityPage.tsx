@@ -3,8 +3,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/components/ui
 import { useTabParam } from '@/shared/hooks/use-tab-search-params'
 import { AdminUsersPage } from './AdminUsersPage'
 import { LoginBlocksPage } from './LoginBlocksPage'
+import { OAuthClientsPage } from './OAuthClientsPage'
 
-const SECURITY_TABS = ['users', 'login-blocks'] as const
+const SECURITY_TABS = ['users', 'login-blocks', 'oauth-clients'] as const
 
 const Container = styled.div`
   display: flex;
@@ -52,6 +53,7 @@ export function AdminSecurityPage() {
           <TabsList variant="line">
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="login-blocks">Login Blocks</TabsTrigger>
+            <TabsTrigger value="oauth-clients">OAuth Clients</TabsTrigger>
           </TabsList>
         </TabBar>
 
@@ -60,6 +62,9 @@ export function AdminSecurityPage() {
         </StyledTabsContent>
         <StyledTabsContent value="login-blocks">
           <LoginBlocksPage />
+        </StyledTabsContent>
+        <StyledTabsContent value="oauth-clients">
+          <OAuthClientsPage />
         </StyledTabsContent>
       </StyledTabs>
     </Container>

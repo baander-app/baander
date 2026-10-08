@@ -3,6 +3,7 @@ import { useTranslation } from '@/shared/i18n'
 import { LoginForm } from '../components/LoginForm'
 import { Notice } from '../components/auth-form-styles'
 import type { PasswordResetDoneState } from '../components/ResetPasswordForm'
+import { returnPathFrom } from '../lib/return-to'
 import { useAuthStore } from '../stores/auth-store'
 import styled from 'styled-components'
 
@@ -53,7 +54,7 @@ export function LoginPage() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />
+    return <Navigate to={returnPathFrom(location.state)} replace />
   }
 
   return (

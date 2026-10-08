@@ -63,6 +63,50 @@
       "notVerified": "Not verified",
       "notVerifiedHint": "Open the link in the verification email we sent to this address, or send a new one.",
       "changeEmailDescription": "Enter your new email address. We'll send a verification link to it, and your address stays unverified until you open that link."
+    },
+    "scopes": {
+      "intro": "It will be able to:",
+      "default": "Use Bånder with your account",
+      "profile": "See your name and profile",
+      "email": "See your email address",
+      "library": "Browse and play your library",
+      "playlist": "See and change your playlists"
+    },
+    "device": {
+      "title": "Connect a device",
+      "intro": "Enter the code shown on your device.",
+      "codeLabel": "Device code",
+      "lookUp": "Continue",
+      "lookingUp": "Looking up the code…",
+      "requestIntro": "{{client}} wants to use your Bånder account.",
+      "compareCode": "Check that your device shows this code:",
+      "approve": "Approve",
+      "deny": "Deny",
+      "approved": "Your device is connected. You can return to your device.",
+      "denied": "You denied the request. The device was not connected.",
+      "invalidCode": "This code is unknown or has expired. Check the code on your device, or start again there.",
+      "useAnotherCode": "Enter another code",
+      "rateLimited_one": "Too many attempts. Try again in {{count}} second.",
+      "rateLimited_other": "Too many attempts. Try again in {{count}} seconds.",
+      "done": "Continue to Bånder"
+    },
+    "consent": {
+      "title": "Allow access",
+      "loading": "Checking the request…",
+      "requestIntro": "{{client}} wants to use your Bånder account.",
+      "clientType": {
+        "public": "App on your device",
+        "confidential": "Web service"
+      },
+      "trustHint": "Allow access only if you started this sign-in and trust this app.",
+      "allow": "Allow",
+      "deny": "Deny",
+      "redirecting": "Returning you to the app…",
+      "invalidRequest": "This sign-in request is not valid, so you can't continue. Go back to the app and try again.",
+      "unsafeRedirect": "The server answered with an unexpected return address, so you were not sent back to the app.",
+      "rateLimited_one": "Too many attempts. Try again in {{count}} second.",
+      "rateLimited_other": "Too many attempts. Try again in {{count}} seconds.",
+      "tryAgain": "Try again"
     }
   },
   "player": {

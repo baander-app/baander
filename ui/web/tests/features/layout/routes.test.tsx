@@ -53,3 +53,17 @@ describe('route structure', () => {
     expect(paths).toContain('/ebooks')
   })
 })
+
+describe('OAuth routes', () => {
+  it('serves the device and consent pages to signed-in users outside the app shell', () => {
+    const guardedChildren = protectedRoutes[0].children ?? []
+    const appShellPaths = (guardedChildren[0]?.children ?? []).map((r) => r.path)
+    const oauthPaths = guardedChildren
+      .filter((r) => r.element === undefined)
+      .flatMap((r) => (r.children ?? []).map((child) => child.path))
+
+    expect(oauthPaths).toEqual(['/device', '/oauth/authorize'])
+    expect(appShellPaths).not.toContain('/device')
+    expect(appShellPaths).not.toContain('/oauth/authorize')
+  })
+})
