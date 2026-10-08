@@ -39,9 +39,9 @@ final class InMemorySpanProcessorTest extends TestCase
         $span->method('getName')->willReturn('health');
         $span->method('toSpanData')->willReturn($data);
         $bridge = new SpanBridge();
+        $bridge->boot();
         $bridge->clear();
-        $processor = new InMemorySpanProcessor();
-        $processor->setBridge($bridge);
+        $processor = new InMemorySpanProcessor($bridge);
 
         try {
             $processor->onEnd($span);

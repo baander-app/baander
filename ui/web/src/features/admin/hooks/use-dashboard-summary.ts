@@ -9,7 +9,7 @@ export interface DashboardSummary {
   redisConnected: boolean
   totalJobs: number
   pendingJobs: number
-  pid: string
+  workers: string
 }
 
 export function useDashboardSummary() {
@@ -27,20 +27,27 @@ export function useDashboardSummary() {
     retry: false,
   })
 
+  // Memory is summed over the web server's workers; uptime is the container's,
+  // which every worker reports alike.
+  const workers = stats?.workers ?? []
   const summary: DashboardSummary = {
-    uptime: stats ? formatUptime(stats.process.uptime) : '—',
-    memoryUsage: stats ? `${stats.memory.usage} MB` : '—',
-    memoryPeak: stats ? `${stats.memory.peak} MB` : '—',
+    uptime: workers.length > 0 ? formatUptime(workers[0].process.uptime) : '—',
+    memoryUsage: workers.length > 0 ? `${sumMegabytes(workers.map((worker) => worker.memory.usage))} MB` : '—',
+    memoryPeak: workers.length > 0 ? `${sumMegabytes(workers.map((worker) => worker.memory.peak))} MB` : '—',
     redisConnected: stats?.redis?.connected ?? false,
     totalJobs: statusOverview
       ? Object.values(statusOverview.counts).reduce((a, b) => a + b, 0)
       : 0,
     pendingJobs:
       statusOverview?.counts?.pending ?? statusOverview?.counts?.new ?? 0,
-    pid: stats ? String(stats.process.pid) : '—',
+    workers: stats ? `${workers.length} ${workers.length === 1 ? 'worker' : 'workers'}` : '—',
   }
 
   return { summary, stats, statusOverview }
+}
+
+function sumMegabytes(values: number[]): number {
+  return Math.round(values.reduce((total, value) => total + value, 0) * 100) / 100
 }
 
 function formatUptime(seconds: number): string {

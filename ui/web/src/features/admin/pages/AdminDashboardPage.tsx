@@ -177,7 +177,7 @@ export function AdminDashboardPage() {
 
       {/* Summary row */}
       <StatsGrid>
-        <StatCard label="Uptime" value={summary.uptime} sub={`PID ${summary.pid}`} to="/admin?tab=diagnostics" />
+        <StatCard label="Uptime" value={summary.uptime} sub={summary.workers} to="/admin?tab=diagnostics" />
         <StatCard label="Memory" value={summary.memoryUsage} sub={`Peak ${summary.memoryPeak}`} to="/admin?tab=diagnostics" />
         <StatCard label="Redis" value={summary.redisConnected ? 'Connected' : 'Disconnected'} ok={summary.redisConnected} to="/admin?tab=diagnostics" />
         <StatCard label="Jobs" value={String(summary.totalJobs)} sub={`${summary.pendingJobs} pending`} to="/admin?tab=jobs" />
