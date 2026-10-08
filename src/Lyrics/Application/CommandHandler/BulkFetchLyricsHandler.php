@@ -37,7 +37,7 @@ final class BulkFetchLyricsHandler
     public function __invoke(BulkFetchLyricsCommand $command): int
     {
         $limit = $command->getLimit();
-        $delayMs = $command->getDelayMs() ?? 500;
+        $delayMs = $command->getDelayMs() ?? BulkFetchLyricsCommand::DEFAULT_DELAY_MS;
         $dispatched = 0;
         $after = null;
 

@@ -23,9 +23,9 @@ The Lyrics context stores song lyrics and fetches them from [LRCLIB](https://lrc
 
 ## Automatic Fetch for New Songs
 
-While the `lyrics.auto_fetch` system setting is on, Catalog ingest asks Lyrics to fetch the lyrics of each new song. `FilesDiscoveredHandler` collects the songs it creates that have no sidecar `.lrc` file, and calls `LyricsFetchRequestInterface::requestFetch()` after each flush that commits them, so a fetch never looks up a song that is not stored yet. A song with a sidecar file gets its lyrics from that file during ingest.
+While the `lyrics.auto_fetch` system setting is on, Catalog ingest asks Lyrics to fetch the lyrics of each new song. `FilesDiscoveredHandler` collects the songs it creates that have no sidecar `.lrc` file, and calls `LyricsFetchRequestInterface::requestFetch()` after each flush that commits them, so a fetch never looks up a song that is not stored yet. A song with a sidecar file gets its lyrics from that file during ingest. The request is best-effort: if it throws, ingest logs the error and keeps the songs pending, so the next flush asks again. Songs still pending after the last flush wait for the bulk fetch.
 
-`LyricsFetchRequester` reads the setting on every call. When the setting is on, it dispatches one `FetchLyricsCommand` per song with a `TransportNamesStamp` for the `async` transport; `LyricsMessagePayloadCodec` encodes it there. The setting is off by default (`LyricsSettingDefinitions`).
+`LyricsFetchRequester` reads the setting on every call. When the setting is on, it dispatches one `FetchLyricsCommand` per song with a `TransportNamesStamp` for the `async` transport; `LyricsMessagePayloadCodec` encodes it there. Each command also carries a `DelayStamp` that spaces the fetches `BulkFetchLyricsCommand::DEFAULT_DELAY_MS` (500 ms) apart, the bulk fetch's pace, so LRCLIB does not throttle a large scan. The schedule carries over between calls in the same worker, so the albums of one scan queue behind each other. The setting is off by default (`LyricsSettingDefinitions`).
 
 The bulk fetch, the on-demand fetch and the LRCLIB search are not gated by the setting, because a user or administrator starts them.
 

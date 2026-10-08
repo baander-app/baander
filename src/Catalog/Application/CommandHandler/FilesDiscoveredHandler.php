@@ -72,7 +72,7 @@ final class FilesDiscoveredHandler
         // resolveAlbum() has committed a new album. A retry or rescan finds it
         // and creates none, so request its sync now rather than after the songs.
         if ($wasCreated) {
-            $this->albumMetadataSync->requestSync($album->getId());
+            $this->requestAlbumSync($album);
         }
 
         foreach ($message->files as $file) {
@@ -367,17 +367,51 @@ final class FilesDiscoveredHandler
     }
 
     /**
+     * Requests a metadata sync for an album that resolveAlbum() has just committed.
+     *
+     * The request is best-effort: a failure must not fail the ingest, whose retry
+     * would find the album and request nothing. A library metadata sync recovers it.
+     */
+    private function requestAlbumSync(Album $album): void
+    {
+        try {
+            $this->albumMetadataSync->requestSync($album->getId());
+        } catch (\Throwable $e) {
+            $this->logger->error('Could not request a metadata sync for new album {album_id}; a library metadata sync from the admin panel picks it up.', [
+                'album_id' => $album->getId()->toString(),
+                'exception' => $e,
+            ]);
+        }
+    }
+
+    /**
      * Requests lyrics for songs that a flush has just committed, then forgets them.
+     *
+     * The request is best-effort: a failure must not fail the ingest, whose retry
+     * would skip these songs as duplicates. Failed songs stay pending, so the next
+     * flush asks again; after the last flush the bulk lyrics fetch recovers them.
      *
      * @param list<Uuid> $songIds
      */
     private function requestLyricsFetch(array &$songIds): void
     {
-        $committed = $songIds;
-        $songIds = [];
-        if ($committed !== []) {
-            $this->lyricsFetch->requestFetch(...$committed);
+        if ($songIds === []) {
+            return;
         }
+
+        try {
+            $this->lyricsFetch->requestFetch(...$songIds);
+        } catch (\Throwable $e) {
+            $this->logger->error('Could not request lyrics for {count} new song(s); they stay pending until the next flush.', [
+                'count' => count($songIds),
+                'song_ids' => array_map(static fn (Uuid $id): string => $id->toString(), $songIds),
+                'exception' => $e,
+            ]);
+
+            return;
+        }
+
+        $songIds = [];
     }
 
     private function dispatchCoverExtraction(Album $album): void

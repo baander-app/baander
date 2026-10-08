@@ -68,6 +68,54 @@ final class HealthAlertServiceTest extends TestCase
         $service->evaluateAndAlert([$this->check(HealthStatus::NotAvailable)]);
     }
 
+    public function testFailedAlertDeliveryIsRetriedOnTheNextCheck(): void
+    {
+        $alerts = $this->createMock(AdminAlertPortInterface::class);
+        $alerts->expects($this->exactly(2))->method('alertAdmins')
+            ->willReturnOnConsecutiveCalls(
+                $this->throwException(new \RuntimeException('PostgreSQL is down')),
+                null,
+            );
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('error')->with(
+            $this->stringContains('alert for {component} failed'),
+            $this->callback(static fn (array $context): bool => $context['component'] === 'redis'
+                && $context['exception'] instanceof \RuntimeException),
+        );
+        $service = $this->service($alerts, $this->settings(true), $logger);
+
+        $service->evaluateAndAlert([$this->check(HealthStatus::Healthy)]);
+        $service->evaluateAndAlert([$this->check(HealthStatus::Unhealthy)]);
+        $service->evaluateAndAlert([$this->check(HealthStatus::Unhealthy)]);
+    }
+
+    public function testDeliveredAlertIsNotRepeatedWhileTheComponentStaysDegraded(): void
+    {
+        $alerts = $this->createMock(AdminAlertPortInterface::class);
+        $alerts->expects($this->once())->method('alertAdmins');
+        $service = $this->service($alerts, $this->settings(true), new NullLogger());
+
+        $service->evaluateAndAlert([$this->check(HealthStatus::Healthy)]);
+        $service->evaluateAndAlert([$this->check(HealthStatus::Unhealthy)]);
+        $service->evaluateAndAlert([$this->check(HealthStatus::Unhealthy)]);
+        $service->evaluateAndAlert([$this->check(HealthStatus::Unhealthy)]);
+    }
+
+    public function testFailedAlertForOneComponentDoesNotBlockTheOthers(): void
+    {
+        $alerts = $this->createMock(AdminAlertPortInterface::class);
+        $alerts->expects($this->exactly(2))->method('alertAdmins')
+            ->willReturnCallback(static function (string $title): void {
+                if ($title === 'redis health degraded') {
+                    throw new \RuntimeException('PostgreSQL is down');
+                }
+            });
+        $service = $this->service($alerts, $this->settings(true), new NullLogger());
+
+        $service->evaluateAndAlert([$this->check(HealthStatus::Healthy), new HealthCheckResult('meilisearch', HealthStatus::Healthy, 1.0)]);
+        $service->evaluateAndAlert([$this->check(HealthStatus::Unhealthy), new HealthCheckResult('meilisearch', HealthStatus::Unhealthy, 1.0)]);
+    }
+
     private function service(AdminAlertPortInterface $alerts, SystemSettingsPortInterface $settings, LoggerInterface $logger): HealthAlertService
     {
         // evaluateAndAlert() takes results directly, so the check service itself is never called.

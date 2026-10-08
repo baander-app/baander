@@ -22,6 +22,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\Messenger\Envelope;
@@ -141,7 +142,48 @@ final class FilesDiscoveredLyricsRequestTest extends TestCase
         self::assertSame($this->ids($state->visibleSongs), [...$state->requests[0], ...$state->requests[1]]);
     }
 
-    private function handler(\stdClass $state, LyricsFetchRequestInterface $lyrics): FilesDiscoveredHandler
+    public function testFailedRequestIsLoggedAndRetriedWithTheNextFlush(): void
+    {
+        $state = $this->state();
+        $state->requestFailures = 1;
+        $lyrics = $this->lyricsFetch($state);
+        $lyrics->expects($this->exactly(2))->method('requestFetch');
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('error')->with(
+            $this->stringContains('Could not request lyrics'),
+            $this->callback(static fn (array $context): bool => $context['count'] === 50
+                && count($context['song_ids']) === 50
+                && $context['exception'] instanceof RuntimeException),
+        );
+        $files = array_map(
+            fn (int $track): DiscoveredFile => $this->file(sprintf('%02d Track.mp3', $track), 'hash-' . $track),
+            range(1, 51),
+        );
+
+        $this->handler($state, $lyrics, $logger)($this->message(...$files));
+
+        self::assertCount(51, $state->visibleSongs);
+        self::assertSame($this->ids($state->visibleSongs), $state->requests[0], 'The second flush asks again for the first batch.');
+    }
+
+    public function testFailedLastRequestIsLoggedAndIngestStillCompletes(): void
+    {
+        $state = $this->state();
+        $state->requestFailures = 1;
+        $lyrics = $this->lyricsFetch($state);
+        $lyrics->expects($this->once())->method('requestFetch');
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('error')->with(
+            $this->stringContains('Could not request lyrics'),
+            $this->callback(fn (array $context): bool => $context['song_ids'] === $this->ids($state->visibleSongs)),
+        );
+
+        $this->handler($state, $lyrics, $logger)($this->message($this->file('01 One.mp3', 'hash-one'), $this->file('02 Two.mp3', 'hash-two')));
+
+        self::assertSame(['song persisted', 'song persisted', 'songs flushed', 'genres flushed'], $state->events);
+    }
+
+    private function handler(\stdClass $state, LyricsFetchRequestInterface $lyrics, ?LoggerInterface $logger = null): FilesDiscoveredHandler
     {
         $album = Album::create(Uuid::v7(), 'Test Album', 'Studio');
         $album->setCoverImage(Uuid::v7());
@@ -203,7 +245,7 @@ final class FilesDiscoveredLyricsRequestTest extends TestCase
             $bus,
             $lyrics,
             $this->createStub(AlbumMetadataSyncRequestInterface::class),
-            new NullLogger(),
+            $logger ?? new NullLogger(),
         );
     }
 
@@ -215,6 +257,11 @@ final class FilesDiscoveredLyricsRequestTest extends TestCase
             $visible = array_map(static fn (Song $song): string => $song->getId()->toString(), $state->visibleSongs);
             $requested = array_map(static fn (Uuid $id): string => $id->toString(), $songIds);
             self::assertSame([], array_diff($requested, $visible), 'Every requested song must already be committed.');
+            if ($state->requestFailures > 0) {
+                --$state->requestFailures;
+
+                throw new RuntimeException('Redis is down');
+            }
             $state->requests[] = $requested;
             $state->events[] = 'lyrics requested';
         });
@@ -231,6 +278,7 @@ final class FilesDiscoveredLyricsRequestTest extends TestCase
             'requests' => [],
             'persistFailures' => [],
             'flushFailure' => null,
+            'requestFailures' => 0,
         ];
     }
 

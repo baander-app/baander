@@ -22,6 +22,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Component\Messenger\Envelope;
@@ -98,7 +99,27 @@ final class FilesDiscoveredAlbumSyncRequestTest extends TestCase
         self::assertSame([[$state->visibleAlbums[0]->getId()->toString()]], $state->requests);
     }
 
-    private function handler(\stdClass $state, AlbumMetadataSyncRequestInterface $sync): FilesDiscoveredHandler
+    public function testFailedSyncRequestIsLoggedAndIngestContinues(): void
+    {
+        $state = $this->state();
+        $sync = $this->createMock(AlbumMetadataSyncRequestInterface::class);
+        $sync->expects($this->once())->method('requestSync')->willThrowException(new RuntimeException('Redis is down'));
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('error')->with(
+            $this->stringContains('metadata sync for new album'),
+            $this->callback(static fn (array $context): bool => $context['album_id'] === $state->visibleAlbums[0]->getId()->toString()
+                && $context['exception'] instanceof RuntimeException),
+        );
+
+        $this->handler($state, $sync, $logger)($this->message($this->file('01 One.mp3', 'hash-one'), $this->file('02 Two.mp3', 'hash-two')));
+
+        self::assertSame(
+            ['album persisted', 'album flushed', 'album artist linked', 'album flushed', 'song persisted', 'song persisted', 'songs flushed'],
+            $state->events,
+        );
+    }
+
+    private function handler(\stdClass $state, AlbumMetadataSyncRequestInterface $sync, ?LoggerInterface $logger = null): FilesDiscoveredHandler
     {
         $albums = $this->createStub(AlbumPortInterface::class);
         $albums->method('findByTitleAndLibrary')->willReturnCallback(static function (string $title) use ($state): ?Album {
@@ -162,7 +183,7 @@ final class FilesDiscoveredAlbumSyncRequestTest extends TestCase
             $bus,
             $this->createStub(LyricsFetchRequestInterface::class),
             $sync,
-            new NullLogger(),
+            $logger ?? new NullLogger(),
         );
     }
 
