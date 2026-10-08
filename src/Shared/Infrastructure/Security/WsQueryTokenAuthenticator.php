@@ -29,7 +29,7 @@ final class WsQueryTokenAuthenticator
 
     /**
      * Authenticates a WebSocket handshake request.
-     * Returns the authenticated user's UUID string, or null on failure.
+     * Returns the authenticated user's UUID string, or null on failure or for a disabled account.
      */
     public function authenticate(\Swoole\Http\Request $request): ?string
     {
@@ -64,7 +64,8 @@ final class WsQueryTokenAuthenticator
 
         $user = $this->userRepository->findByUuid(Uuid::fromString($userIdentifier));
 
-        if ($user === null) {
+        // A disabled account's token is refused even if it was issued past the revocation.
+        if ($user === null || $user->isDisabled()) {
             return null;
         }
 

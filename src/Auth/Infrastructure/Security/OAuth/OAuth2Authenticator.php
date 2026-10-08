@@ -30,7 +30,7 @@ use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPasspor
  *
  * Extracts the token from the Authorization header, validates it through
  * the league/oauth2-server ResourceServer, and creates a Passport with
- * the user loaded from the database by UUID.
+ * the user loaded from the database by UUID. A disabled account does not authenticate.
  */
 final class OAuth2Authenticator extends AbstractAuthenticator
 {
@@ -99,6 +99,16 @@ final class OAuth2Authenticator extends AbstractAuthenticator
 
                 if ($user === null) {
                     $this->logger->warning('OAuth2 authenticated user not found in database.', ['uuid' => $uuid]);
+                    throw new CustomUserMessageAuthenticationException(
+                        'Invalid or expired token.',
+                        ['error_code' => 'AUTH_INVALID_TOKEN'],
+                    );
+                }
+
+                // Disabling revokes the account's tokens; this also refuses any token
+                // issued past that revocation, such as by a refresh racing the disable.
+                if ($user->isDisabled()) {
+                    $this->logger->info('OAuth2 token of a disabled account refused.', ['uuid' => $uuid]);
                     throw new CustomUserMessageAuthenticationException(
                         'Invalid or expired token.',
                         ['error_code' => 'AUTH_INVALID_TOKEN'],

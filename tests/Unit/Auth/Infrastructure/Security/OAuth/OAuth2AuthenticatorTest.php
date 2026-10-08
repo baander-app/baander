@@ -161,6 +161,29 @@ final class OAuth2AuthenticatorTest extends TestCase
         $this->createAuthenticator($tokenMetadataRepository)->authenticate($request);
     }
 
+    public function testATokenOfADisabledAccountDoesNotAuthenticate(): void
+    {
+        $user = \App\Auth\Domain\Model\User::register(
+            new \App\Shared\Domain\Model\Email('disabled@baander.app'),
+            'hashed-pw',
+            'Disabled User',
+        );
+        $user->disable();
+        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), $user->getId()->toString());
+
+        $request = Request::create('/');
+        $request->headers->set('Authorization', 'Bearer token123');
+        $passport = $this->createAuthenticator($this->createStub(TokenMetadataRepositoryInterface::class), $user)->authenticate($request);
+
+        try {
+            $passport->getUser();
+            self::fail('A disabled account must not authenticate.');
+        } catch (CustomUserMessageAuthenticationException $exception) {
+            self::assertSame('Invalid or expired token.', $exception->getMessageKey());
+            self::assertSame(401, $this->authenticator->onAuthenticationFailure($request, $exception)->getStatusCode());
+        }
+    }
+
     private function setupSuccessfulResourceServerValidation(string $accessTokenId, string $userId): void
     {
         $psrRequest = new Psr7Request('GET', '/');
@@ -174,11 +197,13 @@ final class OAuth2AuthenticatorTest extends TestCase
         $this->resourceServer->method('validateAuthenticatedRequest')->willReturn($psrRequest);
     }
 
-    private function createAuthenticator(TokenMetadataRepositoryInterface $tokenMetadataRepository): OAuth2Authenticator
-    {
+    private function createAuthenticator(
+        TokenMetadataRepositoryInterface $tokenMetadataRepository,
+        ?\App\Auth\Domain\Model\User $user = null,
+    ): OAuth2Authenticator {
         $userRepository = $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class);
         $userRepository->method('findByUuid')->willReturn(
-            \App\Auth\Domain\Model\User::register(
+            $user ?? \App\Auth\Domain\Model\User::register(
                 new \App\Shared\Domain\Model\Email('test@baander.app'),
                 'hashed-pw',
                 'Test User',
