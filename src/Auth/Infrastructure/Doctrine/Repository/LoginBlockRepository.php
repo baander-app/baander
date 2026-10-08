@@ -47,13 +47,17 @@ final class LoginBlockRepository implements LoginBlockRepositoryInterface
             ->count([]);
     }
 
-    public function deleteByUuid(Uuid $uuid): void
+    public function deleteByUuid(Uuid $uuid): bool
     {
         $entity = $this->entityManager->find(LoginBlockEntity::class, $uuid);
-        if ($entity !== null) {
-            $this->entityManager->remove($entity);
-            $this->entityManager->flush();
+        if ($entity === null) {
+            return false;
         }
+
+        $this->entityManager->remove($entity);
+        $this->entityManager->flush();
+
+        return true;
     }
 
     public function deleteAll(): void

@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Activity\Interface\Controller;
 
 use App\Activity\Application\Port\ActivityAnalyticsPortInterface;
+use App\Activity\Interface\Request\ActivityAnalyticsRange;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Shared\Interface\Exception\InvalidQueryParameter;
-use App\Shared\Interface\Request\QueryParameters;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -57,11 +57,12 @@ final class ActivityAdminController
         ],
     )]
     #[Route('/summary', name: 'summary', methods: ['GET'])]
+    #[CliCounterpart('app:activity:summary')]
     public function summary(Request $request): JsonResponse
     {
-        [$from, $to] = $this->parseDateRange($request);
+        $range = ActivityAnalyticsRange::fromQuery($request->query);
 
-        return $this->successResponse($this->analytics->getSummary($from, $to));
+        return $this->successResponse($this->analytics->getSummary($range->from, $range->to));
     }
 
     #[OA\Get(
@@ -94,12 +95,13 @@ final class ActivityAdminController
         ],
     )]
     #[Route('/top-tracks', name: 'top_tracks', methods: ['GET'])]
+    #[CliCounterpart('app:activity:top-tracks')]
     public function topTracks(Request $request): JsonResponse
     {
-        [$from, $to] = $this->parseDateRange($request);
-        $limit = QueryParameters::integer($request->query, 'limit', 10, 1, 100);
+        $range = ActivityAnalyticsRange::fromQuery($request->query);
+        $limit = ActivityAnalyticsRange::limit($request->query);
 
-        return $this->successResponse($this->analytics->getTopTracks($from, $to, $limit));
+        return $this->successResponse($this->analytics->getTopTracks($range->from, $range->to, $limit));
     }
 
     #[OA\Get(
@@ -130,12 +132,13 @@ final class ActivityAdminController
         ],
     )]
     #[Route('/top-artists', name: 'top_artists', methods: ['GET'])]
+    #[CliCounterpart('app:activity:top-artists')]
     public function topArtists(Request $request): JsonResponse
     {
-        [$from, $to] = $this->parseDateRange($request);
-        $limit = QueryParameters::integer($request->query, 'limit', 10, 1, 100);
+        $range = ActivityAnalyticsRange::fromQuery($request->query);
+        $limit = ActivityAnalyticsRange::limit($request->query);
 
-        return $this->successResponse($this->analytics->getTopArtists($from, $to, $limit));
+        return $this->successResponse($this->analytics->getTopArtists($range->from, $range->to, $limit));
     }
 
     #[OA\Get(
@@ -164,30 +167,11 @@ final class ActivityAdminController
         ],
     )]
     #[Route('/engagement', name: 'engagement', methods: ['GET'])]
+    #[CliCounterpart('app:activity:engagement')]
     public function engagement(Request $request): JsonResponse
     {
-        [$from, $to] = $this->parseDateRange($request);
+        $range = ActivityAnalyticsRange::fromQuery($request->query);
 
-        return $this->successResponse($this->analytics->getEngagement($from, $to));
-    }
-
-    /**
-     * The instants [from, to) covering the requested days. Both dates are inclusive calendar days in
-     * the server time zone, so the range ends at the start of the day after `to`. That boundary does
-     * not depend on how finely last_played_at is stored, unlike an inclusive end at 23:59:59.
-     *
-     * @return array{\DateTimeImmutable, \DateTimeImmutable}
-     */
-    private function parseDateRange(Request $request): array
-    {
-        $from = QueryParameters::optionalDate($request->query, 'from') ?? new \DateTimeImmutable('-30 days');
-        $lastDay = QueryParameters::optionalDate($request->query, 'to') ?? new \DateTimeImmutable('today');
-        $to = $lastDay->modify('+1 day');
-
-        if ($from >= $to) {
-            throw new InvalidQueryParameter('to', 'End date must not precede start date.');
-        }
-
-        return [$from, $to];
+        return $this->successResponse($this->analytics->getEngagement($range->from, $range->to));
     }
 }

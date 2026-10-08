@@ -4,19 +4,28 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Controller;
 
-use App\Auth\Domain\Repository\LoginBlockRepositoryInterface;
+use App\Auth\Application\Command\LoginBlock\DeleteAllLoginBlocksCommand;
+use App\Auth\Application\Command\LoginBlock\DeleteLoginBlockCommand;
+use App\Auth\Application\DTO\LoginBlockPage;
+use App\Auth\Application\Query\LoginBlock\ListLoginBlocksQuery;
 use App\Auth\Interface\Resource\LoginBlockResource;
-use App\Shared\Domain\Model\Uuid;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Request\QueryParameters;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
+/**
+ * The login honeypot's blocks for administrators: administrators list them and super
+ * administrators remove them. The app:login-block:* console commands dispatch the same
+ * application messages.
+ */
 #[OA\Tag(name: 'Admin / Login Blocks', description: 'Honeypot login block management')]
 #[Route('/api/admin/login-blocks', name: 'admin_login_blocks_')]
 #[IsGranted('ROLE_ADMIN')]
@@ -25,7 +34,7 @@ final class AdminLoginBlockController
     use ApiResponsesTrait;
 
     public function __construct(
-        private readonly LoginBlockRepositoryInterface $repository,
+        private readonly MessageBusInterface $bus,
     ) {}
 
     #[OA\Get(
@@ -54,17 +63,18 @@ final class AdminLoginBlockController
         ],
     )]
     #[Route('', name: 'list', methods: ['GET'])]
+    #[CliCounterpart('app:login-block:list')]
     public function list(Request $request): JsonResponse
     {
-        $pagination = QueryParameters::pagination($request->query);
+        $pagination = QueryParameters::pagination($request->query, ListLoginBlocksQuery::DEFAULT_LIMIT, ListLoginBlocksQuery::MAX_LIMIT);
 
-        $blocks = $this->repository->findRecent($pagination->limit, $pagination->offset);
-        $total = $this->repository->countRecent();
+        $page = $this->dispatch(new ListLoginBlocksQuery($pagination->limit, $pagination->offset));
+        assert($page instanceof LoginBlockPage);
 
         return new JsonResponse([
-            'data' => LoginBlockResource::collection($blocks),
+            'data' => LoginBlockResource::collection($page->blocks),
             'meta' => [
-                'total' => $total,
+                'total' => $page->total,
                 'limit' => $pagination->limit,
                 'offset' => $pagination->offset,
             ],
@@ -81,15 +91,10 @@ final class AdminLoginBlockController
     )]
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
+    #[CliCounterpart('app:login-block:delete')]
     public function delete(string $id): JsonResponse
     {
-        try {
-            $uuid = Uuid::fromString($id);
-        } catch (\InvalidArgumentException) {
-            return $this->notFound('Block not found.');
-        }
-
-        $this->repository->deleteByUuid($uuid);
+        $this->dispatch(new DeleteLoginBlockCommand($id));
 
         return $this->noContent();
     }
@@ -103,10 +108,17 @@ final class AdminLoginBlockController
     )]
     #[Route('', name: 'delete_all', methods: ['DELETE'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
+    #[CliCounterpart('app:login-block:delete')]
     public function deleteAll(): JsonResponse
     {
-        $this->repository->deleteAll();
+        $this->dispatch(new DeleteAllLoginBlocksCommand());
 
         return $this->noContent();
+    }
+
+    /** Dispatches synchronously; a handler's not-found or invalid-input outcome reaches the exception subscriber. */
+    private function dispatch(object $message): mixed
+    {
+        return $this->bus->dispatch($message)->last(HandledStamp::class)?->getResult();
     }
 }
