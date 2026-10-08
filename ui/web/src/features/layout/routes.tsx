@@ -8,6 +8,8 @@ import { RegisterPage } from '../auth/pages/RegisterPage'
 import { ForgotPasswordPage } from '../auth/pages/ForgotPasswordPage'
 import { ResetPasswordPage } from '../auth/pages/ResetPasswordPage'
 import { VerifyEmailPage } from '../auth/pages/VerifyEmailPage'
+import { DeviceAuthorizationPage } from '../auth/pages/DeviceAuthorizationPage'
+import { OAuthConsentPage } from '../auth/pages/OAuthConsentPage'
 import { AlbumsPage } from '../catalog/pages/AlbumsPage'
 import { AlbumDetailPage } from '../catalog/pages/AlbumDetailPage'
 import { ArtistDetailPage } from '../catalog/pages/ArtistDetailPage'
@@ -106,6 +108,13 @@ export const protectedRoutes: RouteObject[] = [
 
           // Catch-all
           { path: '*', element: <Navigate to="/music" replace /> },
+        ],
+      },
+      // -- OAuth pages: signed in, outside the app shell --
+      {
+        children: [
+          { path: '/device', element: <DeviceAuthorizationPage /> },
+          { path: '/oauth/authorize', element: <OAuthConsentPage /> },
         ],
       },
       {

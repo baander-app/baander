@@ -202,14 +202,14 @@ Administrators manage device, public and confidential clients. The first-party c
 
 ### Who can manage clients
 
-Anyone with console access can run the `app:oauth:client:*` commands. In the admin API, an administrator (`ROLE_ADMIN`) can list clients, and only a super administrator (`ROLE_SUPER_ADMIN`) can register a client, rotate its secret or revoke it. The commands and the endpoints run the same application handlers, so they apply the same rules:
+Anyone with console access can run the `app:oauth:client:*` commands. In the admin panel and the admin API, an administrator (`ROLE_ADMIN`) can list clients, and only a super administrator (`ROLE_SUPER_ADMIN`) can register a client, rotate its secret or revoke it. The admin panel's **Security → OAuth Clients** tab (`/admin/security?tab=oauth-clients`) calls the admin API. The commands and the endpoints run the same application handlers, so they apply the same rules:
 
-| Action | Command | Admin API |
-|--------|---------|-----------|
-| List clients | [app:oauth:client:list](commands/app-oauth-client-list.md) | `GET /api/admin/oauth/clients` |
-| Register a client | [app:oauth:client:create](commands/app-oauth-client-create.md) | `POST /api/admin/oauth/clients` |
-| Rotate a confidential client's secret | [app:oauth:client:rotate-secret](commands/app-oauth-client-rotate-secret.md) | `POST /api/admin/oauth/clients/{clientId}/rotate-secret` |
-| Revoke a client and its tokens | [app:oauth:client:revoke](commands/app-oauth-client-revoke.md) | `POST /api/admin/oauth/clients/{clientId}/revoke` |
+| Action | Command | Admin panel | Admin API |
+|--------|---------|-------------|-----------|
+| List clients | [app:oauth:client:list](commands/app-oauth-client-list.md) | The OAuth Clients tab | `GET /api/admin/oauth/clients` |
+| Register a client | [app:oauth:client:create](commands/app-oauth-client-create.md) | **Create client** | `POST /api/admin/oauth/clients` |
+| Rotate a confidential client's secret | [app:oauth:client:rotate-secret](commands/app-oauth-client-rotate-secret.md) | **Rotate secret** on the client's row | `POST /api/admin/oauth/clients/{clientId}/rotate-secret` |
+| Revoke a client and its tokens | [app:oauth:client:revoke](commands/app-oauth-client-revoke.md) | **Revoke** on the client's row | `POST /api/admin/oauth/clients/{clientId}/revoke` |
 
 ### Registering a client
 
@@ -229,7 +229,7 @@ A redirect URI must be absolute, without a fragment or credentials, and use `htt
 
 ### Client secrets
 
-A confidential client gets a generated secret when it is registered. The command output or the API response shows that secret once. Baander stores only its SHA-256 digest, so nobody can read the secret back later, not even an administrator. Copy it into the client's configuration straight away.
+A confidential client gets a generated secret when it is registered. The command output, the admin panel or the API response shows that secret once. Baander stores only its SHA-256 digest, so nobody can read the secret back later, not even an administrator. Copy it into the client's configuration straight away.
 
 If the secret is lost or may have leaked, rotate it. The old secret stops working at once, while the access and refresh tokens the client already holds stay valid. The client needs the new secret before its next token request. Device and public clients have no secret.
 
