@@ -11,15 +11,14 @@ use OpenTelemetry\SDK\Trace\ReadWriteSpanInterface;
 use OpenTelemetry\SDK\Trace\SpanProcessorInterface;
 
 /**
- * Copies completed spans into the SpanBridge for the debug /api/debug/spans endpoint.
+ * Copies completed spans into the SpanBridge for the server diagnostics
+ * (/api/debug/spans and app:server:spans). The tracer provider always registers it.
  */
-final class InMemorySpanProcessor implements SpanProcessorInterface
+final readonly class InMemorySpanProcessor implements SpanProcessorInterface
 {
-    private ?SpanBridge $bridge = null;
-
-    public function setBridge(SpanBridge $bridge): void
-    {
-        $this->bridge = $bridge;
+    public function __construct(
+        private SpanBridge $bridge,
+    ) {
     }
 
     public function onStart(ReadWriteSpanInterface $span, ContextInterface $parentContext): void
@@ -29,10 +28,6 @@ final class InMemorySpanProcessor implements SpanProcessorInterface
 
     public function onEnd(ReadableSpanInterface $span): void
     {
-        if ($this->bridge === null) {
-            return;
-        }
-
         $context = $span->getContext();
         $parent = $span->getParentContext();
         $spanData = $span->toSpanData();

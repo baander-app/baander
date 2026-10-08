@@ -136,6 +136,32 @@ services:
     App\Shared\Application\Port\ServerControlPortInterface:
         alias: App\Shared\Infrastructure\Swoole\Control\ServerControl
 
+    # --- Server diagnostics (debug.* control operations) ---
+    App\Shared\Application\Port\ServerDiagnosticsInterface:
+        alias: App\Shared\Infrastructure\Swoole\ServerDiagnostics
+
+    App\Shared\Infrastructure\Swoole\Control\Operation\DebugWorkersOperation:
+        arguments:
+            $cpuProcessPoolLocator: !service_locator
+                App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool: '@App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool'
+
+    # --- OpenTelemetry ---
+    # The span buffer's table is created before the workers fork, so every worker
+    # shares it. Spans always reach it; app.otel.enabled only adds OTLP export.
+    App\Shared\Infrastructure\OpenTelemetry\SpanBridge:
+        tags:
+            - { name: 'swoole_bundle.bootable_service' }
+
+    App\Shared\Infrastructure\OpenTelemetry\TracerProviderFactory:
+        arguments:
+            $exportEnabled: '%app.otel.enabled%'
+            $exporterUrl: '%app.otel.exporter_url%'
+            $serviceName: '%app.otel.service_name%'
+
+    OpenTelemetry\API\Trace\TracerProviderInterface:
+        class: OpenTelemetry\SDK\Trace\TracerProvider
+        factory: [ '@App\Shared\Infrastructure\OpenTelemetry\TracerProviderFactory', 'create' ]
+
     # --- Swoole WebProfiler ---
 
     App\Shared\Infrastructure\Swoole\SwooleDataCollector:
