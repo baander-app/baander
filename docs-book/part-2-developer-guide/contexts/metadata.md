@@ -28,7 +28,7 @@ While the `metadata.auto_sync` system setting is on, Catalog ingest asks Metadat
 
 `AlbumMetadataSyncRequester` reads the setting on every call. When the setting is on, it calls `MetadataSyncOrchestrator::syncAlbum()` for each album. The orchestrator dispatches `SyncAlbumMessage`, which runs later from the `swoole_task` queue, or from the Redis `async` transport outside the Swoole server, so ingest does not wait for the external lookups. The setting is off by default.
 
-Admin and CLI syncs call the orchestrator directly and ignore the setting.
+The admin sync, `POST /api/admin/metadata/trigger-sync`, dispatches its own message and ignores the setting. No console command starts a sync.
 
 ## Ports
 
@@ -65,9 +65,9 @@ Routes under `/api/admin/metadata` (controller `MetadataAdminController`, gated 
 
 | Direction | Context | Relationship |
 |-----------|---------|-------------|
-| Depends on | Shared | Uses `Uuid` for identifiers |
+| Depends on | Shared | Uses `Uuid` for identifiers, and `SystemSettingsPortInterface` for `metadata.auto_sync` |
 | Depends on | Catalog | Updates albums, artists, and songs with enriched data |
-| Depends on | Lyrics | Stores lyrics retrieved during enrichment |
+| Depends on | Library | `MetadataSyncOrchestrator` looks up libraries through `LibraryPortInterface` |
 | Depended on by | Catalog | Ingest requests a sync of each new album through `AlbumMetadataSyncRequestInterface` (the `Metadata Album Sync Request Contract` Deptrac layer) |
 
 ## Infrastructure

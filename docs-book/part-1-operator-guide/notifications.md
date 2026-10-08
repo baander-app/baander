@@ -143,6 +143,19 @@ The Docker development environment includes [Mailpit](https://mailpit.axllent.or
 
 Password reset emails use the same transport but are not notifications: they ignore notification preferences and are sent whenever a user asks for a reset. See [Password reset](configuration.md#password-reset).
 
+### Language
+
+Notification emails are written in each recipient's [email language](configuration.md#email-language): the user's own choice, otherwise the server default `i18n.default_language`, otherwise English. The worker looks the language up when it sends each email, so a change made after the notification was queued applies to it. In-app notifications, push notifications and webhook payloads are always in English.
+
+## Server Settings
+
+Two [server settings](configuration.md#server-settings) switch parts of notification delivery off for the whole server. Baander reads them for every message, so a change applies without a restart.
+
+| Setting | Default | While it is off |
+|---------|---------|-----------------|
+| `notifications.push_enabled` | `true` | No browser push is sent. The notification is still created and delivered in the app and by any other channel, and each skipped push is logged. |
+| `notifications.admin_alerts` | `true` | A health check that stops reporting healthy no longer alerts administrators; the degradation is still logged. Other admin alerts, such as new user registrations, are always sent. |
+
 ## Scope
 
 This page covers admin-configurable notification channels: push key setup, webhook management, and mailer configuration. User-facing notification preference toggling (per-category, per-channel opt-in/out) is not documented here because access control on those endpoints has not been verified for the current release.

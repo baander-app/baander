@@ -2,6 +2,8 @@
 
 Baander converts video files into streamable CMAF segments on-the-fly using FFmpeg. Segments are served via HLS v6 and DASH manifests, with per-segment adaptive bitrate selection across multiple quality tiers.
 
+Music tracks can also be transcoded to Opus, AAC or MP3 for clients that cannot play the original. That is off until you turn it on; see [Audio Transcoding](#audio-transcoding).
+
 ## How It Works
 
 When a client requests a video stream, Baander creates a **transcode session** and an associated **transcode job** for the requested quality tier. The encoding loop runs in a Swoole coroutine and dispatches FFmpeg work to isolated worker processes:
@@ -114,9 +116,45 @@ The `docker-compose.yml` file contains commented-out configuration for both NVID
 - Passing `/dev/dri` into the container for Intel iGPU access.
 - Updating `TranscodePoolWorker` to select a hardware encoder when available.
 
+## Audio Transcoding
+
+Music tracks stream as their original files unless a client asks for another format. A client that cannot play a track's format, such as a browser without FLAC support, asks for it transcoded:
+
+```
+GET /api/stream/track?id=<track public ID>&format=opus
+GET /api/stream/track?id=<track public ID>&format=mp3&bitrate=192000
+```
+
+`format` is `opus`, `aac` or `mp3`. `bitrate` is optional, in bits per second, and requires `format`. Baander checks the listener's access to the track before it transcodes anything, exactly as for the original file.
+
+### Settings
+
+Two [server settings](configuration.md#server-settings) govern audio transcoding. Baander reads them on every request. Video transcoding is outside both.
+
+| Setting | Default | Effect |
+|---------|---------|--------|
+| `transcode.enabled` | `false` | While off, a request that names a format gets `403` saying transcoding is turned off, and no encode starts. Requests without a format stream the original either way. |
+| `transcode.max_bitrate` | `320` | The highest bitrate, in kbps: `128`, `192`, `256` or `320`. A higher requested bitrate is lowered to it, and a request without a bitrate gets it. |
+
+Baander then fits the bitrate to the format's range, 32 to 256 kbps for Opus and 32 to 320 kbps for AAC and MP3, in whole kilobits. An Opus stream therefore never exceeds 256 kbps, whatever the maximum.
+
+An unsupported format, a bitrate that is not a positive whole number, or a bitrate without a format gets `400`. A failed encode gets `500` and is logged with the track, format and bitrate.
+
+### Cached renditions
+
+Each track, format and bitrate has one cached rendition under `CONVERT_STORAGE_PATH/audio-renditions/<track>/`. Its file name includes a fingerprint of the source file, so a replaced source is encoded again.
+
+The first request for a rendition starts the encode and streams the output while FFmpeg writes it. Its length is not known yet, so that response carries `Accept-Ranges: none` and the listener cannot seek. A second request for the same rendition while it is encoding joins that encode instead of starting another. Once the rendition is complete, later requests get the cached file with full byte-range support, so seeking works. Encodes run in the [CPU process pool](#cpu-process-pool), never in the HTTP worker.
+
+The transcode cache sweep (`app:transcode:cache-sweep`) treats each track's renditions, all formats and bitrates together, as one cache unit under the same age limit and size budget as video segments. A track's renditions count as in use while an encode has written to a partial rendition recently.
+
+### Web player
+
+The web player always asks for the original file first. When the browser rejects it as an unsupported source, the player asks for the same track as Opus, then AAC, then MP3, without a bitrate, so the server applies `transcode.max_bitrate`. While a transcoded stream is still encoding, the player refuses to seek and says so. If the transcoded stream fails as well, playback stops with an error message. With `transcode.enabled` off, a track the browser cannot play therefore does not play in the web player.
+
 ## Configuration
 
-Transcoding does not have dedicated environment variables. The relevant configuration is:
+Transcoding does not have dedicated environment variables. Audio transcoding is switched on and capped with the [server settings](#settings) above. The rest of the relevant configuration is:
 
 - **CPU process pool worker count** -- set `$workerCount` in `config/services.yaml` (default: 2). See [Configuration](configuration.md) for general server settings.
 - **State directory** -- persisted job state is written to `var/transcode_state/` inside the container. Ensure this directory is on a persistent volume if you deploy with ephemeral containers.

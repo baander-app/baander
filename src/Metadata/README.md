@@ -15,9 +15,9 @@ The enrichment pipeline flows: **extract** → **match** → **enrich**
 - **Matching** (`Infrastructure/Matching/`) compares local metadata against API results using validators to score match quality
 - **Enrichers** (`Application/`) — `AlbumMetadataEnricher`, `ArtistMetadataEnricher`, `SongMetadataEnricher` — orchestrate the lookup and write-back to Catalog via port interfaces
 
-Sync is triggered by Library dispatching `ExtractAlbumCoverCommand`, or via Messenger messages (`SyncAlbumMessage`, `SyncArtistMessage`, etc.).
+Catalog ingest dispatches `ExtractAlbumCoverCommand` for an album without a cover. Syncs run from Messenger messages (`SyncAlbumMessage`, `SyncArtistMessage`, etc.).
 
-- Automatic sync: while `metadata.auto_sync` is on, Catalog ingest queues one `SyncAlbumMessage` for each album it creates. The setting is off by default and does not gate the admin or CLI syncs.
+- Automatic sync: while `metadata.auto_sync` is on, Catalog ingest queues one `SyncAlbumMessage` for each album it creates. The setting is off by default and does not gate the admin sync.
 
 ## Ports
 
@@ -28,12 +28,13 @@ Sync is triggered by Library dispatching `ExtractAlbumCoverCommand`, or via Mess
 
 ## Events
 
-None. Metadata consumes events from Library but does not publish.
+None. Metadata neither publishes nor consumes domain events.
 
 ## Interactions
 
 - **Catalog** — reads and writes via `AlbumPortInterface`, `ArtistPortInterface`, `SongPortInterface`, `GenrePortInterface`
-- **Library** — `CoverArtExtractor` and scanner trigger metadata extraction
+- **Catalog ingest** — dispatches `ExtractAlbumCoverCommand` and requests album syncs through `AlbumMetadataSyncRequestInterface`
+- **Library** — `MetadataSyncOrchestrator` looks up libraries through `LibraryPortInterface`
 - **Media** — stores cover art via `ImagePortInterface` and `StoragePortInterface`
 
 ---

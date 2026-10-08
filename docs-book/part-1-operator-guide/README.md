@@ -28,4 +28,4 @@ Everything you need to deploy, configure, monitor, and troubleshoot Baander.
 
 | Page | Description |
 |------|-------------|
-| [CLI Reference](commands/README.md) | All 33 console commands with usage and examples |
+| [CLI Reference](commands/README.md) | All 38 console commands with usage and examples |

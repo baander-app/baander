@@ -3,20 +3,30 @@
 
 # UserPreference
 
-Per-user UI preferences — sidebar configuration and accent color.
+Per-user UI and playback preferences (accent color, sidebar configuration, audio, layout and player preferences, EQ device profiles, theme mood) and the per-user settings store.
 
 ## Concepts
 
-The `SidebarConfig` aggregate stores a user's sidebar layout as an ordered list of `SidebarItem` models. `SidebarItemType` value object distinguishes item types. The accent color preference is stored directly without a domain model — `AccentColorRepositoryInterface` persists it, but there's no `AccentColor` aggregate.
+The `SidebarConfig` aggregate stores a user's sidebar layout as an ordered list of `SidebarItem` models. `SidebarItemType` value object distinguishes item types. The accent color and theme mood are stored directly without a domain model: `AccentColorRepositoryInterface` and `ThemeMoodRepositoryInterface` persist them. Audio, layout and player preferences are versioned JSON payloads: `VersionedPreferencesWriter` saves them with optimistic locking and appends each version to `preference_history`, which rollback reads. `EqDeviceProfile` holds a user's named EQ profiles.
 
-Both settings are user-scoped, resolved via `SecurityUser` from the Auth context at the controller layer.
+User settings are scalar values described by Shared `SettingDefinition`s with user scope. `user_settings` holds one row per explicit choice, keyed by `(user_id, key)`. `UserSettingsReader` combines a stored choice with its definition into the effective value, the value after a reset (a system setting's current value for a setting that follows one) and its source. `LanguageSettingDefinitions` contributes the only user setting so far, `language`, which follows `i18n.default_language`. Both setting stores are read through DBAL, so a long-running worker sees fresh values.
+
+Every controller is scoped to the signed-in user. The preference controllers resolve it through `SecurityUser` from the Auth context; `UserSettingsController` uses Auth's `AuthenticatedUserIdentityInterface`.
 
 ## Ports
 
 | Port | Purpose |
 |------|---------|
 | `SidebarConfigPortInterface` | Sidebar config CRUD |
-| `AccentColorPortInterface` | Accent color CRUD |
+| `AccentColorPortInterface` | Accent color get and set |
+| `ThemeMoodPortInterface` | Theme mood get and set |
+| `AudioPreferencesPortInterface` | Versioned audio preferences, history and rollback |
+| `LayoutPreferencesPortInterface` | Versioned layout preferences, history and rollback |
+| `PlayerPreferencesPortInterface` | Versioned player preferences, history and rollback |
+| `PreferenceWriterPortInterface` | Optimistic-locking save shared by the three versioned preferences |
+| `EqDeviceProfilePortInterface` | EQ device profile CRUD and activation |
+| `UserSettingStoreInterface` | Rows of `user_settings` |
+| `UserSettingsContractInterface` | Published contract (`UserPreference Settings Contract` Deptrac layer, with `UserSettingView`): email language resolution and seeding, and administrator reads and writes of a user's settings |
 
 ## Events
 
@@ -24,10 +34,14 @@ None.
 
 ## Interactions
 
-- **Auth** — controllers use `SecurityUser` to resolve the current user (Interface layer only)
+- **Auth** — controllers use `SecurityUser` or `AuthenticatedUserIdentityInterface` to resolve the current user (Interface layer only). Auth calls `UserSettingsContractInterface` to seed the email language at registration, to resolve it for credential emails, and for the admin user settings endpoints and `app:user:setting`.
+- **Notification** — `SendEmailHandler` resolves each recipient's email language through `UserSettingsContractInterface`.
+- **Shared** — setting definition registry, `SettingValueParser`, and `SystemSettingsPortInterface` for the system setting a user setting follows.
 
 ---
 
 <!-- Everything below this line is hand-written. Edit freely. -->
 
 ## Notes
+
+Theme mood and accent color are meant to move onto user settings first; the versioned payloads follow only if the store gains versioning, and sidebar configuration and EQ profiles stay aggregates. The [UserPreference guide](../../docs-book/part-2-developer-guide/contexts/user-preference.md#moving-preferences-onto-user-settings) gives the reasons.

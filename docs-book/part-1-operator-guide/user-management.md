@@ -47,13 +47,26 @@ Baander uses three roles:
 |------|-------------|
 | `ROLE_USER` | Standard user — can browse libraries, stream media, create playlists, and manage their own preferences |
 | `ROLE_ADMIN` | Administrator — has access to the operational and management API endpoints; some changes there need `ROLE_SUPER_ADMIN` |
-| `ROLE_SUPER_ADMIN` | Super administrator — includes `ROLE_ADMIN` and may also make the changes reserved for it, such as creating users and registering, rotating and revoking [OAuth clients](#oauth-clients) |
+| `ROLE_SUPER_ADMIN` | Super administrator — includes `ROLE_ADMIN` and may also make the changes reserved for it, such as creating administrators, changing [server settings](configuration.md#server-settings) and [users' settings](#user-settings), and registering, rotating and revoking [OAuth clients](#oauth-clients) |
 
 Roles are assigned at creation time with the `--role` flag, which grants `ROLE_USER` or `ROLE_ADMIN`. A super administrator can assign roles, `ROLE_SUPER_ADMIN` included, through the admin API (`POST /api/admin/users/{id}/roles`). There is currently no CLI command to change a user's role after creation. To modify roles, you must update the `roles` column directly in the database:
 
 ```sql
 UPDATE users SET roles = '["ROLE_USER", "ROLE_ADMIN"]' WHERE email = 'alice@example.com';
 ```
+
+### Who can manage users
+
+Two [server settings](configuration.md#server-settings) decide what an administrator who is not a super administrator may do on the admin **Users** page and the `/api/admin/users` endpoints:
+
+| Setting | Default | While it is on |
+|---------|---------|----------------|
+| `admin.can_view_users` | `true` | Administrators may list users. While it is off, the list request gets `403` and the page explains why. |
+| `admin.can_create_users` | `false` | Administrators may create users, but only with the User role. The setting never lets an administrator create another administrator. While it is off, the page hides **Create User**. |
+
+Baander reads both settings on every request, so a change applies at once. Super administrators may always list and create users, with any role. Every other change to an account, such as editing it, assigning roles, resetting its password, disabling, enabling or deleting it, needs `ROLE_SUPER_ADMIN`. Administrators who are not super administrators therefore get a single **View** action for each user, which opens the user dialog read-only.
+
+The console commands are not affected by these settings: console access carries full authority.
 
 ## Passkeys (WebAuthn)
 
@@ -118,6 +131,30 @@ make exec cmd="php bin/console app:user:change-email alice@baander.app alice.new
 ```
 
 The command accepts the current email address or the UUID. All three ways make the new address unverified, email it a verification link, and end the verification and password reset links sent to the old address. See [app:user:change-email](commands/app-user-change-email.md).
+
+## User Settings
+
+Each user has settings of their own. Currently there is one, `language`, the language Baander emails the user in; it follows the server default until the user or an administrator chooses a language. [Email language](configuration.md#email-language) explains how Baander picks the language of each email.
+
+Users change their own email language in **Settings**. Administrators see a user's language in the admin user dialog; super administrators can change it there, and other administrators see it read-only. Operators use the CLI:
+
+```bash
+make exec cmd="php bin/console app:user:setting get alice@baander.app"
+make exec cmd="php bin/console app:user:setting set alice@baander.app language da"
+make exec cmd="php bin/console app:user:setting reset alice@baander.app language"
+```
+
+The command accepts an email address or UUID. `reset` removes the choice, so the user follows the server default again. See [app:user:setting](commands/app-user-setting.md).
+
+The admin API offers the same operations. Users are addressed by UUID:
+
+| Method | Path | Role | Purpose |
+|--------|------|------|---------|
+| `GET` | `/api/admin/users/{id}/settings` | `ROLE_ADMIN` | List the user's settings, including a stored value that is no longer allowed, marked `storedValueValid: false` |
+| `PUT` | `/api/admin/users/{id}/settings/{key}` | `ROLE_SUPER_ADMIN` | Set the user's choice; the body is `{"value": <value>}` |
+| `DELETE` | `/api/admin/users/{id}/settings/{key}` | `ROLE_SUPER_ADMIN` | Remove the user's choice |
+
+Super administrators can set every user setting, including any that users cannot change themselves. Each change made through the admin API or the CLI writes an info log entry with the acting administrator's ID (`cli` for the command), the user's ID, the key, and the old and new stored values.
 
 ## Disabling and Enabling Users
 

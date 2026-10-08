@@ -28,7 +28,7 @@ All endpoints are prefixed with `/api`.
 | `GET` | `/api/images/{publicId}` | Get image metadata (dimensions, MIME type, size) |
 | `GET` | `/api/images/{publicId}/file` | Serve the image file binary |
 | `GET` | `/api/images/{publicId}/blurhash` | Get the BlurHash placeholder string for progressive image loading |
-| `GET` | `/api/stream/track` | Stream a track by public ID after checking library access; supports byte ranges |
+| `GET` | `/api/stream/track` | Stream a track by public ID after checking library access; supports byte ranges. With `format` (`opus`, `aac` or `mp3`) and an optional `bitrate` in bits per second, streams a cached transcoded rendition while `transcode.enabled` is on (see [Transcode](transcode.md#audio-renditions)) |
 
 ## Infrastructure
 
@@ -44,6 +44,7 @@ All endpoints are prefixed with `/api`.
 
 | Direction | Context | Relationship |
 |-----------|---------|--------------|
-| Depends on | Shared | Uses `Uuid`, `PublicId`, and `CursorPaginatedResponse` for entity identification and API responses |
+| Depends on | Shared | Uses `Uuid`, `PublicId`, and `CursorPaginatedResponse` for entity identification and API responses, and `SystemSettingsPortInterface` for the transcoding settings |
+| Depends on | Transcode | The track stream transcodes audio through `AudioRenditionPortInterface` (the `Transcode Audio Rendition Contract` Deptrac layer) |
 | Depended on by | Catalog | Stores cover art images for albums and artists |
 | Depended on by | Notification | Stores image attachments for notifications |

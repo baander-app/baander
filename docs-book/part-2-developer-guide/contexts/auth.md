@@ -35,7 +35,7 @@ Commands and handlers are organized into feature namespaces under `Application/C
 
 | Command | Handler | Purpose |
 |---------|---------|---------|
-| `RegisterUserCommand` | `RegisterUserHandler` | Self-registration (User/) |
+| `RegisterUserCommand` | `RegisterUserHandler` | Self-registration; seeds the email language from the browser (User/) |
 | `CreateUserCommand` | `CreateUserHandler` | Operator-created users (User/) |
 | `DisableUserCommand` | `DisableUserHandler` | Disable a user account (User/) |
 | `EnableUserCommand` | `EnableUserHandler` | Re-enable a disabled account (User/) |
@@ -94,9 +94,9 @@ Four queries serve the OAuth endpoints. `GetAuthorizationRequestQuery` (`GetAuth
 
 `RequestPasswordResetHandler` charges the per-account limiter before looking up the address and issues a token only for an existing account; the endpoint answers the same way in every case. After issuing the token, the handler passes it to the `PasswordResetDeliveryInterface` port. The raw token exists only in the handler's memory and in that delivery. Do not put it in a domain event, because events are stored in the outbox.
 
-`MailerPasswordResetDelivery` implements the port. It builds the link `APP_URL/reset-password#token=…` and captures the request locale, because `LocaleListener` resets the translator before the email is sent. It then waits for `kernel.terminate`, which the Swoole server and PHP-FPM both dispatch after the response has gone out. Sending inside the request would make the request slower for real accounts than for unknown addresses, and that difference would reveal which addresses have accounts. Pending emails are held in a `WeakMap` keyed by the main request, so concurrent coroutines in one worker do not send each other's mail. Without a current request (a console command or a worker), it sends at once.
+`MailerPasswordResetDelivery` implements the port. It builds the link `APP_URL/reset-password#token=…` and queues the email on `AfterResponseMailer`, which waits for `kernel.terminate`, which the Swoole server and PHP-FPM both dispatch after the response has gone out. Sending inside the request would make the request slower for real accounts than for unknown addresses, and that difference would reveal which addresses have accounts. Pending emails are held in a `WeakMap` keyed by the main request, so concurrent coroutines in one worker do not send each other's mail. Without a current request (a console command or a worker), it sends at once.
 
-Sending is shared with the verification email through `AfterResponseMailer`, which queues a `CredentialEmail` and sends it.
+Sending is shared with the verification email through `AfterResponseMailer`, which queues a `CredentialEmail` and sends it. The `CredentialEmail` carries the user ID, not a language. When `AfterResponseMailer` sends the email, it asks `UserSettingsContractInterface::resolveLanguage()` for the recipient's [email language](#email-language) and passes that locale explicitly to the translator and the templates; it never changes the shared translator's locale. Resolving the language at send time keeps the per-account lookup out of the request, so a reset request for a real account still takes as long as one for an unknown address. If the lookup fails, the email is sent in English and the failure is logged with the exception class only.
 
 The mailer calls the mailer transport directly rather than `MailerInterface`. `MailerInterface` dispatches a `SendEmailMessage` on the message bus, and a later routing change could put the token into Redis or the `failed_messages` table. Notification email (`SendEmailCommand` on `swoole_task`) can be retried from those stores; a reset email cannot, and does not need to be, because the user can ask for a new link. A failed send is logged with the user ID and exception class only, since transport errors can quote the recipient. The templates are `templates/email/auth/password_reset.{txt,html}.twig`, translated through the `password_reset_email` keys in the `auth` domain.
 
@@ -115,6 +115,14 @@ Redemption is a single `DELETE … RETURNING`, so a token works once even under 
 `MailerEmailVerificationDelivery` builds the link `APP_URL/verify-email#token=…` and queues the email on `AfterResponseMailer`. That is the reset email's path: it sends after the response and straight to the mailer transport, so a slow or failing mail server neither delays an HTTP response nor fails a registration. The templates are `templates/email/auth/email_verification.{txt,html}.twig`, translated through the `email_verification_email` keys in the `auth` domain. Both auth emails are written in the recipient's email language. `AfterResponseMailer` reads it through the UserPreference settings contract when it sends the email, after the response, so the request does no per-account work. If the lookup fails, the email is sent in English and the failure is logged without the address or the link.
 
 The web page is `/verify-email` in `ui/web/src/features/auth/`. It reads the token from the fragment and removes the fragment from the address bar. The account card in **Settings** shows an unverified address and offers a new link.
+
+## Email Language
+
+The email language is a UserPreference user setting, `language`, that follows the system setting `i18n.default_language`. Auth reaches it only through `UserSettingsContractInterface`, in the `UserPreference Settings Contract` Deptrac layer (see [UserPreference](user-preference.md#the-settings-contract)).
+
+At registration, `AuthController` passes the `Accept-Language` header to `AcceptLanguageMatcher` (`Interface/Request/`), which returns the supported language the browser ranks highest. It ignores `*` and entries with `q=0`, maps a regional tag such as `da-DK` to `da`, and returns `null` when nothing matches. `Request::getPreferredLanguage()` is not used, because it answers with the first supported language even when the browser asks for none of them. `RegisterUserCommand` carries the result, and `RegisterUserHandler` calls `seedLanguage()` inside the registration transaction. The contract stores the language only when it differs from the current server default, so a user whose browser asks for the default keeps following it when an administrator changes it. `CreateUserHandler`, behind `app:user:create` and the admin panel, stores no language. `Accept-Language` is read nowhere else; it does not localize API responses.
+
+The verification email that follows registration is sent in the stored language, because `AfterResponseMailer` resolves the language when it sends.
 
 ## Domain Events
 
@@ -170,7 +178,7 @@ All endpoints except the two `/.well-known/` documents are under `/api`.
 
 ### Admin — User Management
 
-All routes under `/api/admin/users` (controller `AdminUserController`, gated `ROLE_ADMIN`; mutating routes require `ROLE_SUPER_ADMIN`).
+All routes under `/api/admin/users` (controller `AdminUserController`, gated `ROLE_ADMIN`). Listing needs `USER_MANAGEMENT_LIST` and creating needs `USER_MANAGEMENT_CREATE`; every other route requires `ROLE_SUPER_ADMIN`. `UserManagementVoter` grants both attributes to super administrators. It grants them to other administrators only while the system settings `admin.can_view_users` and `admin.can_create_users` are on, reading them on every vote, and grants creation only when every requested role is `ROLE_USER`. The console commands are not gated by these settings.
 
 | Method | Path | Purpose |
 |--------|------|---------|
@@ -182,6 +190,18 @@ All routes under `/api/admin/users` (controller `AdminUserController`, gated `RO
 | POST | `/api/admin/users/{id}/reset-password` | Reset a user's password and sign them out (CLI: `app:user:reset-password`) |
 | POST | `/api/admin/users/{id}/disable` | Disable a user |
 | POST | `/api/admin/users/{id}/enable` | Enable a user |
+
+### Admin — User Settings
+
+Routes under `/api/admin/users/{id}/settings` (controller `AdminUserSettingsController`). `{id}` is the user's UUID; any other value is `404`.
+
+| Method | Path | Role | Purpose |
+|--------|------|------|---------|
+| GET | `/api/admin/users/{id}/settings` | `ROLE_ADMIN` | List the user's settings, with a stored value that is no longer allowed marked `storedValueValid: false` |
+| PUT | `/api/admin/users/{id}/settings/{key}` | `ROLE_SUPER_ADMIN` | Set the user's choice (body `{"value": …}`), for every user setting, including ones users cannot change themselves; `422` for an invalid value |
+| DELETE | `/api/admin/users/{id}/settings/{key}` | `ROLE_SUPER_ADMIN` | Remove the user's choice |
+
+`app:user:setting get|set|reset <identifier> [key] [value]` is the console counterpart; it accepts an email address or UUID. The endpoints and the command share the application service `AdminUserSettings`, which resolves the user with `UserLookup`, calls `UserSettingsContractInterface`, and logs every set and reset at info level with `actor_id` (the signed-in administrator, or `cli`), `target_id`, `key`, `old_value` and `new_value`. The logged values are the stored ones; `null` means no choice.
 
 Deleting a user deletes their access tokens (`fk_oauth_access_tokens_user_id` is `ON DELETE CASCADE`), and the existing cascades from `oauth_access_tokens` then delete the matching refresh tokens and token metadata. The user's authorization codes and device codes are deleted with them as well (`Version20261006300000` made `fk_oauth_device_codes_user_id` cascade; authorization codes always did).
 
@@ -314,6 +334,8 @@ Password login, passkey login, and every grant at the token endpoint accept an o
 |-----------|---------|---------|
 | Depends on | Shared | `Uuid`, `PublicId`, `Email` |
 | Depended on by | All contexts | Every authenticated endpoint depends on Auth |
+| Depends on | UserPreference | Registration, credential emails and the admin user settings call `UserSettingsContractInterface` through the narrow `UserPreference Settings Contract` Deptrac layer |
+| Depends on | Shared | `SystemSettingsPortInterface` for the user management settings, read by `UserManagementVoter` |
 | Depended on by | Notification | Notification Domain maps `DeviceCodeApproved` to the Security category through the narrow `Auth Device Approval Event Contract` Deptrac layer |
 
 ## Infrastructure
@@ -328,6 +350,7 @@ Password login, passkey login, and every grant at the token endpoint accept an o
 | `RateLimitListener` | Security | Per-IP and per-client limits for the auth and OAuth endpoints (see [Rate limiting](../../part-1-operator-guide/configuration.md#rate-limiting)) |
 | Doctrine entities | ORM | Persistence for all models |
 | Doctrine repositories | ORM | Repository implementations for all aggregates |
-| Voter classes | Security | Authorization checks for protected resources |
+| Voter classes | Security | Authorization checks for protected resources; `UserManagementVoter` applies the user management settings |
+| `AfterResponseMailer` | Mail | Sends credential emails after the response, in the recipient's email language |
 
 See the [Architecture](../architecture.md#anti-corruption-layer) page for details on the League anti-corruption layer.

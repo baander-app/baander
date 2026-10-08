@@ -36,3 +36,4 @@ make exec cmd="php bin/console baander:lyrics:fetch --limit=500 --delay=1000"
 - Increase `--delay` if LRCLIB rate-limits your requests; the default 500 ms is conservative.
 - The command only queues the fetch work — it reports how many songs were dispatched, not the fetch results. Check the worker logs for per-song outcomes.
 - If every song already has lyrics, the command exits 0 with a "no songs required fetching" message.
+- The `lyrics.auto_fetch` [server setting](../configuration.md#server-settings) does not affect this command. That setting fetches lyrics automatically for new tracks as a scan adds them; this command backfills songs already in the catalog.
