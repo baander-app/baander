@@ -4,24 +4,33 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Console;
 
-use App\Catalog\Domain\Repository\AlbumRepositoryInterface;
-use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
+use App\Catalog\Application\Command\BatchExtractCoversCommand;
+use App\Catalog\Application\Port\AlbumPortInterface;
+use App\Shared\Application\Port\JobMonitorAdministrationInterface;
+use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Messenger\MessageBusInterface;
+use Throwable;
 
+/**
+ * The CLI counterpart of POST /api/albums/covers/extract.
+ *
+ * The batch that pages the coverless albums runs inline and is recorded in the job
+ * monitor (KTD4); it queues one extraction job per album on the async queue, as the
+ * batch does when the web path queues it.
+ */
 #[AsCommand(
-    name: 'app:albums:extract-covers',
-    description: 'Extract embedded cover art for all albums that are missing one.',
+    name: 'app:album:extract-covers',
+    description: 'Queue embedded cover art extraction for every album without a cover.',
 )]
 final class ExtractAlbumCoversCommand extends Command
 {
     public function __construct(
-        private readonly AlbumRepositoryInterface $albumRepository,
-        private readonly MessageBusInterface $bus,
+        private readonly AlbumPortInterface $albums,
+        private readonly JobMonitorAdministrationInterface $jobMonitor,
     ) {
         parent::__construct();
     }
@@ -30,37 +39,19 @@ final class ExtractAlbumCoversCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
 
-        $total = $this->albumRepository->countCoverlessAlbums();
-
-        if ($total === 0) {
-            $io->info('All albums already have cover art. Nothing to do.');
-
-            return Command::SUCCESS;
+        try {
+            $io->text(sprintf('%d album(s) have no cover art. Queuing an extraction job for each...', $this->albums->countCoverlessAlbums()));
+            $run = $this->jobMonitor->runInline(new BatchExtractCoversCommand());
+        } catch (Throwable $exception) {
+            return AdminCommandSupport::fail($io, $exception);
         }
 
-        $io->info(sprintf('Found %d album(s) without cover art.', $total));
-
-        $limit = 500;
-        $after = null;
-        $dispatched = 0;
-
-        while (true) {
-            $ids = $this->albumRepository->findCoverlessAlbumIdsAfter($after, $limit);
-
-            if ($ids === []) {
-                break;
-            }
-
-            foreach ($ids as $albumId) {
-                $this->bus->dispatch(new ExtractAlbumCoverCommand($albumId));
-                ++$dispatched;
-            }
-
-            $io->text(sprintf('  Dispatched %d / %d', $dispatched, $total));
-            $after = $ids[array_key_last($ids)];
-        }
-
-        $io->success(sprintf('Dispatched %d cover extraction job(s).', $dispatched));
+        $io->success(sprintf(
+            'Queued %d cover extraction job(s) on the async queue. Batch job ID: %s',
+            (int) $run->result,
+            $run->jobId,
+        ));
+        $io->text('The queue workers extract the covers. Follow their progress with app:monitor:jobs.');
 
         return Command::SUCCESS;
     }

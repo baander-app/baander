@@ -35,8 +35,18 @@ final class AlbumDuplicateService implements AlbumDuplicatePortInterface
 
     public function findDuplicates(Uuid $libraryId): array
     {
-        $groups = $this->detector->findDuplicates($libraryId);
+        return $this->enrichGroups($this->detector->findDuplicates($libraryId));
+    }
 
+    /**
+     * Adds each album's data, cover and artists to the groups, as the duplicate views show them.
+     *
+     * @param list<DuplicateGroup> $groups
+     *
+     * @return list<DuplicateGroup>
+     */
+    private function enrichGroups(array $groups): array
+    {
         if ($groups === []) {
             return [];
         }
@@ -112,13 +122,13 @@ final class AlbumDuplicateService implements AlbumDuplicatePortInterface
         $allGroups = $this->detector->findDuplicates($album->getLibraryId());
 
         // Filter to only groups containing the specified album
-        return array_filter(
+        return $this->enrichGroups(array_values(array_filter(
             $allGroups,
             fn(DuplicateGroup $group) => in_array(
                 $albumId->toString(),
                 array_map(fn($id) => $id->toString(), $group->getAlbumIds()),
                 true,
             ),
-        );
+        )));
     }
 }

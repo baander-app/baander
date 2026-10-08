@@ -6,6 +6,7 @@ namespace App\Catalog\Interface\Controller;
 
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Command\BatchExtractCoversCommand;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use OpenApi\Attributes as OA;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -39,6 +40,7 @@ final class ExtractCoversController
         ],
     )]
     #[Route(methods: ['POST'])]
+    #[CliCounterpart('app:album:extract-covers')]
     public function __invoke(): JsonResponse
     {
         $count = $this->albumService->countCoverlessAlbums();

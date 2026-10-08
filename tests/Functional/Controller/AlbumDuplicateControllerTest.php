@@ -93,7 +93,7 @@ final class AlbumDuplicateControllerTest extends TestCase
 
     // --- Album-specific duplicates endpoint ---
 
-    public function testAlbumDuplicatesReturns200(): void
+    public function testALibraryMemberCanReadAnAlbumsDuplicates(): void
     {
         $user = $this->createTestUser();
         $libraryId = $this->createLibraryFixture();
@@ -107,15 +107,40 @@ final class AlbumDuplicateControllerTest extends TestCase
         $response = $this->authenticatedRequest('GET', '/api/albums/' . $album->getPublicId()->toString() . '/duplicates', $user);
 
         $data = $this->assertJsonResponse($response, 200, 'data');
-        $this->assertIsArray($data['data']);
+        // The groups' contents are covered by the next test; this one checks member access.
+        $this->assertTrue(array_is_list($data['data']));
+    }
 
-        if (!empty($data['data'])) {
-            $group = $data['data'][0];
-            $this->assertArrayHasKey('albumIds', $group);
-            $this->assertArrayHasKey('confidence', $group);
-            $this->assertArrayHasKey('albumCount', $group);
-            $this->assertContains($album->getPublicId()->toString(), $group['albumIds']);
-        }
+    public function testAlbumDuplicatesListTheGroupsWithTheAlbumsTheBannerMerges(): void
+    {
+        $user = $this->createAdminUser();
+        $libraryId = $this->createLibraryFixture();
+        $albumIds = $this->createDuplicateAlbumsFixture($libraryId);
+        // Give the second album every artist of the first, so their artists overlap enough to match.
+        $this->entityManager->getConnection()->executeStatement(
+            'INSERT INTO artist_album (id, artist_id, album_id, role)
+             SELECT gen_random_uuid(), artist_id, ?, role FROM artist_album a
+             WHERE a.album_id = ? AND NOT EXISTS (SELECT 1 FROM artist_album b WHERE b.album_id = ? AND b.artist_id = a.artist_id)',
+            [$albumIds[1]->toString(), $albumIds[0]->toString(), $albumIds[1]->toString()],
+        );
+        $viewed = $this->albumRepository->findByUuid($albumIds[0]);
+        $duplicate = $this->albumRepository->findByUuid($albumIds[1]);
+        $this->assertNotNull($viewed);
+        $this->assertNotNull($duplicate);
+
+        $response = $this->authenticatedRequest('GET', '/api/albums/' . $viewed->getPublicId()->toString() . '/duplicates', $user);
+
+        $data = $this->assertJsonResponse($response, 200, 'data')['data'];
+        $this->assertTrue(array_is_list($data));
+        $this->assertCount(1, $data);
+        $albums = array_column($data[0]['albums'], 'title', 'publicId');
+        ksort($albums);
+        $expected = [
+            $viewed->getPublicId()->toString() => 'The Great Album',
+            $duplicate->getPublicId()->toString() => 'The Great Album!',
+        ];
+        ksort($expected);
+        $this->assertSame($expected, $albums);
     }
 
     public function testAlbumDuplicatesReturns404ForInvalidPublicId(): void

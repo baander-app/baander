@@ -6,6 +6,7 @@ namespace App\Catalog\Interface\Controller;
 
 use App\Catalog\Application\Port\AlbumDuplicatePortInterface;
 use App\Catalog\Interface\Resource\DuplicateGroupResource;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -55,6 +56,7 @@ final class AlbumDuplicateController
         ],
     )]
     #[Route('/duplicates', name: 'duplicates', methods: ['GET'])]
+    #[CliCounterpart('app:album:duplicates')]
     public function listDuplicates(Request $request): JsonResponse
     {
         $libraryId = $request->query->get('libraryId');

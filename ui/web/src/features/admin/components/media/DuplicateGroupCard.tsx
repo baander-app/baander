@@ -216,14 +216,14 @@ const RadioDot = styled.div`
 
 export function DuplicateGroupCard({ group, onMergeComplete }: DuplicateGroupCardProps) {
   const [isMergeDialogOpen, setIsMergeDialogOpen] = useState(false)
-  const [targetAlbumId, setTargetAlbumId] = useState<string | null>(null)
+  const [targetPublicId, setTargetPublicId] = useState<string | null>(null)
 
   const qc = useQueryClient()
   const mergeMutation = useMutation({
-    mutationFn: ({ targetId, sourceId }: { targetId: string; sourceId: string }) =>
+    mutationFn: ({ targetPublicId, sourcePublicId }: { targetPublicId: string; sourcePublicId: string }) =>
       AXIOS_INSTANCE.post('/api/albums/merge', {
-        targetPublicId: targetId,
-        sourcePublicId: sourceId,
+        targetPublicId,
+        sourcePublicId,
       }),
     onSuccess: () => {
       toast.success('The duplicate albums have been merged.')
@@ -239,10 +239,10 @@ export function DuplicateGroupCard({ group, onMergeComplete }: DuplicateGroupCar
   })
 
   const handleMerge = () => {
-    if (!targetAlbumId) return
-    const sourceAlbum = group.albums.find(a => a.uuid !== targetAlbumId)
+    if (!targetPublicId) return
+    const sourceAlbum = group.albums.find(a => a.publicId !== targetPublicId)
     if (!sourceAlbum) return
-    mergeMutation.mutate({ targetId: targetAlbumId, sourceId: sourceAlbum.uuid })
+    mergeMutation.mutate({ targetPublicId, sourcePublicId: sourceAlbum.publicId })
   }
 
   return (
@@ -262,7 +262,7 @@ export function DuplicateGroupCard({ group, onMergeComplete }: DuplicateGroupCar
 
       <CardBody>
         {group.albums.map((album) => (
-          <AlbumRow key={album.uuid}>
+          <AlbumRow key={album.publicId}>
             <Thumbnail>
               {album.coverImage?.publicId ? (
                 <ThumbnailImg src={getCoverImageUrl(album.coverImage.publicId)} alt="" loading="lazy" />
@@ -300,10 +300,10 @@ export function DuplicateGroupCard({ group, onMergeComplete }: DuplicateGroupCar
             <TargetHint>Select target album:</TargetHint>
             {group.albums.map((album) => (
               <TargetButton
-                key={album.uuid}
+                key={album.publicId}
                 type="button"
-                $selected={targetAlbumId === album.uuid}
-                onClick={() => setTargetAlbumId(album.uuid)}
+                $selected={targetPublicId === album.publicId}
+                onClick={() => setTargetPublicId(album.publicId)}
               >
                 <Thumbnail>
                   {album.coverImage?.publicId ? (
@@ -319,8 +319,8 @@ export function DuplicateGroupCard({ group, onMergeComplete }: DuplicateGroupCar
                     {album.artists && album.artists.map(a => a.name).join(', ')}
                   </TargetAlbumMeta>
                 </TargetAlbumInfo>
-                <RadioButton $selected={targetAlbumId === album.uuid}>
-                  {targetAlbumId === album.uuid && <RadioDot />}
+                <RadioButton $selected={targetPublicId === album.publicId}>
+                  {targetPublicId === album.publicId && <RadioDot />}
                 </RadioButton>
               </TargetButton>
             ))}
@@ -336,7 +336,7 @@ export function DuplicateGroupCard({ group, onMergeComplete }: DuplicateGroupCar
             </Button>
             <Button
               onClick={handleMerge}
-              disabled={!targetAlbumId || mergeMutation.isPending}
+              disabled={!targetPublicId || mergeMutation.isPending}
             >
               {mergeMutation.isPending ? 'Merging...' : 'Merge Albums'}
             </Button>

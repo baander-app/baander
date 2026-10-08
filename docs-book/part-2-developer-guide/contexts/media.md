@@ -38,7 +38,8 @@ All endpoints are prefixed with `/api`.
 | `BlurHashGenerator` | Generates a compact BlurHash string from an image. Used by the frontend to render a low-fidelity placeholder while the full image loads. |
 | `ImageConverter` | Converts images between formats (e.g., PNG to WebP). Used during upload to normalize formats and reduce file sizes. |
 | `ImageEntity` | Doctrine ORM entity for the `images` table. |
-| `PruneMissingImagesCommand` | Console command (`app:images:prune-missing`) that removes image records whose backing files no longer exist in storage. |
+| `PruneMissingImagesCommand` | Console command (`app:image:prune-missing`) that removes image records whose backing files no longer exist in storage, or lists them with `--dry-run`. |
+| `ImageStatsCommand` | Console command (`app:image:stats`) that shows image counts and stored sizes by owner type. |
 
 ## Cross-Context Dependencies
 
