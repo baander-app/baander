@@ -276,7 +276,7 @@ Besides Baander's own apps, other clients can obtain tokens through the OAuth 2.
 Baander runs behind Nginx in Docker Compose. By default:
 
 - **Port 80/443** — Nginx handles TLS termination and proxies to the Swoole server
-- **Port 9200** — Swoole API server (should NOT be exposed to the internet in production)
+- **Port 9200** — Swoole management API. It has no authentication and can report status, reload workers and shut the server down, so it listens only on `127.0.0.1` inside the app container and no compose file publishes it. `swoole:server:status` and `swoole:server:reload` reach it from inside the container. Keep `swoole.http_server.api.host` on loopback; the bundle also defaults to `127.0.0.1` when no host is configured.
 - **Port 5432** — PostgreSQL (should NOT be exposed — Docker internal network only)
 - **Port 6379** — Redis (should NOT be exposed — Docker internal network only)
 
