@@ -80,6 +80,8 @@ Async jobs dispatched via Symfony Messenger are tracked through:
 
 - `JobIdStamp` — attached to messages to assign a unique job ID
 - `JobMonitoringMiddleware` — assigns each dispatched message its job ID (`JobIdStamp`)
+- `JobCancellationMiddleware` — runs each received job as the current job of its coroutine and marks a job that stopped at a cancellation checkpoint `cancelled`, without a retry
+- `JobCancellationCheckpointInterface` — Application port that handlers call between items; `check()` throws `JobCancelledException` once the job was cancelled
 - `JobMonitorService` — queries job status and history
 
 See the [Real-Time Patterns](real-time-patterns.md) page for SSE and WebSocket details.

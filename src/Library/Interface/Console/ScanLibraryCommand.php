@@ -12,6 +12,7 @@ use App\Library\Application\DTO\LibraryScanClaimResult;
 use App\Library\Application\DTO\LibraryScanSummary;
 use App\Library\Interface\Resource\LibraryResource;
 use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Application\JobCancelledException;
 use App\Shared\Application\Port\JobMonitorAdministrationInterface;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -29,7 +30,8 @@ use Throwable;
  *
  * The web queues scans on the Swoole task workers, which a console process cannot reach,
  * so this command claims each library and runs its scan in this process, recorded in the
- * job monitor. A scan that fails, or that SIGINT or SIGTERM interrupts, releases its claim.
+ * job monitor. A scan that fails, that is cancelled from the job monitor, or that SIGINT or
+ * SIGTERM interrupts, releases its claim.
  */
 #[AsCommand(
     name: 'app:library:scan',
@@ -165,7 +167,11 @@ final class ScanLibraryCommand extends Command implements SignalableCommandInter
         } catch (Throwable $exception) {
             $this->scanning = null;
             $this->releaseAfterFailure($io, $library);
-            $io->getErrorStyle()->error(sprintf('The scan of "%s" failed: %s', $library['slug'], $exception->getMessage()));
+            $io->getErrorStyle()->error(sprintf(
+                $exception instanceof JobCancelledException ? 'The scan of "%s" was cancelled: %s' : 'The scan of "%s" failed: %s',
+                $library['slug'],
+                $exception->getMessage(),
+            ));
 
             return false;
         }

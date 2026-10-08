@@ -83,10 +83,12 @@ final class JobMonitorService
     /**
      * Finishes the given attempt; a stale attempt leaves a newer one untouched. Only a running
      * attempt completes, so a job cancelled at a checkpoint stays cancelled.
+     *
+     * @return bool whether the attempt was running and is now finished
      */
-    public function markFinished(string $jobId, int $attempt): void
+    public function markFinished(string $jobId, int $attempt): bool
     {
-        $this->completeAttempt($jobId, $attempt, JobStatus::Finished, null);
+        return $this->completeAttempt($jobId, $attempt, JobStatus::Finished, null);
     }
 
     /** Fails the given attempt; a stale or no longer running attempt leaves the row untouched. */
@@ -611,14 +613,15 @@ final class JobMonitorService
     }
 
     /**
-     * Records the outcome of one attempt. The finish time is never before the attempt's
-     * start, even when the clock went back in between; chk_job_monitors_finished_at
-     * enforces that.
+     * Records the outcome of one attempt and returns whether the attempt was still running.
+     * The finish time is never before the attempt's start, even when the clock went back in
+     * between; chk_job_monitors_finished_at enforces that.
      */
-    private function completeAttempt(string $jobId, int $attempt, JobStatus $status, ?\Throwable $exception): void
+    private function completeAttempt(string $jobId, int $attempt, JobStatus $status, ?\Throwable $exception): bool
     {
         $now = $this->now();
-        $this->entityManager->getConnection()->executeStatement(
+
+        return $this->entityManager->getConnection()->executeStatement(
             <<<'SQL'
                 UPDATE job_monitors
                 SET status = :status,
@@ -646,7 +649,7 @@ final class JobMonitorService
                 'exception' => $exception === null ? ParameterType::NULL : ParameterType::STRING,
                 'attempt' => ParameterType::INTEGER,
             ],
-        );
+        ) === 1;
     }
 
     /**

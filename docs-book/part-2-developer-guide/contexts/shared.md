@@ -67,12 +67,14 @@ Use `App\Shared\Infrastructure\Swoole\Async::sleep()` for all sleeping. It auto-
 
 ## Job Monitoring
 
-Async jobs dispatched via Symfony Messenger are tracked through three components:
+Async jobs dispatched via Symfony Messenger are tracked, and can be cancelled, through these components:
 
 | Component | Purpose |
 |-----------|---------|
 | `JobIdStamp` | Middleware stamp that assigns a unique job ID to dispatched messages |
 | `JobMonitoringMiddleware` | Assigns each dispatched message its job ID (`JobIdStamp`) |
+| `JobCancellationMiddleware` | Runs each received job as the current job of its coroutine; marks a job that stopped at a cancellation checkpoint `cancelled` and acknowledges it without a retry |
+| `JobCancellationCheckpointInterface` | Application port that handlers call between items; `check()` throws `JobCancelledException` once the job was cancelled |
 | `JobMonitorService` | Queries job status and history |
 
 See the [CQRS and Messaging](../cqrs-and-messaging.md) page for dispatching patterns.

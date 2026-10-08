@@ -19,7 +19,9 @@ use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Library\Infrastructure\Scanner\MediaFile;
+use App\Shared\Application\JobCancelledException;
 use App\Shared\Domain\ValueObject\FilesystemType;
+use App\Tests\Fixtures\Messaging\CancelAtCheckpoint;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -38,6 +40,7 @@ final class ScanLibraryHandlerTest extends TestCase
     {
         $this->directory = sys_get_temp_dir() . '/baander-scan-handler-' . bin2hex(random_bytes(8));
         (new Filesystem())->dumpFile($this->directory . '/Fixture Movie/clip.mp4', 'fixture video bytes');
+        (new Filesystem())->dumpFile($this->directory . '/Second Movie/clip.mp4', 'more fixture video bytes');
         $this->library = Library::create('Movies', new LibrarySlug('movies'), new LibraryPath($this->directory), LibraryType::Movie, FilesystemType::Local);
     }
 
@@ -52,9 +55,27 @@ final class ScanLibraryHandlerTest extends TestCase
 
         self::assertSame($this->library->getId()->toString(), $result->libraryId);
         self::assertSame('movies', $result->slug);
-        self::assertSame(1, $result->filesDiscovered);
-        self::assertSame(1, $result->directoriesQueued);
-        self::assertSame(['saved scanning', 'published ' . $this->directory . '/Fixture Movie', 'saved completed', 'event completed'], $this->timeline);
+        self::assertSame(2, $result->filesDiscovered);
+        self::assertSame(2, $result->directoriesQueued);
+        self::assertSame([
+            'saved scanning',
+            'published ' . $this->directory . '/Fixture Movie',
+            'published ' . $this->directory . '/Second Movie',
+            'saved completed',
+            'event completed',
+        ], $this->timeline);
+    }
+
+    public function testACancelledScanStopsBeforeItsNextDirectoryAndEndsItsClaim(): void
+    {
+        try {
+            ($this->handler(publishFails: false, cancellation: new CancelAtCheckpoint(passes: 1)))(new ScanLibraryCommand(new LibrarySlug('movies')));
+            self::fail('The cancellation must reach the job runner.');
+        } catch (JobCancelledException) {
+        }
+
+        // The scan status leaves `scanning`, which ends the claim; the published directory stays queued.
+        self::assertSame(['saved scanning', 'published ' . $this->directory . '/Fixture Movie', 'saved failed'], $this->timeline);
     }
 
     public function testFailedPublicationMarksTheScanFailedWithoutCompletionEvent(): void
@@ -69,7 +90,7 @@ final class ScanLibraryHandlerTest extends TestCase
         self::assertSame(['saved scanning', 'saved failed'], $this->timeline);
     }
 
-    private function handler(bool $publishFails): ScanLibraryHandler
+    private function handler(bool $publishFails, CancelAtCheckpoint $cancellation = new CancelAtCheckpoint()): ScanLibraryHandler
     {
         $libraries = $this->createStub(LibraryRepositoryInterface::class);
         $libraries->method('findBySlug')->willReturn($this->library);
@@ -93,11 +114,12 @@ final class ScanLibraryHandlerTest extends TestCase
 
             return $event;
         });
-        $path = $this->directory . '/Fixture Movie/clip.mp4';
         $directoryScanner = $this->createStub(DirectoryScannerPortInterface::class);
-        $directoryScanner->method('scan')->willReturn([
-            new MediaFile($path, 'Fixture Movie/clip.mp4', 'mp4', (int) filesize($path), (int) filemtime($path)),
-        ]);
+        $directoryScanner->method('scan')->willReturn(array_map(function (string $relativePath): MediaFile {
+            $path = $this->directory . '/' . $relativePath;
+
+            return new MediaFile($path, $relativePath, 'mp4', (int) filesize($path), (int) filemtime($path));
+        }, ['Fixture Movie/clip.mp4', 'Second Movie/clip.mp4']));
         $fileIndex = $this->createStub(LibraryFileIndexRepositoryInterface::class);
         $logger = new NullLogger();
 
@@ -105,8 +127,8 @@ final class ScanLibraryHandlerTest extends TestCase
             $libraries,
             new LibraryDiscovery(
                 $libraries,
-                new MusicScanner($directoryScanner, $fileIndex, $logger),
-                new MovieScanner($directoryScanner, $fileIndex, $logger),
+                new MusicScanner($directoryScanner, $fileIndex, $logger, $cancellation),
+                new MovieScanner($directoryScanner, $fileIndex, $logger, $cancellation),
                 $events,
                 $logger,
             ),

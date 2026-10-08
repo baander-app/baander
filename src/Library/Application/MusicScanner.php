@@ -9,6 +9,9 @@ use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\Repository\LibraryFileIndexRepositoryInterface;
 use App\Library\Infrastructure\Scanner\MediaFile;
+use App\Shared\Application\JobCancelledException;
+use App\Shared\Application\Port\JobCancellationCheckpointInterface;
+use Closure;
 use Psr\Log\LoggerInterface;
 
 final class MusicScanner
@@ -17,12 +20,22 @@ final class MusicScanner
         private readonly DirectoryScannerPortInterface $directoryScanner,
         private readonly LibraryFileIndexRepositoryInterface $fileIndexRepository,
         private readonly LoggerInterface $logger,
+        private readonly JobCancellationCheckpointInterface $cancellation,
     ) {
     }
 
-    public function scan(Library $library, bool $rescan = false): ScanResult
+    /**
+     * Hashes the library's audio files one directory (album) at a time. A directory with new
+     * or changed files goes to $publishDirectory first and into the file index after, so a
+     * directory whose publication failed is published again by the next scan. A cancelled
+     * scan stops before its next directory and leaves the index of the remaining ones as it was.
+     *
+     * @param (Closure(string, array<DiscoveredFile>): void)|null $publishDirectory
+     *
+     * @throws JobCancelledException when the job running the scan was cancelled
+     */
+    public function scan(Library $library, bool $rescan = false, ?Closure $publishDirectory = null): ScanResult
     {
-        $filesDiscovered = 0;
         $filesProcessed = 0;
         $filesSkipped = 0;
 
@@ -44,51 +57,67 @@ final class MusicScanner
             : $this->fileIndexRepository->findIndexPathMapByLibrary($library->getId());
 
         // Group files by parent directory (album grouping)
+        $filesByDirectory = [];
+        foreach ($audioFiles as $file) {
+            $filesByDirectory[dirname($file->getAbsolutePath())][] = $file;
+        }
+
         $directories = [];
         $seenPaths = [];
-        foreach ($audioFiles as $file) {
-            $dir = dirname($file->getAbsolutePath());
-            $hash = hash_file('xxh3', $file->getAbsolutePath());
-            if ($hash === false) {
-                $this->logger->warning('Failed to hash file', ['path' => $file->getAbsolutePath()]);
-                $filesSkipped++;
+        foreach ($filesByDirectory as $dir => $files) {
+            // Hashing reads every file, so a cancelled job stops before its next directory.
+            $this->cancellation->check();
+
+            $discoveredFiles = [];
+            foreach ($files as $file) {
+                $hash = hash_file('xxh3', $file->getAbsolutePath());
+                if ($hash === false) {
+                    $this->logger->warning('Failed to hash file', ['path' => $file->getAbsolutePath()]);
+                    $filesSkipped++;
+                    continue;
+                }
+                $seenPaths[$file->getAbsolutePath()] = true;
+
+                // Check if file is new or changed
+                $existingHash = $indexMap[$file->getAbsolutePath()] ?? null;
+                if ($existingHash !== null && $existingHash === $hash && !$rescan) {
+                    // Unchanged file — skip
+                    $filesSkipped++;
+                    continue;
+                }
+
+                $discoveredFiles[] = new DiscoveredFile(
+                    absolutePath: $file->getAbsolutePath(),
+                    relativePath: $file->getRelativePath(),
+                    extension: $file->getExtension(),
+                    size: $file->getSize(),
+                    modifiedAt: $file->getModifiedAt(),
+                    hash: $hash,
+                );
+            }
+
+            if ($discoveredFiles === []) {
                 continue;
             }
-            $seenPaths[$file->getAbsolutePath()] = true;
 
-            // Check if file is new or changed
-            $existingHash = $indexMap[$file->getAbsolutePath()] ?? null;
-            if ($existingHash !== null && $existingHash === $hash && !$rescan) {
-                // Unchanged file — skip
-                $filesSkipped++;
-                continue;
+            if ($publishDirectory !== null) {
+                $publishDirectory((string) $dir, $discoveredFiles);
             }
-
-            $discoveredFile = new DiscoveredFile(
-                absolutePath: $file->getAbsolutePath(),
-                relativePath: $file->getRelativePath(),
-                extension: $file->getExtension(),
-                size: $file->getSize(),
-                modifiedAt: $file->getModifiedAt(),
-                hash: $hash,
-            );
-
-            if (!isset($directories[$dir])) {
-                $directories[$dir] = [];
-            }
-            $directories[$dir][] = $discoveredFile;
+            $directories[$dir] = $discoveredFiles;
 
             // Upsert file index
-            $this->fileIndexRepository->upsert(
-                $library->getId(),
-                $file->getAbsolutePath(),
-                $hash,
-                $file->getSize(),
-                $file->getExtension(),
-                $file->getModifiedAt(),
-            );
+            foreach ($discoveredFiles as $discoveredFile) {
+                $this->fileIndexRepository->upsert(
+                    $library->getId(),
+                    $discoveredFile->absolutePath,
+                    $discoveredFile->hash,
+                    $discoveredFile->size,
+                    $discoveredFile->extension,
+                    $discoveredFile->modifiedAt,
+                );
+            }
 
-            $filesProcessed++;
+            $filesProcessed += count($discoveredFiles);
         }
 
         // Remove stale entries (files no longer on disk)

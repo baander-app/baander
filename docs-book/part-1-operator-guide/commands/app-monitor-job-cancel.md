@@ -26,6 +26,9 @@ These jobs have checkpoints:
 | `SyncMetadataCommand` | [app:metadata:sync](app-metadata-sync.md) with `--source genres` | Its next album |
 | `BulkFetchLyricsCommand` | [app:lyrics:fetch](app-lyrics-fetch.md) | Its next song |
 | `BatchExtractCoversCommand` | The admin cover extraction or [app:album:extract-covers](app-album-extract-covers.md) | Its next page of 500 albums |
+| `ScanLibraryCommand` | A library scan from the admin panel, one job per library with **Scan all**, or [app:library:scan](app-library-scan.md) | Its next directory (an album or a movie folder) |
+
+A cancelled library scan marks the library's scan `failed`, which ends its claim, so the next scan can start. The directories it queued for ingestion before it stopped are still ingested; the next scan picks up the rest.
 
 Other jobs have no checkpoints and run to the end; the flag does not change them. Recommendation jobs have their own cancel command, [app:recommendation:job:cancel](app-recommendation-job-cancel.md).
 
