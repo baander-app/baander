@@ -1305,7 +1305,7 @@
                     "Admin / Users"
                 ],
                 "summary": "Update a user",
-                "description": "A new email address starts unverified and is sent a verification link.",
+                "description": "A new email address starts unverified and is sent a verification link. The CLI counterparts are app:user:rename and app:user:change-email.",
                 "operationId": "patch_admin_users_update",
                 "parameters": [
                     {
@@ -1362,6 +1362,16 @@
                                 }
                             }
                         }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -1415,6 +1425,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
                                 }
                             }
                         }
@@ -6046,8 +6066,18 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "Another genre has the slug",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "422": {
-                        "description": "Validation error",
+                        "description": "Invalid name, slug or MusicBrainz ID, or a parent that is not an existing genre",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -6235,8 +6265,18 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "Another genre has the new slug",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "422": {
-                        "description": "Validation error",
+                        "description": "Invalid name, slug or MusicBrainz ID, a parent that is not an existing genre, or a parent that would create a circular reference",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -6331,7 +6371,7 @@
                         "description": "Song removed from genre"
                     },
                     "404": {
-                        "description": "Genre not found",
+                        "description": "Genre or song not found",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -6426,7 +6466,7 @@
                         "description": "Album removed from genre"
                     },
                     "404": {
-                        "description": "Genre not found",
+                        "description": "Genre or album not found",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -7361,7 +7401,7 @@
                             }
                         }
                     },
-                    "400": {
+                    "422": {
                         "description": "Invalid type filter",
                         "content": {
                             "application/json": {
@@ -7438,16 +7478,6 @@
                             }
                         }
                     },
-                    "400": {
-                        "description": "Bad request",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ApiError"
-                                }
-                            }
-                        }
-                    },
                     "403": {
                         "description": "Administrator role required",
                         "content": {
@@ -7492,11 +7522,10 @@
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Library UUID",
+                        "description": "Library UUID or slug",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -7542,17 +7571,16 @@
                 "tags": [
                     "Library"
                 ],
-                "summary": "Delete a library",
+                "summary": "Delete a library (admin)",
                 "operationId": "delete_library_delete",
                 "parameters": [
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Library UUID",
+                        "description": "Library UUID or slug",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -7583,6 +7611,16 @@
                             }
                         }
                     },
+                    "403": {
+                        "description": "Administrator role required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Not found",
                         "content": {
@@ -7599,17 +7637,16 @@
                 "tags": [
                     "Library"
                 ],
-                "summary": "Update a library",
+                "summary": "Rename or reorder a library (admin)",
                 "operationId": "patch_library_update",
                 "parameters": [
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Library UUID",
+                        "description": "Library UUID or slug",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -7659,8 +7696,8 @@
                             }
                         }
                     },
-                    "400": {
-                        "description": "Bad request",
+                    "403": {
+                        "description": "Administrator role required",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -7697,18 +7734,17 @@
                 "tags": [
                     "Library"
                 ],
-                "summary": "Trigger a library scan",
-                "description": "Dispatches an asynchronous scan job. The scan runs in the background and progress is reported via SSE.",
+                "summary": "Trigger a library scan (admin)",
+                "description": "Claims the library for a scan and dispatches an asynchronous scan job. The scan runs in the background and progress is reported via SSE. A library that is already scanning answers 409.",
                 "operationId": "post_library_scan",
                 "parameters": [
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Library UUID",
+                        "description": "Library UUID or slug",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -7730,6 +7766,16 @@
                     },
                     "401": {
                         "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Administrator role required",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -7772,11 +7818,10 @@
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Library UUID",
+                        "description": "Library UUID or slug",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -7928,6 +7973,16 @@
                                 }
                             }
                         }
+                    },
+                    "422": {
+                        "description": "Path is missing",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -7937,7 +7992,7 @@
                 "tags": [
                     "Library"
                 ],
-                "summary": "Trigger scan for all libraries",
+                "summary": "Trigger scan for all libraries (admin)",
                 "description": "Dispatches an asynchronous scan job for every library. Skips libraries already scanning.",
                 "operationId": "post_library_scan_all",
                 "responses": {
@@ -7968,6 +8023,16 @@
                     },
                     "401": {
                         "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Administrator role required",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -8037,16 +8102,19 @@
                 "tags": [
                     "Admin"
                 ],
-                "summary": "Trigger bulk lyrics fetch (SUPER_ADMIN only)",
+                "summary": "Queue a lyrics fetch for every song without lyrics (SUPER_ADMIN only)",
                 "operationId": "post_admin_lyrics_bulk_fetch",
                 "requestBody": {
+                    "required": false,
                     "content": {
                         "application/json": {
                             "schema": {
                                 "properties": {
                                     "limit": {
-                                        "description": "Max number of jobs to enqueue",
-                                        "type": "integer"
+                                        "description": "Most songs to queue; absent or null queues every song without lyrics",
+                                        "type": "integer",
+                                        "nullable": true,
+                                        "minimum": 1
                                     }
                                 },
                                 "type": "object"
@@ -8064,6 +8132,7 @@
                                         "data": {
                                             "properties": {
                                                 "jobsEnqueued": {
+                                                    "description": "Songs queued for fetching",
                                                     "type": "integer"
                                                 }
                                             },
@@ -8071,6 +8140,16 @@
                                         }
                                     },
                                     "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Limit is not an integer of at least 1",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -8940,9 +9019,12 @@
                             "schema": {
                                 "properties": {
                                     "source": {
-                                        "description": "Sync source: genres or null for full library sync",
+                                        "description": "genres for the genre sync only; null or absent for one sync per library",
                                         "type": "string",
-                                        "nullable": true
+                                        "nullable": true,
+                                        "enum": [
+                                            "genres"
+                                        ]
                                     }
                                 },
                                 "type": "object"
@@ -8960,6 +9042,7 @@
                                         "data": {
                                             "properties": {
                                                 "jobsDispatched": {
+                                                    "description": "Jobs queued: one per library, or one per album and song for the genre sync",
                                                     "type": "integer"
                                                 }
                                             },
@@ -8967,6 +9050,16 @@
                                         }
                                     },
                                     "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Unknown source",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -11778,11 +11871,11 @@
                 "tags": [
                     "Admin"
                 ],
-                "summary": "Get stream governor status",
+                "summary": "Get the stream governor status of every web server worker",
                 "operationId": "get_admin_qol_status",
                 "responses": {
                     "200": {
-                        "description": "Governor status"
+                        "description": "One status row per worker, the total of active streams, and the workers that did not answer or failed"
                     },
                     "403": {
                         "description": "Forbidden",
@@ -11802,11 +11895,11 @@
                 "tags": [
                     "Admin"
                 ],
-                "summary": "List active streams with budget allocations",
+                "summary": "List the active streams of every web server worker with their budget allocations",
                 "operationId": "get_admin_qol_streams",
                 "responses": {
                     "200": {
-                        "description": "Active streams"
+                        "description": "Active streams per worker, their total, and the workers that did not answer or failed"
                     },
                     "403": {
                         "description": "Forbidden",
@@ -11826,7 +11919,7 @@
                 "tags": [
                     "Admin"
                 ],
-                "summary": "Update algorithm profile",
+                "summary": "Set the algorithm profile in every web server worker",
                 "operationId": "patch_admin_qol_profile",
                 "requestBody": {
                     "content": {
@@ -11849,10 +11942,30 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Profile updated"
+                        "description": "Profile set and saved; one status row per worker"
                     },
-                    "400": {
-                        "description": "Invalid profile",
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Missing or unknown profile; no worker was changed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The change did not reach every worker; `details` holds the per-worker report with `missing_workers` and `worker_errors`",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -11869,14 +11982,24 @@
                 "tags": [
                     "Admin"
                 ],
-                "summary": "Reset learning data and return to Learning state",
+                "summary": "Reset learning data in every web server worker and return each to the Learning state",
                 "operationId": "post_admin_qol_reset",
                 "responses": {
                     "200": {
-                        "description": "Learning reset"
+                        "description": "Learning reset and saved; one status row per worker"
                     },
                     "403": {
                         "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The reset did not reach every worker; `details` holds the per-worker report with `missing_workers` and `worker_errors`",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -12911,7 +13034,7 @@
                     "Admin"
                 ],
                 "summary": "Trigger recommendation generation",
-                "description": "Starts a new recommendation generation job. Returns immediately with job ID for async execution, or results for synchronous execution.",
+                "description": "Creates a recommendation job. In the web server the job runs on the CPU process pool and the response returns at once with the pending job; without the pool the job runs during the request and the response carries its counts.",
                 "operationId": "post_admin_recommendations_generate",
                 "responses": {
                     "202": {
@@ -12943,8 +13066,7 @@
                                                     "type": "string",
                                                     "example": "async",
                                                     "enum": [
-                                                        "async",
-                                                        "sync"
+                                                        "async"
                                                     ]
                                                 }
                                             },
@@ -12957,13 +13079,33 @@
                         }
                     },
                     "200": {
-                        "description": "Generation completed (sync)",
+                        "description": "Generation ran during the request (sync)",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "properties": {
                                         "data": {
                                             "properties": {
+                                                "job_id": {
+                                                    "type": "string"
+                                                },
+                                                "public_id": {
+                                                    "type": "string"
+                                                },
+                                                "mode": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "full",
+                                                        "incremental"
+                                                    ]
+                                                },
+                                                "status": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "completed",
+                                                        "cancelled"
+                                                    ]
+                                                },
                                                 "counts": {
                                                     "type": "object",
                                                     "example": {
@@ -12987,7 +13129,7 @@
                             }
                         }
                     },
-                    "400": {
+                    "422": {
                         "description": "Invalid mode",
                         "content": {
                             "application/json": {
@@ -13036,61 +13178,7 @@
                                 "schema": {
                                     "properties": {
                                         "data": {
-                                            "properties": {
-                                                "id": {
-                                                    "type": "string"
-                                                },
-                                                "public_id": {
-                                                    "type": "string"
-                                                },
-                                                "status": {
-                                                    "type": "string",
-                                                    "enum": [
-                                                        "pending",
-                                                        "in_progress",
-                                                        "completed",
-                                                        "failed",
-                                                        "cancelled"
-                                                    ]
-                                                },
-                                                "is_full": {
-                                                    "type": "boolean"
-                                                },
-                                                "total_songs": {
-                                                    "type": "integer"
-                                                },
-                                                "completed_songs": {
-                                                    "type": "integer"
-                                                },
-                                                "current_strategy": {
-                                                    "type": "string"
-                                                },
-                                                "strategy_counts": {
-                                                    "type": "object"
-                                                },
-                                                "progress_percentage": {
-                                                    "type": "number"
-                                                },
-                                                "created_at": {
-                                                    "type": "string",
-                                                    "format": "date-time"
-                                                },
-                                                "started_at": {
-                                                    "type": "string",
-                                                    "format": "date-time",
-                                                    "nullable": true
-                                                },
-                                                "completed_at": {
-                                                    "type": "string",
-                                                    "format": "date-time",
-                                                    "nullable": true
-                                                },
-                                                "fail_reason": {
-                                                    "type": "string",
-                                                    "nullable": true
-                                                }
-                                            },
-                                            "type": "object"
+                                            "$ref": "#/components/schemas/RecommendationJobResource"
                                         }
                                     },
                                     "type": "object"
@@ -13125,6 +13213,7 @@
                     "Admin"
                 ],
                 "summary": "Cancel a recommendation job",
+                "description": "Cancelling a cancelled job succeeds without change.",
                 "operationId": "delete_admin_recommendations_job_cancel",
                 "parameters": [
                     {
@@ -13143,6 +13232,16 @@
                     },
                     "404": {
                         "description": "Job not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Job already completed or failed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -13170,7 +13269,7 @@
                     "Admin"
                 ],
                 "summary": "Requeue a failed or cancelled recommendation job",
-                "description": "Creates a new job with the same parameters as the original",
+                "description": "Creates a new job with the same parameters as the original and starts it like a generated job.",
                 "operationId": "post_admin_recommendations_job_requeue",
                 "parameters": [
                     {
@@ -13185,7 +13284,7 @@
                 ],
                 "responses": {
                     "201": {
-                        "description": "Job requeued",
+                        "description": "Job requeued and started",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -13208,6 +13307,17 @@
                                                 "status": {
                                                     "type": "string",
                                                     "example": "pending"
+                                                },
+                                                "execution": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "async",
+                                                        "sync"
+                                                    ]
+                                                },
+                                                "counts": {
+                                                    "description": "Only when the job ran during the request",
+                                                    "type": "object"
                                                 }
                                             },
                                             "type": "object"
@@ -13228,8 +13338,8 @@
                             }
                         }
                     },
-                    "400": {
-                        "description": "Job cannot be requeued (not failed/cancelled)",
+                    "409": {
+                        "description": "Job cannot be requeued (not failed or cancelled)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -13262,7 +13372,7 @@
                     {
                         "name": "limit",
                         "in": "query",
-                        "description": "Max jobs to return",
+                        "description": "Max jobs to return, 1-100",
                         "schema": {
                             "type": "integer",
                             "default": 20
@@ -13286,7 +13396,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "List of jobs",
+                        "description": "List of jobs, newest first",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -13294,25 +13404,21 @@
                                         "data": {
                                             "type": "array",
                                             "items": {
-                                                "properties": {
-                                                    "id": {
-                                                        "type": "string"
-                                                    },
-                                                    "public_id": {
-                                                        "type": "string"
-                                                    },
-                                                    "status": {
-                                                        "type": "string"
-                                                    },
-                                                    "created_at": {
-                                                        "type": "string"
-                                                    }
-                                                },
-                                                "type": "object"
+                                                "$ref": "#/components/schemas/RecommendationJobResource"
                                             }
                                         }
                                     },
                                     "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Unknown status",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -13820,6 +13926,16 @@
                                 }
                             }
                         }
+                    },
+                    "422": {
+                        "description": "Invalid job, such as an unschedulable command or parameters outside its schema",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -13882,7 +13998,8 @@
                         "in": "path",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
                         }
                     }
                 ],
@@ -13908,6 +14025,16 @@
                                         }
                                     },
                                     "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid job, such as an unschedulable command or parameters outside its schema",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -13946,7 +14073,8 @@
                         "in": "path",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
                         }
                     }
                 ],
@@ -13990,13 +14118,14 @@
                         "in": "path",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Job paused",
+                        "description": "Job paused, or already paused",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -14011,7 +14140,7 @@
                         }
                     },
                     "409": {
-                        "description": "Job changed concurrently; reload before retrying",
+                        "description": "Job is disabled, or changed concurrently; reload before retrying",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -14046,13 +14175,14 @@
                         "in": "path",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Job resumed",
+                        "description": "Job resumed, or already active",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -14067,7 +14197,7 @@
                         }
                     },
                     "409": {
-                        "description": "Job changed concurrently; reload before retrying",
+                        "description": "Job is disabled, or changed concurrently; reload before retrying",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -14197,13 +14327,14 @@
                         "in": "path",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Job enabled",
+                        "description": "Job enabled, or already enabled",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -14253,13 +14384,14 @@
                         "in": "path",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
                         }
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Job disabled",
+                        "description": "Job disabled, or already disabled",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -15082,14 +15214,44 @@
                 "tags": [
                     "Debug"
                 ],
-                "summary": "Swoole coroutine and channel statistics",
+                "summary": "Swoole coroutine and channel statistics of every HTTP worker",
                 "operationId": "get_debug_coroutines",
                 "responses": {
                     "200": {
-                        "description": "Coroutine and channel stats",
+                        "description": "Coroutine and channel stats per worker",
                         "content": {
                             "application/json": {
                                 "schema": {
+                                    "properties": {
+                                        "workers": {
+                                            "description": "One entry per HTTP worker that answered: worker_id, coroutines, active_cids, channels",
+                                            "type": "array",
+                                            "items": {
+                                                "additionalProperties": true
+                                            }
+                                        },
+                                        "missing_workers": {
+                                            "description": "Workers that did not answer in time",
+                                            "type": "array",
+                                            "items": {
+                                                "type": "integer"
+                                            }
+                                        },
+                                        "worker_errors": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "worker_id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "error": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
                                     "type": "object"
                                 }
                             }
@@ -15689,6 +15851,16 @@
                                 }
                             }
                         }
+                    },
+                    "422": {
+                        "description": "Unknown status",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -15881,11 +16053,11 @@
                         }
                     },
                     "422": {
-                        "description": "Invalid input",
+                        "description": "Days is less than 1",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/ValidationError"
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -15944,12 +16116,12 @@
                             }
                         }
                     },
-                    "422": {
-                        "description": "Job cannot be retried",
+                    "409": {
+                        "description": "Job cannot be retried: it has not failed, was already retried, or has no readable stored message",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/ValidationError"
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -16008,12 +16180,12 @@
                             }
                         }
                     },
-                    "422": {
-                        "description": "Job cannot be cancelled",
+                    "409": {
+                        "description": "Job cannot be cancelled because it has finished or failed",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/ValidationError"
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -16249,7 +16421,7 @@
                 "tags": [
                     "System"
                 ],
-                "summary": "Internal server diagnostics with coroutine and channel stats",
+                "summary": "Per-worker server diagnostics with the shared Redis and SSE figures",
                 "operationId": "get_debug_stats",
                 "responses": {
                     "200": {
@@ -16259,6 +16431,47 @@
                                 "schema": {
                                     "properties": {
                                         "data": {
+                                            "properties": {
+                                                "workers": {
+                                                    "description": "One entry per HTTP worker that answered: worker_id, memory, process, swoole, coroutines, pools",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "additionalProperties": true
+                                                    }
+                                                },
+                                                "missing_workers": {
+                                                    "description": "Workers that did not answer in time",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "integer"
+                                                    }
+                                                },
+                                                "worker_errors": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "worker_id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "error": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "redis": {
+                                                    "additionalProperties": true
+                                                },
+                                                "sse": {
+                                                    "properties": {
+                                                        "active_connections": {
+                                                            "type": "integer"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
                                             "type": "object"
                                         }
                                     },
@@ -16275,8 +16488,22 @@
                 "tags": [
                     "Debug"
                 ],
-                "summary": "Recent OpenTelemetry spans",
+                "summary": "Recent server spans, newest first",
                 "operationId": "get_debug_spans",
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "description": "Number of spans to return, at most 500",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 100,
+                            "maximum": 500,
+                            "minimum": 0
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "List of recent spans",
@@ -16297,7 +16524,7 @@
                 "tags": [
                     "Debug"
                 ],
-                "summary": "Clear in-memory spans",
+                "summary": "Clear the span buffer of every worker",
                 "operationId": "delete_debug_spans_clear",
                 "responses": {
                     "200": {
@@ -16536,7 +16763,7 @@
                     "System"
                 ],
                 "summary": "Get transport status",
-                "description": "Returns queue depths, consumer name, and consumer running status for the messenger transports.",
+                "description": "Returns queue depths, consumer name, and consumer running status for the messenger transports. CLI counterpart: app:monitor:transport.",
                 "operationId": "get_monitor_transport_status",
                 "responses": {
                     "200": {
@@ -16596,7 +16823,7 @@
                     "System"
                 ],
                 "summary": "List failed messages",
-                "description": "Lists the messages held by the failure transport, newest first. CLI counterpart: messenger:failed:show.",
+                "description": "Lists the messages held by the failure transport, newest first, including messages waiting out a retry delay. CLI counterpart: app:failed-message:list.",
                 "operationId": "get_monitor_transport_failed_list",
                 "parameters": [
                     {
@@ -16806,7 +17033,7 @@
                     "System"
                 ],
                 "summary": "Flush all failed messages",
-                "description": "Removes all messages from the failed transport. Requires ?confirm=true query parameter. CLI counterpart: messenger:failed:remove --all --force.",
+                "description": "Removes all messages from the failed transport, including messages waiting out a retry delay. Requires ?confirm=true query parameter. CLI counterpart: app:failed-message:flush.",
                 "operationId": "post_monitor_transport_failed_flush",
                 "parameters": [
                     {
@@ -20293,8 +20520,7 @@
                         "example": "Alice",
                         "nullable": true,
                         "default": null,
-                        "maxLength": 255,
-                        "minLength": 1
+                        "maxLength": 255
                     }
                 },
                 "type": "object"
@@ -23850,6 +24076,88 @@
                         "description": "Creation timestamp",
                         "type": "string",
                         "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "RecommendationJobResource": {
+                "required": [
+                    "id",
+                    "public_id",
+                    "status",
+                    "is_full",
+                    "total_songs",
+                    "completed_songs",
+                    "current_strategy",
+                    "strategy_counts",
+                    "progress_percentage",
+                    "created_at",
+                    "metadata"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "public_id": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "pending",
+                            "in_progress",
+                            "completed",
+                            "failed",
+                            "cancelled"
+                        ]
+                    },
+                    "is_full": {
+                        "type": "boolean"
+                    },
+                    "total_songs": {
+                        "type": "integer"
+                    },
+                    "completed_songs": {
+                        "type": "integer"
+                    },
+                    "current_strategy": {
+                        "type": "string"
+                    },
+                    "strategy_counts": {
+                        "description": "Recommendations saved per strategy",
+                        "type": "object",
+                        "additionalProperties": true
+                    },
+                    "progress_percentage": {
+                        "type": "number"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "started_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "completed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "fail_reason": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "metadata": {
+                        "type": "object",
+                        "additionalProperties": true
+                    },
+                    "original_job_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
                     }
                 },
                 "type": "object"
