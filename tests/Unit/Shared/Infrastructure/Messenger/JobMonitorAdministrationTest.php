@@ -30,6 +30,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\DependencyInjection\Container;
 use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Handler\HandlerDescriptor;
 use Symfony\Component\Messenger\Handler\HandlersLocator;
 use Symfony\Component\Messenger\MessageBus;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -284,6 +285,22 @@ final class JobMonitorAdministrationTest extends TestCase
         self::assertSame([], $transport->getSent());
     }
 
+    public function testAnInlineRunReachesAHandlerBoundToTheTransportTheMessageIsRoutedTo(): void
+    {
+        $handled = 0;
+        $handler = static function (ExtractAlbumCoverCommand $command) use (&$handled): void {
+            ++$handled;
+        };
+        $bus = new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
+            ExtractAlbumCoverCommand::class => [new HandlerDescriptor($handler, ['from_transport' => 'async'])],
+        ]))]);
+
+        $this->administration(null, $bus, expectFlush: false, routing: [ExtractAlbumCoverCommand::class => ['async']])
+            ->runInline(new ExtractAlbumCoverCommand(Uuid::generate()));
+
+        self::assertSame(1, $handled);
+    }
+
     private function failedJob(?string $queue): JobMonitorEntity
     {
         $job = new JobMonitorEntity('original-job', queue: $queue);
@@ -295,7 +312,8 @@ final class JobMonitorAdministrationTest extends TestCase
         return $job;
     }
 
-    private function administration(?JobMonitorEntity $job, MessageBusInterface $bus, bool $expectFlush = true): JobMonitorAdministration
+    /** @param array<class-string, list<string>> $routing message class => transport names */
+    private function administration(?JobMonitorEntity $job, MessageBusInterface $bus, bool $expectFlush = true, array $routing = []): JobMonitorAdministration
     {
         $repository = $this->createStub(EntityRepository::class);
         $repository->method('findOneBy')->willReturn($job);
@@ -323,7 +341,19 @@ final class JobMonitorAdministrationTest extends TestCase
             new JobMessageSerializer(MessageCodecFactory::create()),
             $this->redis(),
             new NullLogger(),
+            new SendersLocator($routing, $this->transports($routing)),
         );
+    }
+
+    /** @param array<class-string, list<string>> $routing */
+    private function transports(array $routing): Container
+    {
+        $container = new Container();
+        foreach (array_merge([], ...array_values($routing)) as $name) {
+            $container->set($name, new InMemoryTransport());
+        }
+
+        return $container;
     }
 
     private function redis(): RedisClientFactory
