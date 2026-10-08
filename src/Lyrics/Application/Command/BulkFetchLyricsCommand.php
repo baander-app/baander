@@ -14,9 +14,12 @@ final readonly class BulkFetchLyricsCommand implements SchedulableCommandInterfa
 {
     use SchedulerParameterSchema;
 
+    /** Pause between lyrics fetches, which keeps LRCLIB from throttling us. */
+    public const int DEFAULT_DELAY_MS = 500;
+
     public function __construct(
         private ?int $limit = null,
-        private ?int $delayMs = 500,
+        private ?int $delayMs = self::DEFAULT_DELAY_MS,
     ) {
     }
 

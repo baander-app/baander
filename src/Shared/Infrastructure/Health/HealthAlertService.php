@@ -15,7 +15,9 @@ use Psr\Log\LoggerInterface;
  *
  * Tracks previous health state in memory (per-worker) and compares against
  * current state on each check call, so a component alerts once when it leaves
- * healthy and again only after it has recovered. The first check in a process
+ * healthy and again only after it has recovered. A failed alert delivery is
+ * logged and leaves the last status in place, so the next check sends the alert
+ * again. The first check in a process
  * records a baseline and never alerts. The scheduled CheckHealthCommand calls
  * checkAndAlert() every five minutes in the Messenger consumer. The
  * `notifications.admin_alerts` setting turns these alerts off; the degradation
@@ -65,38 +67,48 @@ final class HealthAlertService implements HealthAlertPortInterface
 
             $previousStatus = $this->previousState[$component] ?? null;
 
-            // Store current state
-            $this->previousState[$component] = $currentStatus;
-
-            // Skip if no previous state (first run) or status unchanged
-            if ($previousStatus === null || $previousStatus === $currentStatus) {
+            // Only alert on degradation (healthy → anything else); every other
+            // transition, including the first check, just records the status.
+            if ($previousStatus !== 'healthy' || $currentStatus === 'healthy') {
+                $this->previousState[$component] = $currentStatus;
                 continue;
             }
 
-            // Only alert on degradation (healthy → anything else)
-            if ($previousStatus === 'healthy' && $currentStatus !== 'healthy') {
-                $this->logger->warning('Health degradation detected: {component} changed from {from} to {to}', [
+            $this->logger->warning('Health degradation detected: {component} changed from {from} to {to}', [
+                'component' => $component,
+                'from' => $previousStatus,
+                'to' => $currentStatus,
+            ]);
+
+            if ($this->systemSettings->get(SharedSettingDefinitions::ADMIN_ALERTS) !== true) {
+                $this->logger->info('Health degradation alert for {component} skipped because admin alerts are turned off.', [
                     'component' => $component,
-                    'from' => $previousStatus,
-                    'to' => $currentStatus,
+                    'setting' => SharedSettingDefinitions::ADMIN_ALERTS,
                 ]);
+                $this->previousState[$component] = $currentStatus;
+                continue;
+            }
 
-                if ($this->systemSettings->get(SharedSettingDefinitions::ADMIN_ALERTS) !== true) {
-                    $this->logger->info('Health degradation alert for {component} skipped because admin alerts are turned off.', [
-                        'component' => $component,
-                        'setting' => SharedSettingDefinitions::ADMIN_ALERTS,
-                    ]);
-
-                    continue;
-                }
-
+            // Record the new status only once the alert is out, so a failed
+            // delivery (PostgreSQL down, say) is retried on the next check.
+            try {
                 $this->adminAlertPort->alertAdmins(
                     title: "{$component} health degraded",
                     body: "Status changed from {$previousStatus} to {$currentStatus}. Response time: " . round($result->responseTimeMs, 1) . 'ms',
                     eventType: 'admin.health_degraded',
                     referenceData: ['component' => $component],
                 );
+            } catch (\Throwable $e) {
+                $this->logger->error('Health degradation alert for {component} failed; the next check retries it.', [
+                    'component' => $component,
+                    'from' => $previousStatus,
+                    'to' => $currentStatus,
+                    'exception' => $e,
+                ]);
+                continue;
             }
+
+            $this->previousState[$component] = $currentStatus;
         }
     }
 }
