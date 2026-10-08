@@ -115,8 +115,6 @@ deptrac:
       - App\Media\Application\Port\ImagePortInterface
       - App\Media\Application\Port\StoragePortInterface
       - App\Media\Domain\Model\Image
-    App\Catalog\Interface\Controller\GenreController:
-      - App\Catalog\Domain\Model\Genre
     App\Catalog\Interface\Controller\MovieController:
       - App\Catalog\Domain\Repository\VideoRepositoryInterface
     App\Catalog\Interface\Controller\SongController:

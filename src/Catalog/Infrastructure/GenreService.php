@@ -119,24 +119,24 @@ final class GenreService implements GenrePortInterface
         $this->genreRepository->delete($genre);
     }
 
-    public function addSongToGenre(Uuid $genreId, Uuid $songId): void
+    public function addSongToGenre(Uuid $genreId, Uuid $songId): bool
     {
-        $this->genreRepository->addSongToGenre($genreId, $songId);
+        return $this->genreRepository->addSongToGenre($genreId, $songId);
     }
 
-    public function removeSongFromGenre(Uuid $genreId, Uuid $songId): void
+    public function removeSongFromGenre(Uuid $genreId, Uuid $songId): bool
     {
-        $this->genreRepository->removeSongFromGenre($genreId, $songId);
+        return $this->genreRepository->removeSongFromGenre($genreId, $songId);
     }
 
-    public function addAlbumToGenre(Uuid $genreId, Uuid $albumId): void
+    public function addAlbumToGenre(Uuid $genreId, Uuid $albumId): bool
     {
-        $this->genreRepository->addAlbumToGenre($genreId, $albumId);
+        return $this->genreRepository->addAlbumToGenre($genreId, $albumId);
     }
 
-    public function removeAlbumFromGenre(Uuid $genreId, Uuid $albumId): void
+    public function removeAlbumFromGenre(Uuid $genreId, Uuid $albumId): bool
     {
-        $this->genreRepository->removeAlbumFromGenre($genreId, $albumId);
+        return $this->genreRepository->removeAlbumFromGenre($genreId, $albumId);
     }
 
     public function addMovieToGenre(Uuid $genreId, Uuid $movieId): void
