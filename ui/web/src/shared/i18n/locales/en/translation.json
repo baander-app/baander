@@ -67,6 +67,7 @@
     "scopes": {
       "intro": "It will be able to:",
       "default": "Use Bånder with your account",
+      "access-api": "Use Bånder with your account",
       "profile": "See your name and profile",
       "email": "See your email address",
       "library": "Browse and play your library",
@@ -85,6 +86,7 @@
       "approved": "Your device is connected. You can return to your device.",
       "denied": "You denied the request. The device was not connected.",
       "invalidCode": "This code is unknown or has expired. Check the code on your device, or start again there.",
+      "alreadyProcessed": "This request was already approved or denied. Start again on your device if you need a new code.",
       "useAnotherCode": "Enter another code",
       "rateLimited_one": "Too many attempts. Try again in {{count}} second.",
       "rateLimited_other": "Too many attempts. Try again in {{count}} seconds.",

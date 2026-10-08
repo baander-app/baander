@@ -1,8 +1,11 @@
 import styled from 'styled-components'
 import { useTranslation } from '@/shared/i18n'
 
-/** Scopes the server grants (`auth.scopes.user_grants`); others are shown by name. */
-const KNOWN_SCOPES = new Set(['profile', 'email', 'library', 'playlist'])
+/**
+ * Scopes the server grants (`auth.scopes.user_grants`) and the default `access-api`; others are
+ * shown by name.
+ */
+const KNOWN_SCOPES = new Set(['access-api', 'profile', 'email', 'library', 'playlist'])
 
 const Intro = styled.p`
   font-size: 0.875rem;

@@ -21,6 +21,7 @@ import {
   type CreatableClientType,
   isCreatableClientType,
 } from './client-type-labels'
+import { parseRedirectUris, redirectUrisProblem } from './redirect-uri-rules'
 
 const Form = styled.form`
   display: flex;
@@ -67,26 +68,6 @@ function needsRedirectUris(type: CreatableClientType): boolean {
   return type !== 'device'
 }
 
-/** One URI per line; blank lines are ignored. */
-function parseRedirectUris(text: string): string[] {
-  return text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line !== '')
-}
-
-function firstInvalidUri(uris: string[]): string | null {
-  for (const uri of uris) {
-    try {
-      new URL(uri)
-    } catch {
-      return uri
-    }
-  }
-
-  return null
-}
-
 interface CreateOAuthClientDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -127,14 +108,9 @@ export function CreateOAuthClientDialog({ open, onOpenChange }: CreateOAuthClien
 
     const redirectUris = needsRedirectUris(type) ? parseRedirectUris(redirectText) : []
     if (needsRedirectUris(type)) {
-      if (redirectUris.length === 0) {
-        setFormError('Add at least one redirect URI.')
-        return
-      }
-
-      const invalid = firstInvalidUri(redirectUris)
-      if (invalid !== null) {
-        setFormError(`Not an absolute URI: ${invalid}`)
+      const problem = redirectUrisProblem(redirectUris)
+      if (problem !== null) {
+        setFormError(problem)
         return
       }
     }
@@ -210,7 +186,10 @@ export function CreateOAuthClientDialog({ open, onOpenChange }: CreateOAuthClien
                     placeholder="https://app.baander.app/callback"
                     rows={3}
                   />
-                  <Hint>One per line, up to 10. Loopback URIs (http://127.0.0.1) match any port.</Hint>
+                  <Hint>
+                    One per line, up to 10, without a fragment: https, http on a loopback host (any port
+                    matches), or a private-use scheme such as app.baander.tv:/callback.
+                  </Hint>
                 </FieldGroup>
               )}
               {formError !== null && <ErrorText role="alert">{formError}</ErrorText>}

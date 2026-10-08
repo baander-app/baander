@@ -16,6 +16,7 @@ export function useOAuthClients() {
  * Create and rotate answers carry a client secret that is shown once. `gcTime: 0` drops the
  * finished mutation, and with it the secret, as soon as no component observes it; the list is
  * refetched rather than updated from the answer, so the secret never enters the query cache.
+ * A failed change refetches too: a 404 or 409 means the list on screen is out of date.
  */
 
 export function useCreateOAuthClient() {
@@ -23,7 +24,7 @@ export function useCreateOAuthClient() {
   return useMutation({
     mutationFn: async (payload: AdminCreateOAuthClientRequest) => (await postAdminOauthClientsCreate(payload)).data,
     gcTime: 0,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetAdminOauthClientsListQueryKey() }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: getGetAdminOauthClientsListQueryKey() }),
   })
 }
 
@@ -32,7 +33,7 @@ export function useRotateOAuthClientSecret() {
   return useMutation({
     mutationFn: async (clientId: string) => (await postAdminOauthClientsRotateSecret(clientId)).data,
     gcTime: 0,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetAdminOauthClientsListQueryKey() }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: getGetAdminOauthClientsListQueryKey() }),
   })
 }
 
@@ -40,6 +41,6 @@ export function useRevokeOAuthClient() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (clientId: string) => (await postAdminOauthClientsRevoke(clientId)).data,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: getGetAdminOauthClientsListQueryKey() }),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: getGetAdminOauthClientsListQueryKey() }),
   })
 }
