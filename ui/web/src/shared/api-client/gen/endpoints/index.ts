@@ -2179,7 +2179,7 @@ export interface SettingDefinitionResource {
   /** @nullable */
   max: number | null;
   editRole: SettingDefinitionResourceEditRole;
-  /** Whether signed-in users can read this system setting */
+  /** Whether user settings may follow this system setting, which shows its value to signed-in users as their default */
   userVisible: boolean;
   /** False while the backend does not yet honour the setting */
   enforced: boolean;
