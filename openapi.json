@@ -1615,7 +1615,7 @@
                         }
                     },
                     "403": {
-                        "description": "Forbidden",
+                        "description": "Forbidden; admins need the admin.can_view_users setting, as for the user list",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -24149,7 +24149,7 @@
                         ]
                     },
                     "userVisible": {
-                        "description": "Whether signed-in users can read this system setting",
+                        "description": "Whether user settings may follow this system setting, which shows its value to signed-in users as their default",
                         "type": "boolean"
                     },
                     "enforced": {
