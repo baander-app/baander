@@ -6,6 +6,7 @@ namespace App\Auth\Interface\Console;
 
 use App\Auth\Application\Query\OAuth\ListRegisteredClientsQuery;
 use App\Auth\Interface\Resource\AdminOAuthClientResource;
+use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -25,6 +26,11 @@ final class OAuthClientListCommand extends Command
         parent::__construct();
     }
 
+    protected function configure(): void
+    {
+        AdminCommandSupport::addJsonOption($this);
+    }
+
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
@@ -32,30 +38,24 @@ final class OAuthClientListCommand extends Command
         try {
             $clients = $this->dispatcher->dispatch(new ListRegisteredClientsQuery());
         } catch (Throwable $exception) {
-            $io->error($exception->getMessage());
-
-            return Command::FAILURE;
+            return AdminCommandSupport::fail($io, $exception);
         }
         assert(is_array($clients));
 
-        if ($clients === []) {
-            $io->text('No OAuth clients are registered.');
-
-            return Command::SUCCESS;
-        }
-
-        $io->table(
+        return AdminCommandSupport::list(
+            $input,
+            $io,
+            AdminOAuthClientResource::collection($clients),
             ['Client ID', 'Name', 'Type', 'Redirect URIs', 'Revoked', 'Created'],
-            array_map(static fn (array $client): array => [
+            static fn (array $client): array => [
                 $client['clientId'],
                 $client['name'],
                 $client['type'],
                 $client['redirectUris'] === [] ? '-' : implode("\n", $client['redirectUris']),
                 $client['revoked'] ? 'yes' : 'no',
                 $client['createdAt'],
-            ], AdminOAuthClientResource::collection($clients)),
+            ],
+            'No OAuth clients are registered.',
         );
-
-        return Command::SUCCESS;
     }
 }

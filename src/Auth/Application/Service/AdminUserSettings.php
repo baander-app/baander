@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Application\Service;
 
 use App\Auth\Application\Exception\UserNotFoundException;
+use App\Shared\Application\Actor;
 use App\Shared\Application\Exception\InvalidSettingValuesException;
 use App\Shared\Application\Exception\UnknownSettingException;
 use App\UserPreference\Application\Port\UserSettingsContractInterface;
@@ -19,7 +20,7 @@ use Psr\Log\LoggerInterface;
 final readonly class AdminUserSettings
 {
     /** The actor logged for a change made on the command line, where nobody is signed in. */
-    public const string CLI_ACTOR = 'cli';
+    public const string CLI_ACTOR = Actor::CLI;
 
     public function __construct(
         private UserLookup $users,

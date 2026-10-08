@@ -7,6 +7,7 @@ namespace App\Auth\Interface\Console;
 use App\Auth\Application\Command\OAuth\RotateClientSecretCommand;
 use App\Auth\Application\DTO\RegisteredClientDTO;
 use App\Auth\Interface\Resource\AdminOAuthClientCredentialsResource;
+use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -41,9 +42,7 @@ final class OAuthClientRotateSecretCommand extends Command
                 OAuthClientMessageDispatcher::publicId((string) $input->getArgument('client-id')),
             ));
         } catch (Throwable $exception) {
-            $io->error($exception->getMessage());
-
-            return Command::FAILURE;
+            return AdminCommandSupport::fail($io, $exception);
         }
         assert($registered instanceof RegisteredClientDTO);
 
