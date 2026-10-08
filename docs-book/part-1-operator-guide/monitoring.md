@@ -87,19 +87,19 @@ A job keeps one record and one job ID across its deliveries. An automatic retry,
 
 ### Retry and cancel
 
-You can retry failed jobs or cancel running/queued jobs through the API. Retrying a job here dispatches a copy of its stored payload as a new job, returned as `newJobId`, and marks the original job `retried`:
+You can retry failed jobs or cancel running jobs through the API. Retrying a job here dispatches a copy of its stored payload as a new job, returned as `newJobId`, and marks the original job `retried`:
 
 ```bash
 # Retry a failed job
 curl -X POST -s -H "Authorization: Bearer $TOKEN" \
   "https://baander.test/api/monitor/jobs/<jobId>/retry" | jq .
 
-# Cancel a running or queued job
+# Cancel a running job
 curl -X POST -s -H "Authorization: Bearer $TOKEN" \
   "https://baander.test/api/monitor/jobs/<jobId>/cancel" | jq .
 ```
 
-Cancellation is cooperative -- the job handler must check for the cancellation flag at its next checkpoint. Queued jobs are flagged before the worker picks them up.
+Cancellation is cooperative. The job stops at its next checkpoint, between two items of its work, and its status becomes `cancelled`; it is not retried and does not go to the failure transport. The metadata sync jobs, the bulk lyrics fetch and the cover extraction have checkpoints; other jobs run to the end. [app:monitor:job:cancel](commands/app-monitor-job-cancel.md) lists the jobs and their checkpoints.
 
 ### Transport status
 

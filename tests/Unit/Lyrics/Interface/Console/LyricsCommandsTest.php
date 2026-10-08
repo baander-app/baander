@@ -12,6 +12,7 @@ use App\Lyrics\Interface\Console\LyricsStatusCommand;
 use App\Lyrics\Interface\Controller\LyricsAdminController;
 use App\Shared\Application\DTO\InlineJobRun;
 use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Application\JobCancelledException;
 use App\Shared\Application\Port\JobMonitorAdministrationInterface;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
@@ -132,6 +133,17 @@ final class LyricsCommandsTest extends TestCase
 
         self::assertSame(Command::INVALID, $tester->execute(['--limit' => '0']));
         self::assertStringContainsString('The limit must be at least 1.', $tester->getDisplay());
+    }
+
+    public function testAFetchCancelledFromTheJobMonitorFailsAndSaysSo(): void
+    {
+        $jobs = $this->createStub(JobMonitorAdministrationInterface::class);
+        $jobs->method('runInline')->willThrowException(JobCancelledException::forJob('inline-job-2'));
+
+        $tester = new CommandTester(new LyricsFetchCommand($jobs));
+
+        self::assertSame(Command::FAILURE, $tester->execute([]));
+        self::assertStringContainsString('Job "inline-job-2" has been cancelled.', $tester->getDisplay());
     }
 
     private function port(): LyricsAdminPortInterface

@@ -1410,6 +1410,10 @@ when@test:
             tags: ['baander.message_payload_codec']
         App\Tests\Fixtures\Messaging\FailureTransportProbeHandler:
             tags: [{ name: 'messenger.message_handler' }]
+        # A job with a cancellation checkpoint per item, for job cancellation tests.
+        App\Tests\Fixtures\Messaging\CancellationProbeHandler:
+            autowire: true
+            tags: [{ name: 'messenger.message_handler' }]
         # Resolve the production user settings contract for integration checks.
         test.user_settings_contract:
             alias: App\UserPreference\Application\Port\UserSettingsContractInterface

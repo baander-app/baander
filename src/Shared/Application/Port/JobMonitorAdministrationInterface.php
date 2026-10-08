@@ -14,6 +14,7 @@ use App\Shared\Application\DTO\JobMonitorRecord;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
+use App\Shared\Application\JobCancelledException;
 
 /**
  * Reads and operates the background job monitor. The admin monitor pages and the
@@ -44,8 +45,10 @@ interface JobMonitorAdministrationInterface
     public function retry(string $jobId, string $actor): string;
 
     /**
-     * Requests cooperative cancellation: sets the flag that CancellableJobInterface::checkCancellation()
-     * reads at a handler's checkpoints. Cancelling a job again sets the flag again.
+     * Requests cooperative cancellation: sets the flag that a running job reads at its next
+     * cancellation checkpoint (JobCancellationCheckpointInterface), where it stops and its
+     * record becomes cancelled. A job without checkpoints runs to its end. Cancelling a job
+     * again sets the flag again.
      *
      * @throws NotFoundException
      * @throws ConflictException when the job has finished or failed
@@ -94,11 +97,13 @@ interface JobMonitorAdministrationInterface
     /**
      * Handles a message in this process, as Messenger's sync transport does, and records the
      * run in the job monitor like a queued job: a running record under a new job ID with the
-     * serialized message, then finished, or failed with the error. The record has no queue,
-     * so retrying it from the monitor dispatches the message through its normal routing.
+     * serialized message, then finished, or failed with the error, or cancelled when the job
+     * was cancelled and stopped at a checkpoint. The record has no queue, so retrying it from
+     * the monitor dispatches the message through its normal routing.
      *
      * Console commands use it to run long work inline (KTD4).
      *
+     * @throws JobCancelledException when the job was cancelled and stopped at a checkpoint
      * @throws \Throwable the handler's own exception, unwrapped from HandlerFailedException
      */
     public function runInline(object $message): InlineJobRun;
