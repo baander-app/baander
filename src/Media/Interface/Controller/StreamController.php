@@ -6,6 +6,7 @@ namespace App\Media\Interface\Controller;
 
 use App\Media\Application\Port\MediaReadScopeProviderInterface;
 use App\Media\Application\Port\StreamPortInterface;
+use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
@@ -14,7 +15,6 @@ use App\Transcode\Application\Port\AudioRendition;
 use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Transcode\Application\Port\AudioRenditionPortInterface;
 use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
-use App\Shared\Application\Port\SystemSettingsPortInterface;
 use OpenApi\Attributes as OA;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use Symfony\Component\HttpFoundation\Request;

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Notification\Application\Handler;
 
 use App\Notification\Application\DTO\SendEmailCommand;
+use App\Notification\Application\DTO\TranslatableParameter;
 use App\Notification\Domain\Repository\NotificationPreferenceRepositoryInterface;
 use App\Notification\Domain\ValueObject\NotificationChannel;
 use App\UserPreference\Application\Port\UserSettingsContractInterface;
@@ -13,7 +14,6 @@ use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Mime\Address;
 use Symfony\Component\Mime\Email;
-use Symfony\Contracts\Translation\TranslatableInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 use Twig\Environment;
 
@@ -89,11 +89,11 @@ final class SendEmailHandler
      */
     private function translate(string $key, array $parameters, string $locale): string
     {
-        $parameters = array_map(
-            fn (mixed $value): mixed => $value instanceof TranslatableInterface ? $value->trans($this->translator, $locale) : $value,
-            $parameters,
+        return $this->translator->trans(
+            $key,
+            TranslatableParameter::resolveAll($parameters, $this->translator, $locale),
+            self::DOMAIN,
+            $locale,
         );
-
-        return $this->translator->trans($key, $parameters, self::DOMAIN, $locale);
     }
 }

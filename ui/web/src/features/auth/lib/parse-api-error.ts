@@ -62,3 +62,17 @@ export function parseApiError(err: unknown, fallback: string): ParsedApiError {
 
   return { code: null, message: fallback }
 }
+
+/**
+ * The messages a 422 validation error carries for one field in `error.details`.
+ *
+ * Any other error, or a field without string messages, gives an empty list.
+ */
+export function parseFieldViolations(err: unknown, field: string): string[] {
+  if (!(err instanceof AxiosError) || err.response?.status !== 422) return []
+  const data: unknown = err.response.data
+  const details = isRecord(data) && isRecord(data.error) ? data.error.details : undefined
+  const messages = isRecord(details) && Object.hasOwn(details, field) ? details[field] : undefined
+
+  return Array.isArray(messages) ? messages.filter((message): message is string => typeof message === 'string') : []
+}

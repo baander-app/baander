@@ -87,8 +87,10 @@ final class SweepTranscodeCacheHandler
             $directories[$unit] = $this->storage->resolveAudioRenditionDirectory($trackKey);
             $active[$unit] = fn (): bool => $this->storage->isAudioRenditionEncodingSince($trackKey, $activeCutoff);
         }
+        // PHP turns numeric-string keys into ints, so cast the units back to strings.
         $units = array_map(strval(...), array_keys($directories));
 
+        // Keyed sets of units, in the order they were added.
         $deleted = [];
         $retained = [];
         $skippedActive = [];
@@ -109,7 +111,7 @@ final class SweepTranscodeCacheHandler
             // R4 — never sweep active content.
             if ($active[$unit]()) {
                 $skippedActive[] = $unit;
-                $retained[] = $unit;
+                $retained[$unit] = true;
                 $this->logger->debug('Cache sweep: skipping active cache directory {directory}.', ['directory' => $unit]);
                 continue;
             }
@@ -123,7 +125,6 @@ final class SweepTranscodeCacheHandler
             }
         }
 
-        $alreadyDeleted = array_flip($deleted);
         $alreadySkipped = array_flip($skippedActive);
 
         // R2 — LRU size budget: if still over budget, evict oldest-accessed
@@ -131,7 +132,7 @@ final class SweepTranscodeCacheHandler
         if ($totalBytes > $maxBytes) {
             $evictionCandidates = [];
             foreach ($units as $unit) {
-                if (isset($alreadyDeleted[$unit]) || isset($alreadySkipped[$unit])) {
+                if (isset($deleted[$unit]) || isset($alreadySkipped[$unit])) {
                     continue;
                 }
                 $evictionCandidates[] = $unit;
@@ -154,16 +155,15 @@ final class SweepTranscodeCacheHandler
         }
 
         foreach ($units as $unit) {
-            if (!in_array($unit, $deleted, true)) {
-                if (!in_array($unit, $retained, true)) {
-                    $retained[] = $unit;
-                }
+            if (!isset($deleted[$unit])) {
+                $retained[$unit] = true;
             }
         }
 
         return new SweepTranscodeCacheResult(
-            deletedDirectories: $deleted,
-            retainedDirectories: $retained,
+            // PHP turns numeric-string keys into ints, so cast the units back to strings.
+            deletedDirectories: array_map(strval(...), array_keys($deleted)),
+            retainedDirectories: array_map(strval(...), array_keys($retained)),
             skippedActive: $skippedActive,
             bytesFreed: $bytesFreed,
             totalCacheBytesBefore: array_sum($dirSize),
@@ -228,7 +228,7 @@ final class SweepTranscodeCacheHandler
         return $newest;
     }
 
-    /** @param list<string> $deleted */
+    /** @param array<int|string, true> $deleted */
     private function deleteDirectory(
         string $unit,
         string $dir,
@@ -240,7 +240,7 @@ final class SweepTranscodeCacheHandler
         if (!$dryRun) {
             $this->storage->deleteDirectory($dir);
         }
-        $deleted[] = $unit;
+        $deleted[$unit] = true;
         $bytesFreed += $size;
         $this->logger->debug('Cache sweep: {action} cache directory {directory} ({bytes} bytes).', [
             'action' => $dryRun ? 'would delete' : 'deleted',

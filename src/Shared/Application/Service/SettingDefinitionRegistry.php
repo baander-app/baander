@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Application\Service;
 
+use App\Shared\Application\Exception\UnknownSettingException;
 use App\Shared\Application\Port\SettingDefinitionProviderInterface;
 use App\Shared\Domain\Model\Setting\SettingDefinition;
 use App\Shared\Domain\Model\Setting\SettingScope;
@@ -29,6 +30,19 @@ final class SettingDefinitionRegistry
     public function get(string $key): ?SettingDefinition
     {
         return $this->definitions()[$key] ?? null;
+    }
+
+    /**
+     * @throws UnknownSettingException when no setting of the scope has the key
+     */
+    public function require(string $key, SettingScope $scope): SettingDefinition
+    {
+        $definition = $this->get($key);
+        if ($definition === null || $definition->scope !== $scope) {
+            throw new UnknownSettingException($key);
+        }
+
+        return $definition;
     }
 
     /**

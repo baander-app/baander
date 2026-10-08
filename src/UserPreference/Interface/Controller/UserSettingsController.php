@@ -6,7 +6,6 @@ namespace App\UserPreference\Interface\Controller;
 
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Shared\Application\Exception\InvalidSettingValuesException;
-use App\Shared\Application\Exception\UnknownSettingException;
 use App\Shared\Application\Service\SettingDefinitionRegistry;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
@@ -132,7 +131,7 @@ final class UserSettingsController
     {
         $definition = $this->definitions->get($key);
         if ($definition === null) {
-            return $this->notFound((new UnknownSettingException($key))->getMessage());
+            return $this->notFound(sprintf('Unknown setting "%s".', $key));
         }
 
         return $definition->isUserEditable()

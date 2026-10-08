@@ -51,13 +51,7 @@ final class SettingDefinitionResource extends AbstractResource
             'description' => $source->description,
             'group' => $source->group,
             'default' => $source->default,
-            'options' => array_map(
-                static fn (int|string $value): array => [
-                    'value' => $value,
-                    'label' => $source->valueLabels[$value] ?? (string) $value,
-                ],
-                $source->allowedValues,
-            ),
+            'options' => $source->options(),
             'min' => $source->min,
             'max' => $source->max,
             'editRole' => $source->editRole,

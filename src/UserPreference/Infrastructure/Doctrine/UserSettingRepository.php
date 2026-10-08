@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\UserPreference\Infrastructure\Doctrine;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Doctrine\JsonSettingValue;
 use App\UserPreference\Application\Port\UserSettingStoreInterface;
 use Doctrine\DBAL\Connection;
 
@@ -30,7 +31,7 @@ final class UserSettingRepository implements UserSettingStoreInterface
             ['user_id' => $userId->toString()],
         );
         foreach ($rows as $key => $json) {
-            $choices[(string) $key] = self::decode($json);
+            $choices[(string) $key] = JsonSettingValue::decode($json, 'user setting');
         }
 
         return $choices;
@@ -43,7 +44,7 @@ final class UserSettingRepository implements UserSettingStoreInterface
             ['user_id' => $userId->toString(), 'key' => $key],
         );
 
-        return $json === false ? null : self::decode($json);
+        return $json === false ? null : JsonSettingValue::decode($json, 'user setting');
     }
 
     public function save(Uuid $userId, string $key, bool|int|string $value): void
@@ -54,7 +55,7 @@ final class UserSettingRepository implements UserSettingStoreInterface
             [
                 'user_id' => $userId->toString(),
                 'key' => $key,
-                'value' => json_encode($value, JSON_THROW_ON_ERROR),
+                'value' => JsonSettingValue::encode($value),
             ],
         );
     }
@@ -65,14 +66,5 @@ final class UserSettingRepository implements UserSettingStoreInterface
             'DELETE FROM user_settings WHERE user_id = :user_id AND key = :key',
             ['user_id' => $userId->toString(), 'key' => $key],
         );
-    }
-
-    private static function decode(mixed $json): mixed
-    {
-        if (!is_string($json)) {
-            throw new \UnexpectedValueException('A user setting value must be read as JSON text.');
-        }
-
-        return json_decode($json, true, 512, JSON_THROW_ON_ERROR);
     }
 }

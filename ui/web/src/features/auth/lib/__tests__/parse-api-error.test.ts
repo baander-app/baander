@@ -1,11 +1,11 @@
 import { AxiosError, AxiosHeaders } from 'axios'
 import { describe, expect, it } from 'vitest'
-import { parseApiError } from '../parse-api-error'
+import { parseApiError, parseFieldViolations } from '../parse-api-error'
 
-function apiError(data: unknown) {
+function apiError(data: unknown, status = 400) {
   return new AxiosError('Request failed', 'ERR_BAD_REQUEST', undefined, undefined, {
     data,
-    status: 400,
+    status,
     statusText: 'Bad Request',
     headers: {},
     config: { headers: new AxiosHeaders() },
@@ -46,5 +46,36 @@ describe('parseApiError', () => {
     for (const error of [new AxiosError('Network Error'), new Error('Local failure'), null]) {
       expect(parseApiError(error, 'Fallback')).toEqual({ code: null, message: 'Fallback' })
     }
+  })
+})
+
+describe('parseFieldViolations', () => {
+  it('returns the string messages a 422 carries for the field', () => {
+    const error = apiError({
+      error: { code: 422, message: 'Validation failed.', details: { language: ['Must be one of: en, da.', 7], email: ['Taken.'] } },
+    }, 422)
+
+    expect(parseFieldViolations(error, 'language')).toEqual(['Must be one of: en, da.'])
+  })
+
+  it('ignores other statuses and non-Axios failures', () => {
+    const body = { error: { code: 400, message: 'Bad request.', details: { language: ['Invalid.'] } } }
+
+    expect(parseFieldViolations(apiError(body, 400), 'language')).toEqual([])
+    expect(parseFieldViolations(new Error('Local failure'), 'language')).toEqual([])
+    expect(parseFieldViolations(null, 'language')).toEqual([])
+  })
+
+  it.each([
+    null, [], 'Failure', {}, { error: 'invalid_grant' }, { error: { details: null } },
+    { error: { details: ['Invalid.'] } },
+    { error: { details: { email: ['Taken.'] } } },
+    { error: { details: { language: 'Invalid.' } } },
+  ])('returns no messages for payload %j', (payload) => {
+    expect(parseFieldViolations(apiError(payload, 422), 'language')).toEqual([])
+  })
+
+  it('does not read inherited properties as a field', () => {
+    expect(parseFieldViolations(apiError({ error: { details: {} } }, 422), 'constructor')).toEqual([])
   })
 })

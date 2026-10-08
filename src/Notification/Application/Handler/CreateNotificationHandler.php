@@ -11,6 +11,7 @@ use App\Notification\Application\DTO\CreateNotificationCommand;
 use App\Notification\Application\DTO\SendEmailCommand;
 use App\Notification\Application\DTO\SendPushCommand;
 use App\Notification\Application\DTO\SendWebhookCommand;
+use App\Notification\Application\DTO\TranslatableParameter;
 use App\Notification\Application\Service\NotificationContentResolver;
 use App\Notification\Domain\Model\Notification;
 use App\Notification\Domain\Repository\NotificationRepositoryInterface;
@@ -20,7 +21,6 @@ use App\Shared\Domain\Model\Setting\SupportedLanguages;
 use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
-use Symfony\Contracts\Translation\TranslatableInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 final class CreateNotificationHandler
@@ -84,12 +84,7 @@ final class CreateNotificationHandler
      */
     private function inEnglish(array $parameters): array
     {
-        return array_map(
-            fn (mixed $value): mixed => $value instanceof TranslatableInterface
-                ? $value->trans($this->translator, SupportedLanguages::FALLBACK)
-                : $value,
-            $parameters,
-        );
+        return TranslatableParameter::resolveAll($parameters, $this->translator, SupportedLanguages::FALLBACK);
     }
 
     /**

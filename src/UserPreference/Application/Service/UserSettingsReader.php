@@ -55,19 +55,12 @@ final readonly class UserSettingsReader
      */
     public function definition(string $key): SettingDefinition
     {
-        $definition = $this->definitions->get($key);
-        if ($definition === null || $definition->scope !== SettingScope::User) {
-            throw new UnknownSettingException($key);
-        }
-
-        return $definition;
+        return $this->definitions->require($key, SettingScope::User);
     }
 
     private function build(SettingDefinition $definition, mixed $storedValue): UserSettingEntry
     {
-        $choice = (is_bool($storedValue) || is_int($storedValue) || is_string($storedValue)) && $definition->allows($storedValue)
-            ? $storedValue
-            : null;
+        $choice = $definition->valueOrNull($storedValue);
         $resetValue = $definition->fallbackKey !== null
             ? $this->systemSettings->get($definition->fallbackKey)
             : $definition->default ?? throw new LogicException(sprintf('User setting "%s" has no default.', $definition->key));

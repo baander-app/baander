@@ -1,5 +1,6 @@
 import { useId, useState, type KeyboardEvent } from 'react'
 import styled from 'styled-components'
+import { parseFieldViolations } from '@/features/auth/lib/parse-api-error'
 import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
@@ -96,7 +97,7 @@ export function SystemSettingRow({ definition, setting, canEdit }: SystemSetting
   const showAttempted = (update.isPending || update.isError) && isSettingValue(attempted)
   const value = showAttempted ? attempted : (setting?.value ?? definition.default)
 
-  const violations = update.error ? violationsFor(update.error, key) : []
+  const violations = parseFieldViolations(update.error, key)
   const errors = [...violations]
   if (update.error && violations.length === 0) {
     errors.push(`Could not save: ${errorMessage(update.error)}`)
@@ -280,14 +281,12 @@ function isSettingValue(value: unknown): value is SystemSettingValue {
 interface ErrorBody {
   error?: {
     message?: unknown
-    details?: unknown
   }
 }
 
 interface HttpErrorLike {
   message: string
   response?: {
-    status?: number
     data?: unknown
   }
 }
@@ -296,20 +295,6 @@ function errorBody(error: HttpErrorLike): ErrorBody | undefined {
   const data = error.response?.data
 
   return typeof data === 'object' && data !== null ? data : undefined
-}
-
-/** The 422 messages the server returned for one setting key. */
-function violationsFor(error: HttpErrorLike, key: string): string[] {
-  if (error.response?.status !== 422) {
-    return []
-  }
-  const details = errorBody(error)?.error?.details
-  if (typeof details !== 'object' || details === null) {
-    return []
-  }
-  const messages: unknown = Object.entries(details).find(([field]) => field === key)?.[1]
-
-  return Array.isArray(messages) ? messages.filter((message) => typeof message === 'string') : []
 }
 
 function errorMessage(error: HttpErrorLike): string {

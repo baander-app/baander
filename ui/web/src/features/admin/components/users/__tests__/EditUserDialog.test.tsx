@@ -4,18 +4,17 @@ import { AxiosError, AxiosHeaders } from 'axios'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
-import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
+import { AXIOS_INSTANCE, customInstance } from '@/shared/api-client/axios-instance'
 import type { AdminUser, AdminUserSetting } from '../../../api/user-admin-api'
 import { render } from '../../../../../../tests/test-utils'
 import { EditUserDialog } from '../EditUserDialog'
 
 vi.mock('@/shared/api-client/axios-instance', () => ({
-  AXIOS_INSTANCE: { get: vi.fn(), put: vi.fn(), delete: vi.fn(), patch: vi.fn() },
+  AXIOS_INSTANCE: { patch: vi.fn() },
+  customInstance: vi.fn(),
 }))
 
-const mockGet = vi.mocked(AXIOS_INSTANCE.get)
-const mockPut = vi.mocked(AXIOS_INSTANCE.put)
-const mockDelete = vi.mocked(AXIOS_INSTANCE.delete)
+const mockRequest = vi.mocked(customInstance)
 const mockPatch = vi.mocked(AXIOS_INSTANCE.patch)
 const initialAuthState = useAuthStore.getState()
 
@@ -49,6 +48,45 @@ function language(overrides: Partial<AdminUserSetting> = {}): AdminUserSetting {
     source: 'server_default',
     ...overrides,
   }
+}
+
+/** The settings the fake server lists for Alice. */
+let served: AdminUserSetting[]
+/** Thrown by the next settings load only. */
+let loadFailure: Error | null
+/** The setting the fake server answers a PUT or DELETE with. */
+let written: AdminUserSetting
+let writeFailure: AxiosError | null
+
+function serve() {
+  mockRequest.mockImplementation(async (url: string, options: RequestInit) => {
+    const method = options.method ?? 'GET'
+
+    if (method === 'GET' && url === SETTINGS_URL) {
+      const failure = loadFailure
+      loadFailure = null
+      if (failure) throw failure
+
+      return { data: served }
+    }
+    if ((method === 'PUT' || method === 'DELETE') && url === `${SETTINGS_URL}/language`) {
+      if (writeFailure) throw writeFailure
+
+      return { data: written }
+    }
+
+    throw new Error(`Unexpected ${method} ${url}`)
+  })
+}
+
+function writeCalls() {
+  return mockRequest.mock.calls
+    .filter(([, options]) => options.method === 'PUT' || options.method === 'DELETE')
+    .map(([url, options]) => ({
+      method: options.method,
+      url,
+      body: options.body === undefined ? undefined : JSON.parse(String(options.body)),
+    }))
 }
 
 function httpError(status: number, message: string, details?: Record<string, string[]>) {
@@ -100,14 +138,13 @@ async function chooseLanguage(option: string) {
 
 describe('EditUserDialog', () => {
   beforeEach(() => {
-    mockGet.mockReset()
-    mockPut.mockReset()
-    mockDelete.mockReset()
+    served = [language()]
+    loadFailure = null
+    written = language()
+    writeFailure = null
+    mockRequest.mockReset()
     mockPatch.mockReset()
-    mockGet.mockImplementation(async (url: string) => {
-      if (url === SETTINGS_URL) return { data: { data: [language()] } }
-      throw new Error(`Unexpected GET ${url}`)
-    })
+    serve()
     mockPatch.mockResolvedValue({ data: { data: ALICE } })
     signIn(['ROLE_USER', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN'])
     Element.prototype.hasPointerCapture = () => false
@@ -130,7 +167,7 @@ describe('EditUserDialog', () => {
   })
 
   it('lets a super admin set the language, then saves the other fields and closes', async () => {
-    mockPut.mockResolvedValue({ data: { data: language({ storedValue: 'da', value: 'da', source: 'user' }) } })
+    written = language({ storedValue: 'da', value: 'da', source: 'user' })
     const user = userEvent.setup()
     const onOpenChange = renderDialog()
 
@@ -138,13 +175,12 @@ describe('EditUserDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
-    expect(mockPut).toHaveBeenCalledWith(`${SETTINGS_URL}/language`, { value: 'da' })
+    expect(writeCalls()).toEqual([{ method: 'PUT', url: `${SETTINGS_URL}/language`, body: { value: 'da' } }])
     expect(mockPatch).toHaveBeenCalledWith(`/api/admin/users/${ALICE.id}`, { email: ALICE.email, name: ALICE.name })
   })
 
   it('resets the language when the server default is chosen over a stored choice', async () => {
-    mockGet.mockResolvedValue({ data: { data: [language({ storedValue: 'th', value: 'th', source: 'user' })] } })
-    mockDelete.mockResolvedValue({ data: { data: language() } })
+    served = [language({ storedValue: 'th', value: 'th', source: 'user' })]
     const user = userEvent.setup()
     const onOpenChange = renderDialog()
 
@@ -153,8 +189,7 @@ describe('EditUserDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
-    expect(mockDelete).toHaveBeenCalledWith(`${SETTINGS_URL}/language`)
-    expect(mockPut).not.toHaveBeenCalled()
+    expect(writeCalls()).toEqual([{ method: 'DELETE', url: `${SETTINGS_URL}/language`, body: undefined }])
   })
 
   it('does not send the language when it was left alone', async () => {
@@ -165,12 +200,11 @@ describe('EditUserDialog', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
-    expect(mockPut).not.toHaveBeenCalled()
-    expect(mockDelete).not.toHaveBeenCalled()
+    expect(writeCalls()).toEqual([])
   })
 
   it('shows a rejected language next to the field and saves nothing else', async () => {
-    mockPut.mockRejectedValue(httpError(422, 'Validation failed.', { language: ['Must be one of: en, da, th.'] }))
+    writeFailure = httpError(422, 'Validation failed.', { language: ['Must be one of: en, da, th.'] })
     const user = userEvent.setup()
     const onOpenChange = renderDialog()
 
@@ -184,7 +218,7 @@ describe('EditUserDialog', () => {
   })
 
   it('shows a stored language that is no longer offered as invalid, with the language the user gets', async () => {
-    mockGet.mockResolvedValue({ data: { data: [language({ storedValue: 'de', storedValueValid: false, value: 'da', resetValue: 'da' })] } })
+    served = [language({ storedValue: 'de', storedValueValid: false, value: 'da', resetValue: 'da' })]
     renderDialog()
 
     expect(await languageSelect()).toHaveAttribute('aria-invalid', 'true')
@@ -193,7 +227,7 @@ describe('EditUserDialog', () => {
 
   it('makes the language read-only for an admin who is not a super admin', async () => {
     signIn(['ROLE_USER', 'ROLE_ADMIN'])
-    mockGet.mockResolvedValue({ data: { data: [language({ storedValue: 'th', value: 'th', source: 'user' })] } })
+    served = [language({ storedValue: 'th', value: 'th', source: 'user' })]
     renderDialog()
 
     const select = await languageSelect()
@@ -204,7 +238,6 @@ describe('EditUserDialog', () => {
 
   it('shows an admin who is not a super admin the user without a way to save', async () => {
     signIn(['ROLE_USER', 'ROLE_ADMIN'])
-    mockGet.mockResolvedValue({ data: { data: [language({})] } })
     renderDialog()
 
     await languageSelect()
@@ -215,7 +248,7 @@ describe('EditUserDialog', () => {
   })
 
   it('offers a retry when the settings cannot be loaded', async () => {
-    mockGet.mockRejectedValueOnce(new Error('Unavailable'))
+    loadFailure = new Error('Unavailable')
     const user = userEvent.setup()
     renderDialog()
 

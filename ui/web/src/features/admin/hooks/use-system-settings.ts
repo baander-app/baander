@@ -44,6 +44,8 @@ export function useUpdateSystemSettings() {
 
   return usePatchAdminSettingsUpdate({
     mutation: {
+      // The response holds every system setting, so the page shows it at once; the refetch keeps
+      // the list current with changes made elsewhere, as the frontend rules ask after mutations.
       onSuccess: (response) => {
         queryClient.setQueryData<GetAdminSettingsIndex200>(queryKey, response)
 
@@ -60,6 +62,7 @@ export function useResetSystemSetting() {
 
   return useDeleteAdminSettingsReset({
     mutation: {
+      // The response holds the reset setting, which replaces its entry in the cached list.
       onSuccess: (response) => {
         const reset = response.data
         if (reset) {
