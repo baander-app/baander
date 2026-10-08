@@ -1,3 +1,9 @@
+parameters:
+    # Server control socket, created mode 0600 in a 0700 directory owned by the
+    # server user. File permissions are its authentication, so keep it outside the
+    # bind-mounted project directory.
+    app.server_control.socket_path: '/tmp/baander-control/control.sock'
+
 swoole:
     http_server:
         host: 0.0.0.0

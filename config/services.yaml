@@ -75,6 +75,8 @@ services:
             tags: ['baander.doctrine.foreign_key_declarations']
         App\Shared\Application\Port\SettingDefinitionProviderInterface:
             tags: ['baander.setting_definition_provider']
+        App\Shared\Infrastructure\Swoole\Control\ServerControlOperation:
+            tags: ['app.server_control.operation']
 
     # --- Swoole DBAL Alive Keepers ---
     # Replaces swoole-bundle/resetter-bundle. Wired by DBALAliveKeeperCompilerPass
@@ -109,6 +111,30 @@ services:
             $authenticator: '@App\Shared\Infrastructure\Security\WsQueryTokenAuthenticator'
         tags:
             - { name: 'swoole_bundle.server_configurator' }
+
+    # --- Server control channel ---
+    # A unix-socket listener in the web server; console commands reach every HTTP
+    # worker's state through it. ControlSocketConfigurator gets the
+    # swoole_bundle.server_configurator tag from the bundle's autoconfiguration of
+    # its Configurator interface. ServerControl picks the in-server
+    # coordinator inside an HTTP worker and the socket client everywhere else.
+    App\Shared\Infrastructure\Swoole\Control\ServerControlOperationRegistry:
+        arguments:
+            $operations: !tagged_iterator app.server_control.operation
+
+    App\Shared\Infrastructure\Swoole\Control\ServerWorkers:
+        alias: App\Shared\Infrastructure\Swoole\Control\SwooleServerWorkers
+
+    App\Shared\Infrastructure\Swoole\Control\ControlSocketConfigurator:
+        arguments:
+            $socketPath: '%app.server_control.socket_path%'
+
+    App\Shared\Infrastructure\Swoole\Control\SocketServerControlClient:
+        arguments:
+            $socketPath: '%app.server_control.socket_path%'
+
+    App\Shared\Application\Port\ServerControlPortInterface:
+        alias: App\Shared\Infrastructure\Swoole\Control\ServerControl
 
     # --- Swoole WebProfiler ---
 
