@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Scheduler\Domain\Model;
 
+use App\Scheduler\Domain\Exception\DisabledScheduledJob;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Domain\ValueObject\ScheduleStatus;
 use App\Shared\Domain\Model\Uuid;
 use Cron\CronExpression;
 use DateTimeImmutable;
-use RuntimeException;
 
 final class ScheduledJob
 {
@@ -172,20 +172,36 @@ final class ScheduledJob
         }
     }
 
+    /**
+     * Pausing a paused job changes nothing.
+     *
+     * @throws DisabledScheduledJob
+     */
     public function pause(): void
     {
-        if ($this->state->status !== ScheduleStatus::Active) {
-            throw new RuntimeException('Can only pause an active job.');
+        if ($this->state->status === ScheduleStatus::Paused) {
+            return;
+        }
+        if ($this->state->status === ScheduleStatus::Disabled) {
+            throw new DisabledScheduledJob('A disabled job cannot be paused. Enable it first.');
         }
 
         $this->state->status = ScheduleStatus::Paused;
         $this->state->updatedAt = new DateTimeImmutable();
     }
 
+    /**
+     * Resuming an active job changes nothing.
+     *
+     * @throws DisabledScheduledJob
+     */
     public function resume(): void
     {
-        if ($this->state->status !== ScheduleStatus::Paused) {
-            throw new RuntimeException('Cannot resume a job that is not paused.');
+        if ($this->state->status === ScheduleStatus::Active) {
+            return;
+        }
+        if ($this->state->status === ScheduleStatus::Disabled) {
+            throw new DisabledScheduledJob('A disabled job cannot be resumed. Enable it first.');
         }
 
         $this->state->status = ScheduleStatus::Active;
@@ -193,10 +209,11 @@ final class ScheduledJob
         $this->recalculateNextRun();
     }
 
+    /** Enabling a job that is not disabled, active or paused, changes nothing. */
     public function enable(): void
     {
         if ($this->state->status !== ScheduleStatus::Disabled) {
-            throw new RuntimeException('Can only enable a disabled job.');
+            return;
         }
 
         $this->state->status = ScheduleStatus::Active;

@@ -30,6 +30,9 @@ final class AdminScheduledJobController
 {
     use ApiResponsesTrait;
 
+    /** A job ID; anything else is no job's address and answers 404. */
+    private const string UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+
     public function __construct(
         private readonly ScheduledJobAdministrationInterface $scheduledJobService,
         private readonly SchedulerManualOccurrenceRecorderInterface $manualOccurrences,
@@ -52,6 +55,7 @@ final class AdminScheduledJobController
         ],
     )]
     #[Route('', name: 'list', methods: ['GET'])]
+    #[CliCounterpart('app:scheduler:list')]
     public function list(): JsonResponse
     {
         $jobs = $this->scheduledJobService->findAll();
@@ -71,7 +75,8 @@ final class AdminScheduledJobController
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}', name: 'show', methods: ['GET'], requirements: ['id' => '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'])]
+    #[Route('/{id}', name: 'show', methods: ['GET'], requirements: ['id' => self::UUID])]
+    #[CliCounterpart('app:scheduler:show')]
     public function show(string $id): JsonResponse
     {
         $job = $this->scheduledJobService->getById(Uuid::fromString($id));
@@ -93,9 +98,11 @@ final class AdminScheduledJobController
             new OA\Response(response: '201', description: 'Job created', content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'data', ref: new Model(type: ScheduledJobResource::class)),
             ])),
+            new OA\Response(response: '422', description: 'Invalid job, such as an unschedulable command or parameters outside its schema', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('', name: 'create', methods: ['POST'])]
+    #[CliCounterpart('app:scheduler:create')]
     public function create(#[MapRequestPayload] CreateScheduledJobRequest $request): JsonResponse
     {
         $job = $this->scheduledJobService->createJob(new ScheduledJobInput(
@@ -121,11 +128,13 @@ final class AdminScheduledJobController
             new OA\Response(response: '200', description: 'Job updated', content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'data', ref: new Model(type: ScheduledJobResource::class)),
             ])),
+            new OA\Response(response: '422', description: 'Invalid job, such as an unschedulable command or parameters outside its schema', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '409', description: 'Job changed concurrently; reload before retrying', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}', name: 'update', methods: ['PUT'])]
+    #[Route('/{id}', name: 'update', methods: ['PUT'], requirements: ['id' => self::UUID])]
+    #[CliCounterpart('app:scheduler:update')]
     public function update(string $id, #[MapRequestPayload] UpdateScheduledJobRequest $request): JsonResponse
     {
         $job = $this->scheduledJobService->updateJob(Uuid::fromString($id), new ScheduledJobInput(
@@ -152,7 +161,8 @@ final class AdminScheduledJobController
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
+    #[Route('/{id}', name: 'delete', methods: ['DELETE'], requirements: ['id' => self::UUID])]
+    #[CliCounterpart('app:scheduler:delete')]
     public function delete(string $id): JsonResponse
     {
         if (!$this->scheduledJobService->deleteById(Uuid::fromString($id))) {
@@ -166,14 +176,15 @@ final class AdminScheduledJobController
         path: '/api/admin/scheduler/jobs/{id}/pause',
         summary: 'Pause a scheduled job',
         responses: [
-            new OA\Response(response: '200', description: 'Job paused', content: new OA\JsonContent(properties: [
+            new OA\Response(response: '200', description: 'Job paused, or already paused', content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'data', ref: new Model(type: ScheduledJobResource::class)),
             ])),
-            new OA\Response(response: '409', description: 'Job changed concurrently; reload before retrying', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '409', description: 'Job is disabled, or changed concurrently; reload before retrying', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}/pause', name: 'pause', methods: ['POST'])]
+    #[Route('/{id}/pause', name: 'pause', methods: ['POST'], requirements: ['id' => self::UUID])]
+    #[CliCounterpart('app:scheduler:pause')]
     public function pause(string $id): JsonResponse
     {
         $job = $this->scheduledJobService->pause(Uuid::fromString($id));
@@ -188,14 +199,15 @@ final class AdminScheduledJobController
         path: '/api/admin/scheduler/jobs/{id}/resume',
         summary: 'Resume a paused scheduled job',
         responses: [
-            new OA\Response(response: '200', description: 'Job resumed', content: new OA\JsonContent(properties: [
+            new OA\Response(response: '200', description: 'Job resumed, or already active', content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'data', ref: new Model(type: ScheduledJobResource::class)),
             ])),
-            new OA\Response(response: '409', description: 'Job changed concurrently; reload before retrying', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '409', description: 'Job is disabled, or changed concurrently; reload before retrying', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}/resume', name: 'resume', methods: ['POST'])]
+    #[Route('/{id}/resume', name: 'resume', methods: ['POST'], requirements: ['id' => self::UUID])]
+    #[CliCounterpart('app:scheduler:resume')]
     public function resume(string $id): JsonResponse
     {
         $job = $this->scheduledJobService->resume(Uuid::fromString($id));
@@ -259,14 +271,15 @@ final class AdminScheduledJobController
         path: '/api/admin/scheduler/jobs/{id}/enable',
         summary: 'Enable a disabled scheduled job',
         responses: [
-            new OA\Response(response: '200', description: 'Job enabled', content: new OA\JsonContent(properties: [
+            new OA\Response(response: '200', description: 'Job enabled, or already enabled', content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'data', ref: new Model(type: ScheduledJobResource::class)),
             ])),
             new OA\Response(response: '409', description: 'Job changed concurrently; reload before retrying', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}/enable', name: 'enable', methods: ['POST'])]
+    #[Route('/{id}/enable', name: 'enable', methods: ['POST'], requirements: ['id' => self::UUID])]
+    #[CliCounterpart('app:scheduler:enable')]
     public function enable(string $id): JsonResponse
     {
         $job = $this->scheduledJobService->enable(Uuid::fromString($id));
@@ -281,14 +294,15 @@ final class AdminScheduledJobController
         path: '/api/admin/scheduler/jobs/{id}/disable',
         summary: 'Disable a scheduled job',
         responses: [
-            new OA\Response(response: '200', description: 'Job disabled', content: new OA\JsonContent(properties: [
+            new OA\Response(response: '200', description: 'Job disabled, or already disabled', content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'data', ref: new Model(type: ScheduledJobResource::class)),
             ])),
             new OA\Response(response: '409', description: 'Job changed concurrently; reload before retrying', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}/disable', name: 'disable', methods: ['POST'])]
+    #[Route('/{id}/disable', name: 'disable', methods: ['POST'], requirements: ['id' => self::UUID])]
+    #[CliCounterpart('app:scheduler:disable')]
     public function disable(string $id): JsonResponse
     {
         $job = $this->scheduledJobService->disable(Uuid::fromString($id));
@@ -312,6 +326,7 @@ final class AdminScheduledJobController
         ],
     )]
     #[Route('/commands', name: 'commands', methods: ['GET'])]
+    #[CliCounterpart('app:scheduler:commands')]
     public function commands(): JsonResponse
     {
         return $this->successResponse($this->scheduledJobService->availableCommands());

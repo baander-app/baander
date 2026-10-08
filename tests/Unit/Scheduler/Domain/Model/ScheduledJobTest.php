@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Scheduler\Domain\Model;
 
+use App\Scheduler\Domain\Exception\DisabledScheduledJob;
 use App\Scheduler\Domain\Model\ScheduledJob;
 use App\Scheduler\Domain\Model\ScheduledJobState;
 use App\Scheduler\Domain\ValueObject\JobType;
@@ -11,7 +12,6 @@ use App\Scheduler\Domain\ValueObject\ScheduleStatus;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 
 final class ScheduledJobTest extends TestCase
 {
@@ -124,23 +124,24 @@ final class ScheduledJobTest extends TestCase
         $this->assertSame(ScheduleStatus::Paused, $job->getStatus());
     }
 
-    public function testPauseFromPausedThrows(): void
+    public function testPauseFromPausedChangesNothing(): void
     {
         $job = $this->createActiveJob();
         $job->pause();
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Can only pause an active job');
+        $before = clone $job->getState();
 
         $job->pause();
+
+        $this->assertEquals($before, $job->getState());
     }
 
-    public function testPauseFromDisabledThrows(): void
+    public function testPauseFromDisabledIsRefused(): void
     {
         $job = $this->createActiveJob();
         $job->disable();
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(DisabledScheduledJob::class);
+        $this->expectExceptionMessage('A disabled job cannot be paused. Enable it first.');
         $job->pause();
     }
 
@@ -157,22 +158,23 @@ final class ScheduledJobTest extends TestCase
         $this->assertNotNull($job->getNextRunAt());
     }
 
-    public function testResumeFromActiveThrows(): void
+    public function testResumeFromActiveChangesNothing(): void
     {
         $job = $this->createActiveJob();
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('not paused');
+        $before = clone $job->getState();
 
         $job->resume();
+
+        $this->assertEquals($before, $job->getState());
     }
 
-    public function testResumeFromDisabledThrows(): void
+    public function testResumeFromDisabledIsRefused(): void
     {
         $job = $this->createActiveJob();
         $job->disable();
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(DisabledScheduledJob::class);
+        $this->expectExceptionMessage('A disabled job cannot be resumed. Enable it first.');
         $job->resume();
     }
 
@@ -189,23 +191,25 @@ final class ScheduledJobTest extends TestCase
         $this->assertNotNull($job->getNextRunAt());
     }
 
-    public function testEnableFromActiveThrows(): void
+    public function testEnableFromActiveChangesNothing(): void
     {
         $job = $this->createActiveJob();
-
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Can only enable a disabled job');
+        $before = clone $job->getState();
 
         $job->enable();
+
+        $this->assertEquals($before, $job->getState());
     }
 
-    public function testEnableFromPausedThrows(): void
+    public function testEnableFromPausedLeavesTheJobPaused(): void
     {
         $job = $this->createActiveJob();
         $job->pause();
+        $before = clone $job->getState();
 
-        $this->expectException(RuntimeException::class);
         $job->enable();
+
+        $this->assertEquals($before, $job->getState());
     }
 
     public function testDisableFromActive(): void

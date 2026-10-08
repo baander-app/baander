@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Scheduler\Infrastructure\Service;
 
 use App\Scheduler\Application\DTO\ScheduledJobInput;
+use App\Scheduler\Application\Exception\InvalidScheduledJob;
 use App\Scheduler\Application\Exception\ScheduledJobConflict;
 use App\Scheduler\Domain\Exception\ScheduledJobConflict as PersistenceConflict;
 use App\Scheduler\Domain\Model\ScheduledJob;
@@ -13,6 +14,8 @@ use App\Scheduler\Domain\Service\SchedulerRegistry;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Domain\ValueObject\ScheduleStatus;
 use App\Scheduler\Infrastructure\Service\ScheduledJobService;
+use App\Shared\Application\Exception\ConflictException;
+use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -66,9 +69,61 @@ final class ScheduledJobAdministrationTest extends TestCase
         try {
             $service->updateJob($job->getId(), $input);
             self::fail('Invalid administration input must fail.');
-        } catch (\InvalidArgumentException) {
+        } catch (InvalidScheduledJob $error) {
+            self::assertInstanceOf(InvalidInputException::class, $error);
             self::assertEquals($before, $job->getState());
         }
+    }
+
+    #[DataProvider('repeatedTransitions')]
+    public function testRepeatingALifecycleActionSucceedsWithoutWriting(string $action, ScheduleStatus $status): void
+    {
+        $job = $this->job();
+        $job->getState()->status = $status;
+        $before = clone $job->getState();
+        $repository = $this->createMock(ScheduledJobRepositoryInterface::class);
+        $repository->method('findByUuid')->willReturn($job);
+        $repository->expects(self::never())->method('save');
+        $service = new ScheduledJobService($repository, $this->createStub(SchedulerRegistry::class));
+
+        self::assertSame($job, $service->{$action}($job->getId()));
+        self::assertEquals($before, $job->getState());
+    }
+
+    /** @return iterable<string, array{string, ScheduleStatus}> */
+    public static function repeatedTransitions(): iterable
+    {
+        yield 'pause a paused job' => ['pause', ScheduleStatus::Paused];
+        yield 'resume an active job' => ['resume', ScheduleStatus::Active];
+        yield 'enable an active job' => ['enable', ScheduleStatus::Active];
+        yield 'enable a paused job' => ['enable', ScheduleStatus::Paused];
+        yield 'disable a disabled job' => ['disable', ScheduleStatus::Disabled];
+    }
+
+    #[DataProvider('disabledTransitions')]
+    public function testPausingOrResumingADisabledJobIsAConflict(string $action, string $message): void
+    {
+        $job = $this->job();
+        $job->disable();
+        $repository = $this->createMock(ScheduledJobRepositoryInterface::class);
+        $repository->method('findByUuid')->willReturn($job);
+        $repository->expects(self::never())->method('save');
+        $service = new ScheduledJobService($repository, $this->createStub(SchedulerRegistry::class));
+
+        try {
+            $service->{$action}($job->getId());
+            self::fail('A disabled job must refuse the change.');
+        } catch (ConflictException $error) {
+            self::assertSame($message, $error->getMessage());
+            self::assertSame(ScheduleStatus::Disabled, $job->getStatus());
+        }
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function disabledTransitions(): iterable
+    {
+        yield 'pause' => ['pause', 'A disabled job cannot be paused. Enable it first.'];
+        yield 'resume' => ['resume', 'A disabled job cannot be resumed. Enable it first.'];
     }
 
     /** @return iterable<string, array{ScheduledJobInput}> */

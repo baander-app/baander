@@ -67,6 +67,7 @@ final class SystemSettingsController
         ],
     )]
     #[Route('/definitions', name: 'definitions', methods: ['GET'])]
+    #[CliCounterpart('app:settings:definitions')]
     public function definitions(): JsonResponse
     {
         return $this->successResponse(SettingDefinitionResource::collection($this->definitions->all()));
