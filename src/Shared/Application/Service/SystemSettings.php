@@ -53,12 +53,7 @@ final readonly class SystemSettings implements SystemSettingsPortInterface
      */
     public function definition(string $key): SettingDefinition
     {
-        $definition = $this->definitions->get($key);
-        if ($definition === null || $definition->scope !== SettingScope::System) {
-            throw new UnknownSettingException($key);
-        }
-
-        return $definition;
+        return $this->definitions->require($key, SettingScope::System);
     }
 
     private function buildEntry(SettingDefinition $definition, mixed $storedValue): SystemSettingEntry
@@ -67,17 +62,15 @@ final readonly class SystemSettings implements SystemSettingsPortInterface
             definition: $definition,
             value: $this->effective($definition, $storedValue),
             storedValue: $storedValue,
-            storedValueValid: $storedValue === null || $definition->allows($storedValue),
+            storedValueValid: $storedValue === null || $definition->valueOrNull($storedValue) !== null,
         );
     }
 
     private function effective(SettingDefinition $definition, mixed $storedValue): bool|int|string
     {
-        if ((is_bool($storedValue) || is_int($storedValue) || is_string($storedValue)) && $definition->allows($storedValue)) {
-            return $storedValue;
-        }
-
         // System definitions always carry a default; only user settings follow a fallback.
-        return $definition->default ?? throw new LogicException(sprintf('System setting "%s" has no default.', $definition->key));
+        return $definition->valueOrNull($storedValue)
+            ?? $definition->default
+            ?? throw new LogicException(sprintf('System setting "%s" has no default.', $definition->key));
     }
 }

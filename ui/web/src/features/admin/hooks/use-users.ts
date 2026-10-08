@@ -1,13 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  userAdminApi,
-  type AdminUserListParams,
-  type AdminUserSetting,
-  type AdminUserSettingValue,
-} from '../api/user-admin-api'
+  deleteAdminUserSettingsReset,
+  getGetAdminUserSettingsIndexQueryKey,
+  putAdminUserSettingsSet,
+  useGetAdminUserSettingsIndex,
+  type GetAdminUserSettingsIndex200,
+  type SetAdminUserSettingRequest,
+} from '@/shared/api-client/gen/endpoints'
+import { userAdminApi, type AdminUserListParams } from '../api/user-admin-api'
 
 const USERS_KEY = ['admin-users']
-const USER_SETTINGS_KEY = ['admin-user-settings']
 
 export function useUsers(params?: AdminUserListParams) {
   return useQuery({
@@ -73,15 +75,16 @@ export function useToggleUser() {
 
 /** A user's settings as administrators see them, including stored values that are no longer allowed. */
 export function useUserSettings(id: string) {
-  return useQuery({
-    queryKey: [...USER_SETTINGS_KEY, id],
-    queryFn: ({ signal }) => userAdminApi.settings(id, signal),
-    retry: false,
+  return useGetAdminUserSettingsIndex(id, {
+    query: {
+      retry: false,
+      select: (response) => response.data ?? [],
+    },
   })
 }
 
 export type UserSettingChange =
-  | { id: string; key: string; action: 'set'; value: AdminUserSettingValue }
+  | { id: string; key: string; action: 'set'; value: SetAdminUserSettingRequest['value'] }
   | { id: string; key: string; action: 'reset' }
 
 /** Sets or resets one of a user's settings and stores the setting the server answers with. */
@@ -90,14 +93,19 @@ export function useChangeUserSetting() {
   return useMutation({
     mutationFn: (change: UserSettingChange) =>
       change.action === 'set'
-        ? userAdminApi.setSetting(change.id, change.key, change.value)
-        : userAdminApi.resetSetting(change.id, change.key),
-    onSuccess: (setting, change) => {
-      qc.setQueryData<AdminUserSetting[]>([...USER_SETTINGS_KEY, change.id], (current) =>
-        current?.map((candidate) => (candidate.key === setting.key ? setting : candidate)),
-      )
+        ? putAdminUserSettingsSet(change.id, change.key, { value: change.value })
+        : deleteAdminUserSettingsReset(change.id, change.key),
+    onSuccess: (response, change) => {
+      const setting = response.data
+      const queryKey = getGetAdminUserSettingsIndexQueryKey(change.id)
+      if (setting) {
+        qc.setQueryData<GetAdminUserSettingsIndex200>(queryKey, (current) => current && {
+          ...current,
+          data: current.data?.map((candidate) => (candidate.key === setting.key ? setting : candidate)),
+        })
+      }
 
-      return qc.invalidateQueries({ queryKey: [...USER_SETTINGS_KEY, change.id] })
+      return qc.invalidateQueries({ queryKey })
     },
   })
 }

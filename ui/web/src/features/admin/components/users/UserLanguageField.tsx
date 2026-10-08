@@ -1,12 +1,12 @@
 import { useId } from 'react'
 import styled from 'styled-components'
-import { AxiosError } from 'axios'
-import { parseApiError } from '@/features/auth/lib/parse-api-error'
+import { parseApiError, parseFieldViolations } from '@/features/auth/lib/parse-api-error'
+import { SERVER_DEFAULT_SELECTION } from '@/features/settings/email-language'
 import { Button } from '@/shared/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import type { AdminUserSetting } from '../../api/user-admin-api'
-import { SERVER_DEFAULT, initialLanguageSelection } from './user-language'
+import { initialLanguageSelection } from './user-language'
 
 const FieldGroup = styled.div`
   display: flex;
@@ -114,7 +114,7 @@ export function UserLanguageField({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value={SERVER_DEFAULT}>
+          <SelectItem value={SERVER_DEFAULT_SELECTION}>
             {`Server default (${optionLabel(setting, setting.resetValue)})`}
           </SelectItem>
           {setting.options.map((option) => (
@@ -147,21 +147,10 @@ function optionLabel(setting: AdminUserSetting, value: unknown): string {
 
 /** The 422 messages for the setting, or one general message for any other failure. */
 function saveErrorMessages(error: unknown, key: string): string[] {
-  if (error instanceof AxiosError && error.response?.status === 422) {
-    const data: unknown = error.response.data
-    const details = isRecord(data) && isRecord(data.error) ? data.error.details : undefined
-    const messages = isRecord(details) ? details[key] : undefined
-    if (Array.isArray(messages)) {
-      const strings = messages.filter((message): message is string => typeof message === 'string')
-      if (strings.length > 0) {
-        return strings
-      }
-    }
+  const violations = parseFieldViolations(error, key)
+  if (violations.length > 0) {
+    return violations
   }
 
   return [`Could not save the language: ${parseApiError(error, 'Request failed.').message}`]
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }

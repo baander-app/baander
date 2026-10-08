@@ -2,10 +2,11 @@ import { useState } from 'react'
 import styled from 'styled-components'
 import { useAdminCheck } from '@/features/auth/hooks/use-admin-check'
 import { parseApiError } from '@/features/auth/lib/parse-api-error'
+import { EMAIL_LANGUAGE_KEY } from '@/features/settings/email-language'
 import { type AdminUser } from '../../api/user-admin-api'
 import { useChangeUserSetting, useUpdateUser, useUserSettings } from '../../hooks/use-users'
 import { UserLanguageField } from './UserLanguageField'
-import { LANGUAGE_KEY, languageChange } from './user-language'
+import { languageChange } from './user-language'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
 import {
@@ -81,7 +82,7 @@ function EditUserForm({ user, onDone }: { user: AdminUser; onDone: () => void })
   const updateUser = useUpdateUser()
   const settings = useUserSettings(user.id)
   const changeSetting = useChangeUserSetting()
-  const language = settings.data?.find((setting) => setting.key === LANGUAGE_KEY)
+  const language = settings.data?.find((setting) => setting.key === EMAIL_LANGUAGE_KEY)
   const saving = updateUser.isPending || changeSetting.isPending
 
   const selectLanguage = (selection: string) => {

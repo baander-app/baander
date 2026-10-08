@@ -1,19 +1,15 @@
 import { useId } from 'react'
 import styled from 'styled-components'
-import { AxiosError } from 'axios'
-import { parseApiError } from '@/features/auth/lib/parse-api-error'
+import { parseApiError, parseFieldViolations } from '@/features/auth/lib/parse-api-error'
 import { Button } from '@/shared/components/ui/button'
 import { Card, CardContent } from '@/shared/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/components/ui/select'
 import { Skeleton } from '@/shared/components/ui/skeleton'
 import type { UserSettingResource } from '@/shared/api-client/gen/endpoints'
+import { EMAIL_LANGUAGE_KEY, SERVER_DEFAULT_SELECTION } from '../email-language'
 import { useResetUserSetting, useSetUserSetting, useUserSetting } from '../hooks/use-user-settings'
 
-const SETTING_KEY = 'language'
 const LABEL = 'Email language'
-
-/** Select value for "no choice of my own"; language codes never take this form. */
-const SERVER_DEFAULT = 'server-default'
 
 const CardStack = styled(CardContent)`
   display: flex;
@@ -58,7 +54,7 @@ const SkeletonLine = styled(Skeleton)<{ $width: string; $height: string }>`
 /** The language Baander writes the user's emails in, or the server default. */
 export function EmailLanguageSetting() {
   const labelId = useId()
-  const setting = useUserSetting(SETTING_KEY)
+  const setting = useUserSetting(EMAIL_LANGUAGE_KEY)
 
   if (setting.isPending) {
     return (
@@ -111,11 +107,11 @@ function EmailLanguageControl({ setting, labelId }: EmailLanguageControlProps) {
     ?? String(setting.resetValue)
 
   // While a save is pending, show what the user chose; otherwise show what the server holds.
-  let selected = setting.choice === null ? SERVER_DEFAULT : String(setting.choice)
+  let selected = setting.choice === null ? SERVER_DEFAULT_SELECTION : String(setting.choice)
   if (save.isPending && save.variables) {
     selected = String(save.variables.data.value)
   } else if (reset.isPending) {
-    selected = SERVER_DEFAULT
+    selected = SERVER_DEFAULT_SELECTION
   }
 
   const failure = save.error ?? reset.error
@@ -125,7 +121,7 @@ function EmailLanguageControl({ setting, labelId }: EmailLanguageControlProps) {
   const choose = (chosen: string) => {
     save.reset()
     reset.reset()
-    if (chosen === SERVER_DEFAULT) {
+    if (chosen === SERVER_DEFAULT_SELECTION) {
       reset.mutate({ key: setting.key })
 
       return
@@ -151,7 +147,7 @@ function EmailLanguageControl({ setting, labelId }: EmailLanguageControlProps) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={SERVER_DEFAULT}>{`Server default (${serverDefaultName})`}</SelectItem>
+              <SelectItem value={SERVER_DEFAULT_SELECTION}>{`Server default (${serverDefaultName})`}</SelectItem>
               {options.map((option) => (
                 <SelectItem key={String(option.value)} value={String(option.value)}>
                   {option.label}
@@ -174,31 +170,10 @@ function EmailLanguageControl({ setting, labelId }: EmailLanguageControlProps) {
 
 /** The server's violations for this setting, or a general save failure. */
 function saveErrors(error: unknown): string[] {
-  const violations = violationsFor(error)
+  const violations = parseFieldViolations(error, EMAIL_LANGUAGE_KEY)
   if (violations.length > 0) {
     return violations
   }
 
   return [`Could not save: ${parseApiError(error, 'The server did not answer.').message}`]
-}
-
-function violationsFor(error: unknown): string[] {
-  if (!(error instanceof AxiosError) || error.response?.status !== 422) {
-    return []
-  }
-  const data: unknown = error.response.data
-  if (typeof data !== 'object' || data === null || !('error' in data)) {
-    return []
-  }
-  const body: unknown = data.error
-  if (typeof body !== 'object' || body === null || !('details' in body)) {
-    return []
-  }
-  const details: unknown = body.details
-  if (typeof details !== 'object' || details === null) {
-    return []
-  }
-  const messages: unknown = Object.entries(details).find(([field]) => field === SETTING_KEY)?.[1]
-
-  return Array.isArray(messages) ? messages.filter((message) => typeof message === 'string') : []
 }

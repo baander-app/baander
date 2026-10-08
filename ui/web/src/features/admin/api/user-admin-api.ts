@@ -2,7 +2,6 @@ import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import type { AdminUserSettingResource } from '@/shared/api-client/gen/endpoints'
 
 export type AdminUserSetting = AdminUserSettingResource
-export type AdminUserSettingValue = boolean | number | string
 
 export interface AdminUser {
   id: string
@@ -62,18 +61,4 @@ export const userAdminApi = {
     await AXIOS_INSTANCE.post(`/api/admin/users/${id}/enable`)
   },
 
-  settings: async (id: string, signal?: AbortSignal): Promise<AdminUserSetting[]> => {
-    const { data } = await AXIOS_INSTANCE.get<{ data: AdminUserSetting[] }>(`/api/admin/users/${id}/settings`, { signal })
-    return data.data
-  },
-
-  setSetting: async (id: string, key: string, value: AdminUserSettingValue): Promise<AdminUserSetting> => {
-    const { data } = await AXIOS_INSTANCE.put<{ data: AdminUserSetting }>(`/api/admin/users/${id}/settings/${key}`, { value })
-    return data.data
-  },
-
-  resetSetting: async (id: string, key: string): Promise<AdminUserSetting> => {
-    const { data } = await AXIOS_INSTANCE.delete<{ data: AdminUserSetting }>(`/api/admin/users/${id}/settings/${key}`)
-    return data.data
-  },
 }

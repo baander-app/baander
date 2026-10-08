@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Doctrine\Repository;
 
 use App\Shared\Application\Port\SystemSettingStoreInterface;
+use App\Shared\Infrastructure\Doctrine\JsonSettingValue;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -25,7 +26,7 @@ final class SystemSettingRepository implements SystemSettingStoreInterface
     {
         $values = [];
         foreach ($this->connection->fetchAllKeyValue('SELECT key, value FROM system_settings ORDER BY key') as $key => $json) {
-            $values[(string) $key] = self::decode($json);
+            $values[(string) $key] = JsonSettingValue::decode($json, 'system setting');
         }
 
         return $values;
@@ -35,7 +36,7 @@ final class SystemSettingRepository implements SystemSettingStoreInterface
     {
         $json = $this->connection->fetchOne('SELECT value FROM system_settings WHERE key = :key', ['key' => $key]);
 
-        return $json === false ? null : self::decode($json);
+        return $json === false ? null : JsonSettingValue::decode($json, 'system setting');
     }
 
     public function save(array $values): void
@@ -51,7 +52,7 @@ final class SystemSettingRepository implements SystemSettingStoreInterface
             $index = count($rows);
             $rows[] = sprintf('(:key_%1$d, CAST(:value_%1$d AS jsonb))', $index);
             $parameters['key_' . $index] = (string) $key;
-            $parameters['value_' . $index] = json_encode($value, JSON_THROW_ON_ERROR);
+            $parameters['value_' . $index] = JsonSettingValue::encode($value);
         }
 
         $this->connection->executeStatement(
@@ -64,14 +65,5 @@ final class SystemSettingRepository implements SystemSettingStoreInterface
     public function delete(string $key): void
     {
         $this->connection->executeStatement('DELETE FROM system_settings WHERE key = :key', ['key' => $key]);
-    }
-
-    private static function decode(mixed $json): mixed
-    {
-        if (!is_string($json)) {
-            throw new \UnexpectedValueException('A system setting value must be read as JSON text.');
-        }
-
-        return json_decode($json, true, 512, JSON_THROW_ON_ERROR);
     }
 }

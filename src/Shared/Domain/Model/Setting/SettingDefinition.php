@@ -74,6 +74,27 @@ final readonly class SettingDefinition
         };
     }
 
+    /**
+     * The value when this definition allows it, otherwise null.
+     */
+    public function valueOrNull(mixed $value): bool|int|string|null
+    {
+        return (is_bool($value) || is_int($value) || is_string($value)) && $this->allows($value) ? $value : null;
+    }
+
+    /**
+     * The allowed values of an enum setting, each with its display label.
+     *
+     * @return list<array{value: int|string, label: string}>
+     */
+    public function options(): array
+    {
+        return array_map(
+            fn (int|string $value): array => ['value' => $value, 'label' => $this->valueLabels[$value] ?? (string) $value],
+            $this->allowedValues,
+        );
+    }
+
     public function isUserEditable(): bool
     {
         return $this->scope === SettingScope::User && $this->editRole === self::ROLE_USER;

@@ -77,10 +77,7 @@ final readonly class UserSettingsContract implements UserSettingsContractInterfa
             key: $definition->key,
             label: $definition->label,
             type: $definition->type->value,
-            options: array_map(
-                static fn (int|string $value): array => ['value' => $value, 'label' => $definition->valueLabels[$value] ?? (string) $value],
-                $definition->allowedValues,
-            ),
+            options: $definition->options(),
             userEditable: $definition->isUserEditable(),
             storedValue: $entry->storedValue,
             storedValueValid: $entry->storedValueValid(),

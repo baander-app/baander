@@ -19,6 +19,21 @@ final readonly class TranslatableParameter implements TranslatableInterface
     ) {
     }
 
+    /**
+     * Translates every translatable value into the locale and keeps the others.
+     *
+     * @param array<string, mixed> $parameters
+     *
+     * @return array<string, mixed>
+     */
+    public static function resolveAll(array $parameters, TranslatorInterface $translator, string $locale): array
+    {
+        return array_map(
+            static fn (mixed $value): mixed => $value instanceof TranslatableInterface ? $value->trans($translator, $locale) : $value,
+            $parameters,
+        );
+    }
+
     public function trans(TranslatorInterface $translator, ?string $locale = null): string
     {
         return $translator->trans($this->key, [], 'notification', $locale);
