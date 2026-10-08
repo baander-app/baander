@@ -15,12 +15,12 @@ use App\Transcode\Interface\Resource\TranscodeJobResource;
 use App\Transcode\Interface\Resource\TranscodeMetricsResource;
 use OpenApi\Attributes as OA;
 use Nelmio\ApiDocBundle\Attribute\Model;
-use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[OA\Tag(name: 'Transcode', description: 'Video transcoding management endpoints')]
 #[Route('/api/transcode/jobs', name: 'transcode_job_')]
@@ -31,7 +31,6 @@ final class TranscodeJobController
     public function __construct(
         private readonly MessageBusInterface $commandBus,
         private readonly TranscodeJobPortInterface $jobPort,
-        private readonly Security $security,
     ) {
     }
 
@@ -81,11 +80,9 @@ final class TranscodeJobController
         ],
     )]
     #[Route('/cleanup', name: 'cleanup', methods: ['POST'])]
+    #[IsGranted('ROLE_ADMIN')]
     public function cleanup(): JsonResponse
     {
-        if (!$this->security->isGranted('ROLE_ADMIN')) {
-            return $this->forbidden();
-        }
         $stamp = $this->commandBus->dispatch(new CleanupOrphanedJobsCommand())->last(HandledStamp::class);
         $count = $stamp?->getResult() ?? 0;
 

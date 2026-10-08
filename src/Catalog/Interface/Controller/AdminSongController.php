@@ -8,6 +8,7 @@ use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Playlist\Application\Port\PlaylistDeletionPreviewPortInterface;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Interface\Attribute\CliParityExemption;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -71,6 +72,7 @@ final class AdminSongController
         ],
     )]
     #[Route('/{publicId}/delete-preview', name: 'delete_preview', methods: ['GET'])]
+    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
     public function deletePreview(string $publicId): JsonResponse
     {
         $resolvedPublicId = $this->resolvePublicId($publicId);
@@ -124,6 +126,7 @@ final class AdminSongController
         ],
     )]
     #[Route('/{publicId}', name: 'delete', methods: ['DELETE'])]
+    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
     public function delete(string $publicId, Request $request): JsonResponse
     {
         $resolvedPublicId = $this->resolvePublicId($publicId);

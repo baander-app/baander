@@ -12,6 +12,7 @@ use App\Scheduler\Interface\Request\CreateScheduledJobRequest;
 use App\Scheduler\Interface\Request\UpdateScheduledJobRequest;
 use App\Scheduler\Interface\Resource\ScheduledJobResource;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -226,6 +227,7 @@ final class AdminScheduledJobController
         ],
     )]
     #[Route('/{id}/trigger', name: 'trigger', methods: ['POST'])]
+    #[CliCounterpart('app:scheduler:run')]
     public function trigger(string $id, Request $request): JsonResponse
     {
         try {

@@ -15,6 +15,7 @@ use App\Shared\Domain\Model\Cursor;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Infrastructure\Pagination\CursorCodec;
+use App\Shared\Interface\Attribute\CliParityExemption;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\DTO\CursorPaginatedResponse;
@@ -161,6 +162,7 @@ final class SongController
         ],
     )]
     #[Route('/{publicId}', name: 'update', methods: ['PATCH'])]
+    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
     public function update(string $publicId, #[MapRequestPayload] UpdateSongRequest $payload): JsonResponse
     {
         try {
@@ -216,6 +218,7 @@ final class SongController
         ],
     )]
     #[Route('/{publicId}', name: 'destroy', methods: ['DELETE'])]
+    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
     public function destroy(string $publicId): JsonResponse
     {
         try {

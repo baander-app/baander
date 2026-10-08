@@ -17,6 +17,7 @@ use App\Auth\Interface\Request\Admin\AdminUpdateUserRequest;
 use App\Auth\Interface\Resource\AdminUserResource;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Request\QueryParameters;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -263,6 +264,7 @@ final class AdminUserController
     )]
     #[Route('/{id}/reset-password', name: 'reset_password', methods: ['POST'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
+    #[CliCounterpart('app:user:reset-password')]
     public function resetPassword(string $id, #[MapRequestPayload] AdminResetPasswordRequest $request): JsonResponse
     {
         $user = $this->findUserOr404($id);

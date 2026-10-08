@@ -9,6 +9,7 @@ use App\Notification\Application\Port\WebhookDestinationPortInterface;
 use App\Notification\Application\Port\WebhookSecretPortInterface;
 use App\Notification\Application\Service\NotificationCategoryFilter;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Interface\Attribute\CliParityExemption;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -47,6 +48,7 @@ final class WebhookController
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
+    #[CliParityExemption('deferred: no admin page; follow-up plan')]
     public function index(): JsonResponse
     {
         $webhooks = $this->entityManager
@@ -90,6 +92,7 @@ final class WebhookController
         ],
     )]
     #[Route('/', name: 'create', methods: ['POST'])]
+    #[CliParityExemption('deferred: no admin page; follow-up plan')]
     public function create(Request $request): JsonResponse
     {
         $data = $request->toArray();
@@ -157,6 +160,7 @@ final class WebhookController
         ],
     )]
     #[Route('/{id}', name: 'update', methods: ['PUT'])]
+    #[CliParityExemption('deferred: no admin page; follow-up plan')]
     public function update(string $id, Request $request): JsonResponse
     {
         $webhook = $this->findWebhook($id);
@@ -217,6 +221,7 @@ final class WebhookController
         ],
     )]
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
+    #[CliParityExemption('deferred: no admin page; follow-up plan')]
     public function delete(string $id): JsonResponse
     {
         $webhook = $this->findWebhook($id);
@@ -248,6 +253,7 @@ final class WebhookController
         ],
     )]
     #[Route('/{id}/rotate-secret', name: 'rotate_secret', methods: ['POST'])]
+    #[CliParityExemption('deferred: no admin page; follow-up plan')]
     public function rotateSecret(string $id): JsonResponse
     {
         $webhook = $this->findWebhook($id);

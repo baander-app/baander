@@ -17,6 +17,7 @@ use App\Catalog\Interface\Resource\DuplicateGroupResource;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
+use App\Shared\Interface\Attribute\CliParityExemption;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\DTO\ApiError;
@@ -334,6 +335,7 @@ final class AlbumController
         ],
     )]
     #[Route('/{publicId}', name: 'update', methods: ['PATCH'])]
+    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
     public function update(string $publicId, #[MapRequestPayload] UpdateAlbumRequest $payload): JsonResponse
     {
         try {
@@ -436,6 +438,7 @@ final class AlbumController
         ],
     )]
     #[Route('/{publicId}', name: 'destroy', methods: ['DELETE'])]
+    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
     public function destroy(string $publicId): JsonResponse
     {
         try {

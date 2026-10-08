@@ -7,6 +7,7 @@ namespace App\Shared\Interface\Controller;
 use App\Shared\Application\Exception\RateLimiterClearFailedException;
 use App\Shared\Application\Exception\UnknownRateLimiterException;
 use App\Shared\Application\Port\RateLimiterAdministrationInterface;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use OpenApi\Attributes as OA;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -56,6 +57,7 @@ final class RateLimiterMonitorController
         ],
     )]
     #[Route('', name: 'list', methods: ['GET'])]
+    #[CliCounterpart('app:rate-limiter:list')]
     public function list(): JsonResponse
     {
         $limiters = [];
@@ -102,6 +104,7 @@ final class RateLimiterMonitorController
         ],
     )]
     #[Route('/clear', name: 'clear_all', methods: ['DELETE'])]
+    #[CliCounterpart('app:rate-limiter:clear')]
     public function clearAll(Request $request): JsonResponse
     {
         if (!$this->isConfirmed($request)) {
@@ -147,6 +150,7 @@ final class RateLimiterMonitorController
         ],
     )]
     #[Route('/{name}/clear', name: 'clear', methods: ['DELETE'])]
+    #[CliCounterpart('app:rate-limiter:clear')]
     public function clear(Request $request, string $name): JsonResponse
     {
         if (!$this->isConfirmed($request)) {

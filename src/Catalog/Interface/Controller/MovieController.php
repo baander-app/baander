@@ -12,6 +12,7 @@ use App\Catalog\Interface\Resource\MovieResource;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Interface\Attribute\CliParityExemption;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\DTO\PaginatedResponse;
@@ -157,6 +158,7 @@ final class MovieController
         ],
     )]
     #[Route('/{publicId}', name: 'update', methods: ['PATCH'])]
+    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
     public function update(string $publicId, #[MapRequestPayload] UpdateMovieRequest $payload): JsonResponse
     {
         try {
@@ -201,6 +203,7 @@ final class MovieController
         ],
     )]
     #[Route('/{publicId}', name: 'destroy', methods: ['DELETE'])]
+    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
     public function destroy(string $publicId): JsonResponse
     {
         try {

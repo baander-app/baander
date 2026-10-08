@@ -12,6 +12,7 @@ use App\Auth\Interface\Resource\AdminUserSettingResource;
 use App\Shared\Application\Exception\InvalidSettingValuesException;
 use App\Shared\Application\Exception\UnknownSettingException;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -55,6 +56,7 @@ final class AdminUserSettingsController
     )]
     #[Route('', name: 'index', methods: ['GET'])]
     #[IsGranted('USER_MANAGEMENT_LIST')]
+    #[CliCounterpart('app:user:setting')]
     public function index(string $id): JsonResponse
     {
         if (!self::isUuid($id)) {
@@ -90,6 +92,7 @@ final class AdminUserSettingsController
     )]
     #[Route('/{key}', name: 'set', requirements: ['key' => '[a-z0-9_.]+'], methods: ['PUT'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
+    #[CliCounterpart('app:user:setting')]
     public function set(string $id, string $key, #[MapRequestPayload] SetAdminUserSettingRequest $request): JsonResponse
     {
         if (!self::isUuid($id)) {
@@ -127,6 +130,7 @@ final class AdminUserSettingsController
     )]
     #[Route('/{key}', name: 'reset', requirements: ['key' => '[a-z0-9_.]+'], methods: ['DELETE'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
+    #[CliCounterpart('app:user:setting')]
     public function reset(string $id, string $key): JsonResponse
     {
         if (!self::isUuid($id)) {

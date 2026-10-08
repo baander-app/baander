@@ -11,6 +11,7 @@ use App\Media\Application\Port\ImagePortInterface;
 use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Domain\Model\Image;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Interface\Attribute\CliParityExemption;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use OpenApi\Attributes as OA;
@@ -67,6 +68,7 @@ final class AlbumCoverController
         ],
     )]
     #[Route('', name: 'upload', methods: ['POST'])]
+    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
     public function upload(string $publicId, Request $request): JsonResponse
     {
         $resolvedPublicId = $this->resolvePublicId($publicId);
@@ -157,6 +159,7 @@ final class AlbumCoverController
         ],
     )]
     #[Route('', name: 'delete', methods: ['DELETE'])]
+    #[CliParityExemption('deferred: catalog/player admin action, follow-up plan')]
     public function delete(string $publicId): JsonResponse
     {
         $resolvedPublicId = $this->resolvePublicId($publicId);
