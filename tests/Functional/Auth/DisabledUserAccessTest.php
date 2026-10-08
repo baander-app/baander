@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Auth;
 
+use App\Auth\Application\Command\OAuth\CreateAuthorizationCodeCommand;
+use App\Auth\Application\Command\OAuth\ExchangeAuthorizationCodeCommand;
 use App\Auth\Application\Command\OAuth\ExchangeRefreshTokenCommand;
 use App\Auth\Application\Command\OAuth\IssueTokenCommand;
 use App\Auth\Application\Command\User\DisableUserCommand;
 use App\Auth\Application\Command\User\EnableUserCommand;
+use App\Auth\Application\DTO\AuthorizationResponseDTO;
 use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Application\Exception\OAuthProtocolException;
+use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\User;
+use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Infrastructure\Security\OAuth\OAuth2Authenticator;
 use App\Shared\Domain\Model\Uuid;
@@ -86,6 +91,37 @@ final class DisabledUserAccessTest extends TestCase
         // Signing in again issues a working pair.
         $fresh = $this->issueTokens($user, $clientPublicId);
         self::assertSame(Response::HTTP_OK, $this->bearerStatus($fresh->getAccessToken()));
+    }
+
+    public function testAnAuthorizationCodeIssuedBeforeADisableCannotBeExchanged(): void
+    {
+        // RFC 7636 appendix B.
+        $verifier = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
+        $challenge = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
+        $redirectUri = 'https://player.baander.app/callback';
+        $user = $this->createTestUser();
+        $client = Client::create('Disabled user player', [$redirectUri]);
+        $this->service(ClientRepositoryInterface::class)->saveClient($client);
+        $clientId = $client->getPublicId()->toString();
+
+        $authorization = $this->bus()
+            ->dispatch(new CreateAuthorizationCodeCommand($user->getId(), 'code', $clientId, $redirectUri, $challenge, 'S256'))
+            ->last(HandledStamp::class)?->getResult();
+        self::assertInstanceOf(AuthorizationResponseDTO::class, $authorization);
+        self::assertIsString($authorization->code);
+
+        $this->bus()->dispatch(new DisableUserCommand($user->getEmail()));
+        $this->entityManager->clear();
+
+        try {
+            $this->bus()->dispatch(new ExchangeAuthorizationCodeCommand($clientId, null, $authorization->code, $redirectUri, $verifier, self::DPOP_JKT));
+            self::fail('The authorization code of a disabled user must not be exchangeable.');
+        } catch (HandlerFailedException $exception) {
+            $cause = $exception->getPrevious();
+            self::assertInstanceOf(OAuthProtocolException::class, $cause);
+            self::assertSame('invalid_grant', $cause->error);
+        }
+        self::assertSame(['access' => 0, 'refresh' => 0], $this->activeTokenCounts($user));
     }
 
     /** The response the production bearer authenticator gives: 200 lets the request through. */

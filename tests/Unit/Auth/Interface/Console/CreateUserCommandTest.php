@@ -96,6 +96,45 @@ final class CreateUserCommandTest extends TestCase
         $this->assertSame(Command::SUCCESS, $tester->getStatusCode());
     }
 
+    /** @return iterable<string, array{list<string>, list<string>}> */
+    public static function roleOptions(): iterable
+    {
+        yield 'super-admin' => [['super-admin'], ['ROLE_SUPER_ADMIN']];
+        yield 'repeated' => [['user', 'admin', 'super-admin'], ['ROLE_USER', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN']];
+        yield 'a role twice' => [['admin', 'admin'], ['ROLE_ADMIN']];
+    }
+
+    /**
+     * @param list<string> $options
+     * @param list<string> $roles
+     */
+    #[DataProvider('roleOptions')]
+    public function testEveryRoleOptionReachesTheUseCase(array $options, array $roles): void
+    {
+        $dispatched = [];
+        $user = User::createByOperator(Email::fromString('root@baander.app'), 'hashed-pw', 'Root', $roles);
+        $this->commandBus->method('dispatch')->willReturnCallback(
+            static function (object $message) use (&$dispatched, $user): Envelope {
+                $dispatched[] = $message;
+
+                return new Envelope($message, [new HandledStamp($user, 'handler')]);
+            },
+        );
+
+        $tester = new CommandTester($this->createCommandWithStream("securepassword\n"));
+        $tester->execute([
+            'email' => 'root@baander.app',
+            'name' => 'Root',
+            '--password' => true,
+            '--role' => $options,
+        ], ['interactive' => false]);
+
+        $this->assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
+        $this->assertCount(1, $dispatched);
+        $this->assertInstanceOf(CreateUserMessage::class, $dispatched[0]);
+        $this->assertSame($roles, $dispatched[0]->getRoles());
+    }
+
     public function testInvalidEmailFormat(): void
     {
         $tester = new CommandTester($this->command);

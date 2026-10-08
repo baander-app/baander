@@ -128,6 +128,51 @@ final class UserTest extends TestCase
         $user->updateName('');
     }
 
+    public function testReplaceRolesSetsTheGivenRolesEachOnce(): void
+    {
+        $user = User::register(new Email('test@baander.app'), 'hashed-pw', 'Alice');
+        $before = $user->getUpdatedAt();
+
+        $user->replaceRoles(['ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_ADMIN']);
+
+        $this->assertSame(['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'], $user->getRoles());
+        $this->assertGreaterThanOrEqual($before, $user->getUpdatedAt());
+        $this->assertNotSame($before, $user->getUpdatedAt());
+    }
+
+    public function testReplaceRolesWithTheCurrentRolesInAnyOrderChangesNothing(): void
+    {
+        $user = User::createByOperator(new Email('test@baander.app'), 'hashed-pw', 'Alice', ['ROLE_USER', 'ROLE_ADMIN']);
+        $before = $user->getUpdatedAt();
+
+        $user->replaceRoles(['ROLE_ADMIN', 'ROLE_USER']);
+
+        $this->assertSame(['ROLE_USER', 'ROLE_ADMIN'], $user->getRoles());
+        $this->assertSame($before, $user->getUpdatedAt());
+    }
+
+    /** @return iterable<string, array{list<string>}> */
+    public static function rejectedRoleSets(): iterable
+    {
+        yield 'no role' => [[]];
+        yield 'unknown role' => [['ROLE_USER', 'ROLE_OWNER']];
+    }
+
+    /** @param list<string> $roles */
+    #[\PHPUnit\Framework\Attributes\DataProvider('rejectedRoleSets')]
+    public function testReplaceRolesRejectsAnEmptyOrUnknownRoleSetAndKeepsTheRoles(array $roles): void
+    {
+        $user = User::register(new Email('test@baander.app'), 'hashed-pw', 'Alice');
+
+        try {
+            $user->replaceRoles($roles);
+            $this->fail('The role set must be rejected.');
+        } catch (InvalidArgumentException) {
+        }
+
+        $this->assertSame(['ROLE_USER'], $user->getRoles());
+    }
+
     public function testSetTotpSecret(): void
     {
         $user = User::register(new Email('test@baander.app'), 'hashed-pw', 'Alice');

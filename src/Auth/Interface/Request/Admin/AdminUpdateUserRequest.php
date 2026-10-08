@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Request\Admin;
 
+use App\Auth\Application\CommandHandler\User\RenameUserHandler;
 use OpenApi\Attributes as OA;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -21,8 +22,9 @@ final readonly class AdminUpdateUserRequest
         #[Assert\NotBlank(allowNull: true, normalizer: 'trim')]
         public ?string $email = null,
 
-        #[Assert\Length(min: 1, max: 255)]
-        #[Assert\NotBlank(allowNull: true, normalizer: 'trim')]
+        // The rename handler's rule and messages, so `app:user:rename` rejects the same names alike.
+        #[Assert\Length(max: RenameUserHandler::NAME_MAX_LENGTH, maxMessage: RenameUserHandler::NAME_TOO_LONG)]
+        #[Assert\NotBlank(message: RenameUserHandler::BLANK_NAME, allowNull: true, normalizer: 'trim')]
         public ?string $name = null,
     ) {
     }

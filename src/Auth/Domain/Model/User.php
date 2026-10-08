@@ -11,6 +11,9 @@ use InvalidArgumentException;
 
 final class User
 {
+    /** The roles a user can be assigned. */
+    public const array ROLES = ['ROLE_USER', 'ROLE_ADMIN', 'ROLE_SUPER_ADMIN'];
+
     private const ROLE_HIERARCHY = [
         'ROLE_SUPER_ADMIN' => ['ROLE_ADMIN', 'ROLE_USER'],
         'ROLE_ADMIN' => ['ROLE_USER'],
@@ -199,6 +202,39 @@ final class User
     public function getRoles(): array
     {
         return $this->state->roles;
+    }
+
+    /**
+     * Replaces the assigned roles with the given ones. A repeated role counts once, and
+     * the roles the user already has, in any order, change nothing.
+     *
+     * @param array<array-key, string> $roles
+     *
+     * @throws InvalidArgumentException when no role is given or a role is not one of ROLES
+     */
+    public function replaceRoles(array $roles): void
+    {
+        $roles = array_values(array_unique($roles));
+        if ($roles === []) {
+            throw new InvalidArgumentException('A user needs at least one role.');
+        }
+
+        foreach ($roles as $role) {
+            if (!in_array($role, self::ROLES, true)) {
+                throw new InvalidArgumentException(sprintf('Unknown role "%s". Allowed roles: %s.', $role, implode(', ', self::ROLES)));
+            }
+        }
+
+        $current = $this->state->roles;
+        $requested = $roles;
+        sort($current);
+        sort($requested);
+        if ($current === $requested) {
+            return;
+        }
+
+        $this->state->roles = $roles;
+        $this->state->updatedAt = new DateTimeImmutable();
     }
 
     /**

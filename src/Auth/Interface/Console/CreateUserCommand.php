@@ -18,6 +18,12 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 
+/**
+ * The CLI counterpart of POST /api/admin/users.
+ *
+ * Acts with full authority: any combination of roles, without the admin panel's role
+ * checks or admin.can_create_users.
+ */
 #[AsCommand(
     name: 'app:user:create',
     description: 'Create a new user.',
@@ -44,7 +50,7 @@ final class CreateUserCommand extends Command
             ->addArgument('email', InputArgument::REQUIRED, 'User email address')
             ->addArgument('name', InputArgument::REQUIRED, 'Display name')
             ->addOption('password', null, InputOption::VALUE_NONE, 'Read password from stdin instead of prompting (for CI/scripting)')
-            ->addOption('role', null, InputOption::VALUE_REQUIRED, 'User role', 'user');
+            ->addOption('role', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Role to assign: user, admin or super-admin; repeat for several', ['user']);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -54,7 +60,8 @@ final class CreateUserCommand extends Command
         $email = $input->getArgument('email');
         $name = $input->getArgument('name');
         $useStdin = (bool) $input->getOption('password');
-        $roleString = $input->getOption('role');
+        // An array input may pass a single role as a string.
+        $roleNames = array_values(array_map(strval(...), (array) $input->getOption('role')));
 
         try {
             new Email($email);
@@ -65,15 +72,15 @@ final class CreateUserCommand extends Command
         }
 
         try {
-            $roles = $this->mapRoleToRoles($roleString);
+            $roles = self::rolesFor($roleNames);
         } catch (\InvalidArgumentException $e) {
             $io->error($e->getMessage());
 
             return Command::FAILURE;
         }
 
-        if ($roles === ['ROLE_ADMIN'] && $input->isInteractive()) {
-            if (!$io->confirm('Create user with admin privileges?', false)) {
+        if (array_diff($roles, ['ROLE_USER']) !== [] && $input->isInteractive()) {
+            if (!$io->confirm(sprintf('Create user with the roles %s?', implode(', ', $roles)), false)) {
                 return Command::SUCCESS;
             }
         }
@@ -140,18 +147,23 @@ final class CreateUserCommand extends Command
     }
 
     /**
-     * @return string[]
+     * @param list<string> $names
+     *
+     * @return list<string> the roles, each once, in the order first named
      */
-    private function mapRoleToRoles(string $role): array
+    private static function rolesFor(array $names): array
     {
-        return match ($role) {
-            'admin' => ['ROLE_ADMIN'],
-            'user' => ['ROLE_USER'],
+        $roles = array_map(static fn (string $name): string => match ($name) {
+            'user' => 'ROLE_USER',
+            'admin' => 'ROLE_ADMIN',
+            'super-admin' => 'ROLE_SUPER_ADMIN',
             default => throw new \InvalidArgumentException(sprintf(
-                'Invalid role "%s". Allowed values: user, admin',
-                $role,
+                'Invalid role "%s". Allowed values: user, admin, super-admin',
+                $name,
             )),
-        };
+        }, $names);
+
+        return array_values(array_unique($roles));
     }
 
     /**
