@@ -18,7 +18,8 @@ interface LoginBlockRepositoryInterface
 
     public function countRecent(): int;
 
-    public function deleteByUuid(Uuid $uuid): void;
+    /** @return bool whether a block had the UUID and was removed */
+    public function deleteByUuid(Uuid $uuid): bool;
 
     public function deleteAll(): void;
 }
