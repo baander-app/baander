@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Library\Application;
 
 use App\Library\Application\CommandHandler\CreateLibraryHandler;
+use App\Library\Application\Exception\LibraryScanAlreadyRunningException;
 use App\Library\Application\LibraryDiscovery;
 use App\Library\Application\LibraryProvisioner;
 use App\Library\Application\MovieScanner;
 use App\Library\Application\MusicScanner;
 use App\Library\Application\Port\DirectoryScannerPortInterface;
 use App\Library\Application\Port\LibraryAccessPortInterface;
+use App\Library\Application\Service\LibraryLookup;
+use App\Library\Application\Service\LibraryScanClaims;
 use App\Library\Domain\Model\Library;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Library\Domain\Repository\LibraryFileIndexRepositoryInterface;
@@ -18,9 +21,11 @@ use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Library\Infrastructure\Scanner\MediaFile;
 use App\Shared\Domain\ValueObject\FilesystemType;
+use App\Tests\Fixtures\Library\InMemoryLibraryRepository;
 use App\Tests\Fixtures\Messaging\CancelAtCheckpoint;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Filesystem\Filesystem;
 
@@ -61,15 +66,7 @@ final class LibraryProvisionerTest extends TestCase
 
     public function testSecondProvisionReusesTheLibraryAndReturnsDiscoveredDirectories(): void
     {
-        /** @var list<Library> $saved */
-        $saved = [];
-        $libraries = $this->createStub(LibraryRepositoryInterface::class);
-        $libraries->method('findBySlug')->willReturnCallback(static function () use (&$saved): ?Library {
-            return $saved[0] ?? null;
-        });
-        $libraries->method('save')->willReturnCallback(static function (Library $library) use (&$saved): void {
-            $saved[] = $library;
-        });
+        $libraries = new InMemoryLibraryRepository(new MockClock());
         $provisioner = $this->provisioner($libraries, $this->directoryScanner());
 
         $first = $provisioner->provisionMovieLibrary('E2E Test Movies', 'e2e-test-movies', $this->directory);
@@ -78,7 +75,7 @@ final class LibraryProvisionerTest extends TestCase
         self::assertTrue($first->created);
         self::assertFalse($second->created);
         self::assertTrue($first->libraryId->equals($second->libraryId));
-        self::assertCount(1, array_unique(array_map(spl_object_id(...), $saved)), 'The second run must not create another library.');
+        self::assertCount(1, $libraries->findAllOrdered(), 'The second run must not create another library.');
         self::assertSame('E2E Test Movies', $second->libraryName);
         self::assertCount(1, $second->discoveries);
         $discovery = $second->discoveries[0];
@@ -87,6 +84,21 @@ final class LibraryProvisionerTest extends TestCase
         self::assertSame($this->directory . '/Fixture Movie', $discovery->directory);
         self::assertCount(1, $discovery->files);
         self::assertSame(hash_file('xxh3', $this->directory . '/Fixture Movie/clip.mp4'), $discovery->files[0]->hash);
+        // Each provisioning scan ran under its own claim and ended it.
+        self::assertSame(['claimed e2e-test-movies', 'completed e2e-test-movies', 'claimed e2e-test-movies', 'completed e2e-test-movies'], $libraries->log);
+        self::assertSame('completed', $libraries->findAllOrdered()[0]->getDiscoveryStatus());
+    }
+
+    public function testProvisioningALibraryAnotherScanHoldsIsAConflict(): void
+    {
+        $clock = new MockClock();
+        $libraries = new InMemoryLibraryRepository($clock);
+        $provisioner = $this->provisioner($libraries, $this->directoryScanner());
+        $provisioner->provisionMovieLibrary('E2E Test Movies', 'e2e-test-movies', $this->directory);
+        (new LibraryScanClaims(new LibraryLookup($libraries), $libraries, $clock))->claim('e2e-test-movies');
+
+        $this->expectException(LibraryScanAlreadyRunningException::class);
+        $provisioner->scanExistingLibrary('e2e-test-movies');
     }
 
     public function testScanningAMissingExistingLibraryReturnsNullWithoutScanning(): void
@@ -115,7 +127,8 @@ final class LibraryProvisionerTest extends TestCase
                     return $operation();
                 }
             }),
-            new LibraryDiscovery($libraries, new MusicScanner($directoryScanner, $fileIndex, $logger, new CancelAtCheckpoint()), $movieScanner, $events, $logger),
+            new LibraryScanClaims(new LibraryLookup($libraries), $libraries, new MockClock()),
+            new LibraryDiscovery(new MusicScanner($directoryScanner, $fileIndex, $logger, new CancelAtCheckpoint()), $movieScanner, $events, $logger),
             $movieScanner,
         );
     }

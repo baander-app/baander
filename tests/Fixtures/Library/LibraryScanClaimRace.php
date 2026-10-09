@@ -12,6 +12,7 @@ use Doctrine\DBAL\Tools\DsnParser;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Mapping\UnderscoreNamingStrategy;
 use Doctrine\ORM\ORMSetup;
+use Symfony\Component\Clock\NativeClock;
 
 /**
  * The production library repository over a disposable schema, shared by LibraryScanClaimTest
@@ -48,6 +49,6 @@ final class LibraryScanClaimRace
 
     public static function repository(EntityManager $manager): LibraryRepository
     {
-        return new LibraryRepository($manager);
+        return new LibraryRepository($manager, new NativeClock());
     }
 }

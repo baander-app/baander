@@ -38,6 +38,7 @@ final class CreateLibraryCommand extends Command
             ->addOption('filesystem-type', null, InputOption::VALUE_REQUIRED, 'Filesystem backend', 'local')
             ->addOption('slug', 's', InputOption::VALUE_REQUIRED, 'URL-friendly slug (generated from the name if omitted)')
             ->addOption('sort-order', null, InputOption::VALUE_REQUIRED, 'Sort order', '0');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -56,6 +57,10 @@ final class CreateLibraryCommand extends Command
             )));
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
+        }
+
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, $library);
         }
 
         $io->success('Library created successfully.');

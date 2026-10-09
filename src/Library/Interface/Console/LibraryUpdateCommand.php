@@ -35,6 +35,7 @@ final class LibraryUpdateCommand extends Command
             ->addArgument('library', InputArgument::REQUIRED, 'Library UUID or slug')
             ->addOption('name', null, InputOption::VALUE_REQUIRED, 'The new name')
             ->addOption('sort-order', null, InputOption::VALUE_REQUIRED, 'The new sort order; lower numbers come first');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -50,6 +51,10 @@ final class LibraryUpdateCommand extends Command
             )));
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
+        }
+
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, $library);
         }
 
         $io->success(sprintf('Library "%s" has been updated.', $library['slug']));

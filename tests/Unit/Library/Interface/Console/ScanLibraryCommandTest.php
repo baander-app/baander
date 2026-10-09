@@ -6,23 +6,31 @@ namespace App\Tests\Unit\Library\Interface\Console;
 
 use App\Library\Application\Command\ClaimAllLibraryScansCommand;
 use App\Library\Application\Command\ClaimLibraryScanCommand;
+use App\Library\Application\Command\EndLibraryScanClaimCommand;
 use App\Library\Application\Command\ReleaseLibraryScanClaimCommand;
 use App\Library\Application\Command\ScanLibraryCommand as ScanLibraryCommandMessage;
+use App\Library\Application\DTO\LibraryScanClaim;
 use App\Library\Application\DTO\LibraryScanClaimResult;
 use App\Library\Application\DTO\LibraryScanSummary;
 use App\Library\Application\Exception\LibraryScanAlreadyRunningException;
+use App\Library\Application\Exception\LibraryScanClaimLiveException;
+use App\Library\Application\Query\GetLibraryQuery;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Library\Interface\Console\ScanLibraryCommand;
+use App\Library\Interface\Resource\LibraryResource;
 use App\Shared\Application\DTO\InlineJobRun;
 use App\Shared\Application\JobCancelledException;
 use App\Shared\Application\Port\JobMonitorAdministrationInterface;
+use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -31,11 +39,26 @@ use Symfony\Component\Messenger\Stamp\HandledStamp;
 /** A console scan holds its claim only while it runs. */
 final class ScanLibraryCommandTest extends TestCase
 {
-    /** @var list<string> */
+    /** @var array<string, Library> claim ID => library */
+    private array $claimed = [];
+    /** @var list<string> the libraries whose claims the command ended */
     private array $released = [];
+    /** @var list<ReleaseLibraryScanClaimCommand> */
+    private array $releaseRequests = [];
     /** @var list<string> */
     private array $scanned = [];
     private ScanLibraryCommand $command;
+
+    public function testTheScanRunsUnderTheClaimTheCommandTook(): void
+    {
+        $music = $this->library('music');
+        $tester = $this->tester([$music], fn () => new LibraryScanSummary('id', 'Music', 'music', 1, 1, 0, 1));
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['library' => 'music']));
+
+        self::assertSame(['music'], $this->scanned);
+        self::assertSame([], $this->released);
+    }
 
     public function testAFailedScanReleasesItsClaim(): void
     {
@@ -44,7 +67,7 @@ final class ScanLibraryCommandTest extends TestCase
 
         self::assertSame(Command::FAILURE, $tester->execute(['library' => 'music']));
 
-        self::assertSame([$music->getId()->toString()], $this->released);
+        self::assertSame(['music'], $this->released);
         self::assertStringContainsString('The scan of "music" failed: disk gone', $this->display($tester));
     }
 
@@ -55,7 +78,7 @@ final class ScanLibraryCommandTest extends TestCase
 
         self::assertSame(Command::FAILURE, $tester->execute(['library' => 'music']));
 
-        self::assertSame([$music->getId()->toString()], $this->released);
+        self::assertSame(['music'], $this->released);
         self::assertStringContainsString('The scan of "music" was cancelled: Job "job-1" has been cancelled.', $this->display($tester));
     }
 
@@ -67,7 +90,7 @@ final class ScanLibraryCommandTest extends TestCase
 
         self::assertSame(128 + \SIGINT, $tester->execute(['library' => 'music']));
 
-        self::assertSame([$music->getId()->toString()], $this->released);
+        self::assertSame(['music'], $this->released);
         self::assertStringContainsString('Interrupted by signal ' . \SIGINT, $this->display($tester));
     }
 
@@ -79,8 +102,42 @@ final class ScanLibraryCommandTest extends TestCase
         self::assertSame(128 + \SIGTERM, $tester->execute(['--all' => true]));
 
         self::assertSame(['first'], $this->scanned);
-        self::assertSame([$first->getId()->toString(), $second->getId()->toString(), $third->getId()->toString()], $this->released);
+        self::assertSame(['first', 'second', 'third'], $this->released);
         self::assertStringContainsString('Not started: second, third', $this->display($tester));
+    }
+
+    public function testASigtermBetweenTwoScansOfScanAllReleasesTheUnstartedClaimsAndExits143(): void
+    {
+        [$first, $second, $third] = [$this->library('first'), $this->library('second'), $this->library('third')];
+        $this->tester([$first, $second, $third], fn () => new LibraryScanSummary('id', 'First', 'first', 1, 1, 0, 1), all: true);
+        // SIGTERM arrives after the first scan finished, while the command reports it.
+        $output = new class ($this->command) extends BufferedOutput {
+            private bool $signalled = false;
+
+            public function __construct(private readonly ScanLibraryCommand $command)
+            {
+                parent::__construct();
+            }
+
+            protected function doWrite(string $message, bool $newline): void
+            {
+                parent::doWrite($message, $newline);
+                if (!$this->signalled && str_contains($message, 'Scanned "first"')) {
+                    $this->signalled = true;
+                    TestCase::assertFalse($this->command->handleSignal(\SIGTERM), 'No scan runs, so the signal only stops the run.');
+                }
+            }
+        };
+
+        $input = new ArrayInput(['--all' => true]);
+        $input->setInteractive(false);
+        self::assertSame(128 + \SIGTERM, $this->command->run($input, $output));
+
+        self::assertSame(['first'], $this->scanned);
+        self::assertSame(['second', 'third'], $this->released);
+        $display = (string) preg_replace('/\s+/', ' ', $output->fetch());
+        self::assertStringContainsString('Not started: second, third', $display);
+        self::assertStringContainsString('Started: first', $display);
     }
 
     public function testASignalWhileNoScanRunsIsRecordedWithoutThrowing(): void
@@ -114,6 +171,49 @@ final class ScanLibraryCommandTest extends TestCase
         self::assertSame([], $this->scanned);
     }
 
+    public function testReleaseRefusesALiveClaimWithoutForce(): void
+    {
+        $tester = $this->tester([], fn () => self::fail('Nothing may scan.'), liveClaim: true);
+
+        self::assertSame(Command::FAILURE, $tester->execute(['library' => 'music', '--release' => true]));
+
+        self::assertFalse($this->releaseRequests[0]->force);
+        self::assertStringContainsString('A scan holds a live claim on the library "Music"', $this->display($tester));
+        self::assertStringContainsString('--force', $this->display($tester));
+    }
+
+    public function testReleaseWithForceReleasesALiveClaim(): void
+    {
+        $tester = $this->tester([], fn () => self::fail('Nothing may scan.'), liveClaim: true);
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['library' => 'music', '--release' => true, '--force' => true]));
+
+        self::assertTrue($this->releaseRequests[0]->force);
+        self::assertStringContainsString('Released the scan claim of "music"', $this->display($tester));
+    }
+
+    public function testJsonPrintsTheScannedLibraryAsTheApiRendersIt(): void
+    {
+        $music = $this->library('music');
+        $tester = $this->tester([$music], fn () => new LibraryScanSummary('id', 'Music', 'music', 1, 1, 0, 1));
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['library' => 'music', '--json' => true], ['capture_stderr_separately' => true]));
+
+        self::assertSame(LibraryResource::from($music), json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
+        self::assertStringContainsString('Scanned "music"', $tester->getErrorOutput());
+    }
+
+    public function testJsonForScanAllPrintsTheCountsTheScanAllEndpointReturns(): void
+    {
+        $idle = $this->library('idle');
+        $busy = $this->library('busy');
+        $tester = $this->tester([$idle], fn () => new LibraryScanSummary('id', 'Idle', 'idle', 3, 3, 0, 1), all: true, skipped: [$busy]);
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['--all' => true, '--json' => true], ['capture_stderr_separately' => true]));
+
+        self::assertSame(['dispatched' => 1, 'skipped' => 1], json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
+    }
+
     public function testNamingALibraryAndAllIsInvalid(): void
     {
         $tester = $this->tester([], fn () => self::fail('Nothing may scan.'));
@@ -121,6 +221,8 @@ final class ScanLibraryCommandTest extends TestCase
         self::assertSame(Command::INVALID, $tester->execute(['library' => 'music', '--all' => true]));
         self::assertSame(Command::INVALID, $tester->execute([]));
         self::assertSame(Command::INVALID, $tester->execute(['library' => 'music', '--release' => true, '--rescan' => true]));
+        self::assertSame(Command::INVALID, $tester->execute(['library' => 'music', '--release' => true, '--json' => true]));
+        self::assertSame(Command::INVALID, $tester->execute(['library' => 'music', '--force' => true]));
     }
 
     /**
@@ -128,16 +230,19 @@ final class ScanLibraryCommandTest extends TestCase
      * @param callable(): mixed $handler runs as the scan's handler
      * @param list<Library>      $skipped
      */
-    private function tester(array $claimed, callable $handler, bool $all = false, array $skipped = [], bool $conflict = false): CommandTester
+    private function tester(array $claimed, callable $handler, bool $all = false, array $skipped = [], bool $conflict = false, bool $liveClaim = false): CommandTester
     {
+        $claims = array_map(fn (Library $library): LibraryScanClaim => $this->claim($library), $claimed);
         $bus = $this->createStub(MessageBusInterface::class);
-        $bus->method('dispatch')->willReturnCallback(function (object $message) use ($claimed, $skipped, $conflict): Envelope {
+        $bus->method('dispatch')->willReturnCallback(function (object $message) use ($claims, $skipped, $conflict, $liveClaim): Envelope {
             $result = match (true) {
                 $message instanceof ClaimLibraryScanCommand => $conflict
                     ? throw LibraryScanAlreadyRunningException::forLibrary('Music')
-                    : $claimed[0],
-                $message instanceof ClaimAllLibraryScansCommand => new LibraryScanClaimResult($claimed, $skipped),
-                $message instanceof ReleaseLibraryScanClaimCommand => $this->released[] = $message->library,
+                    : $claims[0],
+                $message instanceof ClaimAllLibraryScansCommand => new LibraryScanClaimResult($claims, $skipped),
+                $message instanceof EndLibraryScanClaimCommand => $this->released[] = $this->claimed[$message->claimId]->getSlug()->toString(),
+                $message instanceof ReleaseLibraryScanClaimCommand => $this->release($message, $liveClaim),
+                $message instanceof GetLibraryQuery => array_find($this->claimed, static fn (Library $library): bool => $library->getId()->toString() === $message->library),
                 default => self::fail('Unexpected message ' . $message::class),
             };
 
@@ -146,6 +251,9 @@ final class ScanLibraryCommandTest extends TestCase
         $jobs = $this->createStub(JobMonitorAdministrationInterface::class);
         $jobs->method('runInline')->willReturnCallback(function (object $message) use ($handler): InlineJobRun {
             self::assertInstanceOf(ScanLibraryCommandMessage::class, $message);
+            $claimId = $message->getClaimId()?->toString();
+            self::assertNotNull($claimId);
+            self::assertSame($message->getLibrarySlug()->toString(), $this->claimed[$claimId]->getSlug()->toString(), 'The scan runs under its own claim.');
             $this->scanned[] = $message->getLibrarySlug()->toString();
 
             return new InlineJobRun('job-' . count($this->scanned), $handler());
@@ -153,6 +261,24 @@ final class ScanLibraryCommandTest extends TestCase
         $this->command = new ScanLibraryCommand(new AdminCommandSupport($bus), $jobs);
 
         return new CommandTester($this->command);
+    }
+
+    private function release(ReleaseLibraryScanClaimCommand $message, bool $liveClaim): bool
+    {
+        $this->releaseRequests[] = $message;
+        if ($liveClaim && !$message->force) {
+            throw LibraryScanClaimLiveException::forLibrary('Music');
+        }
+
+        return $liveClaim;
+    }
+
+    private function claim(Library $library): LibraryScanClaim
+    {
+        $claim = new LibraryScanClaim($library, new Uuid());
+        $this->claimed[$claim->claimId->toString()] = $library;
+
+        return $claim;
     }
 
     private function library(string $slug): Library

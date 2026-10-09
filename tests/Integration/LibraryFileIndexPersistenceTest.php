@@ -21,6 +21,7 @@ use DoctrineMigrations\Version20261006190000;
 use DoctrineMigrations\Version20261006201000;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Clock\NativeClock;
 
 final class LibraryFileIndexPersistenceTest extends TestCase
 {
@@ -53,7 +54,7 @@ final class LibraryFileIndexPersistenceTest extends TestCase
 
     public function testDeletingALibraryRemovesOnlyItsIndexRows(): void
     {
-        $libraries = new LibraryRepository($this->manager);
+        $libraries = new LibraryRepository($this->manager, new NativeClock());
         $deleted = $this->createLibrary();
         $kept = $this->createLibrary();
         $this->index($deleted, '/media/u15/a.flac', '/media/u15/b.flac');
@@ -159,7 +160,7 @@ final class LibraryFileIndexPersistenceTest extends TestCase
             type: LibraryType::Music,
             filesystemType: FilesystemType::Local,
         );
-        (new LibraryRepository($this->manager))->save($library);
+        (new LibraryRepository($this->manager, new NativeClock()))->save($library);
 
         return $library;
     }

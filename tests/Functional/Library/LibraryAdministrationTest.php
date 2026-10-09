@@ -151,13 +151,36 @@ final class LibraryAdministrationTest extends TestCase
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries/' . $library['id'] . '/scan', $admin), 202);
     }
 
-    public function testReleaseClearsAClaimAKilledScanLeftBehind(): void
+    public function testALostQueuedScanBlocksNewScansOnlyUntilItsLeaseLapses(): void
+    {
+        $admin = $this->createAdminUser();
+        $library = $this->createThroughApi('lost-' . bin2hex(random_bytes(3)), $admin);
+        // The queued scan is lost, as in a server restart: the test transport never runs it.
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries/' . $library['id'] . '/scan', $admin), 202);
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries/' . $library['id'] . '/scan', $admin), 409);
+
+        $this->lapseClaim($library['id']);
+
+        $shown = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/libraries/' . $library['id'], $admin), 200, 'data')['data'];
+        self::assertSame('failed', $shown['scanStatus'], 'The panel offers a scan again.');
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries/' . $library['id'] . '/scan', $admin), 202);
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries/' . $library['id'] . '/scan', $admin), 409);
+    }
+
+    public function testReleaseRefusesALiveClaimWithoutForceAndClearsAClaimWhoseLeaseLapsed(): void
     {
         $admin = $this->createAdminUser();
         $library = $this->createThroughApi('killed-' . bin2hex(random_bytes(3)), $admin);
-        // A scan claimed from the web whose process died never ends its claim.
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries/' . $library['id'] . '/scan', $admin), 202);
 
+        // The claim is live, so its scan may still run: --release alone refuses.
+        $refused = $this->command('app:library:scan');
+        self::assertSame(Command::FAILURE, $refused->execute(['library' => $library['slug'], '--release' => true]));
+        self::assertStringContainsString('--force', self::flat($refused->getDisplay()));
+        self::assertSame('scanning', $this->library($library['slug'])->getDiscoveryStatus());
+
+        // A scan whose process died stops renewing its claim, which then lapses.
+        $this->lapseClaim($library['id']);
         $release = $this->command('app:library:scan');
         self::assertSame(Command::SUCCESS, $release->execute(['library' => $library['slug'], '--release' => true]), $release->getDisplay());
         self::assertSame('failed', $this->library($library['slug'])->getDiscoveryStatus());
@@ -165,6 +188,12 @@ final class LibraryAdministrationTest extends TestCase
         $again = $this->command('app:library:scan');
         self::assertSame(Command::SUCCESS, $again->execute(['library' => $library['slug'], '--release' => true]));
         self::assertStringContainsString('nothing changed', self::flat($again->getDisplay()));
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries/' . $library['id'] . '/scan', $admin), 202);
+
+        // An operator who knows the scan is gone releases a live claim with --force.
+        $forced = $this->command('app:library:scan');
+        self::assertSame(Command::SUCCESS, $forced->execute(['library' => $library['id'], '--release' => true, '--force' => true]), $forced->getDisplay());
+        self::assertSame('failed', $this->library($library['slug'])->getDiscoveryStatus());
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries/' . $library['id'] . '/scan', $admin), 202);
     }
 
@@ -230,6 +259,25 @@ final class LibraryAdministrationTest extends TestCase
         $this->assertJsonResponse($this->authenticatedRequest('PATCH', '/api/libraries/' . Uuid::v7()->toString(), $admin, ['name' => 'X']), 404);
     }
 
+    public function testCreateAndUpdateWithJsonPrintTheLibraryAsTheApiReturnsIt(): void
+    {
+        $admin = $this->createAdminUser();
+        $slug = 'json-' . bin2hex(random_bytes(3));
+
+        $create = $this->command('app:library:create');
+        self::assertSame(Command::SUCCESS, $create->execute(['name' => 'JSON library', 'path' => $this->directory, 'type' => 'music', '--slug' => $slug, '--json' => true]), $create->getDisplay());
+        $created = json_decode($create->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        $shown = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/libraries/' . $slug, $admin), 200, 'data')['data'];
+        self::assertSame($shown, $created);
+
+        $update = $this->command('app:library:update');
+        self::assertSame(Command::SUCCESS, $update->execute(['library' => $slug, '--sort-order' => '4', '--json' => true]), $update->getDisplay());
+        $updated = json_decode($update->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        $patched = $this->assertJsonResponse($this->authenticatedRequest('PATCH', '/api/libraries/' . $slug, $admin, ['sortOrder' => 4]), 200, 'data')['data'];
+        self::assertSame(4, $updated['sortOrder']);
+        self::assertSame(array_diff_key($patched, ['updatedAt' => true]), array_diff_key($updated, ['updatedAt' => true]));
+    }
+
     public function testLibraryErrorsAreReportedInTheRequestLocale(): void
     {
         $admin = $this->createAdminUser();
@@ -275,6 +323,17 @@ final class LibraryAdministrationTest extends TestCase
 
         return $this->service(LibraryPortInterface::class)->findBySlug(new LibrarySlug($slug))
             ?? throw new \LogicException(sprintf('Library "%s" is missing.', $slug));
+    }
+
+    /** Moves the library's claim lease into the past, as if its scan stopped renewing it. */
+    private function lapseClaim(string $libraryId): void
+    {
+        self::assertSame(1, $this->entityManager->getConnection()->executeStatement(
+            "UPDATE libraries SET scan_claim_expires_at = clock_timestamp() - interval '1 second' WHERE id = ? AND scan_claim_id IS NOT NULL",
+            [$libraryId],
+        ));
+        // The update bypassed the unit of work, which the test client's requests share.
+        $this->entityManager->clear();
     }
 
     /** What NotificationBridgeSubscriber dispatches when the outbox relays LibraryScanCompleted. */

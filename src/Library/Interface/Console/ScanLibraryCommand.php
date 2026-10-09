@@ -6,14 +6,20 @@ namespace App\Library\Interface\Console;
 
 use App\Library\Application\Command\ClaimAllLibraryScansCommand;
 use App\Library\Application\Command\ClaimLibraryScanCommand;
+use App\Library\Application\Command\EndLibraryScanClaimCommand;
 use App\Library\Application\Command\ReleaseLibraryScanClaimCommand;
 use App\Library\Application\Command\ScanLibraryCommand as ScanLibraryCommandMessage;
+use App\Library\Application\DTO\LibraryScanClaim;
 use App\Library\Application\DTO\LibraryScanClaimResult;
 use App\Library\Application\DTO\LibraryScanSummary;
+use App\Library\Application\Exception\LibraryScanClaimLiveException;
+use App\Library\Application\Query\GetLibraryQuery;
 use App\Library\Interface\Resource\LibraryResource;
+use App\Library\Interface\Resource\LibraryScanAllResource;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\JobCancelledException;
 use App\Shared\Application\Port\JobMonitorAdministrationInterface;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -31,7 +37,8 @@ use Throwable;
  * The web queues scans on the Swoole task workers, which a console process cannot reach,
  * so this command claims each library and runs its scan in this process, recorded in the
  * job monitor. A scan that fails, that is cancelled from the job monitor, or that SIGINT or
- * SIGTERM interrupts, releases its claim.
+ * SIGTERM interrupts, ends its claim. A process killed outright leaves its claim to lapse
+ * with its lease.
  */
 #[AsCommand(
     name: 'app:library:scan',
@@ -56,7 +63,9 @@ final class ScanLibraryCommand extends Command implements SignalableCommandInter
             ->addArgument('library', InputArgument::OPTIONAL, 'Library UUID or slug')
             ->addOption('all', null, InputOption::VALUE_NONE, 'Scan every library that is not already scanning, one after another')
             ->addOption('rescan', null, InputOption::VALUE_NONE, 'Re-read files the index already knows')
-            ->addOption('release', null, InputOption::VALUE_NONE, 'Only release the scan claim a killed scan left behind, marking that scan failed');
+            ->addOption('release', null, InputOption::VALUE_NONE, 'Only release the scan claim of a scan that is gone, marking that scan failed; refused while the claim is live')
+            ->addOption('force', null, InputOption::VALUE_NONE, 'With --release, release a live claim too, whose scan may still be running');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     /** @return list<int> */
@@ -82,22 +91,27 @@ final class ScanLibraryCommand extends Command implements SignalableCommandInter
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
+        $json = AdminCommandSupport::wantsJson($input);
         $this->scanning = null;
         $this->interruptedBy = null;
         $library = $input->getArgument('library');
         $all = $input->getOption('all') === true;
         $rescan = $input->getOption('rescan') === true;
+        $force = $input->getOption('force') === true;
 
         try {
             if ($all === is_string($library)) {
                 throw new InvalidInputException('Name one library, or use --all.');
             }
             if ($input->getOption('release') === true) {
-                if ($all || $rescan) {
-                    throw new InvalidInputException('--release takes one library and no other option.');
+                if ($all || $rescan || $json) {
+                    throw new InvalidInputException('--release takes one library and no other option than --force.');
                 }
 
-                return $this->release($io, (string) $library);
+                return $this->release($io, (string) $library, $force);
+            }
+            if ($force) {
+                throw new InvalidInputException('--force only applies to --release.');
             }
 
             $claims = $all
@@ -108,53 +122,79 @@ final class ScanLibraryCommand extends Command implements SignalableCommandInter
         }
         assert($claims instanceof LibraryScanClaimResult);
 
-        return $this->scanClaimed($io, LibraryResource::collection($claims->claimed), LibraryResource::collection($claims->skipped), $rescan, $all);
+        // With --json, stdout carries only the JSON; the progress report goes to stderr.
+        $started = $this->scanClaimed($json ? $io->getErrorStyle() : $io, $claims, $rescan, $all);
+        $exitCode = match (true) {
+            $this->interruptedBy !== null => 128 + $this->interruptedBy,
+            in_array(false, $started, true) => Command::FAILURE,
+            default => Command::SUCCESS,
+        };
+
+        if (!$json) {
+            return $exitCode;
+        }
+
+        try {
+            AdminCommandSupport::json($io, $all
+                ? LibraryScanAllResource::from(new LibraryScanClaimResult(
+                    array_values(array_filter($claims->claimed, static fn (LibraryScanClaim $claim): bool => isset($started[$claim->claimId->toString()]))),
+                    $claims->skipped,
+                ))
+                : LibraryResource::from($this->support->dispatch(new GetLibraryQuery(
+                    LibraryResource::from($claims->claimed[0]->library)['id'],
+                    LibraryReadScope::unrestricted(),
+                ))));
+        } catch (Throwable $exception) {
+            return AdminCommandSupport::fail($io, $exception);
+        }
+
+        return $exitCode;
     }
 
     /**
-     * @param list<array<string, mixed>> $claimed
-     * @param list<array<string, mixed>> $skipped
+     * Runs the claimed scans; a signal can interrupt the run, which sets $interruptedBy.
+     *
+     * @return array<string, bool> claim ID => whether the scan completed, for every scan started
+     *
+     * @phpstan-impure
      */
-    private function scanClaimed(SymfonyStyle $io, array $claimed, array $skipped, bool $rescan, bool $all): int
+    private function scanClaimed(SymfonyStyle $io, LibraryScanClaimResult $claims, bool $rescan, bool $all): array
     {
-        if ($skipped !== []) {
-            $io->text(sprintf('Skipped, already scanning: %s', self::names($skipped)));
+        if ($claims->skipped !== []) {
+            $io->text(sprintf('Skipped, already scanning: %s', self::names(LibraryResource::collection($claims->skipped))));
         }
-        if ($claimed === []) {
+        if ($claims->claimed === []) {
             $io->text('No library to scan.');
 
-            return Command::SUCCESS;
+            return [];
         }
 
         $started = [];
-        $failed = [];
-        foreach ($claimed as $index => $library) {
+        foreach ($claims->claimed as $index => $claim) {
             if ($this->interruptedBy !== null) {
-                $this->releaseUnstarted($io, array_slice($claimed, $index));
+                $this->releaseUnstarted($io, array_slice($claims->claimed, $index));
                 break;
             }
 
-            $started[] = $library;
-            if (!$this->scan($io, $library, $rescan)) {
-                $failed[] = $library;
-            }
+            $started[$claim->claimId->toString()] = $this->scan($io, $claim, $rescan);
         }
 
         if ($all) {
-            $io->text(sprintf('Started: %s', self::names($started)));
+            $io->text(sprintf('Started: %s', self::names(array_map(
+                static fn (LibraryScanClaim $claim): array => LibraryResource::from($claim->library),
+                array_values(array_filter($claims->claimed, static fn (LibraryScanClaim $claim): bool => isset($started[$claim->claimId->toString()]))),
+            ))));
         }
         if ($this->interruptedBy !== null) {
             $io->getErrorStyle()->error('Interrupted. The claims of unfinished scans are released.');
-
-            return 128 + $this->interruptedBy;
         }
 
-        return $failed === [] ? Command::SUCCESS : Command::FAILURE;
+        return $started;
     }
 
-    /** @param array<string, mixed> $library */
-    private function scan(SymfonyStyle $io, array $library, bool $rescan): bool
+    private function scan(SymfonyStyle $io, LibraryScanClaim $claim, bool $rescan): bool
     {
+        $library = LibraryResource::from($claim->library);
         $io->text(sprintf('Claimed "%s" (%s); scanning%s...', $library['name'], $library['slug'], $rescan ? ' all files again' : ''));
         $this->scanning = $library['id'];
 
@@ -162,11 +202,11 @@ final class ScanLibraryCommand extends Command implements SignalableCommandInter
             if ($this->interruptedBy !== null) {
                 throw new LibraryScanInterrupted($this->interruptedBy);
             }
-            $run = $this->jobs->runInline(ScanLibraryCommandMessage::forSlug($library['slug'], $rescan));
+            $run = $this->jobs->runInline(ScanLibraryCommandMessage::forSlug($library['slug'], $rescan, $claim->claimId));
             $this->scanning = null;
         } catch (Throwable $exception) {
             $this->scanning = null;
-            $this->releaseAfterFailure($io, $library);
+            $this->endClaim($io, $claim);
             $io->getErrorStyle()->error(sprintf(
                 $exception instanceof JobCancelledException ? 'The scan of "%s" was cancelled: %s' : 'The scan of "%s" failed: %s',
                 $library['slug'],
@@ -191,35 +231,42 @@ final class ScanLibraryCommand extends Command implements SignalableCommandInter
         return true;
     }
 
-    /** @param array<string, mixed> $library */
-    private function releaseAfterFailure(SymfonyStyle $io, array $library): void
+    private function endClaim(SymfonyStyle $io, LibraryScanClaim $claim): void
     {
         try {
             // A failed scan normally ends its claim itself; this covers a scan that could not.
-            $this->support->dispatch(new ReleaseLibraryScanClaimCommand($library['id']));
+            $this->support->dispatch(new EndLibraryScanClaimCommand($claim->claimId->toString()));
         } catch (Throwable $exception) {
+            $slug = LibraryResource::from($claim->library)['slug'];
             $io->getErrorStyle()->error(sprintf(
-                'The scan claim of "%s" could not be released: %s. Run app:library:scan %s --release.',
-                $library['slug'],
+                'The scan claim of "%s" could not be released: %s. It lapses with its lease, or run app:library:scan %s --release --force.',
+                $slug,
                 $exception->getMessage(),
-                $library['slug'],
+                $slug,
             ));
         }
     }
 
-    /** @param list<array<string, mixed>> $libraries */
-    private function releaseUnstarted(SymfonyStyle $io, array $libraries): void
+    /** @param list<LibraryScanClaim> $claims */
+    private function releaseUnstarted(SymfonyStyle $io, array $claims): void
     {
-        foreach ($libraries as $library) {
-            $this->releaseAfterFailure($io, $library);
+        foreach ($claims as $claim) {
+            $this->endClaim($io, $claim);
         }
-        $io->text(sprintf('Not started: %s', self::names($libraries)));
+        $io->text(sprintf('Not started: %s', self::names(array_map(
+            static fn (LibraryScanClaim $claim): array => LibraryResource::from($claim->library),
+            $claims,
+        ))));
     }
 
-    private function release(SymfonyStyle $io, string $library): int
+    private function release(SymfonyStyle $io, string $library, bool $force): int
     {
         try {
-            $released = $this->support->dispatch(new ReleaseLibraryScanClaimCommand($library));
+            $released = $this->support->dispatch(new ReleaseLibraryScanClaimCommand($library, $force));
+        } catch (LibraryScanClaimLiveException $exception) {
+            $io->getErrorStyle()->error($exception->getMessage() . ' Release it anyway with --force once you know that scan is gone.');
+
+            return Command::FAILURE;
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
         }

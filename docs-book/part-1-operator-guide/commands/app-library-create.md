@@ -29,6 +29,7 @@ make exec cmd="php bin/console app:library:create 'My Music' /data/music music -
 | `--filesystem-type` | `local` | Filesystem backend. Currently only `local` is supported. |
 | `--slug`, `-s` | Generated from the name | URL-friendly identifier. Omit it to generate one from the name. |
 | `--sort-order` | `0` | Sort order for display (lower numbers appear first) |
+| `--json` | — | Print only the created library in JSON, as the API's `data` returns it |
 
 ## Details
 

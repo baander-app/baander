@@ -41,7 +41,7 @@ The scan performs these steps:
 
 Scanning is idempotent. Running it multiple times on the same library will update existing records and add new files without creating duplicates. Removed files are cleaned up on subsequent scans.
 
-Only one scan of a library runs at a time. While its status is `scanning`, the admin panel and the command refuse a second scan of it. `app:library:scan --all` scans every library that is not already scanning. If a scan was killed and left the library at `scanning`, clear it with `app:library:scan my-music --release`.
+Only one scan of a library runs at a time. Starting a scan claims the library, and while the claim holds, the admin panel and the command refuse a second scan of it. `app:library:scan --all` scans every library that is not already scanning. A running scan renews its claim as it works. A claim that nobody renews for 15 minutes lapses, for example after a web server restart dropped a queued scan or after a scan's process was killed. The library then reads as `failed` and can be scanned again. To free a library sooner, release its claim with `app:library:scan my-music --release --force` once you know its scan is gone.
 
 See the [command reference](commands/app-library-scan.md) for details. The other `app:library:*` commands list, show, rename and delete libraries; renaming, deleting and scanning in the admin panel need the admin role.
 

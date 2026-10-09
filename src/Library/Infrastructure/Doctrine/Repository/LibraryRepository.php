@@ -10,16 +10,20 @@ use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
+use App\Library\Domain\ValueObject\ScanClaimRelease;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Library\Domain\Model\LibraryState;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Clock\ClockInterface;
 
 final class LibraryRepository implements LibraryRepositoryInterface
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
+        private readonly ClockInterface $clock,
     ) {
     }
 
@@ -150,14 +154,18 @@ final class LibraryRepository implements LibraryRepositoryInterface
         }
     }
 
-    public function claimScan(Uuid $libraryId): bool
+    public function claimScan(Uuid $libraryId, Uuid $claimId, int $leaseSeconds): bool
     {
-        // READ COMMITTED re-checks the condition after a concurrent claim commits, so a second
-        // claimer that waited on the row lock updates nothing.
+        // READ COMMITTED re-checks the condition on the committed row after waiting on a concurrent
+        // claim's row lock, so of two claims of a free or lapsed library one updates nothing.
         $claimed = $this->entityManager->getConnection()->executeStatement(
-            "UPDATE libraries SET scan_status = 'scanning', updated_at = now()
-             WHERE id = :id AND scan_status IS DISTINCT FROM 'scanning'",
-            ['id' => $libraryId->toString()],
+            "UPDATE libraries
+             SET scan_status = 'scanning', scan_claim_id = :claim,
+                 scan_claim_expires_at = clock_timestamp() + make_interval(secs => :lease), updated_at = now()
+             WHERE id = :id
+               AND (scan_claim_id IS NULL OR scan_claim_id = :claim OR scan_claim_expires_at <= clock_timestamp())",
+            ['id' => $libraryId->toString(), 'claim' => $claimId->toString(), 'lease' => $leaseSeconds],
+            ['lease' => ParameterType::INTEGER],
         ) === 1;
 
         if ($claimed) {
@@ -167,19 +175,61 @@ final class LibraryRepository implements LibraryRepositoryInterface
         return $claimed;
     }
 
-    public function releaseScanClaim(Uuid $libraryId): bool
+    public function renewScanClaim(Uuid $claimId, int $leaseSeconds): bool
     {
-        $released = $this->entityManager->getConnection()->executeStatement(
-            "UPDATE libraries SET scan_status = 'failed', updated_at = now()
-             WHERE id = :id AND scan_status = 'scanning'",
-            ['id' => $libraryId->toString()],
+        // A renewal leaves updated_at alone: that records changes to the library, not scan progress.
+        return $this->entityManager->getConnection()->executeStatement(
+            'UPDATE libraries SET scan_claim_expires_at = clock_timestamp() + make_interval(secs => :lease)
+             WHERE scan_claim_id = :claim',
+            ['claim' => $claimId->toString(), 'lease' => $leaseSeconds],
+            ['lease' => ParameterType::INTEGER],
+        ) === 1;
+    }
+
+    public function endScanClaim(Uuid $claimId, bool $completed): bool
+    {
+        $libraryId = $this->entityManager->getConnection()->fetchOne(
+            'UPDATE libraries
+             SET scan_status = :status, scan_claim_id = NULL, scan_claim_expires_at = NULL, updated_at = now(),
+                 last_scan = CASE WHEN :completed THEN now() ELSE last_scan END
+             WHERE scan_claim_id = :claim
+             RETURNING id',
+            ['claim' => $claimId->toString(), 'status' => $completed ? 'completed' : 'failed', 'completed' => $completed],
+            ['completed' => ParameterType::BOOLEAN],
+        );
+
+        if (!is_string($libraryId)) {
+            return false;
+        }
+        $this->refreshManaged(Uuid::fromString($libraryId));
+
+        return true;
+    }
+
+    public function releaseScanClaim(Uuid $libraryId, bool $evenIfLive): ScanClaimRelease
+    {
+        $connection = $this->entityManager->getConnection();
+        $released = $connection->executeStatement(
+            "UPDATE libraries
+             SET scan_status = 'failed', scan_claim_id = NULL, scan_claim_expires_at = NULL, updated_at = now()
+             WHERE id = :id AND scan_claim_id IS NOT NULL AND (:even_if_live OR scan_claim_expires_at <= clock_timestamp())",
+            ['id' => $libraryId->toString(), 'even_if_live' => $evenIfLive],
+            ['even_if_live' => ParameterType::BOOLEAN],
         ) === 1;
 
         if ($released) {
             $this->refreshManaged($libraryId);
+
+            return ScanClaimRelease::Released;
         }
 
-        return $released;
+        // Only a live claim can have stopped the release; this read just names the reason.
+        $held = $connection->fetchOne(
+            'SELECT 1 FROM libraries WHERE id = :id AND scan_claim_id IS NOT NULL',
+            ['id' => $libraryId->toString()],
+        );
+
+        return $held === false ? ScanClaimRelease::NoClaim : ScanClaimRelease::Live;
     }
 
     // --- Internal ---
@@ -231,10 +281,21 @@ final class LibraryRepository implements LibraryRepositoryInterface
             filesystemType: FilesystemType::from($entity->getFilesystemType()),
             sortOrder: $entity->getSortOrder(),
             lastScan: $entity->getLastScan(),
-            discoveryStatus: $entity->getScanStatus(),
+            discoveryStatus: $this->discoveryStatus($entity),
             createdAt: $entity->getCreatedAt(),
             updatedAt: $entity->getUpdatedAt(),
         ));
+    }
+
+    /** No scan renews a lapsed claim any longer, so the library reads as failed until a scan claims it. */
+    private function discoveryStatus(LibraryEntity $entity): ?string
+    {
+        $expiresAt = $entity->getScanClaimExpiresAt();
+        if ($expiresAt !== null && $expiresAt <= $this->clock->now()) {
+            return 'failed';
+        }
+
+        return $entity->getScanStatus();
     }
 
     private function syncToEntity(Library $library, LibraryEntity $entity): void
@@ -242,10 +303,6 @@ final class LibraryRepository implements LibraryRepositoryInterface
         $state = $library->getState();
         $entity->setName($state->name);
         $entity->setSortOrder($state->sortOrder);
-        $entity->setScanStatus($state->discoveryStatus);
-
-        if ($state->lastScan !== null) {
-            $entity->markScanned();
-        }
+        // The scan status and time belong to the claim statements; a flush never writes them.
     }
 }

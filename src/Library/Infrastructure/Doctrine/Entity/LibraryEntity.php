@@ -10,6 +10,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity]
 #[ORM\Table(name: 'libraries')]
 #[ORM\UniqueConstraint(name: 'uniq_libraries_slug', columns: ['slug'])]
+#[ORM\UniqueConstraint(name: 'uniq_libraries_scan_claim_id', columns: ['scan_claim_id'])]
 class LibraryEntity
 {
     #[ORM\Id]
@@ -43,6 +44,17 @@ class LibraryEntity
 
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $scanStatus = null;
+
+    /**
+     * The token of the scan that holds the claim, while the status is `scanning`. The claim
+     * columns are written only by LibraryRepository's claim statements, never by a flush.
+     */
+    #[ORM\Column(type: 'uuid', nullable: true)]
+    private ?Uuid $scanClaimId = null;
+
+    /** When the claim lapses unless its scan renews it; a lapsed claim may be taken over. */
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $scanClaimExpiresAt = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $updatedAt;
@@ -143,21 +155,19 @@ class LibraryEntity
         return $this->lastScan;
     }
 
-    public function markScanned(): void
-    {
-        $this->lastScan = new \DateTimeImmutable();
-        $this->updatedAt = new \DateTimeImmutable();
-    }
-
     public function getScanStatus(): ?string
     {
         return $this->scanStatus;
     }
 
-    public function setScanStatus(?string $scanStatus): void
+    public function getScanClaimId(): ?Uuid
     {
-        $this->scanStatus = $scanStatus;
-        $this->updatedAt = new \DateTimeImmutable();
+        return $this->scanClaimId;
+    }
+
+    public function getScanClaimExpiresAt(): ?\DateTimeImmutable
+    {
+        return $this->scanClaimExpiresAt;
     }
 
     public function getCreatedAt(): \DateTimeImmutable
