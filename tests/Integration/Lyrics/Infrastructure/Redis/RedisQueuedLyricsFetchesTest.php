@@ -64,6 +64,24 @@ final class RedisQueuedLyricsFetchesTest extends TestCase
         self::assertSame(90, $this->ttl('cancelled_run', $runId));
     }
 
+    public function testCancellingAFinishedJobCancelsItsRunForWhatRemainsOfTheRecord(): void
+    {
+        $runId = Uuid::v7();
+        $this->fetches->recordJobRun('bulk-job', $runId, 90);
+
+        self::assertTrue($this->fetches->hasQueuedWork('bulk-job'));
+        self::assertFalse($this->fetches->hasQueuedWork('other-job'));
+        self::assertFalse($this->fetches->isRunCancelled($runId));
+
+        self::assertTrue($this->fetches->cancelQueuedWork('bulk-job'));
+
+        self::assertTrue($this->fetches->isRunCancelled($runId));
+        self::assertGreaterThanOrEqual(89, $this->ttl('cancelled_run', $runId));
+        self::assertLessThanOrEqual(90, $this->ttl('cancelled_run', $runId));
+        self::assertTrue($this->fetches->cancelQueuedWork('bulk-job'), 'Cancelling again succeeds.');
+        self::assertFalse($this->fetches->cancelQueuedWork('other-job'));
+    }
+
     private function ttl(string $kind, Uuid $id): int
     {
         $key = sprintf('%s:%s:%s', self::PREFIX, $kind, $id->toString());

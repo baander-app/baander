@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Application\Port;
 
 use App\Shared\Application\DTO\InlineJobRun;
+use App\Shared\Application\DTO\JobCancellation;
 use App\Shared\Application\DTO\JobAnalyticsRange;
 use App\Shared\Application\DTO\JobMonitorOverview;
 use App\Shared\Application\DTO\JobMonitorPage;
@@ -27,7 +28,11 @@ interface JobMonitorAdministrationInterface
     /** @throws InvalidInputException for an unknown status filter */
     public function jobs(JobMonitorQuery $query): JobMonitorPage;
 
-    /** @throws NotFoundException */
+    /**
+     * A job with its error, stored message and whether it can be cancelled.
+     *
+     * @throws NotFoundException
+     */
     public function job(string $jobId): JobMonitorRecord;
 
     /**
@@ -50,10 +55,14 @@ interface JobMonitorAdministrationInterface
      * record becomes cancelled. A job without checkpoints runs to its end. Cancelling a job
      * again sets the flag again.
      *
+     * A finished job that queued work to run later, such as a lyrics bulk fetch, has that
+     * work stopped instead (QueuedJobWorkInterface): what has not run yet is skipped when it
+     * comes due, and the job's record becomes cancelled.
+     *
      * @throws NotFoundException
-     * @throws ConflictException when the job has finished or failed
+     * @throws ConflictException when the job has failed, or has finished without queued work waiting
      */
-    public function cancel(string $jobId): void;
+    public function cancel(string $jobId): JobCancellation;
 
     /**
      * Deletes the finished, failed and cancelled jobs created more than the given number of days ago.

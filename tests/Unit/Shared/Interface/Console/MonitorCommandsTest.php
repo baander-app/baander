@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Interface\Console;
 
 use App\Shared\Application\DTO\InlineJobRun;
+use App\Shared\Application\DTO\JobCancellation;
 use App\Shared\Application\DTO\JobAnalyticsRange;
 use App\Shared\Application\DTO\JobMonitorOverview;
 use App\Shared\Application\DTO\JobMonitorPage;
@@ -161,6 +162,16 @@ final class MonitorCommandsTest extends TestCase
         self::assertStringContainsString('Finished jobs cannot be cancelled.', $tester->getDisplay());
     }
 
+    public function testCancellingAFinishedJobSaysItsQueuedWorkIsSkipped(): void
+    {
+        $this->monitor->cancellation = JobCancellation::QueuedWorkCancelled;
+        $tester = new CommandTester(new MonitorJobCancelCommand($this->monitor));
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['jobId' => 'job-finished']));
+        self::assertSame('job-finished', $this->monitor->cancelled);
+        self::assertStringContainsString('The work it queued is cancelled', $tester->getDisplay());
+    }
+
     public function testRetryAndCancelJsonPrintTheDataTheEndpointsReturn(): void
     {
         $controller = new JobMonitorController($this->monitor);
@@ -301,6 +312,7 @@ final class FakeJobMonitor implements JobMonitorAdministrationInterface
     /** @var array{string, string}|null */
     public ?array $retried = null;
     public ?string $cancelled = null;
+    public JobCancellation $cancellation = JobCancellation::Requested;
     /** @var array{int, bool}|null */
     public ?array $pruned = null;
 
@@ -340,10 +352,12 @@ final class FakeJobMonitor implements JobMonitorAdministrationInterface
         return 'new-job';
     }
 
-    public function cancel(string $jobId): void
+    public function cancel(string $jobId): JobCancellation
     {
         $this->fail();
         $this->cancelled = $jobId;
+
+        return $this->cancellation;
     }
 
     public function prune(int $days, bool $dryRun = false): JobMonitorPruneResult

@@ -46,7 +46,9 @@ export function useCancelJob() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: cancelJob,
-    onSuccess: () => {
+    onSuccess: (_result, jobId) => {
+      // A finished job becomes cancelled at once and is no longer cancellable.
+      queryClient.invalidateQueries({ queryKey: ['job-detail', jobId] })
       queryClient.invalidateQueries({ queryKey: ['job-list'] })
       queryClient.invalidateQueries({ queryKey: ['status-overview'] })
     },

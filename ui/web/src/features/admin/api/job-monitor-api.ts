@@ -22,6 +22,8 @@ export interface JobDetail extends JobListItem {
   data: string | null;
   dataTruncated: boolean;
   duration: number | null;
+  /** Running or queued, or finished with queued work, such as lyrics fetches, still waiting. */
+  cancellable: boolean;
 }
 
 export interface JobListResponse {

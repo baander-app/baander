@@ -9,8 +9,9 @@ use App\Shared\Domain\Model\JobStatus;
 /**
  * One job of the job monitor: every delivery of a message shares its job's record.
  *
- * The records of a job list and of the running jobs leave out the error detail and the
- * stored message, so their $exception and $data are null; a single job's record has them.
+ * The records of a job list and of the running jobs leave out the error detail, the stored
+ * message and whether the job can be cancelled, so their $exception, $data and $cancellable
+ * are null; a single job's record has them.
  */
 final readonly class JobMonitorRecord
 {
@@ -36,6 +37,11 @@ final readonly class JobMonitorRecord
         public bool $dataTruncated,
         /** The database-generated run time of the current attempt, so the detail agrees with the duration sort. */
         public ?int $durationMicroseconds,
+        /**
+         * Whether cancelling the job can still change anything: it is queued or running, or it
+         * has finished and work it queued may still be waiting (QueuedJobWorkInterface).
+         */
+        public ?bool $cancellable = null,
     ) {
     }
 }

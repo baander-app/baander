@@ -163,6 +163,7 @@ final class JobMonitorController
                         new OA\Property(property: 'data', description: 'Serialized message payload', type: 'string', nullable: true),
                         new OA\Property(property: 'dataTruncated', description: 'Whether the message payload was truncated', type: 'boolean'),
                         new OA\Property(property: 'duration', description: 'Execution time in seconds (null if not finished)', type: 'number', format: 'float', nullable: true),
+                        new OA\Property(property: 'cancellable', description: 'Whether cancelling the job can still change anything: it is queued or running, or it has finished and work it queued, such as lyrics fetches, may still be waiting', type: 'boolean'),
                     ], type: 'object')],
                     type: 'object',
                 ),
@@ -249,17 +250,12 @@ final class JobMonitorController
     }
 
     /**
-     * Cancel a running or queued job via cooperative Redis flag.
-     *
-     * Sets a Redis key that handlers can check at their checkpoints.
-     * Cancellation is best-effort: already-executing handlers detect the flag
-     * on their next checkCancellation() call, and queued messages are flagged
-     * before the worker picks them up.
+     * Cancel a running job at its next checkpoint, or the work a finished job queued.
      */
     #[OA\Post(
         path: '/api/monitor/jobs/{jobId}/cancel',
-        description: 'Sets a cooperative cancellation flag in Redis. Handlers that implement CancellableJobInterface will detect the flag at their next checkpoint. For queued jobs, the flag is set before the worker picks up the message.',
-        summary: 'Cancel a running or queued background job',
+        description: 'Sets a cooperative cancellation flag in Redis; a running job stops at its next checkpoint and becomes cancelled. A finished job that queued work to run later, such as the lyrics fetches of a bulk fetch, has that work cancelled instead: what has not run yet is skipped when it comes due, and the job becomes cancelled.',
+        summary: 'Cancel a running background job, or the work a finished job queued',
         parameters: [
             new OA\Parameter(name: 'jobId', description: 'Internal job identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
@@ -273,7 +269,7 @@ final class JobMonitorController
                 ),
             ),
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
-            new OA\Response(response: '409', description: 'Job cannot be cancelled because it has finished or failed', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '409', description: 'Job cannot be cancelled because it has failed, or has finished with no queued work waiting', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
         ],
     )]
     #[CliCounterpart('app:monitor:job:cancel')]

@@ -527,7 +527,7 @@ export function JobDetailPanel({ jobId, onClose }: JobDetailPanelProps) {
                 </RetryButton>
               )}
 
-              {(job.status === 'running' || job.status === 'queued') && (
+              {job.cancellable && (
                 <CancelJobButton
                   onClick={() => setConfirmAction('cancel')}
                   disabled={cancelMutation.isPending}

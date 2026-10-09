@@ -6,6 +6,7 @@ namespace App\Shared\Infrastructure\Messenger;
 
 use App\Shared\Application\CancellableJobInterface;
 use App\Shared\Application\DTO\InlineJobRun;
+use App\Shared\Application\DTO\JobCancellation;
 use App\Shared\Application\DTO\JobAnalyticsRange;
 use App\Shared\Application\DTO\JobMonitorOverview;
 use App\Shared\Application\DTO\JobMonitorPage;
@@ -18,12 +19,14 @@ use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\JobCancelledException;
 use App\Shared\Application\Port\JobMonitorAdministrationInterface;
+use App\Shared\Application\Port\QueuedJobWorkInterface;
 use App\Shared\Domain\Model\JobStatus;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Infrastructure\Doctrine\Entity\JobMonitorEntity;
 use App\Shared\Infrastructure\Pagination\CursorCodec;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
@@ -33,7 +36,8 @@ use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
 use Throwable;
 
 /**
- * The job monitor over JobMonitorService, the Messenger bus and the Redis cancellation flag.
+ * The job monitor over JobMonitorService, the Messenger bus, the Redis cancellation flag and
+ * the contexts' queued work (QueuedJobWorkInterface).
  *
  * @phpstan-import-type JobMonitorSummary from JobMonitorService
  */
@@ -50,6 +54,9 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
         private RedisClientFactory $redisClientFactory,
         private LoggerInterface $logger,
         private SendersLocatorInterface $sendersLocator,
+        /** @var iterable<QueuedJobWorkInterface> */
+        #[AutowireIterator(QueuedJobWorkInterface::class)]
+        private iterable $queuedWork,
     ) {
     }
 
@@ -93,7 +100,13 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
 
     public function job(string $jobId): JobMonitorRecord
     {
-        return self::record($this->entity($jobId));
+        $job = $this->entity($jobId);
+
+        return self::record($job, match ($job->getStatus()) {
+            JobStatus::Queued, JobStatus::Running => true,
+            JobStatus::Finished => $this->hasQueuedWork($jobId),
+            JobStatus::Failed, JobStatus::Cancelled => false,
+        });
     }
 
     public function retry(string $jobId, string $actor): string
@@ -141,13 +154,18 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
         return $newJobId->toString();
     }
 
-    public function cancel(string $jobId): void
+    public function cancel(string $jobId): JobCancellation
     {
         $status = $this->jobMonitorService->findStatus($jobId)
             ?? throw new NotFoundException('Job not found.', ['jobId' => $jobId]);
 
         if ($status === JobStatus::Finished) {
-            throw new ConflictException('Finished jobs cannot be cancelled.', ['reason' => 'finished']);
+            if (!$this->cancelQueuedWork($jobId)) {
+                throw new ConflictException('Finished jobs cannot be cancelled.', ['reason' => 'finished']);
+            }
+            $this->jobMonitorService->cancelFinished($jobId);
+
+            return JobCancellation::QueuedWorkCancelled;
         }
 
         if ($status === JobStatus::Failed) {
@@ -157,6 +175,8 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
         $this->redisClientFactory->borrow(
             static fn (\Redis $redis): mixed => $redis->setex(self::cancelFlag($jobId), self::CANCEL_FLAG_TTL_SECONDS, '1'),
         );
+
+        return JobCancellation::Requested;
     }
 
     public function checkCancellation(string $jobId): void
@@ -244,6 +264,28 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
         return new InlineJobRun($jobId, $handled->last(HandledStamp::class)?->getResult());
     }
 
+    private function hasQueuedWork(string $jobId): bool
+    {
+        foreach ($this->queuedWork as $work) {
+            if ($work->hasQueuedWork($jobId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Stops the job's queued work of every kind; false when the job had none waiting. */
+    private function cancelQueuedWork(string $jobId): bool
+    {
+        $cancelled = false;
+        foreach ($this->queuedWork as $work) {
+            $cancelled = $work->cancelQueuedWork($jobId) || $cancelled;
+        }
+
+        return $cancelled;
+    }
+
     /** The first transport the message is routed to, or 'sync' when it is handled synchronously. */
     private function routedTransport(object $message): string
     {
@@ -266,7 +308,7 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
         return sprintf('job_cancel:%s', $jobId);
     }
 
-    private static function record(JobMonitorEntity $job): JobMonitorRecord
+    private static function record(JobMonitorEntity $job, bool $cancellable): JobMonitorRecord
     {
         return new JobMonitorRecord(
             jobId: $job->getJobId(),
@@ -285,6 +327,7 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
             data: $job->getData(),
             dataTruncated: $job->getDataTruncated(),
             durationMicroseconds: $job->getDurationMicroseconds(),
+            cancellable: $cancellable,
         );
     }
 

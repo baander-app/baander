@@ -12,6 +12,7 @@ use App\Lyrics\Domain\Model\Lyrics;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\JobCancelledException;
+use App\Shared\Application\Port\CurrentJobInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Messaging\CancelAtCheckpoint;
 use App\Tests\Unit\Lyrics\InMemoryQueuedLyricsFetches;
@@ -195,10 +196,51 @@ final class BulkFetchLyricsHandlerTest extends TestCase
         self::assertNotSame($runIds[0], $runIds[2]);
     }
 
+    public function testAFinishedRunIsRecordedAgainstItsJobUntilADayAfterItsLastFetchIsDue(): void
+    {
+        $songs = $this->createStub(SongLookupInterface::class);
+        $songs->method('songIdsAfter')->willReturn([Uuid::v7(), Uuid::v7(), Uuid::v7()]);
+
+        $this->handler($songs, jobId: 'bulk-job')(new BulkFetchLyricsCommand(limit: 3, delayMs: 2500));
+
+        // Cancelling the finished job finds the run, so the fetches still to come are skipped.
+        self::assertSame(['bulk-job' => [$this->queuedRunId()->toString(), 86405]], $this->marks->jobRuns);
+    }
+
+    public function testARunOutsideAJobOrThatQueuedNothingRecordsNoRun(): void
+    {
+        $songs = $this->createStub(SongLookupInterface::class);
+        $songs->method('songIdsAfter')->willReturn([Uuid::v7()]);
+        $this->handler($songs)(new BulkFetchLyricsCommand());
+
+        $lyrics = $this->createStub(LyricsRepositoryInterface::class);
+        $lyrics->method('findBySongId')->willReturn(Lyrics::create(Uuid::v7(), 'Stored lyrics', 'embedded'));
+        self::assertSame(0, $this->handler($songs, $lyrics, jobId: 'empty-job')(new BulkFetchLyricsCommand()));
+
+        self::assertSame([], $this->marks->jobRuns);
+    }
+
+    public function testARunCancelledWhileItQueuesRecordsNoRunForItsJob(): void
+    {
+        $songs = $this->createStub(SongLookupInterface::class);
+        $songs->method('songIdsAfter')->willReturn([Uuid::v7(), Uuid::v7()]);
+
+        try {
+            $this->handler($songs, cancellation: new CancelAtCheckpoint(passes: 1), jobId: 'bulk-job')(new BulkFetchLyricsCommand());
+            self::fail('A cancelled bulk fetch must stop.');
+        } catch (JobCancelledException) {
+        }
+
+        // The job ends cancelled with its run already cancelled; there is nothing left to cancel.
+        self::assertSame([], $this->marks->jobRuns);
+        self::assertCount(1, $this->marks->cancelledRuns);
+    }
+
     private function handler(
         SongLookupInterface $songs,
         ?LyricsRepositoryInterface $lyrics = null,
         CancelAtCheckpoint $cancellation = new CancelAtCheckpoint(),
+        ?string $jobId = null,
     ): BulkFetchLyricsHandler {
         if ($lyrics === null) {
             $lyrics = $this->createStub(LyricsRepositoryInterface::class);
@@ -212,7 +254,18 @@ final class BulkFetchLyricsHandlerTest extends TestCase
             return $envelope;
         });
 
-        return new BulkFetchLyricsHandler($songs, $lyrics, $bus, new NullLogger(), $cancellation, $this->marks);
+        $currentJob = new readonly class ($jobId) implements CurrentJobInterface {
+            public function __construct(private ?string $jobId)
+            {
+            }
+
+            public function currentJobId(): ?string
+            {
+                return $this->jobId;
+            }
+        };
+
+        return new BulkFetchLyricsHandler($songs, $lyrics, $bus, new NullLogger(), $cancellation, $this->marks, $currentJob);
     }
 
     private function queuedRunId(): Uuid

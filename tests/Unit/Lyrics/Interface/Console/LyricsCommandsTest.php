@@ -11,6 +11,7 @@ use App\Lyrics\Interface\Console\LyricsFetchCommand;
 use App\Lyrics\Interface\Console\LyricsStatusCommand;
 use App\Lyrics\Interface\Controller\LyricsAdminController;
 use App\Shared\Application\DTO\InlineJobRun;
+use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\JobCancelledException;
 use App\Shared\Application\Port\JobMonitorAdministrationInterface;
@@ -19,9 +20,6 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\Messenger\Envelope;
-use Symfony\Component\Messenger\MessageBusInterface;
-use Symfony\Component\Messenger\Stamp\HandledStamp;
 
 /** The app:lyrics:* commands reach what /api/admin/lyrics/* reaches and print the same data. */
 final class LyricsCommandsTest extends TestCase
@@ -157,6 +155,17 @@ final class LyricsCommandsTest extends TestCase
         self::assertStringContainsString('Job "inline-job-2" has been cancelled.', $tester->getDisplay());
     }
 
+    public function testABulkFetchCancelledWhileItQueuesIsAConflictOnTheAdminPage(): void
+    {
+        $jobs = $this->createStub(JobMonitorAdministrationInterface::class);
+        $jobs->method('runInline')->willThrowException(JobCancelledException::forJob('inline-job-3'));
+
+        $this->expectException(ConflictException::class);
+        $this->expectExceptionMessage('Job "inline-job-3" has been cancelled.');
+
+        (new LyricsAdminController($this->port(), $jobs))->bulkFetch(Request::create('/', 'POST'));
+    }
+
     private function port(): LyricsAdminPortInterface
     {
         $port = $this->createStub(LyricsAdminPortInterface::class);
@@ -168,14 +177,8 @@ final class LyricsCommandsTest extends TestCase
 
     private function controller(int $result = 0): LyricsAdminController
     {
-        $bus = $this->createStub(MessageBusInterface::class);
-        $bus->method('dispatch')->willReturnCallback(function (object $message) use ($result): Envelope {
-            $this->dispatched[] = $message;
-
-            return (new Envelope($message))->with(new HandledStamp($result, 'handler'));
-        });
-
-        return new LyricsAdminController($this->port(), $bus);
+        // The admin page runs the bulk fetch as a job, as the command does.
+        return new LyricsAdminController($this->port(), $this->jobs($this->dispatched, $result));
     }
 
     /** @param list<object> $inline */

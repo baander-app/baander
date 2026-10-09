@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Controller;
 
 use App\Lyrics\Application\Command\FetchLyricsCommand;
+use App\Lyrics\Application\Port\LrclibClientInterface;
 use App\Lyrics\Application\Port\QueuedLyricsFetchesInterface;
 use App\Lyrics\Domain\Model\Lyrics;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
@@ -15,6 +16,8 @@ use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\ReceivedStamp;
 use Symfony\Component\Messenger\Stamp\DelayStamp;
 use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
@@ -171,6 +174,60 @@ final class LyricsAdminControllerTest extends TestCase
         }
     }
 
+    public function testCancellingAFinishedRunInTheJobMonitorSkipsTheFetchesItQueuedOnBothPaths(): void
+    {
+        /** @var list<string> $lrclibRequests the titles LRCLIB was asked for */
+        $lrclibRequests = [];
+        $lrclib = $this->createStub(LrclibClientInterface::class);
+        foreach (['getBySignatureCached', 'getBySignature'] as $method) {
+            $lrclib->method($method)->willReturnCallback(static function (string $title) use (&$lrclibRequests): null {
+                $lrclibRequests[] = $title;
+
+                return null;
+            });
+        }
+        static::getContainer()->set(LrclibClientInterface::class, $lrclib);
+        $songs = $this->createSongs(2);
+        $this->giveArtist($songs);
+        $admin = $this->createSuperAdminUser();
+
+        // A run from the admin page, cancelled in the web job monitor after it finished queueing.
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/admin/lyrics/bulk-fetch', $admin), 200, 'data');
+        $webJob = $this->latestBulkFetchJob();
+        $detail = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/monitor/jobs/' . $webJob, $admin), 200, 'data')['data'];
+        $this->assertSame('finished', $detail['status']);
+        $this->assertTrue($detail['cancellable']);
+        $this->assertSame(
+            ['cancelled' => true],
+            $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/monitor/jobs/' . $webJob . '/cancel', $admin), 200, 'data')['data'],
+        );
+        // The cancel updates the row in SQL; the requests here share one entity manager.
+        $this->entityManager->clear();
+        $detail = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/monitor/jobs/' . $webJob, $admin), 200, 'data')['data'];
+        $this->assertSame('cancelled', $detail['status']);
+        $this->assertFalse($detail['cancellable']);
+        $this->assertSame(2, $this->handleQueuedFetches());
+        $this->assertSame([], $lrclibRequests, 'The fetches of the cancelled run do not call LRCLIB.');
+
+        // A run from the console, cancelled with app:monitor:job:cancel.
+        $consoleJob = $this->consoleRun();
+        $show = new CommandTester((new Application(static::$kernel))->find('app:monitor:job:show'));
+        $this->assertSame(Command::SUCCESS, $show->execute(['jobId' => $consoleJob, '--json' => true]));
+        $this->assertTrue(json_decode($show->getDisplay(), true, flags: JSON_THROW_ON_ERROR)['cancellable']);
+        $cancel = new CommandTester((new Application(static::$kernel))->find('app:monitor:job:cancel'));
+        $this->assertSame(Command::SUCCESS, $cancel->execute(['jobId' => $consoleJob]), $cancel->getDisplay());
+        $this->assertStringContainsString('skipped', $cancel->getDisplay());
+        $this->assertSame('cancelled', $this->jobStatus($consoleJob));
+        $this->assertSame(2, $this->handleQueuedFetches());
+        $this->assertSame([], $lrclibRequests, 'The fetches of the cancelled run do not call LRCLIB.');
+
+        // Cancelling again changes nothing; a run nobody cancels calls LRCLIB for each song.
+        $this->assertSame(Command::SUCCESS, $cancel->execute(['jobId' => $consoleJob]), $cancel->getDisplay());
+        $this->consoleRun();
+        $this->assertSame(2, $this->handleQueuedFetches());
+        $this->assertSame(['Track 0', 'Track 0', 'Track 1', 'Track 1'], $lrclibRequests);
+    }
+
     public function testBulkFetchRejectsALimitBelowOne(): void
     {
         $response = $this->authenticatedRequest('POST', '/api/admin/lyrics/bulk-fetch', $this->createSuperAdminUser(), ['limit' => 0]);
@@ -248,6 +305,77 @@ final class LyricsAdminControllerTest extends TestCase
         $response = $this->authenticatedRequest('GET', '/api/admin/lyrics/sync-status', $user);
 
         $this->assertSame(403, $response->getStatusCode());
+    }
+
+    /** Runs app:lyrics:fetch and returns its job ID. */
+    private function consoleRun(): string
+    {
+        $tester = new CommandTester((new Application(static::$kernel))->find('app:lyrics:fetch'));
+        $this->assertSame(Command::SUCCESS, $tester->execute(['--json' => true]), $tester->getDisplay());
+
+        return json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR)['jobId'];
+    }
+
+    /**
+     * Handles the queued lyrics fetches as a worker does once they are due, and empties the queue.
+     *
+     * @return int the fetches handled for the songs that have an artist
+     */
+    private function handleQueuedFetches(): int
+    {
+        $bus = static::getContainer()->get(MessageBusInterface::class);
+        $handled = 0;
+        foreach ($this->asyncTransport()->getSent() as $envelope) {
+            $message = $envelope->getMessage();
+            if (!$message instanceof FetchLyricsCommand) {
+                continue;
+            }
+            $bus->dispatch(new Envelope($message, [new ReceivedStamp('async')]));
+            if (in_array($message->getSongId()->toString(), $this->artistSongs, true)) {
+                ++$handled;
+            }
+        }
+        $this->asyncTransport()->reset();
+
+        return $handled;
+    }
+
+    /** The job ID of the latest bulk fetch the job monitor recorded. */
+    private function latestBulkFetchJob(): string
+    {
+        $jobId = $this->entityManager->getConnection()->fetchOne(
+            "SELECT job_id FROM job_monitors WHERE name = 'BulkFetchLyricsCommand' ORDER BY created_at DESC, id DESC LIMIT 1",
+        );
+        $this->assertIsString($jobId, 'The run is recorded in the job monitor.');
+
+        return $jobId;
+    }
+
+    private function jobStatus(string $jobId): string|false
+    {
+        return $this->entityManager->getConnection()->fetchOne('SELECT status FROM job_monitors WHERE job_id = ?', [$jobId]);
+    }
+
+    /** @var list<string> the songs that have an artist, so their fetches reach LRCLIB */
+    private array $artistSongs = [];
+
+    /** @param list<Uuid> $songs */
+    private function giveArtist(array $songs): void
+    {
+        $conn = $this->entityManager->getConnection();
+        $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
+        $artistId = Uuid::v7()->toString();
+        $conn->executeStatement(
+            'INSERT INTO artists (id, public_id, name, locked_fields, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+            [$artistId, (new PublicId())->toString(), 'Lyrics admin artist', '{}', $now, $now],
+        );
+        foreach ($songs as $songId) {
+            $conn->executeStatement(
+                "INSERT INTO artist_song (id, artist_id, song_id, role) VALUES (?, ?, ?, 'primary')",
+                [Uuid::v7()->toString(), $artistId, $songId->toString()],
+            );
+            $this->artistSongs[] = $songId->toString();
+        }
     }
 
     private function asyncTransport(): InMemoryTransport

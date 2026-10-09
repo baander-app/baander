@@ -58,6 +58,7 @@ final class MonitorJobShowCommand extends Command
             ['Progress' => $job['progress'] === null ? '-' : $job['progress'] . '%'],
             ['Attempt' => (string) $job['attempt']],
             ['Retried' => AdminCommandSupport::yesNo($job['retried'] === true)],
+            ['Cancellable' => AdminCommandSupport::yesNo($job['cancellable'] === true)],
             ['Created' => $job['createdAt']],
             ['Started' => $job['startedAt'] ?? '-'],
             ['Finished' => $job['finishedAt'] ?? '-'],

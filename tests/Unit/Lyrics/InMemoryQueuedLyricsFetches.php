@@ -16,6 +16,9 @@ final class InMemoryQueuedLyricsFetches implements QueuedLyricsFetchesInterface
     /** @var array<string, int> run ID => TTL */
     public array $cancelledRuns = [];
 
+    /** @var array<string, array{string, int}> job ID => [run ID, TTL] */
+    public array $jobRuns = [];
+
     public function markQueued(Uuid $songId, int $ttlSeconds): bool
     {
         if (isset($this->queued[$songId->toString()])) {
@@ -39,5 +42,10 @@ final class InMemoryQueuedLyricsFetches implements QueuedLyricsFetchesInterface
     public function isRunCancelled(Uuid $runId): bool
     {
         return isset($this->cancelledRuns[$runId->toString()]);
+    }
+
+    public function recordJobRun(string $jobId, Uuid $runId, int $ttlSeconds): void
+    {
+        $this->jobRuns[$jobId] = [$runId->toString(), $ttlSeconds];
     }
 }
