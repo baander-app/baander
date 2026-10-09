@@ -34,6 +34,7 @@ make exec cmd="php bin/console app:oauth:client:create 'Scrobble bridge' --type 
 |--------|---------|-------------|
 | `--type`, `-t` | — | `device`, `public` or `confidential`. Required. |
 | `--redirect-uri`, `-r` | — | Redirect URI of a public or confidential client. Repeat the option for each URI. |
+| `--json` | — | Print only the new client, as the admin API's `data` payload, in JSON |
 
 ## Details
 
@@ -49,6 +50,8 @@ A redirect URI must be absolute and carry no fragment and no user name or passwo
 
 The command prints the client ID, name, type, redirect URIs and revocation state. For a confidential client it also prints the client secret, followed by a warning to store it now. Baander keeps only a SHA-256 digest of the secret and cannot show it again. If the secret is lost, issue a new one with [app:oauth:client:rotate-secret](app-oauth-client-rotate-secret.md).
 
+With `--json` the command prints only the client as the API's `data` object, the same resource `POST /api/admin/oauth/clients` returns: `clientId`, `name`, `type`, `redirectUris`, `revoked`, `createdAt`, `updatedAt` and `clientSecret`. `clientSecret` is `null` for device and public clients. The JSON is the only copy of a confidential client's secret, so store it before the output is discarded.
+
 The client ID is the `client_id` the client sends to the authorization server. It is an identifier, not a secret.
 
 ## Exit codes
@@ -56,8 +59,8 @@ The client ID is the `client_id` the client sends to the authorization server. I
 | Code | Meaning |
 |------|---------|
 | 0 | Client registered |
-| 1 | The name or redirect URIs were rejected, or another error occurred; the message says why |
-| 2 | `--type` is missing or not `device`, `public` or `confidential` |
+| 1 | An error occurred; the message says why |
+| 2 | `--type` is missing or not `device`, `public` or `confidential`, or the name or redirect URIs were rejected, as the API rejects them with 422; nothing was registered |
 
 ## Tips
 

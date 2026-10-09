@@ -5,15 +5,17 @@ declare(strict_types=1);
 namespace App\Auth\Interface\Console;
 
 use App\Auth\Application\Command\User\DisableUserCommand as DisableUserMessage;
+use App\Auth\Interface\Resource\AdminUserResource;
+use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Messenger\MessageBusInterface;
-use Symfony\Component\Messenger\Stamp\HandledStamp;
+use Throwable;
 
+/** The CLI counterpart of POST /api/admin/users/{id}/disable. */
 #[AsCommand(
     name: 'app:user:disable',
     description: 'Disable a user account.',
@@ -21,7 +23,7 @@ use Symfony\Component\Messenger\Stamp\HandledStamp;
 final class DisableUserCommand extends Command
 {
     public function __construct(
-        private readonly MessageBusInterface $commandBus,
+        private readonly AdminCommandSupport $support,
     ) {
         parent::__construct();
     }
@@ -29,21 +31,22 @@ final class DisableUserCommand extends Command
     protected function configure(): void
     {
         $this->addArgument('identifier', InputArgument::REQUIRED, 'User email or UUID');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
-        $identifier = $input->getArgument('identifier');
+        $identifier = (string) $input->getArgument('identifier');
 
         try {
-            $this->commandBus->dispatch(new DisableUserMessage(
-                identifier: $identifier,
-            ));
-        } catch (\Throwable $e) {
-            $io->error($e->getMessage());
+            $user = AdminUserResource::from($this->support->dispatch(new DisableUserMessage(identifier: $identifier)));
+        } catch (Throwable $exception) {
+            return AdminCommandSupport::fail($io, $exception);
+        }
 
-            return Command::FAILURE;
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, $user);
         }
 
         $io->success(sprintf('User "%s" has been disabled.', $identifier));

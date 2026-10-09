@@ -25,10 +25,13 @@ make exec cmd="php bin/console app:user:delete alice@baander.app --force"
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--force` | — | Delete without asking. Required when no terminal is attached |
+| `--json` | — | Print nothing on success, as the admin API answers `204 No Content`; the exit code reports the outcome |
 
 ## Details
 
 Deletion cannot be undone. On a terminal, the command asks before it deletes; answering no leaves the account as it was. Without a terminal and without `--force`, the command deletes nothing and exits with code 2.
+
+With `--json` the command prints nothing on success, because the API answers `204 No Content`; read the outcome from the exit code. Errors still go to stderr. `--json` does not stand in for `--force`.
 
 The command acts with full authority. It can delete any account, an admin's or a super admin's included, and it does not check whether another super admin remains. If the last super admin is deleted, create a new one with [app:user:create](app-user-create.md) and `--role=super-admin`.
 

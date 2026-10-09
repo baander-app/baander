@@ -28,6 +28,7 @@ echo "new-secure-password" | make exec cmd="php bin/console app:user:reset-passw
 |-------------------|----------|-------------|
 | `identifier` | Yes | User's email address or UUID |
 | `--password` | No | Read the password from stdin instead of prompting |
+| `--json` | No | Print only the admin API's `data` payload, in JSON |
 
 ## What it changes
 
@@ -36,9 +37,12 @@ echo "new-secure-password" | make exec cmd="php bin/console app:user:reset-passw
 - An outstanding password reset token for the user is removed.
 - The user receives a security notification that their password changed.
 
+With `--json` the command prints only `{"message": "Password reset successfully."}`, the `data` object of the API's response. The password prompt goes to stderr, so stdout carries only the JSON.
+
 ## Exit codes
 
 | Code | Meaning |
 |------|---------|
 | 0 | Password reset |
-| 1 | Failure: no password was given, the user was not found, the password breaks the policy, or another error occurred (the message is printed) |
+| 1 | The user was not found, or another error occurred; the message says why |
+| 2 | No password was given, or the password is not 8 to 255 characters; nothing was changed |

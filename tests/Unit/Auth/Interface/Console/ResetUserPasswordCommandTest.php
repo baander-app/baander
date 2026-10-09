@@ -8,6 +8,7 @@ use App\Auth\Application\Command\User\SetUserPasswordCommand;
 use App\Auth\Application\Exception\PasswordPolicyException;
 use App\Auth\Application\Exception\UserNotFoundException;
 use App\Auth\Interface\Console\ResetUserPasswordCommand;
+use App\Shared\Interface\Console\AdminCommandSupport;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -44,26 +45,47 @@ final class ResetUserPasswordCommandTest extends TestCase
         self::assertSame('prompted-password-2', $this->dispatched[0]->password);
     }
 
-    public function testFailsWithoutAPassword(): void
+    public function testPrintsTheApiDataWithJson(): void
+    {
+        $tester = new CommandTester($this->command(dispatches: true, stdin: "operator-password-1\n"));
+
+        $tester->execute(['identifier' => 'alice@baander.app', '--password' => true, '--json' => true], ['interactive' => false]);
+
+        self::assertSame(Command::SUCCESS, $tester->getStatusCode());
+        self::assertSame(['message' => 'Password reset successfully.'], json_decode($tester->getDisplay(), true, 512, JSON_THROW_ON_ERROR));
+    }
+
+    public function testAMissingPasswordIsInvalid(): void
     {
         $tester = new CommandTester($this->command(dispatches: true, stdin: ''));
 
         $tester->execute(['identifier' => 'alice@baander.app', '--password' => true], ['interactive' => false]);
 
-        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertSame(Command::INVALID, $tester->getStatusCode());
+        self::assertStringContainsString('A password is required.', $tester->getDisplay());
         self::assertSame([], $this->dispatched);
     }
 
-    public function testReportsTheUseCaseRejection(): void
+    public function testAnUnknownUserFails(): void
     {
-        foreach ([UserNotFoundException::forIdentifier('nobody@baander.app'), PasswordPolicyException::length(8, 255)] as $failure) {
-            $tester = new CommandTester($this->command(dispatches: false, stdin: "operator-password-1\n", failure: $failure));
+        $failure = UserNotFoundException::forIdentifier('nobody@baander.app');
+        $tester = new CommandTester($this->command(dispatches: false, stdin: "operator-password-1\n", failure: $failure));
 
-            $tester->execute(['identifier' => 'nobody@baander.app', '--password' => true], ['interactive' => false]);
+        $tester->execute(['identifier' => 'nobody@baander.app', '--password' => true], ['interactive' => false]);
 
-            self::assertSame(Command::FAILURE, $tester->getStatusCode());
-            self::assertStringContainsString($failure->getMessage(), preg_replace('/\s+/', ' ', $tester->getDisplay()) ?? '');
-        }
+        self::assertSame(Command::FAILURE, $tester->getStatusCode());
+        self::assertStringContainsString($failure->getMessage(), preg_replace('/\s+/', ' ', $tester->getDisplay()) ?? '');
+    }
+
+    public function testAPasswordOutsideThePolicyIsInvalid(): void
+    {
+        $failure = PasswordPolicyException::length(8, 255);
+        $tester = new CommandTester($this->command(dispatches: false, stdin: "short\n", failure: $failure));
+
+        $tester->execute(['identifier' => 'alice@baander.app', '--password' => true], ['interactive' => false]);
+
+        self::assertSame(Command::INVALID, $tester->getStatusCode());
+        self::assertStringContainsString($failure->getMessage(), preg_replace('/\s+/', ' ', $tester->getDisplay()) ?? '');
     }
 
     private function command(bool $dispatches, ?string $stdin = null, ?\Throwable $failure = null): ResetUserPasswordCommand
@@ -80,13 +102,13 @@ final class ResetUserPasswordCommandTest extends TestCase
         });
 
         if ($stdin === null) {
-            return new ResetUserPasswordCommand($bus);
+            return new ResetUserPasswordCommand(new AdminCommandSupport($bus));
         }
         $stream = fopen('php://memory', 'r+');
         self::assertIsResource($stream);
         fwrite($stream, $stdin);
         rewind($stream);
 
-        return new ResetUserPasswordCommand($bus, $stream);
+        return new ResetUserPasswordCommand(new AdminCommandSupport($bus), $stream);
     }
 }

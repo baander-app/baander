@@ -128,6 +128,23 @@ final class LoginBlockCommandsTest extends TestCase
         self::assertSame(Command::SUCCESS, $tester->execute(['--all' => true, '--force' => true], ['interactive' => false]));
     }
 
+    public function testDeleteWithJsonPrintsNothingAsTheApiAnswersWithNoContent(): void
+    {
+        $known = new Uuid();
+        $blocks = $this->createMock(LoginBlockRepositoryInterface::class);
+        $blocks->expects(self::once())->method('deleteByUuid')->willReturn(true);
+        $blocks->expects(self::once())->method('deleteAll');
+        $command = new LoginBlockDeleteCommand($this->support($blocks));
+
+        $one = new CommandTester($command);
+        self::assertSame(Command::SUCCESS, $one->execute(['id' => $known->toString(), '--json' => true], ['interactive' => false]));
+        self::assertSame('', $one->getDisplay());
+
+        $all = new CommandTester($command);
+        self::assertSame(Command::SUCCESS, $all->execute(['--all' => true, '--force' => true, '--json' => true], ['interactive' => false]));
+        self::assertSame('', $all->getDisplay());
+    }
+
     public function testDeleteNeedsExactlyOneOfAnIdAndAll(): void
     {
         $blocks = $this->createMock(LoginBlockRepositoryInterface::class);

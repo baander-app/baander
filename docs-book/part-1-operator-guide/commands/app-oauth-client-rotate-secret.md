@@ -14,11 +14,19 @@ make exec cmd="php bin/console app:oauth:client:rotate-secret V1StGXR8_Z5jdHi6B-
 |----------|----------|-------------|
 | `client-id` | Yes | The client's `client_id`, as [app:oauth:client:list](app-oauth-client-list.md) shows it |
 
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--json` | Print only the client and its new secret, as the admin API's `data` payload, in JSON |
+
 ## Details
 
 The new secret replaces the old one at once: from then on the old secret no longer authenticates a token request. Access and refresh tokens the client already holds stay valid, so its signed-in users are not signed out. Install the new secret in the client before its next token request.
 
 The command prints the client and its new secret, followed by a warning to store the secret now. Baander keeps only a SHA-256 digest and cannot show the secret again.
+
+With `--json` the command prints only the client as the API's `data` object, the same resource `POST /api/admin/oauth/clients/{clientId}/rotate-secret` returns: `clientId`, `name`, `type`, `redirectUris`, `revoked`, `createdAt`, `updatedAt` and the new `clientSecret`. The JSON is the only copy of the secret, so store it before the output is discarded.
 
 Only confidential clients have a secret. The command refuses:
 

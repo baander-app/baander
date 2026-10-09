@@ -18,7 +18,7 @@ make exec cmd="php bin/console app:transcode:session:list --user=listener@baande
 
 | Option | Description |
 |--------|-------------|
-| `--user` | List only the sessions of this user, by email address or UUID |
+| `--user` | List only the sessions of this user, by email address or UUID, as the `app:user:*` commands take it |
 | `--json` | Print the sessions in the shape of the API's `data` array, in JSON |
 
 ## Details
@@ -38,12 +38,13 @@ The table has one row per session:
 | Segment | The segment being transcoded |
 | Created | Start time in ISO 8601 format |
 
-When no session is active, the command prints `No transcode session is active.` A UUID given to `--user` is not checked against the user list: a UUID that belongs to no user lists no sessions.
+When no session is active, the command prints `No transcode session is active.`
+
+`--user` finds the user the same way as the `app:user:*` commands. The command checks a UUID against the user list just as it checks an email address, so a UUID that belongs to no user fails with `User "..." not found.` rather than listing no sessions. A value that is neither an email address nor a UUID fails the same way.
 
 ## Exit codes
 
 | Code | Meaning |
 |------|---------|
 | 0 | List printed, possibly empty |
-| 1 | No user has the email address given to `--user`, or the sessions could not be read; the message says why |
-| 2 | The value of `--user` is neither an email address nor a UUID |
+| 1 | No user has the email address or UUID given to `--user`, or the sessions could not be read; the message says why |

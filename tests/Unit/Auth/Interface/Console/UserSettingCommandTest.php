@@ -94,7 +94,7 @@ final class UserSettingCommandTest extends TestCase
     {
         $exitCode = $this->tester->execute(['action' => 'set', 'identifier' => 'alice@baander.app', 'key' => 'language', 'value' => 'de']);
 
-        $this->assertSame(Command::FAILURE, $exitCode);
+        $this->assertSame(Command::INVALID, $exitCode);
         $this->assertStringContainsString('language: Must be one of: en, da, th.', $this->display());
         $this->assertSame([], $this->stored);
         $this->assertSame([], $this->logs->getRecords());
@@ -112,7 +112,7 @@ final class UserSettingCommandTest extends TestCase
     {
         $exitCode = $this->tester->execute(['action' => 'set', 'identifier' => 'alice@baander.app', 'key' => 'language']);
 
-        $this->assertSame(Command::FAILURE, $exitCode);
+        $this->assertSame(Command::INVALID, $exitCode);
         $this->assertSame([], $this->stored);
     }
 
@@ -120,8 +120,39 @@ final class UserSettingCommandTest extends TestCase
     {
         $exitCode = $this->tester->execute(['action' => 'remove', 'identifier' => 'alice@baander.app', 'key' => 'language']);
 
-        $this->assertSame(Command::FAILURE, $exitCode);
+        $this->assertSame(Command::INVALID, $exitCode);
         $this->assertStringContainsString('get, set or reset', $this->display());
+    }
+
+    public function testResetWithoutAKeyIsInvalid(): void
+    {
+        $exitCode = $this->tester->execute(['action' => 'reset', 'identifier' => 'alice@baander.app']);
+
+        $this->assertSame(Command::INVALID, $exitCode);
+        $this->assertStringContainsString('Reset needs a setting key.', $this->display());
+    }
+
+    public function testJsonPrintsTheSettingsAsTheApiReturnsThem(): void
+    {
+        $this->stored[$this->aliceId()]['language'] = 'th';
+
+        $this->assertSame(Command::SUCCESS, $this->tester->execute(['action' => 'get', 'identifier' => 'alice@baander.app', '--json' => true]));
+        $listed = $this->json();
+        $languages = array_values(array_filter($listed, static fn (array $setting): bool => $setting['key'] === 'language'));
+        $this->assertCount(1, $languages);
+        $this->assertSame('th', $languages[0]['value']);
+        $this->assertSame('user', $languages[0]['source']);
+
+        $this->assertSame(Command::SUCCESS, $this->tester->execute(['action' => 'get', 'identifier' => 'alice@baander.app', 'key' => 'language', '--json' => true]));
+        $this->assertSame($languages[0], $this->json());
+
+        $this->assertSame(Command::SUCCESS, $this->tester->execute(['action' => 'set', 'identifier' => 'alice@baander.app', 'key' => 'language', 'value' => 'da', '--json' => true]));
+        $set = $this->json();
+        $this->assertSame(['language', 'da', 'da', 'user'], [$set['key'], $set['value'], $set['storedValue'], $set['source']]);
+
+        $this->assertSame(Command::SUCCESS, $this->tester->execute(['action' => 'reset', 'identifier' => 'alice@baander.app', 'key' => 'language', '--json' => true]));
+        $reset = $this->json();
+        $this->assertSame(['language', null], [$reset['key'], $reset['storedValue']]);
     }
 
     public function testGetMarksAStoredValueThatIsNoLongerAllowedAsInvalid(): void
@@ -166,6 +197,15 @@ final class UserSettingCommandTest extends TestCase
     private function aliceId(): string
     {
         return $this->alice->getId()->toString();
+    }
+
+    /** @return array<array-key, mixed> */
+    private function json(): array
+    {
+        $decoded = json_decode($this->tester->getDisplay(), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertIsArray($decoded);
+
+        return $decoded;
     }
 
     private function display(): string

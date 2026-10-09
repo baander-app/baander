@@ -36,8 +36,6 @@ deptrac:
       - App\Notification\Application\DTO\SeedDefaultPreferencesCommand
     App\Auth\Application\CommandHandler\User\RegisterUserHandler:
       - App\Notification\Application\DTO\SeedDefaultPreferencesCommand
-    App\Auth\Interface\Console\CreateUserCommand:
-      - App\Auth\Domain\Model\User
     App\Auth\Interface\Console\SetupClientsCommand:
       - App\Auth\Domain\Model\OAuth\Client
       - App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface

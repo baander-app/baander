@@ -36,6 +36,7 @@ final class UserRenameCommand extends Command
         $this
             ->addArgument('identifier', InputArgument::REQUIRED, 'User email or UUID')
             ->addArgument('name', InputArgument::REQUIRED, 'The new display name');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -47,6 +48,10 @@ final class UserRenameCommand extends Command
             $user = AdminUserResource::from($this->support->dispatch(new RenameUserCommand($identifier, (string) $input->getArgument('name'))));
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
+        }
+
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, $user);
         }
 
         $io->success(sprintf('User %s is now named "%s".', $user['email'], $user['name']));

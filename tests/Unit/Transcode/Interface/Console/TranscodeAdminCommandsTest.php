@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Interface\Console;
 
-use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Auth\Application\Exception\UserNotFoundException;
+use App\Auth\Application\Port\UserIdentifierResolverInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use App\Transcode\Application\Command\CleanupOrphanedJobsCommand;
@@ -17,14 +18,13 @@ use App\Transcode\Interface\Console\TranscodeJobCleanupCommand;
 use App\Transcode\Interface\Console\TranscodeSessionListCommand;
 use App\Transcode\Interface\Console\TranscodeSessionShowCommand;
 use App\Transcode\Interface\Resource\TranscodeSessionResource;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 use Symfony\Component\Messenger\Handler\HandlersLocator;
 use Symfony\Component\Messenger\MessageBus;
 use Symfony\Component\Messenger\Middleware\HandleMessageMiddleware;
-use Symfony\Component\Security\Core\Exception\UserNotFoundException;
-use Symfony\Component\Security\Core\User\UserProviderInterface;
 
 final class TranscodeAdminCommandsTest extends TestCase
 {
@@ -35,8 +35,10 @@ final class TranscodeAdminCommandsTest extends TestCase
         $sessions = $this->createMock(TranscodeSessionPortInterface::class);
         $sessions->expects(self::once())->method('findActive')->willReturn([$first, $second]);
         $sessions->expects(self::never())->method('findActiveByUser');
+        $users = $this->createMock(UserIdentifierResolverInterface::class);
+        $users->expects(self::never())->method('userId');
 
-        $tester = new CommandTester(new TranscodeSessionListCommand($sessions, $this->createStub(UserProviderInterface::class)));
+        $tester = new CommandTester(new TranscodeSessionListCommand($sessions, $users));
 
         self::assertSame(Command::SUCCESS, $tester->execute([]));
         $display = $tester->getDisplay();
@@ -46,7 +48,15 @@ final class TranscodeAdminCommandsTest extends TestCase
         }
     }
 
-    public function testSessionListWithAUserUuidListsOnlyThatUsersSessions(): void
+    /** @return iterable<string, array{string}> */
+    public static function userIdentifiers(): iterable
+    {
+        yield 'a UUID' => ['0199b0a4-3c55-7a8e-9f2b-6c1d4e5f7a80'];
+        yield 'an email address' => ['viewer@baander.app'];
+    }
+
+    #[DataProvider('userIdentifiers')]
+    public function testSessionListWithAUserListsOnlyTheSessionsOfTheUserAuthResolves(string $identifier): void
     {
         $owner = Uuid::generate();
         $own = $this->session($owner);
@@ -56,50 +66,35 @@ final class TranscodeAdminCommandsTest extends TestCase
             ->method('findActiveByUser')
             ->with(self::callback(static fn (Uuid $id): bool => $id->equals($owner)))
             ->willReturn([$own]);
-        $users = $this->createMock(UserProviderInterface::class);
-        $users->expects(self::never())->method('loadUserByIdentifier');
+        $users = $this->createMock(UserIdentifierResolverInterface::class);
+        $users->expects(self::once())->method('userId')->with($identifier)->willReturn($owner);
 
         $tester = new CommandTester(new TranscodeSessionListCommand($sessions, $users));
 
-        self::assertSame(Command::SUCCESS, $tester->execute(['--user' => $owner->toString(), '--json' => true]));
+        self::assertSame(Command::SUCCESS, $tester->execute(['--user' => $identifier, '--json' => true]));
         self::assertJsonStringEqualsJsonString(json_encode(TranscodeSessionResource::collection([$own]), JSON_THROW_ON_ERROR), $tester->getDisplay());
     }
 
-    public function testSessionListResolvesAUserEmailAddress(): void
+    /** @return iterable<string, array{string}> */
+    public static function unknownUsers(): iterable
     {
-        $owner = Uuid::generate();
-        $sessions = $this->createMock(TranscodeSessionPortInterface::class);
-        $sessions->expects(self::once())
-            ->method('findActiveByUser')
-            ->with(self::callback(static fn (Uuid $id): bool => $id->equals($owner)))
-            ->willReturn([]);
-        $users = $this->createMock(UserProviderInterface::class);
-        $users->expects(self::once())
-            ->method('loadUserByIdentifier')
-            ->with('viewer@baander.app')
-            ->willReturn(new SecurityUser($owner->toString(), 'viewer@baander.app', ''));
-
-        $tester = new CommandTester(new TranscodeSessionListCommand($sessions, $users));
-
-        self::assertSame(Command::SUCCESS, $tester->execute(['--user' => 'viewer@baander.app']));
-        self::assertStringContainsString('No transcode session is active.', $tester->getDisplay());
+        yield 'an unknown email address' => ['nobody@baander.app'];
+        yield 'an unknown UUID' => ['0199b0a4-3c55-7a8e-9f2b-6c1d4e5f7a81'];
+        yield 'neither' => ['not-a-user'];
     }
 
-    public function testSessionListFailsForAnUnknownEmailAndRejectsAMalformedUser(): void
+    #[DataProvider('unknownUsers')]
+    public function testSessionListFailsForAUserAuthDoesNotFind(string $identifier): void
     {
-        $users = $this->createStub(UserProviderInterface::class);
-        $users->method('loadUserByIdentifier')->willThrowException(new UserNotFoundException());
+        $users = $this->createStub(UserIdentifierResolverInterface::class);
+        $users->method('userId')->willThrowException(UserNotFoundException::forIdentifier($identifier));
         $sessions = $this->createMock(TranscodeSessionPortInterface::class);
         $sessions->expects(self::never())->method('findActiveByUser');
+        $sessions->expects(self::never())->method('findActive');
         $tester = new CommandTester(new TranscodeSessionListCommand($sessions, $users));
 
-        self::assertSame(Command::FAILURE, $tester->execute(['--user' => 'nobody@baander.app']));
-        self::assertStringContainsString('No user has the email address "nobody@baander.app".', $tester->getDisplay());
-
-        foreach (['not-a-user', 'nobody@'] as $malformed) {
-            self::assertSame(Command::INVALID, $tester->execute(['--user' => $malformed]));
-            self::assertStringContainsString('The user must be an email address or a UUID.', $tester->getDisplay());
-        }
+        self::assertSame(Command::FAILURE, $tester->execute(['--user' => $identifier]));
+        self::assertStringContainsString(sprintf('User "%s" not found.', $identifier), $tester->getDisplay());
     }
 
     public function testSessionShowPrintsTheSessionAsTheApiDoes(): void

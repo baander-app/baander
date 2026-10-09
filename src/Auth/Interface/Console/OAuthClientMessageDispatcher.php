@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Auth\Interface\Console;
 
+use App\Auth\Application\Exception\ClientManagementException;
+use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use InvalidArgumentException;
@@ -23,12 +25,21 @@ final readonly class OAuthClientMessageDispatcher
 
     /**
      * Dispatches through the bus the admin API uses and unwraps the handler's own exception.
+     * A registration the API rejects with 422 is rejected input here too.
      *
      * @throws Throwable
      */
     public function dispatch(object $message): mixed
     {
-        return $this->support->dispatch($message);
+        try {
+            return $this->support->dispatch($message);
+        } catch (ClientManagementException $exception) {
+            if ($exception->reason !== ClientManagementException::INVALID_REGISTRATION) {
+                throw $exception;
+            }
+
+            throw new InvalidInputException($exception->getMessage(), previous: $exception);
+        }
     }
 
     public static function publicId(string $value): PublicId
