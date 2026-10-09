@@ -41,7 +41,8 @@ class SongEntity
     #[ORM\Column(type: 'text')]
     private string $path;
 
-    #[ORM\Column(type: 'integer')]
+    /** Bytes; lossless and uncompressed audio files can pass 2 GiB. */
+    #[ORM\Column(type: 'bigint')]
     private int $size;
 
     #[ORM\Column(type: 'text')]
