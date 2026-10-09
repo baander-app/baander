@@ -7,8 +7,8 @@ Understand the architecture, write code following project conventions, and contr
 | Page | Description |
 |------|-------------|
 | [Architecture Overview](architecture.md) | DDD bounded contexts, four-layer structure, and shared kernel |
-| [Shared Kernel](shared-kernel.md) | UUID v7, cursor pagination, search, Swoole async, caching, SSE/WebSocket |
-| [Real-Time Patterns](real-time-patterns.md) | WebSocket connection registry, SSE via Redis Pub/Sub, party sync |
+| [Shared Kernel](shared-kernel.md) | UUID v7, cursor pagination, search, Swoole async, caching, WebSocket |
+| [Real-Time Patterns](real-time-patterns.md) | WebSocket connection registry, message protocol, party sync |
 | [API Reference](api-reference.md) | OpenAPI spec, REST patterns, and authentication flows |
 
 ## Development
@@ -48,7 +48,7 @@ Understand the architecture, write code following project conventions, and contr
 | [Session](contexts/session.md) | Listening sessions and registered devices |
 | [Transcode](contexts/transcode.md) | CMAF video transcoding via FFmpeg and Swoole |
 | [User Preference](contexts/user-preference.md) | Accent color, sidebar, audio/layout/player preferences, EQ profiles, theme mood, and user settings |
-| [Shared](contexts/shared.md) | Cross-cutting kernel: UUID, Swoole, caching, SSE, WebSocket, and settings |
+| [Shared](contexts/shared.md) | Cross-cutting kernel: UUID, Swoole, caching, WebSocket, and settings |
 
 ## Contributing
 

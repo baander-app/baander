@@ -17,7 +17,7 @@ The `EventCategoryResolver` maps domain event classes to `NotificationCategory` 
 Delivery channels:
 - **Push** — Web Push via VAPID keys, managed through `PushSubscriptionController`
 - **Webhooks** — HMAC-signed payloads to Slack and Discord via adapter pattern (`WebhookAdapterInterface`)
-- **SSE** — real-time delivery to connected clients via Redis Pub/Sub (wired through `Shared\Interface\Controller\NotificationSseController`)
+- **In-app** — stored notifications that clients read over HTTP (the list and the unread count); no stream pushes them
 
 ## Ports
 

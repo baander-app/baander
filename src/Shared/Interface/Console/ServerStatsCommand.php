@@ -17,7 +17,7 @@ use Throwable;
  */
 #[AsCommand(
     name: 'app:server:stats',
-    description: 'Show memory, process and coroutine figures of every web server worker, with the shared Redis and SSE figures.',
+    description: 'Show memory, process and coroutine figures of every web server worker, with the shared Redis figures.',
 )]
 final class ServerStatsCommand extends Command
 {
@@ -75,9 +75,6 @@ final class ServerStatsCommand extends Command
                 ['Max memory (MB)' => ServerWorkerReport::scalar($redis['maxmemory'] ?? null)],
             );
         }
-
-        $io->section('SSE');
-        $io->definitionList(['Active connections' => $stats['sse']['active_connections']]);
 
         return ServerWorkerReport::finish($io, $stats['missing_workers'], $stats['worker_errors']);
     }

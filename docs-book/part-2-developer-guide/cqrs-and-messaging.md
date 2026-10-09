@@ -141,5 +141,5 @@ In tests, commands are processed synchronously by default — no worker process 
 ## See Also
 
 - [Coding Conventions](coding-conventions.md) — CQRS rules and common mistakes
-- [Real-Time Patterns](real-time-patterns.md) — how events feed into WebSocket and SSE
+- [Real-Time Patterns](real-time-patterns.md) — how events feed into WebSocket pushes
 - [Testing](testing.md) — how to test handlers

@@ -231,4 +231,4 @@ Tailwind. Read the actual primitive before changing its variants or behavior.
 
 For authentication and endpoint contracts, see [Auth](contexts/auth.md) and
 [API Reference](api-reference.md). See [Real-Time Patterns](real-time-patterns.md)
-for WebSocket and SSE, and [AGENTS.md](../../AGENTS.md) for agent instructions.
+for WebSocket, and [AGENTS.md](../../AGENTS.md) for agent instructions.

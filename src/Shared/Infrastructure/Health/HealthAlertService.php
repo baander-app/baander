@@ -47,7 +47,7 @@ final class HealthAlertService implements HealthAlertPortInterface
 
     /**
      * Evaluate pre-fetched health results and alert on degradation.
-     * Use this when health results are already available (e.g., from SSE polling).
+     * Use this when the caller already ran the health checks.
      *
      * @param HealthCheckResult[] $results
      */

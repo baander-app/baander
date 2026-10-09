@@ -1,11 +1,9 @@
 import styled from 'styled-components'
-import { KVRow } from '@/shared/components/kv-row'
 import { Button } from '@/shared/components/ui/button'
 import { useServerStats } from '../hooks/use-server-stats'
 import { LiveHealthBar } from '../components/dashboard/LiveHealthBar'
 import { CoroutinesSection } from '../components/diagnostics/CoroutinesSection'
 import { DeveloperToolsCard } from '../components/diagnostics/DeveloperToolsCard'
-import { DiagnosticsCard } from '../components/diagnostics/DiagnosticsCard'
 import { RedisCard } from '../components/diagnostics/RedisCard'
 import { SectionSkeleton } from '../components/diagnostics/SectionStates'
 import { SpansSection } from '../components/diagnostics/SpansSection'
@@ -106,9 +104,6 @@ export function ServerDiagnosticsPage() {
         <WorkersTable workers={stats.workers} />
         <Grid>
           <RedisCard redis={stats.redis} />
-          <DiagnosticsCard title="Server-sent events">
-            <KVRow label="Active connections" value={stats.sse.active_connections} />
-          </DiagnosticsCard>
         </Grid>
       </Section>
 

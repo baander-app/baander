@@ -29,7 +29,7 @@ final class ServerDiagnosticsCommandsTest extends TestCase
     /** @var list<array{string, array<string, mixed>}> */
     private array $calls = [];
 
-    public function testStatsListsOneRowPerWorkerPlusTheSharedRedisAndSseFigures(): void
+    public function testStatsListsOneRowPerWorkerPlusTheSharedRedisFigures(): void
     {
         $this->answers['debug.stats'] = new ServerControlResult([
             0 => $this->workerStats(4101, 21.5),
@@ -50,7 +50,7 @@ final class ServerDiagnosticsCommandsTest extends TestCase
         self::assertMatchesRegularExpression('/DB size\s+42/', $display);
         self::assertMatchesRegularExpression('/Connected clients\s+7/', $display);
         self::assertMatchesRegularExpression('/Ping\s+PONG/', $display);
-        self::assertMatchesRegularExpression('/Active connections\s+5/', $display);
+        self::assertStringNotContainsString('SSE', $display);
     }
 
     public function testStatsJsonIsTheDataTheAdminEndpointReturns(): void
@@ -64,7 +64,7 @@ final class ServerDiagnosticsCommandsTest extends TestCase
         $endpoint = json_decode((string) (new ServerStatsControllerWithCoroutines($diagnostics))->stats()->getContent(), true);
         self::assertSame($endpoint['data'], json_decode($tester->getDisplay(), true));
         self::assertSame([0, 1], array_column($endpoint['data']['workers'], 'worker_id'));
-        self::assertSame(['active_connections' => 5], $endpoint['data']['sse']);
+        self::assertSame(['workers', 'missing_workers', 'worker_errors', 'redis'], array_keys($endpoint['data']));
     }
 
     public function testStatsNamesWorkersThatDidNotAnswerAndFails(): void
@@ -273,8 +273,6 @@ final class ServerDiagnosticsCommandsTest extends TestCase
         $redis->method('info')->willReturn(['connected_clients' => '7', 'used_memory' => '2097152', 'maxmemory' => '0']);
         $redis->method('ping')->willReturn(true);
         $redis->method('dbSize')->willReturn(42);
-        $redis->method('scan')->willReturn(['sse:connections:node-a']);
-        $redis->method('mget')->willReturn(['5']);
 
         return new ServerDiagnostics($port, new RedisClientFactory('redis://127.0.0.1:6379', connectionFactory: static fn (): Redis => $redis));
     }

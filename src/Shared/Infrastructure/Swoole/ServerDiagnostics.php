@@ -18,7 +18,7 @@ use Redis;
 use Throwable;
 
 /**
- * Reads the server diagnostics through the control channel. Redis and SSE figures
+ * Reads the server diagnostics through the control channel. The Redis figures
  * live outside the workers, so they are read once, here.
  *
  * @phpstan-import-type PerWorker from ServerDiagnosticsInterface
@@ -37,7 +37,6 @@ final readonly class ServerDiagnostics implements ServerDiagnosticsInterface
     {
         return $this->perWorker($this->serverControl->execute(DebugStatsOperation::NAME)) + [
             'redis' => $this->redis(),
-            'sse' => ['active_connections' => $this->sseConnections()],
         ];
     }
 
@@ -113,31 +112,6 @@ final readonly class ServerDiagnostics implements ServerDiagnosticsInterface
             });
         } catch (Throwable $exception) {
             return ['connected' => false, 'error' => $exception->getMessage()];
-        }
-    }
-
-    /** Sum of the per-node SSE connection counters; 0 when Redis cannot be read. */
-    private function sseConnections(): int
-    {
-        try {
-            return $this->redisClientFactory->borrow(static function (Redis $redis): int {
-                $total = 0;
-                $iterator = null;
-                while (($keys = $redis->scan($iterator, 'sse:connections:*', 100)) !== false) {
-                    // A page can be empty while the scan goes on; MGET needs at least one key.
-                    $counts = $keys === [] ? [] : $redis->mget($keys);
-                    foreach (is_array($counts) ? $counts : [] as $count) {
-                        $total += (int) $count;
-                    }
-                    if ($iterator === null || $iterator === 0 || $iterator === '0') {
-                        break;
-                    }
-                }
-
-                return $total;
-            });
-        } catch (Throwable) {
-            return 0;
         }
     }
 }

@@ -84,12 +84,11 @@ Async jobs dispatched via Symfony Messenger are tracked through:
 - `JobCancellationCheckpointInterface` — Application port that handlers call between items; `check()` throws `JobCancelledException` once the job was cancelled
 - `JobMonitorService` — queries job status and history
 
-See the [Real-Time Patterns](real-time-patterns.md) page for SSE and WebSocket details.
+See the [Real-Time Patterns](real-time-patterns.md) page for WebSocket details.
 
 ## Redis
 
 - **Caching** — tag-aware cache pools via `RedisTagAwareAdapter`. The `noeviction` policy is required for tag invalidation to work correctly.
-- **SSE Pub/Sub** — server-sent events are delivered via Redis Pub/Sub channels
 - **Session storage** — user sessions stored in Redis
 
 ## Controllers
@@ -102,7 +101,6 @@ The Shared kernel provides several shared controllers:
 | `ServerStatsController` | `/api/debug/stats` | Server diagnostics |
 | `JobMonitorController` | `/api/monitor/*` | Job status and management |
 | `PrometheusMetricsController` | `/metrics` | Prometheus metrics endpoint |
-| `SseController` | `/sse` | Server-sent events endpoint |
 | `WebSocketController` | `/ws` | WebSocket endpoint |
 
 ## DTOs

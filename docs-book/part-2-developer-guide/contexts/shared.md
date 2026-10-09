@@ -100,19 +100,12 @@ Redis-backed tag-aware cache pools via `RedisTagAwareAdapter`. The `noeviction` 
 
 ## Redis
 
-Connection management and configuration for all Redis-backed features: caching, Messenger transport, SSE Pub/Sub, and session storage.
-
-## Server-Sent Events
-
-SSE delivery uses Redis Pub/Sub channels. When a domain event is published, an event listener pushes it to a Redis channel. The SSE controller subscribes to that channel and streams events to connected clients.
-
-See the [Real-Time Patterns](../real-time-patterns.md) page for the full SSE and WebSocket architecture.
+Connection management and configuration for all Redis-backed features: caching, Messenger transport, and session storage.
 
 ## Security
 
 | Component | Purpose |
 |-----------|---------|
-| `SseQueryTokenAuthenticator` | Authenticates SSE connections via query string token |
 | `WsQueryTokenAuthenticator` | Authenticates WebSocket connections via query string token |
 
 ## Logging
@@ -201,8 +194,6 @@ Removing a language reverses the steps. A stored choice of the removed language 
 | `ConfigCheckController` | `/api/config/check` | Configuration validation |
 | `RateLimiterMonitorController` | `/api/rate-limiter` | Rate limiter status and statistics |
 | `SpaController` | `/` | Single-page application entry point (catch-all) |
-| `SseController` | `/api/sse` | Server-sent events endpoint |
-| `NotificationSseController` | `/api/sse/notifications` | Notification-specific SSE stream |
 | `WebSocketController` | `/ws` | WebSocket connection endpoint |
 
 ## DTOs
@@ -227,5 +218,5 @@ Shared response types used across contexts:
 ## See Also
 
 - [Shared Kernel (detailed)](../shared-kernel.md) — UUID v7 usage, cursor pagination, and Redis configuration
-- [Real-Time Patterns](../real-time-patterns.md) — SSE and WebSocket architecture
+- [Real-Time Patterns](../real-time-patterns.md) — WebSocket architecture
 - [CQRS and Messaging](../cqrs-and-messaging.md) — Job monitoring and task dispatching

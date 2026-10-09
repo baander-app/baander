@@ -1,6 +1,6 @@
 # Real-Time Patterns
 
-Baander provides two real-time transport mechanisms: WebSocket for bidirectional low-latency communication (party sync, room messaging), and Server-Sent Events (SSE) for unidirectional server-to-client streams (notifications, job monitoring). Both run on top of Swoole and share a common authentication approach.
+Baander has one real-time transport: a WebSocket connection served by Swoole. It carries room messaging, watch-party and listening-session sync, transcode position reports, and server pushes to a user's open connections. Notifications and the admin pages do not hold a stream open; they read over HTTP, as [Delivery without a stream](#delivery-without-a-stream) describes.
 
 ## WebSocket
 
@@ -45,6 +45,11 @@ The controller dispatches messages by `type` field:
 | `party.sync` | Client to server | Report client position for drift correction |
 | `party.sync_response` | Server to client | Server-adjusted position after sync |
 | `party.member_event` | Server to room broadcast | Member joined or left |
+| `session.join` | Client to server | Join the user's listening session from a device; answered with `session.joined` |
+| `session.playback` | Client to server | Play, pause or seek the listening session; answered with `session.playback_result` |
+| `session.sync` | Client to server | Report a device's position; answered with `session.sync_result` |
+| `session.claimed` / `session.state` | Server to the user's connections | A device took over the listening session, or its queue changed (`SessionEventSubscriber`) |
+| `transcode.position` | Client to server | Report the playback position of a transcode session; answered with `transcode.position_ack` |
 | `error` | Server to client | Error response with message |
 
 Rate limiting is enforced per connection: 30 messages per second. Exceeding this returns an `error` message and the excess messages are dropped.
@@ -53,79 +58,14 @@ Rate limiting is enforced per connection: 30 messages per second. Exceeding this
 
 On open, the server issues a `reconnectToken` (via `ReconnectionTokenService`). If the connection drops, the client can reconnect and send `auth.reconnect` with the token to restore its identity without re-authenticating through the full OAuth handshake. A new token is issued on each successful reconnection.
 
-## SSE (Server-Sent Events)
+## Delivery without a stream
 
-SSE provides unidirectional server-to-client streaming over HTTP. Baander uses SSE for two endpoints: job monitoring and notifications.
+Server-sent event (SSE) endpoints for notifications and job monitoring were removed: their coroutines held pooled services for up to an hour each and exhausted the service pools. Each now works without a stream:
 
-### SSE Endpoints
+- **Notifications** are stored, then read over HTTP. The web client fetches the list and the unread count when the notification views load and refetches them once they are older than 30 seconds. `CreateNotificationHandler` also dispatches a `SendPushCommand`, which delivers a Web Push message to each browser subscription the user registered, unless push is turned off for the server or the user turned off push for that category.
+- **Admin pages** poll their endpoints with React Query: server diagnostics every 5 seconds, the dashboard every 10 seconds, the job monitor every 15 to 30 seconds.
 
-| Endpoint | Authentication | Channel | Source |
-|----------|---------------|---------|--------|
-| `/api/sse/events` | Admin only, `?token=` | Polls `JobMonitorService` | Job status changes |
-| `/api/notifications/sse` | Any user, `?token=` | Redis Pub/Sub `notification:{userId}` | `NotificationSseController` |
-
-Both endpoints enforce a maximum of 5 concurrent connections per user (tracked via Redis key with a 120-second TTL). Exceeding the limit returns HTTP 429.
-
-### Event Flow: Notifications
-
-The notification SSE endpoint uses Redis Pub/Sub for true push delivery:
-
-```
-Notification publisher
-    |
-    v
-Redis PUBLISH notification:{userId}
-    |
-    v
-RedisPubSubConnection (blocking subscribe)
-    |
-    v
-sendSseEvent() -> client
-```
-
-`RedisPubSubConnection` manages a dedicated Redis connection for subscribing (Redis does not allow publish and subscribe on the same connection). Messages are JSON-decoded and forwarded to the client as SSE events.
-
-On connect, the client can pass a `Last-Event-ID` header. The server queries the database for any notifications with IDs greater than the provided value and replays them (up to 50) before subscribing to the live stream.
-
-### Event Flow: Job Monitoring
-
-The job monitoring endpoint uses a polling loop rather than Pub/Sub:
-
-1. On connect, sends a `connected` event with current job counts by status.
-2. Every 3 seconds, polls `JobMonitorService::getRecent()` for updated jobs.
-3. Deduplicates by comparing `updatedAt` timestamps against the last emitted event.
-4. Sends heartbeats every 30 seconds to keep the connection alive.
-
-### SSE Event Format
-
-All SSE events follow the standard format:
-
-```
-id: {event-id}
-event: {event-type}
-data: {json-payload}
-
-```
-
-Event types for job monitoring:
-
-| Event | Trigger |
-|-------|---------|
-| `connected` | Initial connection with job counts |
-| `job.queued` | Job moved to queued status |
-| `job.started` | Job started running |
-| `job.progress` | Job progress update |
-| `job.completed` | Job finished successfully |
-| `job.failed` | Job failed |
-| `job.cancelled` | Job cancelled |
-| `heartbeat` | Keep-alive (every 30s) |
-
-Event types for notifications:
-
-| Event | Trigger |
-|-------|---------|
-| `notification` | New or replayed notification |
-| `heartbeat` | Keep-alive (every 30s) |
+The WebSocket channel does not carry admin job events yet.
 
 ## Party Sync Protocol
 
@@ -198,17 +138,11 @@ When the host seeks, the flow is:
 
 ## Authentication
 
-Both WebSocket and SSE use OAuth 2.0 token authentication via query parameter. This is necessary because neither the browser `EventSource` API (SSE) nor the WebSocket handshake (in some client configurations) supports custom headers.
+A WebSocket connection authenticates with an OAuth 2.0 access token in the `token` query parameter, because the browser WebSocket API cannot set an `Authorization` header on the handshake.
 
 ### WsQueryTokenAuthenticator
 
 Invoked during Swoole's `onHandshake` callback -- this is not a Symfony firewall authenticator. It builds a minimal Symfony `Request` from the Swoole request, injects the token as a `Bearer` header, and validates through the League OAuth2 `ResourceServer`. Returns the authenticated user's UUID string, or `null` on failure (which rejects the handshake).
-
-### SseQueryTokenAuthenticator
-
-A Symfony firewall authenticator (`AbstractAuthenticator`) that matches requests to `/api/sse/**` with a `token` query parameter. It uses the same OAuth2 `ResourceServer` validation path as the standard header-based authenticator, extracting the user identifier and loading the `SecurityUser` from the repository. Returns a `SelfValidatingPassport` on success, or a JSON 401 on failure.
-
-Both authenticators share the same underlying OAuth 2.0 validation pipeline. The only difference is the entry point: WebSocket authenticates at the Swoole handshake level (before Symfony), while SSE authenticates through the standard Symfony security firewall.
 
 ---
 
