@@ -168,6 +168,36 @@ final class WebSocketPusherTest extends TestCase
         $this->assertSame(2, $sent);
     }
 
+    // --- disconnect a user ---
+
+    public function testDisconnectUserClosesEachEstablishedConnectionOfThatUserOnly(): void
+    {
+        $this->registry->addConnection(10, 'user-1', 0);
+        $this->registry->addConnection(20, 'user-1', 1);
+        $this->registry->addConnection(30, 'user-1', 2);
+        $this->registry->addConnection(40, 'user-2', 0);
+
+        $this->server->method('isEstablished')->willReturnMap([[10, true], [20, true], [30, false], [40, true]]);
+        $closed = [];
+        $this->server->expects($this->exactly(2))->method('disconnect')->willReturnCallback(function (int $fd, int $code, string $reason) use (&$closed): bool {
+            $closed[] = [$fd, $code, $reason];
+
+            return true;
+        });
+
+        self::assertSame(2, $this->pusher->disconnectUser('user-1', 1008, 'Session ended'));
+        self::assertEqualsCanonicalizing([[10, 1008, 'Session ended'], [20, 1008, 'Session ended']], $closed);
+    }
+
+    public function testDisconnectUserWithoutAServerFails(): void
+    {
+        $this->server->expects($this->never())->method('disconnect');
+        $pusher = new WebSocketPusher($this->registry, new JsonEncoder());
+
+        $this->expectException(\LogicException::class);
+        $pusher->disconnectUser('user-1', 1008, 'Session ended');
+    }
+
     public function testPlainServerIsRejectedBeforeAnyPushAttempt(): void
     {
         $this->server->expects($this->never())->method('push');
