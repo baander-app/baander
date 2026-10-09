@@ -32,6 +32,7 @@ final class QoLResetCommand extends Command
     protected function configure(): void
     {
         AdminCommandSupport::addForceOption($this);
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -48,9 +49,14 @@ final class QoLResetCommand extends Command
             return AdminCommandSupport::fail($io, $e);
         }
 
-        QoLStatusTable::render($io, $report);
+        $json = AdminCommandSupport::wantsJson($input);
+        if ($json) {
+            AdminCommandSupport::json($io, $report);
+        } else {
+            QoLStatusTable::render($io, $report);
+        }
         $exitCode = ServerWorkerReport::finish($io, $report['missing_workers'], $report['worker_errors']);
-        if ($exitCode === Command::SUCCESS) {
+        if ($exitCode === Command::SUCCESS && !$json) {
             $io->success('Every worker is back in the Learning state; the reset is saved.');
         }
 

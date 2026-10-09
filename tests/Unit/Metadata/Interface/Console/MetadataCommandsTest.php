@@ -89,6 +89,17 @@ final class MetadataCommandsTest extends TestCase
         self::assertStringContainsString('Queued 3 metadata sync job(s). Job ID: inline-job-1', $tester->getDisplay());
     }
 
+    public function testSyncJsonIsTheEndpointsDataWithTheJobIdOfTheInlineRun(): void
+    {
+        $endpoint = $this->data($this->controller($this->port(), result: 3)->triggerSync(Request::create('/', 'POST', content: '{}')));
+
+        $inline = [];
+        $tester = new CommandTester(new MetadataSyncCommand($this->jobs($inline, 3)));
+        self::assertSame(Command::SUCCESS, $tester->execute(['--json' => true]));
+
+        self::assertSame($endpoint + ['jobId' => 'inline-job-1'], json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
+    }
+
     public function testGenreSourceRunsOnlyTheGenreSyncOnBothPaths(): void
     {
         $this->controller($this->port(), result: 7)->triggerSync(Request::create('/', 'POST', content: '{"source":"genres"}'));

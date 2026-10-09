@@ -33,6 +33,7 @@ final class PruneJobMonitorsCommand extends Command
         $this
             ->addOption('days', 'd', InputOption::VALUE_REQUIRED, 'Prune jobs older than this many days', '7')
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Show how many jobs would be pruned without deleting');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -44,6 +45,13 @@ final class PruneJobMonitorsCommand extends Command
             $result = $this->jobMonitor->prune((int) $input->getOption('days'), $dryRun);
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
+        }
+
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, [
+                'pruned' => $result->count,
+                'olderThan' => $result->olderThan->format(\DateTimeInterface::ATOM),
+            ]);
         }
 
         $cutoff = $result->olderThan->format('Y-m-d H:i:s');

@@ -35,6 +35,19 @@ final class ExtractAlbumCoversCommandTest extends TestCase
         self::assertStringContainsString('batch-job-1', $display);
     }
 
+    public function testJsonPrintsTheApiPayloadWithTheBatchJobIdAndNothingElse(): void
+    {
+        $albums = $this->createStub(AlbumPortInterface::class);
+        $albums->method('countCoverlessAlbums')->willReturn(3);
+        $jobs = $this->createStub(JobMonitorAdministrationInterface::class);
+        $jobs->method('runInline')->willReturn(new InlineJobRun('batch-job-3', 3));
+
+        $tester = new CommandTester(new ExtractAlbumCoversCommand($albums, $jobs));
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['--json' => true]));
+        self::assertSame(['albums' => 3, 'jobId' => 'batch-job-3'], json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
+    }
+
     public function testRunsTheBatchAlsoWhenNoAlbumLacksACoverLikeTheApiRoute(): void
     {
         $albums = $this->createStub(AlbumPortInterface::class);

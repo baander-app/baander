@@ -38,6 +38,7 @@ final class GenreCreateCommand extends Command
             ->addArgument('slug', InputArgument::REQUIRED, 'The URL slug: lowercase letters, digits and single hyphens')
             ->addOption('parent', null, InputOption::VALUE_REQUIRED, 'UUID of the parent genre')
             ->addOption('mbid', null, InputOption::VALUE_REQUIRED, 'MusicBrainz ID of the genre');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -55,6 +56,10 @@ final class GenreCreateCommand extends Command
             )));
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
+        }
+
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, $genre);
         }
 
         $io->success(sprintf('Genre "%s" (%s) created with UUID %s.', $genre['name'], $genre['slug'], $genre['uuid']));

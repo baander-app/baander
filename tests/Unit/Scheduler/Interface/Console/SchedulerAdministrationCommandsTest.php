@@ -95,6 +95,28 @@ final class SchedulerAdministrationCommandsTest extends TestCase
         self::assertStringContainsString($job->getId()->toString(), $tester->getDisplay());
     }
 
+    public function testCreateAndUpdateJsonPrintTheJobTheApiReturns(): void
+    {
+        $create = $this->tester(new SchedulerCreateCommand($this->jobs, $this->reader()));
+        self::assertSame(Command::SUCCESS, $create->execute([
+            '--name' => 'Nightly test',
+            '--expression' => '0 3 * * *',
+            '--type' => 'console',
+            '--command' => 'app:test',
+            '--parameters' => '{"limit": 3}',
+            '--json' => true,
+        ]), $create->getDisplay());
+        $job = array_values($this->rows)[0];
+        self::assertSame(ScheduledJobResource::from($job), json_decode($create->getDisplay(), true, 32, JSON_THROW_ON_ERROR));
+
+        $update = $this->tester(new SchedulerUpdateCommand($this->jobs, $this->reader()));
+        self::assertSame(Command::SUCCESS, $update->execute(['id' => $job->getId()->toString(), '--name' => 'Renamed', '--json' => true]));
+        self::assertSame(
+            ScheduledJobResource::from($this->rows[$job->getId()->toString()]),
+            json_decode($update->getDisplay(), true, 32, JSON_THROW_ON_ERROR),
+        );
+    }
+
     public function testCreateRejectsParametersOutsideTheCommandsSchema(): void
     {
         $tester = $this->tester(new SchedulerCreateCommand($this->jobs, $this->reader()));
@@ -215,6 +237,21 @@ final class SchedulerAdministrationCommandsTest extends TestCase
         self::assertSame($to, $this->rows[$job->getId()->toString()]->getStatus());
     }
 
+    /**
+     * @param \Closure(self): Command $command
+     */
+    #[DataProvider('lifecycle')]
+    public function testLifecycleJsonPrintsTheJobTheApiReturns(\Closure $command, ScheduleStatus $from, ScheduleStatus $to): void
+    {
+        $job = $this->stored($from);
+        $tester = $this->tester($command($this));
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['id' => $job->getId()->toString(), '--json' => true]));
+        $printed = json_decode($tester->getDisplay(), true, 32, JSON_THROW_ON_ERROR);
+        self::assertSame(ScheduledJobResource::from($this->rows[$job->getId()->toString()]), $printed);
+        self::assertSame($to->value, $printed['status']);
+    }
+
     /** @return iterable<string, array{\Closure(self): Command, ScheduleStatus, ScheduleStatus}> */
     public static function lifecycle(): iterable
     {
@@ -274,6 +311,21 @@ final class SchedulerAdministrationCommandsTest extends TestCase
 
         $forced = $tester->execute(['id' => $job->getId()->toString(), '--force' => true], ['interactive' => false]);
         self::assertSame(Command::SUCCESS, $forced, $tester->getDisplay());
+        self::assertSame([], $this->rows);
+    }
+
+    public function testDeleteJsonPrintsNothingAsTheApiAnswersNoContentAndStillNeedsForce(): void
+    {
+        $job = $this->stored();
+        $tester = $this->tester(new SchedulerDeleteCommand($this->jobs));
+
+        $refused = $tester->execute(['id' => $job->getId()->toString(), '--json' => true], ['interactive' => false, 'capture_stderr_separately' => true]);
+        self::assertSame(Command::INVALID, $refused);
+        self::assertArrayHasKey($job->getId()->toString(), $this->rows);
+
+        $forced = $tester->execute(['id' => $job->getId()->toString(), '--force' => true, '--json' => true], ['interactive' => false]);
+        self::assertSame(Command::SUCCESS, $forced);
+        self::assertSame('', $tester->getDisplay());
         self::assertSame([], $this->rows);
     }
 

@@ -6,6 +6,7 @@ namespace App\Recommendation\Interface\Console;
 
 use App\Recommendation\Application\Command\GenerateRecommendationsCommand;
 use App\Recommendation\Application\DTO\RecommendationGenerationResult;
+use App\Recommendation\Interface\Resource\RecommendationGenerationResource;
 use App\Shared\Application\Actor;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Port\JobMonitorAdministrationInterface;
@@ -54,6 +55,7 @@ final class RecommendationGenerateCommand extends Command
                 InputOption::VALUE_REQUIRED,
                 'Store the collaborative recommendations for this user (UUID) instead of for everyone',
             );
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -67,11 +69,14 @@ final class RecommendationGenerateCommand extends Command
             return AdminCommandSupport::fail($io, $exception);
         }
 
-        $io->text(sprintf(
-            'Generating %s recommendations for %s in this process. Follow the job from another shell with app:recommendation:job:list.',
-            $mode,
-            $userId === null ? 'all users' : 'user ' . $userId->toString(),
-        ));
+        $json = AdminCommandSupport::wantsJson($input);
+        if (!$json) {
+            $io->text(sprintf(
+                'Generating %s recommendations for %s in this process. Follow the job from another shell with app:recommendation:job:list.',
+                $mode,
+                $userId === null ? 'all users' : 'user ' . $userId->toString(),
+            ));
+        }
 
         try {
             $run = $this->jobMonitor->runInline(new GenerateRecommendationsCommand(
@@ -86,12 +91,21 @@ final class RecommendationGenerateCommand extends Command
         $result = $run->result;
         assert($result instanceof RecommendationGenerationResult);
 
-        return self::report($io, $result, $run->jobId);
+        return self::report($io, $result, $run->jobId, $json);
     }
 
-    /** Prints the job, its monitor record and the recommendations each strategy saved. */
-    public static function report(SymfonyStyle $io, RecommendationGenerationResult $result, string $monitorJobId): int
+    /**
+     * Prints the job, its monitor record and the recommendations each strategy saved, or with
+     * `--json` the API's payload. A job that did not complete exits with FAILURE either way.
+     */
+    public static function report(SymfonyStyle $io, RecommendationGenerationResult $result, string $monitorJobId, bool $json): int
     {
+        if ($json) {
+            AdminCommandSupport::json($io, RecommendationGenerationResource::from($result));
+
+            return $result->status === 'completed' ? Command::SUCCESS : self::stopped($io, $result);
+        }
+
         $io->definitionList(
             ['Recommendation job' => $result->publicId],
             ['Job monitor ID' => $monitorJobId],
@@ -107,17 +121,22 @@ final class RecommendationGenerateCommand extends Command
         }
 
         if ($result->status !== 'completed') {
-            $io->getErrorStyle()->error(sprintf(
-                'The job was %s before it finished; the strategies listed above ran.',
-                $result->status,
-            ));
-
-            return Command::FAILURE;
+            return self::stopped($io, $result);
         }
 
         $io->success('Recommendation generation completed.');
 
         return Command::SUCCESS;
+    }
+
+    private static function stopped(SymfonyStyle $io, RecommendationGenerationResult $result): int
+    {
+        $io->getErrorStyle()->error(sprintf(
+            'The job was %s before it finished; the strategies listed above ran.',
+            $result->status,
+        ));
+
+        return Command::FAILURE;
     }
 
     private static function userId(mixed $value): ?Uuid

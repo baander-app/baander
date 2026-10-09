@@ -39,6 +39,7 @@ final class GenreUpdateCommand extends Command
             ->addOption('slug', null, InputOption::VALUE_REQUIRED, 'The new slug')
             ->addOption('parent', null, InputOption::VALUE_REQUIRED, 'UUID of the new parent genre')
             ->addOption('mbid', null, InputOption::VALUE_REQUIRED, 'The new MusicBrainz ID');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -55,6 +56,10 @@ final class GenreUpdateCommand extends Command
             )));
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
+        }
+
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, $genre);
         }
 
         $io->success(sprintf('Genre "%s" (%s) updated.', $genre['name'], $genre['slug']));

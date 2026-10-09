@@ -8,11 +8,18 @@ Remove every message from the failure transport, including messages waiting out 
 make exec cmd="php bin/console app:failed-message:flush --force"
 ```
 
+Print the result as JSON, for a script:
+
+```bash
+make exec cmd="php bin/console app:failed-message:flush --force --json"
+```
+
 ## Options
 
 | Option | Description |
 |--------|-------------|
 | `--force` | Remove the messages without asking; required when no terminal is attached |
+| `--json` | Print only the result, as the admin API's `data` payload, in JSON |
 
 ## Details
 
@@ -21,6 +28,8 @@ On a terminal the command asks for confirmation before it removes anything. With
 The command prints the number of messages it removed. Removed messages cannot be recovered.
 
 Symfony's `messenger:failed:remove --all` skips messages waiting out a retry delay until the delay ends. This command, like the API, removes them too. To remove one message, run `messenger:failed:remove <id> --force`.
+
+With `--json` the command prints only `{"flushed": 12}`, the API's `data` object with the number of messages removed. `--json` does not stand in for `--force`.
 
 ## Exit codes
 

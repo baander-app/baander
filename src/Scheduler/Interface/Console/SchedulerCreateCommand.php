@@ -31,6 +31,7 @@ final class SchedulerCreateCommand extends Command
     protected function configure(): void
     {
         ScheduledJobInputReader::addOptions($this, update: false);
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -41,6 +42,10 @@ final class SchedulerCreateCommand extends Command
             $job = ScheduledJobResource::from($this->jobs->createJob($this->reader->forCreate($input)));
         } catch (Throwable $failure) {
             return AdminCommandSupport::fail($io, $failure);
+        }
+
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, $job);
         }
 
         $io->success(sprintf('Created scheduled job "%s".', $job['name']));

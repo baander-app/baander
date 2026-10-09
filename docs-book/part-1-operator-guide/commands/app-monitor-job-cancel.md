@@ -8,11 +8,23 @@ Cancel a running background job. The job stops at its next checkpoint. The comma
 make exec cmd="php bin/console app:monitor:job:cancel <jobId>"
 ```
 
+Print the result as JSON, for a script:
+
+```bash
+make exec cmd="php bin/console app:monitor:job:cancel <jobId> --json"
+```
+
 ## Arguments
 
 | Argument | Required | Description |
 |----------|----------|-------------|
 | `jobId` | Yes | The job's ID, as [app:monitor:jobs](app-monitor-jobs.md) lists it |
+
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--json` | Print only the result, as the admin API's `data` payload, in JSON |
 
 ## Details
 
@@ -24,7 +36,7 @@ These jobs have checkpoints:
 |--------------------|------------|--------------|
 | `SyncLibraryMessage` | A metadata sync, one job per library | Its next album |
 | `SyncMetadataCommand` | [app:metadata:sync](app-metadata-sync.md) with `--source genres` | Its next album |
-| `BulkFetchLyricsCommand` | [app:lyrics:fetch](app-lyrics-fetch.md) | Its next song |
+| `BulkFetchLyricsCommand` | [app:lyrics:fetch](app-lyrics-fetch.md) | Its next song. The fetches it already queued are skipped when they come due |
 | `BatchExtractCoversCommand` | The admin cover extraction or [app:album:extract-covers](app-album-extract-covers.md) | Its next page of 500 albums |
 | `ScanLibraryCommand` | A library scan from the admin panel, one job per library with **Scan all**, or [app:library:scan](app-library-scan.md) | Its next directory (an album or a movie folder) |
 
@@ -35,6 +47,8 @@ Other jobs have no checkpoints and run to the end; the flag does not change them
 A console command that runs a job inline, such as `app:lyrics:fetch`, prints `Job "<jobId>" has been cancelled.` and exits with code 1 when the job is cancelled.
 
 Cancelling a job that has finished or failed is refused. Cancelling a job again sets the flag again and succeeds. If the same job runs again within the hour, for example after a worker restart, it stops at its first checkpoint.
+
+With `--json` the command prints only `{"cancelled": true}`, the API's `data` object.
 
 ## Exit codes
 

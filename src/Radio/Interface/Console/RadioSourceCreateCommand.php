@@ -46,6 +46,7 @@ final class RadioSourceCreateCommand extends Command
             ->addOption('sync-url', null, InputOption::VALUE_REQUIRED, 'URL the station data is synced from')
             ->addOption('sync-config', null, InputOption::VALUE_REQUIRED, 'Source configuration as a JSON object; defaults to {}')
             ->addOption('sync-schedule', null, InputOption::VALUE_REQUIRED, 'Cron expression for the sync, such as "0 */6 * * *"');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -63,6 +64,10 @@ final class RadioSourceCreateCommand extends Command
             );
         } catch (Throwable $failure) {
             return AdminCommandSupport::fail($io, $failure);
+        }
+
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, $source);
         }
 
         $io->success(sprintf('Created radio source "%s" (%s).', $source['name'], $source['id']));

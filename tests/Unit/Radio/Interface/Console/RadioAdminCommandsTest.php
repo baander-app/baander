@@ -85,6 +85,24 @@ final class RadioAdminCommandsTest extends TestCase
         self::assertStringContainsString('Created radio source "Local" (0199b8a0-0000-7000-8000-000000000002).', $tester->getDisplay());
     }
 
+    public function testSourceCreateJsonIsTheSourceTheApiReturns(): void
+    {
+        $created = ['id' => '0199b8a0-0000-7000-8000-000000000003', 'name' => 'Local', 'type' => 'iprd'];
+        $sources = $this->createStub(RadioSourcePortInterface::class);
+        $sources->method('createSource')->willReturn($created);
+        $tester = new CommandTester($this->sourceCreate($sources));
+
+        $exitCode = $tester->execute([
+            '--name' => 'Local',
+            '--type' => 'iprd',
+            '--sync-url' => 'https://radio.baander.app/iprd',
+            '--json' => true,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        self::assertSame($created, json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
+    }
+
     public function testSourceCreateRejectsAnInvalidUrlWithTheApisValidationMessage(): void
     {
         $sources = $this->createMock(RadioSourcePortInterface::class);

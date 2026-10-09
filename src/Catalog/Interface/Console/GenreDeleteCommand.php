@@ -33,6 +33,7 @@ final class GenreDeleteCommand extends Command
     {
         $this->addArgument('slug', InputArgument::REQUIRED, 'The slug of the genre to delete');
         AdminCommandSupport::addForceOption($this);
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -54,7 +55,9 @@ final class GenreDeleteCommand extends Command
             return AdminCommandSupport::fail($io, $exception);
         }
 
-        $io->success(sprintf('Genre "%s" deleted.', $slug));
+        if (!AdminCommandSupport::wantsJson($input)) {
+            $io->success(sprintf('Genre "%s" deleted.', $slug));
+        }
 
         return Command::SUCCESS;
     }

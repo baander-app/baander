@@ -21,6 +21,7 @@ use App\Recommendation\Interface\Console\RecommendationJobListCommand;
 use App\Recommendation\Interface\Console\RecommendationJobRequeueCommand;
 use App\Recommendation\Interface\Console\RecommendationJobShowCommand;
 use App\Recommendation\Interface\Console\RecommendationStatsCommand;
+use App\Recommendation\Interface\Resource\RecommendationGenerationResource;
 use App\Recommendation\Interface\Resource\RecommendationJobResource;
 use App\Shared\Application\DTO\InlineJobRun;
 use App\Shared\Application\Exception\ConflictException;
@@ -143,6 +144,43 @@ final class RecommendationCommandsTest extends TestCase
         self::assertMatchesRegularExpression('/Recommendation job\s+recommendationJob0001/', $tester->getDisplay());
         self::assertMatchesRegularExpression('/Job monitor ID\s+monitorJobId000000001/', $tester->getDisplay());
         self::assertMatchesRegularExpression('/collaborative\s+5/', $tester->getDisplay());
+    }
+
+    public function testGenerateAndRequeueJsonPrintTheGenerationTheApiReturns(): void
+    {
+        $result = $this->generationResult('completed');
+        $monitor = $this->createStub(JobMonitorAdministrationInterface::class);
+        $monitor->method('runInline')->willReturn(new InlineJobRun('monitorJobId000000001', $result));
+        $expected = self::asJson(RecommendationGenerationResource::from($result));
+
+        $generate = new CommandTester(new RecommendationGenerateCommand($monitor));
+        self::assertSame(Command::SUCCESS, $generate->execute(['--json' => true]));
+        self::assertSame($expected, json_decode($generate->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
+
+        $requeue = new CommandTester(new RecommendationJobRequeueCommand($monitor));
+        self::assertSame(Command::SUCCESS, $requeue->execute(['publicId' => 'failedJob000000000001', '--json' => true]));
+        self::assertSame($expected, json_decode($requeue->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
+    }
+
+    public function testGenerateJsonOfACancelledJobPrintsThePayloadAndFails(): void
+    {
+        $monitor = $this->createStub(JobMonitorAdministrationInterface::class);
+        $monitor->method('runInline')->willReturn(new InlineJobRun('monitorJobId000000001', $this->generationResult('cancelled')));
+
+        $tester = new CommandTester(new RecommendationGenerateCommand($monitor));
+        self::assertSame(Command::FAILURE, $tester->execute(['--json' => true], ['capture_stderr_separately' => true]));
+        self::assertSame('cancelled', json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR)['status']);
+        self::assertStringContainsString('The job was cancelled before it finished', $tester->getErrorOutput());
+    }
+
+    public function testCancelJsonPrintsNothingAsTheApiAnswersNoContent(): void
+    {
+        $pending = $this->jobs->create(isFull: true);
+
+        $cancel = new CommandTester(new RecommendationJobCancelCommand($this->support()));
+        self::assertSame(Command::SUCCESS, $cancel->execute(['publicId' => $pending->getPublicId()->toString(), '--json' => true]));
+        self::assertSame('', $cancel->getDisplay());
+        self::assertSame('cancelled', $pending->getStatus()->value);
     }
 
     public function testGenerateFailsWhenTheJobWasCancelledAndRejectsAMalformedUserId(): void

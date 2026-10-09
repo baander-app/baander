@@ -35,6 +35,7 @@ final class GenreAlbumRemoveCommand extends Command
         $this
             ->addArgument('slug', InputArgument::REQUIRED, 'The genre slug')
             ->addArgument('album-id', InputArgument::REQUIRED, 'The album UUID');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -51,7 +52,9 @@ final class GenreAlbumRemoveCommand extends Command
             return AdminCommandSupport::fail($io, $exception);
         }
 
-        $io->success(sprintf('Album %s no longer has the genre "%s".', $link->targetId->toString(), $slug));
+        if (!AdminCommandSupport::wantsJson($input)) {
+            $io->success(sprintf('Album %s no longer has the genre "%s".', $link->targetId->toString(), $slug));
+        }
 
         return Command::SUCCESS;
     }

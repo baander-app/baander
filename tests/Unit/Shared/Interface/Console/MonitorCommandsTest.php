@@ -23,10 +23,14 @@ use App\Shared\Interface\Console\MonitorJobShowCommand;
 use App\Shared\Interface\Console\MonitorJobsCommand;
 use App\Shared\Interface\Console\MonitorStatusCommand;
 use App\Shared\Interface\Console\PruneJobMonitorsCommand;
+use App\Shared\Interface\Controller\JobMonitorController;
 use App\Shared\Interface\Resource\JobMonitorResource;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Security\Core\User\InMemoryUser;
 
 final class MonitorCommandsTest extends TestCase
 {
@@ -157,6 +161,35 @@ final class MonitorCommandsTest extends TestCase
         self::assertStringContainsString('Finished jobs cannot be cancelled.', $tester->getDisplay());
     }
 
+    public function testRetryAndCancelJsonPrintTheDataTheEndpointsReturn(): void
+    {
+        $controller = new JobMonitorController($this->monitor);
+
+        $retry = new CommandTester(new MonitorJobRetryCommand($this->monitor));
+        self::assertSame(Command::SUCCESS, $retry->execute(['jobId' => 'job-failed', '--json' => true]));
+        self::assertSame(
+            self::data($controller->retry('job-failed', new InMemoryUser('admin@baander.app', null))),
+            json_decode($retry->getDisplay(), true, flags: JSON_THROW_ON_ERROR),
+        );
+
+        $cancel = new CommandTester(new MonitorJobCancelCommand($this->monitor));
+        self::assertSame(Command::SUCCESS, $cancel->execute(['jobId' => 'job-running', '--json' => true]));
+        self::assertSame(self::data($controller->cancel('job-running')), json_decode($cancel->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
+    }
+
+    public function testPruneJsonHasTheFieldsOfTheEndpointsData(): void
+    {
+        $endpoint = self::data((new JobMonitorController($this->monitor))->prune(Request::create('/', 'POST', content: '{"days":3}')));
+
+        $tester = new CommandTester(new PruneJobMonitorsCommand($this->monitor));
+        self::assertSame(Command::SUCCESS, $tester->execute(['--days' => '3', '--json' => true]));
+        $printed = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame(array_keys($endpoint), array_keys($printed));
+        self::assertSame(4, $printed['pruned']);
+        self::assertNotFalse(\DateTimeImmutable::createFromFormat(\DateTimeInterface::ATOM, $printed['olderThan']));
+    }
+
     public function testAnalyticsPrintsTheChosenSectionForTheGivenRange(): void
     {
         $tester = new CommandTester(new MonitorAnalyticsCommand($this->monitor));
@@ -215,6 +248,12 @@ final class MonitorCommandsTest extends TestCase
 
         $this->monitor->failure = new InvalidInputException('Days must be at least 1.');
         self::assertSame(Command::INVALID, $tester->execute(['--days' => '0']));
+    }
+
+    /** @return array<string, mixed> the response's `data` */
+    private static function data(JsonResponse $response): array
+    {
+        return json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
     }
 
     public static function record(string $jobId, JobStatus $status): JobMonitorRecord

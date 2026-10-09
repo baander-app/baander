@@ -30,6 +30,7 @@ final class RecommendationJobCancelCommand extends Command
     protected function configure(): void
     {
         $this->addArgument('publicId', InputArgument::REQUIRED, 'The job\'s public ID, as app:recommendation:job:list shows it');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -43,7 +44,9 @@ final class RecommendationJobCancelCommand extends Command
             return AdminCommandSupport::fail($io, $exception);
         }
 
-        $io->success(sprintf('Recommendation job "%s" is cancelled. A run stops at its next check.', $publicId));
+        if (!AdminCommandSupport::wantsJson($input)) {
+            $io->success(sprintf('Recommendation job "%s" is cancelled. A run stops at its next check.', $publicId));
+        }
 
         return Command::SUCCESS;
     }

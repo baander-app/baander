@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Catalog\Interface\Console;
 
+use App\Catalog\Application\Command\Genre\CreateGenreCommand;
 use App\Catalog\Application\Command\Genre\DeleteGenreCommand;
 use App\Catalog\Application\Command\Genre\UpdateGenreCommand;
+use App\Catalog\Application\CommandHandler\Genre\CreateGenreHandler;
 use App\Catalog\Application\CommandHandler\Genre\DeleteGenreHandler;
 use App\Catalog\Application\CommandHandler\Genre\UpdateGenreHandler;
 use App\Catalog\Application\Port\GenrePortInterface;
@@ -13,10 +15,12 @@ use App\Catalog\Application\Service\GenreParentResolver;
 use App\Catalog\Domain\Model\Genre;
 use App\Catalog\Domain\ReadModel\GenreReadView;
 use App\Catalog\Interface\Console\GenreAlbumAddCommand;
+use App\Catalog\Interface\Console\GenreCreateCommand;
 use App\Catalog\Interface\Console\GenreDeleteCommand;
 use App\Catalog\Interface\Console\GenreListCommand;
 use App\Catalog\Interface\Console\GenreSongRemoveCommand;
 use App\Catalog\Interface\Console\GenreUpdateCommand;
+use App\Catalog\Interface\Resource\GenreResource;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Interface\Console\AdminCommandSupport;
@@ -29,6 +33,9 @@ use Symfony\Component\Messenger\Middleware\HandleMessageMiddleware;
 
 final class GenreCommandsTest extends TestCase
 {
+    /** @var array<string, Genre> the genres the port stored, by slug */
+    private array $saved = [];
+
     public function testListReadsEveryGenreWithTheUnrestrictedScopeAndShowsTheTree(): void
     {
         $rock = new GenreReadView(new Uuid(), 'Rock', 'rock', null, null);
@@ -160,9 +167,59 @@ final class GenreCommandsTest extends TestCase
         self::assertStringContainsString('Album not found.', $tester->getDisplay());
     }
 
+    public function testCreateAndUpdateJsonPrintTheGenreTheApiReturns(): void
+    {
+        $genres = $this->createStub(GenrePortInterface::class);
+        $genres->method('findBySlug')->willReturnCallback(fn (string $slug): ?Genre => $this->saved[$slug] ?? null);
+        $genres->method('save')->willReturnCallback(function (Genre $genre): void {
+            $this->saved[$genre->getSlug()] = $genre;
+        });
+
+        $create = new CommandTester(new GenreCreateCommand($this->support($genres)));
+        self::assertSame(Command::SUCCESS, $create->execute(['name' => 'Rock', 'slug' => 'rock', '--json' => true]));
+        $created = json_decode($create->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(GenreResource::from($this->saved['rock']), $created);
+        self::assertSame(['uuid', 'name', 'slug', 'parentId', 'mbid'], array_keys($created));
+
+        $update = new CommandTester(new GenreUpdateCommand($this->support($genres)));
+        self::assertSame(Command::SUCCESS, $update->execute(['slug' => 'rock', '--name' => 'Rock and Roll', '--json' => true]));
+        $updated = json_decode($update->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($created['uuid'], $updated['uuid']);
+        self::assertSame('Rock and Roll', $updated['name']);
+    }
+
+    public function testDeleteAndLinkJsonPrintNothingAsTheApiAnswersNoContent(): void
+    {
+        $rock = Genre::create('Rock', 'rock');
+        $genres = $this->createStub(GenrePortInterface::class);
+        $genres->method('findBySlug')->willReturn($rock);
+        $genres->method('addAlbumToGenre')->willReturn(true);
+
+        $delete = new CommandTester(new GenreDeleteCommand($this->support($genres)));
+        self::assertSame(Command::SUCCESS, $delete->execute(['slug' => 'rock', '--force' => true, '--json' => true], ['interactive' => false]));
+        self::assertSame('', $delete->getDisplay());
+
+        $link = new CommandTester(new GenreAlbumAddCommand($genres));
+        self::assertSame(Command::SUCCESS, $link->execute(['slug' => 'rock', 'album-id' => (new Uuid())->toString(), '--json' => true]));
+        self::assertSame('', $link->getDisplay());
+    }
+
+    public function testDeleteJsonStillNeedsForceWithoutATerminal(): void
+    {
+        $genres = $this->createMock(GenrePortInterface::class);
+        $genres->method('findBySlug')->willReturn(Genre::create('Rock', 'rock'));
+        $genres->expects(self::never())->method('delete');
+
+        $tester = new CommandTester(new GenreDeleteCommand($this->support($genres)));
+
+        self::assertSame(Command::INVALID, $tester->execute(['slug' => 'rock', '--json' => true], ['interactive' => false, 'capture_stderr_separately' => true]));
+        self::assertSame('', $tester->getDisplay());
+    }
+
     private function support(GenrePortInterface $genres): AdminCommandSupport
     {
         return new AdminCommandSupport(new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
+            CreateGenreCommand::class => [new CreateGenreHandler($genres, new GenreParentResolver($genres))],
             UpdateGenreCommand::class => [new UpdateGenreHandler($genres, new GenreParentResolver($genres))],
             DeleteGenreCommand::class => [new DeleteGenreHandler($genres)],
         ]))]));

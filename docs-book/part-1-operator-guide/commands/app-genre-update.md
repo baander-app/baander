@@ -14,6 +14,12 @@ Move a genre below another one:
 make exec cmd="php bin/console app:genre:update grunge --parent=0192a3b4-c5d6-7890-abcd-ef1234567890"
 ```
 
+Print the result as JSON, for a script:
+
+```bash
+make exec cmd="php bin/console app:genre:update hard-rock --name='Hard Rock' --json"
+```
+
 ## Arguments
 
 | Argument | Required | Description |
@@ -28,12 +34,15 @@ make exec cmd="php bin/console app:genre:update grunge --parent=0192a3b4-c5d6-78
 | `--slug=SLUG` | The new slug: lowercase letters, digits and single hyphens |
 | `--parent=UUID` | The UUID of the new parent genre, as [app:genre:list](app-genre-list.md) shows it |
 | `--mbid=ID` | The new MusicBrainz ID |
+| `--json` | Print only the result, as the admin API's `data` payload, in JSON |
 
 ## Details
 
 An option that is left out keeps its current value. A parent cannot be removed with this command or the API; a genre becomes a root genre again only when its parent is deleted.
 
 A new parent must be an existing genre, and it cannot be the genre itself or one of its descendants. Such a parent is rejected with `Cannot set parent: would create a circular reference.`, which the API answers with `422` and the same message. When any change is rejected, nothing is saved.
+
+With `--json` the command prints only the updated genre as the API's `data` object, with `uuid`, `name`, `slug`, `parentId` and `mbid`.
 
 ## Exit codes
 

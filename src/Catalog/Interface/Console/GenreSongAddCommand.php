@@ -35,6 +35,7 @@ final class GenreSongAddCommand extends Command
         $this
             ->addArgument('slug', InputArgument::REQUIRED, 'The genre slug')
             ->addArgument('song-id', InputArgument::REQUIRED, 'The song UUID');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -51,7 +52,9 @@ final class GenreSongAddCommand extends Command
             return AdminCommandSupport::fail($io, $exception);
         }
 
-        $io->success(sprintf('Song %s has the genre "%s".', $link->targetId->toString(), $slug));
+        if (!AdminCommandSupport::wantsJson($input)) {
+            $io->success(sprintf('Song %s has the genre "%s".', $link->targetId->toString(), $slug));
+        }
 
         return Command::SUCCESS;
     }

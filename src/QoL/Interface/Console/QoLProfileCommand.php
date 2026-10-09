@@ -33,6 +33,7 @@ final class QoLProfileCommand extends Command
     protected function configure(): void
     {
         $this->addArgument('profile', InputArgument::REQUIRED, 'conservative, balanced or aggressive');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -45,9 +46,14 @@ final class QoLProfileCommand extends Command
             return AdminCommandSupport::fail($io, $e);
         }
 
-        QoLStatusTable::render($io, $report);
+        $json = AdminCommandSupport::wantsJson($input);
+        if ($json) {
+            AdminCommandSupport::json($io, $report);
+        } else {
+            QoLStatusTable::render($io, $report);
+        }
         $exitCode = ServerWorkerReport::finish($io, $report['missing_workers'], $report['worker_errors']);
-        if ($exitCode === Command::SUCCESS) {
+        if ($exitCode === Command::SUCCESS && !$json) {
             $io->success(sprintf('Every worker uses the %s profile.', $profile));
         }
 

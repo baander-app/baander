@@ -32,6 +32,38 @@ final class SchedulerRunCommandTest extends TestCase
         self::assertStringContainsString('Accepted occurrence ' . $requestId->toString(), $tester->getDisplay());
     }
 
+    public function testJsonPrintsTheApiPayloadAndTheRequestUuidOnStderr(): void
+    {
+        $jobId = Uuid::generate();
+        $requestId = Uuid::generate();
+        $recorder = $this->createStub(SchedulerManualOccurrenceRecorderInterface::class);
+        $recorder->method('record')->willReturn(
+            new SchedulerOccurrence($requestId, $jobId, new \DateTimeImmutable('2026-10-03T10:00:00Z'), JobType::Console, 'app:test', [], SchedulerOccurrenceOrigin::Manual),
+        );
+        $tester = new CommandTester(new SchedulerRunCommand($recorder));
+
+        self::assertSame(Command::SUCCESS, $tester->execute(
+            ['id' => $jobId->toString(), '--request-id' => $requestId->toString(), '--json' => true],
+            ['capture_stderr_separately' => true],
+        ));
+        self::assertSame(
+            ['occurrenceId' => $requestId->toString(), 'jobId' => $jobId->toString()],
+            json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR),
+        );
+        self::assertStringContainsString('Request UUID: ' . $requestId->toString(), $tester->getErrorOutput());
+    }
+
+    public function testJsonPrintsAMissingJobOnStderrOnly(): void
+    {
+        $recorder = $this->createStub(SchedulerManualOccurrenceRecorderInterface::class);
+        $recorder->method('record')->willReturn(null);
+        $tester = new CommandTester(new SchedulerRunCommand($recorder));
+
+        self::assertSame(Command::FAILURE, $tester->execute(['id' => Uuid::generate()->toString(), '--json' => true], ['capture_stderr_separately' => true]));
+        self::assertSame('', $tester->getDisplay());
+        self::assertStringContainsString('not found', $tester->getErrorOutput());
+    }
+
     public function testGeneratedIdentityIsPrintedBeforeAnUncertainCommit(): void
     {
         $jobId = Uuid::generate();

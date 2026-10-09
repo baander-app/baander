@@ -144,6 +144,19 @@ final class TransportCommandsTest extends TestCase
         self::assertStringContainsString('Removed 2 failed messages.', $tester->getDisplay());
     }
 
+    public function testFlushJsonIsTheDataTheEndpointReturns(): void
+    {
+        $this->failedMessages->messages = [self::message('2', 'two'), self::message('1', 'one')];
+        $tester = new CommandTester(new FailedMessageFlushCommand($this->failedMessages));
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['--force' => true, '--json' => true], ['interactive' => false]));
+        self::assertSame(['flushed' => 2], json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
+
+        $this->failedMessages->messages = [self::message('2', 'two'), self::message('1', 'one')];
+        $endpoint = json_decode((string) $this->controller()->flushFailed(new Request(['confirm' => 'true']))->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame($endpoint['data'], json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
+    }
+
     public function testFlushRemovesNothingWhenTheOperatorDeclines(): void
     {
         $this->failedMessages->messages = [self::message('1', 'kept')];
