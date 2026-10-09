@@ -49,10 +49,10 @@ This creates the database schema and runs any pending migrations on both the mai
 ### 3. Create an admin user
 
 ```bash
-echo "your-password" | make exec cmd="php bin/console app:user:create admin@example.com Admin --password --role admin"
+echo "your-password" | make exec cmd="php bin/console app:user:create admin@baander.app Admin --password --role admin --force"
 ```
 
-See the [User Management](user-management.md) page and the [CLI Reference](commands/app-user-create.md) for details.
+The admin role needs confirmation; `--force` gives it when the password comes from a pipe. See the [User Management](user-management.md) page and the [CLI Reference](commands/app-user-create.md) for details.
 
 ### 4. Configure ports (if needed)
 
