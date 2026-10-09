@@ -5925,6 +5925,8 @@ export type GetMonitorJobsDetail200Data = {
      * @nullable
      */
   duration?: number | null;
+  /** Whether cancelling the job can still change anything: it is queued or running, or it has finished and work it queued, such as lyrics fetches, may still be waiting */
+  cancellable?: boolean;
 };
 
 export type GetMonitorJobsDetail200 = {
@@ -6048,10 +6050,6 @@ export type GetDebugStats200DataWorkerErrorsItem = {
 
 export type GetDebugStats200DataRedis = { [key: string]: unknown };
 
-export type GetDebugStats200DataSse = {
-  active_connections?: number;
-};
-
 export type GetDebugStats200Data = {
   /** One entry per HTTP worker that answered: worker_id, memory, process, swoole, coroutines, pools */
   workers?: GetDebugStats200DataWorkersItem[];
@@ -6059,7 +6057,6 @@ export type GetDebugStats200Data = {
   missing_workers?: number[];
   worker_errors?: GetDebugStats200DataWorkerErrorsItem[];
   redis?: GetDebugStats200DataRedis;
-  sse?: GetDebugStats200DataSse;
 };
 
 export type GetDebugStats200 = {
@@ -16140,7 +16137,7 @@ export const getPostLibraryScanUrl = (id: string,) => {
 }
 
 /**
- * Claims the library for a scan and dispatches an asynchronous scan job. The scan runs in the background and progress is reported via SSE. A library that is already scanning answers 409.
+ * Claims the library for a scan and dispatches an asynchronous scan job. The scan runs in the background; follow it in the job monitor and in the scan status of the library. A library that is already scanning answers 409.
  * @summary Trigger a library scan (admin)
  */
 export const postLibraryScan = async (id: string, options?: RequestInit): Promise<PostLibraryScan202> => {
@@ -26708,8 +26705,8 @@ export const getPostMonitorJobsCancelUrl = (jobId: string,) => {
 }
 
 /**
- * Sets a cooperative cancellation flag in Redis. Handlers that implement CancellableJobInterface will detect the flag at their next checkpoint. For queued jobs, the flag is set before the worker picks up the message.
- * @summary Cancel a running or queued background job
+ * Sets a cooperative cancellation flag in Redis; a running job stops at its next checkpoint and becomes cancelled. A finished job that queued work to run later, such as the lyrics fetches of a bulk fetch, has that work cancelled instead: what has not run yet is skipped when it comes due, and the job becomes cancelled.
+ * @summary Cancel a running background job, or the work a finished job queued
  */
 export const postMonitorJobsCancel = async (jobId: string, options?: RequestInit): Promise<PostMonitorJobsCancel200> => {
 
@@ -26757,7 +26754,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostMonitorJobsCancelMutationError = ErrorType<ApiError>
 
     /**
- * @summary Cancel a running or queued background job
+ * @summary Cancel a running background job, or the work a finished job queued
  */
 export const usePostMonitorJobsCancel = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postMonitorJobsCancel>>, TError,{jobId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -27038,7 +27035,7 @@ export const getGetDebugStatsUrl = () => {
 }
 
 /**
- * @summary Per-worker server diagnostics with the shared Redis and SSE figures
+ * @summary Per-worker server diagnostics with the shared Redis figures
  */
 export const getDebugStats = async ( options?: RequestInit): Promise<GetDebugStats200> => {
 
@@ -27109,7 +27106,7 @@ export function useGetDebugStats<TData = Awaited<ReturnType<typeof getDebugStats
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Per-worker server diagnostics with the shared Redis and SSE figures
+ * @summary Per-worker server diagnostics with the shared Redis figures
  */
 
 export function useGetDebugStats<TData = Awaited<ReturnType<typeof getDebugStats>>, TError = ErrorType<unknown>>(
