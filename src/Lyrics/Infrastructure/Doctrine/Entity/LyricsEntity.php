@@ -10,7 +10,6 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity]
 #[ORM\Table(name: 'lyrics')]
 #[ORM\UniqueConstraint(name: 'uniq_lyrics_song_id', columns: ['song_id'])]
-#[ORM\UniqueConstraint(name: 'uniq_lyrics_lrclib_id', columns: ['lrclib_id'])]
 class LyricsEntity
 {
     #[ORM\Id]

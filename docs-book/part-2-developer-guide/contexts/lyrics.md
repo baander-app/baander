@@ -25,7 +25,7 @@ The Lyrics context stores song lyrics and fetches them from [LRCLIB](https://lrc
 
 `LrclibClient` returns null or an empty list when LRCLIB has nothing, and `LrclibUnavailable` when a request fails, LRCLIB answers with another error, or the body is unreadable. `FetchLyricsHandler` turns that into a `LyricsFetchResult`: found, not found, or LRCLIB unavailable. It never throws for an outage, so a queued fetch is acknowledged without a retry. The per-song route and `app:song:lyrics:fetch` call `lyricsOrFail()`, which throws `LyricsProviderUnavailableException` (HTTP 503, exit 1); search and apply throw it directly.
 
-A fetch for a song that has lyrics returns them without calling LRCLIB. Apply refuses that song with a conflict (HTTP 409). It also refuses a result that is already another song's lyrics, because `lrclib_id` is unique.
+A fetch for a song that has lyrics returns them without calling LRCLIB. Apply refuses that song with a conflict (HTTP 409). Several songs can store the same LRCLIB record, such as one recording on an album and a compilation, or one album in two libraries, so `lrclib_id` is not unique.
 
 ## Automatic Fetch for New Songs
 

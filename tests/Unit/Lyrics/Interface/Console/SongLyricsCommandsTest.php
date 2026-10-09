@@ -66,11 +66,6 @@ final class SongLyricsCommandsTest extends TestCase
                 return $this->bySong[$songId->toString()] ?? null;
             }
 
-            public function findByLrclibId(int $id): ?Lyrics
-            {
-                return null;
-            }
-
             public function delete(Lyrics $lyrics): void
             {
                 unset($this->bySong[$lyrics->getSongId()->toString()]);

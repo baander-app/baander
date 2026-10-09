@@ -5,8 +5,8 @@ export const LYRICS_ALREADY_EXIST = 'This song already has lyrics. They were lef
 
 /**
  * The message for a failed lyrics fetch, search or apply. The API answers 503 when LRCLIB is
- * unavailable, and 409 when an apply targets a song that has lyrics or a result another song
- * has; the 409 message says which.
+ * unavailable, and 409 when an apply targets a song that has lyrics; the API's 409 message is
+ * shown when it has one.
  */
 export function lyricsErrorMessage(error: unknown, fallback: string): string {
   if (!isAxiosError(error)) {
