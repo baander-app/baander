@@ -7,6 +7,8 @@ namespace App\Lyrics\Application\CommandHandler;
 use App\Catalog\Application\Port\SongLookupInterface;
 use App\Lyrics\Application\Command\FetchLyricsCommand;
 use App\Lyrics\Application\DTO\LrclibResult;
+use App\Lyrics\Application\DTO\LrclibUnavailable;
+use App\Lyrics\Application\DTO\LyricsFetchResult;
 use App\Lyrics\Application\Port\LrclibClientInterface;
 use App\Lyrics\Application\Port\QueuedLyricsFetchesInterface;
 use App\Lyrics\Domain\Model\Lyrics;
@@ -19,6 +21,11 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * Handles FetchLyricsCommand.
  *
  * Orchestrates: resolve song signature → check local cache → fetch from LRCLIB → persist.
+ *
+ * A song that has lyrics keeps them: the fetch returns them without asking LRCLIB. The
+ * result tells found, not found and LRCLIB unavailable apart, and the handler never throws
+ * for an outage, so a queued fetch (bulk or automatic) ends without a retry. The per-song
+ * API route and app:song:lyrics:fetch dispatch it synchronously and report an outage.
  *
  * A fetch that a bulk run queued is skipped when that run was cancelled, and releases its
  * song's queued mark once handled, so a later run can queue the song again.
@@ -35,7 +42,7 @@ final class FetchLyricsHandler
     ) {
     }
 
-    public function __invoke(FetchLyricsCommand $command): ?Lyrics
+    public function __invoke(FetchLyricsCommand $command): LyricsFetchResult
     {
         $songId = $command->getSongId();
         $runId = $command->getBulkRunId();
@@ -50,7 +57,7 @@ final class FetchLyricsHandler
                     'bulk_run_id' => $runId->toString(),
                 ]);
 
-                return null;
+                return LyricsFetchResult::notFound();
             }
 
             return $this->fetch($songId);
@@ -59,9 +66,8 @@ final class FetchLyricsHandler
         }
     }
 
-    private function fetch(Uuid $songId): ?Lyrics
+    private function fetch(Uuid $songId): LyricsFetchResult
     {
-
         // 1. Find song
         $signature = $this->songs->findLyricSignature($songId);
         if ($signature === null) {
@@ -69,7 +75,7 @@ final class FetchLyricsHandler
                 'song_id' => $songId->toString(),
             ]);
 
-            return null;
+            return LyricsFetchResult::notFound();
         }
 
         // 2. Check if lyrics already exist
@@ -79,7 +85,7 @@ final class FetchLyricsHandler
                 'song_id' => $songId->toString(),
             ]);
 
-            return $existing;
+            return LyricsFetchResult::found($existing);
         }
 
         // 3. Require an artist name
@@ -89,7 +95,7 @@ final class FetchLyricsHandler
                 'song_id' => $songId->toString(),
             ]);
 
-            return null;
+            return LyricsFetchResult::notFound();
         }
 
         // 4. Album name is optional
@@ -102,10 +108,10 @@ final class FetchLyricsHandler
                 'song_id' => $songId->toString(),
             ]);
 
-            return null;
+            return LyricsFetchResult::notFound();
         }
 
-        // 6. Try cached endpoint first, then full endpoint
+        // 6. Try cached endpoint first, then full endpoint, which also answers when the cached one failed
         $result = $this->lrclibClient->getBySignatureCached(
             $signature->title,
             $artistName,
@@ -113,7 +119,7 @@ final class FetchLyricsHandler
             $duration,
         );
 
-        if ($result === null) {
+        if (!$result instanceof LrclibResult) {
             $result = $this->lrclibClient->getBySignature(
                 $signature->title,
                 $artistName,
@@ -122,7 +128,17 @@ final class FetchLyricsHandler
             );
         }
 
-        // 7. No lyrics found
+        // 7. LRCLIB unavailable: nothing is decided, and a later fetch may succeed
+        if ($result instanceof LrclibUnavailable) {
+            $this->logger->warning('LRCLIB unavailable, no lyrics fetched for song', [
+                'song_id' => $songId->toString(),
+                'reason' => $result->reason,
+            ]);
+
+            return LyricsFetchResult::providerUnavailable();
+        }
+
+        // 8. No lyrics found
         if ($result === null) {
             $this->logger->info('No lyrics found on LRCLIB for song', [
                 'song_id' => $songId->toString(),
@@ -130,10 +146,10 @@ final class FetchLyricsHandler
                 'artist' => $artistName,
             ]);
 
-            return null;
+            return LyricsFetchResult::notFound();
         }
 
-        // 8. Create and persist lyrics
+        // 9. Create and persist lyrics
         $lyrics = $this->createLyricsFromResult($result, $songId);
         $this->lyricsRepository->save($lyrics);
 
@@ -144,7 +160,7 @@ final class FetchLyricsHandler
             'instrumental' => $result->instrumental,
         ]);
 
-        return $lyrics;
+        return LyricsFetchResult::found($lyrics);
     }
 
     private function createLyricsFromResult(LrclibResult $result, Uuid $songId): Lyrics

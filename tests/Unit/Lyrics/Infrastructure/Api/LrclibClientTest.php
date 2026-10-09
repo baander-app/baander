@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Lyrics\Infrastructure\Api;
 
 use App\Lyrics\Application\DTO\LrclibResult;
 use App\Lyrics\Application\DTO\LrclibSearchResult;
+use App\Lyrics\Application\DTO\LrclibUnavailable;
 use App\Lyrics\Infrastructure\Api\LrclibClient;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
@@ -56,7 +57,7 @@ final class LrclibClientTest extends TestCase
 
         $result = $this->client->getBySignatureCached('Test Song', 'Test Artist', 'Test Album', 200.0);
 
-        $this->assertNotNull($result);
+        $this->assertInstanceOf(LrclibResult::class, $result);
         $this->assertSame(123, $result->id);
         $this->assertSame('Test Song', $result->trackName);
         $this->assertSame('Test Artist', $result->artistName);
@@ -104,7 +105,7 @@ final class LrclibClientTest extends TestCase
 
         $result = $this->client->getBySignature('Full Song', 'Artist', 'Album', 180.0);
 
-        $this->assertNotNull($result);
+        $this->assertInstanceOf(LrclibResult::class, $result);
         $this->assertSame(42, $result->id);
         $this->assertSame('full lyrics', $result->plainLyrics);
     }
@@ -124,7 +125,7 @@ final class LrclibClientTest extends TestCase
         $this->assertNull($result);
     }
 
-    public function testGetBySignatureReturnsNullOnHttpError(): void
+    public function testGetBySignatureReportsAnHttpErrorAsUnavailable(): void
     {
         $this->httpClient = $this->createMock(HttpClientInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
@@ -138,7 +139,7 @@ final class LrclibClientTest extends TestCase
 
         $result = $this->client->getBySignature('Song', 'Artist', 'Album', 100.0);
 
-        $this->assertNull($result);
+        $this->assertInstanceOf(LrclibUnavailable::class, $result);
     }
 
     // --- getById ---
@@ -162,7 +163,7 @@ final class LrclibClientTest extends TestCase
 
         $result = $this->client->getById(555);
 
-        $this->assertNotNull($result);
+        $this->assertInstanceOf(LrclibResult::class, $result);
         $this->assertSame(555, $result->id);
         $this->assertSame('ById Song', $result->trackName);
     }
@@ -177,6 +178,26 @@ final class LrclibClientTest extends TestCase
         $result = $this->client->getById(99999);
 
         $this->assertNull($result);
+    }
+
+    public function testGetByIdReportsAServerErrorAsUnavailable(): void
+    {
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getStatusCode')->willReturn(503);
+
+        $this->httpClient->method('request')->willReturn($response);
+
+        $this->assertInstanceOf(LrclibUnavailable::class, $this->client->getById(555));
+    }
+
+    public function testGetByIdReportsRateLimitingAsUnavailable(): void
+    {
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getStatusCode')->willReturn(429);
+
+        $this->httpClient->method('request')->willReturn($response);
+
+        $this->assertInstanceOf(LrclibUnavailable::class, $this->client->getById(555));
     }
 
     // --- search ---
@@ -232,7 +253,7 @@ final class LrclibClientTest extends TestCase
         $this->assertSame([], $results);
     }
 
-    public function testSearchReturnsEmptyArrayWhenResponseIsNotList(): void
+    public function testSearchReportsAResponseThatIsNotAListAsUnavailable(): void
     {
         $response = $this->createStub(ResponseInterface::class);
         $response->method('getStatusCode')->willReturn(200);
@@ -242,12 +263,12 @@ final class LrclibClientTest extends TestCase
 
         $results = $this->client->search('test');
 
-        $this->assertSame([], $results);
+        $this->assertInstanceOf(LrclibUnavailable::class, $results);
     }
 
     // --- Error handling ---
 
-    public function testLogsWarningOnHttp500Error(): void
+    public function testLogsWarningAndReportsUnavailableOnHttp500Error(): void
     {
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->client = $this->createClient();
@@ -261,10 +282,10 @@ final class LrclibClientTest extends TestCase
 
         $result = $this->client->getBySignatureCached('Song', 'Artist', 'Album', 100.0);
 
-        $this->assertNull($result);
+        $this->assertInstanceOf(LrclibUnavailable::class, $result);
     }
 
-    public function testReturnsNullOnHttpException(): void
+    public function testReportsATransportErrorAsUnavailable(): void
     {
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->client = $this->createClient();
@@ -278,10 +299,10 @@ final class LrclibClientTest extends TestCase
 
         $result = $this->client->getBySignatureCached('Song', 'Artist', 'Album', 100.0);
 
-        $this->assertNull($result);
+        $this->assertInstanceOf(LrclibUnavailable::class, $result);
     }
 
-    public function testReturnsNullOnGenericException(): void
+    public function testReportsAnUnexpectedExceptionAsUnavailable(): void
     {
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->client = $this->createClient();
@@ -294,10 +315,10 @@ final class LrclibClientTest extends TestCase
 
         $result = $this->client->getBySignatureCached('Song', 'Artist', 'Album', 100.0);
 
-        $this->assertNull($result);
+        $this->assertInstanceOf(LrclibUnavailable::class, $result);
     }
 
-    public function testReturnsNullOnNetworkError(): void
+    public function testReportsANetworkErrorAsUnavailable(): void
     {
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->client = $this->createClient();
@@ -310,10 +331,10 @@ final class LrclibClientTest extends TestCase
 
         $result = $this->client->getBySignatureCached('Song', 'Artist', 'Album', 100.0);
 
-        $this->assertNull($result);
+        $this->assertInstanceOf(LrclibUnavailable::class, $result);
     }
 
-    public function testSearchReturnsEmptyArrayOnNetworkError(): void
+    public function testSearchReportsANetworkErrorAsUnavailable(): void
     {
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->client = $this->createClient();
@@ -326,7 +347,7 @@ final class LrclibClientTest extends TestCase
 
         $results = $this->client->search('test');
 
-        $this->assertSame([], $results);
+        $this->assertInstanceOf(LrclibUnavailable::class, $results);
     }
 
     // --- Instrumental tracks ---
@@ -350,7 +371,7 @@ final class LrclibClientTest extends TestCase
 
         $result = $this->client->getBySignatureCached('Intro', 'Artist', 'Album', 60.0);
 
-        $this->assertNotNull($result);
+        $this->assertInstanceOf(LrclibResult::class, $result);
         $this->assertTrue($result->instrumental);
         $this->assertNull($result->plainLyrics);
         $this->assertNull($result->syncedLyrics);

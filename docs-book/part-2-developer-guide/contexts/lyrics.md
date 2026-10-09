@@ -16,10 +16,16 @@ The Lyrics context stores song lyrics and fetches them from [LRCLIB](https://lrc
 
 | Command | Handler | Purpose |
 |---------|---------|---------|
-| `FetchLyricsCommand` | `FetchLyricsHandler` | Fetch and store the lyrics of one song from LRCLIB |
+| `FetchLyricsCommand` | `FetchLyricsHandler` | Fetch and store the lyrics of one song from LRCLIB; returns a `LyricsFetchResult` |
+| `ApplyLyricsCommand` | `ApplyLyricsHandler` | Store an LRCLIB search result as the lyrics of a song that has none (the apply route and `app:lyrics:apply`) |
+| `SearchLyricsQuery` | `SearchLyricsHandler` | Search LRCLIB by keywords (the search route and `app:lyrics:search`) |
 | `BulkFetchLyricsCommand` | `BulkFetchLyricsHandler` | Walk songs without lyrics and queue a fetch for each, up to an optional limit (`app:lyrics:fetch`, the admin bulk fetch and admin-created schedules); returns the number queued |
 
-`FetchLyricsCommand` has no transport route, so the on-demand fetch of one song handles it synchronously. The bulk fetch and the automatic requests below queue it on the `async` transport with a `TransportNamesStamp`, spaced by a `DelayStamp`; the bulk fetch spaces its fetches by the command's delay, 500 ms by default. The bulk fetch handler therefore returns once the fetches are queued, so the admin request does not wait for LRCLIB. Without a limit, both the admin page and `app:lyrics:fetch` queue every song without lyrics. `app:lyrics:fetch` runs the bulk fetch through `JobMonitorAdministrationInterface::runInline()`, which records the run in the job monitor.
+`FetchLyricsCommand` has no transport route, so the on-demand fetch of one song, from the API or `app:song:lyrics:fetch`, handles it synchronously. The bulk fetch and the automatic requests below queue it on the `async` transport with a `TransportNamesStamp`, spaced by a `DelayStamp`; the bulk fetch spaces its fetches by the command's delay, 500 ms by default. The bulk fetch handler therefore returns once the fetches are queued, so the admin request does not wait for LRCLIB. Without a limit, both the admin page and `app:lyrics:fetch` queue every song without lyrics. `app:lyrics:fetch` runs the bulk fetch through `JobMonitorAdministrationInterface::runInline()`, which records the run in the job monitor.
+
+`LrclibClient` returns null or an empty list when LRCLIB has nothing, and `LrclibUnavailable` when a request fails, LRCLIB answers with another error, or the body is unreadable. `FetchLyricsHandler` turns that into a `LyricsFetchResult`: found, not found, or LRCLIB unavailable. It never throws for an outage, so a queued fetch is acknowledged without a retry. The per-song route and `app:song:lyrics:fetch` call `lyricsOrFail()`, which throws `LyricsProviderUnavailableException` (HTTP 503, exit 1); search and apply throw it directly.
+
+A fetch for a song that has lyrics returns them without calling LRCLIB. Apply refuses that song with a conflict (HTTP 409). It also refuses a result that is already another song's lyrics, because `lrclib_id` is unique.
 
 ## Automatic Fetch for New Songs
 
@@ -33,7 +39,7 @@ The bulk fetch, the on-demand fetch and the LRCLIB search are not gated by the s
 
 | Port | Purpose |
 |------|---------|
-| `LyricsPortInterface` | Find, fetch and store, search LRCLIB, and apply a search result |
+| `LyricsPortInterface` | Find the stored lyrics of a song |
 | `LyricsAdminPortInterface` | Lyrics coverage and sync status for the admin API and `app:lyrics:coverage` and `app:lyrics:status` |
 | `LrclibClientInterface` | LRCLIB HTTP API contract, implemented by `LrclibClient` (anti-corruption layer) |
 | `LyricsFetchRequestInterface` | Published contract for Catalog ingest: requests fetches for new songs while `lyrics.auto_fetch` is on (the `Lyrics Fetch Request Contract` Deptrac layer) |
@@ -54,7 +60,7 @@ The bulk fetch, the on-demand fetch and the LRCLIB search are not gated by the s
 
 | Component | Purpose |
 |-----------|---------|
-| `LyricsService` | Implements `LyricsPortInterface`: LRCLIB lookups by song signature and search, and persistence through the repository |
+| `LyricsService` | Implements `LyricsPortInterface` through the repository |
 | `LrclibClient` | Symfony HttpClient adapter for the LRCLIB API |
 | `LyricsRepository`, `LyricsAdminRepository` | Doctrine persistence and admin statistics |
 | `LyricsMessagePayloadCodec` | Encodes `FetchLyricsCommand` for the `async` transport, and `BulkFetchLyricsCommand` for the job monitor's stored payload |

@@ -173,9 +173,12 @@ own exit code without JSON. Error output contains no credentials or raw diagnost
 |---------|-------------|
 | [app:image:prune-missing](app-image-prune-missing.md) | Delete image records whose files no longer exist in storage |
 | [app:image:stats](app-image-stats.md) | Show how many images are stored and how much space they use, by type |
+| [app:lyrics:apply](app-lyrics-apply.md) | Store an LRCLIB search result as the lyrics of a song that has none |
 | [app:lyrics:coverage](app-lyrics-coverage.md) | Show how many tracks have lyrics, and the lyrics by source |
 | [app:lyrics:fetch](app-lyrics-fetch.md) | Queue a lyrics fetch from LRCLIB for songs without lyrics |
+| [app:lyrics:search](app-lyrics-search.md) | Search LRCLIB for lyrics and list the results with their IDs |
 | [app:lyrics:status](app-lyrics-status.md) | Show the lyrics fetch jobs of the past 7 days and how many finished or failed |
+| [app:song:lyrics:fetch](app-song-lyrics-fetch.md) | Fetch the lyrics of one song from LRCLIB and store them |
 
 ## Metadata
 
