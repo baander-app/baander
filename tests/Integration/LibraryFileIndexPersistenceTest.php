@@ -8,6 +8,7 @@ use App\Library\Domain\Model\Library;
 use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
+use App\Library\Infrastructure\Doctrine\Entity\LibraryFileIndexEntity;
 use App\Library\Infrastructure\Doctrine\Repository\LibraryFileIndexRepository;
 use App\Library\Infrastructure\Doctrine\Repository\LibraryRepository;
 use App\Shared\Domain\Model\Uuid;
@@ -91,6 +92,38 @@ final class LibraryFileIndexPersistenceTest extends TestCase
 
         $repository->removeByPath($library->getId(), '/media/u15/a.flac');
         self::assertSame(0, $this->countIndexRows($library->getId()));
+    }
+
+    /** Video files pass 2 GiB, and file times pass January 2038; both fit and read back unchanged. */
+    public function testIndexesAFileLargerThan2GibModifiedAfter2038(): void
+    {
+        $library = $this->createLibrary();
+        $repository = new LibraryFileIndexRepository($this->manager);
+        $size = 5 * 1024 ** 3;
+        $modifiedAt = 4_102_444_800; // 2100-01-01T00:00:00Z
+
+        $repository->upsert($library->getId(), '/media/u15/remux.mkv', 'hash', $size, 'mkv', $modifiedAt);
+
+        self::assertSame(
+            ['size' => $size, 'modified_at' => $modifiedAt],
+            $this->manager->getConnection()->fetchAssociative(
+                'SELECT size, modified_at FROM library_file_index WHERE library_id = ?',
+                [$library->getId()->toString()],
+            ),
+        );
+        $this->manager->clear();
+        $entity = $this->manager->getRepository(LibraryFileIndexEntity::class)->findOneBy(['libraryId' => $library->getId()]);
+        self::assertInstanceOf(LibraryFileIndexEntity::class, $entity);
+        self::assertSame($size, $entity->getSize());
+        self::assertSame($modifiedAt, $entity->getModifiedAt());
+        self::assertSame(
+            ['modified_at' => 'bigint', 'size' => 'bigint'],
+            $this->manager->getConnection()->fetchAllKeyValue(
+                "SELECT column_name, data_type FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'library_file_index' AND column_name IN ('size', 'modified_at')
+                 ORDER BY column_name",
+            ),
+        );
     }
 
     public function testIndexRowForAnUnknownLibraryIsRejected(): void

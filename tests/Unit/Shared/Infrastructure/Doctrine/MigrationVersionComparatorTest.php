@@ -66,6 +66,7 @@ final class MigrationVersionComparatorTest extends TestCase
         'DoctrineMigrations\\Version20261007130000',
         'DoctrineMigrations\\Version20261007140000',
         'DoctrineMigrations\\Version20261008200000',
+        'DoctrineMigrations\\Version20261009100000',
     ];
 
     public function testFreshPlanOrdersAllActualMigrationClassesByDependencies(): void

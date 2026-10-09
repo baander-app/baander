@@ -27,13 +27,15 @@ class LibraryFileIndexEntity
         #[ORM\Column(type: 'text')]
         private string $hash,
 
-        #[ORM\Column(type: 'integer')]
+        /** Bytes; video files pass 2 GiB. */
+        #[ORM\Column(type: 'bigint')]
         private int $size,
 
         #[ORM\Column(type: 'text')]
         private string $extension,
 
-        #[ORM\Column(type: 'integer')]
+        /** The file system's modification time in epoch seconds, as filemtime() reports it. */
+        #[ORM\Column(type: 'bigint')]
         private int $modifiedAt,
 
         #[ORM\Column(type: 'datetime_immutable')]
