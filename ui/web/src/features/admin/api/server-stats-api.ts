@@ -53,10 +53,6 @@ export interface RedisStats {
   error?: string
 }
 
-export interface SseStats {
-  active_connections: number
-}
-
 export interface ServerStats {
   /** One snapshot per HTTP worker that answered, sorted by worker ID. */
   workers: WorkerSnapshot[]
@@ -64,7 +60,6 @@ export interface ServerStats {
   missing_workers: number[]
   worker_errors: WorkerError[]
   redis: RedisStats
-  sse: SseStats
 }
 
 export async function getServerStats(): Promise<ServerStats> {

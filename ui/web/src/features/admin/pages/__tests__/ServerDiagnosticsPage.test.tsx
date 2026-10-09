@@ -79,7 +79,6 @@ const SERVER_STATS: ServerStats = {
     used_memory: 12.5,
     maxmemory: 256,
   },
-  sse: { active_connections: 9 },
 }
 
 const COROUTINE_STATS: CoroutineStats = {
@@ -177,7 +176,7 @@ describe('ServerDiagnosticsPage', () => {
     queryClient?.clear()
   })
 
-  it('shows one row per worker with its ID and PID, plus the shared Redis and SSE figures', async () => {
+  it('shows one row per worker with its ID and PID, plus the shared Redis figures', async () => {
     mount()
 
     const workers = await screen.findByRole('table', { name: 'HTTP workers' })
@@ -188,7 +187,7 @@ describe('ServerDiagnosticsPage', () => {
 
     expect(within(region('Redis')).getByText('4242')).toBeInTheDocument()
     expect(within(region('Redis')).getByText('17')).toBeInTheDocument()
-    expect(within(region('Server-sent events')).getByText('9')).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Server-sent events' })).not.toBeInTheDocument()
     expect(screen.queryByText(/did not answer/)).not.toBeInTheDocument()
   })
 

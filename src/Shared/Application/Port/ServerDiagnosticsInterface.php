@@ -21,9 +21,9 @@ interface ServerDiagnosticsInterface
     public const int MAX_SPANS = 500;
 
     /**
-     * Per-worker process figures, plus the Redis and SSE figures every worker shares.
+     * Per-worker process figures, plus the Redis figures every worker shares.
      *
-     * @return array{workers: list<array<string, mixed>>, missing_workers: list<int>, worker_errors: list<WorkerError>, redis: array<string, mixed>, sse: array{active_connections: int}}
+     * @return array{workers: list<array<string, mixed>>, missing_workers: list<int>, worker_errors: list<WorkerError>, redis: array<string, mixed>}
      *
      * @throws ServerControlException when no server runs or it cannot answer
      */

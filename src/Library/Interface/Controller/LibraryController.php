@@ -208,7 +208,7 @@ final class LibraryController
     #[OA\Post(
         path: '/api/libraries/{id}/scan',
         summary: 'Trigger a library scan (admin)',
-        description: 'Claims the library for a scan and dispatches an asynchronous scan job. The scan runs in the background and progress is reported via SSE. A library that is already scanning answers 409.',
+        description: 'Claims the library for a scan and dispatches an asynchronous scan job. The scan runs in the background; follow it in the job monitor and through the library's scan status. A library that is already scanning answers 409.',
         parameters: [
             new OA\Parameter(name: 'id', description: 'Library UUID or slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],

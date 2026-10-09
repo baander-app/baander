@@ -183,23 +183,25 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 
 ## Server Stats
 
-The server stats endpoint returns a snapshot of the current worker process state. Requires `ROLE_ADMIN`.
+The server stats endpoint returns a snapshot of every HTTP worker of the web server. Requires `ROLE_ADMIN`. The [`app:server:stats`](commands/app-server-stats.md) command prints the same data from the web container.
 
 ```bash
 curl -s -H "Authorization: Bearer $TOKEN" https://baander.test/api/debug/stats | jq .
 ```
 
-The response includes:
+The `data` object holds:
 
-| Section | Contents |
-|---------|----------|
-| `memory` | Current usage, peak, real usage, real peak (all in MB) |
-| `process` | PID, UID, GID, user, uptime |
-| `swoole` | Swoole VM status (coroutine count, connections, request count) |
-| `pools` | Swoole connection pool stats (active, free, limit per connection) |
-| `doctrine` | Identity map size, scheduled inserts/updates/deletes, EM open status |
-| `redis` | Connected status, ping result, DB size, client count, memory usage |
-| `sse` | Active SSE connection count |
+| Field | Contents |
+|-------|----------|
+| `workers` | One entry per worker that answered, each with `worker_id` and the groups below |
+| `workers[].memory` | Current usage, peak, real usage, real peak (all in MB) |
+| `workers[].process` | PID, UID, GID, user, uptime |
+| `workers[].swoole` | Swoole VM status, or `null` |
+| `workers[].coroutines` | Running coroutines and the peak count |
+| `workers[].pools` | Swoole connection pool stats (active, free, limit per connection) |
+| `missing_workers` | IDs of workers that did not answer in time |
+| `worker_errors` | Workers whose figures could not be read, with the error |
+| `redis` | Connected status, ping result, DB size, client count, memory usage; read once for the server |
 
 Use this for lightweight debugging of memory leaks, connection exhaustion, or hangs without setting up external monitoring.
 

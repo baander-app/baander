@@ -22,7 +22,7 @@ final readonly class ServerStatsControllerWithCoroutines
 
     #[OA\Get(
         path: '/api/debug/stats',
-        summary: 'Per-worker server diagnostics with the shared Redis and SSE figures',
+        summary: 'Per-worker server diagnostics with the shared Redis figures',
         responses: [
             new OA\Response(response: '200', description: 'Server stats snapshot',
                 content: new OA\JsonContent(
@@ -44,9 +44,6 @@ final readonly class ServerStatsControllerWithCoroutines
                                 ]),
                             ),
                             new OA\Property(property: 'redis', additionalProperties: true),
-                            new OA\Property(property: 'sse', properties: [
-                                new OA\Property(property: 'active_connections', type: 'integer'),
-                            ]),
                         ]),
                     ],
                 ),

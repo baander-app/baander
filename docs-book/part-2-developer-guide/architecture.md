@@ -117,8 +117,7 @@ API entry points. Controllers, request DTOs, response resources. Coordinates bet
 - **Messenger** — job monitoring middleware, task dispatching
 - **Caching** — Redis tag-aware cache pools
 - **Search** — PGroonga full-text search trait
-- **SSE** — server-sent events via Redis Pub/Sub
-- **Security** — authenticators for SSE and WebSocket connections
+- **Security** — the WebSocket handshake authenticator
 
 See the [Shared Kernel](shared-kernel.md) page for detailed documentation.
 
