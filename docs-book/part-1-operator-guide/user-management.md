@@ -9,13 +9,13 @@ Users can self-register through the public `POST /api/auth/register` endpoint, o
 Create a regular user:
 
 ```bash
-make exec cmd="php bin/console app:user:create alice@example.com Alice"
+make exec cmd="php bin/console app:user:create alice@baander.app Alice"
 ```
 
 Create an admin (the command asks for confirmation before granting admin privileges):
 
 ```bash
-make exec cmd="php bin/console app:user:create admin@example.com Admin --role admin"
+make exec cmd="php bin/console app:user:create admin@baander.app Admin --role admin"
 ```
 
 ### Arguments and options
@@ -26,11 +26,13 @@ make exec cmd="php bin/console app:user:create admin@example.com Admin --role ad
 | `name` | Yes | — | Display name |
 | `--password` | No | — | Read password from stdin instead of prompting interactively |
 | `--role` | No | `user` | User role: `user` or `admin` |
+| `--force` | No | — | Grant an admin role without the confirmation prompt; required when no terminal is attached |
+| `--json` | No | — | Print the created user as JSON, the same data as `POST /api/admin/users` |
 
 For scripted or CI usage, pipe the password via stdin with `--password`:
 
 ```bash
-echo "securepassword" | make exec cmd="php bin/console app:user:create alice@example.com Alice --password"
+echo "securepassword" | make exec cmd="php bin/console app:user:create alice@baander.app Alice --password"
 ```
 
 See the [full command reference](commands/app-user-create.md) for exit codes and additional details.
@@ -49,10 +51,10 @@ Baander uses three roles:
 | `ROLE_ADMIN` | Administrator — has access to the operational and management API endpoints; some changes there need `ROLE_SUPER_ADMIN` |
 | `ROLE_SUPER_ADMIN` | Super administrator — includes `ROLE_ADMIN` and may also make the changes reserved for it, such as creating administrators, changing [server settings](configuration.md#server-settings) and [users' settings](#user-settings), and registering, rotating and revoking [OAuth clients](#oauth-clients) |
 
-Roles are assigned at creation time with the `--role` flag, which grants `ROLE_USER` or `ROLE_ADMIN`. A super administrator can assign roles, `ROLE_SUPER_ADMIN` included, through the admin API (`POST /api/admin/users/{id}/roles`). There is currently no CLI command to change a user's role after creation. To modify roles, you must update the `roles` column directly in the database:
+Roles are assigned at creation time with the `--role` flag. To change them later, [app:user:roles](commands/app-user-roles.md) replaces a user's roles with the set you give; a super administrator can do the same in the admin panel or through the admin API (`POST /api/admin/users/{id}/roles`):
 
-```sql
-UPDATE users SET roles = '["ROLE_USER", "ROLE_ADMIN"]' WHERE email = 'alice@example.com';
+```bash
+make exec cmd="php bin/console app:user:roles alice@baander.app ROLE_USER ROLE_ADMIN"
 ```
 
 ### Who can manage users
@@ -161,28 +163,28 @@ Super administrators can set every user setting, including any that users cannot
 Disable a user account to revoke access without deleting it:
 
 ```bash
-make exec cmd="php bin/console app:user:disable alice@example.com"
+make exec cmd="php bin/console app:user:disable alice@baander.app"
 ```
 
 Re-enable a disabled account:
 
 ```bash
-make exec cmd="php bin/console app:user:enable alice@example.com"
+make exec cmd="php bin/console app:user:enable alice@baander.app"
 ```
 
-Both commands accept an email address or UUID as the identifier. See [app:user:disable](commands/app-user-disable.md) and [app:user:enable](commands/app-user-enable.md) for details.
+Both commands accept an email address or UUID as the identifier. Disabling revokes the user's tokens and closes their open WebSocket connections. See [app:user:disable](commands/app-user-disable.md) and [app:user:enable](commands/app-user-enable.md) for details.
 
 To revoke all authentication for a user in one step, rotate all secrets as described in the [security guide](security.md). This forces every user to re-authenticate.
 
 ## Deleting Users
 
-There is no CLI command to delete user accounts. To remove a user, delete their records from the database directly. This may leave orphaned data (activity history, playlists, preferences) depending on your schema and whether cascading deletes are configured:
+[app:user:delete](commands/app-user-delete.md) deletes an account through the same use case as the admin panel. It asks for confirmation on a terminal and needs `--force` in a script:
 
-```sql
-DELETE FROM users WHERE email = 'alice@example.com';
+```bash
+make exec cmd="php bin/console app:user:delete alice@baander.app"
 ```
 
-Use this with caution — there is no undo. Take a database backup before deleting any user data.
+Deletion cannot be undone. To stop someone from signing in while keeping their account, disable it instead.
 
 ## OAuth Clients
 

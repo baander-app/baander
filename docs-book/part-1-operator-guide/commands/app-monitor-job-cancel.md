@@ -28,7 +28,7 @@ make exec cmd="php bin/console app:monitor:job:cancel <jobId> --json"
 
 ## Details
 
-The command sets the job's cancellation flag in Redis for one hour and returns. The job stops at its next checkpoint, which is between two items of its work, and its status in the monitor becomes `cancelled`. A cancelled job is not retried and does not go to the failure transport. Work it queued before it stopped stays queued.
+The command sets the job's cancellation flag in Redis for one hour and returns. The job stops at its next checkpoint, which is between two items of its work, and its status in the monitor becomes `cancelled`. A cancelled job is not retried and does not go to the failure transport. Work it queued before it stopped stays queued, except for a lyrics fetch: its queued fetches skip LRCLIB when the run was cancelled during queueing.
 
 These jobs have checkpoints:
 

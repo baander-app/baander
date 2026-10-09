@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-10-08. This is the working delivery record for the remediation,
+Updated: 2026-10-09. This is the working delivery record for the remediation,
 registry, and web-state plans. Update it when scope changes or a stage is verified.
 Completed code is not proof of production or performance qualification.
 
@@ -31,9 +31,34 @@ plans come next, in this order:
    - the Swoole runtime checks for credential email at `kernel.terminate` and
      progressive audio streaming were run by hand; no script under `scripts/` repeats them;
    - Safari playback of a transcoded rendition that is still encoding is unverified.
-2. Admin/CLI parity: every admin-panel action gets a CLI command. An earlier count
-   found 76 admin actions, 7 covered, 7 drifting and 62 missing; the plan rebuilds
-   the inventory. Planning in progress.
+2. [Admin/CLI parity](docs/plans/2026-10-08-1627-feat-admin-cli-parity-plan.md):
+   every action on the admin pages has a console command that reaches the same
+   Application use case as its controller. `AdminCliParityTest` fails on an admin route
+   with neither `#[CliCounterpart]` nor `#[CliParityExemption]`, and
+   `CommandDocsCoverageTest` on a command without an operator docs page. The work
+   also added the server control channel for diagnostics and QoL, cooperative job
+   cancellation, admin-only library rename, delete and scan with a leased scan claim,
+   and it ends a disabled user's tokens and WebSocket connections. Delivered on
+   2026-10-09. Recorded exemptions, deferred to a follow-up plan: the catalog and
+   player admin actions (metadata editing, per-song lyrics fetch and apply, cover
+   upload and delete, artist create and credits, album and song delete, movie
+   writes), webhook administration and server discovery registration (no admin page
+   offers them), and the admin notification bell. Still open:
+   - webhook administration uses `EntityManager` in its controller; move that into
+     Application commands before adding its commands;
+   - no action grants or revokes a member's access to a library;
+   - no API request selects a non-English locale, so the translated library errors
+     are never returned;
+   - a lyrics bulk fetch can be cancelled only while it queues; after that, its
+     queued fetches run;
+   - `app:rate-limiter:clear`, `app:settings:set` and `app:settings:reset` have no
+     `--json`;
+   - the React Native TV QoL fix ran only under `ui/web`'s test tooling; run `ui/rn`'s
+     own tests once its toolchain is installed;
+   - server diagnostics still count SSE connections, and the developer guide still
+     describes SSE endpoints, though both were removed;
+   - `auth.reconnect` lets an authenticated WebSocket take another user's identity
+     with a valid reconnection token; review that design.
 3. Timestamp convention: 130 `timestamptz(0)` columns, 13 `timestamp without time
    zone` columns, and ORM writes without offset or fraction. Not yet planned.
 
