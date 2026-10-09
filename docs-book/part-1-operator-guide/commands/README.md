@@ -262,6 +262,7 @@ own exit code without JSON. Error output contains no credentials or raw diagnost
 |---------|-------------|
 | [app:cli:manifest](app-cli-manifest.md) | Output a JSON manifest of all CLI commands and tooling metadata |
 | [app:config:validate](app-config-validate.md) | Validate application configuration and check for misconfigurations |
+| [app:discovery:register](app-discovery-register.md) | Register a self-hosted server for discovery and pairing |
 | [app:health:check](app-health-check.md) | Check the health of all system components |
 | [app:monitor:analytics](app-monitor-analytics.md) | Show background job analytics for a time range: summary, timing or failures |
 | [app:monitor:job:cancel](app-monitor-job-cancel.md) | Cancel a running background job, or the work a finished job queued |

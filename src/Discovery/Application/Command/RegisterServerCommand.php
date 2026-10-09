@@ -10,12 +10,10 @@ final readonly class RegisterServerCommand
         private string $serverUrl,
         private string $name,
         private string $version,
-        private string $apiKey,
     ) {
     }
 
     public function getServerUrl(): string { return $this->serverUrl; }
     public function getName(): string { return $this->name; }
     public function getVersion(): string { return $this->version; }
-    public function getApiKey(): string { return $this->apiKey; }
 }

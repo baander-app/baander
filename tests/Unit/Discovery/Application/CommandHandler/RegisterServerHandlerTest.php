@@ -9,6 +9,7 @@ use App\Discovery\Application\CommandHandler\RegisterServerHandler;
 use App\Discovery\Application\Port\ServerInstancePortInterface;
 use App\Discovery\Domain\Event\ServerRegistered;
 use App\Discovery\Domain\Model\ServerInstance;
+use App\Shared\Application\Exception\InvalidInputException;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -38,7 +39,7 @@ final class RegisterServerHandlerTest extends TestCase
 
         $this->serverPort->expects($this->once())
             ->method('register')
-            ->with('https://music.baander.app', 'Home Server', '1.2.3', 'secret-key')
+            ->with('https://music.baander.app', 'Home Server', '1.2.3', $this->matchesRegularExpression('/^[0-9a-f]{64}$/'))
             ->willReturn($server);
 
         $this->eventDispatcher->expects($this->once())
@@ -51,9 +52,38 @@ final class RegisterServerHandlerTest extends TestCase
             'https://music.baander.app',
             'Home Server',
             '1.2.3',
-            'secret-key',
         ));
 
         $this->assertSame($server, $result);
+    }
+
+    public function testRejectsAMalformedUrlWithoutRegistering(): void
+    {
+        $this->serverPort->expects($this->never())->method('register');
+        $this->eventDispatcher->expects($this->never())->method('dispatch');
+
+        $this->expectException(InvalidInputException::class);
+
+        ($this->handler)(new RegisterServerCommand('ftp://music.baander.app', 'Home Server', '1.2.3'));
+    }
+
+    public function testRejectsABlankNameWithoutRegistering(): void
+    {
+        $this->serverPort->expects($this->never())->method('register');
+        $this->eventDispatcher->expects($this->never())->method('dispatch');
+
+        $this->expectException(InvalidInputException::class);
+
+        ($this->handler)(new RegisterServerCommand('https://music.baander.app', '  ', '1.2.3'));
+    }
+
+    public function testRejectsABlankVersionWithoutRegistering(): void
+    {
+        $this->serverPort->expects($this->never())->method('register');
+        $this->eventDispatcher->expects($this->never())->method('dispatch');
+
+        $this->expectException(InvalidInputException::class);
+
+        ($this->handler)(new RegisterServerCommand('https://music.baander.app', 'Home Server', ''));
     }
 }
