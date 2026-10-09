@@ -11,8 +11,8 @@ use Symfony\Component\Console\Input\InputOption;
 /**
  * The --lock and --unlock options of the app:album:update, app:song:update and app:artist:update commands.
  *
- * Each option may repeat and may list several fields separated by commas. Locks and unlocks apply
- * before the edit, so a run may unlock a field and change it.
+ * Each option may repeat and may list several fields separated by commas. Unlocks apply before the
+ * edit and locks after it, so a run may unlock a field and change it, or change a field and lock it.
  */
 final class FieldLockOptions
 {
@@ -22,7 +22,7 @@ final class FieldLockOptions
     public static function add(Command $command): void
     {
         $command
-            ->addOption(self::LOCK, null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Lock a field, named as the API names it, so automatic metadata updates keep its value')
+            ->addOption(self::LOCK, null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Lock a field, named as the API names it, so automatic metadata updates keep its value; applied after the edit, so the same run may change it')
             ->addOption(self::UNLOCK, null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Unlock a field; applied before the edit, so the same run may change it');
     }
 

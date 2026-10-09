@@ -7,7 +7,8 @@ namespace App\Catalog\Application\Command\Song;
 /**
  * Changes a song's metadata and which of its fields are locked. A null field stays as it is.
  *
- * Lock changes apply before the edit, so one command may unlock a field and change it.
+ * Unlocks apply before the edit and locks after it, so one command may unlock a field and change
+ * it, or change a field and lock it.
  */
 final readonly class UpdateSongCommand
 {

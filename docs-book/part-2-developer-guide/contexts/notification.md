@@ -33,10 +33,29 @@ The Notification context handles in-app notifications, push notifications (Web P
 | `SendEmailCommand` | `SendEmailHandler` | Deliver an email notification in the recipient's email language |
 | `SendPushCommand` | `SendPushHandler` | Deliver a Web Push notification while `notifications.push_enabled` is on |
 | `SendWebhookCommand` | `SendWebhookHandler` | Deliver a notification to an external webhook |
+| `ListWebhooksQuery` | `ListWebhooksHandler` | List the configured webhooks, oldest first, without secrets (`GET /api/webhooks` and `app:webhook:list`) |
+| `CreateWebhookCommand` | `CreateWebhookHandler` | Add a webhook and issue its signing secret (`POST /api/webhooks` and `app:webhook:create`) |
+| `UpdateWebhookCommand` | `UpdateWebhookHandler` | Change a webhook's URL, its category filter, or both (`PUT /api/webhooks/{id}` and `app:webhook:update`) |
+| `RotateWebhookSecretCommand` | `RotateWebhookSecretHandler` | Replace a webhook's signing secret; the webhook keeps its signing version (`POST /api/webhooks/{id}/rotate-secret` and `app:webhook:rotate-secret`) |
+| `DeleteWebhookCommand` | `DeleteWebhookHandler` | Delete a webhook (`DELETE /api/webhooks/{id}` and `app:webhook:delete`) |
+
+## Webhook Administration
+
+`WebhookController` and the `app:webhook:*` commands dispatch the same commands and query, so the API and the shell share one use case for each action. The commands carry the input as the client sent it; the handlers validate it with `WebhookInput`. An ID that is not a UUID, a missing URL, a destination that `WebhookDestinationPortInterface` does not resolve to an allowed address, or a category filter that is neither null nor a list of supported categories raises `InvalidInputException` (HTTP 422, console exit `INVALID`). An unknown webhook raises `NotFoundException` (HTTP 404). `UpdateWebhookCommand` changes a field only when its `changes*` flag is set. A null category filter with the flag set clears the filter; without the flag, the filter stays as it is.
+
+Create and rotate each generate a secret of 64 hex characters from `random_bytes(32)`, store it encrypted through `WebhookSecretPortInterface`, and return the plain secret once in an `IssuedWebhookSecret`. `WebhookRepositoryInterface` takes the encrypted secret and returns `WebhookView`, which never carries it, so list and update cannot return a secret.
 
 ## Ports
 
-None. The Notification context does not define application ports. It reads the recipient's email language through UserPreference's `UserSettingsContractInterface`.
+| Port | Purpose | Implemented By |
+|------|---------|----------------|
+| `WebhookRepositoryInterface` | Store webhook configuration; takes the encrypted secret and returns `WebhookView` without it | `WebhookRepository` |
+| `WebhookSecretPortInterface` | Encrypt and decrypt webhook signing secrets | `WebhookSecretCodec` |
+| `WebhookDestinationPortInterface` | Resolve a webhook URL to its host and allowed IP addresses, or null | `WebhookDestinationPolicy` |
+| `PushSubscriptionRegistrationPortInterface` | Register a push endpoint for a user or rotate its owner's credentials | `PushSubscriptionRepository` |
+| `PushSubscriptionRemovalPortInterface` | Remove one or all of a user's push subscriptions | `PushSubscriptionRepository` |
+
+The context reads the recipient's email language through UserPreference's `UserSettingsContractInterface`.
 
 ## Email Language
 
@@ -87,13 +106,14 @@ All endpoints are prefixed with `/api`.
 
 ### Webhooks
 
-| Method | Path | Controller | Purpose |
-|--------|------|------------|---------|
 The entire controller is gated with `#[IsGranted('ROLE_ADMIN')]` — only admins can manage webhooks.
 
+| Method | Path | Controller | Purpose |
+|--------|------|------------|---------|
 | GET | `/api/webhooks` | `WebhookController` | List all webhooks (admin) |
 | POST | `/api/webhooks` | `WebhookController` | Create a webhook (admin, returns one-time secret) |
 | PUT | `/api/webhooks/{id}` | `WebhookController` | Update a webhook (admin) |
+| POST | `/api/webhooks/{id}/rotate-secret` | `WebhookController` | Rotate a webhook's secret (admin, returns one-time secret) |
 | DELETE | `/api/webhooks/{id}` | `WebhookController` | Delete a webhook (admin) |
 
 ## Cross-Context Dependencies
@@ -118,6 +138,8 @@ The entire controller is gated with `#[IsGranted('ROLE_ADMIN')]` — only admins
 | `WebhookEntity` | Webhook configuration |
 | `WebhookDeliveryLogEntity` | Webhook delivery audit log |
 
+`WebhookRepository` implements `WebhookRepositoryInterface` over `WebhookEntity`.
+
 ### Webhook Delivery
 
 | Component | Purpose |
@@ -126,6 +148,17 @@ The entire controller is gated with `#[IsGranted('ROLE_ADMIN')]` — only admins
 | `SlackAdapter` | Formats and delivers payloads to Slack |
 | `HmacSigner` | Signs webhook payloads with HMAC for verification |
 | `WebhookDeliveryService` | Orchestrates webhook delivery and retry logic |
+
+### Console Commands
+
+| Command | Purpose |
+|---------|---------|
+| `app:webhook:list` (`WebhookListCommand`) | List the configured webhooks, without their secrets |
+| `app:webhook:create` (`WebhookCreateCommand`) | Add a webhook and print its signing secret once |
+| `app:webhook:update` (`WebhookUpdateCommand`) | Change a webhook's URL or categories; `--category` replaces the filter and `--all-categories` clears it |
+| `app:webhook:rotate-secret` (`WebhookRotateSecretCommand`) | Replace a webhook's signing secret and print the new one once |
+| `app:webhook:delete` (`WebhookDeleteCommand`) | Delete a webhook |
+| `app:generate-vapid-keys` (`GenerateVapidKeysCommand`) | Generate VAPID keys for Web Push |
 
 ### Security
 
