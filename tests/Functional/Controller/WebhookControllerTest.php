@@ -5,13 +5,11 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Controller;
 
 use App\Auth\Domain\Model\User;
-use App\Notification\Application\Port\WebhookDestinationPortInterface;
 use App\Notification\Application\Port\WebhookSecretPortInterface;
 use App\Notification\Infrastructure\Doctrine\Entity\WebhookEntity;
-use App\Notification\Infrastructure\Webhook\WebhookDestinationPolicy;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Functional\Notification\WebhookDnsStub;
 use App\Tests\Functional\TestCase;
-use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Functional tests for outgoing webhook management (Notification bounded context).
@@ -19,23 +17,20 @@ use Symfony\Component\HttpFoundation\Response;
  * Covers WebhookController — the entire controller is ROLE_ADMIN-gated.
  *
  *   GET    /api/webhooks/         list
- *   POST   /api/webhooks/         create (201, returns secret once)
- *   PUT    /api/webhooks/{id}     update
- *   DELETE /api/webhooks/{id}     delete (204)
+ *   POST   /api/webhooks/                    create (201, returns secret once)
+ *   PUT    /api/webhooks/{id}                update
+ *   DELETE /api/webhooks/{id}                delete (204)
+ *   POST   /api/webhooks/{id}/rotate-secret  rotate (returns the new secret once)
  */
 final class WebhookControllerTest extends TestCase
 {
+    use WebhookDnsStub;
+
     protected function setUp(): void
     {
         parent::setUp();
 
-        static::getContainer()->set(WebhookDestinationPortInterface::class, new WebhookDestinationPolicy(
-            dnsResolver: static fn (string $host): array => match ($host) {
-                'baander.app', 'old.baander.app', 'new.baander.app' => ['93.184.216.34'],
-                'mixed.baander.app' => ['93.184.216.34', '192.168.1.2'],
-                default => [],
-            },
-        ));
+        $this->stubWebhookDns();
     }
 
     // ---------------------------------------------------------------
@@ -109,11 +104,8 @@ final class WebhookControllerTest extends TestCase
     {
         $admin = $this->createAdminUser();
 
-        $response = $this->createWebhook($admin, 'https://baander.app/hook');
-        $this->assertSame(201, $response->getStatusCode());
+        $data = $this->createWebhook($admin, 'https://baander.app/hook');
 
-        // created() returns flat data (no 'data' wrapper)
-        $data = json_decode($response->getContent(), true, 512, JSON_THROW_ON_ERROR);
         $this->assertSame('https://baander.app/hook', $data['url']);
         $this->assertArrayHasKey('secret', $data);
         $this->assertNotEmpty($data['secret']);
@@ -144,7 +136,7 @@ final class WebhookControllerTest extends TestCase
     public function testUpdateChangesUrl(): void
     {
         $admin = $this->createAdminUser();
-        $created = json_decode($this->createWebhook($admin, 'https://old.baander.app')->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        $created = $this->createWebhook($admin, 'https://old.baander.app');
 
         $data = $this->assertJsonResponse(
             $this->authenticatedRequest('PUT', '/api/webhooks/' . $created['id'], $admin, [
@@ -175,7 +167,7 @@ final class WebhookControllerTest extends TestCase
     public function testDeleteRemovesWebhook(): void
     {
         $admin = $this->createAdminUser();
-        $created = json_decode($this->createWebhook($admin, 'https://baander.app')->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        $created = $this->createWebhook($admin, 'https://baander.app');
 
         $response = $this->authenticatedRequest('DELETE', '/api/webhooks/' . $created['id'], $admin);
 
@@ -199,6 +191,22 @@ final class WebhookControllerTest extends TestCase
         $this->assertJsonResponse($response, 404);
     }
 
+    public function testAMalformedIdIsInvalidInputOnEveryRouteThatTakesOne(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->assertJsonResponse($this->authenticatedRequest('PUT', '/api/webhooks/not-a-uuid', $admin, ['url' => 'https://baander.app/hook']), 422);
+        $this->assertJsonResponse($this->authenticatedRequest('DELETE', '/api/webhooks/not-a-uuid', $admin), 422);
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/webhooks/not-a-uuid/rotate-secret', $admin), 422);
+    }
+
+    public function testRotatingAnUnknownWebhookAnswers404(): void
+    {
+        $admin = $this->createAdminUser();
+
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/webhooks/' . Uuid::generate()->toString() . '/rotate-secret', $admin), 404);
+    }
+
     public function testMixedPublicAndPrivateDnsAnswersAreRejectedWithoutChangingStoredConfiguration(): void
     {
         $admin = $this->createAdminUser();
@@ -207,7 +215,7 @@ final class WebhookControllerTest extends TestCase
         ]), 422);
         $this->assertSame([], $this->entityManager->getRepository(WebhookEntity::class)->findAll());
 
-        $created = $this->assertJsonResponse($this->createWebhook($admin, 'https://baander.app/hook'), 201);
+        $created = $this->createWebhook($admin, 'https://baander.app/hook');
         $this->assertJsonResponse($this->authenticatedRequest('PUT', '/api/webhooks/' . $created['id'], $admin, [
             'url' => 'https://mixed.baander.app/hook',
             'category_filter' => ['security'],
@@ -230,7 +238,7 @@ final class WebhookControllerTest extends TestCase
         $created = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/webhooks/', $admin, [
             'url' => 'https://baander.app/hook',
             'category_filter' => ['security'],
-        ]), 201);
+        ]), 201, 'data')['data'];
         $this->assertJsonResponse($this->authenticatedRequest('PUT', '/api/webhooks/' . $created['id'], $admin, [
             'url' => 'https://new.baander.app/hook',
             'category_filter' => ['key' => 'security'],
@@ -249,7 +257,7 @@ final class WebhookControllerTest extends TestCase
     public function testSecretRotationRequiresAdminRole(): void
     {
         $admin = $this->createAdminUser();
-        $created = $this->assertJsonResponse($this->createWebhook($admin, 'https://baander.app/hook'), 201);
+        $created = $this->createWebhook($admin, 'https://baander.app/hook');
         $originalCiphertext = $this->storedWebhook($created['id'])->getEncryptedSecret();
         $user = $this->createTestUser();
 
@@ -261,7 +269,7 @@ final class WebhookControllerTest extends TestCase
     public function testAdminRotatesTheStoredEncryptedSecretAndListDoesNotExposeIt(): void
     {
         $admin = $this->createAdminUser();
-        $created = $this->assertJsonResponse($this->createWebhook($admin, 'https://baander.app/hook'), 201);
+        $created = $this->createWebhook($admin, 'https://baander.app/hook');
         $originalCiphertext = $this->storedWebhook($created['id'])->getEncryptedSecret();
         $rotated = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/webhooks/' . $created['id'] . '/rotate-secret', $admin), 200, 'data')['data'];
 
@@ -303,12 +311,14 @@ final class WebhookControllerTest extends TestCase
     // Helpers
     // ---------------------------------------------------------------
 
-    private function createWebhook(User $admin, string $url): Response
+    /** @return array<string, mixed> the `data` payload of the 201 response */
+    private function createWebhook(User $admin, string $url): array
     {
-        $response = $this->authenticatedRequest('POST', '/api/webhooks/', $admin, ['url' => $url]);
-        $this->assertJsonResponse($response, 201);
-
-        return $response;
+        return $this->assertJsonResponse(
+            $this->authenticatedRequest('POST', '/api/webhooks/', $admin, ['url' => $url]),
+            201,
+            'data',
+        )['data'];
     }
 
     private function storedWebhook(string $id): WebhookEntity

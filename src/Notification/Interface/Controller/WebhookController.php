@@ -4,19 +4,22 @@ declare(strict_types=1);
 
 namespace App\Notification\Interface\Controller;
 
-use App\Notification\Infrastructure\Doctrine\Entity\WebhookEntity;
-use App\Notification\Application\Port\WebhookDestinationPortInterface;
-use App\Notification\Application\Port\WebhookSecretPortInterface;
-use App\Notification\Application\Service\NotificationCategoryFilter;
-use App\Shared\Domain\Model\Uuid;
-use App\Shared\Interface\Attribute\CliParityExemption;
+use App\Notification\Application\DTO\CreateWebhookCommand;
+use App\Notification\Application\DTO\DeleteWebhookCommand;
+use App\Notification\Application\DTO\ListWebhooksQuery;
+use App\Notification\Application\DTO\RotateWebhookSecretCommand;
+use App\Notification\Application\DTO\UpdateWebhookCommand;
+use App\Notification\Interface\Resource\WebhookResource;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\AsController;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -29,11 +32,8 @@ final class WebhookController
     use ApiResponsesTrait;
 
     public function __construct(
-        private readonly EntityManagerInterface $entityManager,
-        private readonly WebhookDestinationPortInterface $destinations,
-        private readonly WebhookSecretPortInterface $secrets,
-    )
-    {
+        private readonly MessageBusInterface $bus,
+    ) {
     }
 
     /**
@@ -48,22 +48,12 @@ final class WebhookController
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
-    #[CliParityExemption(CliParityExemption::DEFERRED_NO_ADMIN_PAGE)]
+    #[CliCounterpart('app:webhook:list')]
     public function index(): JsonResponse
     {
-        $webhooks = $this->entityManager
-            ->getRepository(WebhookEntity::class)
-            ->findAll();
+        $webhooks = $this->dispatch(new ListWebhooksQuery());
 
-        $data = array_map(static fn(WebhookEntity $w) => [
-            'id'              => $w->getId()->toString(),
-            'url'             => $w->getUrl(),
-            'category_filter' => $w->getCategoryFilter(),
-            'created_at'      => $w->getCreatedAt()->format(\DateTimeInterface::ATOM),
-            'updated_at'      => $w->getUpdatedAt()->format(\DateTimeInterface::ATOM),
-        ], $webhooks);
-
-        return $this->successResponse($data);
+        return $this->successResponse(WebhookResource::collection($webhooks));
     }
 
     /**
@@ -92,43 +82,13 @@ final class WebhookController
         ],
     )]
     #[Route('/', name: 'create', methods: ['POST'])]
-    #[CliParityExemption(CliParityExemption::DEFERRED_NO_ADMIN_PAGE)]
+    #[CliCounterpart('app:webhook:create')]
     public function create(Request $request): JsonResponse
     {
         $data = $request->toArray();
+        $issued = $this->dispatch(new CreateWebhookCommand($data['url'] ?? null, $data['category_filter'] ?? null));
 
-        $url = $data['url'] ?? null;
-        if (!is_string($url) || trim($url) === '') {
-            return $this->errorResponse('URL is required.', 422);
-        }
-
-        if ($this->destinations->resolve($url) === null) {
-            return $this->errorResponse('Webhook destination is not allowed or cannot be resolved.', 422);
-        }
-
-        $categoryFilter = $data['category_filter'] ?? null;
-        if (!NotificationCategoryFilter::isValid($categoryFilter)) {
-            return $this->errorResponse('category_filter must contain supported notification categories.', 422);
-        }
-
-        $secret = bin2hex(random_bytes(32));
-
-        $webhook = new WebhookEntity(Uuid::generate(), $this->secrets->encrypt($secret));
-        $webhook->setUrl($url);
-        $webhook->setCategoryFilter($categoryFilter);
-
-        $this->entityManager->persist($webhook);
-        $this->entityManager->flush();
-
-        return $this->created([
-            'id'              => $webhook->getId()->toString(),
-            'url'             => $webhook->getUrl(),
-            'category_filter' => $webhook->getCategoryFilter(),
-            'secret'          => $secret,
-            'signing_version' => $webhook->getSigningVersion(),
-            'created_at'      => $webhook->getCreatedAt()->format(\DateTimeInterface::ATOM),
-            'updated_at'      => $webhook->getUpdatedAt()->format(\DateTimeInterface::ATOM),
-        ]);
+        return $this->successResponse(WebhookResource::created($issued), Response::HTTP_CREATED);
     }
 
     /**
@@ -160,49 +120,19 @@ final class WebhookController
         ],
     )]
     #[Route('/{id}', name: 'update', methods: ['PUT'])]
-    #[CliParityExemption(CliParityExemption::DEFERRED_NO_ADMIN_PAGE)]
+    #[CliCounterpart('app:webhook:update')]
     public function update(string $id, Request $request): JsonResponse
     {
-        $webhook = $this->findWebhook($id);
-        if ($webhook === null) {
-            return $this->notFound('Webhook not found.');
-        }
-
         $data = $request->toArray();
+        $webhook = $this->dispatch(new UpdateWebhookCommand(
+            webhookId: $id,
+            changesUrl: array_key_exists('url', $data),
+            url: $data['url'] ?? null,
+            changesCategoryFilter: array_key_exists('category_filter', $data),
+            categoryFilter: $data['category_filter'] ?? null,
+        ));
 
-        if (array_key_exists('category_filter', $data) && !NotificationCategoryFilter::isValid($data['category_filter'])) {
-            return $this->errorResponse('category_filter must contain supported notification categories.', 422);
-        }
-
-        $url = $data['url'] ?? null;
-        if (array_key_exists('url', $data)) {
-            if (!is_string($url) || trim($url) === '') {
-                return $this->errorResponse('URL must be a non-empty string.', 422);
-            }
-
-            if ($this->destinations->resolve($url) === null) {
-                return $this->errorResponse('Webhook destination is not allowed or cannot be resolved.', 422);
-            }
-
-            $webhook->setUrl($url);
-        }
-
-        if (array_key_exists('category_filter', $data)) {
-            $categoryFilter = $data['category_filter'];
-            $webhook->setCategoryFilter($categoryFilter);
-        }
-
-        $webhook->setUpdatedAt(new \DateTimeImmutable());
-
-        $this->entityManager->flush();
-
-        return $this->successResponse([
-            'id'              => $webhook->getId()->toString(),
-            'url'             => $webhook->getUrl(),
-            'category_filter' => $webhook->getCategoryFilter(),
-            'created_at'      => $webhook->getCreatedAt()->format(\DateTimeInterface::ATOM),
-            'updated_at'      => $webhook->getUpdatedAt()->format(\DateTimeInterface::ATOM),
-        ]);
+        return $this->successResponse(WebhookResource::from($webhook));
     }
 
     /**
@@ -217,27 +147,22 @@ final class WebhookController
         responses: [
             new OA\Response(response: '204', description: 'Deleted'),
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'The ID is not a UUID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
             new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
-    #[CliParityExemption(CliParityExemption::DEFERRED_NO_ADMIN_PAGE)]
+    #[CliCounterpart('app:webhook:delete')]
     public function delete(string $id): JsonResponse
     {
-        $webhook = $this->findWebhook($id);
-        if ($webhook === null) {
-            return $this->notFound('Webhook not found.');
-        }
-
-        $this->entityManager->remove($webhook);
-        $this->entityManager->flush();
+        $this->dispatch(new DeleteWebhookCommand($id));
 
         return $this->noContent();
     }
 
     #[OA\Post(
         path: '/api/webhooks/{id}/rotate-secret',
-        summary: 'Rotate a webhook secret and upgrade to signature version 2',
+        summary: 'Rotate a webhook secret; the webhook keeps its signature version',
         parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))],
         responses: [
             new OA\Response(response: '200', description: 'New secret, returned once', content: new OA\JsonContent(
@@ -250,33 +175,21 @@ final class WebhookController
             )),
             new OA\Response(response: '403', description: 'Administrator required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Webhook not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'The ID is not a UUID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
     #[Route('/{id}/rotate-secret', name: 'rotate_secret', methods: ['POST'])]
-    #[CliParityExemption(CliParityExemption::DEFERRED_NO_ADMIN_PAGE)]
+    #[CliCounterpart('app:webhook:rotate-secret')]
     public function rotateSecret(string $id): JsonResponse
     {
-        $webhook = $this->findWebhook($id);
-        if ($webhook === null) {
-            return $this->notFound('Webhook not found.');
-        }
-        $secret = bin2hex(random_bytes(32));
-        $webhook->setEncryptedSigningSecret($this->secrets->encrypt($secret));
-        $this->entityManager->flush();
+        $issued = $this->dispatch(new RotateWebhookSecretCommand($id));
 
-        return $this->successResponse(['id' => $id, 'secret' => $secret, 'signing_version' => 2]);
+        return $this->successResponse(WebhookResource::rotated($issued));
     }
 
-    private function findWebhook(string $id): ?WebhookEntity
+    /** A handler's exception reaches ExceptionSubscriber, which unwraps it to its 404 or 422 response. */
+    private function dispatch(object $message): mixed
     {
-        try {
-            $uuid = Uuid::fromString($id);
-        } catch (\Throwable) {
-            return null;
-        }
-
-        return $this->entityManager
-            ->getRepository(WebhookEntity::class)
-            ->find($uuid);
+        return $this->bus->dispatch($message)->last(HandledStamp::class)?->getResult();
     }
 }
