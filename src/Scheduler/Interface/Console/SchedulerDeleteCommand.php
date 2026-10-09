@@ -31,6 +31,7 @@ final class SchedulerDeleteCommand extends Command
     {
         ScheduledJobConsole::addIdArgument($this);
         AdminCommandSupport::addForceOption($this);
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -57,7 +58,9 @@ final class SchedulerDeleteCommand extends Command
             return AdminCommandSupport::fail($io, $failure);
         }
 
-        $io->success(sprintf('Deleted scheduled job "%s".', $job['name']));
+        if (!AdminCommandSupport::wantsJson($input)) {
+            $io->success(sprintf('Deleted scheduled job "%s".', $job['name']));
+        }
 
         return Command::SUCCESS;
     }

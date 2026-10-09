@@ -42,6 +42,7 @@ final class MetadataSyncCommand extends Command
             InputOption::VALUE_REQUIRED,
             sprintf('"%s" for the genre sync only; leave it out to sync every library', SyncMetadataCommand::SOURCE_GENRES),
         );
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -50,9 +51,11 @@ final class MetadataSyncCommand extends Command
         $source = $input->getOption('source');
         $source = is_string($source) ? $source : null;
 
-        if ($source === null) {
+        $json = AdminCommandSupport::wantsJson($input);
+
+        if (!$json && $source === null) {
             $io->text('Queuing a metadata sync for every library...');
-        } elseif ($source === SyncMetadataCommand::SOURCE_GENRES) {
+        } elseif (!$json && $source === SyncMetadataCommand::SOURCE_GENRES) {
             $io->text('Queuing a forced sync of every album and song for the genre sync...');
         }
 
@@ -63,6 +66,10 @@ final class MetadataSyncCommand extends Command
         }
 
         $queued = is_int($run->result) ? $run->result : 0;
+        if ($json) {
+            return AdminCommandSupport::json($io, ['jobsDispatched' => $queued, 'jobId' => $run->jobId]);
+        }
+
         $io->success(sprintf('Queued %d metadata sync job(s). Job ID: %s', $queued, $run->jobId));
 
         return Command::SUCCESS;

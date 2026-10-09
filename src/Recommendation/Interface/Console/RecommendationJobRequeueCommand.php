@@ -38,6 +38,7 @@ final class RecommendationJobRequeueCommand extends Command
     protected function configure(): void
     {
         $this->addArgument('publicId', InputArgument::REQUIRED, 'The failed or cancelled job\'s public ID, as app:recommendation:job:list shows it');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -45,7 +46,10 @@ final class RecommendationJobRequeueCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $publicId = (string) $input->getArgument('publicId');
 
-        $io->text(sprintf('Requeueing recommendation job "%s" and running the new job in this process.', $publicId));
+        $json = AdminCommandSupport::wantsJson($input);
+        if (!$json) {
+            $io->text(sprintf('Requeueing recommendation job "%s" and running the new job in this process.', $publicId));
+        }
 
         try {
             $run = $this->jobMonitor->runInline(new RequeueRecommendationJobCommand($publicId, Actor::CLI));
@@ -56,6 +60,6 @@ final class RecommendationJobRequeueCommand extends Command
         $result = $run->result;
         assert($result instanceof RecommendationGenerationResult);
 
-        return RecommendationGenerateCommand::report($io, $result, $run->jobId);
+        return RecommendationGenerateCommand::report($io, $result, $run->jobId, $json);
     }
 }

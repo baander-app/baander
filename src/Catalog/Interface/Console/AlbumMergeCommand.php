@@ -6,6 +6,7 @@ namespace App\Catalog\Interface\Console;
 
 use App\Catalog\Application\Port\AlbumMergePortInterface;
 use App\Catalog\Application\Port\AlbumPortInterface;
+use App\Catalog\Interface\Resource\AlbumResource;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use InvalidArgumentException;
@@ -38,6 +39,7 @@ final class AlbumMergeCommand extends Command
         $this->addArgument('target', InputArgument::REQUIRED, 'The public ID of the album to keep');
         $this->addArgument('source', InputArgument::REQUIRED, 'The public ID of the album to merge into the target and delete');
         AdminCommandSupport::addForceOption($this);
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -92,6 +94,10 @@ final class AlbumMergeCommand extends Command
             return Command::INVALID;
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
+        }
+
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, AlbumResource::from($merged));
         }
 
         $io->success(sprintf(

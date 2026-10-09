@@ -104,6 +104,28 @@ final class AlbumDuplicateCommandsTest extends TestCase
         );
     }
 
+    public function testMergeJsonPrintsTheMergedAlbumAsTheApiReturnsIt(): void
+    {
+        $library = Uuid::fromString(self::LIBRARY);
+        $target = Album::create($library, 'Blue Train', 'album', year: 1957);
+        $source = Album::create($library, 'Blue Train (Remaster)', 'album');
+        $merge = $this->createStub(AlbumMergePortInterface::class);
+        $merge->method('mergeAlbums')->willReturn($target);
+
+        $tester = new CommandTester(new AlbumMergeCommand($this->albums($target, $source), $merge));
+
+        self::assertSame(Command::SUCCESS, $tester->execute([
+            'target' => $target->getPublicId()->toString(),
+            'source' => $source->getPublicId()->toString(),
+            '--force' => true,
+            '--json' => true,
+        ], ['interactive' => false]));
+        self::assertSame(
+            json_decode(json_encode(AlbumResource::from($target), JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR),
+            json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR),
+        );
+    }
+
     public function testMergeWithoutATerminalNeedsForce(): void
     {
         $library = Uuid::fromString(self::LIBRARY);

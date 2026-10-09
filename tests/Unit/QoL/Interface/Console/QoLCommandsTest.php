@@ -111,6 +111,28 @@ final class QoLCommandsTest extends TestCase
         self::assertSame(['aggressive', 'aggressive', 'aggressive'], array_column($this->qol->getStatus()['workers'], 'profile'));
     }
 
+    public function testProfileJsonIsTheReportTheApiReturns(): void
+    {
+        $tester = new CommandTester(new QoLProfileCommand($this->qol));
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['profile' => 'aggressive', '--json' => true]));
+
+        $report = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(json_decode(json_encode($this->qol->getStatus(), JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR), $report);
+        self::assertSame(['aggressive', 'aggressive', 'aggressive'], array_column($report['workers'], 'profile'));
+    }
+
+    public function testAProfileChangeThatMissesAWorkerPrintsTheReportAndFails(): void
+    {
+        $this->workers->missing = [1];
+        $tester = new CommandTester(new QoLProfileCommand($this->qol));
+
+        self::assertSame(Command::FAILURE, $tester->execute(['profile' => 'aggressive', '--json' => true], ['capture_stderr_separately' => true]));
+
+        self::assertSame([1], json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR)['missing_workers']);
+        self::assertStringContainsString('No answer from worker(s) 1.', $tester->getErrorOutput());
+    }
+
     public function testAnUnknownProfileExitsInvalidAndChangesNoWorker(): void
     {
         $tester = new CommandTester(new QoLProfileCommand($this->qol));
@@ -143,6 +165,22 @@ final class QoLCommandsTest extends TestCase
         self::assertStringContainsString('--force', $tester->getDisplay());
         self::assertSame([], $this->workers->calls);
         self::assertSame(GovernorState::Active, $this->workers->governors[0]->getState());
+    }
+
+    public function testResetJsonStillRequiresForceWithoutATerminalAndThenPrintsTheReport(): void
+    {
+        $this->train();
+        $tester = new CommandTester(new QoLResetCommand($this->qol));
+
+        self::assertSame(Command::INVALID, $tester->execute(['--json' => true], ['interactive' => false, 'capture_stderr_separately' => true]));
+        self::assertSame('', $tester->getDisplay());
+        self::assertSame([], $this->workers->calls);
+
+        $forced = new CommandTester(new QoLResetCommand($this->qol));
+        self::assertSame(Command::SUCCESS, $forced->execute(['--json' => true, '--force' => true], ['interactive' => false]));
+        $report = json_decode($forced->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame([], $report['missing_workers']);
+        self::assertSame([], $report['worker_errors']);
     }
 
     public function testForcedResetReturnsEveryWorkerToLearning(): void

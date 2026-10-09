@@ -39,27 +39,35 @@ final class LyricsFetchCommand extends Command
         $this
             ->addOption('limit', 'l', InputOption::VALUE_REQUIRED, 'Most songs to queue; leave it out to queue every song without lyrics')
             ->addOption('delay', 'd', InputOption::VALUE_REQUIRED, 'Milliseconds between the queued fetches', (string) BulkFetchLyricsCommand::DEFAULT_DELAY_MS);
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
+        $json = AdminCommandSupport::wantsJson($input);
 
         try {
             $limit = AdminCommandSupport::integerOption($input, 'limit');
             $delay = AdminCommandSupport::integerOption($input, 'delay') ?? BulkFetchLyricsCommand::DEFAULT_DELAY_MS;
 
-            $io->text(sprintf(
-                'Queuing lyrics fetches for %s, %d ms apart...',
-                $limit === null ? 'every song without lyrics' : sprintf('up to %d songs without lyrics', $limit),
-                $delay,
-            ));
+            if (!$json) {
+                $io->text(sprintf(
+                    'Queuing lyrics fetches for %s, %d ms apart...',
+                    $limit === null ? 'every song without lyrics' : sprintf('up to %d songs without lyrics', $limit),
+                    $delay,
+                ));
+            }
             $run = $this->jobs->runInline(new BulkFetchLyricsCommand(limit: $limit, delayMs: $delay));
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
         }
 
         $queued = is_int($run->result) ? $run->result : 0;
+        if ($json) {
+            return AdminCommandSupport::json($io, ['jobsEnqueued' => $queued, 'jobId' => $run->jobId]);
+        }
+
         if ($queued === 0) {
             $io->success(sprintf('No song needs lyrics; nothing was queued. Job ID: %s', $run->jobId));
 

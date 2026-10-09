@@ -31,6 +31,7 @@ final class MonitorJobCancelCommand extends Command
     protected function configure(): void
     {
         $this->addArgument('jobId', InputArgument::REQUIRED, 'The job\'s ID');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -41,6 +42,10 @@ final class MonitorJobCancelCommand extends Command
             $this->jobMonitor->cancel((string) $input->getArgument('jobId'));
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
+        }
+
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, ['cancelled' => true]);
         }
 
         $io->success('Cancellation was requested. A job that checks for cancellation stops at its next checkpoint.');

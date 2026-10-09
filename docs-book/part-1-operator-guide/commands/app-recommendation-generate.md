@@ -16,12 +16,19 @@ Replace only those of songs updated in the last seven days:
 make exec cmd="php bin/console app:recommendation:generate --mode incremental"
 ```
 
+Print the result as JSON, for a script:
+
+```bash
+make exec cmd="php bin/console app:recommendation:generate --mode=incremental --json"
+```
+
 ## Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--mode` (`-m`) | `full` | `full` replaces the recommendations of every song; `incremental` only those of songs updated in the last seven days |
 | `--user-id` (`-u`) | none | Store the collaborative recommendations for this user (UUID) instead of for everyone. Content and genre recommendations are shared and stay unscoped |
+| `--json` | off | Print only the result, as the admin API's `data` payload, in JSON |
 
 ## Details
 
@@ -31,11 +38,13 @@ The run is also recorded in the job monitor as `GenerateRecommendationsCommand`,
 
 When the run finishes, the command prints the recommendation job's public ID, the job monitor ID, the mode, the final status and the number of recommendations each strategy saved.
 
-Cancelling the job with `app:recommendation:job:cancel` or from the admin page stops the run before its next strategy starts. The strategies that already ran keep their recommendations, and the command exits with 1. If generation throws, the job is marked `failed` with the error as its reason, and the command prints the error and exits with 1.
+Cancelling the job with `app:recommendation:job:cancel` or from the admin page stops the run before its next strategy starts. The strategies that already ran keep their recommendations, and the command exits with 1. A cancellation that arrives as the last strategy finishes is kept too: the job stays `cancelled` rather than `completed`. If the job completes first, the cancellation is refused. If generation throws, the job is marked `failed` with the error as its reason, unless it was cancelled meanwhile, and the command prints the error and exits with 1.
 
 The command always generates, whatever the `recommendations.auto_generate` [server setting](../configuration.md#server-settings) says. That setting governs only the daily **Generate recommendations** scheduled job; see [Scheduled recommendations](../configuration.md#scheduled-recommendations).
 
 A full run loads every song and every user's listening history, so on a large library it can take long and use a lot of memory.
+
+With `--json` the command prints only the API's `data` object: `job_id`, `public_id`, `mode`, `status`, `execution` (always `sync`, because the job runs in this process) and `counts`, the recommendations each strategy saved. A job that was cancelled or stopped before it finished still prints the object and exits with 1. The job-monitor ID that the table shows is not part of the JSON.
 
 ## Exit codes
 

@@ -65,7 +65,8 @@ final class ScheduledJobConsole
     }
 
     /**
-     * Runs a status change on one job and reports it, like the scheduler page's row actions.
+     * Runs a status change on one job and reports it, like the scheduler page's row actions, or
+     * with `--json` prints the changed job as the API returns it.
      *
      * @param \Closure(Uuid): ?object $change the administration port's action; null when the job does not exist
      * @param string                  $done   the action in the past tense, such as "Paused"
@@ -76,6 +77,10 @@ final class ScheduledJobConsole
             $job = ScheduledJobResource::from($change(self::id($input)) ?? throw self::notFound());
         } catch (Throwable $failure) {
             return AdminCommandSupport::fail($io, $failure);
+        }
+
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, $job);
         }
 
         $io->success(sprintf('%s scheduled job "%s". Its status is %s.', $done, $job['name'], $job['status']));

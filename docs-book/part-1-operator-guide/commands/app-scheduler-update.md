@@ -8,6 +8,12 @@ Change a scheduled job's name, cron expression, type, command, description or pa
 make exec cmd="php bin/console app:scheduler:update 0192a3b4-c5d6-7890-abcd-ef1234567890 --expression='30 4 * * *'"
 ```
 
+Print the result as JSON, for a script:
+
+```bash
+make exec cmd="php bin/console app:scheduler:update 0192a3b4-c5d6-7890-abcd-ef1234567890 --expression='0 4 * * *' --json"
+```
+
 ## Arguments
 
 | Argument | Required | Description |
@@ -27,6 +33,12 @@ Every option is optional. Like the edit dialog, the command starts from the job'
 | `--description` | Free-text description; an empty value (`--description=`) removes it |
 | `--parameters` | The command's parameters as a JSON object; replaces all current parameters |
 
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--json` | Print only the result, as the admin API's `data` payload, in JSON |
+
 ## Details
 
 The resulting job is checked as [app:scheduler:create](app-scheduler-create.md#details) describes, so rejected input gets the admin API's 422 message. When you change the command, give the parameters its schema expects; the old ones are kept otherwise and may not fit. Changing the expression recomputes the next run. The status does not change; use the pause, resume, enable and disable commands for that.
@@ -34,6 +46,8 @@ The resulting job is checked as [app:scheduler:create](app-scheduler-create.md#d
 If the job changed between reading and saving, for example because a run finished or someone edited it in the admin panel, the update is refused with `Scheduled job changed. Reload it and try again.`, the conflict the API reports as 409. Nothing is changed; run the command again.
 
 On success the command prints the updated job.
+
+With `--json` the command prints only the updated job as the API's `data` object, the same fields [app:scheduler:show](app-scheduler-show.md) `--json` prints.
 
 ## Exit codes
 

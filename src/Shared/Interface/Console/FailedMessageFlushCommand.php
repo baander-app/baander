@@ -30,6 +30,7 @@ final class FailedMessageFlushCommand extends Command
     protected function configure(): void
     {
         AdminCommandSupport::addForceOption($this);
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -46,6 +47,10 @@ final class FailedMessageFlushCommand extends Command
             $io->getErrorStyle()->error(sprintf('Failure transport unavailable: %s', $e->getMessage()));
 
             return Command::FAILURE;
+        }
+
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, ['flushed' => $flushed]);
         }
 
         $io->success(sprintf('Removed %d failed %s.', $flushed, $flushed === 1 ? 'message' : 'messages'));

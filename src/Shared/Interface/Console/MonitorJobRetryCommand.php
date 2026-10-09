@@ -32,6 +32,7 @@ final class MonitorJobRetryCommand extends Command
     protected function configure(): void
     {
         $this->addArgument('jobId', InputArgument::REQUIRED, 'The failed job\'s ID');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -42,6 +43,10 @@ final class MonitorJobRetryCommand extends Command
             $newJobId = $this->jobMonitor->retry((string) $input->getArgument('jobId'), Actor::CLI);
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
+        }
+
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, ['newJobId' => $newJobId]);
         }
 
         $io->success(sprintf('The job was dispatched again as job %s.', $newJobId));

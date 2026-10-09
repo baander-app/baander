@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Scheduler\Interface\Console;
 
 use App\Scheduler\Application\Port\ScheduledJobAdministrationInterface;
+use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -27,6 +28,7 @@ final class SchedulerEnableCommand extends Command
     protected function configure(): void
     {
         ScheduledJobConsole::addIdArgument($this);
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int

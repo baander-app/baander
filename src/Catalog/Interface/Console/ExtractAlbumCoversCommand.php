@@ -35,15 +35,29 @@ final class ExtractAlbumCoversCommand extends Command
         parent::__construct();
     }
 
+    protected function configure(): void
+    {
+        AdminCommandSupport::addJsonOption($this);
+    }
+
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
 
+        $json = AdminCommandSupport::wantsJson($input);
+
         try {
-            $io->text(sprintf('%d album(s) have no cover art. Queuing an extraction job for each...', $this->albums->countCoverlessAlbums()));
+            $albums = $this->albums->countCoverlessAlbums();
+            if (!$json) {
+                $io->text(sprintf('%d album(s) have no cover art. Queuing an extraction job for each...', $albums));
+            }
             $run = $this->jobMonitor->runInline(new BatchExtractCoversCommand());
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
+        }
+
+        if ($json) {
+            return AdminCommandSupport::json($io, ['albums' => $albums, 'jobId' => $run->jobId]);
         }
 
         $io->success(sprintf(

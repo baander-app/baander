@@ -26,6 +26,11 @@ final class TranscodeJobCleanupCommand extends Command
         parent::__construct();
     }
 
+    protected function configure(): void
+    {
+        AdminCommandSupport::addJsonOption($this);
+    }
+
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
@@ -36,7 +41,12 @@ final class TranscodeJobCleanupCommand extends Command
             return AdminCommandSupport::fail($io, $failure);
         }
 
-        $io->success(sprintf('Removed %d orphaned transcode jobs.', is_int($cleaned) ? $cleaned : 0));
+        $cleaned = is_int($cleaned) ? $cleaned : 0;
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, ['cleaned' => $cleaned]);
+        }
+
+        $io->success(sprintf('Removed %d orphaned transcode jobs.', $cleaned));
 
         return Command::SUCCESS;
     }

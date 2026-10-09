@@ -37,6 +37,7 @@ final class SchedulerUpdateCommand extends Command
     {
         ScheduledJobConsole::addIdArgument($this);
         ScheduledJobInputReader::addOptions($this, update: true);
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -51,6 +52,10 @@ final class SchedulerUpdateCommand extends Command
             );
         } catch (Throwable $failure) {
             return AdminCommandSupport::fail($io, $failure);
+        }
+
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, $job);
         }
 
         $io->success(sprintf('Updated scheduled job "%s".', $job['name']));

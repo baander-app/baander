@@ -88,6 +88,17 @@ final class LyricsCommandsTest extends TestCase
         self::assertStringContainsString('Job ID: inline-job-1', $tester->getDisplay());
     }
 
+    public function testFetchJsonIsTheEndpointsDataWithTheJobIdOfTheInlineRun(): void
+    {
+        $endpoint = $this->data($this->controller(result: 10)->bulkFetch(Request::create('/', 'POST', content: '{"limit":10}')));
+
+        $inline = [];
+        $tester = new CommandTester(new LyricsFetchCommand($this->jobs($inline, 10)));
+        self::assertSame(Command::SUCCESS, $tester->execute(['--limit' => '10', '--json' => true]));
+
+        self::assertSame($endpoint + ['jobId' => 'inline-job-1'], json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
+    }
+
     public function testWithoutALimitBothPathsQueueEverySongWithoutLyrics(): void
     {
         // The admin page posts no body at all.

@@ -14,11 +14,18 @@ Run only the genre sync:
 make exec cmd="php bin/console app:metadata:sync --source=genres"
 ```
 
+Print the result as JSON, for a script:
+
+```bash
+make exec cmd="php bin/console app:metadata:sync --json"
+```
+
 ## Options
 
 | Option | Description |
 |--------|-------------|
 | `--source` | `genres` for the genre sync only; leave it out to sync every library |
+| `--json` | Print only the result in JSON: the API's `data` payload plus the job ID |
 
 ## Details
 
@@ -27,6 +34,8 @@ Without a source, the sync queues one library sync per library. Each library syn
 The genre sync queues a sync of every album and song in the catalog with forced updates, so the providers' data, genres included, replaces what is stored. It queues nothing for the libraries.
 
 The command runs the sync job in its own process and records the run in the job monitor like a queued job. When the job finishes, the command prints the number of jobs it queued, one per library or one per album and song, and the job ID. The queue workers perform the queued syncs; follow them with [app:monitor:jobs](app-monitor-jobs.md) or [app:metadata:status](app-metadata-status.md).
+
+With `--json` the command prints only `{"jobsDispatched": 3, "jobId": "..."}`. `jobsDispatched` is the API's `data` payload, the number of jobs queued. `jobId` is the job-monitor ID of the sync run, which the API does not return; pass it to [app:monitor:job:show](app-monitor-job-show.md).
 
 ## Exit codes
 

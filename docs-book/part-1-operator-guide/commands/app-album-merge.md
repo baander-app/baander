@@ -14,6 +14,12 @@ Without a terminal, for example in a script:
 make exec cmd="php bin/console app:album:merge keptAlbumPublicId0001 mergedAlbumPublicId02 --force"
 ```
 
+Print the result as JSON, for a script:
+
+```bash
+make exec cmd="php bin/console app:album:merge keptAlbumPublicId0001 mergedAlbumPublicId02 --force --json"
+```
+
 ## Arguments
 
 | Argument | Required | Description |
@@ -26,6 +32,7 @@ make exec cmd="php bin/console app:album:merge keptAlbumPublicId0001 mergedAlbum
 | Option | Description |
 |--------|-------------|
 | `--force` | Merge without asking; required when no terminal is attached |
+| `--json` | Print only the result, as the admin API's `data` payload, in JSON |
 
 ## Details
 
@@ -36,6 +43,8 @@ On a terminal the command names both albums and asks before it merges. Without a
 The merge moves the source album's songs to the target. A source song whose file hash matches a target song is deleted instead. Metadata the target lacks is taken from the source. The target records the merge in its merge history, and the source album is deleted. The merge cannot be undone.
 
 Both albums must be in the same library, and an album cannot be merged into itself.
+
+With `--json` the command prints only the merged album as the API's `data` object, the same album resource `POST /api/albums/merge` returns. `--json` does not stand in for `--force`.
 
 ## Exit codes
 
