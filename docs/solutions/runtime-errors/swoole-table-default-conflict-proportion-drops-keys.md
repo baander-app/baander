@@ -79,22 +79,28 @@ String columns have a fixed width. Swoole truncates a longer value instead of re
 ## Prevention
 
 - Treat `new Table(N)` as "fewer than N keys". For a table that must hold a known key set, either pass a conflict proportion of 1.0 or size the table at about 1.5x the peak key count. Use 1.0 when memory is small or when the key set is fixed and every key must fit.
-- Check the return value of `set()` and `incr()`. Both return `false` when no row is free, and neither throws. Decide what a refused write means (drop and log, fall back, or fail) and write that down next to the call.
+- Check the return value of `set()` and `incr()`. Both return `false` when no row is free, and both emit a warning. Under an error handler that turns warnings into exceptions (Symfony's in debug mode, which forked pool workers inherit) they throw instead, so call them with `@` and check the result. Decide what a refused write means (drop and log, fall back, or fail) and write that down next to the call.
+- `incr()` is declared as returning `int|float`, but it returns `false` when a new key gets no row. Compared as a count, `false` is never above a limit. Check that the key has a row afterwards instead of trusting the declared type.
 - Length-check values for every `TYPE_STRING` column before writing them.
+- Keep keys at 63 bytes or less. Swoole 6.2.1 warns about a longer key, stores it cut to 63 bytes and returns the cut key when you iterate the table, so a prefix scan over the keys misses it. `get()` with the full key still finds it, which hides the problem in simple tests.
 - When a reader skips missing rows, make sure a failed write is visible somewhere else (a log line, a counter), or the loss stays silent.
-- A test for a table that must hold a fixed key set should write every key and assert they all read back. That is the test that caught this.
+- A test for a table that must hold a fixed key set should write every key and assert they all read back. That is the test that caught this. To test a refused write, fill the table until about a thousand writes in a row are refused: after the first refusal, a key whose bucket is still free still gets a row.
 
-Other `Swoole\Table` uses in `src/`, as of this writing (`grep -rn "new Table(" src/`):
+The registry tables showed that sequential keys can fare worse than random ones. With
+the default proportion, a 1,024-row connection table keyed by fd (`"1"`, `"2"`, ...)
+refused connection 455; random keys got to about 70%.
+
+Other `Swoole\Table` uses in `src/`, as of 2026-10-09 (`grep -rn "new Table(" src/`):
 
 | Table | Size | Keys | Headroom / failure handling |
 |---|---|---|---|
 | `src/QoL/Infrastructure/Swoole/CpuGpuSampler.php:47` | 2 | 1 | Plenty. |
 | `src/QoL/Infrastructure/Swoole/AlgorithmProfileTable.php:50` | 2 | 1 | Plenty. |
-| `src/Shared/Infrastructure/Swoole/ProcessPool/CpuProcessPool.php:122` (health) | `workerCount + 1` | `pool` plus one per worker | Same shape as the span ring, default proportion. Fine at the configured 6 workers (`config/services.yaml:1038`). Measured: a pool of 45 to 63 workers would lose keys. `publishHealth()` throws when `set()` fails, so the failure would be loud. |
-| `src/Shared/Infrastructure/Swoole/ProcessPool/CpuProcessPool.php:135` (results) | 8192 | one per in-flight job | Plenty. Results are also written to files, which are the source of truth. |
-| `src/Shared/Infrastructure/Swoole/ProcessPool/CpuProcessPool.php:142` (limits) | 64 | one per limit key | Plenty for the few keys in use. If `incr()` ever failed it would return `false`, and `false > $limit` lets the dispatch through without a limit (`CpuProcessPool.php:347`). |
-| `src/Shared/Infrastructure/Swoole/ReconnectionTokenService.php:25` | 4096 | one per token, 5-minute TTL | With random keys like these, the first refusal came at about 70% of 4096. `generate()` ignores the result of `set()`, so a refused token is handed out and later fails to reconnect. |
-| `src/Shared/Infrastructure/Swoole/WebSocketConnectionRegistry.php:34-44` | 1024 connections, 8192 room memberships | one per connection / membership | Expect the first refusal below 1024 connections (about 70% of the size with random keys). `set()` results are not checked. |
+| `CpuProcessPool` health table | `workerCount + 1` | `pool` plus one per worker | Proportion 1.0. `publishHealth()` throws when `set()` fails. |
+| `CpuProcessPool` result table | 8192 | one per job not yet read | Default proportion. Rows used to stay after `readResult()`, so the table filled up after a few thousand jobs and kept up to 64 KB of shared memory per finished job; a refused `set()` under a throwing error handler stopped the pool worker. `readResult()` now deletes the row, and `writeResult()` writes the row best effort with `@`, because the result file is the source of truth. |
+| `CpuProcessPool` limit table | 64 | one per limit key | Proportion 1.0. A failed `incr()` refuses the dispatch as if at the limit and logs a warning. |
+| `src/Shared/Infrastructure/Swoole/ReconnectionTokenService.php` | 4096 | one per token, 5-minute TTL | Proportion 1.0 (0.64 MB); with the default, the 4,096-row table refused about the 2,900th token. Nothing swept expired tokens, so `generate()` drops them when the table is full and retries once. It returns `null` and logs when the token still cannot be stored, and the connection then gets no reconnection token. |
+| `src/Shared/Infrastructure/Swoole/WebSocketConnectionRegistry.php` | 1024 connections, 8192 room memberships | one per connection / membership | Proportion 1.0 (about 2.5 MB for the three tables). A refused write throws `WebSocketRegistrationRefused` after removing anything it wrote. `WebSocketController` closes a refused connection (1013, or 1008 over the per-user limit) and answers a refused room join with an error. Room names are limited to 52 bytes so membership keys stay within 63 bytes. |
 | `src/Transcode/Infrastructure/Swoole/SegmentAvailabilityTable.php:61` | 16384 by default | one per ready segment | Sized with headroom (see its docblock). It checks `set()`, warns, and falls back to polling the file system. |
 
 ## Related Issues

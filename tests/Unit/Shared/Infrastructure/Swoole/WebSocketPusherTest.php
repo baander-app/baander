@@ -198,6 +198,26 @@ final class WebSocketPusherTest extends TestCase
         $pusher->disconnectUser('user-1', 1008, 'Session ended');
     }
 
+    // --- close one connection ---
+
+    public function testCloseSendsACloseFrameToAnEstablishedConnection(): void
+    {
+        $this->server->expects($this->once())->method('isEstablished')->with(10)->willReturn(true);
+        $this->server->expects($this->once())->method('disconnect')->with(10, 1013, 'Server connection limit reached')->willReturn(true);
+        $this->server->expects($this->never())->method('close');
+
+        self::assertTrue($this->pusher->close(10, 1013, 'Server connection limit reached'));
+    }
+
+    public function testCloseClosesTheSocketWhenNoCloseFrameCanBeSent(): void
+    {
+        $this->server->expects($this->once())->method('isEstablished')->with(10)->willReturn(true);
+        $this->server->method('disconnect')->willReturn(false);
+        $this->server->expects($this->once())->method('close')->with(10)->willReturn(true);
+
+        self::assertTrue($this->pusher->close(10, 1013, 'Server connection limit reached'));
+    }
+
     public function testPlainServerIsRejectedBeforeAnyPushAttempt(): void
     {
         $this->server->expects($this->never())->method('push');

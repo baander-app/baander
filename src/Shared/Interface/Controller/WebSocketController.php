@@ -17,6 +17,7 @@ use App\Shared\Infrastructure\Messenger\Stamp\PartyMemberResultStamp;
 use App\Shared\Infrastructure\Swoole\ReconnectionTokenService;
 use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
 use App\Shared\Infrastructure\Swoole\WebSocketPusher;
+use App\Shared\Infrastructure\Swoole\WebSocketRegistrationRefused;
 use App\Transcode\Application\Command\UpdateTranscodePositionCommand;
 use InvalidArgumentException;
 use Psr\Log\LoggerInterface;
@@ -54,18 +55,65 @@ final class WebSocketController extends AbstractWebSocketController
 
     public function onOpen(int $fd, string $userId): void
     {
-        $this->registry->addConnection($fd, $userId, $this->registry->getWorkerId());
-        $this->fdUsers[$fd] = $userId;
+        if (!$this->register($fd, $userId)) {
+            return;
+        }
 
         $this->logger?->debug('WebSocket connected', ['fd' => $fd, 'userId' => $userId, 'workerId' => $this->registry->getWorkerId()]);
 
         $message = ['type' => 'connected'];
 
-        if ($this->reconnectionTokens !== null) {
-            $message['reconnectToken'] = $this->reconnectionTokens->generate($userId);
+        $token = $this->reconnectionTokens?->generate($userId);
+        if ($token !== null) {
+            $message['reconnectToken'] = $token;
         }
 
         $this->pusher->pushToConnection($fd, $message);
+    }
+
+    /**
+     * Registers the connection, or closes it when the registry refuses it. A refused
+     * connection must not stay open: it would get no pushes or broadcasts.
+     */
+    private function register(int $fd, string $userId): bool
+    {
+        try {
+            $this->registry->addConnection($fd, $userId, $this->registry->getWorkerId());
+        } catch (WebSocketRegistrationRefused $refused) {
+            unset($this->fdUsers[$fd]);
+            $this->logger?->warning('WebSocket connection refused', [
+                'fd' => $fd, 'userId' => $userId, 'reason' => $refused->getMessage(),
+            ]);
+            $this->pusher->close($fd, $refused->closeCode, $refused->closeReason);
+
+            return false;
+        }
+        $this->fdUsers[$fd] = $userId;
+
+        return true;
+    }
+
+    /**
+     * Adds the connection to a broadcast room. Sends the error and returns false when
+     * the registry refuses the membership.
+     */
+    private function joinBroadcastRoom(int $fd, string $userId, string $room): bool
+    {
+        try {
+            $this->registry->joinRoom($room, $fd);
+        } catch (WebSocketRegistrationRefused $refused) {
+            $this->logger?->warning('WebSocket room join refused', [
+                'fd' => $fd, 'userId' => $userId, 'room' => $room, 'reason' => $refused->getMessage(),
+            ]);
+            $this->pusher->pushToConnection($fd, [
+                'type'    => 'error',
+                'message' => 'Room limit reached; try again later',
+            ]);
+
+            return false;
+        }
+
+        return true;
     }
 
     public function onMessage(int $fd, string $data): void
@@ -186,19 +234,21 @@ final class WebSocketController extends AbstractWebSocketController
 
         // Re-register the connection with the restored user identity
         $this->registry->removeConnection($fd);
-        $this->registry->addConnection($fd, $userId, $this->registry->getWorkerId());
-        $this->fdUsers[$fd] = $userId;
+        if (!$this->register($fd, $userId)) {
+            return;
+        }
 
         $this->logger?->info('WebSocket reconnected', ['fd' => $fd, 'userId' => $userId]);
 
-        // Generate a new reconnection token
+        $message = ['type' => 'connected'];
+        // A new reconnection token, when the table can store one
         $newToken = $this->reconnectionTokens->generate($userId);
+        if ($newToken !== null) {
+            $message['reconnectToken'] = $newToken;
+        }
+        $message['reconnected'] = true;
 
-        $this->pusher->pushToConnection($fd, [
-            'type'           => 'connected',
-            'reconnectToken' => $newToken,
-            'reconnected'    => true,
-        ]);
+        $this->pusher->pushToConnection($fd, $message);
     }
 
     private function checkRateLimit(int $fd): bool
@@ -225,7 +275,18 @@ final class WebSocketController extends AbstractWebSocketController
             return;
         }
 
-        $this->registry->joinRoom($room, $fd);
+        if (strlen($room) > WebSocketConnectionRegistry::MAX_ROOM_NAME_BYTES) {
+            $this->pusher->pushToConnection($fd, [
+                'type'    => 'error',
+                'message' => sprintf('room.join "room" may be at most %d bytes long', WebSocketConnectionRegistry::MAX_ROOM_NAME_BYTES),
+            ]);
+
+            return;
+        }
+
+        if (!$this->joinBroadcastRoom($fd, $userId, $room)) {
+            return;
+        }
         $this->logger?->debug('Room joined', ['fd' => $fd, 'userId' => $userId, 'room' => $room]);
 
         $this->pusher->pushToConnection($fd, [
@@ -305,9 +366,13 @@ final class WebSocketController extends AbstractWebSocketController
             return;
         }
 
-        // Add to Swoole Table room for broadcasting
+        // Add to Swoole Table room for broadcasting. A refused membership keeps the
+        // party membership: the user may already be a member through another
+        // connection, so leaving the party here could remove that membership.
         $room = sprintf('party:%s', $sessionId);
-        $this->registry->joinRoom($room, $fd);
+        if (!$this->joinBroadcastRoom($fd, $userId, $room)) {
+            return;
+        }
         $this->logger?->info('Party joined', ['fd' => $fd, 'userId' => $userId, 'sessionId' => $sessionId, 'role' => $member->getRole()->value]);
 
         $this->pusher->pushToConnection($fd, [

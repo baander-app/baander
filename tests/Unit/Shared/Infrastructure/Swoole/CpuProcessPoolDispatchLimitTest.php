@@ -57,6 +57,61 @@ assertReaped($pids);
 PHP);
     }
 
+    /**
+     * incr() returns false when the limit table has no row for a new key. Taken as
+     * a count, false is never above the limit, so the job would run unlimited.
+     */
+    public function testALimitKeyTheTableCannotHoldRefusesTheDispatchAndLogsIt(): void
+    {
+        $this->runProbe(<<<'PHP'
+symfonyLikeErrorHandler();
+$logger = new RecordingLogger();
+$pool = new CpuProcessPool([new GatedProbeWorker()], 2, $logger, 16, $argv[2]);
+$pool->boot();
+$pids = trackWorkers($pool);
+fillTable((new ReflectionProperty($pool, 'limitTable'))->getValue($pool), ['count' => 0]);
+check(touch($GLOBALS['argv'][2] . '/gate'), 'Could not open the gate');
+check(!$pool->dispatchWithinLimit('{"type":"gated"}', 'unlimited', 'new-kind', 1), 'A dispatch ran without a limit');
+check(awaitResult($pool, 'unlimited') === null, 'The refused job ran');
+check(count($logger->warnings) === 1 && str_contains($logger->warnings[0], 'limit'), 'The refusal was not logged');
+$pool->shutdown();
+assertReaped($pids);
+PHP);
+    }
+
+    public function testAResultOnceReadLeavesNoRowInTheResultTable(): void
+    {
+        $this->runProbe(<<<'PHP'
+symfonyLikeErrorHandler();
+$pool->boot();
+$pids = trackWorkers($pool);
+check(touch($GLOBALS['argv'][2] . '/gate'), 'Could not open the gate');
+$pool->dispatch('{"type":"gated"}', 'read-once');
+check(awaitResult($pool, 'read-once') === ['data' => 'done', 'status' => 'ok'], 'The job did not finish');
+check($pool->getResultTable()->count() === 0, 'A read result kept its row in the result table');
+$pool->shutdown();
+assertReaped($pids);
+PHP);
+    }
+
+    /** The result file is the source of truth, so a full result table must not lose the result. */
+    public function testAFullResultTableStillDeliversTheResult(): void
+    {
+        $this->runProbe(<<<'PHP'
+symfonyLikeErrorHandler();
+$pool->boot();
+$pids = trackWorkers($pool);
+fillTable($pool->getResultTable(), ['data' => 'filler', 'status' => 'ok']);
+check(touch($GLOBALS['argv'][2] . '/gate'), 'Could not open the gate');
+$pool->dispatch('{"type":"gated"}', 'table-full');
+check(awaitResult($pool, 'table-full') === ['data' => 'done', 'status' => 'ok'], 'A full result table lost the result');
+$pool->dispatch('{"type":"gated"}', 'worker-alive');
+check(awaitResult($pool, 'worker-alive') === ['data' => 'done', 'status' => 'ok'], 'A full result table stopped the worker');
+$pool->shutdown();
+assertReaped($pids);
+PHP);
+    }
+
     private function runProbe(string $scenario): void
     {
         $directory = sys_get_temp_dir() . '/baander-pool-limit-' . bin2hex(random_bytes(8));
@@ -108,6 +163,29 @@ function awaitResult(CpuProcessPool $pool, string $key): ?array {
         usleep(10_000);
     } while (hrtime(true) < $deadline);
     return null;
+}
+final class RecordingLogger extends Psr\Log\AbstractLogger {
+    public array $warnings = [];
+    public function log($level, Stringable|string $message, array $context = []): void {
+        if ($level === Psr\Log\LogLevel::WARNING) { $this->warnings[] = (string) $message; }
+    }
+}
+// Like Symfony's debug error handler: a warning throws unless it was silenced with @.
+// The forked pool workers inherit it.
+function symfonyLikeErrorHandler(): void {
+    set_error_handler(static function (int $severity, string $message, string $file, int $line): bool {
+        if (!(error_reporting() & $severity)) { return true; }
+        throw new ErrorException($message, 0, $severity, $file, $line);
+    });
+}
+// Writes rows until a thousand writes in a row are refused, so no key finds a free bucket.
+function fillTable(mixed $table, array $row): void {
+    check($table instanceof Swoole\Table, 'The pool has no such table');
+    $refusedInARow = 0;
+    for ($key = 0; $refusedInARow < 1000; ++$key) {
+        check($key < 100_000, 'The table never filled up');
+        $refusedInARow = @$table->set('filler-' . $key, $row) ? 0 : $refusedInARow + 1;
+    }
 }
 register_shutdown_function(static function () use ($owner, &$trackedPids): void {
     if (getmypid() !== $owner) { return; }

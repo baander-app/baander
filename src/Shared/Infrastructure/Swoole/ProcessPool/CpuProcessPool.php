@@ -9,6 +9,7 @@ use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Swoole\Process;
 use Swoole\Table;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\CoWrapper;
 use SwooleBundle\SwooleBundle\Server\Runtime\Bootable;
 use Throwable;
 
@@ -30,6 +31,12 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
     private const string SHUTDOWN_MESSAGE = "\0baander:cpu-pool:shutdown";
     /** Distinct dispatch limit keys the pool can track (a few job kinds use one). */
     private const int LIMIT_KEYS = 64;
+    /**
+     * Conflict proportion for the health and limit tables. With Swoole's default
+     * (0.2) a table runs out of overflow rows before it holds `size` keys; 1.0
+     * makes room for every key whatever it hashes to. Both tables are small.
+     */
+    private const float CONFLICT_PROPORTION = 1.0;
     private ?int $ownerPid = null;
     private ?int $healthTimerId = null;
     private ?int $healthTimerOwnerPid = null;
@@ -55,13 +62,18 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
     /** @var string Directory where worker results are written as JSON files. */
     private readonly string $resultDir;
 
-    /** @param iterable<ProcessPoolWorkerInterface> $handlers */
+    /**
+     * @param iterable<ProcessPoolWorkerInterface> $handlers
+     * @param CoWrapper|null $coWrapper Releases the pooled logger after each health
+     *        check tick. The container passes it; it is optional only for tests.
+     */
     public function __construct(
         private readonly iterable $handlers,
         private readonly int $workerCount,
         private readonly LoggerInterface $logger,
         private readonly int $resultTableSize = 8192,
         ?string $resultDir = null,
+        private readonly ?CoWrapper $coWrapper = null,
     )
     {
         $this->resultDir = $resultDir ?? sys_get_temp_dir() . '/baander_cpu_pool_results';
@@ -119,7 +131,7 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
             // Keep this table across reboots: inherited HTTP workers must see
             // shutdown and must never mistake a later generation for their own.
             if ($this->healthTable === null) {
-                $this->healthTable = new Table($this->workerCount + 1);
+                $this->healthTable = new Table($this->workerCount + 1, self::CONFLICT_PROPORTION);
                 foreach (['generation', 'alive', 'pid'] as $column) {
                     $this->healthTable->column($column, Table::TYPE_INT);
                 }
@@ -139,7 +151,7 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
 
             // Limit counters start at zero with each generation: a stopped
             // generation's workers are gone, and so are the jobs they held.
-            $this->limitTable = new Table(self::LIMIT_KEYS);
+            $this->limitTable = new Table(self::LIMIT_KEYS, self::CONFLICT_PROPORTION);
             $this->limitTable->column('count', Table::TYPE_INT);
             if (!$this->limitTable->create()) {
                 throw new RuntimeException('Unable to create CPU pool limit table.');
@@ -249,7 +261,9 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
                 $table->del($key);
             }
 
-            $table->set($key, [
+            // Best effort: the file below is the result. A full table makes set()
+            // warn, and a warning turned into an exception would stop this worker.
+            @$table->set($key, [
                 'data'   => $data,
                 'status' => $status,
             ]);
@@ -305,6 +319,9 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
 
         $raw = @file_get_contents($filePath);
         @unlink($filePath);
+        // The row is never read again; without this the table fills up and keeps
+        // up to 64 KB of shared memory per finished job.
+        $this->resultTable?->del($key);
 
         if ($raw === false || $raw === '') {
             return null;
@@ -344,7 +361,19 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
 
         // incr is atomic across processes, so concurrent dispatchers never both
         // take the last slot. The table has room for far more keys than use it.
-        if ($limits->incr($limitKey, 'count') > $limit) {
+        // A full table makes incr() warn and fail for a new key. Swoole declares a
+        // numeric result but returns false then (measured on Swoole 6.2.1), and
+        // false is never above the limit, so the job would run without one. The
+        // key has no row in that case; a key that has a row never fails.
+        $count = @$limits->incr($limitKey, 'count');
+        if (!$limits->exists($limitKey)) {
+            $this->logger->warning('CPU pool limit table is full; treating the dispatch limit as reached', [
+                'limitKey' => $limitKey,
+            ]);
+
+            return false;
+        }
+        if ($count > $limit) {
             $limits->decr($limitKey, 'count');
 
             return false;
@@ -424,6 +453,9 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
 
         $this->healthTimerOwnerPid = getmypid();
         $this->healthTimerId = \Swoole\Timer::tick(5000, function (): void {
+            // Each tick runs in a new coroutine the swoole bundle does not manage, and
+            // reaping an exited worker logs through the pooled logger.
+            $this->coWrapper?->defer();
             if (!$this->booted || $this->shuttingDown) {
                 $this->stopHealthCheck();
                 return;

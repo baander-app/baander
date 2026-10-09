@@ -16,7 +16,9 @@ use Throwable;
  * If over-budget is sustained for 10 consecutive seconds (2 checks),
  * triggers emergency stream release of the highest-cost stream.
  *
- * Timer callback uses error_log() only — no pooled services.
+ * Timer callback uses error_log() only — no pooled services. The governor, the
+ * sampler and the profile table it reads are not pooled either, so the tick needs
+ * no CoWrapper::defer(). Add one before the tick uses the logger or a repository.
  */
 final class MidStreamMonitor
 {

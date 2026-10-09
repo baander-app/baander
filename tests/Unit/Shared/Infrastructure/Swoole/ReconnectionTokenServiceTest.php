@@ -6,6 +6,9 @@ namespace App\Tests\Unit\Shared\Infrastructure\Swoole;
 
 use App\Shared\Infrastructure\Swoole\ReconnectionTokenService;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
+use Psr\Log\LogLevel;
+use Swoole\Table;
 
 final class ReconnectionTokenServiceTest extends TestCase
 {
@@ -137,5 +140,75 @@ final class ReconnectionTokenServiceTest extends TestCase
         $this->assertNull($this->service->consume($second));
         $this->assertSame('user-2', $this->service->consume($other));
         $this->assertSame(0, $this->service->revokeForUser('user-1'));
+    }
+
+    public function testEveryTokenUpToTheStatedLimitIsStored(): void
+    {
+        $service = ReconnectionTokenService::create();
+
+        for ($issued = 0; $issued < 4096; ++$issued) {
+            $token = $service->generate('user-1');
+            self::assertNotNull($token, sprintf('Token %d was refused.', $issued + 1));
+            self::assertTrue($service->exists($token), sprintf('Token %d was handed out but not stored.', $issued + 1));
+        }
+    }
+
+    public function testATokenTheTableCannotStoreIsNotHandedOut(): void
+    {
+        $logger = new class () extends AbstractLogger {
+            /** @var list<string> */
+            public array $warnings = [];
+
+            public function log($level, \Stringable|string $message, array $context = []): void
+            {
+                if ($level === LogLevel::WARNING) {
+                    $this->warnings[] = (string) $message;
+                }
+            }
+        };
+        $service = ReconnectionTokenService::create(maxTokens: 1, logger: $logger);
+
+        $refused = false;
+        for ($issued = 0; $issued < 10_000 && !$refused; ++$issued) {
+            $token = $service->generate('user-1');
+            if ($token === null) {
+                $refused = true;
+                continue;
+            }
+            self::assertTrue($service->exists($token), 'A token was handed out but not stored.');
+        }
+
+        self::assertTrue($refused, 'A full token table accepted every token.');
+        self::assertCount(1, $logger->warnings);
+    }
+
+    public function testAFullTableMakesRoomByDroppingExpiredTokens(): void
+    {
+        $service = ReconnectionTokenService::create(maxTokens: 1);
+        $table = (new \ReflectionProperty($service, 'tokens'))->getValue($service);
+        self::assertInstanceOf(Table::class, $table);
+        self::fillTable($table, ['user_id' => 'user-1', 'created_at' => time() - 301]);
+
+        $token = $service->generate('user-2');
+
+        self::assertNotNull($token);
+        self::assertSame('user-2', $service->consume($token));
+        self::assertFalse($service->exists('filler-0'));
+    }
+
+    /**
+     * Writes filler rows until a thousand writes in a row are refused. The first
+     * refusal alone does not mean the table is full: a key whose bucket is still free
+     * would get a row.
+     *
+     * @param array<string, int|string> $row
+     */
+    private static function fillTable(Table $table, array $row): void
+    {
+        $refusedInARow = 0;
+        for ($key = 0; $refusedInARow < 1000; ++$key) {
+            self::assertLessThan(100_000, $key, 'The table never filled up.');
+            $refusedInARow = @$table->set('filler-' . $key, $row) ? 0 : $refusedInARow + 1;
+        }
     }
 }

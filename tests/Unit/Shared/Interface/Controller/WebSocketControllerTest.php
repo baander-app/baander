@@ -19,6 +19,7 @@ use App\Shared\Interface\Controller\WebSocketController;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
+use Swoole\Table;
 use Swoole\WebSocket\Server;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\HandlerFailedException;
@@ -42,6 +43,9 @@ final class WebSocketControllerTest extends TestCase
     /** @var list<array{fd: int, data: string}> Captured push calls from the mock server. */
     private array $pushedMessages = [];
 
+    /** @var list<array{fd: int, code: int, reason: string}> Captured close frames from the mock server. */
+    private array $closedConnections = [];
+
     protected function setUp(): void
     {
         if (!\extension_loaded('swoole')) {
@@ -54,6 +58,7 @@ final class WebSocketControllerTest extends TestCase
         );
 
         $this->pushedMessages = [];
+        $this->closedConnections = [];
         $this->server = $this->createStub(Server::class);
         $this->server->worker_id = 0;
 
@@ -62,6 +67,15 @@ final class WebSocketControllerTest extends TestCase
         $this->server->method('push')->willReturnCallback(
             function (int $fd, string $data) use (&$pushedMessages): bool {
                 $pushedMessages[] = ['fd' => $fd, 'data' => $data];
+
+                return true;
+            },
+        );
+
+        $closedConnections = &$this->closedConnections;
+        $this->server->method('disconnect')->willReturnCallback(
+            function (int $fd, int $code, string $reason) use (&$closedConnections): bool {
+                $closedConnections[] = ['fd' => $fd, 'code' => $code, 'reason' => $reason];
 
                 return true;
             },
@@ -738,6 +752,129 @@ final class WebSocketControllerTest extends TestCase
             'reconnectToken' => $reconnectToken,
         ]));
         $this->assertLastPushMatches(1, 'error', ['message' => 'Invalid or expired reconnection token']);
+    }
+
+    // --- Registrations the registry refuses ---
+
+    public function testOnOpenOverTheUserLimitClosesTheConnectionWithoutRegisteringIt(): void
+    {
+        for ($fd = 1; $fd <= 10; ++$fd) {
+            $this->controller->onOpen($fd, 'user-1');
+        }
+        $this->pushedMessages = [];
+
+        $this->controller->onOpen(11, 'user-1');
+
+        self::assertSame([['fd' => 11, 'code' => 1008, 'reason' => 'Too many connections for this user']], $this->closedConnections);
+        self::assertSame([], $this->pushedMessages, 'A refused connection was told it is connected.');
+        $this->assertConnectionMissing(11);
+        $this->controller->onMessage(11, '{"type":"ping"}');
+        $this->assertLastPushMatches(11, 'error', ['message' => 'Not authenticated']);
+    }
+
+    public function testOnOpenWhenTheConnectionTableIsFullClosesTheConnectionWithoutRegisteringIt(): void
+    {
+        self::fillTable($this->registryTable('connections'), ['user_id' => 'filler', 'worker_id' => 0, 'connected_at' => 0]);
+
+        $this->controller->onOpen(1, 'user-1');
+
+        self::assertSame([['fd' => 1, 'code' => 1013, 'reason' => 'Server connection limit reached']], $this->closedConnections);
+        self::assertSame([], $this->pushedMessages);
+        $this->assertConnectionMissing(1);
+    }
+
+    public function testOnOpenWithoutAStoredReconnectTokenStillConnects(): void
+    {
+        $tokens = (new \ReflectionProperty($this->reconnectionTokens, 'tokens'))->getValue($this->reconnectionTokens);
+        self::assertInstanceOf(Table::class, $tokens);
+        self::fillTable($tokens, ['user_id' => 'filler', 'created_at' => time()]);
+
+        $this->controller->onOpen(1, 'user-1');
+
+        self::assertSame([['fd' => 1, 'payload' => ['type' => 'connected']]], $this->allPushedPayloads());
+        self::assertNotNull($this->registry->getConnection(1));
+    }
+
+    public function testRoomJoinTheRegistryRefusesSendsAnErrorAndRecordsNoMembership(): void
+    {
+        $this->controller->onOpen(1, 'user-1');
+        self::fillTable($this->registryTable('roomMembers'), ['joined_at' => 0]);
+
+        $this->controller->onMessage(1, json_encode(['type' => 'room.join', 'room' => 'room:full'], JSON_THROW_ON_ERROR));
+
+        $this->assertLastPushMatches(1, 'error', ['message' => 'Room limit reached; try again later']);
+        self::assertSame([], $this->registry->getRoomMembers('room:full'));
+        self::assertSame([], $this->closedConnections);
+    }
+
+    public function testRoomJoinWithANameTooLongForTheRegistrySendsAnError(): void
+    {
+        $this->controller->onOpen(1, 'user-1');
+        $room = str_repeat('r', WebSocketConnectionRegistry::MAX_ROOM_NAME_BYTES + 1);
+
+        $this->controller->onMessage(1, json_encode(['type' => 'room.join', 'room' => $room], JSON_THROW_ON_ERROR));
+
+        $this->assertLastPushMatches(1, 'error', ['message' => 'room.join "room" may be at most 52 bytes long']);
+        self::assertSame([], $this->registry->getRoomMembers($room));
+    }
+
+    public function testPartyJoinTheRegistryRefusesSendsAnErrorInsteadOfJoined(): void
+    {
+        $sessionId = '01900000-0000-7000-8000-000000000002';
+        $controller = $this->controllerWithJoinHandler(static fn (JoinPartySessionCommand $command): PartyMember => PartyMember::create(
+            $command->getUserId(),
+            $command->getSessionId(),
+        ), new ResultStampMiddleware([PartyMemberResultStamp::class]));
+        $controller->onOpen(1, '01900000-0000-7000-8000-000000000001');
+        self::fillTable($this->registryTable('roomMembers'), ['joined_at' => 0]);
+
+        $controller->onMessage(1, json_encode(['type' => 'party.join', 'sessionId' => $sessionId], JSON_THROW_ON_ERROR));
+
+        $this->assertLastPushMatches(1, 'error', ['message' => 'Room limit reached; try again later']);
+        self::assertSame([], $this->registry->getRoomMembers('party:' . $sessionId));
+        foreach ($this->allPushedPayloads() as $push) {
+            self::assertNotSame('party.joined', $push['payload']['type']);
+        }
+    }
+
+    public function testAuthReconnectOverTheUserLimitClosesTheConnection(): void
+    {
+        $this->controller->onOpen(1, 'user-1');
+        for ($fd = 2; $fd <= 11; ++$fd) {
+            $this->registry->addConnection($fd, 'user-2', 0);
+        }
+        $user2Token = $this->reconnectionTokens->generate('user-2');
+        self::assertNotNull($user2Token);
+
+        $this->controller->onMessage(1, json_encode(['type' => 'auth.reconnect', 'reconnectToken' => $user2Token], JSON_THROW_ON_ERROR));
+
+        self::assertSame([['fd' => 1, 'code' => 1008, 'reason' => 'Too many connections for this user']], $this->closedConnections);
+        $this->assertConnectionMissing(1);
+        $this->controller->onMessage(1, '{"type":"ping"}');
+        $this->assertLastPushMatches(1, 'error', ['message' => 'Not authenticated']);
+    }
+
+    private function registryTable(string $property): Table
+    {
+        $table = (new \ReflectionProperty($this->registry, $property))->getValue($this->registry);
+        self::assertInstanceOf(Table::class, $table);
+
+        return $table;
+    }
+
+    /**
+     * Writes filler rows until a thousand writes in a row are refused, so no key
+     * can still find a free bucket.
+     *
+     * @param array<string, int|string> $row
+     */
+    private static function fillTable(Table $table, array $row): void
+    {
+        $refusedInARow = 0;
+        for ($key = 0; $refusedInARow < 1000; ++$key) {
+            self::assertLessThan(100_000, $key, 'The table never filled up.');
+            $refusedInARow = @$table->set('filler-' . $key, $row) ? 0 : $refusedInARow + 1;
+        }
     }
 
     private function assertConnectionMissing(int $fd): void
