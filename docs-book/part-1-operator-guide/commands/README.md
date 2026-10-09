@@ -142,9 +142,13 @@ own exit code without JSON. Error output contains no credentials or raw diagnost
 
 | Command | Description |
 |---------|-------------|
+| [app:album:cover:remove](app-album-cover-remove.md) | Remove an album cover and delete its image files |
+| [app:album:cover:set](app-album-cover-set.md) | Set or replace an album cover from an image file in the container |
 | [app:album:duplicates](app-album-duplicates.md) | List the groups of albums in a library that look like duplicates |
 | [app:album:extract-covers](app-album-extract-covers.md) | Queue embedded cover art extraction for every album without a cover |
 | [app:album:merge](app-album-merge.md) | Merge a source album into a target album and delete the source |
+| [app:artist:cover:remove](app-artist-cover-remove.md) | Remove an artist cover and delete its image files |
+| [app:artist:cover:set](app-artist-cover-set.md) | Set or replace an artist cover from an image file in the container |
 | [app:genre:album:add](app-genre-album-add.md) | Assign a genre to an album |
 | [app:genre:album:remove](app-genre-album-remove.md) | Remove a genre from an album |
 | [app:genre:create](app-genre-create.md) | Create a genre, optionally below a parent genre |

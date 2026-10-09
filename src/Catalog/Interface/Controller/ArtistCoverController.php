@@ -4,22 +4,20 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Controller;
 
-use App\Catalog\Application\Port\ArtistPortInterface;
-use App\Catalog\Interface\Request\UploadCoverRequest;
-use App\Filesystem\Application\Port\MimeDetectorPortInterface;
-use App\Media\Application\Port\ImagePortInterface;
-use App\Media\Application\Port\StoragePortInterface;
-use App\Media\Domain\Model\Image;
-use App\Shared\Domain\Model\PublicId;
-use App\Shared\Interface\Attribute\CliParityExemption;
+use App\Catalog\Application\Command\Cover\CoverOwner;
+use App\Catalog\Application\Command\Cover\RemoveCoverCommand;
+use App\Catalog\Application\Command\Cover\SetCoverCommand;
+use App\Catalog\Interface\Resource\CoverImageResource;
+use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
 use OpenApi\Attributes as OA;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -29,13 +27,9 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class ArtistCoverController
 {
     use ApiResponsesTrait;
-    use TranslatorTrait;
 
     public function __construct(
-        private readonly ArtistPortInterface $artistService,
-        private readonly ImagePortInterface $imagePort,
-        private readonly StoragePortInterface $storage,
-        private readonly MimeDetectorPortInterface $mimeDetector,
+        private readonly MessageBusInterface $bus,
     ) {
     }
 
@@ -63,85 +57,21 @@ final class ArtistCoverController
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Artist not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error (missing file, oversized file, or unsupported type)', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '422', description: 'Validation error (invalid public ID, missing file, oversized file, or unsupported type)', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
     #[Route('', name: 'upload', methods: ['POST'])]
-    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
+    #[CliCounterpart('app:artist:cover:set')]
     public function upload(string $publicId, Request $request): JsonResponse
     {
-        $resolvedPublicId = $this->resolvePublicId($publicId);
-        if ($resolvedPublicId === null) {
-            return $this->errorResponse($this->trans('errors.invalid_public_id'));
-        }
-
-        $artist = $this->artistService->findByPublicId($resolvedPublicId);
-        if ($artist === null) {
-            return $this->notFound();
-        }
-
-        /** @var UploadedFile|null $file */
         $file = $request->files->get('cover');
-        if ($file === null) {
-            return $this->errorResponse('No file uploaded.', Response::HTTP_UNPROCESSABLE_ENTITY);
+        if (!$file instanceof UploadedFile) {
+            throw new InvalidInputException('No file uploaded.');
         }
 
-        $validation = new UploadCoverRequest($file, $this->mimeDetector);
-        if (!$validation->validate()) {
-            return $this->errorResponse(
-                $validation->getError()->getMessage(),
-                Response::HTTP_UNPROCESSABLE_ENTITY,
-            );
-        }
+        $cover = $this->dispatch(new SetCoverCommand(CoverOwner::Artist, $publicId, $file->getPathname()));
 
-        $contents = $file->getContent();
-        $dimensions = @getimagesizefromstring($contents);
-        $width = $dimensions[0] ?? 0;
-        $height = $dimensions[1] ?? 0;
-        $mimeType = $validation->getMimeType();
-
-        $extension = match ($mimeType) {
-            'image/jpeg' => 'jpg',
-            'image/png' => 'png',
-            'image/webp' => 'webp',
-            default => 'jpg',
-        };
-
-        $relativePath = 'images/artist/' . $artist->getId()->toString() . '.' . $extension;
-        $storedFile = $this->storage->storeFromBytes($contents, $relativePath);
-
-        // Delete old cover if it exists
-        if ($artist->getCoverImageId() !== null) {
-            $oldImage = $this->imagePort->findByUuid($artist->getCoverImageId());
-            if ($oldImage !== null) {
-                $this->storage->delete($oldImage->getPath());
-                $this->storage->deleteDerived($oldImage->getPath(), $oldImage->getExtension());
-                $this->imagePort->delete($oldImage);
-            }
-        }
-
-        $image = Image::create(
-            path: $storedFile->getPath(),
-            extension: $extension,
-            mimeType: $mimeType,
-            size: $storedFile->getSize(),
-            width: $width,
-            height: $height,
-            imageableType: 'artist',
-            artistId: $artist->getId(),
-        );
-        $this->imagePort->save($image);
-
-        $artist->setCoverImage($image->getId());
-        $this->artistService->save($artist);
-
-        return $this->successResponse([
-            'publicId' => $image->getPublicId()->toString(),
-            'url'      => '/api/images/' . $image->getPublicId()->toString() . '/file',
-            'size'     => $image->getSize(),
-            'width'    => $image->getWidth(),
-            'height'   => $image->getHeight(),
-        ]);
+        return $this->successResponse(CoverImageResource::from($cover));
     }
 
     #[OA\Delete(
@@ -155,45 +85,20 @@ final class ArtistCoverController
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Artist or cover image not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'Invalid public ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('', name: 'delete', methods: ['DELETE'])]
-    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
+    #[CliCounterpart('app:artist:cover:remove')]
     public function delete(string $publicId): JsonResponse
     {
-        $resolvedPublicId = $this->resolvePublicId($publicId);
-        if ($resolvedPublicId === null) {
-            return $this->errorResponse($this->trans('errors.invalid_public_id'));
-        }
-
-        $artist = $this->artistService->findByPublicId($resolvedPublicId);
-        if ($artist === null) {
-            return $this->notFound();
-        }
-
-        if ($artist->getCoverImageId() === null) {
-            return $this->notFound();
-        }
-
-        $image = $this->imagePort->findByUuid($artist->getCoverImageId());
-        if ($image !== null) {
-            $this->storage->delete($image->getPath());
-            $this->storage->deleteDerived($image->getPath(), $image->getExtension());
-            $this->imagePort->delete($image);
-        }
-
-        $artist->setCoverImage(null);
-        $this->artistService->save($artist);
+        $this->dispatch(new RemoveCoverCommand(CoverOwner::Artist, $publicId));
 
         return $this->noContent();
     }
 
-    private function resolvePublicId(string $publicId): ?PublicId
+    private function dispatch(object $message): mixed
     {
-        try {
-            return PublicId::fromString($publicId);
-        } catch (\Throwable) {
-            return null;
-        }
+        return $this->bus->dispatch($message)->last(HandledStamp::class)?->getResult();
     }
 }

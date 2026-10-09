@@ -92,27 +92,15 @@ deptrac:
     App\Catalog\Interface\Controller\AlbumController:
       - App\Catalog\Domain\Model\Album
       - App\Media\Application\Port\ImagePortInterface
-    App\Catalog\Interface\Controller\AlbumCoverController:
-      - App\Filesystem\Application\Port\MimeDetectorPortInterface
-      - App\Media\Application\Port\ImagePortInterface
-      - App\Media\Application\Port\StoragePortInterface
-      - App\Media\Domain\Model\Image
     App\Catalog\Interface\Controller\ArtistController:
       - App\Catalog\Domain\Model\Artist
       - App\Catalog\Domain\ValueObject\ArtistRole
       - App\Media\Application\Port\ImagePortInterface
-    App\Catalog\Interface\Controller\ArtistCoverController:
-      - App\Filesystem\Application\Port\MimeDetectorPortInterface
-      - App\Media\Application\Port\ImagePortInterface
-      - App\Media\Application\Port\StoragePortInterface
-      - App\Media\Domain\Model\Image
     App\Catalog\Interface\Controller\MovieController:
       - App\Catalog\Domain\Repository\VideoRepositoryInterface
     App\Catalog\Interface\Controller\SongController:
       - App\Catalog\Domain\Model\Song
       - App\Shared\Infrastructure\Pagination\CursorCodec
-    App\Catalog\Interface\Request\UploadCoverRequest:
-      - App\Filesystem\Application\Port\MimeDetectorPortInterface
     App\Catalog\Interface\Resource\AlbumResource:
       - App\Media\Domain\Model\Image
     App\Catalog\Interface\Resource\ArtistResource:
