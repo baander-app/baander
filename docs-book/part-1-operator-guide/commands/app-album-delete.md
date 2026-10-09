@@ -42,7 +42,8 @@ With `--delete-files`, every song file is checked before anything changes. The c
 
 - a file, or the file a symlink points to, lies outside the album's library root (exit code 2);
 - the server cannot write a directory that holds a file (exit code 1);
-- a scan of the library is running (exit code 1).
+- a scan of the library is running (exit code 1);
+- the library folder is not available, such as unmounted storage (exit code 1).
 
 The album, its songs and the songs' file index entries are then deleted together, and the files are unlinked after that. A symlink is removed as a link; its target stays. The result lists the files removed, the files that were already missing, and the files left on disk with the reason. A file left on disk has no index entry, so the next library scan imports it again. When any file is left, the command exits with code 1 although the catalog rows are gone.
 
@@ -59,5 +60,5 @@ To delete one song, use [app:song:delete](app-song-delete.md).
 | Code | Meaning |
 |------|---------|
 | 0 | Album deleted, or the preview printed |
-| 1 | No album has the public ID, a scan holds the library, the server cannot write a song directory, a file was left on disk, the operator declined, or another error occurred; the message says why |
+| 1 | No album has the public ID, a scan holds the library, the library folder is not available, the server cannot write a song directory, a file was left on disk, the operator declined, or another error occurred; the message says why |
 | 2 | The public ID is malformed, a song file lies outside the library root, `--delete-files` was given without `--force`, or no terminal is attached and `--force` was not given; nothing was deleted |

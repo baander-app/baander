@@ -23,8 +23,9 @@ final class RegisterServerHandler
     #[AsMessageHandler]
     public function __invoke(RegisterServerCommand $command): ServerInstance
     {
-        $scheme = parse_url($command->getServerUrl(), PHP_URL_SCHEME);
-        if (filter_var($command->getServerUrl(), FILTER_VALIDATE_URL) === false || !in_array($scheme, ['http', 'https'], true)) {
+        // Not FILTER_VALIDATE_URL: it refuses host names with an underscore, such as Docker service names.
+        $url = parse_url($command->getServerUrl());
+        if (!is_array($url) || !in_array($url['scheme'] ?? null, ['http', 'https'], true) || ($url['host'] ?? '') === '') {
             throw new InvalidInputException('The server URL must be a valid http or https URL.');
         }
         if (trim($command->getName()) === '') {

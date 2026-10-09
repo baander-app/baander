@@ -187,6 +187,17 @@ final class AdminCommandSupportTest extends TestCase
         $this->assertSame(1, $this->dispatched);
     }
 
+    /** The question goes to stderr, so `out=$(… --json)` captures only the data. */
+    public function testTheConfirmationQuestionIsAskedOnStderr(): void
+    {
+        $tester = new CommandTester($this->command($this->support(null), destructive: true));
+        $tester->setInputs(['yes']);
+
+        $this->assertSame(Command::SUCCESS, $tester->execute([], ['capture_stderr_separately' => true]));
+        $this->assertStringNotContainsString('?', $tester->getDisplay());
+        $this->assertStringContainsString('?', $tester->getErrorOutput());
+    }
+
     public function testADestructiveCommandOnATerminalAsksFirst(): void
     {
         $confirmed = new CommandTester($this->command($this->support(null), destructive: true));

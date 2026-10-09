@@ -55,6 +55,16 @@ plans come next, in this order:
      library removes it from the other;
    - PHP has no `unlinkat()`, so a parent directory swapped for a symlink between the
      last check and the unlink is not caught;
+   - a delete with files refuses a library whose folder is missing, but an empty mount
+     point reads as every file missing, so the delete drops their index rows and the next
+     scan after remounting imports the songs again;
+   - applying LRCLIB lyrics checks for existing lyrics, asks LRCLIB, then inserts; a queued
+     fetch that stores lyrics for the same song in between turns the insert into a
+     unique-violation 500 instead of a 409 (the fetch has the same shape);
+   - metadata enrichment loads an album, spends seconds on provider lookups, then saves
+     that snapshot, so a cover set or field edit made during the lookup is reverted;
+   - `LrclibClient` sets no request timeout, so a stalled LRCLIB holds a per-song fetch
+     for two socket timeouts (cached lookup, then full lookup);
    - no action grants or revokes a member's access to a library;
    - no API request selects a non-English locale, so the translated library errors
      are never returned;

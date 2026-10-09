@@ -201,7 +201,8 @@ final readonly class AdminCommandSupport
             return Command::INVALID;
         }
 
-        if ($io->confirm($question, false)) {
+        // On stderr, so `out=$(… --json)` on a terminal captures only the data.
+        if ($io->getErrorStyle()->confirm($question, false)) {
             return null;
         }
 

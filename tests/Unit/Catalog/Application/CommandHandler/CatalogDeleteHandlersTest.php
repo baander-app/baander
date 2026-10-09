@@ -320,6 +320,7 @@ final class CatalogDeleteHandlersTest extends TestCase
             '/music',
             array_map(static fn (string $path): LibraryMediaFileCheck => new LibraryMediaFileCheck($path, LibraryMediaFileVerdict::Deletable), $paths),
             false,
+            true,
         );
     }
 
