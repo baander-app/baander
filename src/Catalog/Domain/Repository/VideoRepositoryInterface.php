@@ -24,4 +24,11 @@ interface VideoRepositoryInterface
     public function findByMovie(Uuid $movieId): array;
 
     public function count(): int;
+
+    /**
+     * Deletes those of the videos that no movie links any more, and returns how many it deleted.
+     *
+     * @param list<Uuid> $videoIds
+     */
+    public function deleteUnlinked(array $videoIds): int;
 }

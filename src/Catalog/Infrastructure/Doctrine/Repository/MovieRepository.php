@@ -200,9 +200,19 @@ final class MovieRepository implements MovieRepositoryInterface
             ->getRepository(MovieEntity::class)
             ->find($movie->getId());
 
-        if ($entity !== null) {
-            $this->entityManager->remove($entity);
-            $this->entityManager->flush();
+        if ($entity === null) {
+            return;
+        }
+
+        $this->entityManager->remove($entity);
+        $this->entityManager->flush();
+
+        // The database deletes the movie's video links (ON DELETE CASCADE). A link this manager
+        // still holds would point at the deleted movie and fail the next flush that writes anything.
+        foreach ($this->entityManager->getUnitOfWork()->getIdentityMap()[MovieVideoEntity::class] ?? [] as $link) {
+            if ($link instanceof MovieVideoEntity && $link->getMovie() === $entity) {
+                $this->entityManager->detach($link);
+            }
         }
     }
 

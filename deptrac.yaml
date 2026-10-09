@@ -1058,7 +1058,6 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Catalog Interface':
-      - 'Playlist Deletion Preview Contract'
       - 'Library Read Scope Contract'
       - 'Catalog Resources'
       - 'Catalog Application'

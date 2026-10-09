@@ -8,6 +8,7 @@ use App\Catalog\Application\Command\Artist\AddArtistCreditCommand;
 use App\Catalog\Application\Command\Artist\ChangeArtistCreditRoleCommand;
 use App\Catalog\Application\Command\Artist\CreateArtistCommand;
 use App\Catalog\Application\Command\Artist\CreditTarget;
+use App\Catalog\Application\Command\Artist\DeleteArtistCommand;
 use App\Catalog\Application\Command\Artist\RemoveArtistCreditCommand;
 use App\Catalog\Application\Command\Artist\UpdateArtistCommand;
 use App\Catalog\Application\Port\ArtistPortInterface;
@@ -18,11 +19,11 @@ use App\Catalog\Interface\Request\CreateArtistRequest;
 use App\Catalog\Interface\Request\UpdateArtistRequest;
 use App\Catalog\Interface\Request\UpdateRoleRequest;
 use App\Catalog\Interface\Resource\ArtistResource;
+use App\Catalog\Interface\Resource\CatalogDeletionResource;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Interface\Attribute\CliCounterpart;
-use App\Shared\Interface\Attribute\CliParityExemption;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\DTO\PaginatedResponse;
@@ -255,30 +256,26 @@ final class ArtistController
             new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
-            new OA\Response(response: '204', description: 'Deleted'),
+            new OA\Response(
+                response: '200',
+                description: 'Deleted, with the cover image',
+                content: new OA\JsonContent(
+                    properties: [new OA\Property(property: 'data', ref: new Model(type: CatalogDeletionResource::class))],
+                    type: 'object',
+                ),
+            ),
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'Invalid public ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
     #[Route('/{publicId}', name: 'destroy', methods: ['DELETE'])]
     #[IsGranted('ROLE_ADMIN')]
-    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
+    #[CliCounterpart('app:artist:delete')]
     public function destroy(string $publicId): JsonResponse
     {
-        try {
-            $resolvedPublicId = PublicId::fromString($publicId);
-        } catch (\Throwable) {
-            return $this->errorResponse($this->trans('errors.invalid_public_id'));
-        }
+        $result = $this->dispatch(new DeleteArtistCommand(publicId: $publicId));
 
-        $artist = $this->artistService->findByPublicId($resolvedPublicId);
-
-        if ($artist === null) {
-            return $this->notFound();
-        }
-
-        $this->artistService->delete($artist);
-
-        return $this->noContent();
+        return $this->successResponse(CatalogDeletionResource::from($result));
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Controller;
 
+use App\Catalog\Application\Command\Album\DeleteAlbumCommand;
 use App\Catalog\Application\Command\Album\UpdateAlbumCommand;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
@@ -12,6 +13,7 @@ use App\Catalog\Application\Port\AlbumMergePortInterface;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Interface\Request\MergeAlbumsRequest;
 use App\Catalog\Interface\Request\UpdateAlbumRequest;
+use App\Catalog\Interface\Resource\CatalogDeletionResource;
 use App\Catalog\Interface\Resource\AlbumResource;
 use App\Catalog\Interface\Resource\SongResource;
 use App\Catalog\Interface\Resource\DuplicateGroupResource;
@@ -19,7 +21,6 @@ use App\Media\Application\Port\ImagePortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Interface\Attribute\CliCounterpart;
-use App\Shared\Interface\Attribute\CliParityExemption;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\DTO\ApiError;
@@ -419,29 +420,25 @@ final class AlbumController
             new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
-            new OA\Response(response: '204', description: 'Deleted'),
+            new OA\Response(
+                response: '200',
+                description: 'Deleted',
+                content: new OA\JsonContent(
+                    properties: [new OA\Property(property: 'data', ref: new Model(type: CatalogDeletionResource::class))],
+                    type: 'object',
+                ),
+            ),
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '422', description: 'Invalid public ID', content: new OA\JsonContent(ref: new Model(type: ValidationError::class))),
         ],
     )]
     #[Route('/{publicId}', name: 'destroy', methods: ['DELETE'])]
-    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
+    #[CliCounterpart('app:album:delete')]
     public function destroy(string $publicId): JsonResponse
     {
-        try {
-            $resolvedPublicId = PublicId::fromString($publicId);
-        } catch (Throwable) {
-            return $this->errorResponse($this->trans('errors.invalid_public_id'));
-        }
+        $result = $this->dispatch(new DeleteAlbumCommand(publicId: $publicId));
 
-        $album = $this->albumService->findByPublicId($resolvedPublicId);
-
-        if ($album === null) {
-            return $this->notFound();
-        }
-
-        $this->albumService->delete($album);
-
-        return $this->noContent();
+        return $this->successResponse(CatalogDeletionResource::from($result));
     }
 
     /** A handler's exception reaches ExceptionSubscriber, which unwraps it to its 404 or 422 response. */

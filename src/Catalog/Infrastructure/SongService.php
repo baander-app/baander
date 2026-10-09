@@ -7,7 +7,6 @@ namespace App\Catalog\Infrastructure;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\SongRepositoryInterface;
-use App\Media\Application\Port\StoragePortInterface;
 use App\Shared\Domain\Model\CursorPage;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
@@ -19,7 +18,6 @@ final class SongService implements SongPortInterface
 {
     public function __construct(
         private readonly SongRepositoryInterface $songRepository,
-        private readonly StoragePortInterface $storage,
     ) {
     }
 
@@ -142,12 +140,8 @@ final class SongService implements SongPortInterface
         $this->songRepository->flush();
     }
 
-    public function delete(Song $song, bool $deleteFile = false): void
+    public function delete(Song $song): void
     {
-        if ($deleteFile) {
-            $this->storage->delete($song->getPath());
-        }
-
         $this->songRepository->delete($song);
     }
 

@@ -144,6 +144,7 @@ own exit code without JSON. Error output contains no credentials or raw diagnost
 |---------|-------------|
 | [app:album:cover:remove](app-album-cover-remove.md) | Remove an album cover and delete its image files |
 | [app:album:cover:set](app-album-cover-set.md) | Set or replace an album cover from an image file in the container |
+| [app:album:delete](app-album-delete.md) | Delete an album and every song on it, optionally with the audio files |
 | [app:album:duplicates](app-album-duplicates.md) | List the groups of albums in a library that look like duplicates |
 | [app:album:extract-covers](app-album-extract-covers.md) | Queue embedded cover art extraction for every album without a cover |
 | [app:album:merge](app-album-merge.md) | Merge a source album into a target album and delete the source |
@@ -154,6 +155,7 @@ own exit code without JSON. Error output contains no credentials or raw diagnost
 | [app:artist:cover:remove](app-artist-cover-remove.md) | Remove an artist cover and delete its image files |
 | [app:artist:cover:set](app-artist-cover-set.md) | Set or replace an artist cover from an image file in the container |
 | [app:artist:create](app-artist-create.md) | Create an artist, such as a performer to credit by hand |
+| [app:artist:delete](app-artist-delete.md) | Delete an artist, its credits and its cover image |
 | [app:artist:song:add](app-artist-song-add.md) | Credit an artist on a song with a role |
 | [app:artist:song:remove](app-artist-song-remove.md) | Remove every one of an artist's credits on a song |
 | [app:artist:song:role](app-artist-song-role.md) | Change the role of an artist's credit on a song |
@@ -174,7 +176,9 @@ own exit code without JSON. Error output contains no credentials or raw diagnost
 | [app:library:stats](app-library-stats.md) | Show the content counts of one media library |
 | [app:library:update](app-library-update.md) | Rename a media library or change its sort order |
 | [app:library:validate-path](app-library-validate-path.md) | Check that a directory can serve as a media library |
+| [app:movie:delete](app-movie-delete.md) | Delete a movie and the videos no other movie uses |
 | [app:movie:update](app-movie-update.md) | Change a movie's title, year or summary |
+| [app:song:delete](app-song-delete.md) | Delete a song, optionally with its audio file |
 | [app:song:update](app-song-update.md) | Change a song's metadata, or lock and unlock its fields |
 | [app:watch-files](app-watch-files.md) | Watch directories for filesystem changes |
 

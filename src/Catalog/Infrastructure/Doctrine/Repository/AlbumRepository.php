@@ -12,6 +12,7 @@ use App\Catalog\Domain\ValueObject\MusicbrainzId;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistAlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\ArtistEntity;
+use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Catalog\Infrastructure\Doctrine\Query\CatalogReadScopeQuery;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Shared\Domain\Model\PublicId;
@@ -411,9 +412,19 @@ final class AlbumRepository implements AlbumRepositoryInterface
             ->getRepository(AlbumEntity::class)
             ->find($album->getId());
 
-        if ($entity !== null) {
-            $this->entityManager->remove($entity);
-            $this->entityManager->flush();
+        if ($entity === null) {
+            return;
+        }
+
+        $this->entityManager->remove($entity);
+        $this->entityManager->flush();
+
+        // The database deletes the album's songs (ON DELETE CASCADE). A song this manager still
+        // holds would point at the deleted album and fail the next flush that writes anything.
+        foreach ($this->entityManager->getUnitOfWork()->getIdentityMap()[SongEntity::class] ?? [] as $song) {
+            if ($song instanceof SongEntity && $song->getAlbum() === $entity) {
+                $this->entityManager->detach($song);
+            }
         }
     }
 
