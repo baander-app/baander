@@ -22,4 +22,12 @@ interface LibraryFileIndexRepositoryInterface
      * Remove a file index entry by path.
      */
     public function removeByPath(Uuid $libraryId, string $path): void;
+
+    /**
+     * Remove the file index entries of these paths, on the caller's connection and in its
+     * transaction when one is open.
+     *
+     * @param list<string> $paths
+     */
+    public function removeByPaths(Uuid $libraryId, array $paths): void;
 }

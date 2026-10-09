@@ -169,6 +169,13 @@ final class InMemoryLibraryRepository implements LibraryRepositoryInterface
         return ScanClaimRelease::Released;
     }
 
+    public function hasLiveScanClaim(Uuid $libraryId): bool
+    {
+        $held = $this->claims[$libraryId->toString()] ?? null;
+
+        return $held !== null && !$this->lapsed($held);
+    }
+
     /** @param array{claim: string, expiresAt: DateTimeImmutable} $claim */
     private function lapsed(array $claim): bool
     {

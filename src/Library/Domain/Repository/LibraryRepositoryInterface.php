@@ -75,4 +75,7 @@ interface LibraryRepositoryInterface
      * will not finish. A live claim is released only when $evenIfLive is true.
      */
     public function releaseScanClaim(Uuid $libraryId, bool $evenIfLive): ScanClaimRelease;
+
+    /** Whether a scan holds a claim on the library that has not lapsed, by the database clock. */
+    public function hasLiveScanClaim(Uuid $libraryId): bool;
 }

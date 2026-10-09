@@ -26,6 +26,7 @@ The scanner directly references Metadata reader classes (`FlacReader`, `Id3Reade
 | `DirectoryScannerPortInterface` | Filesystem scanning |
 | `CoverArtExtractorPortInterface` | Cover art extraction |
 | `LibraryMembershipQueryPort` | User-library membership queries |
+| `LibraryMediaFilesInterface` | Guarded deletion of media files inside a library root |
 
 ## Events
 
