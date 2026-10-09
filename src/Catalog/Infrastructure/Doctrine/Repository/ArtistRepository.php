@@ -367,131 +367,140 @@ final class ArtistRepository implements ArtistRepositoryInterface
         }
     }
 
-    public function addSongToArtist(Uuid $artistId, Uuid $songId, string $role): void
+    public function addSongToArtist(Uuid $artistId, Uuid $songId, string $role): bool
     {
-        $artistEntity = $this->entityManager->getRepository(ArtistEntity::class)->find($artistId);
-        $songEntity = $this->entityManager->getRepository(SongEntity::class)->find($songId);
+        $artistEntity = $this->entityManager->find(ArtistEntity::class, $artistId);
+        $songEntity = $this->entityManager->find(SongEntity::class, $songId);
 
         if ($artistEntity === null || $songEntity === null) {
-            return;
+            return false;
         }
 
-        $existing = $this->entityManager->getRepository(ArtistSongEntity::class)->findOneBy([
-            'artist' => $artistEntity,
-            'song' => $songEntity,
-            'role' => $role,
-        ]);
-
-        if ($existing !== null) {
-            return;
-        }
-
-        $this->entityManager->persist(new ArtistSongEntity($artistEntity, $songEntity, $role));
-        $this->entityManager->flush();
-    }
-
-    public function removeSongFromArtist(Uuid $artistId, Uuid $songId): void
-    {
-        $artistEntity = $this->entityManager->getRepository(ArtistEntity::class)->find($artistId);
-        $songEntity = $this->entityManager->getRepository(SongEntity::class)->find($songId);
-
-        if ($artistEntity === null || $songEntity === null) {
-            return;
-        }
-
-        $links = $this->entityManager->getRepository(ArtistSongEntity::class)->findBy([
-            'artist' => $artistEntity,
-            'song' => $songEntity,
-        ]);
-
-        foreach ($links as $link) {
-            $this->entityManager->remove($link);
-        }
-
-        $this->entityManager->flush();
-    }
-
-    public function updateSongRole(Uuid $artistId, Uuid $songId, string $role): void
-    {
-        $artistEntity = $this->entityManager->getRepository(ArtistEntity::class)->find($artistId);
-        $songEntity = $this->entityManager->getRepository(SongEntity::class)->find($songId);
-
-        if ($artistEntity === null || $songEntity === null) {
-            return;
-        }
-
-        $link = $this->entityManager->getRepository(ArtistSongEntity::class)->findOneBy([
-            'artist' => $artistEntity,
-            'song' => $songEntity,
-        ]);
-
-        if ($link !== null) {
-            $link->setRole($role);
+        if ($this->creditLink(ArtistSongEntity::class, 'song', $artistId, $songId, $role) === null) {
+            $this->entityManager->persist(new ArtistSongEntity($artistEntity, $songEntity, $role));
             $this->entityManager->flush();
         }
+
+        return true;
     }
 
-    public function addAlbumToArtist(Uuid $artistId, Uuid $albumId, string $role): void
+    public function removeSongFromArtist(Uuid $artistId, Uuid $songId): bool
     {
-        $artistEntity = $this->entityManager->getRepository(ArtistEntity::class)->find($artistId);
-        $albumEntity = $this->entityManager->getRepository(AlbumEntity::class)->find($albumId);
-
-        if ($artistEntity === null || $albumEntity === null) {
-            return;
-        }
-
-        $existing = $this->entityManager->getRepository(ArtistAlbumEntity::class)->findOneBy([
-            'artist' => $artistEntity,
-            'album' => $albumEntity,
-            'role' => $role,
-        ]);
-
-        if ($existing !== null) {
-            return;
-        }
-
-        $this->entityManager->persist(new ArtistAlbumEntity($artistEntity, $albumEntity, $role));
-        $this->entityManager->flush();
+        return $this->removeCreditLinks(ArtistSongEntity::class, 'song', $artistId, $songId);
     }
 
-    public function removeAlbumFromArtist(Uuid $artistId, Uuid $albumId): void
+    public function songCreditRoles(Uuid $artistId, Uuid $songId): array
     {
-        $artistEntity = $this->entityManager->getRepository(ArtistEntity::class)->find($artistId);
-        $albumEntity = $this->entityManager->getRepository(AlbumEntity::class)->find($albumId);
-
-        if ($artistEntity === null || $albumEntity === null) {
-            return;
-        }
-
-        $links = $this->entityManager->getRepository(ArtistAlbumEntity::class)->findBy([
-            'artist' => $artistEntity,
-            'album' => $albumEntity,
-        ]);
-
-        foreach ($links as $link) {
-            $this->entityManager->remove($link);
-        }
-
-        $this->entityManager->flush();
+        return $this->creditRoles(ArtistSongEntity::class, 'song', $artistId, $songId);
     }
 
-    public function updateAlbumRole(Uuid $artistId, Uuid $albumId, string $role): void
+    public function updateSongRole(Uuid $artistId, Uuid $songId, ?string $currentRole, string $role): bool
     {
-        $artistEntity = $this->entityManager->getRepository(ArtistEntity::class)->find($artistId);
-        $albumEntity = $this->entityManager->getRepository(AlbumEntity::class)->find($albumId);
+        return $this->changeCreditRole(ArtistSongEntity::class, 'song', $artistId, $songId, $currentRole, $role);
+    }
+
+    public function addAlbumToArtist(Uuid $artistId, Uuid $albumId, string $role): bool
+    {
+        $artistEntity = $this->entityManager->find(ArtistEntity::class, $artistId);
+        $albumEntity = $this->entityManager->find(AlbumEntity::class, $albumId);
 
         if ($artistEntity === null || $albumEntity === null) {
-            return;
+            return false;
         }
 
-        $link = $this->entityManager->getRepository(ArtistAlbumEntity::class)->findOneBy([
-            'artist' => $artistEntity,
-            'album' => $albumEntity,
-        ]);
-
-        if ($link !== null) {
-            $link->setRole($role);
+        if ($this->creditLink(ArtistAlbumEntity::class, 'album', $artistId, $albumId, $role) === null) {
+            $this->entityManager->persist(new ArtistAlbumEntity($artistEntity, $albumEntity, $role));
             $this->entityManager->flush();
         }
+
+        return true;
+    }
+
+    public function removeAlbumFromArtist(Uuid $artistId, Uuid $albumId): bool
+    {
+        return $this->removeCreditLinks(ArtistAlbumEntity::class, 'album', $artistId, $albumId);
+    }
+
+    public function albumCreditRoles(Uuid $artistId, Uuid $albumId): array
+    {
+        return $this->creditRoles(ArtistAlbumEntity::class, 'album', $artistId, $albumId);
+    }
+
+    public function updateAlbumRole(Uuid $artistId, Uuid $albumId, ?string $currentRole, string $role): bool
+    {
+        return $this->changeCreditRole(ArtistAlbumEntity::class, 'album', $artistId, $albumId, $currentRole, $role);
+    }
+
+    /**
+     * @template T of ArtistSongEntity|ArtistAlbumEntity
+     * @param class-string<T>  $link
+     * @param 'song'|'album'   $target the link's association to the song or album
+     * @return T|null
+     */
+    private function creditLink(string $link, string $target, Uuid $artistId, Uuid $targetId, ?string $role): ?object
+    {
+        return $this->entityManager->getRepository($link)->findOneBy(['artist' => $artistId, $target => $targetId, 'role' => $role]);
+    }
+
+    /**
+     * @param class-string<ArtistSongEntity|ArtistAlbumEntity> $link
+     * @param 'song'|'album'                                   $target
+     */
+    private function removeCreditLinks(string $link, string $target, Uuid $artistId, Uuid $targetId): bool
+    {
+        $links = $this->entityManager->getRepository($link)->findBy(['artist' => $artistId, $target => $targetId]);
+        if ($links === []) {
+            return false;
+        }
+
+        foreach ($links as $credit) {
+            $this->entityManager->remove($credit);
+        }
+        $this->entityManager->flush();
+
+        return true;
+    }
+
+    /**
+     * @param class-string<ArtistSongEntity|ArtistAlbumEntity> $link
+     * @param 'song'|'album'                                   $target
+     * @return list<string|null> sorted, a credit without a role first
+     */
+    private function creditRoles(string $link, string $target, Uuid $artistId, Uuid $targetId): array
+    {
+        $roles = array_map(
+            static fn (ArtistSongEntity|ArtistAlbumEntity $credit): ?string => $credit->getRole(),
+            $this->entityManager->getRepository($link)->findBy(['artist' => $artistId, $target => $targetId]),
+        );
+        sort($roles);
+
+        return $roles;
+    }
+
+    /**
+     * The unique constraint on (artist, target, role) forbids renaming a credit to a role the pair
+     * already holds, so that case removes the renamed credit instead.
+     *
+     * @param class-string<ArtistSongEntity|ArtistAlbumEntity> $link
+     * @param 'song'|'album'                                   $target
+     */
+    private function changeCreditRole(string $link, string $target, Uuid $artistId, Uuid $targetId, ?string $currentRole, string $role): bool
+    {
+        $credit = $this->creditLink($link, $target, $artistId, $targetId, $currentRole);
+        if ($credit === null) {
+            return false;
+        }
+        if ($currentRole === $role) {
+            return true;
+        }
+
+        if ($this->creditLink($link, $target, $artistId, $targetId, $role) !== null) {
+            $this->entityManager->remove($credit);
+        } else {
+            $credit->setRole($role);
+        }
+        $this->entityManager->flush();
+
+        return true;
     }
 }

@@ -93,8 +93,6 @@ deptrac:
       - App\Catalog\Domain\Model\Album
       - App\Media\Application\Port\ImagePortInterface
     App\Catalog\Interface\Controller\ArtistController:
-      - App\Catalog\Domain\Model\Artist
-      - App\Catalog\Domain\ValueObject\ArtistRole
       - App\Media\Application\Port\ImagePortInterface
     App\Catalog\Interface\Controller\MovieController:
       - App\Catalog\Domain\Repository\VideoRepositoryInterface

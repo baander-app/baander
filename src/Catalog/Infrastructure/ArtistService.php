@@ -96,33 +96,43 @@ final class ArtistService implements ArtistPortInterface
         $this->artistRepository->delete($artist);
     }
 
-    public function addSongToArtist(Uuid $artistId, Uuid $songId, string $role): void
+    public function addSongToArtist(Uuid $artistId, Uuid $songId, string $role): bool
     {
-        $this->artistRepository->addSongToArtist($artistId, $songId, $role);
+        return $this->artistRepository->addSongToArtist($artistId, $songId, $role);
     }
 
-    public function removeSongFromArtist(Uuid $artistId, Uuid $songId): void
+    public function removeSongFromArtist(Uuid $artistId, Uuid $songId): bool
     {
-        $this->artistRepository->removeSongFromArtist($artistId, $songId);
+        return $this->artistRepository->removeSongFromArtist($artistId, $songId);
     }
 
-    public function updateSongRole(Uuid $artistId, Uuid $songId, string $role): void
+    public function songCreditRoles(Uuid $artistId, Uuid $songId): array
     {
-        $this->artistRepository->updateSongRole($artistId, $songId, $role);
+        return $this->artistRepository->songCreditRoles($artistId, $songId);
     }
 
-    public function addAlbumToArtist(Uuid $artistId, Uuid $albumId, string $role): void
+    public function updateSongRole(Uuid $artistId, Uuid $songId, ?string $currentRole, string $role): bool
     {
-        $this->artistRepository->addAlbumToArtist($artistId, $albumId, $role);
+        return $this->artistRepository->updateSongRole($artistId, $songId, $currentRole, $role);
     }
 
-    public function removeAlbumFromArtist(Uuid $artistId, Uuid $albumId): void
+    public function addAlbumToArtist(Uuid $artistId, Uuid $albumId, string $role): bool
     {
-        $this->artistRepository->removeAlbumFromArtist($artistId, $albumId);
+        return $this->artistRepository->addAlbumToArtist($artistId, $albumId, $role);
     }
 
-    public function updateAlbumRole(Uuid $artistId, Uuid $albumId, string $role): void
+    public function removeAlbumFromArtist(Uuid $artistId, Uuid $albumId): bool
     {
-        $this->artistRepository->updateAlbumRole($artistId, $albumId, $role);
+        return $this->artistRepository->removeAlbumFromArtist($artistId, $albumId);
+    }
+
+    public function albumCreditRoles(Uuid $artistId, Uuid $albumId): array
+    {
+        return $this->artistRepository->albumCreditRoles($artistId, $albumId);
+    }
+
+    public function updateAlbumRole(Uuid $artistId, Uuid $albumId, ?string $currentRole, string $role): bool
+    {
+        return $this->artistRepository->updateAlbumRole($artistId, $albumId, $currentRole, $role);
     }
 }
