@@ -29,6 +29,12 @@ Add OpenAPI attributes matching effective routes, request fields, and responses.
 Keep repeated tag descriptions consistent. Respect the current Nelmio restriction
 on combining `properties:` and `type: 'object'` in `OA\JsonContent` or `OA\Items`.
 
+An admin-guarded route, or a route an admin page calls, needs its console command
+and parity marking in the same change; follow the
+[admin command recipe](admin-command.md). Report not-found, conflict and invalid-input
+outcomes with the shared exceptions in `src/Shared/Application/Exception` rather than
+per-controller error responses.
+
 Verify authorization, validation, missing-resource/errors, response fields, route
 registration, and actual service resolution. New write producers need deliberate
 transaction/outbox and failure semantics; the existence of a save-and-dispatch

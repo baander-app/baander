@@ -31,6 +31,15 @@ implementation; useful details or tips are optional rather than filler.
 `check` mode reports missing pages, stale signatures/defaults/behavior, broken
 links, and stale index entries without writing. Compare these facts, not exact
 LLM-generated prose, so a wording change is not falsely reported as command drift.
-Report pages for removed commands and retain them unless deletion is authorized;
-some may intentionally document upgrade or historical behavior. Do not execute
-the commands' side effects as a documentation check.
+`tests/Unit/Docs/CommandDocsCoverageTest.php` fails when a command under `src/` has
+no page or no index row, when the index names a command that no longer exists, and
+when a page belongs to no command or linked family page. Delete or rename a page in
+the same change that removes or renames its command. Do not execute the commands'
+side effects as a documentation check.
+
+Admin commands follow the [admin and console rules](../../../rules/admin-cli-parity.md).
+Document what they share: exit code 1 for an unknown target, a conflict or a declined
+confirmation, exit 2 for rejected input or a missing `--force` without a terminal;
+`--force`, which skips the confirmation; and `--json`, which prints the API response's
+`data` payload, or nothing when the route answers 204. Name the admin panel action or
+API route the command mirrors.

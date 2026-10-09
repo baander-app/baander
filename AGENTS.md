@@ -62,7 +62,9 @@ Prefix Baander-defined HTTP headers with `X-Baander-`; preserve generic protocol
 proxy, and security header names.
 
 For backend changes, read [architecture rules](.agents/rules/architecture-rules.md)
-and the relevant `ddd-*.md` reference in `.agents/rules/`. For web changes, read
+and the relevant `ddd-*.md` reference in `.agents/rules/`. For admin routes, console
+commands, long-running jobs, or state inside the web server, also read
+[admin and console rules](.agents/rules/admin-cli-parity.md). For web changes, read
 [frontend rules](.agents/rules/frontend.md) and `ui/DESIGN.md`. Use the
 [testing guide](docs-book/part-2-developer-guide/testing.md) for current runners.
 Treat documented exceptions narrowly; existing violations and baselines do not
