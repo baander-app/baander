@@ -17,6 +17,7 @@ use App\Shared\Interface\Console\SettingsGetCommand;
 use App\Shared\Interface\Console\SettingsListCommand;
 use App\Shared\Interface\Console\SettingsResetCommand;
 use App\Shared\Interface\Console\SettingsSetCommand;
+use App\Shared\Interface\Resource\SystemSettingResource;
 use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
@@ -110,6 +111,46 @@ final class SystemSettingsCommandsTest extends TestCase
         $tester = new CommandTester(new SettingsResetCommand($this->bus, $this->settings));
 
         $this->assertSame(Command::FAILURE, $tester->execute(['key' => 'nope.key']));
+    }
+
+    public function testSetJsonPrintsTheSettingsTheApiReturns(): void
+    {
+        $tester = new CommandTester(new SettingsSetCommand($this->bus, $this->settings));
+
+        $this->assertSame(Command::SUCCESS, $tester->execute(['key' => 'transcode.max_bitrate', 'value' => '192', '--json' => true]));
+        $this->assertSame(
+            SystemSettingResource::collection($this->settings->entries()),
+            json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR),
+        );
+    }
+
+    public function testSetJsonKeepsViolationsOffStdout(): void
+    {
+        $tester = new CommandTester(new SettingsSetCommand($this->bus, $this->settings));
+
+        $this->assertSame(Command::FAILURE, $tester->execute(['key' => 'transcode.max_bitrate', 'value' => 'abc', '--json' => true], ['capture_stderr_separately' => true]));
+        $this->assertSame('', $tester->getDisplay());
+        $this->assertStringContainsString('transcode.max_bitrate', $tester->getErrorOutput());
+    }
+
+    public function testResetJsonPrintsTheSettingTheApiReturns(): void
+    {
+        $this->rows['transcode.max_bitrate'] = 128;
+        $tester = new CommandTester(new SettingsResetCommand($this->bus, $this->settings));
+
+        $this->assertSame(Command::SUCCESS, $tester->execute(['key' => 'transcode.max_bitrate', '--json' => true]));
+        $this->assertSame(
+            SystemSettingResource::from($this->settings->entry('transcode.max_bitrate')),
+            json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR),
+        );
+    }
+
+    public function testResetJsonKeepsFailuresOffStdout(): void
+    {
+        $tester = new CommandTester(new SettingsResetCommand($this->bus, $this->settings));
+
+        $this->assertSame(Command::FAILURE, $tester->execute(['key' => 'nope.key', '--json' => true], ['capture_stderr_separately' => true]));
+        $this->assertSame('', $tester->getDisplay());
     }
 
     private function store(): SystemSettingStoreInterface

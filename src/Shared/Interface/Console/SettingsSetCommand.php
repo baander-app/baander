@@ -7,6 +7,7 @@ namespace App\Shared\Interface\Console;
 use App\Shared\Application\Command\UpdateSystemSettingsCommand;
 use App\Shared\Application\Exception\InvalidSettingValuesException;
 use App\Shared\Application\Service\SystemSettings;
+use App\Shared\Interface\Resource\SystemSettingResource;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -35,6 +36,7 @@ final class SettingsSetCommand extends Command
         $this
             ->addArgument('key', InputArgument::REQUIRED, 'Setting key, for example transcode.max_bitrate')
             ->addArgument('value', InputArgument::REQUIRED, 'New value, for example true, 192 or da');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -50,10 +52,14 @@ final class SettingsSetCommand extends Command
                 throw $e;
             }
             foreach ($cause->violations as $violation) {
-                $io->error(sprintf('%s: %s', $violation->key, $violation->message));
+                $io->getErrorStyle()->error(sprintf('%s: %s', $violation->key, $violation->message));
             }
 
             return Command::FAILURE;
+        }
+
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, SystemSettingResource::collection($this->settings->entries()));
         }
 
         $io->success(sprintf('%s is now %s.', $key, SettingValueFormatter::format($this->settings->get($key))));

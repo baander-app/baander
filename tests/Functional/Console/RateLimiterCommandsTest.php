@@ -69,6 +69,33 @@ final class RateLimiterCommandsTest extends KernelTestCase
         self::assertStringContainsString('Unknown rate limiter "no_such_limiter"', $tester->getDisplay());
     }
 
+    public function testClearJsonPrintsTheApiPayloadForOneLimiter(): void
+    {
+        $tester = $this->command('app:rate-limiter:clear');
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['name' => 'batch_cover_extract', '--json' => true]), $tester->getDisplay());
+        self::assertSame(['cleared' => true, 'limiter' => 'batch_cover_extract'], json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR));
+    }
+
+    public function testClearAllJsonPrintsTheApiPayload(): void
+    {
+        $tester = $this->command('app:rate-limiter:clear');
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['--all' => true, '--json' => true]), $tester->getDisplay());
+        $data = json_decode($tester->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertTrue($data['cleared']);
+        self::assertEqualsCanonicalizing($this->configuredLimiterNames(), $data['limiters']);
+    }
+
+    public function testClearJsonKeepsFailuresOffStdout(): void
+    {
+        $tester = $this->command('app:rate-limiter:clear');
+
+        self::assertSame(Command::FAILURE, $tester->execute(['name' => 'no_such_limiter', '--json' => true], ['capture_stderr_separately' => true]));
+        self::assertSame('', $tester->getDisplay());
+        self::assertStringContainsString('Unknown rate limiter', $tester->getErrorOutput());
+    }
+
     private function command(string $name): CommandTester
     {
         return new CommandTester((new Application(self::$kernel))->find($name));

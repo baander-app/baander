@@ -71,6 +71,16 @@ The value is parsed by the setting's type:
 
 An unknown key or an invalid value prints the reason, saves nothing, and exits with `1`. On success the command prints the setting's new value.
 
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--json` | off | Print every setting after the change, as `PATCH /api/admin/settings` returns them |
+
+With `--json`, stdout holds only the API's `data` array, one object per setting with `key`, `value`, `storedValue`, `isExplicit` and `storedValueValid`. Rejected values go to stderr.
+
+```bash
+make exec cmd="php bin/console app:settings:set transcode.max_bitrate 192 --json"
+```
+
 ## app:settings:reset
 
 Deletes the stored value, so the setting follows its default again, and prints the value it now has.

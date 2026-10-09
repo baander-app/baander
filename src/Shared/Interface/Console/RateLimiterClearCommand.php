@@ -32,6 +32,7 @@ final class RateLimiterClearCommand extends Command
         $this
             ->addArgument('name', InputArgument::OPTIONAL, 'Rate limiter to clear (see app:rate-limiter:list)')
             ->addOption('all', null, InputOption::VALUE_NONE, 'Clear every configured rate limiter');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -41,7 +42,7 @@ final class RateLimiterClearCommand extends Command
         $all = (bool) $input->getOption('all');
 
         if ($all === ($name !== null)) {
-            $io->error('Pass either a rate limiter name or --all.');
+            $io->getErrorStyle()->error('Pass either a rate limiter name or --all.');
 
             return Command::INVALID;
         }
@@ -49,6 +50,10 @@ final class RateLimiterClearCommand extends Command
         try {
             if ($all) {
                 $cleared = $this->rateLimiters->clearAll();
+                if (AdminCommandSupport::wantsJson($input)) {
+                    return AdminCommandSupport::json($io, ['cleared' => true, 'limiters' => $cleared]);
+                }
+
                 $io->success(sprintf('Cleared %d rate limiter(s): %s', count($cleared), implode(', ', $cleared)));
 
                 return Command::SUCCESS;
@@ -56,9 +61,13 @@ final class RateLimiterClearCommand extends Command
 
             $this->rateLimiters->clear((string) $name);
         } catch (UnknownRateLimiterException|RateLimiterClearFailedException $e) {
-            $io->error($e->getMessage());
+            $io->getErrorStyle()->error($e->getMessage());
 
             return Command::FAILURE;
+        }
+
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, ['cleared' => true, 'limiter' => (string) $name]);
         }
 
         $io->success(sprintf('Cleared rate limiter "%s".', $name));

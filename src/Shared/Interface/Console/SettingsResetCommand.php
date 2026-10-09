@@ -7,6 +7,7 @@ namespace App\Shared\Interface\Console;
 use App\Shared\Application\Command\ResetSystemSettingCommand;
 use App\Shared\Application\Exception\UnknownSettingException;
 use App\Shared\Application\Service\SystemSettings;
+use App\Shared\Interface\Resource\SystemSettingResource;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -33,6 +34,7 @@ final class SettingsResetCommand extends Command
     protected function configure(): void
     {
         $this->addArgument('key', InputArgument::REQUIRED, 'Setting key, for example transcode.max_bitrate');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -46,9 +48,13 @@ final class SettingsResetCommand extends Command
             if (!$e->getPrevious() instanceof UnknownSettingException) {
                 throw $e;
             }
-            $io->error($e->getPrevious()->getMessage());
+            $io->getErrorStyle()->error($e->getPrevious()->getMessage());
 
             return Command::FAILURE;
+        }
+
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, SystemSettingResource::from($this->settings->entry($key)));
         }
 
         $io->success(sprintf('%s follows its default again: %s.', $key, SettingValueFormatter::format($this->settings->get($key))));
