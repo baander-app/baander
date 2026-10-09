@@ -79,7 +79,8 @@ interface SongPortInterface
 
     public function flush(): void;
 
-    public function delete(Song $song, bool $deleteFile = false): void;
+    /** Deletes the song; its audio file is never touched here. */
+    public function delete(Song $song): void;
 
     public function linkArtistToSong(Uuid $songId, string $artistName, string $role): void;
 

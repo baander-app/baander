@@ -4,18 +4,20 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Controller;
 
-use App\Catalog\Application\Port\AlbumPortInterface;
-use App\Catalog\Application\Port\SongPortInterface;
-use App\Playlist\Application\Port\PlaylistDeletionPreviewPortInterface;
-use App\Shared\Domain\Model\PublicId;
-use App\Shared\Domain\Model\Uuid;
-use App\Shared\Interface\Attribute\CliParityExemption;
+use App\Catalog\Application\Command\Album\DeleteAlbumCommand;
+use App\Catalog\Application\Query\Album\GetAlbumDeletePreviewQuery;
+use App\Catalog\Interface\Resource\AlbumDeletePreviewResource;
+use App\Catalog\Interface\Resource\CatalogDeletionResource;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
-use App\Shared\Interface\Controller\TranslatorTrait;
+use App\Shared\Interface\DTO\ApiError;
+use App\Shared\Interface\DTO\ValidationError;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -25,12 +27,9 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class AdminAlbumController
 {
     use ApiResponsesTrait;
-    use TranslatorTrait;
 
     public function __construct(
-        private readonly AlbumPortInterface $albumPort,
-        private readonly SongPortInterface $songPort,
-        private readonly PlaylistDeletionPreviewPortInterface $playlistPreview,
+        private readonly MessageBusInterface $bus,
     ) {
     }
 
@@ -39,80 +38,33 @@ final class AdminAlbumController
         summary: 'Preview what will be deleted when deleting an album',
         parameters: [
             new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'deleteFiles', description: 'Also check each song file as a delete with deleteFiles would', in: 'query', required: false, schema: new OA\Schema(type: 'boolean')),
         ],
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Delete preview data',
                 content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'album', properties: [
-                            new OA\Property(property: 'id', type: 'string'),
-                            new OA\Property(property: 'title', type: 'string'),
-                            new OA\Property(property: 'songCount', type: 'integer'),
-                        ], type: 'object'),
-                        new OA\Property(property: 'files', properties: [
-                            new OA\Property(property: 'count', type: 'integer'),
-                            new OA\Property(property: 'totalSize', type: 'integer'),
-                        ], type: 'object'),
-                        new OA\Property(property: 'coverImage', properties: [
-                            new OA\Property(property: 'id', type: 'string', nullable: true),
-                        ], type: 'object', nullable: true),
-                        new OA\Property(property: 'affected', properties: [
-                            new OA\Property(property: 'playlists', type: 'integer'),
-                            new OA\Property(property: 'playlistNames', items: new OA\Items(type: 'string'), type: 'array'),
-                        ], type: 'object'),
-                    ],
+                    properties: [new OA\Property(property: 'data', ref: new Model(type: AlbumDeletePreviewResource::class))],
                     type: 'object',
                 ),
             ),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Album not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid public ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '404', description: 'Album not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '422', description: 'Invalid public ID', content: new OA\JsonContent(ref: new Model(type: ValidationError::class))),
         ],
     )]
     #[Route('/{publicId}/delete-preview', name: 'delete_preview', methods: ['GET'])]
-    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
-    public function deletePreview(string $publicId): JsonResponse
+    #[CliCounterpart('app:album:delete')]
+    public function deletePreview(string $publicId, Request $request): JsonResponse
     {
-        $resolvedPublicId = $this->resolvePublicId($publicId);
-        if ($resolvedPublicId === null) {
-            return $this->errorResponse($this->trans('errors.invalid_public_id'), 422);
-        }
+        $preview = $this->dispatch(new GetAlbumDeletePreviewQuery(
+            publicId: $publicId,
+            deleteFiles: filter_var($request->query->get('deleteFiles', 'false'), FILTER_VALIDATE_BOOLEAN),
+        ));
 
-        $album = $this->albumPort->findByPublicId($resolvedPublicId);
-        if ($album === null) {
-            return $this->notFound();
-        }
-
-        $songs = $this->songPort->findByAlbum($album->getId(), limit: 1000);
-        $totalSize = array_sum(array_map(fn($s) => $s->getSize(), $songs));
-
-        $playlists = $this->playlistPreview->findContainingSongs(
-            array_map(static fn ($song): Uuid => $song->getId(), $songs),
-        );
-
-        $coverImageData = $album->getCoverImageId() !== null
-            ? ['id' => $album->getCoverImageId()->toString()]
-            : null;
-
-        return $this->successResponse([
-            'album' => [
-                'id' => $album->getPublicId()->toString(),
-                'title' => $album->getTitle(),
-                'songCount' => count($songs),
-            ],
-            'files' => [
-                'count' => count($songs),
-                'totalSize' => $totalSize,
-            ],
-            'coverImage' => $coverImageData,
-            'affected' => [
-                'playlists' => count($playlists),
-                'playlistNames' => array_column($playlists, 'name'),
-            ],
-        ]);
+        return $this->successResponse(AlbumDeletePreviewResource::from($preview));
     }
 
     #[OA\Delete(
@@ -120,45 +72,41 @@ final class AdminAlbumController
         summary: 'Delete an album with optional file deletion',
         parameters: [
             new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'deleteFiles', description: 'Whether to delete audio files', in: 'query', required: false, schema: new OA\Schema(type: 'boolean')),
+            new OA\Parameter(name: 'deleteFiles', description: 'Also delete the song audio files, inside the library root only', in: 'query', required: false, schema: new OA\Schema(type: 'boolean')),
             new OA\Parameter(name: 'deleteCover', description: 'Whether to delete cover image (default: true)', in: 'query', required: false, schema: new OA\Schema(type: 'boolean')),
         ],
         responses: [
-            new OA\Response(response: '204', description: 'Album deleted successfully'),
-            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Album not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Invalid public ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '200',
+                description: 'Album deleted; with deleteFiles, the files removed and left',
+                content: new OA\JsonContent(
+                    properties: [new OA\Property(property: 'data', ref: new Model(type: CatalogDeletionResource::class))],
+                    type: 'object',
+                ),
+            ),
+            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '404', description: 'Album not found', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '409', description: 'With deleteFiles: a scan holds the library, or the server cannot write a song directory; nothing was deleted', content: new OA\JsonContent(ref: new Model(type: ApiError::class))),
+            new OA\Response(response: '422', description: 'Invalid public ID, or with deleteFiles a song file outside the library root; nothing was deleted', content: new OA\JsonContent(ref: new Model(type: ValidationError::class))),
         ],
     )]
     #[Route('/{publicId}', name: 'delete', methods: ['DELETE'])]
-    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
+    #[CliCounterpart('app:album:delete')]
     public function delete(string $publicId, Request $request): JsonResponse
     {
-        $resolvedPublicId = $this->resolvePublicId($publicId);
-        if ($resolvedPublicId === null) {
-            return $this->errorResponse($this->trans('errors.invalid_public_id'), 422);
-        }
+        $result = $this->dispatch(new DeleteAlbumCommand(
+            publicId: $publicId,
+            deleteFiles: filter_var($request->query->get('deleteFiles', 'false'), FILTER_VALIDATE_BOOLEAN),
+            deleteCover: filter_var($request->query->get('deleteCover', 'true'), FILTER_VALIDATE_BOOLEAN),
+        ));
 
-        $album = $this->albumPort->findByPublicId($resolvedPublicId);
-        if ($album === null) {
-            return $this->notFound();
-        }
-
-        $deleteFiles = filter_var($request->query->get('deleteFiles', 'false'), FILTER_VALIDATE_BOOLEAN);
-        $deleteCover = filter_var($request->query->get('deleteCover', 'true'), FILTER_VALIDATE_BOOLEAN);
-
-        $this->albumPort->delete($album, $deleteFiles, $deleteCover);
-
-        return $this->noContent();
+        return $this->successResponse(CatalogDeletionResource::from($result));
     }
 
-    private function resolvePublicId(string $publicId): ?PublicId
+    /** A handler's exception reaches ExceptionSubscriber, which unwraps it to its 404, 409 or 422 response. */
+    private function dispatch(object $message): mixed
     {
-        try {
-            return PublicId::fromString($publicId);
-        } catch (\Throwable) {
-            return null;
-        }
+        return $this->bus->dispatch($message)->last(HandledStamp::class)?->getResult();
     }
 }

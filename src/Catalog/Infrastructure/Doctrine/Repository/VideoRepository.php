@@ -11,6 +11,7 @@ use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -81,6 +82,19 @@ final class VideoRepository implements VideoRepositoryInterface
         return (int) $this->entityManager
             ->getRepository(VideoEntity::class)
             ->count([]);
+    }
+
+    public function deleteUnlinked(array $videoIds): int
+    {
+        if ($videoIds === []) {
+            return 0;
+        }
+
+        return (int) $this->entityManager->getConnection()->executeStatement(
+            'DELETE FROM videos v WHERE v.id IN (:ids) AND NOT EXISTS (SELECT 1 FROM movie_video mv WHERE mv.video_id = v.id)',
+            ['ids' => array_map(static fn (Uuid $id): string => $id->toString(), $videoIds)],
+            ['ids' => ArrayParameterType::STRING],
+        );
     }
 
     // --- Internal ---

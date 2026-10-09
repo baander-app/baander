@@ -69,10 +69,6 @@ deptrac:
     App\Catalog\Infrastructure\AlbumDuplicateService:
       - App\Catalog\Interface\Resource\AlbumResource
       - App\Media\Application\Port\ImagePortInterface
-    App\Catalog\Infrastructure\AlbumService:
-      - App\Media\Application\Port\ImagePortInterface
-      - App\Media\Application\Port\StoragePortInterface
-      - App\Media\Domain\Model\Image
     App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity:
       - App\Library\Infrastructure\Doctrine\Entity\LibraryEntity
       - App\Media\Infrastructure\Doctrine\Entity\ImageEntity
@@ -87,8 +83,6 @@ deptrac:
       - App\Media\Infrastructure\Doctrine\Entity\ImageEntity
     App\Catalog\Infrastructure\Doctrine\Repository\MovieRepository:
       - App\Library\Infrastructure\Doctrine\Entity\LibraryEntity
-    App\Catalog\Infrastructure\SongService:
-      - App\Media\Application\Port\StoragePortInterface
     App\Catalog\Interface\Controller\AlbumController:
       - App\Catalog\Domain\Model\Album
       - App\Media\Application\Port\ImagePortInterface

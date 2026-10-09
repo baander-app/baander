@@ -200,7 +200,7 @@ final class ArtistMutationFirewallTest extends TestCase
         return match ($action) {
             'store' => ['POST', '/api/artists/', ['name' => $this->createdName], 201],
             'update' => ['PATCH', $base, ['name' => 'Modified artist'], 200],
-            'destroy' => ['DELETE', $base, [], 204],
+            'destroy' => ['DELETE', $base, [], 200],
             'add-song' => ['POST', $base . '/songs', ['songId' => $songId, 'role' => 'primary'], 204],
             'remove-song' => ['DELETE', $base . '/songs/' . $songId, [], 204],
             'song-role' => ['PATCH', $base . '/songs/' . $songId, ['role' => 'featured'], 204],

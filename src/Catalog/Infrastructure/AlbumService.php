@@ -4,14 +4,11 @@ declare(strict_types=1);
 
 namespace App\Catalog\Infrastructure;
 
+use App\Catalog\Application\CommandHandler\Cover\CoverImageDiscarder;
 use App\Catalog\Application\Port\AlbumPortInterface;
-use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Repository\AlbumRepositoryInterface;
 use App\Catalog\Domain\ValueObject\MusicbrainzId;
-use App\Media\Application\Port\ImagePortInterface;
-use App\Media\Application\Port\StoragePortInterface;
-use App\Media\Domain\Model\Image;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
@@ -22,9 +19,7 @@ final class AlbumService implements AlbumPortInterface
 {
     public function __construct(
         private readonly AlbumRepositoryInterface $albumRepository,
-        private readonly SongPortInterface $songPort,
-        private readonly StoragePortInterface $storage,
-        private readonly ImagePortInterface $imagePort,
+        private readonly CoverImageDiscarder $covers,
     ) {
     }
 
@@ -139,29 +134,15 @@ final class AlbumService implements AlbumPortInterface
         $this->albumRepository->flush();
     }
 
-    public function delete(Album $album, bool $deleteFiles = false, bool $deleteCover = true): void
+    public function delete(Album $album, bool $deleteCover = true): void
     {
-        $songs = $this->songPort->findByAlbum($album->getId(), limit: 1000);
-
-        if ($deleteFiles) {
-            foreach ($songs as $song) {
-                $this->storage->delete($song->getPath());
-            }
-        }
-
-        if ($deleteCover) {
-            $coverImageId = $album->getCoverImageId();
-            if ($coverImageId !== null) {
-                $coverImage = $this->imagePort->findByUuid($coverImageId);
-                if ($coverImage !== null) {
-                    $this->storage->delete($coverImage->getPath());
-                    $this->storage->deleteDerived($coverImage->getPath(), $coverImage->getExtension());
-                    $this->imagePort->delete($coverImage);
-                }
-            }
-        }
+        $coverImageId = $deleteCover ? $album->getCoverImageId() : null;
 
         $this->albumRepository->delete($album);
+
+        if ($coverImageId !== null) {
+            $this->covers->discard($coverImageId);
+        }
     }
 
     public function linkArtistToAlbum(Uuid $albumId, string $artistName, string $role): void

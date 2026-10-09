@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Controller;
 
+use App\Catalog\Application\Command\Song\DeleteSongCommand;
 use App\Catalog\Application\Command\Song\UpdateSongCommand;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Port\SongSortField;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Interface\Request\UpdateSongRequest;
+use App\Catalog\Interface\Resource\CatalogDeletionResource;
 use App\Catalog\Interface\Resource\SongResource;
 use App\Shared\Domain\Exception\CursorMismatchException;
 use App\Shared\Domain\Model\Cursor;
@@ -17,7 +19,6 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Infrastructure\Pagination\CursorCodec;
 use App\Shared\Interface\Attribute\CliCounterpart;
-use App\Shared\Interface\Attribute\CliParityExemption;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\DTO\CursorPaginatedResponse;
@@ -199,29 +200,25 @@ final class SongController
             new OA\Parameter(name: 'publicId', description: 'Song public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
-            new OA\Response(response: '204', description: 'Deleted'),
+            new OA\Response(
+                response: '200',
+                description: 'Deleted',
+                content: new OA\JsonContent(
+                    properties: [new OA\Property(property: 'data', ref: new Model(type: CatalogDeletionResource::class))],
+                    type: 'object',
+                ),
+            ),
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'Invalid public ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
     #[Route('/{publicId}', name: 'destroy', methods: ['DELETE'])]
-    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
+    #[CliCounterpart('app:song:delete')]
     public function destroy(string $publicId): JsonResponse
     {
-        try {
-            $resolvedPublicId = PublicId::fromString($publicId);
-        } catch (\Throwable) {
-            return $this->errorResponse($this->trans('errors.invalid_public_id'));
-        }
+        $result = $this->dispatch(new DeleteSongCommand(publicId: $publicId));
 
-        $song = $this->songService->findByPublicId($resolvedPublicId);
-
-        if ($song === null) {
-            return $this->notFound();
-        }
-
-        $this->songService->delete($song);
-
-        return $this->noContent();
+        return $this->successResponse(CatalogDeletionResource::from($result));
     }
 
     private function buildSearchOptions(Request $request, string $query, int $limit, ?Cursor $cursor): SearchOptions

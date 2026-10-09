@@ -65,7 +65,11 @@ interface AlbumPortInterface
 
     public function flush(): void;
 
-    public function delete(Album $album, bool $deleteFiles = false, bool $deleteCover = true): void;
+    /**
+     * Deletes the album and, through the database, its songs. With $deleteCover the cover image is
+     * deleted after the album; the songs' audio files are never touched here.
+     */
+    public function delete(Album $album, bool $deleteCover = true): void;
 
     public function linkArtistToAlbum(Uuid $albumId, string $artistName, string $role): void;
 
