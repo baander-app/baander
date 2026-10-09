@@ -6,7 +6,7 @@ namespace App\Catalog\Application\CommandHandler\Song;
 
 use App\Catalog\Application\Command\CatalogDeletionResult;
 use App\Catalog\Application\Command\Song\DeleteSongCommand;
-use App\Catalog\Application\CommandHandler\CatalogInput;
+use App\Catalog\Application\Service\CatalogInput;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Library\Application\Port\LibraryMediaFilesInterface;

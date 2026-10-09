@@ -25,6 +25,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\Controller\DispatchesMessagesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\DTO\PaginatedResponse;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -34,7 +35,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
-use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -43,6 +43,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class ArtistController
 {
     use ApiResponsesTrait;
+    use DispatchesMessagesTrait;
     use TranslatorTrait;
     public function __construct(
         private readonly ArtistPortInterface $artistService,
@@ -446,11 +447,5 @@ final class ArtistController
         $this->dispatch(new ChangeArtistCreditRoleCommand($publicId, CreditTarget::Album, $albumId, $payload->role, $payload->currentRole));
 
         return $this->noContent();
-    }
-
-    /** A handler's exception reaches ExceptionSubscriber, which unwraps it to its 404 or 422 response. */
-    private function dispatch(object $message): mixed
-    {
-        return $this->bus->dispatch($message)->last(HandledStamp::class)?->getResult();
     }
 }

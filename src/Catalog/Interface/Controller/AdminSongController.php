@@ -10,6 +10,7 @@ use App\Catalog\Interface\Resource\CatalogDeletionResource;
 use App\Catalog\Interface\Resource\SongDeletePreviewResource;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\Controller\DispatchesMessagesTrait;
 use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\ValidationError;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -17,7 +18,6 @@ use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Messenger\MessageBusInterface;
-use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -27,6 +27,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class AdminSongController
 {
     use ApiResponsesTrait;
+    use DispatchesMessagesTrait;
 
     public function __construct(
         private readonly MessageBusInterface $bus,
@@ -100,11 +101,5 @@ final class AdminSongController
         ));
 
         return $this->successResponse(CatalogDeletionResource::from($result));
-    }
-
-    /** A handler's exception reaches ExceptionSubscriber, which unwraps it to its 404, 409 or 422 response. */
-    private function dispatch(object $message): mixed
-    {
-        return $this->bus->dispatch($message)->last(HandledStamp::class)?->getResult();
     }
 }

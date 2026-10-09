@@ -10,7 +10,7 @@ use App\Catalog\Application\Command\Movie\DeleteMovieCommand;
 use App\Catalog\Application\Command\Song\DeleteSongCommand;
 use App\Catalog\Application\CommandHandler\Album\DeleteAlbumHandler;
 use App\Catalog\Application\CommandHandler\Artist\DeleteArtistHandler;
-use App\Catalog\Application\CommandHandler\Cover\CoverImageDiscarder;
+use App\Catalog\Application\Service\CoverImageDiscarder;
 use App\Catalog\Application\CommandHandler\Movie\DeleteMovieHandler;
 use App\Catalog\Application\CommandHandler\Song\DeleteSongHandler;
 use App\Catalog\Application\Port\AlbumPortInterface;

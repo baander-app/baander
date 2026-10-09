@@ -20,6 +20,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\Controller\DispatchesMessagesTrait;
 use App\Shared\Interface\DTO\ApiError;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -27,7 +28,6 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapQueryString;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
-use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -36,6 +36,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class LyricsController
 {
     use ApiResponsesTrait;
+    use DispatchesMessagesTrait;
 
     public function __construct(
         private readonly LyricsPortInterface $lyricsPort,
@@ -195,10 +196,5 @@ final class LyricsController
         }
 
         return $this->songs->findVisibleSongId($resolvedPublicId, $this->libraryReadScope->current());
-    }
-
-    private function dispatch(object $message): mixed
-    {
-        return $this->bus->dispatch($message)->last(HandledStamp::class)?->getResult();
     }
 }

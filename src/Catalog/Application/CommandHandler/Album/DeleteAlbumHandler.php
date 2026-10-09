@@ -6,8 +6,8 @@ namespace App\Catalog\Application\CommandHandler\Album;
 
 use App\Catalog\Application\Command\Album\DeleteAlbumCommand;
 use App\Catalog\Application\Command\CatalogDeletionResult;
-use App\Catalog\Application\CommandHandler\CatalogInput;
-use App\Catalog\Application\CommandHandler\Cover\CoverImageDiscarder;
+use App\Catalog\Application\Service\CatalogInput;
+use App\Catalog\Application\Service\CoverImageDiscarder;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Domain\Model\Song;

@@ -11,7 +11,6 @@ use App\Lyrics\Application\DTO\LrclibUnavailable;
 use App\Lyrics\Application\DTO\LyricsFetchResult;
 use App\Lyrics\Application\Port\LrclibClientInterface;
 use App\Lyrics\Application\Port\QueuedLyricsFetchesInterface;
-use App\Lyrics\Domain\Model\Lyrics;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
 use Psr\Log\LoggerInterface;
@@ -150,7 +149,7 @@ final class FetchLyricsHandler
         }
 
         // 9. Create and persist lyrics
-        $lyrics = $this->createLyricsFromResult($result, $songId);
+        $lyrics = $result->toLyrics($songId);
         $this->lyricsRepository->save($lyrics);
 
         $this->logger->info('Fetched and stored lyrics from LRCLIB', [
@@ -161,18 +160,5 @@ final class FetchLyricsHandler
         ]);
 
         return LyricsFetchResult::found($lyrics);
-    }
-
-    private function createLyricsFromResult(LrclibResult $result, Uuid $songId): Lyrics
-    {
-        return Lyrics::create(
-            songId: $songId,
-            lyrics: $result->plainLyrics ?? '',
-            source: 'lrclib',
-            sourceUrl: null,
-            isInstrumental: $result->instrumental,
-            syncedLyrics: $result->syncedLyrics,
-            lrclibId: $result->id,
-        );
     }
 }

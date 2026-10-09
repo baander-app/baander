@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Catalog\Application\CommandHandler;
+namespace App\Catalog\Application\Service;
 
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Domain\Model\PublicId;

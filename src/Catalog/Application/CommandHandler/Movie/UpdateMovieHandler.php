@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Application\CommandHandler\Movie;
 
 use App\Catalog\Application\Command\Movie\UpdateMovieCommand;
-use App\Catalog\Application\CommandHandler\CatalogInput;
+use App\Catalog\Application\Service\CatalogInput;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Domain\Model\Movie;
 use App\Shared\Application\Exception\InvalidInputException;

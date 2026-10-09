@@ -6,7 +6,7 @@ namespace App\Catalog\Application\CommandHandler\Movie;
 
 use App\Catalog\Application\Command\CatalogDeletionResult;
 use App\Catalog\Application\Command\Movie\DeleteMovieCommand;
-use App\Catalog\Application\CommandHandler\CatalogInput;
+use App\Catalog\Application\Service\CatalogInput;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Shared\Application\Exception\InvalidInputException;

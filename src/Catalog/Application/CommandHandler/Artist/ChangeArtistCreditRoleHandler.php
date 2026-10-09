@@ -6,11 +6,12 @@ namespace App\Catalog\Application\CommandHandler\Artist;
 
 use App\Catalog\Application\Command\Artist\ChangeArtistCreditRoleCommand;
 use App\Catalog\Application\Command\Artist\CreditTarget;
-use App\Catalog\Application\CommandHandler\CatalogInput;
+use App\Catalog\Application\Service\CatalogInput;
 use App\Catalog\Application\Port\ArtistPortInterface;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use App\Catalog\Application\Service\ArtistCreditInput;
 
 /**
  * Changes the role of the artist's credit on a song or an album that the current role names, or

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Infrastructure;
 
-use App\Catalog\Application\CommandHandler\Cover\CoverImageDiscarder;
+use App\Catalog\Application\Service\CoverImageDiscarder;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Repository\AlbumRepositoryInterface;

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Application\CommandHandler\Album;
 
 use App\Catalog\Application\Command\Album\UpdateAlbumCommand;
-use App\Catalog\Application\CommandHandler\CatalogInput;
+use App\Catalog\Application\Service\CatalogInput;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Domain\Model\Album;
 use App\Shared\Application\Exception\InvalidInputException;

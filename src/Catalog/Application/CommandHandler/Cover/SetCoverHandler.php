@@ -18,6 +18,8 @@ use App\Shared\Domain\Model\Uuid;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Throwable;
+use App\Catalog\Application\Service\CoverOwners;
+use App\Catalog\Application\Service\CoverImageDiscarder;
 
 /**
  * Stores an image file as the cover of an album or an artist.

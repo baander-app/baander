@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Lyrics\Application\DTO;
 
+use App\Lyrics\Domain\Model\Lyrics;
+use App\Shared\Domain\Model\Uuid;
+
 /**
  * Value object representing a lyrics result from the LRCLIB API.
  *
@@ -40,6 +43,20 @@ final readonly class LrclibResult
             instrumental: (bool) ($data['instrumental'] ?? false),
             plainLyrics: $data['plainLyrics'] ?? null,
             syncedLyrics: $data['syncedLyrics'] ?? null,
+        );
+    }
+
+    /** The song's lyrics from this result, as a fetch or an applied search result stores them. */
+    public function toLyrics(Uuid $songId): Lyrics
+    {
+        return Lyrics::create(
+            songId: $songId,
+            lyrics: $this->plainLyrics ?? '',
+            source: 'lrclib',
+            sourceUrl: null,
+            isInstrumental: $this->instrumental,
+            syncedLyrics: $this->syncedLyrics,
+            lrclibId: $this->id,
         );
     }
 }

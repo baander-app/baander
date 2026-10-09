@@ -11,13 +11,13 @@ use App\Catalog\Interface\Resource\CoverImageResource;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\Controller\DispatchesMessagesTrait;
 use OpenApi\Attributes as OA;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Messenger\MessageBusInterface;
-use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -27,6 +27,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class ArtistCoverController
 {
     use ApiResponsesTrait;
+    use DispatchesMessagesTrait;
 
     public function __construct(
         private readonly MessageBusInterface $bus,
@@ -95,10 +96,5 @@ final class ArtistCoverController
         $this->dispatch(new RemoveCoverCommand(CoverOwner::Artist, $publicId));
 
         return $this->noContent();
-    }
-
-    private function dispatch(object $message): mixed
-    {
-        return $this->bus->dispatch($message)->last(HandledStamp::class)?->getResult();
     }
 }

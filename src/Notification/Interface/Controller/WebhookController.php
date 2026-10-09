@@ -12,6 +12,7 @@ use App\Notification\Application\DTO\UpdateWebhookCommand;
 use App\Notification\Interface\Resource\WebhookResource;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\Controller\DispatchesMessagesTrait;
 use OpenApi\Attributes as OA;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -19,7 +20,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\AsController;
 use Symfony\Component\Messenger\MessageBusInterface;
-use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -30,6 +30,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class WebhookController
 {
     use ApiResponsesTrait;
+    use DispatchesMessagesTrait;
 
     public function __construct(
         private readonly MessageBusInterface $bus,
@@ -185,11 +186,5 @@ final class WebhookController
         $issued = $this->dispatch(new RotateWebhookSecretCommand($id));
 
         return $this->successResponse(WebhookResource::rotated($issued));
-    }
-
-    /** A handler's exception reaches ExceptionSubscriber, which unwraps it to its 404 or 422 response. */
-    private function dispatch(object $message): mixed
-    {
-        return $this->bus->dispatch($message)->last(HandledStamp::class)?->getResult();
     }
 }

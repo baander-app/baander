@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Application\CommandHandler\Artist;
 
 use App\Catalog\Application\Command\Artist\UpdateArtistCommand;
-use App\Catalog\Application\CommandHandler\CatalogInput;
+use App\Catalog\Application\Service\CatalogInput;
 use App\Catalog\Application\Port\ArtistPortInterface;
 use App\Catalog\Domain\Model\Artist;
 use App\Shared\Application\Exception\InvalidInputException;

@@ -48,15 +48,7 @@ final readonly class ApplyLyricsHandler
             throw new NotFoundException(sprintf('LRCLIB has no lyrics with ID %d.', $command->lrclibResultId));
         }
 
-        $lyrics = Lyrics::create(
-            songId: $songId,
-            lyrics: $result->plainLyrics ?? '',
-            source: 'lrclib',
-            sourceUrl: null,
-            isInstrumental: $result->instrumental,
-            syncedLyrics: $result->syncedLyrics,
-            lrclibId: $result->id,
-        );
+        $lyrics = $result->toLyrics($songId);
         $this->lyricsRepository->save($lyrics);
 
         $this->logger->info('Applied LRCLIB search result to song', [
