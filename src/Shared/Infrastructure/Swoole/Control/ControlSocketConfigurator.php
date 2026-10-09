@@ -15,9 +15,9 @@ use Throwable;
 /**
  * Adds the server control listener before the server starts.
  *
- * The unix socket is mode 0600 in a 0700 directory owned by the server's user:
- * file permissions are the authentication, so only that user (operators running
- * commands in the same container) can connect. The bundle tags this service as a
+ * The unix socket is mode 0600 in a 0700 directory owned by the server's user
+ * (ControlSocketDirectory): file permissions are the authentication, so only
+ * that user (operators running commands in the same container) can connect. The bundle tags this service as a
  * server configurator through autoconfiguration.
  */
 final readonly class ControlSocketConfigurator implements Configurator
@@ -35,7 +35,11 @@ final readonly class ControlSocketConfigurator implements Configurator
 
     public function configure(Server $server): void
     {
-        $this->prepareDirectory(dirname($this->socketPath));
+        // ext-posix is a platform requirement; a development host may lack it.
+        ControlSocketDirectory::prepare(
+            dirname($this->socketPath),
+            function_exists('posix_geteuid') ? posix_geteuid() : null,
+        );
         $this->removeStaleSocket();
 
         $umask = umask(0077);
@@ -87,29 +91,6 @@ final readonly class ControlSocketConfigurator implements Configurator
             return ControlProtocol::encodeError($request['id'], $exception->getMessage());
         } catch (Throwable $exception) {
             return ControlProtocol::encodeError($request['id'], 'server control operation failed: ' . $exception->getMessage());
-        }
-    }
-
-    private function prepareDirectory(string $directory): void
-    {
-        if (!is_dir($directory)) {
-            $umask = umask(0077);
-            try {
-                if (!mkdir($directory, 0700, true) && !is_dir($directory)) {
-                    throw new RuntimeException(sprintf('Cannot create the server control directory %s.', $directory));
-                }
-            } finally {
-                umask($umask);
-            }
-        }
-        // Only the owner can change the mode, so a directory another user created
-        // beforehand (the default lives under the shared /tmp) is refused here.
-        clearstatcache(true, $directory);
-        if (is_link($directory) || !is_dir($directory) || !@chmod($directory, 0700)) {
-            throw new RuntimeException(sprintf(
-                'The server control directory %s must be a directory owned by the server user.',
-                $directory,
-            ));
         }
     }
 

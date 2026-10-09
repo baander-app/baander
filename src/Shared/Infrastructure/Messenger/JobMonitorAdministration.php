@@ -13,6 +13,7 @@ use App\Shared\Application\DTO\JobMonitorPruneResult;
 use App\Shared\Application\DTO\JobMonitorQuery;
 use App\Shared\Application\DTO\JobMonitorRecord;
 use App\Shared\Application\Exception\ConflictException;
+use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\JobCancelledException;
@@ -24,7 +25,6 @@ use App\Shared\Infrastructure\Pagination\CursorCodec;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Envelope;
-use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Messenger\Stamp\ReceivedStamp;
@@ -221,7 +221,7 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
         try {
             $handled = $this->messageBus->dispatch($envelope);
         } catch (Throwable $exception) {
-            $cause = self::cause($exception);
+            $cause = HandlerFailure::cause($exception);
             try {
                 $this->jobMonitorService->markFailed($jobId, $attempt, $cause);
             } catch (Throwable $monitorException) {
@@ -264,16 +264,6 @@ final readonly class JobMonitorAdministration implements JobMonitorAdministratio
     private static function cancelFlag(string $jobId): string
     {
         return sprintf('job_cancel:%s', $jobId);
-    }
-
-    /** Unwraps HandlerFailedException, nested ones included, when it wraps a single exception. */
-    private static function cause(Throwable $exception): Throwable
-    {
-        while ($exception instanceof HandlerFailedException && count($exception->getWrappedExceptions()) === 1) {
-            [$exception] = array_values($exception->getWrappedExceptions());
-        }
-
-        return $exception;
     }
 
     private static function record(JobMonitorEntity $job): JobMonitorRecord

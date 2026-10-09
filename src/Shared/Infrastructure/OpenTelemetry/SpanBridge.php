@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\OpenTelemetry;
 
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Swoole\Table;
 use SwooleBundle\SwooleBundle\Server\Runtime\Bootable;
 
@@ -17,16 +19,23 @@ use SwooleBundle\SwooleBundle\Server\Runtime\Bootable;
  *
  * A metadata row ('__meta') counts the spans ever written; its atomic increment
  * hands each writer its own slot ('span_0'..'span_N'). Each span is stored as a
- * JSON string in a single column.
+ * JSON string in a single column; a span whose JSON does not fit the column is
+ * dropped, and the first drop in each process is logged.
  */
 final class SpanBridge implements Bootable
 {
-    private const int MAX_SPANS = 500;
+    public const int MAX_SPANS = 500;
     private const int MAX_SPAN_BYTES = 16384;
     private const string META_KEY = '__meta';
     private const string SPAN_PREFIX = 'span_';
 
     private ?Table $table = null;
+    private bool $dropLogged = false;
+
+    public function __construct(
+        private readonly LoggerInterface $logger = new NullLogger(),
+    ) {
+    }
 
     public function boot(array $runtimeConfiguration = []): void
     {
@@ -34,7 +43,11 @@ final class SpanBridge implements Bootable
             return;
         }
 
-        $table = new Table(self::MAX_SPANS + 1); // +1 for the metadata row
+        // +1 for the metadata row. A key whose hash bucket is taken goes to an
+        // overflow pool of size * conflict proportion rows; Swoole's default
+        // proportion (0.2) leaves about a quarter of the ring's keys without a row.
+        // A proportion of 1 gives every key a row whatever the hashes.
+        $table = new Table(self::MAX_SPANS + 1, 1.0);
         $table->column('data', Table::TYPE_STRING, self::MAX_SPAN_BYTES);
         $table->column('idx', Table::TYPE_INT);
         $table->create();
@@ -54,12 +67,34 @@ final class SpanBridge implements Bootable
             return;
         }
 
+        $data = json_encode($spanData, JSON_THROW_ON_ERROR);
+        // Swoole would truncate a longer value, and the cut JSON would break every read.
+        if (strlen($data) > self::MAX_SPAN_BYTES) {
+            $this->logDrop(sprintf('its JSON is %d bytes, over the %d-byte limit', strlen($data), self::MAX_SPAN_BYTES));
+
+            return;
+        }
+
         $written = $this->table->incr(self::META_KEY, 'idx');
         $slot = ($written - 1) % self::MAX_SPANS;
-        $this->table->set(self::SPAN_PREFIX . $slot, [
-            'data' => json_encode($spanData, JSON_THROW_ON_ERROR),
-            'idx' => $slot,
-        ]);
+        $key = self::SPAN_PREFIX . $slot;
+        if (!@$this->table->set($key, ['data' => $data, 'idx' => $slot])) {
+            // The slot still holds the span from the previous lap; it is not the newest.
+            $this->table->del($key);
+            $this->logDrop(sprintf('the table refused the row (Swoole error %d)', swoole_last_error()));
+        }
+    }
+
+    private function logDrop(string $reason): void
+    {
+        if ($this->dropLogged) {
+            return;
+        }
+        $this->dropLogged = true;
+        $this->logger->warning(sprintf(
+            'A span was dropped from the diagnostics buffer: %s. Later drops in this process are not logged.',
+            $reason,
+        ));
     }
 
     /**
