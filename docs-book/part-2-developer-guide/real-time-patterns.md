@@ -1,6 +1,6 @@
 # Real-Time Patterns
 
-Baander has one real-time transport: a WebSocket connection served by Swoole. It carries room messaging, watch-party and listening-session sync, transcode position reports, and server pushes to a user's open connections. Notifications and the admin pages do not hold a stream open; they read over HTTP, as [Delivery without a stream](#delivery-without-a-stream) describes.
+Baander has one real-time transport: a WebSocket connection served by Swoole. It carries watch-party sync and member events, listening-session sync, transcode position reports, and server pushes to a user's open connections. Notifications and the admin pages do not hold a stream open; they read over HTTP, as [Delivery without a stream](#delivery-without-a-stream) describes.
 
 ## WebSocket
 
@@ -26,9 +26,21 @@ Each user is limited to 10 concurrent WebSocket connections. Orphaned entries (c
 |--------|--------|----------|
 | `pushToConnection(fd, payload)` | Single connection by file descriptor | Replies, error messages |
 | `push(userId, payload)` | All connections for a user | User-scoped notifications |
-| `broadcast(room, payload)` | All members of a room | Party events, room broadcasts |
+| `broadcast(room, payload)` | All members of a room | Party member events |
 
 All payloads are JSON-encoded before sending. Failed pushes (disconnected clients) are logged and silently skipped.
+
+### Rooms
+
+A room's members receive everything broadcast to it, so a connection joins a room only through the message that checks it may. `WebSocketRoomPolicy` names the rooms and holds the join rules:
+
+| Room | Joined by | Left by | Broadcasts |
+|------|-----------|---------|------------|
+| `party:{sessionId}` | `party.join`, after `JoinPartySessionCommand` accepts the user as a member of the party | `party.leave`, `room.leave`, or closing the connection | `party.member_event` |
+
+No other room exists. Pushes to one user, such as `session.claimed` and `session.state`, go through `push(userId, payload)` and need no room. `room.join` joins nothing: it answers a party room with `Party rooms are joined with party.join` and any other name with `Unknown room`, and logs a warning. No client sends it. A new room kind gets its join rule in `WebSocketRoomPolicy` and a row here.
+
+A room name may be at most 52 bytes long. Swoole keeps only the first 63 bytes of a table key, and a membership key adds a NUL and the connection's fd (up to 10 digits) to the name.
 
 ### WebSocket Message Protocol
 
@@ -39,7 +51,8 @@ The controller dispatches messages by `type` field:
 | `connected` | Server to client | Sent on successful handshake, includes `reconnectToken` |
 | `auth.reconnect` | Client to server | Restore identity with a previously issued token |
 | `ping` / `pong` | Both | Keep-alive |
-| `room.join` / `room.leave` | Client to server | Join or leave a named room |
+| `room.join` | Client to server | Refused for every room; see [Rooms](#rooms) |
+| `room.leave` | Client to server | Leave a room the connection is in; answered with `room.left` |
 | `party.join` / `party.leave` | Client to server | Join or leave a watch-party session |
 | `party.playback` | Client to server | Play, pause, or seek (host only) |
 | `party.sync` | Client to server | Report client position for drift correction |
