@@ -49,7 +49,7 @@ final class DiscoveryControllerSecurityTest extends TestCase
     {
         $admin = $this->createAdminUser();
         $firstResponse = $this->authenticatedRequest('POST', '/api/discovery/register', $admin, $this->registration());
-        $first = $this->assertJsonResponse($firstResponse, 201);
+        $first = $this->assertJsonResponse($firstResponse, 201, 'data')['data'];
 
         self::assertArrayNotHasKey('apiKey', $first);
 
@@ -59,7 +59,7 @@ final class DiscoveryControllerSecurityTest extends TestCase
         self::assertStringNotContainsString($server->getApiKey(), json_encode($first, JSON_THROW_ON_ERROR));
 
         $repeatResponse = $this->authenticatedRequest('POST', '/api/discovery/register', $admin, $this->registration());
-        $repeat = $this->assertJsonResponse($repeatResponse, 201);
+        $repeat = $this->assertJsonResponse($repeatResponse, 201, 'data')['data'];
 
         self::assertSame($first['publicId'], $repeat['publicId']);
         self::assertArrayNotHasKey('apiKey', $repeat);

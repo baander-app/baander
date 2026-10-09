@@ -1399,6 +1399,7 @@ deptrac:
     'Discovery Application':
       - 'Discovery Domain'
       - 'Shared Domain'
+      - 'Shared Application'
     'Discovery Infrastructure':
       - 'Shared Application'
       - 'Discovery Application'
