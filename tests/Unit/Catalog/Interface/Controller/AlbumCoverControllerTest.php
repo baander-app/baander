@@ -4,394 +4,104 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Catalog\Interface\Controller;
 
-use App\Catalog\Application\Port\AlbumPortInterface;
-use App\Catalog\Domain\Model\Album;
 use App\Catalog\Interface\Controller\AlbumCoverController;
-use App\Filesystem\Application\Port\MimeDetectorPortInterface;
-use App\Media\Application\Port\ImagePortInterface;
-use App\Media\Application\Port\StoragePortInterface;
-use App\Media\Domain\Model\Image;
-use App\Media\Domain\Model\StoredFile;
+use App\Shared\Application\Exception\HandlerFailure;
+use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\Model\PublicId;
-use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\Stub;
-use PHPUnit\Framework\TestCase;
+use App\Tests\Unit\Catalog\Application\CommandHandler\Cover\CoverTestCase;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
-use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Contracts\Translation\TranslatorInterface;
+use Symfony\Component\Messenger\Exception\HandlerFailedException;
 
-final class AlbumCoverControllerTest extends TestCase
+/**
+ * The controller hands the uploaded file's temporary path to the cover use case, which runs
+ * here against image storage in a temporary directory.
+ */
+final class AlbumCoverControllerTest extends CoverTestCase
 {
-    private AlbumPortInterface&Stub $albumService;
-    private ImagePortInterface&Stub $imagePort;
-    private StoragePortInterface&Stub $storage;
-    private MimeDetectorPortInterface&Stub $mimeDetector;
-    private AlbumCoverController $controller;
-
-    protected function setUp(): void
+    public function testUploadingAJpegOverAJpegCoverKeepsTheNewImageOnDisk(): void
     {
-        $this->albumService = $this->createStub(AlbumPortInterface::class);
-        $this->imagePort = $this->createStub(ImagePortInterface::class);
-        $this->storage = $this->createStub(StoragePortInterface::class);
-        $this->mimeDetector = $this->createStub(MimeDetectorPortInterface::class);
+        $album = $this->album();
+        // The old upload code stored every JPEG cover of an album at this one path.
+        $old = $this->existingCover($album, 'images/album/' . $album->getId()->toString() . '.jpg');
 
-        $this->controller = $this->createController();
+        $response = $this->controller()->upload($album->getPublicId()->toString(), $this->upload($this->jpeg(8, 6)));
+
+        self::assertSame(200, $response->getStatusCode());
+        $data = json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR)['data'];
+        self::assertSame(['publicId', 'url', 'size', 'width', 'height'], array_keys($data));
+        self::assertSame('/api/images/' . $data['publicId'] . '/file', $data['url']);
+        self::assertSame([8, 6], [$data['width'], $data['height']]);
+
+        $new = $this->images->findByPublicId(PublicId::fromString($data['publicId']));
+        self::assertNotNull($new);
+        self::assertNotSame($old->getPath(), $new->getPath());
+        self::assertFileExists($this->storage->resolve($new->getPath()));
+        self::assertSame([$new->getPath()], $this->storedFiles());
+        self::assertSame($new->getId()->toString(), $this->storedCovers[$album->getPublicId()->toString()]);
     }
 
-    private function createController(): AlbumCoverController
+    public function testAnUploadWithoutAFileIsInvalidInput(): void
     {
-        $controller = new AlbumCoverController(
-            $this->albumService,
-            $this->imagePort,
-            $this->storage,
-            $this->mimeDetector,
-        );
+        $album = $this->album();
 
-        $translator = $this->createStub(TranslatorInterface::class);
-        $translator->method('trans')->willReturnArgument(0);
-        $controller->setTranslator($translator);
-        return $controller;
+        $this->expectException(InvalidInputException::class);
+        $this->expectExceptionMessage('No file uploaded.');
+
+        $this->controller()->upload($album->getPublicId()->toString(), new Request());
     }
 
-    protected function tearDown(): void
+    public function testAMalformedPublicIdIsInvalidInput(): void
     {
-        // Clean up any temp files created during tests
-        $tmpFiles = glob(sys_get_temp_dir() . '/cover_test_*');
-        if ($tmpFiles !== false) {
-            foreach ($tmpFiles as $f) {
-                @unlink($f);
-            }
+        $failure = $this->failureOf(fn () => $this->controller()->upload('invalid public id!', $this->upload($this->jpeg(2, 2))));
+
+        self::assertInstanceOf(InvalidInputException::class, $failure);
+        self::assertSame([], $this->storedFiles());
+
+        self::assertInstanceOf(InvalidInputException::class, $this->failureOf(fn () => $this->controller()->delete('invalid-public-id!')));
+    }
+
+    public function testDeleteRemovesTheCoverAndAnswersNoContent(): void
+    {
+        $album = $this->album();
+        $image = $this->existingCover($album, 'images/album/' . $album->getId()->toString() . '/cover.jpg');
+
+        $response = $this->controller()->delete($album->getPublicId()->toString());
+
+        self::assertSame(204, $response->getStatusCode());
+        self::assertNull($this->storedCovers[$album->getPublicId()->toString()]);
+        self::assertNull($this->images->findByUuid($image->getId()));
+        self::assertSame([], $this->storedFiles());
+    }
+
+    public function testDeletingAMissingCoverOrAlbumIsNotFound(): void
+    {
+        $album = $this->album();
+
+        self::assertInstanceOf(NotFoundException::class, $this->failureOf(fn () => $this->controller()->delete($album->getPublicId()->toString())));
+        self::assertInstanceOf(NotFoundException::class, $this->failureOf(fn () => $this->controller()->delete((new PublicId())->toString())));
+    }
+
+    private function controller(): AlbumCoverController
+    {
+        return new AlbumCoverController($this->bus());
+    }
+
+    private function upload(string $path): Request
+    {
+        return new Request(files: ['cover' => new UploadedFile($path, 'cover.jpg', 'image/jpeg', UPLOAD_ERR_OK, true)]);
+    }
+
+    /** The use case's own exception, as ExceptionSubscriber unwraps it. */
+    private function failureOf(callable $call): \Throwable
+    {
+        try {
+            $call();
+        } catch (HandlerFailedException $exception) {
+            return HandlerFailure::cause($exception);
         }
-    }
 
-    private function createAlbum(?Uuid $coverImageId = null): Album
-    {
-        $album = Album::create(
-            libraryId: Uuid::v4(),
-            title: 'Test Album',
-            type: 'album',
-        );
-
-        if ($coverImageId !== null) {
-            $album->setCoverImage($coverImageId);
-        }
-
-        return $album;
-    }
-
-    /**
-     * Creates an UploadedFile backed by a real temp file with the given content.
-     */
-    private function createUploadedFile(string $content, string $originalName = 'cover.jpg', string $mimeType = 'image/jpeg'): UploadedFile
-    {
-        $tmpFile = tempnam(sys_get_temp_dir(), 'cover_test_');
-        file_put_contents($tmpFile, $content);
-
-        return new UploadedFile(
-            path: $tmpFile,
-            originalName: $originalName,
-            mimeType: $mimeType,
-            error: UPLOAD_ERR_OK,
-        );
-    }
-
-    // --- Upload: happy path ---
-
-    public function testUploadCreatesCoverImageForAlbum(): void
-    {
-        $this->albumService = $this->createMock(AlbumPortInterface::class);
-        $this->imagePort = $this->createMock(ImagePortInterface::class);
-        $this->controller = $this->createController();
-
-        $album = $this->createAlbum();
-        $publicId = $album->getPublicId()->toString();
-
-        $this->albumService->method('findByPublicId')->willReturn($album);
-
-        $file = $this->createUploadedFile("\xFF\xD8\xFF" . str_repeat("\x00", 100));
-
-        $this->mimeDetector->method('detect')->willReturn('image/jpeg');
-
-        $storedFile = new StoredFile(
-            path: 'images/album/' . $album->getId()->toString() . '.jpg',
-            mimeType: 'image/jpeg',
-            size: 103,
-        );
-        $this->storage->method('storeFromBytes')->willReturn($storedFile);
-        $this->imagePort->expects($this->once())->method('save');
-        $this->albumService->expects($this->once())->method('save');
-
-        $request = new Request(files: ['cover' => $file]);
-        $response = $this->controller->upload($publicId, $request);
-
-        $this->assertInstanceOf(JsonResponse::class, $response);
-        $this->assertSame(200, $response->getStatusCode());
-
-        $data = json_decode($response->getContent(), true);
-        $this->assertArrayHasKey('data', $data);
-        $this->assertArrayHasKey('publicId', $data['data']);
-        $this->assertArrayHasKey('url', $data['data']);
-        $this->assertArrayHasKey('size', $data['data']);
-        $this->assertArrayHasKey('width', $data['data']);
-        $this->assertArrayHasKey('height', $data['data']);
-
-        // Album cover should be set
-        $this->assertNotNull($album->getCoverImageId());
-    }
-
-    // --- Upload: replaces existing cover ---
-
-    public function testUploadReplacesExistingCover(): void
-    {
-        $this->albumService = $this->createMock(AlbumPortInterface::class);
-        $this->imagePort = $this->createMock(ImagePortInterface::class);
-        $this->storage = $this->createMock(StoragePortInterface::class);
-        $this->controller = $this->createController();
-
-        $oldImage = Image::create(
-            path: 'images/album/old.jpg',
-            extension: 'jpg',
-            mimeType: 'image/jpeg',
-            size: 100,
-            width: 100,
-            height: 100,
-            imageableType: 'album',
-            albumId: Uuid::v4(),
-        );
-
-        $album = $this->createAlbum($oldImage->getId());
-        $publicId = $album->getPublicId()->toString();
-
-        $this->albumService->method('findByPublicId')->willReturn($album);
-
-        // Old image should be found and deleted
-        $this->imagePort->expects($this->once())->method('findByUuid')
-            ->with($oldImage->getId())
-            ->willReturn($oldImage);
-
-        $this->storage->expects($this->once())->method('delete')->with($oldImage->getPath());
-        $this->imagePort->expects($this->once())->method('delete')->with($oldImage);
-
-        $file = $this->createUploadedFile("\xFF\xD8\xFF" . str_repeat("\x00", 100));
-
-        $this->mimeDetector->method('detect')->willReturn('image/jpeg');
-
-        $storedFile = new StoredFile(
-            path: 'images/album/' . $album->getId()->toString() . '.jpg',
-            mimeType: 'image/jpeg',
-            size: 103,
-        );
-        $this->storage->method('storeFromBytes')->willReturn($storedFile);
-
-        // New image should be saved
-        $this->imagePort->expects($this->once())->method('save');
-        $this->albumService->expects($this->once())->method('save');
-
-        $request = new Request(files: ['cover' => $file]);
-        $response = $this->controller->upload($publicId, $request);
-
-        $this->assertSame(200, $response->getStatusCode());
-    }
-
-    // --- Upload: no file ---
-
-    public function testUploadReturns422WhenNoFileProvided(): void
-    {
-        $this->imagePort = $this->createMock(ImagePortInterface::class);
-        $this->controller = $this->createController();
-
-        $album = $this->createAlbum();
-        $publicId = $album->getPublicId()->toString();
-
-        $this->albumService->method('findByPublicId')->willReturn($album);
-
-        $request = new Request();
-        $response = $this->controller->upload($publicId, $request);
-
-        $this->assertInstanceOf(JsonResponse::class, $response);
-        $this->assertSame(422, $response->getStatusCode());
-
-        $this->imagePort->expects($this->never())->method('save');
-    }
-
-    // --- Upload: oversized file ---
-
-    public function testUploadReturns422WhenFileIsTooLarge(): void
-    {
-        $this->imagePort = $this->createMock(ImagePortInterface::class);
-        $this->controller = $this->createController();
-
-        $album = $this->createAlbum();
-        $publicId = $album->getPublicId()->toString();
-
-        $this->albumService->method('findByPublicId')->willReturn($album);
-
-        // Create an actual file > 10 MB (UploadedFile::getSize() reads from disk)
-        $oversizedContent = str_repeat("\x00", 10 * 1024 * 1024 + 1);
-        $file = $this->createUploadedFile($oversizedContent);
-
-        $request = new Request(files: ['cover' => $file]);
-        $response = $this->controller->upload($publicId, $request);
-
-        $this->assertInstanceOf(JsonResponse::class, $response);
-        $this->assertSame(422, $response->getStatusCode());
-
-        $data = json_decode($response->getContent(), true);
-        $this->assertStringContainsString('10 MB', $data['error']['message']);
-
-        $this->imagePort->expects($this->never())->method('save');
-    }
-
-    // --- Upload: wrong MIME type ---
-
-    public function testUploadReturns422WhenMimeTypeIsUnsupported(): void
-    {
-        $this->imagePort = $this->createMock(ImagePortInterface::class);
-        $this->controller = $this->createController();
-
-        $album = $this->createAlbum();
-        $publicId = $album->getPublicId()->toString();
-
-        $this->albumService->method('findByPublicId')->willReturn($album);
-
-        $file = $this->createUploadedFile('GIF89a' . str_repeat("\x00", 50), 'cover.gif', 'image/gif');
-
-        $this->mimeDetector->method('detect')->willReturn('image/gif');
-
-        $request = new Request(files: ['cover' => $file]);
-        $response = $this->controller->upload($publicId, $request);
-
-        $this->assertInstanceOf(JsonResponse::class, $response);
-        $this->assertSame(422, $response->getStatusCode());
-
-        $data = json_decode($response->getContent(), true);
-        $this->assertStringContainsString('image/gif', $data['error']['message']);
-
-        $this->imagePort->expects($this->never())->method('save');
-    }
-
-    // --- Upload: non-existent album ---
-
-    public function testUploadReturns404WhenAlbumDoesNotExist(): void
-    {
-        $this->imagePort = $this->createMock(ImagePortInterface::class);
-        $this->controller = $this->createController();
-
-        $publicId = (new PublicId())->toString();
-
-        $this->albumService->method('findByPublicId')->willReturn(null);
-
-        $file = $this->createUploadedFile("\xFF\xD8\xFF" . str_repeat("\x00", 100));
-
-        $request = new Request(files: ['cover' => $file]);
-        $response = $this->controller->upload($publicId, $request);
-
-        $this->assertInstanceOf(JsonResponse::class, $response);
-        $this->assertSame(404, $response->getStatusCode());
-
-        $this->imagePort->expects($this->never())->method('save');
-    }
-
-    // --- Upload: invalid public ID ---
-
-    public function testUploadReturns400WhenPublicIdIsInvalid(): void
-    {
-        // PublicId requires exactly 21 chars from [0-9a-zA-Z_-]
-        // Use a string with a space to make it invalid
-        $file = $this->createUploadedFile("\xFF\xD8\xFF" . str_repeat("\x00", 100));
-
-        $request = new Request(files: ['cover' => $file]);
-        $response = $this->controller->upload('invalid public id!', $request);
-
-        $this->assertInstanceOf(JsonResponse::class, $response);
-        $this->assertSame(400, $response->getStatusCode());
-    }
-
-    // --- Delete: happy path ---
-
-    public function testDeleteRemovesCoverImageFromAlbum(): void
-    {
-        $this->albumService = $this->createMock(AlbumPortInterface::class);
-        $this->imagePort = $this->createMock(ImagePortInterface::class);
-        $this->storage = $this->createMock(StoragePortInterface::class);
-        $this->controller = $this->createController();
-
-        $image = Image::create(
-            path: 'images/album/test.jpg',
-            extension: 'jpg',
-            mimeType: 'image/jpeg',
-            size: 100,
-            width: 200,
-            height: 200,
-            imageableType: 'album',
-            albumId: Uuid::v4(),
-        );
-
-        $album = $this->createAlbum($image->getId());
-        $publicId = $album->getPublicId()->toString();
-
-        $this->albumService->method('findByPublicId')->willReturn($album);
-        $this->imagePort->expects($this->once())->method('findByUuid')
-            ->with($image->getId())
-            ->willReturn($image);
-
-        $this->storage->expects($this->once())->method('delete')->with($image->getPath());
-        $this->imagePort->expects($this->once())->method('delete')->with($image);
-        $this->albumService->expects($this->once())->method('save')->with($this->callback(
-            static fn(Album $a): bool => $a->getCoverImageId() === null,
-        ));
-
-        $response = $this->controller->delete($publicId);
-
-        $this->assertInstanceOf(JsonResponse::class, $response);
-        $this->assertSame(204, $response->getStatusCode());
-    }
-
-    // --- Delete: no cover exists ---
-
-    public function testDeleteReturns404WhenNoCoverExists(): void
-    {
-        $this->imagePort = $this->createMock(ImagePortInterface::class);
-        $this->storage = $this->createMock(StoragePortInterface::class);
-        $this->controller = $this->createController();
-
-        $album = $this->createAlbum();
-        $publicId = $album->getPublicId()->toString();
-
-        $this->albumService->method('findByPublicId')->willReturn($album);
-
-        $response = $this->controller->delete($publicId);
-
-        $this->assertInstanceOf(JsonResponse::class, $response);
-        $this->assertSame(404, $response->getStatusCode());
-
-        $this->storage->expects($this->never())->method('delete');
-        $this->imagePort->expects($this->never())->method('delete');
-    }
-
-    // --- Delete: non-existent album ---
-
-    public function testDeleteReturns404WhenAlbumDoesNotExist(): void
-    {
-        $publicId = (new PublicId())->toString();
-
-        $this->albumService->method('findByPublicId')->willReturn(null);
-
-        $response = $this->controller->delete($publicId);
-
-        $this->assertInstanceOf(JsonResponse::class, $response);
-        $this->assertSame(404, $response->getStatusCode());
-    }
-
-    // --- Delete: invalid public ID ---
-
-    public function testDeleteReturns400WhenPublicIdIsInvalid(): void
-    {
-        // PublicId requires exactly 21 chars from [0-9a-zA-Z_-]
-        $response = $this->controller->delete('invalid-public-id!');
-
-        $this->assertInstanceOf(JsonResponse::class, $response);
-        $this->assertSame(400, $response->getStatusCode());
+        self::fail('The call must fail.');
     }
 }
