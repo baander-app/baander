@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Interface\Console;
 
+use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Console\Command\Command;
@@ -47,7 +48,7 @@ final readonly class AdminCommandSupport
         try {
             return $this->bus->dispatch($message)->last(HandledStamp::class)?->getResult();
         } catch (HandlerFailedException $exception) {
-            throw self::cause($exception);
+            throw HandlerFailure::cause($exception);
         }
     }
 
@@ -235,16 +236,6 @@ final readonly class AdminCommandSupport
     public static function exitCode(Throwable $failure): int
     {
         return $failure instanceof InvalidInputException ? Command::INVALID : Command::FAILURE;
-    }
-
-    /** Unwraps HandlerFailedException, nested ones included, when it wraps a single exception. */
-    private static function cause(Throwable $exception): Throwable
-    {
-        while ($exception instanceof HandlerFailedException && count($exception->getWrappedExceptions()) === 1) {
-            [$exception] = array_values($exception->getWrappedExceptions());
-        }
-
-        return $exception;
     }
 
     /**

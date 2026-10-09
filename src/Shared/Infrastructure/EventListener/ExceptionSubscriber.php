@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\EventListener;
 
 use App\Shared\Application\Exception\ConflictException;
+use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Interface\DTO\ApiError;
@@ -15,7 +16,6 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\KernelEvents;
-use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Contracts\Translation\TranslatableInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 use Throwable;
@@ -33,7 +33,7 @@ final class ExceptionSubscriber
     public function __invoke(ExceptionEvent $event): void
     {
         // A handler's exception reaches the controller wrapped in HandlerFailedException.
-        $exception = self::cause($event->getThrowable());
+        $exception = HandlerFailure::cause($event->getThrowable());
         if ($exception !== $event->getThrowable()) {
             $event->setThrowable($exception);
         }
@@ -93,16 +93,6 @@ final class ExceptionSubscriber
         $event->setResponse(new JsonResponse($error->toArray(), $status));
 
         return true;
-    }
-
-    /** Unwraps HandlerFailedException, nested ones included, when it wraps a single exception. */
-    private static function cause(Throwable $exception): Throwable
-    {
-        while ($exception instanceof HandlerFailedException && count($exception->getWrappedExceptions()) === 1) {
-            [$exception] = array_values($exception->getWrappedExceptions());
-        }
-
-        return $exception;
     }
 
     private function getSafeMessage(Throwable $exception, int $status): string
