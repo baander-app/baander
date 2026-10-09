@@ -7,6 +7,7 @@ namespace App\Recommendation\Application\CommandHandler;
 use App\Recommendation\Application\Command\CancelRecommendationJobCommand;
 use App\Recommendation\Application\Port\RecommendationJobPortInterface;
 use App\Recommendation\Application\Service\RecommendationJobFinder;
+use App\Recommendation\Domain\ValueObject\RecommendationJobStatus;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\NotFoundException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -29,14 +30,31 @@ final readonly class CancelRecommendationJobHandler
     {
         $job = $this->finder->byPublicId($command->publicId);
 
+        if ($job->getStatus() === RecommendationJobStatus::Cancelled) {
+            return;
+        }
         if ($job->isFinished()) {
-            throw new ConflictException(
-                sprintf('The recommendation job is %s and can no longer be cancelled.', $job->getStatus()->value),
-                ['status' => $job->getStatus()->value],
-            );
+            throw self::finished($job->getStatus());
         }
 
         $job->markCancelled();
-        $this->jobs->save($job);
+        // A run that completed or failed after the job was read keeps its outcome.
+        if ($this->jobs->saveIfStatusIn($job, RecommendationJobStatus::Pending, RecommendationJobStatus::InProgress)) {
+            return;
+        }
+
+        $stored = $this->jobs->storedStatus($job->getId())
+            ?? throw new NotFoundException('Recommendation job not found.', ['publicId' => $command->publicId]);
+        if ($stored !== RecommendationJobStatus::Cancelled) {
+            throw self::finished($stored);
+        }
+    }
+
+    private static function finished(RecommendationJobStatus $status): ConflictException
+    {
+        return new ConflictException(
+            sprintf('The recommendation job is %s and can no longer be cancelled.', $status->value),
+            ['status' => $status->value],
+        );
     }
 }

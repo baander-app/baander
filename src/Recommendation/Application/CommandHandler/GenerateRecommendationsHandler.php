@@ -143,12 +143,15 @@ final class GenerateRecommendationsHandler
     /**
      * Runs the job in this process. The record moves to in progress, names each strategy as
      * it starts, and ends completed, failed with the error, or cancelled when an admin
-     * cancelled it between strategies.
+     * cancelled it between strategies. Each of these saves applies only while the stored
+     * status is the one the run expects, as on the pool worker's path, so a cancellation
+     * stored at any moment is kept.
      */
     private function runHere(RecommendationJob $job): RecommendationGenerationResult
     {
-        if ($this->jobPort->isCancelled($job->getId())) {
-            return $this->result($job, RecommendationGenerationResult::EXECUTION_SYNC, RecommendationJobStatus::Cancelled);
+        // Spares loading the songs for a job cancelled before it started.
+        if ($this->jobPort->storedStatus($job->getId()) !== RecommendationJobStatus::Pending) {
+            return $this->stopped($job);
         }
 
         try {
@@ -156,15 +159,18 @@ final class GenerateRecommendationsHandler
                 ? $this->songRepository->findAllForRecommendations()
                 : $this->songRepository->findUpdatedAfter(new \DateTimeImmutable('7 days ago'));
             $job->markInProgress(count($songs));
-            $this->jobPort->save($job);
-
-            [$counts, $cancelled] = $this->generate($job, $songs);
-            if ($cancelled || $this->jobPort->isCancelled($job->getId())) {
-                return $this->result($job, RecommendationGenerationResult::EXECUTION_SYNC, RecommendationJobStatus::Cancelled, $counts);
+            if (!$this->jobPort->saveIfStatusIn($job, RecommendationJobStatus::Pending)) {
+                return $this->stopped($job);
             }
 
-            $job->markCompleted($counts);
-            $this->jobPort->save($job);
+            [$counts, $stopped] = $this->generate($job, $songs);
+            if (!$stopped) {
+                $job->markCompleted($counts);
+                $stopped = !$this->jobPort->saveIfStatusIn($job, RecommendationJobStatus::InProgress);
+            }
+            if ($stopped) {
+                return $this->stopped($job, $counts);
+            }
         } catch (Throwable $failure) {
             $this->recordFailure($job, $failure);
 
@@ -179,7 +185,7 @@ final class GenerateRecommendationsHandler
      *
      * @param \App\Catalog\Domain\Model\Song[] $songs
      *
-     * @return array{0: array<string, int>, 1: bool} the counts per strategy, and whether the job was cancelled
+     * @return array{0: array<string, int>, 1: bool} the counts per strategy, and whether the run stopped because its job moved on, such as an admin cancelling it
      */
     private function generate(RecommendationJob $job, array $songs): array
     {
@@ -208,12 +214,10 @@ final class GenerateRecommendationsHandler
         ];
 
         foreach ($strategies as $strategy => $recommendations) {
-            if ($this->jobPort->isCancelled($job->getId())) {
+            $job->updateProgress($strategy, 0, $counts);
+            if (!$this->jobPort->saveIfStatusIn($job, RecommendationJobStatus::InProgress)) {
                 return [$counts, true];
             }
-
-            $job->updateProgress($strategy, 0, $counts);
-            $this->jobPort->save($job);
 
             foreach ($recommendations() as $recommendation) {
                 $this->commandBus->dispatch($recommendation);
@@ -229,7 +233,8 @@ final class GenerateRecommendationsHandler
     {
         try {
             $job->markFailed($failure->getMessage());
-            $this->jobPort->save($job);
+            // A job cancelled meanwhile stays cancelled.
+            $this->jobPort->saveIfStatusIn($job, RecommendationJobStatus::Pending, RecommendationJobStatus::InProgress);
         } catch (Throwable $recordFailure) {
             $this->logger->error('Could not mark the recommendation job failed.', [
                 'job_id' => $job->getId()->toString(),
@@ -237,6 +242,20 @@ final class GenerateRecommendationsHandler
                 'record_error' => $recordFailure->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * The result of a run that stopped because another process moved its job on. It reports
+     * the stored status: cancelled by an admin, or failed by the cleanup at server start. A
+     * job whose record is gone counts as cancelled.
+     *
+     * @param array<string, int> $counts
+     */
+    private function stopped(RecommendationJob $job, array $counts = []): RecommendationGenerationResult
+    {
+        $status = $this->jobPort->storedStatus($job->getId()) ?? RecommendationJobStatus::Cancelled;
+
+        return $this->result($job, RecommendationGenerationResult::EXECUTION_SYNC, $status, $counts);
     }
 
     /** @param array<string, int> $counts */

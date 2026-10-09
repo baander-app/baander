@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Controller;
 
 use App\Lyrics\Application\Command\FetchLyricsCommand;
+use App\Lyrics\Application\Port\QueuedLyricsFetchesInterface;
 use App\Lyrics\Domain\Model\Lyrics;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
 use App\Shared\Domain\Model\PublicId;
@@ -19,6 +20,14 @@ use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 final class LyricsAdminControllerTest extends TestCase
 {
+    protected function tearDown(): void
+    {
+        // The queued marks live in Redis, outside the test's database transaction.
+        $this->forgetQueuedFetches();
+
+        parent::tearDown();
+    }
+
     // --- Coverage ---
 
     public function testCoverageReturns200ForSuperAdmin(): void
@@ -119,6 +128,7 @@ final class LyricsAdminControllerTest extends TestCase
         $this->assertSame(10, $data['data']['jobsEnqueued']);
         $web = $this->queuedFetches();
         $this->assertCount(10, $web);
+        $this->forgetQueuedFetches();
         $this->asyncTransport()->reset();
 
         $tester = new CommandTester((new Application(static::$kernel))->find('app:lyrics:fetch'));
@@ -134,6 +144,31 @@ final class LyricsAdminControllerTest extends TestCase
             ['name' => 'BulkFetchLyricsCommand', 'status' => 'finished'],
             $this->entityManager->getConnection()->fetchAssociative('SELECT name, status FROM job_monitors WHERE job_id = ?', [$match[1]]),
         );
+    }
+
+    public function testARunThatOverlapsAnEarlierOneSkipsTheSongsItQueued(): void
+    {
+        $songs = array_map(static fn (Uuid $id): string => $id->toString(), $this->createSongs(3));
+
+        $this->assertJsonResponse(
+            $this->authenticatedRequest('POST', '/api/admin/lyrics/bulk-fetch', $this->createSuperAdminUser(), ['limit' => 2]),
+            200,
+            'data',
+        );
+        $first = $this->queuedFetches();
+        $this->assertCount(2, $first);
+
+        // The fetches of the first run have not run yet when the console run starts.
+        $tester = new CommandTester((new Application(static::$kernel))->find('app:lyrics:fetch'));
+        $this->assertSame(Command::SUCCESS, $tester->execute([]), $tester->getDisplay());
+
+        $all = $this->queuedFetches();
+        $this->assertSame(array_values(array_unique($all)), $all, 'No song is queued twice.');
+        $this->assertSame(1, preg_match('/Queued (\d+) lyrics fetch/', $tester->getDisplay(), $queued), $tester->getDisplay());
+        $this->assertSame(count($all) - 2, (int) $queued[1]);
+        foreach ($songs as $songId) {
+            $this->assertContains($songId, $all);
+        }
     }
 
     public function testBulkFetchRejectsALimitBelowOne(): void
@@ -221,6 +256,15 @@ final class LyricsAdminControllerTest extends TestCase
         $this->assertInstanceOf(InMemoryTransport::class, $transport);
 
         return $transport;
+    }
+
+    /** Removes the queued marks of the fetches this test queued. */
+    private function forgetQueuedFetches(): void
+    {
+        $marks = static::getContainer()->get(QueuedLyricsFetchesInterface::class);
+        foreach ($this->queuedFetches() as $songId) {
+            $marks->clearQueued(Uuid::fromString($songId));
+        }
     }
 
     /** @return list<string> the song IDs of the queued lyrics fetches, in queue order */

@@ -28,6 +28,9 @@ final class InMemoryRecommendationJobs implements RecommendationJobPortInterface
     /** @var (callable(RecommendationJob): void)|null runs on every save, after it is recorded */
     public $onSave = null;
 
+    /** @var (callable(Uuid): void)|null runs after each read of the stored status, before the caller sees it; after a guarded save, it runs once the save is done */
+    public $afterStatusRead = null;
+
     public function create(bool $isFull, ?Uuid $userId = null, array $metadata = [], ?Uuid $originalJobId = null): RecommendationJob
     {
         $job = RecommendationJob::create($isFull, $userId, $metadata, $originalJobId);
@@ -69,8 +72,30 @@ final class InMemoryRecommendationJobs implements RecommendationJobPortInterface
         }
     }
 
-    public function isCancelled(Uuid $id): bool
+    public function saveIfStatusIn(RecommendationJob $job, RecommendationJobStatus ...$from): bool
     {
-        return ($this->storedStatus[$id->toString()] ?? null) === RecommendationJobStatus::Cancelled;
+        $saved = in_array($this->storedStatus[$job->getId()->toString()] ?? null, $from, true);
+        if ($saved) {
+            $this->save($job);
+        }
+        // The read and the write are one step; another process can only act after both.
+        $this->afterStatusRead($job->getId());
+
+        return $saved;
+    }
+
+    public function storedStatus(Uuid $id): ?RecommendationJobStatus
+    {
+        $status = $this->storedStatus[$id->toString()] ?? null;
+        $this->afterStatusRead($id);
+
+        return $status;
+    }
+
+    private function afterStatusRead(Uuid $id): void
+    {
+        if ($this->afterStatusRead !== null) {
+            ($this->afterStatusRead)($id);
+        }
     }
 }
