@@ -1,20 +1,15 @@
 /**
- * useQoLUtilization -- poll QoL utilization data for the utilization card.
+ * useQoLUtilization -- poll the per-worker QoL status for the utilization card.
  * Auto-refreshes every 5 seconds.
  */
 
 import { useState, useEffect } from 'react';
 import { getAuthSnapshot } from '@/features/auth/stores/auth-store';
 import Axios from 'axios';
-
-export interface QoLUtilization {
-  state: 'learning' | 'active';
-  budget_cap: number;
-  active_streams: number;
-}
+import type { QoLStatusReport } from '../qol-report';
 
 export interface UseQoLUtilizationResult {
-  data: QoLUtilization | null;
+  data: QoLStatusReport | null;
   isLoading: boolean;
   error: Error | null;
 }
@@ -22,7 +17,7 @@ export interface UseQoLUtilizationResult {
 const POLL_INTERVAL_MS = 5000;
 
 export function useQoLUtilization(): UseQoLUtilizationResult {
-  const [data, setData] = useState<QoLUtilization | null>(null);
+  const [data, setData] = useState<QoLStatusReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -38,7 +33,7 @@ export function useQoLUtilization(): UseQoLUtilizationResult {
       }
 
       try {
-        const { data: response } = await Axios.get<{ data: QoLUtilization }>(
+        const { data: response } = await Axios.get<{ data: QoLStatusReport }>(
           `${auth.serverUrl}/api/admin/qol/status`,
           { headers: auth.accessToken ? { Authorization: `Bearer ${auth.accessToken}` } : {} },
         );

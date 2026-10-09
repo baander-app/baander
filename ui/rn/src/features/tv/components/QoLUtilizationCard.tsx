@@ -1,46 +1,57 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { tvColors, tvFontSizes, tvSpacing } from '../theme/tv-tokens';
-import type { QoLUtilization } from '@/features/admin/hooks/useQoLUtilization';
+import { sharedValue } from '@/features/admin/qol-report';
+import type { QoLStatusReport } from '@/features/admin/qol-report';
 
 interface QoLUtilizationCardProps {
-  data: QoLUtilization | null;
+  data: QoLStatusReport | null;
 }
 
+const HINTS = {
+  learning: 'Learning from transcode patterns…',
+  active: 'Enforcing CPU budget',
+  mixed: 'Some workers are still learning…',
+} as const;
+
+/** The CPU budget cap of every web server worker and the total of active streams. */
 export function QoLUtilizationCard({ data }: QoLUtilizationCardProps) {
   if (!data) return null;
 
-  const budgetPercent = data.budget_cap * 100;
-  const barColor = data.state === 'active' ? tvColors.accent : tvColors.textMuted;
+  const state = sharedValue(data.workers.map((worker) => worker.state));
 
   return (
     <View style={styles.card}>
       <Text style={styles.title}>Budget Utilization</Text>
 
-      <View style={styles.budgetBarBackground}>
-        <View
-          style={[
-            styles.budgetBarFill,
-            { width: `${budgetPercent}%`, backgroundColor: barColor },
-          ]}
-        />
-      </View>
+      {data.workers.map((worker) => {
+        const budgetPercent = worker.budget_cap * 100;
+        const barColor = worker.state === 'active' ? tvColors.accent : tvColors.textMuted;
 
-      <View style={styles.row}>
-        <Text style={styles.label}>Cap:</Text>
-        <Text style={styles.value}>{budgetPercent.toFixed(0)}%</Text>
-      </View>
+        return (
+          <View key={worker.worker_id}>
+            <View style={styles.row}>
+              <Text style={styles.label}>Worker {worker.worker_id} cap:</Text>
+              <Text style={styles.value}>{budgetPercent.toFixed(0)}%</Text>
+            </View>
+            <View style={styles.budgetBarBackground}>
+              <View
+                style={[
+                  styles.budgetBarFill,
+                  { width: `${budgetPercent}%`, backgroundColor: barColor },
+                ]}
+              />
+            </View>
+          </View>
+        );
+      })}
 
       <View style={styles.row}>
         <Text style={styles.label}>Active Streams:</Text>
-        <Text style={styles.value}>{data.active_streams}</Text>
+        <Text style={styles.value}>{data.total.active_streams}</Text>
       </View>
 
-      <Text style={styles.hint}>
-        {data.state === 'learning'
-          ? 'Learning from transcode patterns…'
-          : 'Enforcing CPU budget'}
-      </Text>
+      {state !== null && <Text style={styles.hint}>{HINTS[state]}</Text>}
     </View>
   );
 }

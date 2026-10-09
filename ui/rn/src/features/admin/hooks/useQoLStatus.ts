@@ -1,37 +1,23 @@
 /**
- * useQoLStatus -- fetch QoL stream governor status.
+ * useQoLStatus -- fetch the stream governor status and active streams of every web server worker.
  */
 
 import { useState, useEffect } from 'react';
 import { getAuthSnapshot } from '@/features/auth/stores/auth-store';
 import Axios from 'axios';
-
-export interface QoLStatus {
-  state: 'learning' | 'active';
-  profile: 'conservative' | 'balanced' | 'aggressive';
-  active_streams: number;
-  sample_count: number;
-  model_ready: boolean;
-  budget_cap: number;
-}
-
-export interface QoLStream {
-  job_id: string;
-  quality_tier: string;
-  predicted_cost: number;
-}
+import type { QoLStatusReport, QoLStreamsReport } from '../qol-report';
 
 export interface UseQoLStatusResult {
-  status: QoLStatus | null;
-  streams: QoLStream[];
+  status: QoLStatusReport | null;
+  streams: QoLStreamsReport | null;
   isLoading: boolean;
   error: Error | null;
   refetch: () => void;
 }
 
 export function useQoLStatus(): UseQoLStatusResult {
-  const [status, setStatus] = useState<QoLStatus | null>(null);
-  const [streams, setStreams] = useState<QoLStream[]>([]);
+  const [status, setStatus] = useState<QoLStatusReport | null>(null);
+  const [streams, setStreams] = useState<QoLStreamsReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [key, setKey] = useState(0);
@@ -53,8 +39,8 @@ export function useQoLStatus(): UseQoLStatusResult {
         const headers = auth.accessToken ? { Authorization: `Bearer ${auth.accessToken}` } : {};
 
         const [statusRes, streamsRes] = await Promise.all([
-          Axios.get<{ data: QoLStatus }>(`${auth.serverUrl}/api/admin/qol/status`, { headers }),
-          Axios.get<{ data: QoLStream[] }>(`${auth.serverUrl}/api/admin/qol/streams`, { headers }),
+          Axios.get<{ data: QoLStatusReport }>(`${auth.serverUrl}/api/admin/qol/status`, { headers }),
+          Axios.get<{ data: QoLStreamsReport }>(`${auth.serverUrl}/api/admin/qol/streams`, { headers }),
         ]);
 
         if (!cancelled) {
