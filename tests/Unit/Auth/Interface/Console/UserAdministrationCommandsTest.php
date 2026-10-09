@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Auth\Interface\Console;
 
 use App\Auth\Application\Command\User\DeleteUserCommand;
+use App\Auth\Application\Command\User\DisableUserCommand as DisableUserMessage;
+use App\Auth\Application\Command\User\EnableUserCommand as EnableUserMessage;
 use App\Auth\Application\Command\User\RenameUserCommand;
 use App\Auth\Application\Command\User\SetUserRolesCommand;
 use App\Auth\Application\DTO\UserPage;
 use App\Auth\Application\Exception\UserNotFoundException;
 use App\Auth\Application\Query\User\ListUsersQuery;
 use App\Auth\Domain\Model\User;
+use App\Auth\Interface\Console\DisableUserCommand;
+use App\Auth\Interface\Console\EnableUserCommand;
 use App\Auth\Interface\Console\UserDeleteCommand;
 use App\Auth\Interface\Console\UserListCommand;
 use App\Auth\Interface\Console\UserRenameCommand;
@@ -27,7 +31,7 @@ use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 
-/** app:user:list, app:user:rename, app:user:delete and app:user:roles dispatch the admin API's use cases. */
+/** app:user:list, app:user:rename, app:user:delete, app:user:roles, app:user:disable and app:user:enable dispatch the admin API's use cases. */
 final class UserAdministrationCommandsTest extends TestCase
 {
     /** @var list<object> */
@@ -99,6 +103,37 @@ final class UserAdministrationCommandsTest extends TestCase
         self::assertEquals([new RenameUserCommand('admin@baander.app', 'Admin')], $this->dispatched);
     }
 
+    public function testUserWritesPrintTheUserAsTheApiReturnsItWithJson(): void
+    {
+        $expected = AdminUserResource::from($this->user);
+
+        foreach ([
+            [new UserRenameCommand($this->support()), ['identifier' => 'admin@baander.app', 'name' => 'Admin']],
+            [new UserRolesCommand($this->support()), ['identifier' => 'admin@baander.app', 'roles' => ['ROLE_USER', 'ROLE_ADMIN']]],
+            [new DisableUserCommand($this->support()), ['identifier' => 'admin@baander.app']],
+            [new EnableUserCommand($this->support()), ['identifier' => 'admin@baander.app']],
+        ] as [$command, $arguments]) {
+            $tester = new CommandTester($command);
+
+            self::assertSame(Command::SUCCESS, $tester->execute($arguments + ['--json' => true]), (string) $command->getName());
+            self::assertSame($expected, json_decode($tester->getDisplay(), true, 512, JSON_THROW_ON_ERROR), (string) $command->getName());
+        }
+    }
+
+    public function testDisableAndEnableDispatchTheUseCasesAndAnUnknownUserFails(): void
+    {
+        self::assertSame(Command::SUCCESS, (new CommandTester(new DisableUserCommand($this->support())))->execute(['identifier' => 'admin@baander.app']));
+        self::assertSame(Command::SUCCESS, (new CommandTester(new EnableUserCommand($this->support())))->execute(['identifier' => 'admin@baander.app']));
+        self::assertEquals([new DisableUserMessage('admin@baander.app'), new EnableUserMessage('admin@baander.app')], $this->dispatched);
+
+        $this->failure = new HandlerFailedException(new Envelope(new \stdClass()), [UserNotFoundException::forIdentifier('nobody@baander.app')]);
+        foreach ([new DisableUserCommand($this->support()), new EnableUserCommand($this->support())] as $command) {
+            $tester = new CommandTester($command);
+            self::assertSame(Command::FAILURE, $tester->execute(['identifier' => 'nobody@baander.app']), (string) $command->getName());
+            self::assertStringContainsString('User "nobody@baander.app" not found.', $tester->getDisplay());
+        }
+    }
+
     public function testRenameReportsAnInvalidNameAsInvalidAndAnUnknownUserAsFailure(): void
     {
         $this->failure = new HandlerFailedException(new Envelope(new \stdClass()), [new InvalidInputException('Name cannot be empty.')]);
@@ -139,6 +174,15 @@ final class UserAdministrationCommandsTest extends TestCase
         $tester = new CommandTester(new UserDeleteCommand($this->support()));
 
         self::assertSame(Command::SUCCESS, $tester->execute(['identifier' => 'admin@baander.app', '--force' => true], ['interactive' => false]));
+        self::assertEquals([new DeleteUserCommand('admin@baander.app')], $this->dispatched);
+    }
+
+    public function testDeleteWithJsonPrintsNothingAsTheApiAnswersWithNoContent(): void
+    {
+        $tester = new CommandTester(new UserDeleteCommand($this->support()));
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['identifier' => 'admin@baander.app', '--force' => true, '--json' => true], ['interactive' => false]));
+        self::assertSame('', $tester->getDisplay());
         self::assertEquals([new DeleteUserCommand('admin@baander.app')], $this->dispatched);
     }
 

@@ -7,7 +7,10 @@ namespace App\Auth\Interface\Console;
 use App\Auth\Application\Command\User\CreateUserCommand as CreateUserMessage;
 use App\Auth\Application\Exception\PasswordPolicyException;
 use App\Auth\Application\Service\PasswordPolicy;
+use App\Auth\Interface\Resource\AdminUserResource;
+use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -15,14 +18,14 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Messenger\MessageBusInterface;
-use Symfony\Component\Messenger\Stamp\HandledStamp;
+use Throwable;
 
 /**
  * The CLI counterpart of POST /api/admin/users.
  *
  * Acts with full authority: any combination of roles, without the admin panel's role
- * checks or admin.can_create_users.
+ * checks or admin.can_create_users. Granting an admin role is confirmed on a terminal
+ * and otherwise needs `--force`.
  */
 #[AsCommand(
     name: 'app:user:create',
@@ -37,7 +40,7 @@ final class CreateUserCommand extends Command
      * @param resource $stdin Stream to read password from when --password is used
      */
     public function __construct(
-        private readonly MessageBusInterface $commandBus,
+        private readonly AdminCommandSupport $support,
         mixed $stdin = STDIN,
     ) {
         parent::__construct();
@@ -51,105 +54,77 @@ final class CreateUserCommand extends Command
             ->addArgument('name', InputArgument::REQUIRED, 'Display name')
             ->addOption('password', null, InputOption::VALUE_NONE, 'Read password from stdin instead of prompting (for CI/scripting)')
             ->addOption('role', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Role to assign: user, admin or super-admin; repeat for several', ['user']);
+        AdminCommandSupport::addForceOption($this);
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
-
-        $email = $input->getArgument('email');
-        $name = $input->getArgument('name');
-        $useStdin = (bool) $input->getOption('password');
-        // An array input may pass a single role as a string.
-        $roleNames = array_values(array_map(strval(...), (array) $input->getOption('role')));
+        // Questions go to stderr, so that stdout carries only the JSON with --json.
+        $prompts = $io->getErrorStyle();
 
         try {
-            new Email($email);
-        } catch (\InvalidArgumentException $e) {
-            $io->error('Invalid email: '.$e->getMessage());
-
-            return Command::FAILURE;
+            $email = self::email((string) $input->getArgument('email'));
+            // An array input may pass a single role as a string.
+            $roles = self::rolesFor(array_values(array_map(strval(...), (array) $input->getOption('role'))));
+        } catch (InvalidInputException $exception) {
+            return AdminCommandSupport::fail($io, $exception);
         }
 
-        try {
-            $roles = self::rolesFor($roleNames);
-        } catch (\InvalidArgumentException $e) {
-            $io->error($e->getMessage());
-
-            return Command::FAILURE;
-        }
-
-        if (array_diff($roles, ['ROLE_USER']) !== [] && $input->isInteractive()) {
-            if (!$io->confirm(sprintf('Create user with the roles %s?', implode(', ', $roles)), false)) {
-                return Command::SUCCESS;
-            }
-        }
-
-        if ($useStdin) {
-            $password = $this->readPasswordFromStream($this->stdin);
-            if ($password === '') {
-                $io->error('No password provided via stdin.');
-
-                return Command::FAILURE;
-            }
-        } else {
-            $password = $io->askHidden('Password');
-            if ($password === null || $password === '') {
-                $io->error('Password is required.');
-
-                return Command::FAILURE;
+        if (array_diff($roles, ['ROLE_USER']) !== []) {
+            $refused = AdminCommandSupport::confirm($input, $prompts, sprintf('Create user with the roles %s?', implode(', ', $roles)));
+            if ($refused !== null) {
+                return $refused;
             }
         }
 
         try {
-            PasswordPolicy::assertAcceptable($password);
-        } catch (PasswordPolicyException $e) {
-            $io->error($e->getMessage());
-
-            return Command::FAILURE;
-        }
-
-        try {
-            $envelope = $this->commandBus->dispatch(new CreateUserMessage(
-                email: new Email($email),
-                name: $name,
-                plainPassword: $password,
+            $user = $this->support->dispatch(new CreateUserMessage(
+                email: $email,
+                name: (string) $input->getArgument('name'),
+                plainPassword: $this->password($input, $prompts),
                 roles: $roles,
             ));
+        } catch (Throwable $exception) {
+            return AdminCommandSupport::fail($io, $exception);
+        }
+        $created = AdminUserResource::from($user);
 
-            $user = $envelope->last(HandledStamp::class)?->getResult();
-
-            if (!$user instanceof \App\Auth\Domain\Model\User) {
-                throw new \RuntimeException('Handler did not return a User instance.');
-            }
-        } catch (\RuntimeException $e) {
-            $io->error($e->getMessage());
-
-            return Command::FAILURE;
-        } catch (\Throwable $e) {
-            $io->error('Failed to create user: '.$e->getMessage());
-
-            return Command::FAILURE;
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, $created);
         }
 
         $io->success('User created successfully.');
         $io->table(
             ['Property', 'Value'],
             [
-                ['Public ID', $user->getPublicId()->toString()],
-                ['Name', $user->getName()],
-                ['Email', $user->getEmail()],
-                ['Role', implode(', ', $user->getRoles())],
+                ['Public ID', $created['publicId']],
+                ['Name', $created['name']],
+                ['Email', $created['email']],
+                ['Role', implode(', ', $created['roles'])],
             ],
         );
 
         return Command::SUCCESS;
     }
 
+    /** @throws InvalidInputException when the value is not an email address */
+    private static function email(string $value): Email
+    {
+        try {
+            return new Email($value);
+        } catch (\InvalidArgumentException $error) {
+            throw new InvalidInputException('Invalid email: ' . $error->getMessage(), previous: $error);
+        }
+    }
+
     /**
      * @param list<string> $names
      *
      * @return list<string> the roles, each once, in the order first named
+     *
+     * @throws InvalidInputException when a name is not a role
      */
     private static function rolesFor(array $names): array
     {
@@ -157,13 +132,41 @@ final class CreateUserCommand extends Command
             'user' => 'ROLE_USER',
             'admin' => 'ROLE_ADMIN',
             'super-admin' => 'ROLE_SUPER_ADMIN',
-            default => throw new \InvalidArgumentException(sprintf(
+            default => throw new InvalidInputException(sprintf(
                 'Invalid role "%s". Allowed values: user, admin, super-admin',
                 $name,
             )),
         }, $names);
 
         return array_values(array_unique($roles));
+    }
+
+    /**
+     * The password from stdin with `--password`, otherwise asked for on the terminal.
+     *
+     * @throws InvalidInputException when the password is missing or outside the password policy
+     */
+    private function password(InputInterface $input, SymfonyStyle $prompts): string
+    {
+        if ($input->getOption('password') === true) {
+            $password = $this->readPasswordFromStream($this->stdin);
+            if ($password === '') {
+                throw new InvalidInputException('No password provided via stdin.');
+            }
+        } else {
+            $password = (string) $prompts->askHidden('Password');
+            if ($password === '') {
+                throw new InvalidInputException('Password is required.');
+            }
+        }
+
+        try {
+            PasswordPolicy::assertAcceptable($password);
+        } catch (PasswordPolicyException $error) {
+            throw new InvalidInputException($error->getMessage(), previous: $error);
+        }
+
+        return $password;
     }
 
     /**

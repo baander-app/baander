@@ -6,8 +6,11 @@ namespace App\Auth\Interface\Console;
 
 use App\Auth\Application\Exception\UserNotFoundException;
 use App\Auth\Application\Service\AdminUserSettings;
+use App\Auth\Interface\Resource\AdminUserSettingResource;
+use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\InvalidSettingValuesException;
 use App\Shared\Application\Exception\UnknownSettingException;
+use App\Shared\Interface\Console\AdminCommandSupport;
 use App\Shared\Interface\Console\SettingValueFormatter;
 use App\UserPreference\Application\Port\UserSettingView;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -20,7 +23,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 /**
  * The CLI counterpart of GET /api/admin/users/{id}/settings and of PUT and
  * DELETE on /api/admin/users/{id}/settings/{key}. Changes are logged with
- * the actor "cli".
+ * the actor "cli". With `--json` it prints the `data` those endpoints return.
  */
 #[AsCommand(
     name: 'app:user:setting',
@@ -53,6 +56,7 @@ final class UserSettingCommand extends Command
                 A stored value that is no longer allowed is shown and marked (invalid);
                 the user gets the value after a reset until it is changed.
                 HELP);
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -64,41 +68,39 @@ final class UserSettingCommand extends Command
         $key = is_string($key) ? $key : null;
         $value = $input->getArgument('value');
 
-        if (!in_array($action, self::ACTIONS, true)) {
-            $io->error(sprintf('Unknown action "%s"; use get, set or reset.', $action));
-
-            return Command::FAILURE;
-        }
-        if ($key === null && $action !== 'get') {
-            $io->error(sprintf('%s needs a setting key.', ucfirst($action)));
-
-            return Command::FAILURE;
-        }
-        if ($action === 'set' && !is_string($value)) {
-            $io->error('Set needs a value.');
-
-            return Command::FAILURE;
-        }
-
         try {
-            return match ($action) {
-                'get' => $key === null ? $this->list($io, $identifier) : $this->show($io, $identifier, $key),
-                'set' => $this->changed($io, $identifier, $this->settings->set(AdminUserSettings::CLI_ACTOR, $identifier, (string) $key, $value)),
-                'reset' => $this->changed($io, $identifier, $this->settings->reset(AdminUserSettings::CLI_ACTOR, $identifier, (string) $key)),
-            };
-        } catch (UserNotFoundException|UnknownSettingException $e) {
-            $io->error($e->getMessage());
-        } catch (InvalidSettingValuesException $e) {
-            foreach ($e->violations as $violation) {
-                $io->error(sprintf('%s: %s', $violation->key, $violation->message));
+            if (!in_array($action, self::ACTIONS, true)) {
+                throw new InvalidInputException(sprintf('Unknown action "%s"; use get, set or reset.', $action));
             }
-        }
+            if ($key === null && $action !== 'get') {
+                throw new InvalidInputException(sprintf('%s needs a setting key.', ucfirst($action)));
+            }
+            if ($action === 'set' && !is_string($value)) {
+                throw new InvalidInputException('Set needs a value.');
+            }
 
-        return Command::FAILURE;
+            $json = AdminCommandSupport::wantsJson($input);
+
+            return match ($action) {
+                'get' => $key === null ? $this->list($io, $identifier, $json) : $this->show($io, $identifier, $key, $json),
+                'set' => $this->changed($io, $identifier, $this->settings->set(AdminUserSettings::CLI_ACTOR, $identifier, (string) $key, $value), $json),
+                'reset' => $this->changed($io, $identifier, $this->settings->reset(AdminUserSettings::CLI_ACTOR, $identifier, (string) $key), $json),
+            };
+        } catch (UserNotFoundException|UnknownSettingException|InvalidInputException $e) {
+            return AdminCommandSupport::fail($io, $e);
+        } catch (InvalidSettingValuesException $e) {
+            // The API answers 422 with the messages per key.
+            return AdminCommandSupport::fail($io, new InvalidInputException('Validation failed.', $e->messagesByKey(), $e));
+        }
     }
 
-    private function list(SymfonyStyle $io, string $identifier): int
+    private function list(SymfonyStyle $io, string $identifier, bool $json): int
     {
+        $settings = $this->settings->settings($identifier);
+        if ($json) {
+            return AdminCommandSupport::json($io, AdminUserSettingResource::collection($settings));
+        }
+
         $io->table(
             ['Key', 'Value', 'Source', 'Stored'],
             array_map(
@@ -108,16 +110,19 @@ final class UserSettingCommand extends Command
                     $setting->source,
                     self::stored($setting),
                 ],
-                $this->settings->settings($identifier),
+                $settings,
             ),
         );
 
         return Command::SUCCESS;
     }
 
-    private function show(SymfonyStyle $io, string $identifier, string $key): int
+    private function show(SymfonyStyle $io, string $identifier, string $key, bool $json): int
     {
         $setting = $this->settings->setting($identifier, $key);
+        if ($json) {
+            return AdminCommandSupport::json($io, AdminUserSettingResource::from($setting));
+        }
 
         $io->definitionList(
             ['Key' => $setting->key],
@@ -134,8 +139,12 @@ final class UserSettingCommand extends Command
         return Command::SUCCESS;
     }
 
-    private function changed(SymfonyStyle $io, string $identifier, UserSettingView $setting): int
+    private function changed(SymfonyStyle $io, string $identifier, UserSettingView $setting, bool $json): int
     {
+        if ($json) {
+            return AdminCommandSupport::json($io, AdminUserSettingResource::from($setting));
+        }
+
         $io->success(sprintf(
             '%s of "%s" is now %s (%s).',
             $setting->key,

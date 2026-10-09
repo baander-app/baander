@@ -15,11 +15,19 @@ make exec cmd="php bin/console app:user:rename alice@baander.app 'Alice Jensen'"
 | `identifier` | Yes | The user's email address or UUID |
 | `name` | Yes | The new display name |
 
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--json` | Print only the changed user, as the admin API's `data` payload, in JSON |
+
 ## Details
 
 The name is stored as given, including any leading or trailing spaces. A name that is empty or only whitespace is rejected with `Name cannot be empty.`, and one longer than 255 characters with `Name cannot be longer than 255 characters.` The admin API rejects the same names with the same messages.
 
 Renaming a user to the name they already have succeeds and changes nothing.
+
+With `--json` the command prints only the user as the API's `data` object, the same user resource `PATCH /api/admin/users/{id}` returns: `id`, `publicId`, `name`, `email`, `emailVerifiedAt`, `roles`, `disabled`, `createdAt` and `updatedAt`.
 
 ## Exit codes
 

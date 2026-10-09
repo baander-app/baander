@@ -7,7 +7,9 @@ namespace App\Tests\Unit\Auth\Interface\Console;
 use App\Auth\Application\Command\User\CreateUserCommand as CreateUserMessage;
 use App\Auth\Domain\Model\User;
 use App\Auth\Interface\Console\CreateUserCommand;
+use App\Auth\Interface\Resource\AdminUserResource;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Interface\Console\AdminCommandSupport;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
@@ -26,7 +28,7 @@ final class CreateUserCommandTest extends TestCase
     protected function setUp(): void
     {
         $this->commandBus = $this->createStub(MessageBusInterface::class);
-        $this->command = new CreateUserCommand($this->commandBus);
+        $this->command = new CreateUserCommand(new AdminCommandSupport($this->commandBus));
     }
 
     /** @param array<array-key, string> $roles */
@@ -62,7 +64,7 @@ final class CreateUserCommandTest extends TestCase
 
     private function createCommandWithStream(string $stdinContent): CreateUserCommand
     {
-        return new CreateUserCommand($this->commandBus, $this->createInputStream($stdinContent));
+        return new CreateUserCommand(new AdminCommandSupport($this->commandBus), $this->createInputStream($stdinContent));
     }
 
     public function testCreateUserSuccess(): void
@@ -91,9 +93,81 @@ final class CreateUserCommandTest extends TestCase
             'name' => 'Admin',
             '--password' => true,
             '--role' => 'admin',
+            '--force' => true,
         ], ['interactive' => false]);
 
         $this->assertSame(Command::SUCCESS, $tester->getStatusCode());
+    }
+
+    public function testPrintsTheCreatedUserAsTheApiReturnsItWithJson(): void
+    {
+        $user = User::createByOperator(Email::fromString('alice@baander.app'), 'hashed-pw', 'Alice', ['ROLE_USER']);
+        $this->commandBus->method('dispatch')->willReturnCallback(
+            static fn (object $m): Envelope => new Envelope($m, [new HandledStamp($user, 'handler')]),
+        );
+
+        $tester = new CommandTester($this->createCommandWithStream("securepassword\n"));
+        $tester->execute([
+            'email' => 'alice@baander.app',
+            'name' => 'Alice',
+            '--password' => true,
+            '--json' => true,
+        ], ['interactive' => false]);
+
+        $this->assertSame(Command::SUCCESS, $tester->getStatusCode());
+        $this->assertSame(AdminUserResource::from($user), json_decode($tester->getDisplay(), true, 512, JSON_THROW_ON_ERROR));
+    }
+
+    public function testAPrivilegedRoleWithoutATerminalOrForceCreatesNothing(): void
+    {
+        $commandBus = $this->createMock(MessageBusInterface::class);
+        $commandBus->expects($this->never())->method('dispatch');
+
+        $tester = new CommandTester(new CreateUserCommand(new AdminCommandSupport($commandBus), $this->createInputStream("adminpassword\n")));
+        $tester->execute([
+            'email' => 'admin@baander.app',
+            'name' => 'Admin',
+            '--password' => true,
+            '--role' => 'admin',
+        ], ['interactive' => false]);
+
+        $this->assertSame(Command::INVALID, $tester->getStatusCode());
+        $this->assertStringContainsString('--force', $tester->getDisplay());
+    }
+
+    public function testDecliningThePrivilegedRoleConfirmationCreatesNothingAndFails(): void
+    {
+        $commandBus = $this->createMock(MessageBusInterface::class);
+        $commandBus->expects($this->never())->method('dispatch');
+
+        $tester = new CommandTester(new CreateUserCommand(new AdminCommandSupport($commandBus), $this->createInputStream("adminpassword\n")));
+        $tester->setInputs(['no']);
+        $tester->execute([
+            'email' => 'admin@baander.app',
+            'name' => 'Admin',
+            '--password' => true,
+            '--role' => 'super-admin',
+        ]);
+
+        $this->assertSame(Command::FAILURE, $tester->getStatusCode());
+        $this->assertStringContainsString('Nothing was changed.', $tester->getDisplay());
+    }
+
+    public function testConfirmingThePrivilegedRoleCreatesTheUser(): void
+    {
+        $this->mockDispatchReturningUser('usr_test123', 'Admin', 'admin@baander.app', ['ROLE_ADMIN']);
+
+        $tester = new CommandTester($this->createCommandWithStream("adminpassword\n"));
+        $tester->setInputs(['yes']);
+        $tester->execute([
+            'email' => 'admin@baander.app',
+            'name' => 'Admin',
+            '--password' => true,
+            '--role' => 'admin',
+        ]);
+
+        $this->assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
+        $this->assertStringContainsString('User created successfully', $tester->getDisplay());
     }
 
     /** @return iterable<string, array{list<string>, list<string>}> */
@@ -127,6 +201,7 @@ final class CreateUserCommandTest extends TestCase
             'name' => 'Root',
             '--password' => true,
             '--role' => $options,
+            '--force' => true,
         ], ['interactive' => false]);
 
         $this->assertSame(Command::SUCCESS, $tester->getStatusCode(), $tester->getDisplay());
@@ -143,7 +218,7 @@ final class CreateUserCommandTest extends TestCase
             'name' => 'Alice',
         ], ['interactive' => false]);
 
-        $this->assertSame(Command::FAILURE, $tester->getStatusCode());
+        $this->assertSame(Command::INVALID, $tester->getStatusCode());
         $this->assertStringContainsString('Invalid email', $tester->getDisplay());
     }
 
@@ -174,7 +249,7 @@ final class CreateUserCommandTest extends TestCase
             '--role' => 'superadmin',
         ], ['interactive' => false]);
 
-        $this->assertSame(Command::FAILURE, $statusCode);
+        $this->assertSame(Command::INVALID, $statusCode);
         $this->assertStringContainsString('Invalid role', $tester->getDisplay());
     }
 
@@ -192,15 +267,31 @@ final class CreateUserCommandTest extends TestCase
         $commandBus = $this->createMock(MessageBusInterface::class);
         $commandBus->expects($this->never())->method('dispatch');
 
-        $tester = new CommandTester(new CreateUserCommand($commandBus, $this->createInputStream($password . "\n")));
+        $tester = new CommandTester(new CreateUserCommand(new AdminCommandSupport($commandBus), $this->createInputStream($password . "\n")));
         $tester->execute([
             'email' => 'test@baander.app',
             'name' => 'Alice',
             '--password' => true,
         ], ['interactive' => false]);
 
-        $this->assertSame(Command::FAILURE, $tester->getStatusCode());
+        $this->assertSame(Command::INVALID, $tester->getStatusCode());
         $this->assertStringContainsString('between 8 and 255 characters', $tester->getDisplay());
+    }
+
+    public function testRejectsAnEmptyPasswordOnStdinAsInvalid(): void
+    {
+        $commandBus = $this->createMock(MessageBusInterface::class);
+        $commandBus->expects($this->never())->method('dispatch');
+
+        $tester = new CommandTester(new CreateUserCommand(new AdminCommandSupport($commandBus), $this->createInputStream("\n")));
+        $tester->execute([
+            'email' => 'test@baander.app',
+            'name' => 'Alice',
+            '--password' => true,
+        ], ['interactive' => false]);
+
+        $this->assertSame(Command::INVALID, $tester->getStatusCode());
+        $this->assertStringContainsString('No password provided via stdin.', $tester->getDisplay());
     }
 
     /** @return iterable<string, array{string}> */

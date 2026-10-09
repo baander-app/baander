@@ -16,6 +16,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
 
+/** The CLI counterpart of POST /api/admin/oauth/clients/{clientId}/rotate-secret. */
 #[AsCommand(
     name: 'app:oauth:client:rotate-secret',
     description: 'Give a confidential OAuth client a new secret.',
@@ -31,6 +32,7 @@ final class OAuthClientRotateSecretCommand extends Command
     protected function configure(): void
     {
         $this->addArgument('client-id', InputArgument::REQUIRED, 'The OAuth client_id');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -45,9 +47,14 @@ final class OAuthClientRotateSecretCommand extends Command
             return AdminCommandSupport::fail($io, $exception);
         }
         assert($registered instanceof RegisteredClientDTO);
+        $client = AdminOAuthClientCredentialsResource::from($registered);
+
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, $client);
+        }
 
         $io->success('The client has a new secret. The old secret no longer works.');
-        OAuthClientMessageDispatcher::show($io, AdminOAuthClientCredentialsResource::from($registered));
+        OAuthClientMessageDispatcher::show($io, $client);
 
         return Command::SUCCESS;
     }

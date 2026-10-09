@@ -176,6 +176,22 @@ final class AdminOAuthClientTest extends TestCase
         self::assertSame(Command::FAILURE, $spa->execute(['client-id' => $this->spaClient()->getPublicId()->toString()]));
         $invalid = $this->command('app:oauth:client:create');
         self::assertSame(Command::INVALID, $invalid->execute(['name' => 'X', '--type' => 'first_party']));
+        $rejected = $this->command('app:oauth:client:create');
+        self::assertSame(Command::INVALID, $rejected->execute(['name' => 'Console TV', '--type' => 'device', '--redirect-uri' => ['https://tv.baander.app/callback']]), 'The API answers 422.');
+
+        $json = $this->command('app:oauth:client:create');
+        self::assertSame(Command::SUCCESS, $json->execute([
+            'name' => 'Scripted server',
+            '--type' => 'confidential',
+            '--redirect-uri' => ['https://scripted.baander.app/callback'],
+            '--json' => true,
+        ]), $json->getDisplay());
+        $printed = json_decode($json->getDisplay(), true, 512, JSON_THROW_ON_ERROR);
+        self::assertIsArray($printed);
+        $viaApi = $this->registerClient($this->createSuperAdminUser(), ['name' => 'API server', 'type' => 'confidential', 'redirectUris' => ['https://api.baander.app/callback']]);
+        self::assertSame(array_keys($viaApi), array_keys($printed), 'The CLI prints the API data.');
+        $this->entityManager->clear();
+        self::assertTrue($this->clients()->findClientByPublicId(PublicId::fromString($printed['clientId']))?->authenticatesWith($printed['clientSecret']));
     }
 
     /**

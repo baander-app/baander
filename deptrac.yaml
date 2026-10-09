@@ -30,7 +30,7 @@ deptrac:
       groups:
         Shared: ['Shared Domain', 'Shared Application', 'Shared Infrastructure', 'Shared Interface']
         Activity: ['Activity Domain', 'Activity Application', 'Activity Infrastructure', 'Activity Resources', 'Activity Interface']
-        Auth: ['Auth Domain', 'Auth Identity Contract', 'Auth Device Approval Event Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
+        Auth: ['Auth Domain', 'Auth Identity Contract', 'Auth User Identifier Contract', 'Auth Device Approval Event Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
         Catalog: ['Catalog Song Lookup Contract', 'Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Resources', 'Catalog Interface']
         Filesystem: ['Filesystem Infrastructure', 'Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
         Library: ['Library Read Scope Contract', 'Library Content Stats Contract', 'Library Files Discovered Contract', 'Library Provisioning Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
@@ -134,6 +134,12 @@ deptrac:
         - type: classLike
           value: '^App\\Auth\\Application\\Port\\AuthenticatedUserIdentityInterface$'
 
+    # Resolves a user named by email address or UUID, for other contexts' console commands.
+    - name: 'Auth User Identifier Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Auth\\Application\\Port\\UserIdentifierResolverInterface$'
+
     - name: 'Auth Application'
       collectors:
         - type: bool
@@ -143,6 +149,8 @@ deptrac:
           must_not:
             - type: classLike
               value: '^App\\Auth\\Application\\Port\\AuthenticatedUserIdentityInterface$'
+            - type: classLike
+              value: '^App\\Auth\\Application\\Port\\UserIdentifierResolverInterface$'
 
     - name: 'Auth Infrastructure'
       collectors:
@@ -944,6 +952,9 @@ deptrac:
 
     # --- Auth ---
     'Auth Identity Contract': []
+    'Auth User Identifier Contract':
+      - 'Shared Domain'
+      - 'Shared Application'
     'Auth Device Approval Event Contract':
       - 'Shared Domain'
     'Auth Domain':
@@ -951,6 +962,7 @@ deptrac:
     'Auth Application':
       - 'UserPreference Settings Contract'
       - 'Auth Identity Contract'
+      - 'Auth User Identifier Contract'
       - 'Auth Device Approval Event Contract'
       - 'Scheduler Schedulable Contract'
       - 'Auth Domain'
@@ -1294,6 +1306,7 @@ deptrac:
       - 'Scheduler Schedulable Contract'
       - 'Transcode Resources'
       - 'Auth Identity Contract'
+      - 'Auth User Identifier Contract'
       - 'Transcode Application'
       - 'Shared Domain'
       - 'Shared Application'

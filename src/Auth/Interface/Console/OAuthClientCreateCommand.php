@@ -17,6 +17,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
 
+/** The CLI counterpart of POST /api/admin/oauth/clients. */
 #[AsCommand(
     name: 'app:oauth:client:create',
     description: 'Register a device, public or confidential OAuth client.',
@@ -35,6 +36,7 @@ final class OAuthClientCreateCommand extends Command
             ->addArgument('name', InputArgument::REQUIRED, 'Name the user sees when approving the client')
             ->addOption('type', 't', InputOption::VALUE_REQUIRED, 'device, public or confidential')
             ->addOption('redirect-uri', 'r', InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Redirect URI of a public or confidential client (repeatable)');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -60,9 +62,14 @@ final class OAuthClientCreateCommand extends Command
             return AdminCommandSupport::fail($io, $exception);
         }
         assert($registered instanceof RegisteredClientDTO);
+        $client = AdminOAuthClientCredentialsResource::from($registered);
+
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, $client);
+        }
 
         $io->success('The OAuth client is registered.');
-        OAuthClientMessageDispatcher::show($io, AdminOAuthClientCredentialsResource::from($registered));
+        OAuthClientMessageDispatcher::show($io, $client);
 
         return Command::SUCCESS;
     }

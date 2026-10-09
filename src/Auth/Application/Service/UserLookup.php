@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace App\Auth\Application\Service;
 
 use App\Auth\Application\Exception\UserNotFoundException;
+use App\Auth\Application\Port\UserIdentifierResolverInterface;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 
 /** Finds the user an operator or a command names by email address or UUID. */
-final readonly class UserLookup
+final readonly class UserLookup implements UserIdentifierResolverInterface
 {
     public function __construct(
         private UserRepositoryInterface $userRepository,
@@ -32,5 +33,13 @@ final readonly class UserLookup
         }
 
         return $user ?? throw UserNotFoundException::forIdentifier($identifier);
+    }
+
+    /**
+     * @throws UserNotFoundException when no user has the email address or UUID
+     */
+    public function userId(string $identifier): Uuid
+    {
+        return $this->byIdentifier($identifier)->getId();
     }
 }

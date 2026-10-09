@@ -56,6 +56,8 @@ final class RefreshTokenHandlerTest extends TestCase
     private bool $clientActiveAtIssuance = true;
     /** @var array<string, true> IDs of the users the user repository reports as disabled */
     private array $disabledUserIds = [];
+    /** @var array<string, true> IDs of the users the user repository no longer finds */
+    private array $deletedUserIds = [];
     private RefreshTokenHandler $handler;
 
     protected function setUp(): void
@@ -369,6 +371,27 @@ final class RefreshTokenHandlerTest extends TestCase
         // A plain RuntimeException, which the token endpoint reports as invalid_grant.
         self::assertNotNull($rejection, 'A disabled account must not refresh.');
         self::assertSame(RuntimeException::class, $rejection::class);
+        self::assertFalse($refreshToken->hasBeenUsed());
+        self::assertSame([], $this->savedAccessTokens);
+    }
+
+    public function testATokenOfADeletedAccountCannotBeRefreshed(): void
+    {
+        $refreshToken = $this->boundRefreshToken();
+        // The account was deleted after the token was loaded with its user.
+        $this->deletedUserIds[$refreshToken->getAccessToken()->getUser()?->getId()->toString() ?? ''] = true;
+
+        $rejection = null;
+        try {
+            ($this->handler)(new RefreshTokenCommand(refreshTokenId: $refreshToken->getTokenId()->toString(), dpopJkt: self::JKT));
+        } catch (RuntimeException $exception) {
+            $rejection = $exception;
+        }
+
+        // A plain RuntimeException, which the token endpoint reports as invalid_grant.
+        self::assertNotNull($rejection, 'A deleted account must not refresh.');
+        self::assertSame(RuntimeException::class, $rejection::class);
+        self::assertSame('Refresh token belongs to a disabled or deleted account.', $rejection->getMessage());
         self::assertFalse($refreshToken->hasBeenUsed());
         self::assertSame([], $this->savedAccessTokens);
     }
@@ -818,7 +841,7 @@ final class RefreshTokenHandlerTest extends TestCase
     private function users(): UserRepositoryInterface
     {
         $users = $this->createStub(UserRepositoryInterface::class);
-        $users->method('findByUuid')->willReturnCallback(fn (Uuid $id): User => User::reconstitute(new UserState(
+        $users->method('findByUuid')->willReturnCallback(fn (Uuid $id): ?User => isset($this->deletedUserIds[$id->toString()]) ? null : User::reconstitute(new UserState(
             id: $id,
             publicId: new PublicId(),
             name: 'Test User',

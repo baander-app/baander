@@ -23,6 +23,12 @@ make exec cmd="php bin/console app:user:roles alice@baander.app ROLE_USER"
 | `identifier` | Yes | The user's email address or UUID |
 | `roles` | Yes | The complete new set of roles, separated by spaces: `ROLE_USER`, `ROLE_ADMIN` and `ROLE_SUPER_ADMIN` |
 
+## Options
+
+| Option | Description |
+|--------|-------------|
+| `--json` | Print only the changed user, as the admin API's `data` payload, in JSON |
+
 ## Details
 
 The roles replace the user's current ones; any role not named is removed. A role named twice counts once. Setting the roles the user already has, in any order, succeeds and changes nothing.
@@ -30,6 +36,8 @@ The roles replace the user's current ones; any role not named is removed. A role
 `ROLE_SUPER_ADMIN` includes the rights of `ROLE_ADMIN`, and `ROLE_ADMIN` those of `ROLE_USER`. An unknown role is rejected and the user's roles stay as they were.
 
 The command acts with full authority and can change any user's roles, a super admin's included.
+
+With `--json` the command prints only the user as the API's `data` object, the same user resource `POST /api/admin/users/{id}/roles` returns: `id`, `publicId`, `name`, `email`, `emailVerifiedAt`, `roles`, `disabled`, `createdAt` and `updatedAt`.
 
 ## Exit codes
 

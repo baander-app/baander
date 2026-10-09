@@ -6,7 +6,8 @@ namespace App\Auth\Interface\Console;
 
 use App\Auth\Application\Command\User\SetUserPasswordCommand;
 use App\Auth\Application\Exception\PasswordPolicyException;
-use App\Auth\Application\Exception\UserNotFoundException;
+use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -14,8 +15,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Messenger\Exception\HandlerFailedException;
-use Symfony\Component\Messenger\MessageBusInterface;
+use Throwable;
 
 /** The CLI counterpart of POST /api/admin/users/{id}/reset-password. */
 #[AsCommand(
@@ -24,6 +24,9 @@ use Symfony\Component\Messenger\MessageBusInterface;
 )]
 final class ResetUserPasswordCommand extends Command
 {
+    /** The `data` of the API's response. */
+    private const string RESET_MESSAGE = 'Password reset successfully.';
+
     /** @var resource */
     private mixed $stdin;
 
@@ -31,7 +34,7 @@ final class ResetUserPasswordCommand extends Command
      * @param resource $stdin Stream to read the password from when --password is used
      */
     public function __construct(
-        private readonly MessageBusInterface $commandBus,
+        private readonly AdminCommandSupport $support,
         mixed $stdin = STDIN,
     ) {
         parent::__construct();
@@ -43,6 +46,7 @@ final class ResetUserPasswordCommand extends Command
         $this
             ->addArgument('identifier', InputArgument::REQUIRED, 'User email or UUID')
             ->addOption('password', null, InputOption::VALUE_NONE, 'Read the password from stdin instead of prompting (for CI/scripting)');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -50,24 +54,24 @@ final class ResetUserPasswordCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $identifier = (string) $input->getArgument('identifier');
 
-        $password = $input->getOption('password')
+        // The question goes to stderr, so that stdout carries only the JSON with --json.
+        $password = $input->getOption('password') === true
             ? trim((string) stream_get_contents($this->stdin))
-            : (string) $io->askHidden('New password');
-        if ($password === '') {
-            $io->error('A password is required.');
-
-            return Command::FAILURE;
-        }
+            : (string) $io->getErrorStyle()->askHidden('New password');
 
         try {
-            $this->commandBus->dispatch(new SetUserPasswordCommand($identifier, $password));
-        } catch (\Throwable $e) {
-            $cause = $e instanceof HandlerFailedException ? ($e->getPrevious() ?? $e) : $e;
-            $io->error($cause instanceof UserNotFoundException || $cause instanceof PasswordPolicyException
-                ? $cause->getMessage()
-                : 'Failed to reset the password: ' . $cause->getMessage());
+            if ($password === '') {
+                throw new InvalidInputException('A password is required.');
+            }
+            $this->support->dispatch(new SetUserPasswordCommand($identifier, $password));
+        } catch (PasswordPolicyException $error) {
+            return AdminCommandSupport::fail($io, new InvalidInputException($error->getMessage(), previous: $error));
+        } catch (Throwable $exception) {
+            return AdminCommandSupport::fail($io, $exception);
+        }
 
-            return Command::FAILURE;
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, ['message' => self::RESET_MESSAGE]);
         }
 
         $io->success(sprintf('The password of "%s" has been reset and all of their sessions signed out.', $identifier));

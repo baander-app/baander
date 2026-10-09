@@ -18,6 +18,8 @@ use Throwable;
 
 /**
  * The CLI counterpart of DELETE /api/admin/login-blocks/{id} and DELETE /api/admin/login-blocks.
+ *
+ * The API answers both with 204 and no body, so with `--json` the command prints nothing.
  */
 #[AsCommand(
     name: 'app:login-block:delete',
@@ -37,6 +39,7 @@ final class LoginBlockDeleteCommand extends Command
             ->addArgument('id', InputArgument::OPTIONAL, 'The UUID of the block to remove, as app:login-block:list shows it')
             ->addOption('all', null, InputOption::VALUE_NONE, 'Remove every block instead of one');
         AdminCommandSupport::addForceOption($this);
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -61,7 +64,9 @@ final class LoginBlockDeleteCommand extends Command
             return AdminCommandSupport::fail($io, $exception);
         }
 
-        $io->success(sprintf('Login block "%s" removed.', $id));
+        if (!AdminCommandSupport::wantsJson($input)) {
+            $io->success(sprintf('Login block "%s" removed.', $id));
+        }
 
         return Command::SUCCESS;
     }
@@ -79,7 +84,9 @@ final class LoginBlockDeleteCommand extends Command
             return AdminCommandSupport::fail($io, $exception);
         }
 
-        $io->success('Every login block was removed.');
+        if (!AdminCommandSupport::wantsJson($input)) {
+            $io->success('Every login block was removed.');
+        }
 
         return Command::SUCCESS;
     }

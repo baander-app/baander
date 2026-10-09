@@ -7,7 +7,9 @@ namespace App\Tests\Functional\Auth;
 use App\Auth\Domain\Event\UserCreatedByOperator;
 use App\Auth\Domain\Model\User;
 use App\Auth\Interface\Console\CreateUserCommand;
+use App\Auth\Interface\Resource\AdminUserResource;
 use App\Shared\Domain\Model\Email;
+use App\Shared\Interface\Console\AdminCommandSupport;
 use App\Tests\Functional\TestCase;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
@@ -33,7 +35,11 @@ final class AdminUserCliParityTest extends TestCase
             $data = $this->assertJsonResponse($this->authenticatedRequest('POST', $this->userPath($viaApi) . '/disable', $superAdmin), 200, 'data')['data'];
             self::assertTrue($data['disabled'], 'API attempt ' . $attempt);
             $disable = $this->command('app:user:disable');
-            self::assertSame(Command::SUCCESS, $disable->execute(['identifier' => $viaCli->getEmail()]), 'CLI attempt ' . $attempt . ': ' . $disable->getDisplay());
+            self::assertSame(Command::SUCCESS, $disable->execute(['identifier' => $viaCli->getEmail(), '--json' => true]), 'CLI attempt ' . $attempt . ': ' . $disable->getDisplay());
+            $printed = json_decode($disable->getDisplay(), true, 512, JSON_THROW_ON_ERROR);
+            self::assertIsArray($printed);
+            self::assertSame(array_keys($data), array_keys($printed), 'The CLI prints the API data.');
+            self::assertTrue($printed['disabled'], 'CLI attempt ' . $attempt);
         }
         self::assertSame($this->state($viaApi), $this->state($viaCli));
         self::assertTrue($this->stored($viaCli)->isDisabled());
@@ -63,18 +69,21 @@ final class AdminUserCliParityTest extends TestCase
         rewind($stdin);
         $bus = static::getContainer()->get(MessageBusInterface::class);
         self::assertInstanceOf(MessageBusInterface::class, $bus);
-        $create = new CommandTester(new CreateUserCommand($bus, $stdin));
+        $create = new CommandTester(new CreateUserCommand(new AdminCommandSupport($bus), $stdin));
 
         self::assertSame(Command::SUCCESS, $create->execute([
             'email' => 'root@baander.app',
             'name' => 'Root',
             '--password' => true,
             '--role' => ['super-admin'],
+            '--force' => true,
+            '--json' => true,
         ], ['interactive' => false]), $create->getDisplay());
 
         $this->entityManager->clear();
         $user = $this->userRepository->findByEmail(new Email('root@baander.app'));
         self::assertNotNull($user);
+        self::assertSame(AdminUserResource::from($user), json_decode($create->getDisplay(), true, 512, JSON_THROW_ON_ERROR), 'The CLI prints the API data.');
         self::assertSame(['ROLE_SUPER_ADMIN'], $user->getRoles());
         self::assertTrue($user->hasRole('ROLE_ADMIN'));
         self::assertTrue($user->isEmailVerified());

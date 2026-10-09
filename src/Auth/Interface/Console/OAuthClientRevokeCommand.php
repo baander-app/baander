@@ -15,6 +15,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
 
+/** The CLI counterpart of POST /api/admin/oauth/clients/{clientId}/revoke. */
 #[AsCommand(
     name: 'app:oauth:client:revoke',
     description: 'Revoke an OAuth client and every token issued to it.',
@@ -30,6 +31,7 @@ final class OAuthClientRevokeCommand extends Command
     protected function configure(): void
     {
         $this->addArgument('client-id', InputArgument::REQUIRED, 'The OAuth client_id');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -44,6 +46,10 @@ final class OAuthClientRevokeCommand extends Command
             return AdminCommandSupport::fail($io, $exception);
         }
         $revoked = AdminOAuthClientResource::from($client);
+
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, $revoked);
+        }
 
         $io->success(sprintf('Client "%s" and its tokens are revoked.', (string) $revoked['name']));
 

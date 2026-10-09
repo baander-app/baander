@@ -4,11 +4,7 @@ declare(strict_types=1);
 
 namespace App\Transcode\Interface\Console;
 
-use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
-use App\Shared\Application\Exception\InvalidInputException;
-use App\Shared\Application\Exception\NotFoundException;
-use App\Shared\Domain\Model\Email;
-use App\Shared\Domain\Model\Uuid;
+use App\Auth\Application\Port\UserIdentifierResolverInterface;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
 use App\Transcode\Interface\Resource\TranscodeSessionResource;
@@ -18,9 +14,6 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Security\Core\Exception\UserNotFoundException;
-use Symfony\Component\Security\Core\User\UserInterface;
-use Symfony\Component\Security\Core\User\UserProviderInterface;
 use Throwable;
 
 /**
@@ -38,10 +31,10 @@ final class TranscodeSessionListCommand extends Command
 {
     private const string USER_OPTION = 'user';
 
-    /** @param UserProviderInterface<UserInterface> $users finds a user by email address, as login does */
+    /** @param UserIdentifierResolverInterface $users finds the user `--user` names, as the `app:user:*` commands do */
     public function __construct(
         private readonly TranscodeSessionPortInterface $sessions,
-        private readonly UserProviderInterface $users,
+        private readonly UserIdentifierResolverInterface $users,
     ) {
         parent::__construct();
     }
@@ -59,7 +52,7 @@ final class TranscodeSessionListCommand extends Command
 
         try {
             $sessions = is_string($user)
-                ? $this->sessions->findActiveByUser($this->userId($user))
+                ? $this->sessions->findActiveByUser($this->users->userId($user))
                 : $this->sessions->findActive();
         } catch (Throwable $failure) {
             return AdminCommandSupport::fail($io, $failure);
@@ -82,33 +75,5 @@ final class TranscodeSessionListCommand extends Command
             ],
             'No transcode session is active.',
         );
-    }
-
-    /**
-     * @throws NotFoundException     when no user has the email address
-     * @throws InvalidInputException when the value is neither an email address nor a UUID
-     */
-    private function userId(string $identifier): Uuid
-    {
-        try {
-            if (!str_contains($identifier, '@')) {
-                return Uuid::fromString($identifier);
-            }
-            $email = new Email($identifier);
-        } catch (\InvalidArgumentException $error) {
-            throw new InvalidInputException('The user must be an email address or a UUID.', previous: $error);
-        }
-
-        try {
-            $user = $this->users->loadUserByIdentifier($email->toString());
-        } catch (UserNotFoundException $error) {
-            throw new NotFoundException(sprintf('No user has the email address "%s".', $identifier), previous: $error);
-        }
-
-        if (!$user instanceof AuthenticatedUserIdentityInterface) {
-            throw new \LogicException(sprintf('The user provider returned a %s without a user ID.', get_debug_type($user)));
-        }
-
-        return Uuid::fromString($user->getId());
     }
 }

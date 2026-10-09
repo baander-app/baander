@@ -33,6 +33,7 @@ final class UserRolesCommand extends Command
         $this
             ->addArgument('identifier', InputArgument::REQUIRED, 'User email or UUID')
             ->addArgument('roles', InputArgument::REQUIRED | InputArgument::IS_ARRAY, 'The complete set of roles: ROLE_USER, ROLE_ADMIN and/or ROLE_SUPER_ADMIN');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -44,6 +45,10 @@ final class UserRolesCommand extends Command
             $user = AdminUserResource::from($this->support->dispatch(new SetUserRolesCommand((string) $input->getArgument('identifier'), $roles)));
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
+        }
+
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, $user);
         }
 
         $io->success(sprintf('User %s now has the roles %s.', $user['email'], implode(', ', $user['roles'])));

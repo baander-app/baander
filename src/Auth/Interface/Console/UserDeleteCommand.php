@@ -14,7 +14,11 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
 
-/** The CLI counterpart of DELETE /api/admin/users/{id}. */
+/**
+ * The CLI counterpart of DELETE /api/admin/users/{id}.
+ *
+ * The API answers 204 with no body, so with `--json` the command prints nothing.
+ */
 #[AsCommand(
     name: 'app:user:delete',
     description: 'Delete a user account.',
@@ -31,6 +35,7 @@ final class UserDeleteCommand extends Command
     {
         $this->addArgument('identifier', InputArgument::REQUIRED, 'User email or UUID');
         AdminCommandSupport::addForceOption($this);
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -49,7 +54,9 @@ final class UserDeleteCommand extends Command
             return AdminCommandSupport::fail($io, $exception);
         }
 
-        $io->success(sprintf('User "%s" has been deleted.', $identifier));
+        if (!AdminCommandSupport::wantsJson($input)) {
+            $io->success(sprintf('User "%s" has been deleted.', $identifier));
+        }
 
         return Command::SUCCESS;
     }

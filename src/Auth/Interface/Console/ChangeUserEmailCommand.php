@@ -5,16 +5,16 @@ declare(strict_types=1);
 namespace App\Auth\Interface\Console;
 
 use App\Auth\Application\Command\User\ChangeEmailCommand;
-use App\Auth\Application\Exception\EmailAddressInUseException;
-use App\Auth\Application\Exception\UserNotFoundException;
+use App\Auth\Interface\Resource\AdminUserResource;
+use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Symfony\Component\Messenger\Exception\HandlerFailedException;
-use Symfony\Component\Messenger\MessageBusInterface;
+use Throwable;
 
 /** The CLI counterpart of changing a user's email in PATCH /api/admin/users/{id}. */
 #[AsCommand(
@@ -24,7 +24,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
 final class ChangeUserEmailCommand extends Command
 {
     public function __construct(
-        private readonly MessageBusInterface $commandBus,
+        private readonly AdminCommandSupport $support,
     ) {
         parent::__construct();
     }
@@ -34,6 +34,7 @@ final class ChangeUserEmailCommand extends Command
         $this
             ->addArgument('identifier', InputArgument::REQUIRED, 'User email or UUID')
             ->addArgument('email', InputArgument::REQUIRED, 'The new email address');
+        AdminCommandSupport::addJsonOption($this);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -43,19 +44,19 @@ final class ChangeUserEmailCommand extends Command
         $email = (string) $input->getArgument('email');
 
         try {
-            $this->commandBus->dispatch(new ChangeEmailCommand($identifier, $email));
-        } catch (\Throwable $e) {
-            $cause = $e instanceof HandlerFailedException ? ($e->getPrevious() ?? $e) : $e;
-            $io->error(match (true) {
-                $cause instanceof UserNotFoundException, $cause instanceof EmailAddressInUseException => $cause->getMessage(),
-                $cause instanceof \InvalidArgumentException => sprintf('"%s" is not a valid email address.', $email),
-                default => 'Failed to change the email address: ' . $cause->getMessage(),
-            });
-
-            return Command::FAILURE;
+            $user = AdminUserResource::from($this->support->dispatch(new ChangeEmailCommand($identifier, $email)));
+        } catch (\InvalidArgumentException $error) {
+            // The use case rejects a malformed new address; the API answers it with 422.
+            return AdminCommandSupport::fail($io, new InvalidInputException(sprintf('"%s" is not a valid email address.', $email), previous: $error));
+        } catch (Throwable $exception) {
+            return AdminCommandSupport::fail($io, $exception);
         }
 
-        $io->success(sprintf('The email address of "%s" is now %s. It stays unverified until the user opens the link sent to it.', $identifier, strtolower($email)));
+        if (AdminCommandSupport::wantsJson($input)) {
+            return AdminCommandSupport::json($io, $user);
+        }
+
+        $io->success(sprintf('The email address of "%s" is now %s. It stays unverified until the user opens the link sent to it.', $identifier, $user['email']));
 
         return Command::SUCCESS;
     }
