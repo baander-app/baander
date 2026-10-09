@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
@@ -98,6 +98,13 @@ export function useMetadataForm({
     }
   }, [dirty, formState, lockedFields, entityType, publicId, patchSong, patchAlbum, patchArtist, queryClient, getQueryKey, buildPayload])
 
+  // The debounced save runs the save of the latest render. The one in scope when a field changed
+  // still holds the state from before that change: its edit, and any lock set in the meantime.
+  const saveRef = useRef(save)
+  useEffect(() => {
+    saveRef.current = save
+  }, [save])
+
   const updateField = useCallback(
     (key: string, value: unknown) => {
       setFormState((prev) => ({ ...prev, [key]: value }))
@@ -108,10 +115,10 @@ export function useMetadataForm({
         clearTimeout(saveTimerRef.current)
       }
       saveTimerRef.current = setTimeout(() => {
-        save()
+        saveRef.current()
       }, 800)
     },
-    [save],
+    [],
   )
 
   const toggleLock = useCallback(
