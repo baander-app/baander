@@ -10,8 +10,9 @@ scanning the entire repository and filtering after the work is done.
 Use [architecture](../../../rules/architecture-rules.md),
 [model](../../../rules/ddd-domain-models.md),
 [repository](../../../rules/ddd-repositories.md),
-[port](../../../rules/ddd-ports.md), and
-[CQRS](../../../rules/ddd-cqrs.md) rules for the relevant roles.
+[port](../../../rules/ddd-ports.md),
+[CQRS](../../../rules/ddd-cqrs.md), and
+[admin and console](../../../rules/admin-cli-parity.md) rules for the relevant roles.
 
 - Trace dependencies by layer. Shared Domain access does not exempt Shared
   Infrastructure access. Identify cross-context ports/events separately from direct
@@ -26,6 +27,14 @@ Use [architecture](../../../rules/architecture-rules.md),
 - Verify service aliases, decorators, and registration in effective configuration.
   Resource loading alone does not prove interface resolution. A unique inferred
   alias may work; an ambiguous or missing service needs concrete evidence.
+- For admin routes and console commands, check that the controller and command reach
+  the same Application use case, that outcomes use the shared not-found, conflict and
+  invalid-input exceptions, and that each admin route carries `#[CliCounterpart]` or
+  `#[CliParityExemption]`. `AdminCliParityTest` proves only the markings, not that
+  both paths share their rules.
+- Check that state set when work is queued on `swoole_task`, such as a claim or a
+  running status, expires or is fenced, because that transport loses queued messages
+  on restart.
 - Check command immutability and callable registration across all current layouts.
   Class-level versus method-level valid framework registration is not an import
   violation merely because a scanner only recognizes one syntax.

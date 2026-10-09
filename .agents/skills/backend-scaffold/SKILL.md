@@ -15,6 +15,8 @@ Choose the relevant recipe; a complete feature may need both:
 - [Aggregate and repository](references/entity-stack.md): new domain/persistence stack.
 - [Endpoint](references/endpoint.md): HTTP input, application contract, implementation,
   output mapping, and OpenAPI integration.
+- [Admin action and console command](references/admin-command.md): an admin route or
+  admin-page action, with the console command that reaches the same use case.
 
 Use the [PostgreSQL skill](../postgres-remediation/SKILL.md) for mappings, queries,
 connection changes, or migrations. Database delivery scope must be explicit: generated
