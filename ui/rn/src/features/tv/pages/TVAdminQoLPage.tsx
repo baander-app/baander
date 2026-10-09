@@ -4,13 +4,16 @@ import { TVAdminShell } from '../components/TVAdminShell';
 import { TVFocusable } from '../components/TVFocusable';
 import { QoLStatusCard } from '../components/QoLStatusCard';
 import { QoLUtilizationCard } from '../components/QoLUtilizationCard';
+import { QoLWorkerNotice } from '../components/QoLWorkerNotice';
 import { useQoLStatus } from '@/features/admin/hooks/useQoLStatus';
 import { useQoLUtilization } from '@/features/admin/hooks/useQoLUtilization';
+import { workerFailures } from '@/features/admin/qol-report';
 import { tvColors, tvFontSizes, tvSpacing } from '../theme/tv-tokens';
 
 export function TVAdminQoLPage() {
   const { status, streams, isLoading, error, refetch } = useQoLStatus();
   const utilization = useQoLUtilization();
+  const failures = workerFailures([status, streams, utilization.data]);
 
   return (
     <TVAdminShell
@@ -28,6 +31,7 @@ export function TVAdminQoLPage() {
         <Text style={styles.error}>Error: {error.message}</Text>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
+          <QoLWorkerNotice missingWorkers={failures.missing_workers} workerErrors={failures.worker_errors} />
           <QoLUtilizationCard data={utilization.data} />
           <QoLStatusCard status={status} streams={streams} />
         </ScrollView>
