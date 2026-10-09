@@ -81,8 +81,43 @@ final class RecommendationJobUseCasesTest extends TestCase
 
         self::assertInstanceOf(RecommendationGenerationResult::class, $result);
         self::assertSame('cancelled', $result->status);
+        // Created, started, collaborative, content; the genre strategy never started.
+        self::assertSame(['pending', 'in_progress', 'in_progress', 'in_progress'], $this->jobs->savedStatuses);
+        self::assertContains(RecommendationJobStatus::Cancelled, $this->jobs->storedStatus);
+    }
+
+    public function testACancellationStoredRightAfterTheLastCheckIsNotOverwrittenByCompletion(): void
+    {
+        $this->jobs->afterStatusRead = function (Uuid $id): void {
+            if ($this->jobs->jobs[$id->toString()]->getCurrentStrategy() === 'genre') {
+                // An admin cancels the job after the run last read its status.
+                $this->jobs->storedStatus[$id->toString()] = RecommendationJobStatus::Cancelled;
+            }
+        };
+
+        $result = $this->generator()(new GenerateRecommendationsCommand(mode: 'full'));
+
+        self::assertInstanceOf(RecommendationGenerationResult::class, $result);
+        self::assertSame('cancelled', $result->status);
         self::assertNotContains('completed', $this->jobs->savedStatuses);
-        self::assertSame('content', $this->jobs->getByPublicId(PublicId::fromString($result->publicId))?->getCurrentStrategy());
+        $job = $this->jobs->getByPublicId(PublicId::fromString($result->publicId));
+        self::assertInstanceOf(RecommendationJob::class, $job);
+        self::assertSame(RecommendationJobStatus::Cancelled, $this->jobs->storedStatus[$job->getId()->toString()]);
+    }
+
+    public function testACancellationStoredBeforeTheRunStartsIsNotOverwrittenByTheStart(): void
+    {
+        $this->jobs->afterStatusRead = function (Uuid $id): void {
+            if ($this->jobs->storedStatus[$id->toString()] === RecommendationJobStatus::Pending) {
+                $this->jobs->storedStatus[$id->toString()] = RecommendationJobStatus::Cancelled;
+            }
+        };
+
+        $result = $this->generator()(new GenerateRecommendationsCommand(mode: 'full'));
+
+        self::assertInstanceOf(RecommendationGenerationResult::class, $result);
+        self::assertSame('cancelled', $result->status);
+        self::assertSame(['pending'], $this->jobs->savedStatuses);
     }
 
     public function testAFailingRunMarksItsJobFailedAndRethrows(): void
@@ -142,6 +177,25 @@ final class RecommendationJobUseCasesTest extends TestCase
                 self::assertSame(['status' => $job->getStatus()->value], $exception->details);
             }
         }
+    }
+
+    public function testACancelThatLosesTheRaceToARunsCompletionIsAConflictAndKeepsTheCompletion(): void
+    {
+        $job = $this->jobs->create(isFull: true);
+        $job->markInProgress(0);
+        $this->jobs->save($job);
+        // The run completes after the cancel read the job as in progress.
+        $this->jobs->storedStatus[$job->getId()->toString()] = RecommendationJobStatus::Completed;
+
+        try {
+            $this->cancel()(new CancelRecommendationJobCommand($job->getPublicId()->toString()));
+            self::fail('Cancelling a job that completed meanwhile should be a conflict.');
+        } catch (ConflictException $exception) {
+            self::assertSame(['status' => 'completed'], $exception->details);
+        }
+
+        self::assertSame(RecommendationJobStatus::Completed, $this->jobs->storedStatus[$job->getId()->toString()]);
+        self::assertNotContains('cancelled', $this->jobs->savedStatuses);
     }
 
     public function testCancellingAnUnknownOrMalformedJobIsNotFound(): void

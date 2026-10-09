@@ -13,6 +13,7 @@ use App\Lyrics\Application\Port\LrclibClientInterface;
 use App\Lyrics\Domain\Model\Lyrics;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Unit\Lyrics\InMemoryQueuedLyricsFetches;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -24,9 +25,11 @@ final class FetchLyricsHandlerTest extends TestCase
     private LyricsRepositoryInterface&Stub $lyricsRepository;
     private LoggerInterface&Stub $logger;
     private FetchLyricsHandler $handler;
+    private InMemoryQueuedLyricsFetches $marks;
 
     protected function setUp(): void
     {
+        $this->marks = new InMemoryQueuedLyricsFetches();
         $this->songs = $this->createStub(SongLookupInterface::class);
         $this->lrclibClient = $this->createStub(LrclibClientInterface::class);
         $this->lyricsRepository = $this->createStub(LyricsRepositoryInterface::class);
@@ -42,6 +45,7 @@ final class FetchLyricsHandlerTest extends TestCase
             $this->lrclibClient,
             $this->lyricsRepository,
             $this->logger,
+            $this->marks,
         );
     }
 
@@ -265,6 +269,52 @@ final class FetchLyricsHandlerTest extends TestCase
         $lyrics = ($this->handler)(new FetchLyricsCommand($songId));
 
         $this->assertNotNull($lyrics);
+    }
+
+    // --- Fetches queued by a bulk run ---
+
+    public function testAFetchOfACancelledBulkRunIsSkippedAndReleasesItsSong(): void
+    {
+        $this->songs = $this->createMock(SongLookupInterface::class);
+        $this->lrclibClient = $this->createMock(LrclibClientInterface::class);
+        $this->handler = $this->createFetchLyricsHandlerFixture();
+        $songId = Uuid::v7();
+        $runId = Uuid::v7();
+        $this->marks->markQueued($songId, 60);
+        $this->marks->markRunCancelled($runId, 60);
+
+        $this->songs->expects($this->never())->method('findLyricSignature');
+        $this->lrclibClient->expects($this->never())->method('getBySignatureCached');
+        $this->lrclibClient->expects($this->never())->method('getBySignature');
+
+        $this->assertNull(($this->handler)(new FetchLyricsCommand($songId, $runId)));
+        $this->assertSame([], $this->marks->queued);
+    }
+
+    public function testAFetchOfABulkRunReleasesItsSongOnceItRan(): void
+    {
+        $this->lrclibClient = $this->createMock(LrclibClientInterface::class);
+        $this->handler = $this->createFetchLyricsHandlerFixture();
+        $songId = Uuid::v7();
+        $this->marks->markQueued($songId, 60);
+
+        $this->songs->method('findLyricSignature')->willReturn(new SongLyricSignature('Test Song', 'Test Artist', 'Test Album', 200.0));
+        $this->lyricsRepository->method('findBySongId')->willReturn(null);
+        $this->lrclibClient->expects($this->once())->method('getBySignatureCached')->willReturn(null);
+        $this->lrclibClient->expects($this->once())->method('getBySignature')->willReturn(null);
+
+        $this->assertNull(($this->handler)(new FetchLyricsCommand($songId, Uuid::v7())));
+        $this->assertSame([], $this->marks->queued);
+    }
+
+    public function testAFetchOutsideABulkRunLeavesTheQueuedMarksAlone(): void
+    {
+        $songId = Uuid::v7();
+        $this->marks->markQueued($songId, 60);
+        $this->songs->method('findLyricSignature')->willReturn(null);
+
+        $this->assertNull(($this->handler)(new FetchLyricsCommand($songId)));
+        $this->assertSame([$songId->toString() => 60], $this->marks->queued);
     }
 
     private function assertSkippedWithoutProviderCall(SongLyricSignature $signature): void

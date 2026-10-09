@@ -6,6 +6,7 @@ namespace App\Tests\Functional\Recommendation;
 
 use App\Recommendation\Application\Port\RecommendationJobPortInterface;
 use App\Recommendation\Domain\Model\RecommendationJob;
+use App\Recommendation\Domain\ValueObject\RecommendationJobStatus;
 use App\Shared\Application\Port\JobMonitorAdministrationInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Tests\Functional\TestCase;
@@ -123,6 +124,24 @@ final class RecommendationAdministrationTest extends TestCase
 
         $this->assertJsonResponse($this->authenticatedRequest('POST', self::PATH . '/generate', $admin, ['mode' => 'Full']), 422);
         self::assertSame(Command::INVALID, $this->command('app:recommendation:generate')->execute(['--mode' => 'Full']));
+    }
+
+    public function testAGuardedSaveKeepsACancellationStoredByAnotherProcess(): void
+    {
+        $job = $this->jobs()->create(isFull: false);
+        $job->markInProgress(0);
+        self::assertTrue($this->jobs()->saveIfStatusIn($job, RecommendationJobStatus::Pending));
+        // An admin cancels the job from another process; this process still holds it in progress.
+        $this->entityManager->getConnection()->executeStatement(
+            "UPDATE recommendation_jobs SET status = 'cancelled' WHERE id = ?",
+            [$job->getId()->toString()],
+        );
+
+        $job->markCompleted(['collaborative' => 0, 'content' => 0, 'genre' => 0]);
+        self::assertFalse($this->jobs()->saveIfStatusIn($job, RecommendationJobStatus::InProgress));
+
+        self::assertSame(RecommendationJobStatus::Cancelled, $this->jobs()->storedStatus($job->getId()));
+        self::assertSame('cancelled', $this->jobStatus($job->getPublicId()->toString()));
     }
 
     private function failedJob(): string

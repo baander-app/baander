@@ -12,7 +12,7 @@ use App\Shared\Domain\Model\Uuid;
 final readonly class LyricsMessagePayloadCodec implements MessagePayloadCodecInterface
 {
     private const array FIELDS = [
-        'lyrics.fetch' => ['song_id'],
+        'lyrics.fetch' => ['song_id', 'bulk_run_id'],
         'lyrics.bulk_fetch' => ['limit', 'delay_ms'],
     ];
 
@@ -32,7 +32,7 @@ final readonly class LyricsMessagePayloadCodec implements MessagePayloadCodecInt
     public function encode(object $message): array
     {
         return match (true) {
-            $message instanceof FetchLyricsCommand => [$message->getSongId()->toString()],
+            $message instanceof FetchLyricsCommand => [$message->getSongId()->toString(), $message->getBulkRunId()?->toString()],
             $message instanceof BulkFetchLyricsCommand => [$message->getLimit(), $message->getDelayMs()],
             default => throw new \InvalidArgumentException('Unsupported message type.'),
         };
@@ -41,7 +41,10 @@ final readonly class LyricsMessagePayloadCodec implements MessagePayloadCodecInt
     public function decode(string $type, array $p): object
     {
         return match ($type) {
-            'lyrics.fetch' => new FetchLyricsCommand(Uuid::fromString($p['song_id'])),
+            'lyrics.fetch' => new FetchLyricsCommand(
+                Uuid::fromString($p['song_id']),
+                $p['bulk_run_id'] === null ? null : Uuid::fromString($p['bulk_run_id']),
+            ),
             'lyrics.bulk_fetch' => new BulkFetchLyricsCommand($p['limit'], $p['delay_ms']),
             default => throw new \InvalidArgumentException('Unsupported message type.'),
         };

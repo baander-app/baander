@@ -8,6 +8,7 @@ use App\Catalog\Application\Port\SongLookupInterface;
 use App\Lyrics\Application\Command\FetchLyricsCommand;
 use App\Lyrics\Application\DTO\LrclibResult;
 use App\Lyrics\Application\Port\LrclibClientInterface;
+use App\Lyrics\Application\Port\QueuedLyricsFetchesInterface;
 use App\Lyrics\Domain\Model\Lyrics;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
@@ -18,6 +19,9 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * Handles FetchLyricsCommand.
  *
  * Orchestrates: resolve song signature → check local cache → fetch from LRCLIB → persist.
+ *
+ * A fetch that a bulk run queued is skipped when that run was cancelled, and releases its
+ * song's queued mark once handled, so a later run can queue the song again.
  */
 #[AsMessageHandler]
 final class FetchLyricsHandler
@@ -27,12 +31,36 @@ final class FetchLyricsHandler
         private readonly LrclibClientInterface $lrclibClient,
         private readonly LyricsRepositoryInterface $lyricsRepository,
         private readonly LoggerInterface $logger,
+        private readonly QueuedLyricsFetchesInterface $queuedFetches,
     ) {
     }
 
     public function __invoke(FetchLyricsCommand $command): ?Lyrics
     {
         $songId = $command->getSongId();
+        $runId = $command->getBulkRunId();
+        if ($runId === null) {
+            return $this->fetch($songId);
+        }
+
+        try {
+            if ($this->queuedFetches->isRunCancelled($runId)) {
+                $this->logger->info('Bulk lyrics fetch was cancelled, skipping song', [
+                    'song_id' => $songId->toString(),
+                    'bulk_run_id' => $runId->toString(),
+                ]);
+
+                return null;
+            }
+
+            return $this->fetch($songId);
+        } finally {
+            $this->queuedFetches->clearQueued($songId);
+        }
+    }
+
+    private function fetch(Uuid $songId): ?Lyrics
+    {
 
         // 1. Find song
         $signature = $this->songs->findLyricSignature($songId);
