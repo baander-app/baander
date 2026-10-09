@@ -124,4 +124,18 @@ final class ReconnectionTokenServiceTest extends TestCase
 
         $this->assertSame(0, $removed);
     }
+
+    public function testRevokeForUserVoidsEveryTokenOfThatUserOnly(): void
+    {
+        $first = $this->service->generate('user-1');
+        $second = $this->service->generate('user-1');
+        $other = $this->service->generate('user-2');
+
+        $this->assertSame(2, $this->service->revokeForUser('user-1'));
+
+        $this->assertNull($this->service->consume($first));
+        $this->assertNull($this->service->consume($second));
+        $this->assertSame('user-2', $this->service->consume($other));
+        $this->assertSame(0, $this->service->revokeForUser('user-1'));
+    }
 }

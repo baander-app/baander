@@ -8,6 +8,7 @@ use App\Auth\Application\Command\User\DisableUserCommand;
 use App\Auth\Application\Command\User\EnableUserCommand;
 use App\Auth\Application\CommandHandler\User\DisableUserHandler;
 use App\Auth\Application\CommandHandler\User\EnableUserHandler;
+use App\Auth\Application\Exception\LiveConnectionsNotClosedException;
 use App\Auth\Application\Service\UserLookup;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\User;
@@ -15,12 +16,19 @@ use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Application\Exception\NotFoundException;
+use App\Shared\Application\Port\LiveConnectionsPortInterface;
+use App\Shared\Application\Port\ServerControlException;
+use App\Shared\Application\Port\ServerNotRunningException;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 
-/** Disabling ends every session in one transaction; disable and enable are idempotent. */
+/**
+ * Disabling ends every session in one transaction, then closes the user's live
+ * connections; disable and enable are idempotent.
+ */
 final class DisableEnableUserHandlersTest extends TestCase
 {
     private User $user;
@@ -28,6 +36,9 @@ final class DisableEnableUserHandlersTest extends TestCase
     private array $log = [];
     private bool $inTransaction = false;
     private ?\Throwable $refreshRevocationFailure = null;
+    private ?\Throwable $liveConnectionsFailure = null;
+    /** @var list<string> */
+    private array $warnings = [];
 
     protected function setUp(): void
     {
@@ -39,7 +50,11 @@ final class DisableEnableUserHandlersTest extends TestCase
         $this->disableHandler()(new DisableUserCommand('member@baander.app'));
 
         self::assertTrue($this->user->isDisabled());
-        self::assertSame(['begin', '+save', '+revoke access tokens', '+revoke refresh tokens', 'commit'], $this->log);
+        self::assertSame(
+            ['begin', '+save', '+revoke access tokens', '+revoke refresh tokens', 'commit', 'close live connections'],
+            $this->log,
+            'Live connections close after the commit, so a reconnect cannot pass on a token the commit has not yet revoked.',
+        );
     }
 
     public function testDisablingByUuidFindsTheSameUser(): void
@@ -57,7 +72,38 @@ final class DisableEnableUserHandlersTest extends TestCase
 
         self::assertSame($this->user, $returned, 'The admin API renders the returned user.');
         self::assertTrue($this->user->isDisabled());
-        self::assertSame([], $this->log);
+        self::assertSame(['close live connections'], $this->log, 'Repeating the disable retries closing live connections.');
+    }
+
+    public function testWithoutAWebServerInThisContainerTheDisableSucceedsAndSaysConnectionsWereNotClosed(): void
+    {
+        $this->liveConnectionsFailure = new ServerNotRunningException();
+
+        $this->disableHandler()(new DisableUserCommand('member@baander.app'));
+
+        self::assertTrue($this->user->isDisabled());
+        self::assertSame(['begin', '+save', '+revoke access tokens', '+revoke refresh tokens', 'commit'], $this->log);
+        self::assertCount(1, $this->warnings);
+        self::assertStringContainsString('web container', $this->warnings[0]);
+    }
+
+    public function testAWebServerThatCannotCloseTheConnectionsFailsTheDisableAfterItCommitted(): void
+    {
+        $this->liveConnectionsFailure = new ServerControlException('the web server did not answer within 5 seconds');
+
+        try {
+            $this->disableHandler()(new DisableUserCommand('member@baander.app'));
+            self::fail('A failed close must be reported.');
+        } catch (LiveConnectionsNotClosedException $exception) {
+            self::assertSame(
+                'User "member@baander.app" is disabled and its tokens are revoked, but its open WebSocket connections '
+                . 'were not closed: the web server did not answer within 5 seconds. Disable the user again to retry.',
+                $exception->getMessage(),
+            );
+        }
+
+        self::assertTrue($this->user->isDisabled());
+        self::assertSame(['begin', '+save', '+revoke access tokens', '+revoke refresh tokens', 'commit'], $this->log);
     }
 
     public function testAFailureWhileRevokingAbortsTheTransactionThatSavesTheDisable(): void
@@ -132,9 +178,33 @@ final class DisableEnableUserHandlersTest extends TestCase
             $this->record('revoke refresh tokens');
         });
 
+        $liveConnections = $this->createStub(LiveConnectionsPortInterface::class);
+        $liveConnections->method('closeForUser')->willReturnCallback(function (Uuid $userId): int {
+            self::assertTrue($this->user->getId()->equals($userId));
+            if ($this->liveConnectionsFailure !== null) {
+                throw $this->liveConnectionsFailure;
+            }
+            $this->record('close live connections');
+
+            return 2;
+        });
+
+        $logger = $this->createStub(LoggerInterface::class);
+        $logger->method('warning')->willReturnCallback(function (string|\Stringable $message, array $context): void {
+            $this->warnings[] = (string) $message;
+        });
+
         $users = $this->userRepository();
 
-        return new DisableUserHandler(new UserLookup($users), $users, $accessTokens, $refreshTokens, $this->transaction());
+        return new DisableUserHandler(
+            new UserLookup($users),
+            $users,
+            $accessTokens,
+            $refreshTokens,
+            $this->transaction(),
+            $liveConnections,
+            $logger,
+        );
     }
 
     private function enableHandler(): EnableUserHandler

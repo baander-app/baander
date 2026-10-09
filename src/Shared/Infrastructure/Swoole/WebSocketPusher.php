@@ -80,6 +80,26 @@ final class WebSocketPusher
         return $sent;
     }
 
+    /**
+     * Closes every connection of a user with a close frame. The connection table is
+     * shared by all workers and a process-mode server closes a connection from any
+     * worker, so the calling worker reaches connections that other workers own.
+     *
+     * @return int Number of connections closed
+     */
+    public function disconnectUser(string $userId, int $code, string $reason): int
+    {
+        $server = $this->server ?? throw new \LogicException('No WebSocket server is attached to this worker.');
+        $closed = 0;
+        foreach ($this->registry->getUserConnectionFds($userId) as $fd) {
+            if ($server->isEstablished($fd) && $server->disconnect($fd, $code, $reason)) {
+                ++$closed;
+            }
+        }
+
+        return $closed;
+    }
+
     private function doPush(int $fd, string $data): bool
     {
         if ($this->server === null || !$this->server->isEstablished($fd)) {

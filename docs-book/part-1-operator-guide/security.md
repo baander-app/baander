@@ -191,6 +191,8 @@ If OAuth refresh tokens are a concern, truncate the token tables in one statemen
 TRUNCATE oauth_access_tokens, oauth_refresh_tokens, oauth_token_metadata, oauth_auth_codes, oauth_device_codes;
 ```
 
+Removing tokens does not close WebSocket connections that were opened before. Restart the web server to end them. Signed stream URLs do not use OAuth tokens. They stay valid until you set a new `STREAM_URL_HMAC_SECRET` and restart the web server; see [Disabled accounts](#disabled-accounts).
+
 ### 5. Audit user accounts
 
 Check for accounts that may have been created or modified during the breach:
@@ -270,6 +272,15 @@ Besides Baander's own apps, other clients can obtain tokens through the OAuth 2.
 - **Cross-origin access.** The token endpoint and the device authorization endpoint accept requests from any origin, because their callers prove possession with DPoP instead of cookies. Revocation, device approval, the authorization endpoint `/api/oauth/authorize`, and all other API routes accept only the `APP_URL` origin. Third-party clients do not call the authorization endpoint; they send the user's browser to the web app's consent page, which calls it for the signed-in user. See [HTTP](configuration.md#http).
 - **Rate limits.** The authorization, token, and device authorization endpoints each have a per-IP limiter, and the token endpoint also counts requests per client. User code lookups and approvals share a per-IP limit that bounds code guessing. See [Rate limiting](configuration.md#rate-limiting).
 - **Revocation.** Revoking a client also revokes every access and refresh token issued to it. This holds for an administrator revoking a device, public or confidential client and for a user revoking a personal access client. Deleting a user deletes their tokens, authorization codes, and device codes.
+
+### Disabled accounts
+
+Disabling a user, from the admin panel or with [app:user:disable](commands/app-user-disable.md), revokes the user's access and refresh tokens in the transaction that saves the disable. Every authenticator then refuses the account: API requests, token refresh and new WebSocket handshakes. After the commit, the web server closes the user's open WebSocket connections on every worker and voids their reconnection tokens. The command reaches the server through its control socket, so run it in the web container. In a container without a web server, it disables the account but logs a warning that the open connections were not closed.
+
+Two kinds of media access outlive the disable:
+
+- **A response already being sent.** A track file, or a transcode that is still encoding, keeps streaming until that one response ends. Every later request authenticates again and is refused.
+- **Signed video stream URLs.** HLS and DASH URLs carry an HMAC signature, not the user's token, so they keep working until they expire. A signed manifest URL lives at most 24 hours. Each manifest the player fetches signs the URLs it lists for another 24 hours. A player that keeps fetching can therefore stream that one video for up to 72 hours after the URL was signed with HLS, and up to 48 hours with DASH. To end every signed URL at once, for every user, set a new `STREAM_URL_HMAC_SECRET` and restart the web server.
 
 ### Network security
 

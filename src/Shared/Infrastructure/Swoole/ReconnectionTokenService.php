@@ -78,6 +78,27 @@ final class ReconnectionTokenService
     }
 
     /**
+     * Voids every pending token of a user, so none of them can restore that identity.
+     *
+     * @return int Number of tokens removed
+     */
+    public function revokeForUser(string $userId): int
+    {
+        $revoked = [];
+        foreach ($this->tokens as $token => $row) {
+            if ($row['user_id'] === $userId) {
+                $revoked[] = (string) $token;
+            }
+        }
+        foreach ($revoked as $token) {
+            $this->tokens->del($token);
+            unset($this->createdAtCache[$token]);
+        }
+
+        return count($revoked);
+    }
+
+    /**
      * Remove all expired tokens from the table. Call periodically (e.g., in onWorkerStart).
      *
      * @return int Number of tokens removed
