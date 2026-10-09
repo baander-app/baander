@@ -4013,6 +4013,15 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "name": "deleteFiles",
+                        "in": "query",
+                        "description": "Also check each song file as a delete with deleteFiles would",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
                     }
                 ],
                 "responses": {
@@ -4022,54 +4031,8 @@
                             "application/json": {
                                 "schema": {
                                     "properties": {
-                                        "album": {
-                                            "properties": {
-                                                "id": {
-                                                    "type": "string"
-                                                },
-                                                "title": {
-                                                    "type": "string"
-                                                },
-                                                "songCount": {
-                                                    "type": "integer"
-                                                }
-                                            },
-                                            "type": "object"
-                                        },
-                                        "files": {
-                                            "properties": {
-                                                "count": {
-                                                    "type": "integer"
-                                                },
-                                                "totalSize": {
-                                                    "type": "integer"
-                                                }
-                                            },
-                                            "type": "object"
-                                        },
-                                        "coverImage": {
-                                            "properties": {
-                                                "id": {
-                                                    "type": "string",
-                                                    "nullable": true
-                                                }
-                                            },
-                                            "type": "object",
-                                            "nullable": true
-                                        },
-                                        "affected": {
-                                            "properties": {
-                                                "playlists": {
-                                                    "type": "integer"
-                                                },
-                                                "playlistNames": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string"
-                                                    }
-                                                }
-                                            },
-                                            "type": "object"
+                                        "data": {
+                                            "$ref": "#/components/schemas/AlbumDeletePreviewResource"
                                         }
                                     },
                                     "type": "object"
@@ -4140,7 +4103,7 @@
                     {
                         "name": "deleteFiles",
                         "in": "query",
-                        "description": "Whether to delete audio files",
+                        "description": "Also delete the song audio files, inside the library root only",
                         "required": false,
                         "schema": {
                             "type": "boolean"
@@ -4157,8 +4120,20 @@
                     }
                 ],
                 "responses": {
-                    "204": {
-                        "description": "Album deleted successfully"
+                    "200": {
+                        "description": "Album deleted; with deleteFiles, the files removed and left",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CatalogDeletionResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "description": "Not authenticated",
@@ -4190,8 +4165,18 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "With deleteFiles: a scan holds the library, or the server cannot write a song directory; nothing was deleted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "422": {
-                        "description": "Invalid public ID",
+                        "description": "Invalid public ID, or with deleteFiles a song file outside the library root; nothing was deleted",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4219,6 +4204,15 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "name": "deleteFile",
+                        "in": "query",
+                        "description": "Also check the song file as a delete with deleteFile would",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
                     }
                 ],
                 "responses": {
@@ -4228,53 +4222,8 @@
                             "application/json": {
                                 "schema": {
                                     "properties": {
-                                        "song": {
-                                            "properties": {
-                                                "id": {
-                                                    "type": "string"
-                                                },
-                                                "title": {
-                                                    "type": "string"
-                                                },
-                                                "album": {
-                                                    "properties": {
-                                                        "id": {
-                                                            "type": "string"
-                                                        },
-                                                        "title": {
-                                                            "type": "string"
-                                                        }
-                                                    },
-                                                    "type": "object",
-                                                    "nullable": true
-                                                }
-                                            },
-                                            "type": "object"
-                                        },
-                                        "file": {
-                                            "properties": {
-                                                "path": {
-                                                    "type": "string"
-                                                },
-                                                "size": {
-                                                    "type": "integer"
-                                                }
-                                            },
-                                            "type": "object"
-                                        },
-                                        "affected": {
-                                            "properties": {
-                                                "playlists": {
-                                                    "type": "integer"
-                                                },
-                                                "playlistNames": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "type": "string"
-                                                    }
-                                                }
-                                            },
-                                            "type": "object"
+                                        "data": {
+                                            "$ref": "#/components/schemas/SongDeletePreviewResource"
                                         }
                                     },
                                     "type": "object"
@@ -4345,7 +4294,7 @@
                     {
                         "name": "deleteFile",
                         "in": "query",
-                        "description": "Whether to delete the audio file",
+                        "description": "Also delete the audio file, inside the library root only",
                         "required": false,
                         "schema": {
                             "type": "boolean"
@@ -4353,8 +4302,20 @@
                     }
                 ],
                 "responses": {
-                    "204": {
-                        "description": "Song deleted successfully"
+                    "200": {
+                        "description": "Song deleted; with deleteFile, whether the file was removed or left",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CatalogDeletionResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "description": "Not authenticated",
@@ -4386,8 +4347,18 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "With deleteFile: a scan holds the library, or the server cannot write the song directory; nothing was deleted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "422": {
-                        "description": "Invalid public ID",
+                        "description": "Invalid public ID, or with deleteFile a file outside the library root; nothing was deleted",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4599,8 +4570,20 @@
                     }
                 ],
                 "responses": {
-                    "204": {
-                        "description": "Deleted"
+                    "200": {
+                        "description": "Deleted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CatalogDeletionResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "404": {
                         "description": "Not found",
@@ -4608,6 +4591,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid public ID",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
                                 }
                             }
                         }
@@ -4853,7 +4846,7 @@
                         }
                     },
                     "422": {
-                        "description": "Validation error (missing file, oversized file, or unsupported type)",
+                        "description": "Validation error (invalid public ID, missing file, oversized file, or unsupported type)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4907,6 +4900,16 @@
                     },
                     "404": {
                         "description": "Album or cover image not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid public ID",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5309,8 +5312,20 @@
                     }
                 ],
                 "responses": {
-                    "204": {
-                        "description": "Deleted"
+                    "200": {
+                        "description": "Deleted, with the cover image",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CatalogDeletionResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "404": {
                         "description": "Not found",
@@ -5318,6 +5333,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid public ID",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
                                 }
                             }
                         }
@@ -5458,7 +5483,7 @@
                 },
                 "responses": {
                     "204": {
-                        "description": "Song added to artist"
+                        "description": "Song added to artist, or the artist already had the credit"
                     },
                     "404": {
                         "description": "Artist or song not found",
@@ -5471,7 +5496,7 @@
                         }
                     },
                     "422": {
-                        "description": "Validation error",
+                        "description": "Malformed public ID or song ID, or an unknown role",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5512,14 +5537,24 @@
                 ],
                 "responses": {
                     "204": {
-                        "description": "Song removed from artist"
+                        "description": "Every one of the artist's credits on the song removed"
                     },
                     "404": {
-                        "description": "Artist not found",
+                        "description": "Artist not found, or the artist has no credit on the song",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Malformed public ID or song ID",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
                                 }
                             }
                         }
@@ -5560,6 +5595,11 @@
                                 "properties": {
                                     "role": {
                                         "type": "string"
+                                    },
+                                    "currentRole": {
+                                        "description": "The role of the credit to change; required when the artist holds several roles on the song",
+                                        "type": "string",
+                                        "nullable": true
                                     }
                                 },
                                 "type": "object"
@@ -5569,10 +5609,10 @@
                 },
                 "responses": {
                     "204": {
-                        "description": "Role updated"
+                        "description": "Role updated; a credit changed to a role the artist already holds on the song is removed"
                     },
                     "404": {
-                        "description": "Artist not found",
+                        "description": "Artist not found, or the artist has no such credit on the song",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5582,7 +5622,7 @@
                         }
                     },
                     "422": {
-                        "description": "Validation error",
+                        "description": "Malformed public ID or song ID, an unknown role, or no current role while the artist holds several",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5632,7 +5672,7 @@
                 },
                 "responses": {
                     "204": {
-                        "description": "Album added to artist"
+                        "description": "Album added to artist, or the artist already had the credit"
                     },
                     "404": {
                         "description": "Artist or album not found",
@@ -5645,7 +5685,7 @@
                         }
                     },
                     "422": {
-                        "description": "Validation error",
+                        "description": "Malformed public ID or album ID, or an unknown role",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5686,14 +5726,24 @@
                 ],
                 "responses": {
                     "204": {
-                        "description": "Album removed from artist"
+                        "description": "Every one of the artist's credits on the album removed"
                     },
                     "404": {
-                        "description": "Artist not found",
+                        "description": "Artist not found, or the artist has no credit on the album",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Malformed public ID or album ID",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
                                 }
                             }
                         }
@@ -5734,6 +5784,11 @@
                                 "properties": {
                                     "role": {
                                         "type": "string"
+                                    },
+                                    "currentRole": {
+                                        "description": "The role of the credit to change; required when the artist holds several roles on the album",
+                                        "type": "string",
+                                        "nullable": true
                                     }
                                 },
                                 "type": "object"
@@ -5743,10 +5798,10 @@
                 },
                 "responses": {
                     "204": {
-                        "description": "Role updated"
+                        "description": "Role updated; a credit changed to a role the artist already holds on the album is removed"
                     },
                     "404": {
-                        "description": "Artist not found",
+                        "description": "Artist not found, or the artist has no such credit on the album",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5756,7 +5811,7 @@
                         }
                     },
                     "422": {
-                        "description": "Validation error",
+                        "description": "Malformed public ID or album ID, an unknown role, or no current role while the artist holds several",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5866,7 +5921,7 @@
                         }
                     },
                     "422": {
-                        "description": "Validation error (missing file, oversized file, or unsupported type)",
+                        "description": "Validation error (invalid public ID, missing file, oversized file, or unsupported type)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5920,6 +5975,16 @@
                     },
                     "404": {
                         "description": "Artist or cover image not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid public ID",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -6591,8 +6656,20 @@
                     }
                 ],
                 "responses": {
-                    "204": {
-                        "description": "Deleted"
+                    "200": {
+                        "description": "Deleted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CatalogDeletionResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "404": {
                         "description": "Not found",
@@ -6600,6 +6677,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid public ID",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
                                 }
                             }
                         }
@@ -6869,8 +6956,20 @@
                     }
                 ],
                 "responses": {
-                    "204": {
-                        "description": "Deleted"
+                    "200": {
+                        "description": "Deleted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CatalogDeletionResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     },
                     "404": {
                         "description": "Not found",
@@ -6878,6 +6977,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid public ID",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
                                 }
                             }
                         }
@@ -7020,7 +7129,12 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/ServerInstanceResource"
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/ServerInstanceResource"
+                                        }
+                                    },
+                                    "type": "object"
                                 }
                             }
                         }
@@ -8293,6 +8407,7 @@
                     "Lyrics"
                 ],
                 "summary": "Fetch lyrics from LRCLIB for a song",
+                "description": "A song that has lyrics keeps them, and the response returns them without asking LRCLIB.",
                 "operationId": "post_lyrics_song_lyrics_fetch",
                 "parameters": [
                     {
@@ -8307,7 +8422,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Lyrics fetched and stored",
+                        "description": "The song's lyrics, just fetched or already stored; an empty array when LRCLIB has none",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -8345,6 +8460,26 @@
                                 }
                             }
                         }
+                    },
+                    "422": {
+                        "description": "Invalid song public ID",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "LRCLIB is unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -8370,7 +8505,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Search results",
+                        "description": "Search results; an empty array when nothing matches",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -8387,8 +8522,21 @@
                             }
                         }
                     },
-                    "400": {
-                        "description": "Validation error",
+                    "401": {
+                        "description": "Authentication required"
+                    },
+                    "422": {
+                        "description": "The search query is blank",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "LRCLIB is unavailable",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -8452,6 +8600,36 @@
                     },
                     "404": {
                         "description": "Song or lyrics result not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The song already has lyrics; they stay unchanged",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Invalid song public ID",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "LRCLIB is unavailable",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -10567,6 +10745,16 @@
                             }
                         }
                     },
+                    "422": {
+                        "description": "The ID is not a UUID",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
                     "403": {
                         "description": "Forbidden",
                         "content": {
@@ -10585,7 +10773,7 @@
                 "tags": [
                     "Webhooks"
                 ],
-                "summary": "Rotate a webhook secret and upgrade to signature version 2",
+                "summary": "Rotate a webhook secret; the webhook keeps its signature version",
                 "operationId": "post_webhook_rotate_secret",
                 "parameters": [
                     {
@@ -10656,6 +10844,16 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The ID is not a UUID",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
                                 }
                             }
                         }
@@ -21093,8 +21291,14 @@
                 ],
                 "properties": {
                     "role": {
-                        "description": "Artist role (primary, featured, producer, composer, conductor, remixer, djmix, other)",
+                        "description": "The new artist role (primary, featured, producer, composer, conductor, remixer, djmix, other)",
                         "type": "string"
+                    },
+                    "currentRole": {
+                        "description": "The role of the credit to change; required when the artist holds several roles on the song or album",
+                        "type": "string",
+                        "nullable": true,
+                        "default": null
                     }
                 },
                 "type": "object"
@@ -22999,6 +23203,238 @@
                         "example": "123456",
                         "nullable": true,
                         "default": null
+                    }
+                },
+                "type": "object"
+            },
+            "FileDeletionPreviewResource": {
+                "required": [
+                    "allowed",
+                    "scanInProgress",
+                    "files"
+                ],
+                "properties": {
+                    "allowed": {
+                        "description": "The delete with files would go ahead",
+                        "type": "boolean"
+                    },
+                    "scanInProgress": {
+                        "description": "A scan holds the library, which refuses the delete",
+                        "type": "boolean"
+                    },
+                    "files": {
+                        "type": "array",
+                        "items": {
+                            "properties": {
+                                "path": {
+                                    "type": "string"
+                                },
+                                "verdict": {
+                                    "type": "string",
+                                    "enum": [
+                                        "deletable",
+                                        "missing",
+                                        "outside_root",
+                                        "directory_not_writable"
+                                    ]
+                                },
+                                "directory": {
+                                    "description": "The directory the server cannot write, for directory_not_writable",
+                                    "type": "string",
+                                    "nullable": true
+                                }
+                            }
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "AlbumDeletePreviewResource": {
+                "required": [
+                    "album",
+                    "files",
+                    "affected"
+                ],
+                "properties": {
+                    "album": {
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "title": {
+                                "type": "string"
+                            },
+                            "songCount": {
+                                "type": "integer"
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "files": {
+                        "properties": {
+                            "count": {
+                                "type": "integer"
+                            },
+                            "totalSize": {
+                                "type": "integer"
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "coverImage": {
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            }
+                        },
+                        "type": "object",
+                        "nullable": true
+                    },
+                    "affected": {
+                        "properties": {
+                            "playlists": {
+                                "type": "integer"
+                            },
+                            "playlistNames": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "fileDeletion": {
+                        "description": "The check of every song file, when deleteFiles is true",
+                        "nullable": true,
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/FileDeletionPreviewResource"
+                            }
+                        ]
+                    }
+                },
+                "type": "object"
+            },
+            "CatalogDeletionResource": {
+                "required": [
+                    "deleted",
+                    "files"
+                ],
+                "properties": {
+                    "deleted": {
+                        "description": "Rows deleted by kind: albums, songs and coverImages for an album; songs for a song; movies and videos for a movie; artists and coverImages for an artist",
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "integer"
+                        }
+                    },
+                    "files": {
+                        "properties": {
+                            "removed": {
+                                "description": "Audio files unlinked",
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "missing": {
+                                "description": "Audio files that were already gone",
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "left": {
+                                "description": "Audio files still on disk; the next scan imports them again",
+                                "type": "array",
+                                "items": {
+                                    "properties": {
+                                        "path": {
+                                            "type": "string"
+                                        },
+                                        "reason": {
+                                            "type": "string",
+                                            "enum": [
+                                                "outside_root",
+                                                "unlink_failed"
+                                            ]
+                                        },
+                                        "detail": {
+                                            "type": "string"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "SongDeletePreviewResource": {
+                "required": [
+                    "song",
+                    "file",
+                    "affected"
+                ],
+                "properties": {
+                    "song": {
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "title": {
+                                "type": "string"
+                            },
+                            "album": {
+                                "properties": {
+                                    "id": {
+                                        "type": "string"
+                                    },
+                                    "title": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object",
+                                "nullable": true
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "file": {
+                        "properties": {
+                            "path": {
+                                "type": "string"
+                            },
+                            "size": {
+                                "type": "integer"
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "affected": {
+                        "properties": {
+                            "playlists": {
+                                "type": "integer"
+                            },
+                            "playlistNames": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "type": "object"
+                    },
+                    "fileDeletion": {
+                        "description": "The check of the song file, when deleteFile is true",
+                        "nullable": true,
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/FileDeletionPreviewResource"
+                            }
+                        ]
                     }
                 },
                 "type": "object"

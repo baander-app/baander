@@ -82,6 +82,16 @@ final class AdminCliParityTest extends KernelTestCase
         self::assertSame(['Route "fixture_unknown" (POST /api/things) names console command "app:fixture:missing", which does not exist.'], $violations);
     }
 
+    public function test_an_exemption_that_defers_the_command_fails(): void
+    {
+        $violations = $this->fixtureViolations([
+            'fixture_deferred' => $this->route('/api/things', 'deferred'),
+            'fixture_exempt' => $this->route('/api/inbox', 'exempt', 'GET'),
+        ]);
+
+        self::assertSame(['Route "fixture_deferred" (POST /api/things) is exempt only until its command exists ("deferred: the fixture command comes later"); add the command and mark the route #[CliCounterpart].'], $violations);
+    }
+
     public function test_an_exemption_on_a_method_no_route_reaches_fails(): void
     {
         $violations = $this->fixtureViolations([], markedClasses: [ParityFixtureController::class]);

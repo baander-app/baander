@@ -177,7 +177,7 @@ describe('lyrics management permissions', () => {
     const applyCallbacks = api.applyHook.mock.lastCall?.[0].mutation
     expect(fetchCallbacks).toBeDefined()
     expect(applyCallbacks).toBeDefined()
-    fetchCallbacks?.onSuccess(undefined, { publicId: dialogProps.songPublicId })
+    fetchCallbacks?.onSuccess({ data: [] }, { publicId: dialogProps.songPublicId })
     applyCallbacks?.onSuccess(undefined, { resultId: 42, data: { songPublicId: dialogProps.songPublicId } })
     expect(invalidation).toHaveBeenNthCalledWith(1, { queryKey: ['lyrics', dialogProps.songPublicId] })
     expect(invalidation).toHaveBeenNthCalledWith(2, { queryKey: ['lyrics', dialogProps.songPublicId] })
