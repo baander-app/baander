@@ -19,6 +19,13 @@ make exec cmd="php bin/console app:rate-limiter:clear auth_login_ip"
 | Option | Default | Description |
 |--------|---------|-------------|
 | `--all` | off | Clear every configured rate limiter |
+| `--json` | off | Print the result as the admin API returns it, in JSON |
+
+With `--json`, the command prints the API's `data` payload and nothing else on stdout: `{"cleared": true, "limiter": "auth_login_ip"}` for one limiter, or `{"cleared": true, "limiters": ["auth_login_ip", "..."]}` with `--all`. Errors go to stderr.
+
+```bash
+make exec cmd="php bin/console app:rate-limiter:clear auth_login_ip --json"
+```
 
 ## Details
 
