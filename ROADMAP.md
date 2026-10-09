@@ -59,6 +59,16 @@ plans come next, in this order:
      describes SSE endpoints, though both were removed;
    - `auth.reconnect` lets an authenticated WebSocket take another user's identity
      with a valid reconnection token; review that design.
+   - Swoole tables that can refuse rows
+     ([learning](docs/solutions/runtime-errors/swoole-table-default-conflict-proportion-drops-keys.md)):
+     `WebSocketConnectionRegistry` uses the default conflict proportion and ignores
+     `set()`, so it can refuse connections well before its 1,024 limit;
+     `ReconnectionTokenService` hands out a token whose `set()` failed; a failed
+     `incr()` in the `CpuProcessPool` limit table lets a dispatch through unlimited;
+   - audit the Timer callbacks in `MidStreamMonitor`, the transcode lock renewal and
+     the `CpuProcessPool` health tick for pooled services used without
+     `CoWrapper::defer()`
+     ([learning](docs/solutions/runtime-errors/swoole-callbacks-outside-the-bundle-leak-pooled-services.md)).
 3. Timestamp convention: 130 `timestamptz(0)` columns, 13 `timestamp without time
    zone` columns, and ORM writes without offset or fraction. Not yet planned.
 
