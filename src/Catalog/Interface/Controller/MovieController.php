@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Controller;
 
+use App\Catalog\Application\Command\Movie\UpdateMovieCommand;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
@@ -12,6 +13,7 @@ use App\Catalog\Interface\Resource\MovieResource;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Attribute\CliParityExemption;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
@@ -21,6 +23,8 @@ use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[OA\Tag(name: 'Catalog', description: 'Album, artist, song, movie, and genre management endpoints')]
@@ -34,6 +38,7 @@ final class MovieController
         private readonly MoviePortInterface $movieService,
         private readonly LibraryReadScopeProviderInterface $libraryReadScopeProvider,
         private readonly VideoRepositoryInterface $videoRepository,
+        private readonly MessageBusInterface $bus,
     ) {
     }
 
@@ -158,32 +163,15 @@ final class MovieController
         ],
     )]
     #[Route('/{publicId}', name: 'update', methods: ['PATCH'])]
-    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
+    #[CliCounterpart('app:movie:update')]
     public function update(string $publicId, #[MapRequestPayload] UpdateMovieRequest $payload): JsonResponse
     {
-        try {
-            $resolvedPublicId = PublicId::fromString($publicId);
-        } catch (\Throwable) {
-            return $this->errorResponse($this->trans('errors.invalid_public_id'));
-        }
-
-        $movie = $this->movieService->findByPublicId($resolvedPublicId);
-
-        if ($movie === null) {
-            return $this->notFound();
-        }
-
-        try {
-            $movie->updateMetadata(
-                title: $payload->title,
-                year: $payload->year,
-                summary: $payload->summary,
-            );
-        } catch (\InvalidArgumentException) {
-            return $this->errorResponse($this->trans('errors.invalid_input'), 422);
-        }
-
-        $this->movieService->save($movie);
+        $movie = $this->dispatch(new UpdateMovieCommand(
+            publicId: $publicId,
+            title: $payload->title,
+            year: $payload->year,
+            summary: $payload->summary,
+        ));
 
         return $this->successResponse(MovieResource::from($movie));
     }
@@ -221,5 +209,11 @@ final class MovieController
         $this->movieService->delete($movie);
 
         return $this->noContent();
+    }
+
+    /** A handler's exception reaches ExceptionSubscriber, which unwraps it to its 404 or 422 response. */
+    private function dispatch(object $message): mixed
+    {
+        return $this->bus->dispatch($message)->last(HandledStamp::class)?->getResult();
     }
 }

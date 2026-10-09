@@ -59,7 +59,7 @@ final class AlbumMetadataEnricher
                 }
             }
 
-            return $this->applyData($album, $data, 'general', $forceUpdate);
+            return $this->applyData($album, $data, $data['source'], $forceUpdate);
         } catch (\Throwable $e) {
             $this->logger->error('Album enrichment failed', [
                 'album_id' => $album->getId(),
@@ -139,6 +139,7 @@ final class AlbumMetadataEnricher
             return EnrichmentResult::noMatch($source, $quality);
         }
 
+        // A field the operator locked keeps its value; enrichment applies the others.
         $updatedFields = [];
 
         // Normalize title to extract disambiguation data from MusicBrainz
@@ -149,22 +150,22 @@ final class AlbumMetadataEnricher
             [$title, $extractedData] = $this->normalizeTitleWithDisambiguation($title);
 
             // Apply extracted disambiguation data to fields
-            if (isset($extractedData['label']) && ($forceUpdate || $album->getLabel() === null)) {
+            if (isset($extractedData['label']) && !$album->isFieldLocked('label') && ($forceUpdate || $album->getLabel() === null)) {
                 $album->updateMetadata(label: $extractedData['label']);
                 $updatedFields[] = 'label';
             }
-            if (isset($extractedData['catalogNumber']) && ($forceUpdate || $album->getCatalogNumber() === null)) {
+            if (isset($extractedData['catalogNumber']) && !$album->isFieldLocked('catalogNumber') && ($forceUpdate || $album->getCatalogNumber() === null)) {
                 $album->updateMetadata(catalogNumber: $extractedData['catalogNumber']);
                 $updatedFields[] = 'catalogNumber';
             }
-            if (isset($extractedData['country']) && ($forceUpdate || $album->getCountry() === null)) {
+            if (isset($extractedData['country']) && !$album->isFieldLocked('country') && ($forceUpdate || $album->getCountry() === null)) {
                 $album->updateMetadata(country: $extractedData['country']);
                 $updatedFields[] = 'country';
             }
         }
 
         // Apply title only on force update or when empty-ish
-        if ($title !== null && ($forceUpdate || !$hasIdentifiers)) {
+        if ($title !== null && !$album->isFieldLocked('title') && ($forceUpdate || !$hasIdentifiers)) {
             // Only update if the normalized title differs from current
             if ($forceUpdate || strlen($title) >= strlen($album->getTitle())) {
                 if ($title !== $album->getTitle()) {
@@ -177,14 +178,14 @@ final class AlbumMetadataEnricher
         // Apply year
         if ($data['year'] !== null) {
             $year = $this->parseYear($data['year']);
-            if ($year !== null && ($forceUpdate || $album->getYear() === null)) {
+            if ($year !== null && !$album->isFieldLocked('year') && ($forceUpdate || $album->getYear() === null)) {
                 $album->updateMetadata(year: $year);
                 $updatedFields[] = 'year';
             }
         }
 
         // Apply country (if not already extracted from title normalization)
-        if (!isset($extractedData['country']) && $data['country'] !== null && ($forceUpdate || $album->getCountry() === null)) {
+        if (!isset($extractedData['country']) && $data['country'] !== null && !$album->isFieldLocked('country') && ($forceUpdate || $album->getCountry() === null)) {
             $album->updateMetadata(country: $data['country']);
             $updatedFields[] = 'country';
         }

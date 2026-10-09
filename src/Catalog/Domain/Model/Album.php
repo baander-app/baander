@@ -82,7 +82,9 @@ final class Album
     }
 
     /**
-     * Update album metadata fields.
+     * Update album metadata fields. A null field stays as it is.
+     *
+     * @throws InvalidArgumentException when a given field is locked or the title or type is empty; nothing changes then
      */
     public function updateMetadata(
         ?string $title = null,
@@ -96,25 +98,32 @@ final class Album
         ?string $disambiguation = null,
         ?string $annotation = null,
     ): void {
-        if ($title !== null && $this->isFieldLocked('title')) {
-            throw new InvalidArgumentException('Field "title" is locked and cannot be updated.');
+        LockedFields::assertUnlocked($this->state->lockedFields, [
+            'title' => $title,
+            'type' => $type,
+            'year' => $year,
+            'label' => $label,
+            'catalogNumber' => $catalogNumber,
+            'barcode' => $barcode,
+            'country' => $country,
+            'language' => $language,
+            'disambiguation' => $disambiguation,
+            'annotation' => $annotation,
+        ]);
+
+        if ($title !== null && trim($title) === '') {
+            throw new InvalidArgumentException('Album title cannot be empty.');
         }
 
-        if ($type !== null && $this->isFieldLocked('type')) {
-            throw new InvalidArgumentException('Field "type" is locked and cannot be updated.');
+        if ($type !== null && trim($type) === '') {
+            throw new InvalidArgumentException('Album type cannot be empty.');
         }
 
         if ($title !== null) {
-            if (trim($title) === '') {
-                throw new InvalidArgumentException('Album title cannot be empty.');
-            }
             $this->state->title = trim($title);
         }
 
         if ($type !== null) {
-            if (trim($type) === '') {
-                throw new InvalidArgumentException('Album type cannot be empty.');
-            }
             $this->state->type = trim($type);
         }
 
@@ -144,9 +153,7 @@ final class Album
 
     public function lockField(string $field): void
     {
-        if (!in_array($field, self::LOCKABLE_FIELDS, true)) {
-            throw new InvalidArgumentException(sprintf('Cannot lock unknown field "%s".', $field));
-        }
+        LockedFields::assertLockable(self::LOCKABLE_FIELDS, $field, 'lock');
 
         if (!in_array($field, $this->state->lockedFields, true)) {
             $this->state->lockedFields[] = $field;
@@ -156,6 +163,8 @@ final class Album
 
     public function unlockField(string $field): void
     {
+        LockedFields::assertLockable(self::LOCKABLE_FIELDS, $field, 'unlock');
+
         $this->state->lockedFields = array_values(array_filter(
             $this->state->lockedFields,
             static fn(string $f): bool => $f !== $field,

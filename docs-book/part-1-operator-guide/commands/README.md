@@ -147,8 +147,11 @@ own exit code without JSON. Error output contains no credentials or raw diagnost
 | [app:album:duplicates](app-album-duplicates.md) | List the groups of albums in a library that look like duplicates |
 | [app:album:extract-covers](app-album-extract-covers.md) | Queue embedded cover art extraction for every album without a cover |
 | [app:album:merge](app-album-merge.md) | Merge a source album into a target album and delete the source |
+| [app:album:update](app-album-update.md) | Change an album's metadata, or lock and unlock its fields |
 | [app:artist:cover:remove](app-artist-cover-remove.md) | Remove an artist cover and delete its image files |
 | [app:artist:cover:set](app-artist-cover-set.md) | Set or replace an artist cover from an image file in the container |
+| [app:artist:create](app-artist-create.md) | Create an artist, such as a performer to credit by hand |
+| [app:artist:update](app-artist-update.md) | Change an artist's metadata, or lock and unlock its fields |
 | [app:genre:album:add](app-genre-album-add.md) | Assign a genre to an album |
 | [app:genre:album:remove](app-genre-album-remove.md) | Remove a genre from an album |
 | [app:genre:create](app-genre-create.md) | Create a genre, optionally below a parent genre |
@@ -165,6 +168,8 @@ own exit code without JSON. Error output contains no credentials or raw diagnost
 | [app:library:stats](app-library-stats.md) | Show the content counts of one media library |
 | [app:library:update](app-library-update.md) | Rename a media library or change its sort order |
 | [app:library:validate-path](app-library-validate-path.md) | Check that a directory can serve as a media library |
+| [app:movie:update](app-movie-update.md) | Change a movie's title, year or summary |
+| [app:song:update](app-song-update.md) | Change a song's metadata, or lock and unlock its fields |
 | [app:watch-files](app-watch-files.md) | Watch directories for filesystem changes |
 
 ## Media & Lyrics

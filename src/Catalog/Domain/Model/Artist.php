@@ -75,7 +75,9 @@ final class Artist
     }
 
     /**
-     * Update artist metadata fields.
+     * Update artist metadata fields. A null field stays as it is.
+     *
+     * @throws InvalidArgumentException when a given field is locked or the name is empty; nothing changes then
      */
     public function updateMetadata(
         ?string $name = null,
@@ -88,9 +90,17 @@ final class Artist
         ?string $sortName = null,
         ?string $biography = null,
     ): void {
-        if ($name !== null && $this->isFieldLocked('name')) {
-            throw new InvalidArgumentException('Field "name" is locked and cannot be updated.');
-        }
+        LockedFields::assertUnlocked($this->state->lockedFields, [
+            'name' => $name,
+            'country' => $country,
+            'gender' => $gender,
+            'type' => $type,
+            'lifeSpanBegin' => $lifeSpanBegin,
+            'lifeSpanEnd' => $lifeSpanEnd,
+            'disambiguation' => $disambiguation,
+            'sortName' => $sortName,
+            'biography' => $biography,
+        ]);
 
         if ($name !== null) {
             if (trim($name) === '') {
@@ -125,9 +135,7 @@ final class Artist
 
     public function lockField(string $field): void
     {
-        if (!in_array($field, self::LOCKABLE_FIELDS, true)) {
-            throw new InvalidArgumentException(sprintf('Cannot lock unknown field "%s".', $field));
-        }
+        LockedFields::assertLockable(self::LOCKABLE_FIELDS, $field, 'lock');
 
         if (!in_array($field, $this->state->lockedFields, true)) {
             $this->state->lockedFields[] = $field;
@@ -137,6 +145,8 @@ final class Artist
 
     public function unlockField(string $field): void
     {
+        LockedFields::assertLockable(self::LOCKABLE_FIELDS, $field, 'unlock');
+
         $this->state->lockedFields = array_values(array_filter(
             $this->state->lockedFields,
             static fn(string $f): bool => $f !== $field,

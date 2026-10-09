@@ -470,6 +470,41 @@ final class SongTest extends TestCase
         $this->assertSame(3, $song->getTrack());
     }
 
+    /** @return iterable<string, array{string, array<string, string|int|bool>}> */
+    public static function everyLockableField(): iterable
+    {
+        yield 'title' => ['title', ['title' => 'New']];
+        yield 'track' => ['track', ['track' => 4]];
+        yield 'disc' => ['disc', ['disc' => 2]];
+        yield 'year' => ['year', ['year' => 2001]];
+        yield 'comment' => ['comment', ['comment' => 'note']];
+        yield 'lyrics' => ['lyrics', ['lyrics' => 'La la la']];
+        yield 'explicit' => ['explicit', ['explicit' => true]];
+    }
+
+    /** @param array<string, string|int|bool> $change */
+    #[\PHPUnit\Framework\Attributes\DataProvider('everyLockableField')]
+    public function testUpdateMetadataRejectsAChangeToAnyLockedField(string $field, array $change): void
+    {
+        $song = Song::create($this->albumId, 'Title', '/path.mp3', 1024, 'audio/mpeg');
+        $song->lockField($field);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(sprintf('Field "%s" is locked and cannot be updated.', $field));
+
+        $song->updateMetadata(...$change);
+    }
+
+    public function testUnlockingAnUnknownFieldIsRejected(): void
+    {
+        $song = Song::create($this->albumId, 'Title', '/path.mp3', 1024, 'audio/mpeg');
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Cannot unlock unknown field "colour".');
+
+        $song->unlockField('colour');
+    }
+
     public function testGettersReturnExpectedTypes(): void
     {
         $song = Song::create($this->albumId, 'Title', '/path.mp3', 1024, 'audio/mpeg');
