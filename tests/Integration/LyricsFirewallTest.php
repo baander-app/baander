@@ -263,12 +263,18 @@ final class LyricsFirewallTest extends TestCase
         $this->authenticate('admin');
         $this->cacheLyrics($this->deniedSong);
         $this->expectNoRemoteCalls();
-        foreach (['fetch', 'apply'] as $operation) {
-            $response = $this->mutation($this->deniedSong, $operation);
-            self::assertSame(200, $response->getStatusCode());
-            self::assertSame('Cached lyrics', json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR)['data']['plainLyrics']);
-        }
+        // A fetch returns the lyrics the song has; an apply reports them as a conflict.
+        $fetch = $this->mutation($this->deniedSong, 'fetch');
+        self::assertSame(200, $fetch->getStatusCode());
+        self::assertSame('Cached lyrics', json_decode((string) $fetch->getContent(), true, 512, JSON_THROW_ON_ERROR)['data']['plainLyrics']);
+        $apply = $this->mutation($this->deniedSong, 'apply');
+        self::assertSame(409, $apply->getStatusCode());
+        self::assertStringNotContainsString('Provider lyrics', (string) $apply->getContent());
         $this->assertLyricsCount(1);
+        $this->manager->clear();
+        $stored = $this->manager->getRepository(LyricsEntity::class)->findOneBy(['songId' => $this->deniedSong->getId()]);
+        self::assertInstanceOf(LyricsEntity::class, $stored);
+        self::assertSame('Cached lyrics', $stored->getPlainLyrics());
     }
 
     private function expectNoRemoteCalls(): void

@@ -6,6 +6,7 @@ namespace App\Lyrics\Application\Port;
 
 use App\Lyrics\Application\DTO\LrclibResult;
 use App\Lyrics\Application\DTO\LrclibSearchResult;
+use App\Lyrics\Application\DTO\LrclibUnavailable;
 
 /**
  * Port interface for the LRCLIB API client.
@@ -13,6 +14,9 @@ use App\Lyrics\Application\DTO\LrclibSearchResult;
  * Defines the contract for fetching lyrics from LRCLIB.
  * Infrastructure implementations handle HTTP communication;
  * the application layer never depends on external API details.
+ *
+ * No method throws: a lookup returns null when LRCLIB has no record and LrclibUnavailable
+ * when LRCLIB gave no usable answer, so callers can tell a miss from an outage.
  */
 interface LrclibClientInterface
 {
@@ -26,30 +30,28 @@ interface LrclibClientInterface
         string $artistName,
         string $albumName,
         float $duration,
-    ): ?LrclibResult;
+    ): LrclibResult|LrclibUnavailable|null;
 
     /**
-     * Fetch lyrics by track signature with external source fallback.
-     *
-     * Tries the cached endpoint first. If no result (404), queries external sources
-     * via the full /api/get endpoint.
+     * Fetch lyrics by track signature from LRCLIB's full endpoint, which also queries
+     * external sources.
      */
     public function getBySignature(
         string $trackName,
         string $artistName,
         string $albumName,
         float $duration,
-    ): ?LrclibResult;
+    ): LrclibResult|LrclibUnavailable|null;
 
     /**
      * Fetch a lyrics record by its LRCLIB ID.
      */
-    public function getById(int $id): ?LrclibResult;
+    public function getById(int $id): LrclibResult|LrclibUnavailable|null;
 
     /**
      * Search for lyrics records using keywords.
      *
-     * @return LrclibSearchResult[]
+     * @return list<LrclibSearchResult>|LrclibUnavailable an empty list when nothing matches
      */
-    public function search(string $query): array;
+    public function search(string $query): array|LrclibUnavailable;
 }

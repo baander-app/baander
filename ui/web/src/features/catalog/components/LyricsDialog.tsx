@@ -32,6 +32,7 @@ import { toast } from 'sonner'
 import { Search, Download, Check, Music } from 'lucide-react'
 import { formatDuration } from '@/shared/utils/format-duration'
 import { interactiveTransition } from '@/shared/theme'
+import { lyricsErrorMessage } from './lyrics-error-message'
 
 const LyricsPre = styled.pre`
   white-space: pre-wrap;
@@ -189,18 +190,23 @@ export function LyricsDialog({
   // Fetch from LRCLIB
   const fetchMutation = usePostLyricsSongLyricsFetch({
     mutation: {
-      onSuccess: (_data, variables) => {
+      onSuccess: (data, variables) => {
         queryClient.invalidateQueries({ queryKey: getGetLyricsSongLyricsQueryKey(variables.publicId) })
+        // LRCLIB having no lyrics is a success with an empty array.
+        if (!data.data || Array.isArray(data.data)) {
+          toast.info('No lyrics found on LRCLIB')
+          return
+        }
         toast.success('Lyrics fetched')
       },
-      onError: () => {
-        toast.error('No lyrics found')
+      onError: (error) => {
+        toast.error(lyricsErrorMessage(error, 'Failed to fetch lyrics'))
       },
     },
   })
 
   // Search LRCLIB
-  const { data: searchData, isLoading: searchLoading } = useGetLyricsSearch(
+  const { data: searchData, isLoading: searchLoading, error: searchError } = useGetLyricsSearch(
     { q: searchQuery },
     { query: { enabled: open && isAdmin && activeTab === 'search' && searchQuery.length >= 2 } },
   )
@@ -215,8 +221,8 @@ export function LyricsDialog({
         toast.success('Lyrics applied')
         setTab('lyrics')
       },
-      onError: () => {
-        toast.error('Failed to apply lyrics')
+      onError: (error) => {
+        toast.error(lyricsErrorMessage(error, 'Failed to apply lyrics'))
       },
     },
   })
@@ -346,6 +352,8 @@ export function LyricsDialog({
                       <Skeleton key={i} style={{ height: '4rem', width: '100%', borderRadius: 'var(--radius-md)' }} />
                     ))}
                   </div>
+                ) : searchError && searchQuery.length >= 2 ? (
+                  <NoResultsText role="alert">{lyricsErrorMessage(searchError, 'Search failed. Try again.')}</NoResultsText>
                 ) : searchResults.length === 0 && searchQuery.length >= 2 ? (
                   <NoResultsText>No results found for &ldquo;{searchQuery}&rdquo;</NoResultsText>
                 ) : (

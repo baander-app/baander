@@ -12,7 +12,8 @@ The `Lyrics` aggregate stores lyrics indexed by song ID, supporting multiple sou
 **Aggregate root:** `Lyrics` (state object pattern via `LyricsState`)
 
 **LRCLIB integration strategy:**
-- On-demand fetch: cached endpoint (`/api/get-cached`) first for predictable latency, fallback to full (`/api/get`) on 404
+- On-demand fetch: cached endpoint (`/api/get-cached`) first for predictable latency, fallback to full (`/api/get`) on a miss or an error. A song that has lyrics keeps them; the fetch returns them without calling LRCLIB
+- Outcomes: `FetchLyricsHandler` returns a `LyricsFetchResult` (found, not found, LRCLIB unavailable) and never throws for an outage, so queued fetches end without a retry. The per-song API route and `app:song:lyrics:fetch` report an outage as `LyricsProviderUnavailableException` (HTTP 503, exit 1); search and apply do the same. Apply refuses a song that has lyrics, and a result another song has, as a conflict
 - Search fallback: manual keyword search via `/api/search` when auto-match by track signature fails
 - Bulk scan: console command iterates songs without lyrics and fetches from LRCLIB
 - Automatic fetch: while `lyrics.auto_fetch` is on, Catalog ingest queues one fetch on the `async` transport for each new song without a sidecar `.lrc` file. The setting is off by default and does not gate the bulk scan or the on-demand fetch.
@@ -21,8 +22,8 @@ The `Lyrics` aggregate stores lyrics indexed by song ID, supporting multiple sou
 
 | Port | Layer | Purpose |
 |------|-------|---------|
-| `LyricsPortInterface` | Application | Lyrics CRUD + LRCLIB orchestration (fetch, search, apply) |
-| `LrclibClientInterface` | Application | LRCLIB HTTP API contract (getBySignature, search, getById) |
+| `LyricsPortInterface` | Application | Reads the stored lyrics of a song |
+| `LrclibClientInterface` | Application | LRCLIB HTTP API contract (getBySignature, search, getById); null or an empty list for a miss, `LrclibUnavailable` for an outage |
 | `LyricsFetchRequestInterface` | Application (contract) | Lets Catalog ingest request fetches for new songs; reads `lyrics.auto_fetch` on every call |
 
 ## Events
@@ -47,12 +48,15 @@ No domain events published yet.
 | `app:lyrics:fetch` | Queue a lyrics fetch from LRCLIB for every song without lyrics, or up to `--limit` |
 | `app:lyrics:coverage` | Lyrics coverage, as the admin coverage endpoint returns it |
 | `app:lyrics:status` | Lyrics job counts, as the admin sync-status endpoint returns them |
+| `app:song:lyrics:fetch` | Fetch the lyrics of one song from LRCLIB, as the per-song fetch route does |
+| `app:lyrics:search` | Search LRCLIB and list the results with their IDs |
+| `app:lyrics:apply` | Store an LRCLIB search result as the lyrics of a song that has none |
 
 ### Cross-Context Dependencies
 
 | Dependency | Layer | Purpose |
 |------------|-------|---------|
-| `Catalog\Application\Port\SongLookupInterface` | Application, Interface, Infrastructure | Visible song ID by public ID and library scope; song-ID pages for the bulk scan; the LRCLIB signature (title, artist name, album title, duration) as `SongLyricSignature` |
+| `Catalog\Application\Port\SongLookupInterface` | Application, Interface | Visible song ID by public ID and library scope; song-ID pages for the bulk scan; the LRCLIB signature (title, artist name, album title, duration) as `SongLyricSignature` |
 
 `LyricsEntity` stores a scalar `song_id`. `LyricsForeignKeys` declares the `fk_lyrics_song_id` constraint (`ON DELETE CASCADE`), so deleting a song still deletes its lyrics.
 

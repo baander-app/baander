@@ -6,6 +6,7 @@ namespace App\Lyrics\Infrastructure\Api;
 
 use App\Lyrics\Application\DTO\LrclibResult;
 use App\Lyrics\Application\DTO\LrclibSearchResult;
+use App\Lyrics\Application\DTO\LrclibUnavailable;
 use App\Lyrics\Application\Port\LrclibClientInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpClient\Exception\ClientException;
@@ -36,7 +37,7 @@ final class LrclibClient implements LrclibClientInterface
         string $artistName,
         string $albumName,
         float $duration,
-    ): ?LrclibResult {
+    ): LrclibResult|LrclibUnavailable|null {
         return $this->fetchBySignature('/api/get-cached', $trackName, $artistName, $albumName, $duration);
     }
 
@@ -45,11 +46,11 @@ final class LrclibClient implements LrclibClientInterface
         string $artistName,
         string $albumName,
         float $duration,
-    ): ?LrclibResult {
+    ): LrclibResult|LrclibUnavailable|null {
         return $this->fetchBySignature('/api/get', $trackName, $artistName, $albumName, $duration);
     }
 
-    public function getById(int $id): ?LrclibResult
+    public function getById(int $id): LrclibResult|LrclibUnavailable|null
     {
         $this->logger->debug('LRCLIB fetch by ID', [
             'service' => 'lrclib',
@@ -58,14 +59,14 @@ final class LrclibClient implements LrclibClientInterface
 
         $data = $this->request('GET', "/api/get/{$id}");
 
-        if ($data === null) {
-            return null;
+        if (!is_array($data)) {
+            return $data;
         }
 
         return LrclibResult::fromApiResponse($data);
     }
 
-    public function search(string $query): array
+    public function search(string $query): array|LrclibUnavailable
     {
         $this->logger->debug('LRCLIB search', [
             'service' => 'lrclib',
@@ -74,8 +75,14 @@ final class LrclibClient implements LrclibClientInterface
 
         $data = $this->request('GET', '/api/search', ['q' => $query]);
 
-        if ($data === null || !array_is_list($data)) {
+        if ($data === null) {
             return [];
+        }
+        if ($data instanceof LrclibUnavailable) {
+            return $data;
+        }
+        if (!array_is_list($data)) {
+            return $this->unavailable('/api/search', 'the response is not a list');
         }
 
         return array_map(
@@ -93,7 +100,7 @@ final class LrclibClient implements LrclibClientInterface
         string $artistName,
         string $albumName,
         float $duration,
-    ): ?LrclibResult {
+    ): LrclibResult|LrclibUnavailable|null {
         $this->logger->debug('LRCLIB fetch by signature', [
             'service' => 'lrclib',
             'endpoint' => $endpoint,
@@ -110,8 +117,8 @@ final class LrclibClient implements LrclibClientInterface
             'duration' => (string) (int) $duration,
         ]);
 
-        if ($data === null) {
-            return null;
+        if (!is_array($data)) {
+            return $data;
         }
 
         return LrclibResult::fromApiResponse($data);
@@ -120,13 +127,15 @@ final class LrclibClient implements LrclibClientInterface
     /**
      * Execute an HTTP request against the LRCLIB API.
      *
-     * Returns null on 404 (no lyrics found), logs errors on other failures,
-     * and never throws external exceptions to callers.
+     * Returns null on 404 (no record), and LrclibUnavailable, after logging a warning, when
+     * the request fails, LRCLIB answers with another error status, or the body is not JSON.
+     * Never throws to callers.
      *
-     * @return array<array-key, mixed>|null Decoded JSON response, or null on failure/404
      * @param array<string, mixed> $params
+     *
+     * @return array<array-key, mixed>|LrclibUnavailable|null the decoded JSON response
      */
-    private function request(string $method, string $endpoint, array $params = []): ?array
+    private function request(string $method, string $endpoint, array $params = []): array|LrclibUnavailable|null
     {
         $url = $this->baseUrl . $endpoint;
 
@@ -146,41 +155,31 @@ final class LrclibClient implements LrclibClientInterface
             }
 
             if ($statusCode >= 400) {
-                $this->logger->warning('LRCLIB API error response', [
-                    'service' => 'lrclib',
-                    'endpoint' => $endpoint,
-                    'status_code' => $statusCode,
-                ]);
-
-                return null;
+                return $this->unavailable($endpoint, sprintf('HTTP %d', $statusCode));
             }
 
-            $data = $response->toArray();
-
-            return $data;
+            return $response->toArray();
         } catch (ClientException $e) {
-            $response = $e->getResponse();
+            $statusCode = $e->getResponse()->getStatusCode();
 
-            if ($response->getStatusCode() === 404) {
+            if ($statusCode === 404) {
                 return null;
             }
 
-            $this->logger->warning('LRCLIB API client error', [
-                'service' => 'lrclib',
-                'endpoint' => $endpoint,
-                'status_code' => $response->getStatusCode(),
-                'error' => $e->getMessage(),
-            ]);
-
-            return null;
+            return $this->unavailable($endpoint, sprintf('HTTP %d: %s', $statusCode, $e->getMessage()));
         } catch (\Throwable $e) {
-            $this->logger->warning('LRCLIB API request failed', [
-                'service' => 'lrclib',
-                'endpoint' => $endpoint,
-                'error' => $e->getMessage(),
-            ]);
-
-            return null;
+            return $this->unavailable($endpoint, $e->getMessage());
         }
+    }
+
+    private function unavailable(string $endpoint, string $reason): LrclibUnavailable
+    {
+        $this->logger->warning('LRCLIB API request failed', [
+            'service' => 'lrclib',
+            'endpoint' => $endpoint,
+            'error' => $reason,
+        ]);
+
+        return new LrclibUnavailable($reason);
     }
 }

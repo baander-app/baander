@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Lyrics\Interface\Request;
 
 use OpenApi\Attributes as OA;
-use Symfony\Component\HttpKernel\Attribute\MapQueryString;
-use Symfony\Component\Validator\Constraints\NotBlank;
 
+/**
+ * The query string of GET /api/lyrics/search. SearchLyricsQuery rejects a blank query, so the
+ * API and app:lyrics:search answer it the same way.
+ */
 #[OA\Schema(
     schema: 'SearchLyricsRequest',
     required: ['q'],
@@ -18,7 +20,6 @@ use Symfony\Component\Validator\Constraints\NotBlank;
 final readonly class SearchLyricsRequest
 {
     public function __construct(
-        #[NotBlank(message: 'Search query is required.')]
         public string $q = '',
     ) {
     }
