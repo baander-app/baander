@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Interface\Console;
 
+use App\Shared\Application\DTO\JobCancellation;
 use App\Shared\Application\Port\JobMonitorAdministrationInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -18,7 +19,7 @@ use Throwable;
  */
 #[AsCommand(
     name: 'app:monitor:job:cancel',
-    description: 'Request cooperative cancellation of a running background job.',
+    description: 'Cancel a running background job, or the work a finished job queued.',
 )]
 final class MonitorJobCancelCommand extends Command
 {
@@ -39,7 +40,7 @@ final class MonitorJobCancelCommand extends Command
         $io = new SymfonyStyle($input, $output);
 
         try {
-            $this->jobMonitor->cancel((string) $input->getArgument('jobId'));
+            $cancellation = $this->jobMonitor->cancel((string) $input->getArgument('jobId'));
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
         }
@@ -48,7 +49,10 @@ final class MonitorJobCancelCommand extends Command
             return AdminCommandSupport::json($io, ['cancelled' => true]);
         }
 
-        $io->success('Cancellation was requested. A job that checks for cancellation stops at its next checkpoint.');
+        $io->success(match ($cancellation) {
+            JobCancellation::Requested => 'Cancellation was requested. A job that checks for cancellation stops at its next checkpoint.',
+            JobCancellation::QueuedWorkCancelled => 'The job had finished. The work it queued is cancelled and skipped when it comes due; the job is now cancelled.',
+        });
 
         return Command::SUCCESS;
     }

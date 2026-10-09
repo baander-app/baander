@@ -38,7 +38,7 @@ final class JobMonitorResource extends AbstractResource
     }
 
     /**
-     * A job with its error, stored message and run time.
+     * A job with its error, stored message, run time and whether it can be cancelled.
      *
      * @return array<string, mixed>
      */
@@ -51,6 +51,7 @@ final class JobMonitorResource extends AbstractResource
             'data' => $job->data,
             'dataTruncated' => $job->dataTruncated,
             'duration' => $job->durationMicroseconds === null ? null : $job->durationMicroseconds / 1e6,
+            'cancellable' => $job->cancellable === true,
         ];
     }
 

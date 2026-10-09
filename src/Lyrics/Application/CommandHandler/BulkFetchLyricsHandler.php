@@ -11,6 +11,7 @@ use App\Lyrics\Application\Port\QueuedLyricsFetchesInterface;
 use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\JobCancelledException;
+use App\Shared\Application\Port\CurrentJobInterface;
 use App\Shared\Application\Port\JobCancellationCheckpointInterface;
 use App\Shared\Domain\Model\Uuid;
 use Psr\Log\LoggerInterface;
@@ -32,6 +33,8 @@ use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
  * one, such as a manual run during a scheduled one, skips the songs already queued. The
  * fetches name their run; when the job is cancelled while it queues, the run is recorded
  * cancelled until after its last fetch is due, and the fetches it already queued are skipped.
+ * A run that finishes is recorded against its job for as long, so cancelling the finished job
+ * in the job monitor cancels the run the same way.
  */
 #[AsMessageHandler]
 final class BulkFetchLyricsHandler
@@ -52,6 +55,7 @@ final class BulkFetchLyricsHandler
         private readonly LoggerInterface $logger,
         private readonly JobCancellationCheckpointInterface $cancellation,
         private readonly QueuedLyricsFetchesInterface $queuedFetches,
+        private readonly CurrentJobInterface $currentJob,
     ) {
     }
 
@@ -117,6 +121,11 @@ final class BulkFetchLyricsHandler
             }
 
             throw $cancelled;
+        }
+
+        $jobId = $this->currentJob->currentJobId();
+        if ($queued > 0 && $jobId !== null) {
+            $this->queuedFetches->recordJobRun($jobId, $runId, self::markTtl(($queued - 1) * $delayMs));
         }
 
         $this->logger->info('Bulk lyrics fetch queued', [

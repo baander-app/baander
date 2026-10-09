@@ -264,7 +264,7 @@ own exit code without JSON. Error output contains no credentials or raw diagnost
 | [app:config:validate](app-config-validate.md) | Validate application configuration and check for misconfigurations |
 | [app:health:check](app-health-check.md) | Check the health of all system components |
 | [app:monitor:analytics](app-monitor-analytics.md) | Show background job analytics for a time range: summary, timing or failures |
-| [app:monitor:job:cancel](app-monitor-job-cancel.md) | Request cooperative cancellation of a running background job |
+| [app:monitor:job:cancel](app-monitor-job-cancel.md) | Cancel a running background job, or the work a finished job queued |
 | [app:monitor:job:retry](app-monitor-job-retry.md) | Dispatch a failed background job's message again under a new job ID |
 | [app:monitor:job:show](app-monitor-job-show.md) | Show one background job with its error, stored message and run time |
 | [app:monitor:jobs](app-monitor-jobs.md) | List background jobs with the job monitor's filters, sorting and pages |

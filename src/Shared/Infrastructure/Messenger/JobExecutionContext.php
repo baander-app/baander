@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Messenger;
 
+use App\Shared\Application\Port\CurrentJobInterface;
+
 /**
  * The job the current execution is handling, so a cancellation checkpoint can find its job
  * ID without the handler knowing it.
@@ -13,7 +15,7 @@ namespace App\Shared\Infrastructure\Messenger;
  * console command) there is one key, -1. A coroutine that a job's handler starts does not
  * inherit the job.
  */
-final class JobExecutionContext
+final class JobExecutionContext implements CurrentJobInterface
 {
     /** @var array<int, string> job IDs by coroutine ID */
     private array $jobIds = [];

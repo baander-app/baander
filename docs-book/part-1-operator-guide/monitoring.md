@@ -101,6 +101,8 @@ curl -X POST -s -H "Authorization: Bearer $TOKEN" \
 
 Cancellation is cooperative. The job stops at its next checkpoint, between two items of its work, and its status becomes `cancelled`; it is not retried and does not go to the failure transport. The metadata sync jobs, the bulk lyrics fetch and the cover extraction have checkpoints; other jobs run to the end. [app:monitor:job:cancel](commands/app-monitor-job-cancel.md) lists the jobs and their checkpoints.
 
+A finished bulk lyrics fetch can still be cancelled while the fetches it queued are waiting: they are skipped when they come due, and the job's status changes from `finished` to `cancelled`. The job detail's `cancellable` field says whether cancelling a job can still change anything. Cancelling a failed job, or a finished job with no queued work waiting, answers `409`.
+
 ### Transport status
 
 The admin **Transport Health** card shows the number of entries in the async Redis stream, the number of messages in the failure transport, and whether the consumer this container is configured with is registered on the stream. The same figures come from the API and the console:

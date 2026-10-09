@@ -8,7 +8,8 @@ use App\Shared\Domain\Model\Uuid;
 
 /**
  * Tracks the lyrics fetches that bulk runs queue with a delay, so that overlapping runs do
- * not queue a song twice and the fetches of a cancelled run are skipped. Every entry
+ * not queue a song twice and the fetches of a cancelled run are skipped, also when its job is
+ * cancelled after it finished. Every entry
  * expires on its own after its time to live, so a fetch that never runs releases its song.
  */
 interface QueuedLyricsFetchesInterface
@@ -27,4 +28,10 @@ interface QueuedLyricsFetchesInterface
     public function markRunCancelled(Uuid $runId, int $ttlSeconds): void;
 
     public function isRunCancelled(Uuid $runId): bool;
+
+    /**
+     * Records for the given time that the job-monitor job queued the bulk run's fetches, so
+     * cancelling the job after it finished cancels the run (QueuedJobWorkInterface).
+     */
+    public function recordJobRun(string $jobId, Uuid $runId, int $ttlSeconds): void;
 }

@@ -6,11 +6,13 @@ namespace App\Tests\Unit\Shared\Infrastructure\Messenger;
 
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Shared\Application\Actor;
+use App\Shared\Application\DTO\JobCancellation;
 use App\Shared\Application\DTO\JobMonitorQuery;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\JobCancelledException;
+use App\Shared\Application\Port\QueuedJobWorkInterface;
 use App\Shared\Domain\Model\JobStatus;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Doctrine\Entity\JobMonitorEntity;
@@ -52,6 +54,8 @@ final class JobMonitorAdministrationTest extends TestCase
 
     /** @var array<string, string> the Redis keys that were set */
     private array $redisKeys = [];
+
+    private QueuedWorkStub $queuedWork;
 
     /** How often a whole job row was loaded. */
     private int $entityLoads = 0;
@@ -181,7 +185,7 @@ final class JobMonitorAdministrationTest extends TestCase
         $administration = $this->administration($job, $this->createStub(MessageBusInterface::class), expectFlush: false);
 
         $administration->checkCancellation('running-job');
-        $administration->cancel('running-job');
+        self::assertSame(JobCancellation::Requested, $administration->cancel('running-job'));
 
         self::assertSame(['job_cancel:running-job' => '1'], $this->redisKeys);
         self::assertSame(0, $this->entityLoads, 'Cancelling reads only the status, not the stored message.');
@@ -202,16 +206,61 @@ final class JobMonitorAdministrationTest extends TestCase
     {
         $job = new JobMonitorEntity('completed-job');
         $job->setStatus($status);
+        // Another job's queued work is not this job's.
+        $administration = $this->administration($job, $this->createStub(MessageBusInterface::class), expectFlush: false, queuedWork: ['other-job']);
 
         try {
-            $this->administration($job, $this->createStub(MessageBusInterface::class), expectFlush: false)->cancel('completed-job');
+            $administration->cancel('completed-job');
             self::fail('A conflict was expected.');
         } catch (ConflictException $exception) {
             self::assertSame($message, $exception->getMessage());
         }
 
         self::assertSame([], $this->redisKeys);
+        self::assertSame([], $this->queuedWork->cancelled);
         self::assertSame(0, $this->entityLoads);
+        self::assertCount(1, $this->statements, 'The job stays as it is.');
+    }
+
+    public function testCancellingAFinishedJobStopsTheWorkItQueuedAndCancelsTheJob(): void
+    {
+        $job = new JobMonitorEntity('finished-job');
+        $job->setStatus(JobStatus::Finished);
+        $administration = $this->administration($job, $this->createStub(MessageBusInterface::class), expectFlush: false, queuedWork: ['finished-job']);
+
+        self::assertSame(JobCancellation::QueuedWorkCancelled, $administration->cancel('finished-job'));
+
+        self::assertSame(['finished-job'], $this->queuedWork->cancelled);
+        self::assertSame([], $this->redisKeys, 'A finished job has no run left to read a flag.');
+        [$sql, $params] = $this->statements[array_key_last($this->statements)];
+        self::assertStringStartsWith('UPDATE job_monitors SET status = :status', $sql);
+        self::assertStringContainsString('WHERE job_id = :job_id AND status = :finished', $sql);
+        self::assertSame(JobStatus::Cancelled->value, $params['status']);
+        self::assertSame('finished-job', $params['job_id']);
+        self::assertSame(JobStatus::Finished->value, $params['finished']);
+    }
+
+    /** @return iterable<string, array{JobStatus, list<string>, bool}> */
+    public static function cancellableJobs(): iterable
+    {
+        yield 'running' => [JobStatus::Running, [], true];
+        yield 'finished with queued work' => [JobStatus::Finished, ['detail-job'], true];
+        yield 'finished' => [JobStatus::Finished, ['other-job'], false];
+        yield 'failed' => [JobStatus::Failed, ['detail-job'], false];
+        yield 'cancelled' => [JobStatus::Cancelled, ['detail-job'], false];
+    }
+
+    /** @param list<string> $queuedWork */
+    #[DataProvider('cancellableJobs')]
+    public function testAJobsRecordSaysWhetherCancellingItCanStillChangeAnything(JobStatus $status, array $queuedWork, bool $cancellable): void
+    {
+        $job = new JobMonitorEntity('detail-job');
+        $job->setStatus($status);
+
+        $record = $this->administration($job, $this->createStub(MessageBusInterface::class), expectFlush: false, queuedWork: $queuedWork)
+            ->job('detail-job');
+
+        self::assertSame($cancellable, $record->cancellable);
     }
 
     public function testTheJobListLeavesOutTheStoredMessageAndTheError(): void
@@ -395,8 +444,11 @@ final class JobMonitorAdministrationTest extends TestCase
         return $job;
     }
 
-    /** @param array<class-string, list<string>> $routing message class => transport names */
-    private function administration(?JobMonitorEntity $job, MessageBusInterface $bus, bool $expectFlush = true, array $routing = []): JobMonitorAdministration
+    /**
+     * @param array<class-string, list<string>> $routing message class => transport names
+     * @param list<string> $queuedWork the jobs with queued work waiting
+     */
+    private function administration(?JobMonitorEntity $job, MessageBusInterface $bus, bool $expectFlush = true, array $routing = [], array $queuedWork = []): JobMonitorAdministration
     {
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $repository = $this->createStub(EntityRepository::class);
@@ -447,6 +499,7 @@ final class JobMonitorAdministrationTest extends TestCase
             $this->redis(),
             new NullLogger(),
             new SendersLocator($routing, $this->transports($routing)),
+            [$this->queuedWork = new QueuedWorkStub($queuedWork)],
         );
     }
 
@@ -475,5 +528,32 @@ final class JobMonitorAdministrationTest extends TestCase
         $factory->method('borrow')->willReturnCallback(static fn (callable $callback): mixed => $callback($redis));
 
         return $factory;
+    }
+}
+
+/** Queued work of the given jobs; records the jobs whose work was cancelled. */
+final class QueuedWorkStub implements QueuedJobWorkInterface
+{
+    /** @var list<string> */
+    public array $cancelled = [];
+
+    /** @param list<string> $jobIds the jobs with queued work waiting */
+    public function __construct(private readonly array $jobIds)
+    {
+    }
+
+    public function hasQueuedWork(string $jobId): bool
+    {
+        return in_array($jobId, $this->jobIds, true);
+    }
+
+    public function cancelQueuedWork(string $jobId): bool
+    {
+        if (!$this->hasQueuedWork($jobId)) {
+            return false;
+        }
+        $this->cancelled[] = $jobId;
+
+        return true;
     }
 }

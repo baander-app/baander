@@ -563,6 +563,18 @@ final class JobMonitorService
     }
 
     /**
+     * Records a finished job as cancelled, once the work it queued was cancelled. The time it
+     * finished stays; a job that is no longer finished keeps its status.
+     */
+    public function cancelFinished(string $jobId): void
+    {
+        $this->entityManager->getConnection()->executeStatement(
+            'UPDATE job_monitors SET status = :status, updated_at = :now WHERE job_id = :job_id AND status = :finished',
+            ['status' => JobStatus::Cancelled->value, 'now' => $this->now(), 'job_id' => $jobId, 'finished' => JobStatus::Finished->value],
+        );
+    }
+
+    /**
      * Claims a failed job for its one retry. The conditional update lets only one of two
      * concurrent retries through, so the job's message is dispatched again at most once.
      *

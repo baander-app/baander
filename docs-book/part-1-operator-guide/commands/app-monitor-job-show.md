@@ -22,7 +22,7 @@ make exec cmd="php bin/console app:monitor:job:show <jobId>"
 
 ## Details
 
-The command prints the job's type, queue, status, progress, attempt number, whether it was retried, its creation, start and finish times, and its run time in seconds. For a failed job it also prints the error class and message. **Message** is the stored message that [app:monitor:job:retry](app-monitor-job-retry.md) dispatches again; it reads `(too large to store)` when the message was too large to keep.
+The command prints the job's type, queue, status, progress, attempt number, whether it was retried, whether it can be cancelled with [app:monitor:job:cancel](app-monitor-job-cancel.md), its creation, start and finish times, and its run time in seconds. For a failed job it also prints the error class and message. **Message** is the stored message that [app:monitor:job:retry](app-monitor-job-retry.md) dispatches again; it reads `(too large to store)` when the message was too large to keep.
 
 The run time is that of the current attempt. A job that has not finished has none.
 
