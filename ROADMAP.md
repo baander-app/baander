@@ -39,13 +39,22 @@ plans come next, in this order:
    also added the server control channel for diagnostics and QoL, cooperative job
    cancellation, admin-only library rename, delete and scan with a leased scan claim,
    and it ends a disabled user's tokens and WebSocket connections. Delivered on
-   2026-10-09. Recorded exemptions, deferred to a follow-up plan: the catalog and
-   player admin actions (metadata editing, per-song lyrics fetch and apply, cover
-   upload and delete, artist create and credits, album and song delete, movie
-   writes), webhook administration and server discovery registration (no admin page
-   offers them), and the admin notification bell. Still open:
-   - webhook administration uses `EntityManager` in its controller; move that into
-     Application commands before adding its commands;
+   2026-10-09. The [follow-up](docs/plans/2026-10-09-1728-feat-deferred-cli-parity-plan.md),
+   also delivered on 2026-10-09, gave commands to the routes it had deferred: the
+   catalog and player admin actions (metadata editing, per-song lyrics fetch and apply,
+   cover upload and delete, artist create and credits, album, song, movie and artist
+   delete), webhook administration and server discovery registration. No deferred
+   exemption remains, and the parity test fails on an exemption that defers its
+   command. The admin notification bell needs no command: it reads the
+   administrator's own inbox. Still open:
+   - a delete with its audio files refuses only while a scan holds the library; a scan
+     that reads a file between the delete's commit and the unlink imports it again as
+     a song whose file is gone, and a `FilesDiscovered` message already queued can do
+     the same;
+   - libraries whose roots overlap can index one file twice, so deleting it for one
+     library removes it from the other;
+   - PHP has no `unlinkat()`, so a parent directory swapped for a symlink between the
+     last check and the unlink is not caught;
    - no action grants or revokes a member's access to a library;
    - no API request selects a non-English locale, so the translated library errors
      are never returned;

@@ -15,16 +15,16 @@ admin route, an admin page call, or a console command. Read it with the
   the controller method:
   - `#[CliCounterpart('app:noun:verb')]` names the command, or a framework command
     such as `messenger:failed:retry`;
-  - `#[CliParityExemption(...)]` records why there is none. Deferred work uses
-    `CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION` or `DEFERRED_NO_ADMIN_PAGE`
-    and is listed under Admin/CLI parity in `ROADMAP.md`.
+  - `#[CliParityExemption(...)]` records why there is none. The reason is a lasting
+    decision that the route needs no command; a reason that defers the command fails
+    the parity test, so build the command instead.
 - A route counts as admin-guarded when an admin prefix in `access_control` matches it
   or `#[IsGranted]` names an admin role or attribute. Convert inline admin role checks
   to attributes so the test sees them. Owner-or-admin checks are not admin gates.
 - A non-admin route that an admin page calls goes on `ADMIN_PAGE_ROUTES` in
   `tests/Integration/AdminCliParityTest.php`. That test fails on an unmarked route, a
-  counterpart naming no command, a marking no route reaches, and a counterpart without
-  an operator docs page.
+  counterpart naming no command, an exemption that defers its command, a marking no
+  route reaches, and a counterpart without an operator docs page.
 
 ## Commands
 

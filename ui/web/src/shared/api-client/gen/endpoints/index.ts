@@ -386,8 +386,13 @@ export interface ArtistSongRequest {
 }
 
 export interface UpdateRoleRequest {
-  /** Artist role (primary, featured, producer, composer, conductor, remixer, djmix, other) */
+  /** The new artist role (primary, featured, producer, composer, conductor, remixer, djmix, other) */
   role: string;
+  /**
+     * The role of the credit to change; required when the artist holds several roles on the song or album
+     * @nullable
+     */
+  currentRole?: string | null;
 }
 
 export interface ArtistAlbumRequest {
@@ -1321,6 +1326,134 @@ export interface LoginRequest {
      * @nullable
      */
   totpCode?: string | null;
+}
+
+export type FileDeletionPreviewResourceFilesItemVerdict = typeof FileDeletionPreviewResourceFilesItemVerdict[keyof typeof FileDeletionPreviewResourceFilesItemVerdict];
+
+
+export const FileDeletionPreviewResourceFilesItemVerdict = {
+  deletable: 'deletable',
+  missing: 'missing',
+  outside_root: 'outside_root',
+  directory_not_writable: 'directory_not_writable',
+} as const;
+
+export type FileDeletionPreviewResourceFilesItem = {
+  path?: string;
+  verdict?: FileDeletionPreviewResourceFilesItemVerdict;
+  /**
+     * The directory the server cannot write, for directory_not_writable
+     * @nullable
+     */
+  directory?: string | null;
+};
+
+export interface FileDeletionPreviewResource {
+  /** The delete with files would go ahead */
+  allowed: boolean;
+  /** A scan holds the library, which refuses the delete */
+  scanInProgress: boolean;
+  files: FileDeletionPreviewResourceFilesItem[];
+}
+
+export type AlbumDeletePreviewResourceAlbum = {
+  id?: string;
+  title?: string;
+  songCount?: number;
+};
+
+export type AlbumDeletePreviewResourceFiles = {
+  count?: number;
+  totalSize?: number;
+};
+
+/**
+ * @nullable
+ */
+export type AlbumDeletePreviewResourceCoverImage = {
+  id?: string;
+} | null;
+
+export type AlbumDeletePreviewResourceAffected = {
+  playlists?: number;
+  playlistNames?: string[];
+};
+
+export interface AlbumDeletePreviewResource {
+  album: AlbumDeletePreviewResourceAlbum;
+  files: AlbumDeletePreviewResourceFiles;
+  /** @nullable */
+  coverImage?: AlbumDeletePreviewResourceCoverImage;
+  affected: AlbumDeletePreviewResourceAffected;
+  /** The check of every song file, when deleteFiles is true */
+  fileDeletion?: FileDeletionPreviewResource | null;
+}
+
+/**
+ * Rows deleted by kind: albums, songs and coverImages for an album; songs for a song; movies and videos for a movie; artists and coverImages for an artist
+ */
+export type CatalogDeletionResourceDeleted = {[key: string]: number};
+
+export type CatalogDeletionResourceFilesLeftItemReason = typeof CatalogDeletionResourceFilesLeftItemReason[keyof typeof CatalogDeletionResourceFilesLeftItemReason];
+
+
+export const CatalogDeletionResourceFilesLeftItemReason = {
+  outside_root: 'outside_root',
+  unlink_failed: 'unlink_failed',
+} as const;
+
+export type CatalogDeletionResourceFilesLeftItem = {
+  path?: string;
+  reason?: CatalogDeletionResourceFilesLeftItemReason;
+  detail?: string;
+};
+
+export type CatalogDeletionResourceFiles = {
+  /** Audio files unlinked */
+  removed?: string[];
+  /** Audio files that were already gone */
+  missing?: string[];
+  /** Audio files still on disk; the next scan imports them again */
+  left?: CatalogDeletionResourceFilesLeftItem[];
+};
+
+export interface CatalogDeletionResource {
+  /** Rows deleted by kind: albums, songs and coverImages for an album; songs for a song; movies and videos for a movie; artists and coverImages for an artist */
+  deleted: CatalogDeletionResourceDeleted;
+  files: CatalogDeletionResourceFiles;
+}
+
+/**
+ * @nullable
+ */
+export type SongDeletePreviewResourceSongAlbum = {
+  id?: string;
+  title?: string;
+} | null;
+
+export type SongDeletePreviewResourceSong = {
+  id?: string;
+  title?: string;
+  /** @nullable */
+  album?: SongDeletePreviewResourceSongAlbum;
+};
+
+export type SongDeletePreviewResourceFile = {
+  path?: string;
+  size?: number;
+};
+
+export type SongDeletePreviewResourceAffected = {
+  playlists?: number;
+  playlistNames?: string[];
+};
+
+export interface SongDeletePreviewResource {
+  song: SongDeletePreviewResourceSong;
+  file: SongDeletePreviewResourceFile;
+  affected: SongDeletePreviewResourceAffected;
+  /** The check of the song file, when deleteFile is true */
+  fileDeletion?: FileDeletionPreviewResource | null;
 }
 
 export type PaginatedResponseMeta = {
@@ -3359,41 +3492,20 @@ export type PutAuthMePassword200 = {
   data?: PutAuthMePassword200Data;
 };
 
-export type GetAdminAlbumDeletePreview200Album = {
-  id?: string;
-  title?: string;
-  songCount?: number;
-};
-
-export type GetAdminAlbumDeletePreview200Files = {
-  count?: number;
-  totalSize?: number;
-};
-
+export type GetAdminAlbumDeletePreviewParams = {
 /**
- * @nullable
+ * Also check each song file as a delete with deleteFiles would
  */
-export type GetAdminAlbumDeletePreview200CoverImage = {
-  /** @nullable */
-  id?: string | null;
-} | null;
-
-export type GetAdminAlbumDeletePreview200Affected = {
-  playlists?: number;
-  playlistNames?: string[];
+deleteFiles?: boolean;
 };
 
 export type GetAdminAlbumDeletePreview200 = {
-  album?: GetAdminAlbumDeletePreview200Album;
-  files?: GetAdminAlbumDeletePreview200Files;
-  /** @nullable */
-  coverImage?: GetAdminAlbumDeletePreview200CoverImage;
-  affected?: GetAdminAlbumDeletePreview200Affected;
+  data?: AlbumDeletePreviewResource;
 };
 
 export type DeleteAdminAlbumDeleteParams = {
 /**
- * Whether to delete audio files
+ * Also delete the song audio files, inside the library root only
  */
 deleteFiles?: boolean;
 /**
@@ -3402,42 +3514,30 @@ deleteFiles?: boolean;
 deleteCover?: boolean;
 };
 
+export type DeleteAdminAlbumDelete200 = {
+  data?: CatalogDeletionResource;
+};
+
+export type GetAdminSongDeletePreviewParams = {
 /**
- * @nullable
+ * Also check the song file as a delete with deleteFile would
  */
-export type GetAdminSongDeletePreview200SongAlbum = {
-  id?: string;
-  title?: string;
-} | null;
-
-export type GetAdminSongDeletePreview200Song = {
-  id?: string;
-  title?: string;
-  /** @nullable */
-  album?: GetAdminSongDeletePreview200SongAlbum;
-};
-
-export type GetAdminSongDeletePreview200File = {
-  path?: string;
-  size?: number;
-};
-
-export type GetAdminSongDeletePreview200Affected = {
-  playlists?: number;
-  playlistNames?: string[];
+deleteFile?: boolean;
 };
 
 export type GetAdminSongDeletePreview200 = {
-  song?: GetAdminSongDeletePreview200Song;
-  file?: GetAdminSongDeletePreview200File;
-  affected?: GetAdminSongDeletePreview200Affected;
+  data?: SongDeletePreviewResource;
 };
 
 export type DeleteAdminSongDeleteParams = {
 /**
- * Whether to delete the audio file
+ * Also delete the audio file, inside the library root only
  */
 deleteFile?: boolean;
+};
+
+export type DeleteAdminSongDelete200 = {
+  data?: CatalogDeletionResource;
 };
 
 export type GetAlbumIndexParams = {
@@ -3505,6 +3605,10 @@ export type GetAlbumShow200Data = {
 
 export type GetAlbumShow200 = {
   data?: GetAlbumShow200Data;
+};
+
+export type DeleteAlbumDestroy200 = {
+  data?: CatalogDeletionResource;
 };
 
 export type PatchAlbumUpdateBody = {
@@ -3625,6 +3729,10 @@ export type GetArtistShow200 = {
   data?: ArtistResource;
 };
 
+export type DeleteArtistDestroy200 = {
+  data?: CatalogDeletionResource;
+};
+
 export type PatchArtistUpdateBody = {
   /** @nullable */
   name?: string | null;
@@ -3653,6 +3761,11 @@ export type PostArtistAddSongBody = {
 
 export type PatchArtistUpdateSongRoleBody = {
   role?: string;
+  /**
+     * The role of the credit to change; required when the artist holds several roles on the song
+     * @nullable
+     */
+  currentRole?: string | null;
 };
 
 export type PostArtistAddAlbumBody = {
@@ -3662,6 +3775,11 @@ export type PostArtistAddAlbumBody = {
 
 export type PatchArtistUpdateAlbumRoleBody = {
   role?: string;
+  /**
+     * The role of the credit to change; required when the artist holds several roles on the album
+     * @nullable
+     */
+  currentRole?: string | null;
 };
 
 export type PostArtistCoverUploadBody = {
@@ -3763,6 +3881,10 @@ export type GetMovieShow200 = {
   data?: MovieResource;
 };
 
+export type DeleteMovieDestroy200 = {
+  data?: CatalogDeletionResource;
+};
+
 export type PatchMovieUpdateBody = {
   /** @nullable */
   title?: string | null;
@@ -3838,6 +3960,10 @@ export type GetSongShow200 = {
   data?: SongResource;
 };
 
+export type DeleteSongDestroy200 = {
+  data?: CatalogDeletionResource;
+};
+
 export type PatchSongUpdateBody = {
   /** @nullable */
   title?: string | null;
@@ -3863,6 +3989,10 @@ export type PostDiscoveryRegisterBody = {
   serverUrl: string;
   name: string;
   version: string;
+};
+
+export type PostDiscoveryRegister201 = {
+  data?: ServerInstanceResource;
 };
 
 export type PostDiscoveryPairingCodeBodyMethod = typeof PostDiscoveryPairingCodeBodyMethod[keyof typeof PostDiscoveryPairingCodeBodyMethod];
@@ -11444,20 +11574,29 @@ export const usePostAuthLoginLogin = <TError = ErrorType<ApiError>,
       return useMutation(getPostAuthLoginLoginMutationOptions(options), queryClient);
     }
 
-export const getGetAdminAlbumDeletePreviewUrl = (publicId: string,) => {
+export const getGetAdminAlbumDeletePreviewUrl = (publicId: string,
+    params?: GetAdminAlbumDeletePreviewParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/admin/albums/${publicId}/delete-preview`
+  return stringifiedParams.length > 0 ? `/api/admin/albums/${publicId}/delete-preview?${stringifiedParams}` : `/api/admin/albums/${publicId}/delete-preview`
 }
 
 /**
  * @summary Preview what will be deleted when deleting an album
  */
-export const getAdminAlbumDeletePreview = async (publicId: string, options?: RequestInit): Promise<GetAdminAlbumDeletePreview200> => {
+export const getAdminAlbumDeletePreview = async (publicId: string,
+    params?: GetAdminAlbumDeletePreviewParams, options?: RequestInit): Promise<GetAdminAlbumDeletePreview200> => {
 
-  return customInstance<GetAdminAlbumDeletePreview200>(getGetAdminAlbumDeletePreviewUrl(publicId),
+  return customInstance<GetAdminAlbumDeletePreview200>(getGetAdminAlbumDeletePreviewUrl(publicId,params),
   {
     ...options,
     method: 'GET'
@@ -11470,23 +11609,25 @@ export const getAdminAlbumDeletePreview = async (publicId: string, options?: Req
 
 
 
-export const getGetAdminAlbumDeletePreviewQueryKey = (publicId: string,) => {
+export const getGetAdminAlbumDeletePreviewQueryKey = (publicId: string,
+    params?: GetAdminAlbumDeletePreviewParams,) => {
     return [
-    `/api/admin/albums/${publicId}/delete-preview`
+    `/api/admin/albums/${publicId}/delete-preview`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetAdminAlbumDeletePreviewQueryOptions = <TData = Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError = ErrorType<ApiError | ValidationError>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetAdminAlbumDeletePreviewQueryOptions = <TData = Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError = ErrorType<ApiError | ValidationError>>(publicId: string,
+    params?: GetAdminAlbumDeletePreviewParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetAdminAlbumDeletePreviewQueryKey(publicId);
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminAlbumDeletePreviewQueryKey(publicId,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>> = ({ signal }) => getAdminAlbumDeletePreview(publicId, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>> = ({ signal }) => getAdminAlbumDeletePreview(publicId,params, { signal, ...requestOptions });
 
 
 
@@ -11500,7 +11641,8 @@ export type GetAdminAlbumDeletePreviewQueryError = ErrorType<ApiError | Validati
 
 
 export function useGetAdminAlbumDeletePreview<TData = Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError = ErrorType<ApiError | ValidationError>>(
- publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError, TData>> & Pick<
+ publicId: string,
+    params: undefined |  GetAdminAlbumDeletePreviewParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>,
           TError,
@@ -11510,7 +11652,8 @@ export function useGetAdminAlbumDeletePreview<TData = Awaited<ReturnType<typeof 
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetAdminAlbumDeletePreview<TData = Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError = ErrorType<ApiError | ValidationError>>(
- publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError, TData>> & Pick<
+ publicId: string,
+    params?: GetAdminAlbumDeletePreviewParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>,
           TError,
@@ -11520,7 +11663,8 @@ export function useGetAdminAlbumDeletePreview<TData = Awaited<ReturnType<typeof 
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetAdminAlbumDeletePreview<TData = Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError = ErrorType<ApiError | ValidationError>>(
- publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ publicId: string,
+    params?: GetAdminAlbumDeletePreviewParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -11528,11 +11672,12 @@ export function useGetAdminAlbumDeletePreview<TData = Awaited<ReturnType<typeof 
  */
 
 export function useGetAdminAlbumDeletePreview<TData = Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError = ErrorType<ApiError | ValidationError>>(
- publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ publicId: string,
+    params?: GetAdminAlbumDeletePreviewParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminAlbumDeletePreview>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetAdminAlbumDeletePreviewQueryOptions(publicId,options)
+  const queryOptions = getGetAdminAlbumDeletePreviewQueryOptions(publicId,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -11565,9 +11710,9 @@ export const getDeleteAdminAlbumDeleteUrl = (publicId: string,
  * @summary Delete an album with optional file deletion
  */
 export const deleteAdminAlbumDelete = async (publicId: string,
-    params?: DeleteAdminAlbumDeleteParams, options?: RequestInit): Promise<void> => {
+    params?: DeleteAdminAlbumDeleteParams, options?: RequestInit): Promise<DeleteAdminAlbumDelete200> => {
 
-  return customInstance<void>(getDeleteAdminAlbumDeleteUrl(publicId,params),
+  return customInstance<DeleteAdminAlbumDelete200>(getDeleteAdminAlbumDeleteUrl(publicId,params),
   {
     ...options,
     method: 'DELETE'
@@ -11624,20 +11769,29 @@ export const useDeleteAdminAlbumDelete = <TError = ErrorType<ApiError | Validati
       return useMutation(getDeleteAdminAlbumDeleteMutationOptions(options), queryClient);
     }
 
-export const getGetAdminSongDeletePreviewUrl = (publicId: string,) => {
+export const getGetAdminSongDeletePreviewUrl = (publicId: string,
+    params?: GetAdminSongDeletePreviewParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/admin/songs/${publicId}/delete-preview`
+  return stringifiedParams.length > 0 ? `/api/admin/songs/${publicId}/delete-preview?${stringifiedParams}` : `/api/admin/songs/${publicId}/delete-preview`
 }
 
 /**
  * @summary Preview what will be deleted when deleting a song
  */
-export const getAdminSongDeletePreview = async (publicId: string, options?: RequestInit): Promise<GetAdminSongDeletePreview200> => {
+export const getAdminSongDeletePreview = async (publicId: string,
+    params?: GetAdminSongDeletePreviewParams, options?: RequestInit): Promise<GetAdminSongDeletePreview200> => {
 
-  return customInstance<GetAdminSongDeletePreview200>(getGetAdminSongDeletePreviewUrl(publicId),
+  return customInstance<GetAdminSongDeletePreview200>(getGetAdminSongDeletePreviewUrl(publicId,params),
   {
     ...options,
     method: 'GET'
@@ -11650,23 +11804,25 @@ export const getAdminSongDeletePreview = async (publicId: string, options?: Requ
 
 
 
-export const getGetAdminSongDeletePreviewQueryKey = (publicId: string,) => {
+export const getGetAdminSongDeletePreviewQueryKey = (publicId: string,
+    params?: GetAdminSongDeletePreviewParams,) => {
     return [
-    `/api/admin/songs/${publicId}/delete-preview`
+    `/api/admin/songs/${publicId}/delete-preview`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetAdminSongDeletePreviewQueryOptions = <TData = Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError = ErrorType<ApiError | ValidationError>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetAdminSongDeletePreviewQueryOptions = <TData = Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError = ErrorType<ApiError | ValidationError>>(publicId: string,
+    params?: GetAdminSongDeletePreviewParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetAdminSongDeletePreviewQueryKey(publicId);
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminSongDeletePreviewQueryKey(publicId,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminSongDeletePreview>>> = ({ signal }) => getAdminSongDeletePreview(publicId, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminSongDeletePreview>>> = ({ signal }) => getAdminSongDeletePreview(publicId,params, { signal, ...requestOptions });
 
 
 
@@ -11680,7 +11836,8 @@ export type GetAdminSongDeletePreviewQueryError = ErrorType<ApiError | Validatio
 
 
 export function useGetAdminSongDeletePreview<TData = Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError = ErrorType<ApiError | ValidationError>>(
- publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError, TData>> & Pick<
+ publicId: string,
+    params: undefined |  GetAdminSongDeletePreviewParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getAdminSongDeletePreview>>,
           TError,
@@ -11690,7 +11847,8 @@ export function useGetAdminSongDeletePreview<TData = Awaited<ReturnType<typeof g
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetAdminSongDeletePreview<TData = Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError = ErrorType<ApiError | ValidationError>>(
- publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError, TData>> & Pick<
+ publicId: string,
+    params?: GetAdminSongDeletePreviewParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getAdminSongDeletePreview>>,
           TError,
@@ -11700,7 +11858,8 @@ export function useGetAdminSongDeletePreview<TData = Awaited<ReturnType<typeof g
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetAdminSongDeletePreview<TData = Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError = ErrorType<ApiError | ValidationError>>(
- publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ publicId: string,
+    params?: GetAdminSongDeletePreviewParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -11708,11 +11867,12 @@ export function useGetAdminSongDeletePreview<TData = Awaited<ReturnType<typeof g
  */
 
 export function useGetAdminSongDeletePreview<TData = Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError = ErrorType<ApiError | ValidationError>>(
- publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ publicId: string,
+    params?: GetAdminSongDeletePreviewParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminSongDeletePreview>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetAdminSongDeletePreviewQueryOptions(publicId,options)
+  const queryOptions = getGetAdminSongDeletePreviewQueryOptions(publicId,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -11745,9 +11905,9 @@ export const getDeleteAdminSongDeleteUrl = (publicId: string,
  * @summary Delete a song with optional file deletion
  */
 export const deleteAdminSongDelete = async (publicId: string,
-    params?: DeleteAdminSongDeleteParams, options?: RequestInit): Promise<void> => {
+    params?: DeleteAdminSongDeleteParams, options?: RequestInit): Promise<DeleteAdminSongDelete200> => {
 
-  return customInstance<void>(getDeleteAdminSongDeleteUrl(publicId,params),
+  return customInstance<DeleteAdminSongDelete200>(getDeleteAdminSongDeleteUrl(publicId,params),
   {
     ...options,
     method: 'DELETE'
@@ -12024,9 +12184,9 @@ export const getDeleteAlbumDestroyUrl = (publicId: string,) => {
 /**
  * @summary Delete an album
  */
-export const deleteAlbumDestroy = async (publicId: string, options?: RequestInit): Promise<void> => {
+export const deleteAlbumDestroy = async (publicId: string, options?: RequestInit): Promise<DeleteAlbumDestroy200> => {
 
-  return customInstance<void>(getDeleteAlbumDestroyUrl(publicId),
+  return customInstance<DeleteAlbumDestroy200>(getDeleteAlbumDestroyUrl(publicId),
   {
     ...options,
     method: 'DELETE'
@@ -12038,7 +12198,7 @@ export const deleteAlbumDestroy = async (publicId: string, options?: RequestInit
 
 
 
-export const getDeleteAlbumDestroyMutationOptions = <TError = ErrorType<ApiError>,
+export const getDeleteAlbumDestroyMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAlbumDestroy>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof deleteAlbumDestroy>>, TError,{publicId: string}, TContext> => {
 
@@ -12067,12 +12227,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type DeleteAlbumDestroyMutationResult = NonNullable<Awaited<ReturnType<typeof deleteAlbumDestroy>>>
 
-    export type DeleteAlbumDestroyMutationError = ErrorType<ApiError>
+    export type DeleteAlbumDestroyMutationError = ErrorType<ApiError | ValidationError>
 
     /**
  * @summary Delete an album
  */
-export const useDeleteAlbumDestroy = <TError = ErrorType<ApiError>,
+export const useDeleteAlbumDestroy = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAlbumDestroy>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteAlbumDestroy>>,
@@ -12967,9 +13127,9 @@ export const getDeleteArtistDestroyUrl = (publicId: string,) => {
 /**
  * @summary Delete an artist
  */
-export const deleteArtistDestroy = async (publicId: string, options?: RequestInit): Promise<void> => {
+export const deleteArtistDestroy = async (publicId: string, options?: RequestInit): Promise<DeleteArtistDestroy200> => {
 
-  return customInstance<void>(getDeleteArtistDestroyUrl(publicId),
+  return customInstance<DeleteArtistDestroy200>(getDeleteArtistDestroyUrl(publicId),
   {
     ...options,
     method: 'DELETE'
@@ -12981,7 +13141,7 @@ export const deleteArtistDestroy = async (publicId: string, options?: RequestIni
 
 
 
-export const getDeleteArtistDestroyMutationOptions = <TError = ErrorType<ApiError>,
+export const getDeleteArtistDestroyMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteArtistDestroy>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof deleteArtistDestroy>>, TError,{publicId: string}, TContext> => {
 
@@ -13010,12 +13170,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type DeleteArtistDestroyMutationResult = NonNullable<Awaited<ReturnType<typeof deleteArtistDestroy>>>
 
-    export type DeleteArtistDestroyMutationError = ErrorType<ApiError>
+    export type DeleteArtistDestroyMutationError = ErrorType<ApiError | ValidationError>
 
     /**
  * @summary Delete an artist
  */
-export const useDeleteArtistDestroy = <TError = ErrorType<ApiError>,
+export const useDeleteArtistDestroy = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteArtistDestroy>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteArtistDestroy>>,
@@ -13195,7 +13355,7 @@ export const deleteArtistRemoveSong = async (publicId: string,
 
 
 
-export const getDeleteArtistRemoveSongMutationOptions = <TError = ErrorType<ApiError>,
+export const getDeleteArtistRemoveSongMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteArtistRemoveSong>>, TError,{publicId: string;songId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof deleteArtistRemoveSong>>, TError,{publicId: string;songId: string}, TContext> => {
 
@@ -13224,12 +13384,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type DeleteArtistRemoveSongMutationResult = NonNullable<Awaited<ReturnType<typeof deleteArtistRemoveSong>>>
 
-    export type DeleteArtistRemoveSongMutationError = ErrorType<ApiError>
+    export type DeleteArtistRemoveSongMutationError = ErrorType<ApiError | ValidationError>
 
     /**
  * @summary Remove a song from an artist
  */
-export const useDeleteArtistRemoveSong = <TError = ErrorType<ApiError>,
+export const useDeleteArtistRemoveSong = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteArtistRemoveSong>>, TError,{publicId: string;songId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteArtistRemoveSong>>,
@@ -13411,7 +13571,7 @@ export const deleteArtistRemoveAlbum = async (publicId: string,
 
 
 
-export const getDeleteArtistRemoveAlbumMutationOptions = <TError = ErrorType<ApiError>,
+export const getDeleteArtistRemoveAlbumMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteArtistRemoveAlbum>>, TError,{publicId: string;albumId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof deleteArtistRemoveAlbum>>, TError,{publicId: string;albumId: string}, TContext> => {
 
@@ -13440,12 +13600,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type DeleteArtistRemoveAlbumMutationResult = NonNullable<Awaited<ReturnType<typeof deleteArtistRemoveAlbum>>>
 
-    export type DeleteArtistRemoveAlbumMutationError = ErrorType<ApiError>
+    export type DeleteArtistRemoveAlbumMutationError = ErrorType<ApiError | ValidationError>
 
     /**
  * @summary Remove an album from an artist
  */
-export const useDeleteArtistRemoveAlbum = <TError = ErrorType<ApiError>,
+export const useDeleteArtistRemoveAlbum = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteArtistRemoveAlbum>>, TError,{publicId: string;albumId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteArtistRemoveAlbum>>,
@@ -14669,9 +14829,9 @@ export const getDeleteMovieDestroyUrl = (publicId: string,) => {
 /**
  * @summary Delete a movie
  */
-export const deleteMovieDestroy = async (publicId: string, options?: RequestInit): Promise<void> => {
+export const deleteMovieDestroy = async (publicId: string, options?: RequestInit): Promise<DeleteMovieDestroy200> => {
 
-  return customInstance<void>(getDeleteMovieDestroyUrl(publicId),
+  return customInstance<DeleteMovieDestroy200>(getDeleteMovieDestroyUrl(publicId),
   {
     ...options,
     method: 'DELETE'
@@ -14683,7 +14843,7 @@ export const deleteMovieDestroy = async (publicId: string, options?: RequestInit
 
 
 
-export const getDeleteMovieDestroyMutationOptions = <TError = ErrorType<ApiError>,
+export const getDeleteMovieDestroyMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMovieDestroy>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof deleteMovieDestroy>>, TError,{publicId: string}, TContext> => {
 
@@ -14712,12 +14872,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type DeleteMovieDestroyMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMovieDestroy>>>
 
-    export type DeleteMovieDestroyMutationError = ErrorType<ApiError>
+    export type DeleteMovieDestroyMutationError = ErrorType<ApiError | ValidationError>
 
     /**
  * @summary Delete a movie
  */
-export const useDeleteMovieDestroy = <TError = ErrorType<ApiError>,
+export const useDeleteMovieDestroy = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMovieDestroy>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteMovieDestroy>>,
@@ -15019,9 +15179,9 @@ export const getDeleteSongDestroyUrl = (publicId: string,) => {
 /**
  * @summary Delete a song
  */
-export const deleteSongDestroy = async (publicId: string, options?: RequestInit): Promise<void> => {
+export const deleteSongDestroy = async (publicId: string, options?: RequestInit): Promise<DeleteSongDestroy200> => {
 
-  return customInstance<void>(getDeleteSongDestroyUrl(publicId),
+  return customInstance<DeleteSongDestroy200>(getDeleteSongDestroyUrl(publicId),
   {
     ...options,
     method: 'DELETE'
@@ -15033,7 +15193,7 @@ export const deleteSongDestroy = async (publicId: string, options?: RequestInit)
 
 
 
-export const getDeleteSongDestroyMutationOptions = <TError = ErrorType<ApiError>,
+export const getDeleteSongDestroyMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSongDestroy>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof deleteSongDestroy>>, TError,{publicId: string}, TContext> => {
 
@@ -15062,12 +15222,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type DeleteSongDestroyMutationResult = NonNullable<Awaited<ReturnType<typeof deleteSongDestroy>>>
 
-    export type DeleteSongDestroyMutationError = ErrorType<ApiError>
+    export type DeleteSongDestroyMutationError = ErrorType<ApiError | ValidationError>
 
     /**
  * @summary Delete a song
  */
-export const useDeleteSongDestroy = <TError = ErrorType<ApiError>,
+export const useDeleteSongDestroy = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSongDestroy>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteSongDestroy>>,
@@ -15160,9 +15320,9 @@ export const getPostDiscoveryRegisterUrl = () => {
 /**
  * @summary Register a self-hosted server
  */
-export const postDiscoveryRegister = async (postDiscoveryRegisterBody: PostDiscoveryRegisterBody, options?: RequestInit): Promise<ServerInstanceResource> => {
+export const postDiscoveryRegister = async (postDiscoveryRegisterBody: PostDiscoveryRegisterBody, options?: RequestInit): Promise<PostDiscoveryRegister201> => {
 
-  return customInstance<ServerInstanceResource>(getPostDiscoveryRegisterUrl(),
+  return customInstance<PostDiscoveryRegister201>(getPostDiscoveryRegisterUrl(),
   {
     ...options,
     method: 'POST',
@@ -16824,6 +16984,7 @@ export const getPostLyricsSongLyricsFetchUrl = (publicId: string,) => {
 }
 
 /**
+ * A song that has lyrics keeps them, and the response returns them without asking LRCLIB.
  * @summary Fetch lyrics from LRCLIB for a song
  */
 export const postLyricsSongLyricsFetch = async (publicId: string, options?: RequestInit): Promise<PostLyricsSongLyricsFetch200> => {
@@ -16925,7 +17086,7 @@ export const getGetLyricsSearchQueryKey = (params?: GetLyricsSearchParams,) => {
     }
 
 
-export const getGetLyricsSearchQueryOptions = <TData = Awaited<ReturnType<typeof getLyricsSearch>>, TError = ErrorType<ApiError>>(params: GetLyricsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLyricsSearch>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetLyricsSearchQueryOptions = <TData = Awaited<ReturnType<typeof getLyricsSearch>>, TError = ErrorType<void | ApiError>>(params: GetLyricsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLyricsSearch>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -16944,10 +17105,10 @@ const {query: queryOptions, request: requestOptions} = options ?? {};
 }
 
 export type GetLyricsSearchQueryResult = NonNullable<Awaited<ReturnType<typeof getLyricsSearch>>>
-export type GetLyricsSearchQueryError = ErrorType<ApiError>
+export type GetLyricsSearchQueryError = ErrorType<void | ApiError>
 
 
-export function useGetLyricsSearch<TData = Awaited<ReturnType<typeof getLyricsSearch>>, TError = ErrorType<ApiError>>(
+export function useGetLyricsSearch<TData = Awaited<ReturnType<typeof getLyricsSearch>>, TError = ErrorType<void | ApiError>>(
  params: GetLyricsSearchParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLyricsSearch>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getLyricsSearch>>,
@@ -16957,7 +17118,7 @@ export function useGetLyricsSearch<TData = Awaited<ReturnType<typeof getLyricsSe
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetLyricsSearch<TData = Awaited<ReturnType<typeof getLyricsSearch>>, TError = ErrorType<ApiError>>(
+export function useGetLyricsSearch<TData = Awaited<ReturnType<typeof getLyricsSearch>>, TError = ErrorType<void | ApiError>>(
  params: GetLyricsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLyricsSearch>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getLyricsSearch>>,
@@ -16967,7 +17128,7 @@ export function useGetLyricsSearch<TData = Awaited<ReturnType<typeof getLyricsSe
       >, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetLyricsSearch<TData = Awaited<ReturnType<typeof getLyricsSearch>>, TError = ErrorType<ApiError>>(
+export function useGetLyricsSearch<TData = Awaited<ReturnType<typeof getLyricsSearch>>, TError = ErrorType<void | ApiError>>(
  params: GetLyricsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLyricsSearch>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
@@ -16975,7 +17136,7 @@ export function useGetLyricsSearch<TData = Awaited<ReturnType<typeof getLyricsSe
  * @summary Search LRCLIB for lyrics
  */
 
-export function useGetLyricsSearch<TData = Awaited<ReturnType<typeof getLyricsSearch>>, TError = ErrorType<ApiError>>(
+export function useGetLyricsSearch<TData = Awaited<ReturnType<typeof getLyricsSearch>>, TError = ErrorType<void | ApiError>>(
  params: GetLyricsSearchParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getLyricsSearch>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
@@ -19771,7 +19932,7 @@ export const deleteWebhookDelete = async (id: string, options?: RequestInit): Pr
 
 
 
-export const getDeleteWebhookDeleteMutationOptions = <TError = ErrorType<ApiError>,
+export const getDeleteWebhookDeleteMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteWebhookDelete>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof deleteWebhookDelete>>, TError,{id: string}, TContext> => {
 
@@ -19800,12 +19961,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type DeleteWebhookDeleteMutationResult = NonNullable<Awaited<ReturnType<typeof deleteWebhookDelete>>>
 
-    export type DeleteWebhookDeleteMutationError = ErrorType<ApiError>
+    export type DeleteWebhookDeleteMutationError = ErrorType<ApiError | ValidationError>
 
     /**
  * @summary Delete a webhook
  */
-export const useDeleteWebhookDelete = <TError = ErrorType<ApiError>,
+export const useDeleteWebhookDelete = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteWebhookDelete>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteWebhookDelete>>,
@@ -19825,7 +19986,7 @@ export const getPostWebhookRotateSecretUrl = (id: string,) => {
 }
 
 /**
- * @summary Rotate a webhook secret and upgrade to signature version 2
+ * @summary Rotate a webhook secret; the webhook keeps its signature version
  */
 export const postWebhookRotateSecret = async (id: string, options?: RequestInit): Promise<PostWebhookRotateSecret200> => {
 
@@ -19841,7 +20002,7 @@ export const postWebhookRotateSecret = async (id: string, options?: RequestInit)
 
 
 
-export const getPostWebhookRotateSecretMutationOptions = <TError = ErrorType<ApiError>,
+export const getPostWebhookRotateSecretMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postWebhookRotateSecret>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postWebhookRotateSecret>>, TError,{id: string}, TContext> => {
 
@@ -19870,12 +20031,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostWebhookRotateSecretMutationResult = NonNullable<Awaited<ReturnType<typeof postWebhookRotateSecret>>>
 
-    export type PostWebhookRotateSecretMutationError = ErrorType<ApiError>
+    export type PostWebhookRotateSecretMutationError = ErrorType<ApiError | ValidationError>
 
     /**
- * @summary Rotate a webhook secret and upgrade to signature version 2
+ * @summary Rotate a webhook secret; the webhook keeps its signature version
  */
-export const usePostWebhookRotateSecret = <TError = ErrorType<ApiError>,
+export const usePostWebhookRotateSecret = <TError = ErrorType<ApiError | ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postWebhookRotateSecret>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postWebhookRotateSecret>>,

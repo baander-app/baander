@@ -48,6 +48,18 @@ final class ParityFixtureController
     {
     }
 
+    #[IsGranted('ROLE_ADMIN')]
+    #[CliParityExemption('deferred: the fixture command comes later')]
+    public function deferred(): void
+    {
+    }
+
+    #[IsGranted('ROLE_ADMIN')]
+    #[CliParityExemption("reads the signed-in administrator's own inbox")]
+    public function exempt(): void
+    {
+    }
+
     public function unguarded(): void
     {
     }

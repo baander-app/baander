@@ -16,7 +16,8 @@ use Symfony\Component\Routing\RouteCollection;
  * Every admin-guarded route, and every declared non-admin route the admin pages
  * call, needs `#[CliCounterpart]` or `#[CliParityExemption]` on its controller
  * method. A counterpart must name an existing command, and a project command must
- * have an operator docs page. Declared entries must name live routes, and a
+ * have an operator docs page. An exemption records a lasting decision, so its
+ * reason may not defer the command. Declared entries must name live routes, and a
  * marking must sit on a method that a route reaches.
  */
 final readonly class AdminCliParityChecker
@@ -101,6 +102,8 @@ final readonly class AdminCliParityChecker
         if ($marking instanceof CliParityExemption) {
             if (trim($marking->reason) === '') {
                 $violations[] = sprintf('%s has an exemption without a reason.', $label);
+            } elseif (preg_match('/\bdeferr/i', $marking->reason) === 1) {
+                $violations[] = sprintf('%s is exempt only until its command exists ("%s"); add the command and mark the route #[CliCounterpart].', $label, $marking->reason);
             }
 
             return $violations;
