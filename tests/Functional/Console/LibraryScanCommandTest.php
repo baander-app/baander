@@ -75,6 +75,11 @@ final class LibraryScanCommandTest extends KernelTestCase
         $scanned = $libraries->findBySlug(new LibrarySlug($slug));
         self::assertNotNull($scanned);
         self::assertSame('completed', $scanned->getDiscoveryStatus());
+        self::assertSame(
+            [$this->libraryDirectory . '/Album/track.flac'],
+            $container->get(Connection::class)->fetchFirstColumn('SELECT path FROM library_file_index WHERE library_id = ?', [$scanned->getId()->toString()]),
+            'The scan stored its file index.',
+        );
 
         $async = $container->get('messenger.transport.async');
         self::assertInstanceOf(InMemoryTransport::class, $async);

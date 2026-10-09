@@ -39,6 +39,7 @@ final class ReferentialIntegrityTest extends TestCase
         'eq_device_profiles.device_id' => 'client-reported device label',
         'job_monitors.job_id' => 'Messenger message identifier',
         'job_monitors.job_uuid' => 'Messenger message identifier',
+        'libraries.scan_claim_id' => 'the scan claim\'s own identifier, which the scan holding the claim carries',
         'listening_sessions.active_device_id' => 'client device identifier; claiming a session does not require a registered device',
         'lyrics.lrclib_id' => 'external LRCLIB identifier',
         'movie_collections.tmdb_collection_id' => 'external TMDB identifier',
