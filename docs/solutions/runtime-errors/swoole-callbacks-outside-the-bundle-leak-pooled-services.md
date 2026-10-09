@@ -74,17 +74,25 @@ Anything else that Swoole calls in a coroutine has no release unless the app add
 - Do not drop the `CoWrapper` argument from the two control classes. It is nullable only for the probe tests. If it is ever not injected, the leak comes back silently. The compiled container passes it to both (checked in `var/cache/dev/App_KernelDevDebugContainer.xml` on 2026-10-08).
 - Pool use is visible in diagnostics. `SwoolePoolStatsProvider` reports `active`, `free` and `limit` per pool, and both `DebugStatsOperation` and `PrometheusMetricsController` use it. An `active` count that grows while the server is idle points to a leak.
 
-Timer callbacks in `src/` as of this writing:
+Timers count as callbacks the bundle does not run. On Swoole 6.2.1 every tick of
+`Swoole\Timer::tick()` and `after()` runs in a new coroutine, in the server's master
+process as well as in its workers, so a pooled service a tick uses keeps its slot.
+Every `monolog.logger.*` channel is pooled (the bundle's `MonologProcessor` proxies
+them), and so are the EntityManager and services tagged `kernel.reset`. The app's own
+Redis pool (`RedisClientFactory::borrow()`) gives its connection back by itself.
 
-| Callback | Pooled services |
-|---|---|
-| `src/QoL/Infrastructure/Swoole/CpuGpuSampler.php:71` | None by design; its docblock says it uses `error_log()` only. |
-| `src/QoL/Infrastructure/Swoole/MidStreamMonitor.php:42` | Uses the governor and sampler and logs with `error_log()`. Not audited further. |
-| `src/Transcode/Infrastructure/Swoole/TranscodeSessionSubscriber.php:397-402` (loop lock renewal, via `SwooleLoopLockRenewalTimer`) | Renews a Redis lock. Logs through the injected logger only when ownership is lost. Not audited for pooling. |
-| `src/Shared/Infrastructure/Swoole/SwooleWorkerEventSubscriber.php:70` | Shutdown force-kill; uses `printf` and `posix_kill` only. |
-| `src/Shared/Infrastructure/Swoole/ProcessPool/CpuProcessPool.php:426` (pool health check) | Reaps exited pool workers and logs through the injected logger when one exited. Not audited for pooling. |
+Timer callbacks in `src/` as of 2026-10-09:
 
-Audit the three marked "not audited" before adding pooled services (a repository, the EntityManager, a logger) to them.
+| Callback | Pooled services | Release |
+|---|---|---|
+| `src/QoL/Infrastructure/Swoole/CpuGpuSampler.php:71` | None by design; its docblock says it uses `error_log()` only. | None needed. |
+| `src/QoL/Infrastructure/Swoole/MidStreamMonitor.php` | None. It reads the governor, the sampler and the algorithm profile table, none of them pooled, and logs with `error_log()`. | None needed; its docblock says to add `defer()` before the tick uses a logger or repository. |
+| `src/Transcode/Infrastructure/Swoole/SwooleLoopLockRenewalTimer.php` (loop lock renewal for `TranscodeSessionSubscriber`) | Renews the Redis lock through `RedisClientFactory::borrow()`. On lost ownership it stops the encoder, and both the subscriber and `TranscodeStreamManager` log through pooled loggers. | Each tick calls `CoWrapper::defer()` (optional `?CoWrapper`, autowired). |
+| `src/Shared/Infrastructure/Swoole/SwooleWorkerEventSubscriber.php:70` | Shutdown force-kill; uses `printf` and `posix_kill` only. | None needed. |
+| `src/Shared/Infrastructure/Swoole/ProcessPool/CpuProcessPool.php` (pool health check, master process) | Reaps exited pool workers and logs through the pooled `monolog.logger` when one exited. | Each tick calls `CoWrapper::defer()` (optional `?CoWrapper`, autowired). |
+
+Probe tests that fail without the release: `SwooleLoopLockRenewalTimerTest` and
+`CpuProcessPoolHealthTest::testEachHealthCheckTickReleasesThePooledServicesItsCoroutineTook`.
 
 ## Related Issues
 

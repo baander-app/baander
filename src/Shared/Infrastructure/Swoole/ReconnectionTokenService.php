@@ -12,9 +12,6 @@ final class ReconnectionTokenService
     private const TTL_SECONDS = 300; // 5 minutes
     private const TOKEN_LENGTH = 24; // 48 hex chars — fits in Swoole Table key limit
 
-    /** @var array<string, int> Token => created_at timestamp (local cache for TTL check) */
-    private array $createdAtCache = [];
-
     private function __construct(
         private readonly Table $tokens,
         private readonly ?LoggerInterface $logger = null,
@@ -22,7 +19,10 @@ final class ReconnectionTokenService
 
     public static function create(int $maxTokens = 4096, ?LoggerInterface $logger = null): self
     {
-        $tokens = new Table($maxTokens);
+        // With the default conflict proportion (0.2) Swoole runs out of overflow rows
+        // early: measured on Swoole 6.2.1, a 4,096-row table refused about the
+        // 2,900th random token. 1.0 makes room for all $maxTokens tokens (0.64 MB).
+        $tokens = new Table($maxTokens, 1.0);
         $tokens->column('user_id', Table::TYPE_STRING, 36);
         $tokens->column('created_at', Table::TYPE_INT);
         $tokens->create();
@@ -31,21 +31,40 @@ final class ReconnectionTokenService
     }
 
     /**
-     * Generate a reconnection token for the given user ID.
+     * Generates and stores a reconnection token for the given user ID.
+     *
+     * Returns null when the table has no free row even after expired tokens are
+     * dropped. The connection then works without a reconnection token.
      */
-    public function generate(string $userId): string
+    public function generate(string $userId): ?string
     {
         $token = bin2hex(random_bytes(self::TOKEN_LENGTH));
-        $now = time();
+        if ($this->store($token, $userId)) {
+            return $token;
+        }
 
-        $this->tokens->set($token, [
-            'user_id' => $userId,
-            'created_at' => $now,
+        // Tokens of connections that never reconnect stay until something drops
+        // them, and nothing else sweeps this table.
+        $this->sweepExpired();
+        if ($this->store($token, $userId)) {
+            return $token;
+        }
+
+        $this->logger?->warning('Reconnection token table is full; the connection gets no reconnection token', [
+            'userId' => $userId,
         ]);
 
-        $this->createdAtCache[$token] = $now;
+        return null;
+    }
 
-        return $token;
+    /** @phpstan-impure */
+    private function store(string $token, string $userId): bool
+    {
+        // A full table makes set() warn and return false; the caller decides what that means.
+        return @$this->tokens->set($token, [
+            'user_id' => $userId,
+            'created_at' => time(),
+        ]);
     }
 
     /**
@@ -61,7 +80,6 @@ final class ReconnectionTokenService
 
         if (time() - (int) $row['created_at'] > self::TTL_SECONDS) {
             $this->tokens->del($token);
-            unset($this->createdAtCache[$token]);
 
             return null;
         }
@@ -72,7 +90,6 @@ final class ReconnectionTokenService
 
         // Single-use: delete immediately
         $this->tokens->del($token);
-        unset($this->createdAtCache[$token]);
 
         return $userId;
     }
@@ -92,14 +109,13 @@ final class ReconnectionTokenService
         }
         foreach ($revoked as $token) {
             $this->tokens->del($token);
-            unset($this->createdAtCache[$token]);
         }
 
         return count($revoked);
     }
 
     /**
-     * Remove all expired tokens from the table. Call periodically (e.g., in onWorkerStart).
+     * Remove all expired tokens from the table. generate() calls it when the table is full.
      *
      * @return int Number of tokens removed
      */
@@ -111,7 +127,6 @@ final class ReconnectionTokenService
         foreach ($this->tokens as $token => $row) {
             if ((int) $row['created_at'] < $cutoff) {
                 $this->tokens->del($token);
-                unset($this->createdAtCache[$token]);
                 ++$removed;
             }
         }
@@ -132,7 +147,6 @@ final class ReconnectionTokenService
         // Clean up expired tokens on check
         if (time() - (int) $row['created_at'] > self::TTL_SECONDS) {
             $this->tokens->del($token);
-            unset($this->createdAtCache[$token]);
 
             return false;
         }

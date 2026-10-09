@@ -212,6 +212,41 @@ assertReaped($pids);
 PHP);
     }
 
+    /**
+     * The health check logs through the pooled app logger when a worker exits. Swoole
+     * runs each tick in a new coroutine that the bundle never releases.
+     */
+    public function testEachHealthCheckTickReleasesThePooledServicesItsCoroutineTook(): void
+    {
+        $this->runProbe(<<<'PHP'
+final class RecordingPool implements SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePool {
+    public array $released = [];
+    public function get(): object { return new stdClass(); }
+    public function releaseFromCoroutine(int $cId): void { $this->released[] = $cId; }
+    public function getAssignedCount(): int { return 0; }
+    public function getFreeCount(): int { return 0; }
+    public function getInstancesLimit(): int { return 1; }
+}
+$services = new RecordingPool();
+$pool = new CpuProcessPool([new HealthProbeWorker()], 1, new Psr\Log\NullLogger(), 16, $argv[2], new SwooleBundle\SwooleBundle\Bridge\Symfony\Container\CoWrapper(
+    new SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePoolContainer([0 => [$services]]),
+    new SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole(),
+));
+$pool->boot();
+$pids = trackWorkers($pool);
+$pool->startHealthCheck();
+$released = [];
+Swoole\Timer::after(5500, static function () use ($services, &$released): void {
+    $released = $services->released;
+    Swoole\Event::exit();
+});
+Swoole\Event::wait();
+check(count($released) === 1 && $released[0] > 0, 'The health check tick kept its pooled services: ' . json_encode($released));
+$pool->shutdown();
+assertReaped($pids);
+PHP);
+    }
+
     private function runProbe(string $scenario): void
     {
         $directory = sys_get_temp_dir() . '/baander-pool-health-' . bin2hex(random_bytes(8));

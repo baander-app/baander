@@ -100,6 +100,17 @@ final class WebSocketPusher
         return $closed;
     }
 
+    /**
+     * Closes one connection with a close frame, or closes its socket when no frame
+     * can be sent, so a refused connection never stays open.
+     */
+    public function close(int $fd, int $code, string $reason): bool
+    {
+        $server = $this->server ?? throw new \LogicException('No WebSocket server is attached to this worker.');
+
+        return ($server->isEstablished($fd) && $server->disconnect($fd, $code, $reason)) || $server->close($fd);
+    }
+
     private function doPush(int $fd, string $data): bool
     {
         if ($this->server === null || !$this->server->isEstablished($fd)) {

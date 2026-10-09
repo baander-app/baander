@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Infrastructure\Swoole;
 
 use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
+use App\Shared\Infrastructure\Swoole\WebSocketRegistrationRefused;
 use PHPUnit\Framework\TestCase;
+use Swoole\Table;
 
 final class WebSocketConnectionRegistryTest extends TestCase
 {
@@ -91,7 +93,7 @@ final class WebSocketConnectionRegistryTest extends TestCase
             $this->registry->addConnection($i, 'user-uuid-1', 0);
         }
 
-        $this->expectException(\RuntimeException::class);
+        $this->expectException(WebSocketRegistrationRefused::class);
         $this->expectExceptionMessage('has reached the maximum of 10 WebSocket connections');
 
         $this->registry->addConnection(11, 'user-uuid-1', 0);
@@ -346,5 +348,101 @@ final class WebSocketConnectionRegistryTest extends TestCase
         $this->assertSame([], $this->registry->getRoomMembers('room:aaa'));
         $this->assertSame([], $this->registry->getRoomMembers('room:bbb'));
         $this->assertSame([], $this->registry->getRoomMembers('room:ccc'));
+    }
+
+    // --- Capacity ---
+
+    public function testTheDefaultRegistryHoldsItsStatedConnectionAndMembershipLimits(): void
+    {
+        $registry = WebSocketConnectionRegistry::create();
+        $rooms = [];
+        for ($room = 0; $room < 8; ++$room) {
+            $rooms[] = sprintf('party:01900000-0000-7000-8000-%012d', $room);
+        }
+
+        for ($fd = 1; $fd <= 1024; ++$fd) {
+            $registry->addConnection($fd, sprintf('01900000-0000-7000-9000-%012d', $fd), 0);
+            foreach ($rooms as $room) {
+                $registry->joinRoom($room, $fd);
+            }
+        }
+
+        self::assertCount(1024, $registry->getAllConnections());
+        self::assertSame('01900000-0000-7000-9000-000000001024', $registry->getConnection(1024)['user_id'] ?? null);
+        foreach ($rooms as $room) {
+            self::assertCount(1024, $registry->getRoomMembers($room));
+        }
+    }
+
+    public function testAConnectionTheTableCannotHoldIsRefusedAndNotRegistered(): void
+    {
+        $registry = WebSocketConnectionRegistry::create(maxConnections: 1, maxRoomMembers: 1);
+
+        $refused = null;
+        for ($fd = 1; $fd <= 10_000 && $refused === null; ++$fd) {
+            try {
+                $registry->addConnection($fd, sprintf('user-%d', $fd), 0);
+            } catch (WebSocketRegistrationRefused $error) {
+                $refused = $fd;
+                self::assertSame(WebSocketRegistrationRefused::CLOSE_TRY_AGAIN_LATER, $error->closeCode);
+            }
+        }
+
+        self::assertNotNull($refused, 'A full connection table accepted every connection.');
+        self::assertNull($registry->getConnection($refused));
+        self::assertCount($refused - 1, $registry->getAllConnections());
+    }
+
+    public function testAMembershipTheTablesCannotHoldIsRefusedWithoutAHalfMembership(): void
+    {
+        $registry = WebSocketConnectionRegistry::create(maxConnections: 1, maxRoomMembers: 1);
+        $registry->addConnection(1, 'user-1', 0);
+        // Fill only the per-connection index, so the first of the two writes succeeds
+        // and the second is refused.
+        $fdRooms = (new \ReflectionProperty($registry, 'fdRooms'))->getValue($registry);
+        self::assertInstanceOf(Table::class, $fdRooms);
+        self::fillTable($fdRooms, ['room_name' => 'filler']);
+
+        try {
+            $registry->joinRoom('room:full', 1);
+            self::fail('A membership the index could not hold was accepted.');
+        } catch (WebSocketRegistrationRefused) {
+        }
+
+        self::assertSame([], $registry->getRoomMembers('room:full'));
+    }
+
+    public function testARoomNameTooLongForTheTableKeysIsRejected(): void
+    {
+        $tooLong = str_repeat('r', WebSocketConnectionRegistry::MAX_ROOM_NAME_BYTES + 1);
+        try {
+            $this->registry->joinRoom($tooLong, 1);
+            self::fail('A room name too long for the table keys was accepted.');
+        } catch (\InvalidArgumentException) {
+        }
+        self::assertSame([], $this->registry->getRoomMembers($tooLong));
+
+        // The longest name with the widest fd still round-trips through the key scans.
+        $longest = str_repeat('r', WebSocketConnectionRegistry::MAX_ROOM_NAME_BYTES);
+        $this->registry->joinRoom($longest, 2_147_483_647);
+        self::assertSame([2_147_483_647], $this->registry->getRoomMembers($longest));
+        $this->registry->leaveAllRooms(2_147_483_647);
+        self::assertSame([], $this->registry->getRoomMembers($longest));
+    }
+
+    /**
+     * Writes filler rows until a thousand writes in a row are refused. The first
+     * refusal alone does not mean the table is full: a key whose bucket is still free
+     * would get a row.
+     *
+     * @param array<string, int|string> $row
+     */
+    private static function fillTable(Table $table, array $row): void
+    {
+        $refusedInARow = 0;
+        for ($key = 0; $refusedInARow < 1000; ++$key) {
+            self::assertLessThan(100_000, $key, 'The table never filled up.');
+            $refusedInARow = @$table->set('filler-' . $key, $row) ? 0 : $refusedInARow + 1;
+        }
     }
 }
