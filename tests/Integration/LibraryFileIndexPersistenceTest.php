@@ -67,6 +67,32 @@ final class LibraryFileIndexPersistenceTest extends TestCase
         self::assertSame(1, $this->countIndexRows($kept->getId()));
     }
 
+    /**
+     * A scan writes the index without a flush: a scan that relied on a later flush lost its rows,
+     * and its next upsert of the same path inserted the path a second time.
+     */
+    public function testEachIndexWriteIsStoredWithoutAFlushAndAnUpsertUpdatesTheKnownPath(): void
+    {
+        $library = $this->createLibrary();
+        $repository = new LibraryFileIndexRepository($this->manager);
+
+        $repository->upsert($library->getId(), '/media/u15/a.flac', 'first', 1, 'flac', 10);
+        self::assertSame(['/media/u15/a.flac' => 'first'], $repository->findIndexPathMapByLibrary($library->getId()));
+
+        $repository->upsert($library->getId(), '/media/u15/a.flac', 'second', 2, 'flac', 20);
+        self::assertSame(1, $this->countIndexRows($library->getId()));
+        self::assertSame(
+            ['hash' => 'second', 'size' => 2, 'modified_at' => 20],
+            $this->manager->getConnection()->fetchAssociative(
+                'SELECT hash, size, modified_at FROM library_file_index WHERE library_id = ?',
+                [$library->getId()->toString()],
+            ),
+        );
+
+        $repository->removeByPath($library->getId(), '/media/u15/a.flac');
+        self::assertSame(0, $this->countIndexRows($library->getId()));
+    }
+
     public function testIndexRowForAnUnknownLibraryIsRejected(): void
     {
         $this->expectException(ForeignKeyConstraintViolationException::class);
@@ -173,7 +199,6 @@ final class LibraryFileIndexPersistenceTest extends TestCase
         foreach ($paths as $path) {
             $repository->upsert($libraryId, $path, 'hash', 1, 'flac', 0);
         }
-        $this->manager->flush();
     }
 
     private function countIndexRows(Uuid $libraryId): int
