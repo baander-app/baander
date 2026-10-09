@@ -13,6 +13,7 @@ use App\Auth\Interface\Resource\AdminOAuthClientResource;
 use App\Shared\Application\Actor;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Application\Exception\ServiceUnavailableException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use PHPUnit\Framework\TestCase;
@@ -43,6 +44,16 @@ final class AdminCommandSupportTest extends TestCase
         $this->assertSame(Command::FAILURE, $exitCode);
         $this->assertStringContainsString('A scan of Music is already running.', $tester->getErrorOutput());
         $this->assertSame('', $tester->getDisplay());
+    }
+
+    public function testAnUnavailableServiceFailsWithItsMessageOnStderr(): void
+    {
+        $tester = new CommandTester($this->actionCommand(new ServiceUnavailableException('LRCLIB is not reachable; try again later.')));
+
+        $exitCode = $tester->execute([], ['capture_stderr_separately' => true]);
+
+        $this->assertSame(Command::FAILURE, $exitCode);
+        $this->assertStringContainsString('LRCLIB is not reachable; try again later.', $tester->getErrorOutput());
     }
 
     public function testInvalidInputIsAnInvalidExit(): void

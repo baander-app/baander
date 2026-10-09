@@ -8,6 +8,7 @@ use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
+use App\Shared\Application\Exception\ServiceUnavailableException;
 use App\Shared\Interface\DTO\ApiError;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
@@ -72,7 +73,8 @@ final class ExceptionSubscriber
     }
 
     /**
-     * The shared use case outcomes are client errors: 404, 409 or 422 with the message and details.
+     * The shared use case outcomes: 404, 409 or 422 for client errors, and 503 when an external
+     * service did not answer, each with the message and details.
      * An outcome that is also TranslatableInterface is reported in the translator's locale, which
      * LocaleListener sets from the API request; getMessage() stays English for the console and logs.
      */
@@ -82,6 +84,7 @@ final class ExceptionSubscriber
             $exception instanceof NotFoundException => [Response::HTTP_NOT_FOUND, $exception->details],
             $exception instanceof ConflictException => [Response::HTTP_CONFLICT, $exception->details],
             $exception instanceof InvalidInputException => [Response::HTTP_UNPROCESSABLE_ENTITY, $exception->details],
+            $exception instanceof ServiceUnavailableException => [Response::HTTP_SERVICE_UNAVAILABLE, $exception->details],
             default => [null, []],
         };
         if ($status === null) {
