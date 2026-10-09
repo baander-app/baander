@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Application\CommandHandler\Song;
 
 use App\Catalog\Application\Command\Song\UpdateSongCommand;
-use App\Catalog\Application\CommandHandler\CatalogInput;
+use App\Catalog\Application\Service\CatalogInput;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Domain\Model\Song;
 use App\Shared\Application\Exception\InvalidInputException;

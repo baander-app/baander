@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Catalog\Application\CommandHandler\Cover;
+namespace App\Catalog\Application\Service;
 
 use App\Catalog\Application\Command\Cover\CoverOwner;
 use App\Catalog\Application\Port\AlbumPortInterface;
@@ -11,8 +11,6 @@ use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Artist;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
-use App\Shared\Domain\Model\PublicId;
-use InvalidArgumentException;
 
 /**
  * Finds and saves the album or artist whose cover the cover use cases change.
@@ -31,11 +29,7 @@ final readonly class CoverOwners
      */
     public function find(CoverOwner $kind, string $publicId): Album|Artist
     {
-        try {
-            $id = PublicId::fromString($publicId);
-        } catch (InvalidArgumentException $exception) {
-            throw new InvalidInputException('Invalid public ID format.', [], $exception);
-        }
+        $id = CatalogInput::publicId($publicId);
 
         $owner = match ($kind) {
             CoverOwner::Album => $this->albums->findByPublicId($id),

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Application\QueryHandler\Album;
 
-use App\Catalog\Application\CommandHandler\CatalogInput;
+use App\Catalog\Application\Service\CatalogInput;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Query\Album\AlbumDeletePreview;

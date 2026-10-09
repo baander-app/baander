@@ -17,6 +17,7 @@ use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
+use App\Shared\Interface\Controller\DispatchesMessagesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\DTO\PaginatedResponse;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -25,7 +26,6 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Messenger\MessageBusInterface;
-use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[OA\Tag(name: 'Catalog', description: 'Album, artist, song, movie, and genre management endpoints')]
@@ -34,6 +34,7 @@ use Symfony\Component\Routing\Attribute\Route;
 final class MovieController
 {
     use ApiResponsesTrait;
+    use DispatchesMessagesTrait;
     use TranslatorTrait;
     public function __construct(
         private readonly MoviePortInterface $movieService,
@@ -206,11 +207,5 @@ final class MovieController
         $result = $this->dispatch(new DeleteMovieCommand(publicId: $publicId));
 
         return $this->successResponse(CatalogDeletionResource::from($result));
-    }
-
-    /** A handler's exception reaches ExceptionSubscriber, which unwraps it to its 404 or 422 response. */
-    private function dispatch(object $message): mixed
-    {
-        return $this->bus->dispatch($message)->last(HandledStamp::class)?->getResult();
     }
 }

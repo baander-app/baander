@@ -6,8 +6,8 @@ namespace App\Catalog\Application\CommandHandler\Artist;
 
 use App\Catalog\Application\Command\Artist\DeleteArtistCommand;
 use App\Catalog\Application\Command\CatalogDeletionResult;
-use App\Catalog\Application\CommandHandler\CatalogInput;
-use App\Catalog\Application\CommandHandler\Cover\CoverImageDiscarder;
+use App\Catalog\Application\Service\CatalogInput;
+use App\Catalog\Application\Service\CoverImageDiscarder;
 use App\Catalog\Application\Port\ArtistPortInterface;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;

@@ -6,8 +6,8 @@ namespace App\Tests\Unit\Catalog\Application\CommandHandler\Cover;
 
 use App\Catalog\Application\Command\Cover\RemoveCoverCommand;
 use App\Catalog\Application\Command\Cover\SetCoverCommand;
-use App\Catalog\Application\CommandHandler\Cover\CoverImageDiscarder;
-use App\Catalog\Application\CommandHandler\Cover\CoverOwners;
+use App\Catalog\Application\Service\CoverImageDiscarder;
+use App\Catalog\Application\Service\CoverOwners;
 use App\Catalog\Application\CommandHandler\Cover\RemoveCoverHandler;
 use App\Catalog\Application\CommandHandler\Cover\SetCoverHandler;
 use App\Catalog\Application\Port\AlbumPortInterface;

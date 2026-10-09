@@ -8,6 +8,8 @@ use App\Catalog\Application\Command\Cover\RemoveCoverCommand;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use App\Catalog\Application\Service\CoverOwners;
+use App\Catalog\Application\Service\CoverImageDiscarder;
 
 /**
  * Clears an album's or artist's cover, then deletes the image record and its files once the

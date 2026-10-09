@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Catalog\Application\CommandHandler\Cover;
+namespace App\Catalog\Application\Service;
 
 use App\Media\Application\Port\ImagePortInterface;
 use App\Media\Application\Port\StoragePortInterface;

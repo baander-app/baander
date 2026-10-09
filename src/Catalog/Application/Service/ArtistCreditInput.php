@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Catalog\Application\CommandHandler\Artist;
+namespace App\Catalog\Application\Service;
 
 use App\Catalog\Application\Command\Artist\CreditTarget;
 use App\Catalog\Application\Port\ArtistPortInterface;
