@@ -279,7 +279,7 @@ deptrac:
     - name: 'Library Media Files Contract'
       collectors:
         - type: classLike
-          value: '^App\\Library\\Application\\Port\\LibraryMediaFilesInterface$'
+          value: '^App\\Library\\Application\\Port\\LibraryMediaFile[A-Za-z]*$'
 
     - name: 'Library Application'
       collectors:
@@ -297,7 +297,7 @@ deptrac:
             - type: classLike
               value: '^App\\Library\\Application\\Port\\(LibraryProvisioningInterface|ProvisionedLibraryScan)$'
             - type: classLike
-              value: '^App\\Library\\Application\\Port\\LibraryMediaFilesInterface$'
+              value: '^App\\Library\\Application\\Port\\LibraryMediaFile[A-Za-z]*$'
 
     - name: 'Library Infrastructure'
       collectors:
@@ -1096,6 +1096,7 @@ deptrac:
       - 'Shared Domain'
     'Library Media Files Contract':
       - 'Shared Domain'
+      - 'Shared Application'
     'Library Application':
       - 'Library Media Files Contract'
       - 'Library Files Discovered Contract'

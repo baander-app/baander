@@ -232,6 +232,14 @@ final class LibraryRepository implements LibraryRepositoryInterface
         return $held === false ? ScanClaimRelease::NoClaim : ScanClaimRelease::Live;
     }
 
+    public function hasLiveScanClaim(Uuid $libraryId): bool
+    {
+        return $this->entityManager->getConnection()->fetchOne(
+            'SELECT 1 FROM libraries WHERE id = :id AND scan_claim_expires_at > clock_timestamp()',
+            ['id' => $libraryId->toString()],
+        ) !== false;
+    }
+
     // --- Internal ---
 
     /** The claim bypasses the unit of work; a library it already loaded must not keep the old status. */

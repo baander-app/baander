@@ -6,6 +6,7 @@ namespace App\Library\Infrastructure\Doctrine\Repository;
 
 use App\Library\Domain\Repository\LibraryFileIndexRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -15,6 +16,9 @@ use Doctrine\ORM\EntityManagerInterface;
  */
 final class LibraryFileIndexRepository implements LibraryFileIndexRepositoryInterface
 {
+    /** Paths per DELETE, well below PostgreSQL's 65535 bind parameters. */
+    private const int PATHS_PER_STATEMENT = 1000;
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
     ) {
@@ -53,5 +57,17 @@ final class LibraryFileIndexRepository implements LibraryFileIndexRepositoryInte
             'DELETE FROM library_file_index WHERE library_id = :library_id AND path = :path',
             ['library_id' => $libraryId->toString(), 'path' => $path],
         );
+    }
+
+    public function removeByPaths(Uuid $libraryId, array $paths): void
+    {
+        $connection = $this->entityManager->getConnection();
+        foreach (array_chunk(array_values(array_unique($paths)), self::PATHS_PER_STATEMENT) as $chunk) {
+            $connection->executeStatement(
+                'DELETE FROM library_file_index WHERE library_id = :library_id AND path IN (:paths)',
+                ['library_id' => $libraryId->toString(), 'paths' => $chunk],
+                ['paths' => ArrayParameterType::STRING],
+            );
+        }
     }
 }
