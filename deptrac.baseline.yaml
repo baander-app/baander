@@ -222,8 +222,6 @@ deptrac:
       - App\Notification\Domain\Repository\NotificationPreferenceRepositoryInterface
       - App\Notification\Domain\ValueObject\NotificationCategory
       - App\Notification\Domain\ValueObject\NotificationChannel
-    App\Notification\Interface\Controller\WebhookController:
-      - App\Notification\Infrastructure\Doctrine\Entity\WebhookEntity
     App\Party\Application\CommandHandler\PausePlaybackHandler:
       - App\Transcode\Domain\Event\PlaybackPositionChanged
     App\Party\Application\CommandHandler\SeekPlaybackHandler:

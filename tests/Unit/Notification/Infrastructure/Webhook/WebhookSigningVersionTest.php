@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Notification\Infrastructure\Webhook;
 
+use App\Notification\Application\DTO\RotateWebhookSecretCommand;
+use App\Notification\Application\Handler\RotateWebhookSecretHandler;
 use App\Notification\Domain\ValueObject\NotificationCategory;
 use App\Notification\Infrastructure\Doctrine\Entity\WebhookEntity;
+use App\Notification\Infrastructure\Doctrine\Repository\WebhookRepository;
 use App\Notification\Infrastructure\Webhook\HmacSigner;
 use App\Notification\Infrastructure\Webhook\WebhookDeliveryService;
 use App\Notification\Infrastructure\Webhook\WebhookDestinationPolicy;
 use App\Notification\Infrastructure\Webhook\WebhookSecretCodec;
 use App\Shared\Domain\Model\Uuid;
-use App\Notification\Interface\Controller\WebhookController;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
 use PHPUnit\Framework\TestCase;
@@ -29,9 +31,9 @@ final class WebhookSigningVersionTest extends TestCase
         $webhook->setUrl('https://1.1.1.1/hook');
         $repository = $this->createStub(EntityRepository::class);
         $repository->method('findAll')->willReturn([$webhook]);
-        $repository->method('find')->willReturn($webhook);
         $em = $this->createMock(EntityManagerInterface::class);
-        $em->expects(self::exactly(3))->method('getRepository')->willReturn($repository);
+        $em->expects(self::exactly(2))->method('getRepository')->willReturn($repository);
+        $em->method('find')->willReturn($webhook);
         $em->expects(self::exactly(2))->method('persist');
         $em->expects(self::exactly(3))->method('flush');
         $previousSecret = 'obsolete-secret';
@@ -50,9 +52,8 @@ final class WebhookSigningVersionTest extends TestCase
         self::assertSame(1, $client->getRequestsCount());
 
         $previousSecret = $secret;
-        $controller = new WebhookController($em, new WebhookDestinationPolicy(), $codec);
-        $response = $controller->rotateSecret($webhook->getId()->toString());
-        $secret = json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR)['data']['secret'];
+        $rotate = new RotateWebhookSecretHandler(new WebhookRepository($em), $codec);
+        $secret = $rotate(new RotateWebhookSecretCommand($webhook->getId()->toString()))->secret;
         self::assertNotSame($previousSecret, $secret);
         $service->deliverAll('title', 'body', NotificationCategory::Security, 'event-after-rotation', Uuid::generate());
         self::assertSame(2, $client->getRequestsCount());

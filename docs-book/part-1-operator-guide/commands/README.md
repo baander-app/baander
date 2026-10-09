@@ -248,6 +248,11 @@ own exit code without JSON. Error output contains no credentials or raw diagnost
 | Command | Description |
 |---------|-------------|
 | [app:generate-vapid-keys](app-generate-vapid-keys.md) | Generate VAPID keys for push notifications |
+| [app:webhook:create](app-webhook-create.md) | Add a webhook and print its signing secret, which is shown only once |
+| [app:webhook:delete](app-webhook-delete.md) | Delete a webhook |
+| [app:webhook:list](app-webhook-list.md) | List the configured webhooks, without their secrets |
+| [app:webhook:rotate-secret](app-webhook-rotate-secret.md) | Replace a webhook's signing secret and print the new one once |
+| [app:webhook:update](app-webhook-update.md) | Change a webhook's URL or the notification categories it receives |
 
 ## Web Server & Workers
 

@@ -35,7 +35,7 @@ Outgoing webhooks let Baander deliver notifications to external services (Slack,
 
 ### Webhook API
 
-All webhook endpoints live under `/api/webhooks`.
+All webhook endpoints live under `/api/webhooks`. Each one has a console command for operators with shell access: [app:webhook:list](commands/app-webhook-list.md), [app:webhook:create](commands/app-webhook-create.md), [app:webhook:update](commands/app-webhook-update.md), [app:webhook:delete](commands/app-webhook-delete.md) and [app:webhook:rotate-secret](commands/app-webhook-rotate-secret.md).
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -65,12 +65,15 @@ The response includes a `secret` value on creation. This is the only time the se
 
 ```json
 {
-  "id": "0197d2ef-...",
-  "url": "https://hooks.slack.com/services/...",
-  "category_filter": ["security", "media_changes"],
-  "secret": "a1b2c3d4...",
-  "created_at": "2026-04-25T10:00:00+00:00",
-  "updated_at": "2026-04-25T10:00:00+00:00"
+  "data": {
+    "id": "0197d2ef-...",
+    "url": "https://hooks.slack.com/services/...",
+    "category_filter": ["security", "media_changes"],
+    "secret": "a1b2c3d4...",
+    "signing_version": 2,
+    "created_at": "2026-04-25T10:00:00+00:00",
+    "updated_at": "2026-04-25T10:00:00+00:00"
+  }
 }
 ```
 
