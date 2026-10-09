@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
+use App\Catalog\Domain\Model\Song;
+use App\Catalog\Domain\Repository\SongRepositoryInterface;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Kernel;
@@ -167,6 +169,33 @@ final class SongReferencePersistenceTest extends TestCase
             [$kept->getId()->toString()],
             array_map(static fn ($song): string => $song->getSongId()->toString(), $stored->getSongs()),
         );
+    }
+
+    /** Lossless and uncompressed audio files can pass 2 GiB; the size round-trips unchanged. */
+    public function testASongLargerThan2GibIsStoredAndReadBack(): void
+    {
+        $library = new LibraryEntity('Large songs', 'large-songs-' . bin2hex(random_bytes(6)), '/large-songs', 'music', 'local');
+        $album = new AlbumEntity(new PublicId(), $library, 'Large', 'album');
+        $this->manager->persist($library);
+        $this->manager->persist($album);
+        $this->manager->flush();
+        $size = 5 * 1024 ** 3;
+        $songs = $this->container->get(SongRepositoryInterface::class);
+        $song = Song::create($album->getId(), 'Large', '/large-songs/large.wav', $size, 'audio/wav');
+
+        $songs->save($song);
+        $this->manager->clear();
+
+        self::assertSame($size, $songs->findByUuid($song->getId())?->getSize());
+        $connection = $this->manager->getConnection();
+        self::assertSame($size, $connection->fetchOne('SELECT size FROM songs WHERE id = ?', [$song->getId()->toString()]));
+        self::assertSame('bigint', $connection->fetchOne(
+            "SELECT data_type FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'songs' AND column_name = 'size'",
+        ));
+        self::assertSame([], array_values(array_filter(
+            (new SchemaTool($this->manager))->getUpdateSchemaSql($this->manager->getMetadataFactory()->getAllMetadata()),
+            static fn (string $sql): bool => preg_match('/\bsongs\b.*\bsize\b/i', $sql) === 1,
+        )), 'The mapping matches the migrated column.');
     }
 
     public function testForeignKeyRejectsLyricsForAnUnknownSong(): void
