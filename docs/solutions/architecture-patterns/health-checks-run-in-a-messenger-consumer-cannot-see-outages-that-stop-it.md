@@ -17,7 +17,7 @@ tags: [health-check, admin-alerts, messenger, scheduler, worker, observability]
 
 ## Context
 
-`notifications.admin_alerts` gates alerts from `HealthAlertService`, but nothing called that service, so no health alert was ever sent. The fix on branch `feat/general-settings-email-language` (unmerged as of this writing) seeds a scheduler job that runs `CheckHealthCommand` every five minutes (`migrations/Version20261007140000.php:14-15`). Its handler calls `HealthAlertService::checkAndAlert()`.
+`notifications.admin_alerts` gates alerts from `HealthAlertService`, but nothing called that service, so no health alert was ever sent. The fix, merged from branch `feat/general-settings-email-language`, seeds a scheduler job that runs `CheckHealthCommand` every five minutes (`migrations/Version20261007140000.php:14-15`). Its handler calls `HealthAlertService::checkAndAlert()`.
 
 A scheduled job does not run in the web server. It runs in the worker's Messenger consumer, `messenger:consume async scheduler --memory-limit=256M` (`src/Shared/Infrastructure/Worker/WorkerSupervisorRunner.php:139`). The code review of that branch (run 20261008-121847-0bad858a, finding #4) traced what the check can see from there, and it is very little.
 
