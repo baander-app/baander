@@ -49,26 +49,22 @@ plans come next, in this order:
    - no action grants or revokes a member's access to a library;
    - no API request selects a non-English locale, so the translated library errors
      are never returned;
-   - a lyrics bulk fetch can be cancelled only while it queues; after that, its
-     queued fetches run;
-   - `app:rate-limiter:clear`, `app:settings:set` and `app:settings:reset` have no
-     `--json`;
-   - the React Native TV QoL fix ran only under `ui/web`'s test tooling; run `ui/rn`'s
-     own tests once its toolchain is installed;
-   - server diagnostics still count SSE connections, and the developer guide still
-     describes SSE endpoints, though both were removed;
    - `auth.reconnect` lets an authenticated WebSocket take another user's identity
-     with a valid reconnection token; review that design.
-   - Swoole tables that can refuse rows
-     ([learning](docs/solutions/runtime-errors/swoole-table-default-conflict-proportion-drops-keys.md)):
-     `WebSocketConnectionRegistry` uses the default conflict proportion and ignores
-     `set()`, so it can refuse connections well before its 1,024 limit;
-     `ReconnectionTokenService` hands out a token whose `set()` failed; a failed
-     `incr()` in the `CpuProcessPool` limit table lets a dispatch through unlimited;
-   - audit the Timer callbacks in `MidStreamMonitor`, the transcode lock renewal and
-     the `CpuProcessPool` health tick for pooled services used without
-     `CoWrapper::defer()`
-     ([learning](docs/solutions/runtime-errors/swoole-callbacks-outside-the-bundle-leak-pooled-services.md)).
+     with a valid reconnection token; review that design;
+   - `ui/rn`'s test setup is broken: 10 of its 12 Jest suites fail before running
+     (`@testing-library/react` missing, `@react-navigation` not transformed) and
+     `tsc` reports 280 errors, Jest globals among them. The TV QoL tests pass under it;
+   - `NotificationRepositoryInterface::findAfterId()`, written for SSE replay, has no
+     production caller since SSE was removed;
+   - a member who leaves a party over HTTP instead of `party.leave` keeps their
+     WebSocket in the party room and still receives `party.member_event` until the
+     connection closes; end the room membership with the party membership.
+
+   Closed on 2026-10-09: a finished lyrics run's queued fetches can be cancelled from
+   the job monitor; every admin write command has `--json`; the dead SSE counter and
+   SSE docs are gone; the WebSocket registry, reconnection tokens and CPU pool tables
+   hold the rows they promise; the Swoole timers that log release pooled services;
+   `room.join` no longer lets any user join another party's room.
 3. Timestamp convention: 130 `timestamptz(0)` columns, 13 `timestamp without time
    zone` columns, and ORM writes without offset or fraction. Not yet planned.
 
