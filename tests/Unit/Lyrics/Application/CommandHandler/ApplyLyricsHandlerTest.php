@@ -15,6 +15,7 @@ use App\Lyrics\Domain\Repository\LyricsRepositoryInterface;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\Model\Uuid;
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -62,18 +63,40 @@ final class ApplyLyricsHandlerTest extends TestCase
         ($this->handler)(new ApplyLyricsCommand(912345, $songId));
     }
 
-    /** Each LRCLIB record can be the lyrics of one song only (uniq_lyrics_lrclib_id). */
-    public function testAResultThatIsAnotherSongsLyricsIsAConflict(): void
+    /** The same recording on an album and a compilation, or in two libraries, shares one LRCLIB record. */
+    #[AllowMockObjectsWithoutExpectations]
+    public function testAResultAnotherSongHasIsStoredForASongWithoutLyricsToo(): void
     {
-        $this->lyrics->method('findBySongId')->willReturn(null);
-        $this->lyrics->expects($this->once())->method('findByLrclibId')->with(912345)->willReturn(Lyrics::create(Uuid::v7(), 'Applied before', 'lrclib', lrclibId: 912345));
-        $this->lrclib->expects($this->never())->method('getById');
-        $this->lyrics->expects($this->never())->method('save');
+        $otherSong = Uuid::v7();
+        $songId = Uuid::v7();
+        $repository = new class implements LyricsRepositoryInterface {
+            /** @var array<string, Lyrics> */
+            public array $bySong = [];
 
-        $this->expectException(ConflictException::class);
-        $this->expectExceptionMessage('LRCLIB result 912345 is already the lyrics of another song.');
+            public function save(Lyrics $lyrics): void
+            {
+                $this->bySong[$lyrics->getSongId()->toString()] = $lyrics;
+            }
 
-        ($this->handler)(new ApplyLyricsCommand(912345, Uuid::v7()));
+            public function findBySongId(Uuid $songId): ?Lyrics
+            {
+                return $this->bySong[$songId->toString()] ?? null;
+            }
+
+            public function delete(Lyrics $lyrics): void
+            {
+                unset($this->bySong[$lyrics->getSongId()->toString()]);
+            }
+        };
+        $repository->save(Lyrics::create($otherSong, 'This was a triumph', 'lrclib', lrclibId: 912345));
+        $this->lrclib->expects($this->once())->method('getById')->with(912345)
+            ->willReturn(new LrclibResult(912345, 'Still Alive', 'GLaDOS', 'Portal', 175.0, false, 'This was a triumph', null));
+
+        $stored = (new ApplyLyricsHandler($this->lrclib, $repository, new NullLogger()))(new ApplyLyricsCommand(912345, $songId));
+
+        $this->assertSame($stored, $repository->findBySongId($songId));
+        $this->assertSame(912345, $stored->getLrclibId());
+        $this->assertSame(912345, $repository->findBySongId($otherSong)?->getLrclibId());
     }
 
     public function testAnUnknownResultIsNotFound(): void

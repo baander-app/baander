@@ -13,7 +13,5 @@ interface LyricsRepositoryInterface
 
     public function findBySongId(Uuid $songId): ?Lyrics;
 
-    public function findByLrclibId(int $id): ?Lyrics;
-
     public function delete(Lyrics $lyrics): void;
 }

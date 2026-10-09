@@ -7,13 +7,13 @@ Song lyrics storage and retrieval. Integrates with the [LRCLIB API](https://lrcl
 
 ## Concepts
 
-The `Lyrics` aggregate stores lyrics indexed by song ID, supporting multiple sources (embedded tags, LRCLIB, Musixmatch, Genius). Each record holds both `plainLyrics` and `syncedLyrics` (LRC format with `[mm:ss.xx]` timestamps for karaoke-style display). An optional `lrclibId` tracks the external LRCLIB record for deduplication.
+The `Lyrics` aggregate stores lyrics indexed by song ID, supporting multiple sources (embedded tags, LRCLIB, Musixmatch, Genius). Each record holds both `plainLyrics` and `syncedLyrics` (LRC format with `[mm:ss.xx]` timestamps for karaoke-style display). An optional `lrclibId` records the LRCLIB record the lyrics came from; several songs can share one record, such as one recording on an album and a compilation.
 
 **Aggregate root:** `Lyrics` (state object pattern via `LyricsState`)
 
 **LRCLIB integration strategy:**
 - On-demand fetch: cached endpoint (`/api/get-cached`) first for predictable latency, fallback to full (`/api/get`) on a miss or an error. A song that has lyrics keeps them; the fetch returns them without calling LRCLIB
-- Outcomes: `FetchLyricsHandler` returns a `LyricsFetchResult` (found, not found, LRCLIB unavailable) and never throws for an outage, so queued fetches end without a retry. The per-song API route and `app:song:lyrics:fetch` report an outage as `LyricsProviderUnavailableException` (HTTP 503, exit 1); search and apply do the same. Apply refuses a song that has lyrics, and a result another song has, as a conflict
+- Outcomes: `FetchLyricsHandler` returns a `LyricsFetchResult` (found, not found, LRCLIB unavailable) and never throws for an outage, so queued fetches end without a retry. The per-song API route and `app:song:lyrics:fetch` report an outage as `LyricsProviderUnavailableException` (HTTP 503, exit 1); search and apply do the same. Apply refuses a song that has lyrics as a conflict; a result another song already has is stored for this song too
 - Search fallback: manual keyword search via `/api/search` when auto-match by track signature fails
 - Bulk scan: console command iterates songs without lyrics and fetches from LRCLIB
 - Automatic fetch: while `lyrics.auto_fetch` is on, Catalog ingest queues one fetch on the `async` transport for each new song without a sidecar `.lrc` file. The setting is off by default and does not gate the bulk scan or the on-demand fetch.

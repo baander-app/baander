@@ -138,25 +138,20 @@ final class LyricsRepositoryTest extends TestCase
         $this->assertNull($found->getSyncedLyrics());
     }
 
-    // --- Happy path: save with lrclibId and findByLrclibId ---
+    // --- Happy path: two songs share one LRCLIB record ---
 
-    public function testFindByLrclibIdReturnsMatchingLyrics(): void
+    /** The same recording on an album and a compilation, or in two libraries, has one LRCLIB record. */
+    public function testTwoSongsStoreLyricsFromTheSameLrclibRecord(): void
     {
-        $songId = $this->createSongFixture();
-        $lyrics = Lyrics::create(
-            songId: $songId,
-            lyrics: 'Found by lrclib ID',
-            source: 'lrclib',
-            lrclibId: 99999,
-        );
+        $firstSong = $this->createSongFixture();
+        $secondSong = $this->createSongFixture();
 
-        $this->lyricsRepository->save($lyrics);
+        $this->lyricsRepository->save(Lyrics::create($firstSong, 'Shared lyrics', 'lrclib', lrclibId: 99999));
+        $this->lyricsRepository->save(Lyrics::create($secondSong, 'Shared lyrics', 'lrclib', lrclibId: 99999));
+        $this->entityManager->clear();
 
-        $found = $this->lyricsRepository->findByLrclibId(99999);
-
-        $this->assertNotNull($found);
-        $this->assertSame('Found by lrclib ID', $found->getLyrics());
-        $this->assertSame(99999, $found->getLrclibId());
+        $this->assertSame(99999, $this->lyricsRepository->findBySongId($firstSong)?->getLrclibId());
+        $this->assertSame(99999, $this->lyricsRepository->findBySongId($secondSong)?->getLrclibId());
     }
 
     // --- Happy path: update existing lyrics via save ---
@@ -221,15 +216,6 @@ final class LyricsRepositoryTest extends TestCase
     public function testFindBySongIdReturnsNullForNonExistent(): void
     {
         $result = $this->lyricsRepository->findBySongId(new Uuid());
-
-        $this->assertNull($result);
-    }
-
-    // --- Edge case: findByLrclibId with non-existent ID ---
-
-    public function testFindByLrclibIdReturnsNullForNonExistent(): void
-    {
-        $result = $this->lyricsRepository->findByLrclibId(999999);
 
         $this->assertNull($result);
     }

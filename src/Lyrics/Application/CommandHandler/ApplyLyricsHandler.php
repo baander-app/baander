@@ -29,7 +29,7 @@ final readonly class ApplyLyricsHandler
     }
 
     /**
-     * @throws ConflictException                  when the song already has lyrics, which stay unchanged, or another song has this result
+     * @throws ConflictException                  when the song already has lyrics, which stay unchanged
      * @throws NotFoundException                  when LRCLIB has no record with the ID
      * @throws LyricsProviderUnavailableException when LRCLIB did not answer
      */
@@ -38,10 +38,6 @@ final readonly class ApplyLyricsHandler
         $songId = $command->songId;
         if ($this->lyricsRepository->findBySongId($songId) !== null) {
             throw new ConflictException('The song already has lyrics.');
-        }
-        // An LRCLIB record can be the lyrics of one song only (uniq_lyrics_lrclib_id).
-        if ($this->lyricsRepository->findByLrclibId($command->lrclibResultId) !== null) {
-            throw new ConflictException(sprintf('LRCLIB result %d is already the lyrics of another song.', $command->lrclibResultId));
         }
 
         $result = $this->lrclibClient->getById($command->lrclibResultId);

@@ -268,7 +268,7 @@ final class LyricsControllerTest extends TestCase
         $this->assertSame('Existing lyrics', $this->lyricsRepository->findBySongId($songId)?->getLyrics());
     }
 
-    public function testApplyingAResultAnotherSongHasAnswers409(): void
+    public function testApplyingAResultAnotherSongHasStoresItForThisSongToo(): void
     {
         $admin = $this->createAdminUser();
         [$firstSong, , $firstPublicId] = $this->createSongFixture($admin->getId());
@@ -277,11 +277,12 @@ final class LyricsControllerTest extends TestCase
         $apply = fn(string $publicId) => $this->authenticatedRequest('POST', '/api/lyrics/search/912345/apply', $admin, ['songPublicId' => $publicId]);
         $this->assertJsonResponse($apply($firstPublicId), 200, 'data');
 
-        $error = $this->assertJsonResponse($apply($secondPublicId), 409);
+        $data = $this->assertJsonResponse($apply($secondPublicId), 200, 'data');
 
-        $this->assertSame('LRCLIB result 912345 is already the lyrics of another song.', $error['error']['message']);
+        $this->assertSame('This was a triumph', $data['data']['plainLyrics']);
+        $this->entityManager->clear();
         $this->assertSame(912345, $this->lyricsRepository->findBySongId($firstSong)?->getLrclibId());
-        $this->assertNull($this->lyricsRepository->findBySongId($secondSong));
+        $this->assertSame(912345, $this->lyricsRepository->findBySongId($secondSong)?->getLrclibId());
     }
 
     public function testApplyLyricsDistinguishesAnUnknownResultFromAnOutage(): void

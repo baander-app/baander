@@ -31,7 +31,7 @@ make exec cmd="php bin/console app:lyrics:apply 912345 V1StGXR8_Z5jdHi6B-myT --j
 
 The command finds the song in any library; it does not need library access. It fetches the result from LRCLIB by ID, stores its plain and synced lyrics with LRCLIB as the source, and prints them.
 
-A song that already has lyrics keeps them: the command reports a conflict and exits with 1, and the API answers 409. No command or API route replaces stored lyrics. Each LRCLIB result can be the lyrics of one song only, so applying a result that another song already has is refused the same way.
+A song that already has lyrics keeps them: the command reports a conflict and exits with 1, and the API answers 409. No command or API route replaces stored lyrics. A result that another song already has, such as the same recording on a compilation, is stored for this song too.
 
 When LRCLIB has no result with the ID, the command exits with 1 and the API answers 404. When LRCLIB cannot be reached, answers with an error, or returns something unreadable, the command reports that LRCLIB is unavailable and exits with 1; the API answers 503. In each case nothing is stored.
 
@@ -40,5 +40,5 @@ When LRCLIB has no result with the ID, the command exits with 1 and the API answ
 | Code | Meaning |
 |------|---------|
 | 0 | The lyrics were stored |
-| 1 | No song has the public ID, the song already has lyrics, another song has the result, LRCLIB has no result with the ID, or LRCLIB is unavailable; the message says which |
+| 1 | No song has the public ID, the song already has lyrics, LRCLIB has no result with the ID, or LRCLIB is unavailable; the message says which |
 | 2 | The result ID is not an integer, or the public ID is malformed |

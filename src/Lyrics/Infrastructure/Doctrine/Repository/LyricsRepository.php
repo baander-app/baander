@@ -38,15 +38,6 @@ final class LyricsRepository implements LyricsRepositoryInterface
         return $entity !== null ? $this->toDomain($entity) : null;
     }
 
-    public function findByLrclibId(int $id): ?Lyrics
-    {
-        $entity = $this->entityManager
-            ->getRepository(LyricsEntity::class)
-            ->findOneBy(['lrclibId' => $id]);
-
-        return $entity !== null ? $this->toDomain($entity) : null;
-    }
-
     public function delete(Lyrics $lyrics): void
     {
         $entity = $this->entityManager
