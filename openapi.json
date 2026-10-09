@@ -7735,7 +7735,7 @@
                     "Library"
                 ],
                 "summary": "Trigger a library scan (admin)",
-                "description": "Claims the library for a scan and dispatches an asynchronous scan job. The scan runs in the background and progress is reported via SSE. A library that is already scanning answers 409.",
+                "description": "Claims the library for a scan and dispatches an asynchronous scan job. The scan runs in the background; follow it in the job monitor and in the scan status of the library. A library that is already scanning answers 409.",
                 "operationId": "post_library_scan",
                 "parameters": [
                     {
@@ -8140,6 +8140,16 @@
                                         }
                                     },
                                     "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The run was cancelled in the job monitor while it queued; the fetches it queued are skipped",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -15977,6 +15987,10 @@
                                                     "type": "number",
                                                     "format": "float",
                                                     "nullable": true
+                                                },
+                                                "cancellable": {
+                                                    "description": "Whether cancelling the job can still change anything: it is queued or running, or it has finished and work it queued, such as lyrics fetches, may still be waiting",
+                                                    "type": "boolean"
                                                 }
                                             },
                                             "type": "object"
@@ -16134,8 +16148,8 @@
                 "tags": [
                     "System"
                 ],
-                "summary": "Cancel a running or queued background job",
-                "description": "Sets a cooperative cancellation flag in Redis. Handlers that implement CancellableJobInterface will detect the flag at their next checkpoint. For queued jobs, the flag is set before the worker picks up the message.",
+                "summary": "Cancel a running background job, or the work a finished job queued",
+                "description": "Sets a cooperative cancellation flag in Redis; a running job stops at its next checkpoint and becomes cancelled. A finished job that queued work to run later, such as the lyrics fetches of a bulk fetch, has that work cancelled instead: what has not run yet is skipped when it comes due, and the job becomes cancelled.",
                 "operationId": "post_monitor_jobs_cancel",
                 "parameters": [
                     {
@@ -16181,7 +16195,7 @@
                         }
                     },
                     "409": {
-                        "description": "Job cannot be cancelled because it has finished or failed",
+                        "description": "Job cannot be cancelled because it has failed, or has finished with no queued work waiting",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -16421,7 +16435,7 @@
                 "tags": [
                     "System"
                 ],
-                "summary": "Per-worker server diagnostics with the shared Redis and SSE figures",
+                "summary": "Per-worker server diagnostics with the shared Redis figures",
                 "operationId": "get_debug_stats",
                 "responses": {
                     "200": {
@@ -16462,14 +16476,6 @@
                                                 },
                                                 "redis": {
                                                     "additionalProperties": true
-                                                },
-                                                "sse": {
-                                                    "properties": {
-                                                        "active_connections": {
-                                                            "type": "integer"
-                                                        }
-                                                    },
-                                                    "type": "object"
                                                 }
                                             },
                                             "type": "object"
