@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Controller;
 
+use App\Catalog\Application\Command\Artist\AddArtistCreditCommand;
+use App\Catalog\Application\Command\Artist\ChangeArtistCreditRoleCommand;
 use App\Catalog\Application\Command\Artist\CreateArtistCommand;
+use App\Catalog\Application\Command\Artist\CreditTarget;
+use App\Catalog\Application\Command\Artist\RemoveArtistCreditCommand;
 use App\Catalog\Application\Command\Artist\UpdateArtistCommand;
 use App\Catalog\Application\Port\ArtistPortInterface;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
-use App\Catalog\Domain\Model\Artist;
-use App\Catalog\Domain\ValueObject\ArtistRole;
 use App\Catalog\Interface\Request\ArtistAlbumRequest;
 use App\Catalog\Interface\Request\ArtistSongRequest;
 use App\Catalog\Interface\Request\CreateArtistRequest;
@@ -19,7 +21,6 @@ use App\Catalog\Interface\Resource\ArtistResource;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
-use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Attribute\CliParityExemption;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
@@ -294,33 +295,17 @@ final class ArtistController
             new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
-            new OA\Response(response: '204', description: 'Song added to artist'),
+            new OA\Response(response: '204', description: 'Song added to artist, or the artist already had the credit'),
             new OA\Response(response: '404', description: 'Artist or song not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '422', description: 'Malformed public ID or song ID, or an unknown role', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
     #[Route('/{publicId}/songs', name: 'add_song', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
-    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
+    #[CliCounterpart('app:artist:song:add')]
     public function addSong(string $publicId, #[MapRequestPayload] ArtistSongRequest $payload): JsonResponse
     {
-        $artist = $this->resolveArtist($publicId);
-
-        if ($artist === null) {
-            return $this->notFound();
-        }
-
-        if (!ArtistRole::tryFrom($payload->role)) {
-            return $this->errorResponse('Invalid role. Valid roles: ' . implode(', ', array_map(fn (ArtistRole $r) => $r->value, ArtistRole::cases())));
-        }
-
-        try {
-            $songId = Uuid::fromString($payload->songId);
-        } catch (\Throwable) {
-            return $this->errorResponse('Invalid song ID format.');
-        }
-
-        $this->artistService->addSongToArtist($artist->getId(), $songId, $payload->role);
+        $this->dispatch(new AddArtistCreditCommand($publicId, CreditTarget::Song, $payload->songId, $payload->role));
 
         return $this->noContent();
     }
@@ -336,28 +321,17 @@ final class ArtistController
             new OA\Parameter(name: 'songId', description: 'Song UUID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
-            new OA\Response(response: '204', description: 'Song removed from artist'),
-            new OA\Response(response: '404', description: 'Artist not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '204', description: "Every one of the artist's credits on the song removed"),
+            new OA\Response(response: '404', description: 'Artist not found, or the artist has no credit on the song', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'Malformed public ID or song ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
     #[Route('/{publicId}/songs/{songId}', name: 'remove_song', methods: ['DELETE'])]
     #[IsGranted('ROLE_ADMIN')]
-    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
+    #[CliCounterpart('app:artist:song:remove')]
     public function removeSong(string $publicId, string $songId): JsonResponse
     {
-        $artist = $this->resolveArtist($publicId);
-
-        if ($artist === null) {
-            return $this->notFound();
-        }
-
-        try {
-            $resolvedSongId = Uuid::fromString($songId);
-        } catch (\Throwable) {
-            return $this->errorResponse('Invalid song ID format.');
-        }
-
-        $this->artistService->removeSongFromArtist($artist->getId(), $resolvedSongId);
+        $this->dispatch(new RemoveArtistCreditCommand($publicId, CreditTarget::Song, $songId));
 
         return $this->noContent();
     }
@@ -370,39 +344,24 @@ final class ArtistController
         summary: 'Update artist role on a song',
         requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'role', type: 'string'),
+                new OA\Property(property: 'currentRole', description: 'The role of the credit to change; required when the artist holds several roles on the song', type: 'string', nullable: true),
             ])),
         parameters: [
             new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'songId', description: 'Song UUID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
-            new OA\Response(response: '204', description: 'Role updated'),
-            new OA\Response(response: '404', description: 'Artist not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '204', description: 'Role updated; a credit changed to a role the artist already holds on the song is removed'),
+            new OA\Response(response: '404', description: 'Artist not found, or the artist has no such credit on the song', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'Malformed public ID or song ID, an unknown role, or no current role while the artist holds several', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
     #[Route('/{publicId}/songs/{songId}', name: 'update_song_role', methods: ['PATCH'])]
     #[IsGranted('ROLE_ADMIN')]
-    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
+    #[CliCounterpart('app:artist:song:role')]
     public function updateSongRole(string $publicId, string $songId, #[MapRequestPayload] UpdateRoleRequest $payload): JsonResponse
     {
-        $artist = $this->resolveArtist($publicId);
-
-        if ($artist === null) {
-            return $this->notFound();
-        }
-
-        if (!ArtistRole::tryFrom($payload->role)) {
-            return $this->errorResponse('Invalid role. Valid roles: ' . implode(', ', array_map(fn (ArtistRole $r) => $r->value, ArtistRole::cases())));
-        }
-
-        try {
-            $resolvedSongId = Uuid::fromString($songId);
-        } catch (\Throwable) {
-            return $this->errorResponse('Invalid song ID format.');
-        }
-
-        $this->artistService->updateSongRole($artist->getId(), $resolvedSongId, $payload->role);
+        $this->dispatch(new ChangeArtistCreditRoleCommand($publicId, CreditTarget::Song, $songId, $payload->role, $payload->currentRole));
 
         return $this->noContent();
     }
@@ -421,33 +380,17 @@ final class ArtistController
             new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
-            new OA\Response(response: '204', description: 'Album added to artist'),
+            new OA\Response(response: '204', description: 'Album added to artist, or the artist already had the credit'),
             new OA\Response(response: '404', description: 'Artist or album not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '422', description: 'Malformed public ID or album ID, or an unknown role', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
     #[Route('/{publicId}/albums', name: 'add_album', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
-    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
+    #[CliCounterpart('app:artist:album:add')]
     public function addAlbum(string $publicId, #[MapRequestPayload] ArtistAlbumRequest $payload): JsonResponse
     {
-        $artist = $this->resolveArtist($publicId);
-
-        if ($artist === null) {
-            return $this->notFound();
-        }
-
-        if (!ArtistRole::tryFrom($payload->role)) {
-            return $this->errorResponse('Invalid role. Valid roles: ' . implode(', ', array_map(fn (ArtistRole $r) => $r->value, ArtistRole::cases())));
-        }
-
-        try {
-            $albumId = Uuid::fromString($payload->albumId);
-        } catch (\Throwable) {
-            return $this->errorResponse('Invalid album ID format.');
-        }
-
-        $this->artistService->addAlbumToArtist($artist->getId(), $albumId, $payload->role);
+        $this->dispatch(new AddArtistCreditCommand($publicId, CreditTarget::Album, $payload->albumId, $payload->role));
 
         return $this->noContent();
     }
@@ -463,28 +406,17 @@ final class ArtistController
             new OA\Parameter(name: 'albumId', description: 'Album UUID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
-            new OA\Response(response: '204', description: 'Album removed from artist'),
-            new OA\Response(response: '404', description: 'Artist not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '204', description: "Every one of the artist's credits on the album removed"),
+            new OA\Response(response: '404', description: 'Artist not found, or the artist has no credit on the album', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'Malformed public ID or album ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
     #[Route('/{publicId}/albums/{albumId}', name: 'remove_album', methods: ['DELETE'])]
     #[IsGranted('ROLE_ADMIN')]
-    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
+    #[CliCounterpart('app:artist:album:remove')]
     public function removeAlbum(string $publicId, string $albumId): JsonResponse
     {
-        $artist = $this->resolveArtist($publicId);
-
-        if ($artist === null) {
-            return $this->notFound();
-        }
-
-        try {
-            $resolvedAlbumId = Uuid::fromString($albumId);
-        } catch (\Throwable) {
-            return $this->errorResponse('Invalid album ID format.');
-        }
-
-        $this->artistService->removeAlbumFromArtist($artist->getId(), $resolvedAlbumId);
+        $this->dispatch(new RemoveArtistCreditCommand($publicId, CreditTarget::Album, $albumId));
 
         return $this->noContent();
     }
@@ -497,39 +429,24 @@ final class ArtistController
         summary: 'Update artist role on an album',
         requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'role', type: 'string'),
+                new OA\Property(property: 'currentRole', description: 'The role of the credit to change; required when the artist holds several roles on the album', type: 'string', nullable: true),
             ])),
         parameters: [
             new OA\Parameter(name: 'publicId', description: 'Artist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'albumId', description: 'Album UUID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
-            new OA\Response(response: '204', description: 'Role updated'),
-            new OA\Response(response: '404', description: 'Artist not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '204', description: 'Role updated; a credit changed to a role the artist already holds on the album is removed'),
+            new OA\Response(response: '404', description: 'Artist not found, or the artist has no such credit on the album', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'Malformed public ID or album ID, an unknown role, or no current role while the artist holds several', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
     #[Route('/{publicId}/albums/{albumId}', name: 'update_album_role', methods: ['PATCH'])]
     #[IsGranted('ROLE_ADMIN')]
-    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
+    #[CliCounterpart('app:artist:album:role')]
     public function updateAlbumRole(string $publicId, string $albumId, #[MapRequestPayload] UpdateRoleRequest $payload): JsonResponse
     {
-        $artist = $this->resolveArtist($publicId);
-
-        if ($artist === null) {
-            return $this->notFound();
-        }
-
-        if (!ArtistRole::tryFrom($payload->role)) {
-            return $this->errorResponse('Invalid role. Valid roles: ' . implode(', ', array_map(fn (ArtistRole $r) => $r->value, ArtistRole::cases())));
-        }
-
-        try {
-            $resolvedAlbumId = Uuid::fromString($albumId);
-        } catch (\Throwable) {
-            return $this->errorResponse('Invalid album ID format.');
-        }
-
-        $this->artistService->updateAlbumRole($artist->getId(), $resolvedAlbumId, $payload->role);
+        $this->dispatch(new ChangeArtistCreditRoleCommand($publicId, CreditTarget::Album, $albumId, $payload->role, $payload->currentRole));
 
         return $this->noContent();
     }
@@ -538,16 +455,5 @@ final class ArtistController
     private function dispatch(object $message): mixed
     {
         return $this->bus->dispatch($message)->last(HandledStamp::class)?->getResult();
-    }
-
-    private function resolveArtist(string $publicId): ?Artist
-    {
-        try {
-            $resolvedPublicId = PublicId::fromString($publicId);
-        } catch (\Throwable) {
-            return null;
-        }
-
-        return $this->artistService->findByPublicId($resolvedPublicId);
     }
 }

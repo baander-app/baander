@@ -148,9 +148,15 @@ own exit code without JSON. Error output contains no credentials or raw diagnost
 | [app:album:extract-covers](app-album-extract-covers.md) | Queue embedded cover art extraction for every album without a cover |
 | [app:album:merge](app-album-merge.md) | Merge a source album into a target album and delete the source |
 | [app:album:update](app-album-update.md) | Change an album's metadata, or lock and unlock its fields |
+| [app:artist:album:add](app-artist-album-add.md) | Credit an artist on an album with a role |
+| [app:artist:album:remove](app-artist-album-remove.md) | Remove every one of an artist's credits on an album |
+| [app:artist:album:role](app-artist-album-role.md) | Change the role of an artist's credit on an album |
 | [app:artist:cover:remove](app-artist-cover-remove.md) | Remove an artist cover and delete its image files |
 | [app:artist:cover:set](app-artist-cover-set.md) | Set or replace an artist cover from an image file in the container |
 | [app:artist:create](app-artist-create.md) | Create an artist, such as a performer to credit by hand |
+| [app:artist:song:add](app-artist-song-add.md) | Credit an artist on a song with a role |
+| [app:artist:song:remove](app-artist-song-remove.md) | Remove every one of an artist's credits on a song |
+| [app:artist:song:role](app-artist-song-role.md) | Change the role of an artist's credit on a song |
 | [app:artist:update](app-artist-update.md) | Change an artist's metadata, or lock and unlock its fields |
 | [app:genre:album:add](app-genre-album-add.md) | Assign a genre to an album |
 | [app:genre:album:remove](app-genre-album-remove.md) | Remove a genre from an album |
