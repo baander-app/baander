@@ -72,7 +72,7 @@ final class DeletePreviewHandlersTest extends TestCase
             ->willReturn(new LibraryMediaFileInspection($album->getLibraryId(), '/music', [
                 new LibraryMediaFileCheck('/music/inside.flac', LibraryMediaFileVerdict::Deletable),
                 new LibraryMediaFileCheck('/elsewhere/outside.flac', LibraryMediaFileVerdict::OutsideRoot),
-            ], false));
+            ], false, true));
 
         $preview = (new GetAlbumDeletePreviewHandler($albums, $songs, $this->createStub(PlaylistDeletionPreviewPortInterface::class), $files))(
             new GetAlbumDeletePreviewQuery($album->getPublicId()->toString(), deleteFiles: true),
@@ -123,7 +123,7 @@ final class DeletePreviewHandlersTest extends TestCase
             ->with($album->getLibraryId(), ['/music/song.flac'])
             ->willReturn(new LibraryMediaFileInspection($album->getLibraryId(), '/music', [
                 new LibraryMediaFileCheck('/music/song.flac', LibraryMediaFileVerdict::Deletable),
-            ], true));
+            ], true, true));
         $playlists = $this->createStub(PlaylistDeletionPreviewPortInterface::class);
         $playlists->method('findContainingSongs')->willReturn([]);
 

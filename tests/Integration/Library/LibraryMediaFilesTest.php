@@ -6,6 +6,7 @@ namespace App\Tests\Integration\Library;
 
 use App\Library\Application\Exception\LibraryMediaDirectoryNotWritableException;
 use App\Library\Application\Exception\LibraryMediaFileOutsideRootException;
+use App\Library\Application\Exception\LibraryRootUnavailableException;
 use App\Library\Application\Exception\LibraryScanAlreadyRunningException;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\MusicScanner;
@@ -118,6 +119,22 @@ final class LibraryMediaFilesTest extends TestCase
         self::assertSame([$first, $second], $this->indexedPaths($library));
     }
 
+    public function testAnUnavailableLibraryRootRefusesTheRequestAsAConflict(): void
+    {
+        [$library, $first, $second] = $this->scannedAlbum();
+        self::assertTrue(rename($this->base . '/library', $this->base . '/unmounted'));
+
+        try {
+            $this->files->prepareDeletion($library->getId(), [$first, $second]);
+            self::fail('An unavailable library root must refuse the deletion.');
+        } catch (LibraryRootUnavailableException $refusal) {
+            self::assertInstanceOf(ConflictException::class, $refusal);
+            self::assertSame(['reason' => 'library_root_unavailable', 'root' => $this->base . '/library'], $refusal->details);
+        }
+
+        self::assertSame([$first, $second], $this->indexedPaths($library));
+    }
+
     public function testADirectoryTheServerCannotWriteRefusesTheRequestAsAConflict(): void
     {
         [$library, $first, $second] = $this->scannedAlbum();
@@ -206,7 +223,7 @@ final class LibraryMediaFilesTest extends TestCase
     {
         $this->manager->getConnection()->rollBack();
         try {
-            $this->files->deleteIndexRows(new LibraryMediaFileInspection(new Uuid(), $this->base, [], false));
+            $this->files->deleteIndexRows(new LibraryMediaFileInspection(new Uuid(), $this->base, [], false, true));
             self::fail('Index rows must be deleted inside the caller transaction.');
         } catch (LogicException) {
         } finally {

@@ -55,6 +55,19 @@ final class MediaFileGuardTest extends TestCase
         self::assertFileDoesNotExist($song);
     }
 
+    /** Unmounted storage reads as every file missing; deleting their index rows would bring the songs back. */
+    public function testALibraryRootThatIsGoneRefusesTheDeletion(): void
+    {
+        $song = $this->file($this->root . '/Artist/Album/01.flac');
+        self::assertTrue(rename($this->root, $this->base . '/unmounted'));
+
+        $inspection = $this->inspect($this->root, [$song]);
+
+        self::assertFalse($inspection->rootAvailable);
+        self::assertSame([LibraryMediaFileVerdict::Missing], $this->verdicts($inspection));
+        self::assertFalse($inspection->allowsDeletion());
+    }
+
     public function testAPathOutsideTheRootIsRefused(): void
     {
         $inside = $this->file($this->root . '/Artist/Album/01.flac');

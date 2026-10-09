@@ -57,6 +57,35 @@ final class RegisterServerHandlerTest extends TestCase
         $this->assertSame($server, $result);
     }
 
+    /** A Docker service name may contain an underscore; the API's Url constraint accepts it too. */
+    public function testRegistersAServerWhoseHostNameHasAnUnderscore(): void
+    {
+        $server = ServerInstance::create(
+            serverUrl: 'http://baander_web:8080',
+            name: 'Compose Server',
+            version: '1.2.3',
+            apiKey: 'secret-key',
+        );
+
+        $this->serverPort->expects($this->once())
+            ->method('register')
+            ->with('http://baander_web:8080', 'Compose Server', '1.2.3', $this->anything())
+            ->willReturn($server);
+        $this->eventDispatcher->expects($this->once())->method('dispatch');
+
+        $this->assertSame($server, ($this->handler)(new RegisterServerCommand('http://baander_web:8080', 'Compose Server', '1.2.3')));
+    }
+
+    public function testRejectsAUrlWithoutAHostWithoutRegistering(): void
+    {
+        $this->serverPort->expects($this->never())->method('register');
+        $this->eventDispatcher->expects($this->never())->method('dispatch');
+
+        $this->expectException(InvalidInputException::class);
+
+        ($this->handler)(new RegisterServerCommand('https://', 'Home Server', '1.2.3'));
+    }
+
     public function testRejectsAMalformedUrlWithoutRegistering(): void
     {
         $this->serverPort->expects($this->never())->method('register');

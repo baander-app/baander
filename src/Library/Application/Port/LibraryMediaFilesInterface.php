@@ -44,7 +44,8 @@ interface LibraryMediaFilesInterface
      * @return LibraryMediaFileInspection a deletion that deleteIndexRows() and deleteFiles() carry out
      *
      * @throws NotFoundException     when no library has the ID
-     * @throws ConflictException     when a scan holds a live claim on the library, or the server
+     * @throws ConflictException     when a scan holds a live claim on the library, the library root is
+     *                               not an existing directory (unmounted storage), or the server
      *                               cannot write a directory that holds one of the files
      * @throws InvalidInputException when a path, or the file a symlink at it points to, lies outside the library root
      */

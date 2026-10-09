@@ -13,18 +13,21 @@ final readonly class LibraryMediaFileInspection
      * @param string                     $root           the library root's real path the files were checked against
      * @param list<LibraryMediaFileCheck> $files          one per distinct requested path, in request order
      * @param bool                       $scanInProgress a scan holds a live claim on the library
+     * @param bool                       $rootAvailable  the library root is an existing directory; when it is not
+     *                                                   (unmounted storage), every file reads as missing
      */
     public function __construct(
         public Uuid $libraryId,
         public string $root,
         public array $files,
         public bool $scanInProgress,
+        public bool $rootAvailable,
     ) {
     }
 
     public function allowsDeletion(): bool
     {
-        if ($this->scanInProgress) {
+        if ($this->scanInProgress || !$this->rootAvailable) {
             return false;
         }
 

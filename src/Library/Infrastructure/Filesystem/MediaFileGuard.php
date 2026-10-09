@@ -37,7 +37,7 @@ final class MediaFileGuard
             $files[] = $this->check($root, $path);
         }
 
-        return new LibraryMediaFileInspection($libraryId, $root, $files, $scanInProgress);
+        return new LibraryMediaFileInspection($libraryId, $root, $files, $scanInProgress, is_dir($root));
     }
 
     /**

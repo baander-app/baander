@@ -7,6 +7,7 @@ namespace App\Library\Infrastructure\Filesystem;
 use App\Library\Application\Exception\LibraryMediaDirectoryNotWritableException;
 use App\Library\Application\Exception\LibraryMediaFileOutsideRootException;
 use App\Library\Application\Exception\LibraryNotFoundException;
+use App\Library\Application\Exception\LibraryRootUnavailableException;
 use App\Library\Application\Exception\LibraryScanAlreadyRunningException;
 use App\Library\Application\Port\LibraryMediaFileCheck;
 use App\Library\Application\Port\LibraryMediaFileDeletionResult;
@@ -42,6 +43,10 @@ final readonly class LibraryMediaFiles implements LibraryMediaFilesInterface
 
         if ($inspection->scanInProgress) {
             throw LibraryScanAlreadyRunningException::forLibrary($library->getName());
+        }
+
+        if (!$inspection->rootAvailable) {
+            throw LibraryRootUnavailableException::forRoot($library->getPath()->toString());
         }
 
         $outside = $inspection->withVerdict(LibraryMediaFileVerdict::OutsideRoot);
