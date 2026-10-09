@@ -14,7 +14,10 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Throwable;
 
-/** Claims a library for a scan and queues the scan, for the admin panel. */
+/**
+ * Claims a library for a scan and queues the scan with the claim, for the admin panel. The claim
+ * of a queued scan that never runs lapses after the lease.
+ */
 final readonly class StartLibraryScanHandler
 {
     public function __construct(
@@ -30,16 +33,16 @@ final readonly class StartLibraryScanHandler
     #[AsMessageHandler]
     public function __invoke(StartLibraryScanCommand $command): Library
     {
-        $library = $this->claims->claim($command->library);
+        $claim = $this->claims->claim($command->library);
 
         try {
-            $this->bus->dispatch(new ScanLibraryCommand($library->getSlug(), $command->rescan));
+            $this->bus->dispatch(new ScanLibraryCommand($claim->library->getSlug(), $command->rescan, $claim->claimId));
         } catch (Throwable $exception) {
             // A scan that was never queued must not hold the claim.
-            $this->claims->release($library->getId()->toString());
+            $this->claims->end($claim->claimId);
             throw $exception;
         }
 
-        return $library;
+        return $claim->library;
     }
 }

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Library\Application;
 
+use App\Library\Application\Exception\LibraryScanClaimLostException;
 use App\Library\Application\Port\DirectoryScannerPortInterface;
 use App\Library\Application\Message\DiscoveredFile;
+use App\Library\Application\Service\LibraryScanLease;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\Repository\LibraryFileIndexRepositoryInterface;
 use App\Library\Infrastructure\Scanner\MediaFile;
@@ -29,17 +31,21 @@ final class MusicScanner
      * or changed files goes to $publishDirectory first and into the file index after, so a
      * directory whose publication failed is published again by the next scan. A cancelled
      * scan stops before its next directory and leaves the index of the remaining ones as it was.
+     * With a lease, the scan renews its claim after every file and before every write, so a
+     * scan that lost its claim stops before it publishes or indexes anything more.
      *
      * @param (Closure(string, array<DiscoveredFile>): void)|null $publishDirectory
      *
-     * @throws JobCancelledException when the job running the scan was cancelled
+     * @throws JobCancelledException         when the job running the scan was cancelled
+     * @throws LibraryScanClaimLostException when another scan took the claim over
      */
-    public function scan(Library $library, bool $rescan = false, ?Closure $publishDirectory = null): ScanResult
+    public function scan(Library $library, bool $rescan = false, ?Closure $publishDirectory = null, ?LibraryScanLease $lease = null): ScanResult
     {
         $filesProcessed = 0;
         $filesSkipped = 0;
 
         $mediaFiles = $this->directoryScanner->scan($library->getPath());
+        $lease?->renew();
         $audioFiles = array_filter($mediaFiles, fn (MediaFile $f) => $f->isAudio());
         $filesDiscovered = count($audioFiles);
 
@@ -67,10 +73,12 @@ final class MusicScanner
         foreach ($filesByDirectory as $dir => $files) {
             // Hashing reads every file, so a cancelled job stops before its next directory.
             $this->cancellation->check();
+            $lease?->renew();
 
             $discoveredFiles = [];
             foreach ($files as $file) {
                 $hash = hash_file('xxh3', $file->getAbsolutePath());
+                $lease?->renew();
                 if ($hash === false) {
                     $this->logger->warning('Failed to hash file', ['path' => $file->getAbsolutePath()]);
                     $filesSkipped++;
@@ -100,6 +108,7 @@ final class MusicScanner
                 continue;
             }
 
+            $lease?->renew();
             if ($publishDirectory !== null) {
                 $publishDirectory((string) $dir, $discoveredFiles);
             }
@@ -123,6 +132,7 @@ final class MusicScanner
         // Remove stale entries (files no longer on disk)
         foreach (array_keys($indexMap) as $indexedPath) {
             if (!isset($seenPaths[$indexedPath])) {
+                $lease?->renew();
                 $this->fileIndexRepository->removeByPath($library->getId(), $indexedPath);
             }
         }

@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 /*
- * Child process of LibraryScanClaimTest: claims a library for a scan over its own PostgreSQL
- * session, so it can wait on the row lock the test process holds.
+ * Child process of LibraryScanClaimTest: claims a library for a scan with a new claim ID over
+ * its own PostgreSQL session, so it can wait on the row lock the test process holds.
  *
  * Arguments: schema, application name, library ID. Prints the outcome as JSON.
  */
@@ -25,5 +25,5 @@ $connection = LibraryScanClaimRace::connect($schema, $application);
 $connection->executeStatement("SET lock_timeout = '10s'");
 
 echo json_encode([
-    'claimed' => LibraryScanClaimRace::repository(LibraryScanClaimRace::entityManager($connection))->claimScan(Uuid::fromString($libraryId)),
+    'claimed' => LibraryScanClaimRace::repository(LibraryScanClaimRace::entityManager($connection))->claimScan(Uuid::fromString($libraryId), new Uuid(), 900),
 ], JSON_THROW_ON_ERROR);

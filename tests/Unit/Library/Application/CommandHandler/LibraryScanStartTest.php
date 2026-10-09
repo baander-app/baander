@@ -9,47 +9,53 @@ use App\Library\Application\Command\ScanLibraryCommand;
 use App\Library\Application\Command\StartLibraryScanCommand;
 use App\Library\Application\CommandHandler\ScanAllLibrariesHandler;
 use App\Library\Application\CommandHandler\StartLibraryScanHandler;
+use App\Library\Application\DTO\LibraryScanClaim;
 use App\Library\Application\Exception\LibraryScanAlreadyRunningException;
 use App\Library\Application\Service\LibraryLookup;
 use App\Library\Application\Service\LibraryScanClaims;
 use App\Library\Domain\Model\Library;
-use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
-use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\FilesystemType;
+use App\Tests\Fixtures\Library\InMemoryLibraryRepository;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 
-/** The web starts scans through the claim and gives the claim back when it cannot queue the scan. */
+/** The web starts scans through the claim, hands the claim to the queued scan, and gives it back when it cannot queue the scan. */
 final class LibraryScanStartTest extends TestCase
 {
-    /** @var array<string, Library> */
-    private array $libraries = [];
-    /** @var array<string, bool> library ID => claimed */
-    private array $claims = [];
-    /** @var list<string> */
-    private array $released = [];
-    /** @var list<string> */
+    private MockClock $clock;
+    private InMemoryLibraryRepository $libraries;
+    /** @var list<ScanLibraryCommand> */
     private array $queued = [];
 
-    public function testAStartQueuesTheScanOfTheClaimedLibrary(): void
+    protected function setUp(): void
+    {
+        $this->clock = new MockClock('2026-10-08 12:00:00 UTC');
+        $this->libraries = new InMemoryLibraryRepository($this->clock);
+    }
+
+    public function testAStartQueuesTheScanOfTheClaimedLibraryWithItsClaim(): void
     {
         $music = $this->library('music');
 
         $started = (new StartLibraryScanHandler($this->claims(), $this->bus()))(new StartLibraryScanCommand('music', rescan: true));
 
         self::assertSame($music, $started);
-        self::assertSame(['music rescan'], $this->queued);
-        self::assertTrue($this->claims[$music->getId()->toString()]);
+        self::assertSame('scanning', $music->getDiscoveryStatus());
+        self::assertCount(1, $this->queued);
+        self::assertSame('music', $this->queued[0]->getLibrarySlug()->toString());
+        self::assertTrue($this->queued[0]->isRescan());
+        self::assertSame($this->libraries->claimOf($music), $this->queued[0]->getClaimId()?->toString());
     }
 
     public function testAStartOnAClaimedLibraryIsAConflictAndQueuesNothing(): void
     {
         $music = $this->library('music');
-        $this->claims[$music->getId()->toString()] = true;
+        $this->claims()->claim('music');
 
         try {
             (new StartLibraryScanHandler($this->claims(), $this->bus()))(new StartLibraryScanCommand($music->getId()->toString()));
@@ -70,56 +76,71 @@ final class LibraryScanStartTest extends TestCase
         } catch (\RuntimeException $failure) {
             self::assertSame('transport down', $failure->getMessage());
         }
-        self::assertSame([$music->getId()->toString()], $this->released);
+        self::assertNull($this->libraries->claimOf($music));
+        self::assertSame('failed', $music->getDiscoveryStatus());
     }
 
-    public function testScanAllSkipsClaimedLibrariesAndQueuesTheOthers(): void
+    public function testALostQueuedScanBlocksNewScansOnlyUntilItsLeaseLapses(): void
     {
-        $busy = $this->library('busy');
-        $this->library('idle');
-        $this->claims[$busy->getId()->toString()] = true;
+        $music = $this->library('music');
+        $start = new StartLibraryScanHandler($this->claims(), $this->bus());
+        // The queued scan is lost, say in a server restart; nothing renews or ends its claim.
+        $start(new StartLibraryScanCommand('music'));
+        $lost = $this->libraries->claimOf($music);
+
+        $this->clock->sleep(LibraryScanClaims::DEFAULT_LEASE_SECONDS - 1);
+        try {
+            $start(new StartLibraryScanCommand('music'));
+            self::fail('A live claim must refuse the start.');
+        } catch (LibraryScanAlreadyRunningException) {
+        }
+
+        $this->clock->sleep(1);
+        $start(new StartLibraryScanCommand('music'));
+
+        self::assertCount(2, $this->queued);
+        self::assertNotSame($lost, $this->libraries->claimOf($music));
+        self::assertSame($this->libraries->claimOf($music), $this->queued[1]->getClaimId()?->toString());
+    }
+
+    public function testScanAllSkipsClaimedLibrariesAndQueuesTheOthersWithTheirClaims(): void
+    {
+        $this->library('busy');
+        $idle = $this->library('idle');
+        $this->claims()->claim('busy');
 
         $result = (new ScanAllLibrariesHandler($this->claims(), $this->bus()))(new ScanAllLibrariesCommand());
 
-        self::assertSame(['idle'], array_map(static fn (Library $library): string => $library->getSlug()->toString(), $result->claimed));
+        self::assertSame(['idle'], array_map(static fn (LibraryScanClaim $claim): string => $claim->library->getSlug()->toString(), $result->claimed));
         self::assertSame(['busy'], array_map(static fn (Library $library): string => $library->getSlug()->toString(), $result->skipped));
-        self::assertSame(['idle'], $this->queued);
+        self::assertCount(1, $this->queued);
+        self::assertSame('idle', $this->queued[0]->getLibrarySlug()->toString());
+        self::assertSame($this->libraries->claimOf($idle), $this->queued[0]->getClaimId()?->toString());
+    }
+
+    public function testScanAllReleasesTheClaimsOfScansItCouldNotQueue(): void
+    {
+        $first = $this->library('first');
+        $second = $this->library('second');
+
+        try {
+            (new ScanAllLibrariesHandler($this->claims(), $this->bus(failing: true)))(new ScanAllLibrariesCommand());
+            self::fail('The queueing failure must propagate.');
+        } catch (\RuntimeException) {
+        }
+
+        self::assertNull($this->libraries->claimOf($first));
+        self::assertNull($this->libraries->claimOf($second));
     }
 
     private function library(string $slug): Library
     {
-        $library = Library::create(ucfirst($slug), new LibrarySlug($slug), new LibraryPath('/media/' . $slug), LibraryType::Music, FilesystemType::Local);
-        $this->libraries[$library->getId()->toString()] = $library;
-
-        return $library;
+        return $this->libraries->add(Library::create(ucfirst($slug), new LibrarySlug($slug), new LibraryPath('/media/' . $slug), LibraryType::Music, FilesystemType::Local));
     }
 
     private function claims(): LibraryScanClaims
     {
-        $repository = $this->createStub(LibraryRepositoryInterface::class);
-        $byId = fn (Uuid $id): ?Library => $this->libraries[$id->toString()] ?? null;
-        $repository->method('findVisibleByUuid')->willReturnCallback($byId);
-        $repository->method('findByUuid')->willReturnCallback($byId);
-        $repository->method('findVisibleBySlug')->willReturnCallback(fn (LibrarySlug $slug): ?Library => array_find(
-            $this->libraries,
-            static fn (Library $library): bool => $library->getSlug()->toString() === $slug->toString(),
-        ));
-        $repository->method('findAllOrdered')->willReturnCallback(fn (): array => array_values($this->libraries));
-        $repository->method('claimScan')->willReturnCallback(function (Uuid $id): bool {
-            if ($this->claims[$id->toString()] ?? false) {
-                return false;
-            }
-
-            return $this->claims[$id->toString()] = true;
-        });
-        $repository->method('releaseScanClaim')->willReturnCallback(function (Uuid $id): bool {
-            $this->released[] = $id->toString();
-            $this->claims[$id->toString()] = false;
-
-            return true;
-        });
-
-        return new LibraryScanClaims(new LibraryLookup($repository), $repository);
+        return new LibraryScanClaims(new LibraryLookup($this->libraries), $this->libraries, $this->clock);
     }
 
     private function bus(bool $failing = false): MessageBusInterface
@@ -130,7 +151,7 @@ final class LibraryScanStartTest extends TestCase
                 throw new \RuntimeException('transport down');
             }
             self::assertInstanceOf(ScanLibraryCommand::class, $message);
-            $this->queued[] = $message->getLibrarySlug()->toString() . ($message->isRescan() ? ' rescan' : '');
+            $this->queued[] = $message;
 
             return new Envelope($message);
         });

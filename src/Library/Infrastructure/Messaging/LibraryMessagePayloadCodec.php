@@ -15,7 +15,7 @@ use App\Shared\Domain\Model\Uuid;
 final readonly class LibraryMessagePayloadCodec implements MessagePayloadCodecInterface
 {
     private const array FIELDS = [
-        'library.scan' => ['library_slug', 'rescan'],
+        'library.scan' => ['library_slug', 'rescan', 'claim_id'],
         'library.files_discovered' => ['library_id', 'library_type', 'directory', 'files'],
     ];
 
@@ -35,7 +35,7 @@ final readonly class LibraryMessagePayloadCodec implements MessagePayloadCodecIn
     public function encode(object $message): array
     {
         return match (true) {
-            $message instanceof ScanLibraryCommand => [$message->getLibrarySlug()->toString(), $message->isRescan()],
+            $message instanceof ScanLibraryCommand => [$message->getLibrarySlug()->toString(), $message->isRescan(), $message->getClaimId()?->toString()],
             $message instanceof FilesDiscovered => [$message->libraryId->toString(), $message->libraryType, $message->directory, array_map(
                 static fn (DiscoveredFile $file): array => [
                     'absolute_path' => $file->absolutePath, 'relative_path' => $file->relativePath, 'extension' => $file->extension,
@@ -49,7 +49,11 @@ final readonly class LibraryMessagePayloadCodec implements MessagePayloadCodecIn
     public function decode(string $type, array $p): object
     {
         return match ($type) {
-            'library.scan' => new ScanLibraryCommand(new LibrarySlug($p['library_slug']), $p['rescan']),
+            'library.scan' => new ScanLibraryCommand(
+                new LibrarySlug($p['library_slug']),
+                $p['rescan'],
+                $p['claim_id'] === null ? null : Uuid::fromString($p['claim_id']),
+            ),
             'library.files_discovered' => new FilesDiscovered(Uuid::fromString($p['library_id']), $p['library_type'], $p['directory'], $this->decodeFiles($p['files'])),
             default => throw new \InvalidArgumentException('Unsupported message type.'),
         };

@@ -10,8 +10,8 @@ use App\Library\Domain\Model\Library;
 final readonly class LibraryScanClaimResult
 {
     /**
-     * @param list<Library> $claimed the libraries now claimed for a scan
-     * @param list<Library> $skipped the libraries a running scan already held
+     * @param list<LibraryScanClaim> $claimed the libraries now claimed for a scan, with their claims
+     * @param list<Library>          $skipped the libraries a live claim of another scan held
      */
     public function __construct(
         public array $claimed,

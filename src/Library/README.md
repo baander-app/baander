@@ -9,8 +9,8 @@ Media library definition and file-system scanning. Owns the concept of a "librar
 
 The `Library` aggregate represents a watched directory. Scanning is the core operation:
 
-1. `LibraryScanClaims` claims the library with one conditional update (`scan_status` becomes `scanning` only if no scan holds it); the web then queues `ScanLibraryCommand`, while `app:library:scan` runs it inline and releases the claim when the scan fails or is interrupted
-2. `ScanLibraryHandler` runs the discovery; completing or failing it ends the claim
+1. `LibraryScanClaims` claims the library with one conditional update that succeeds only while no live claim holds it. The claim is a lease (`scan_claim_id`, `scan_claim_expires_at`, 15 minutes by default) under a new claim ID; a lapsed claim is taken over. The web then queues `ScanLibraryCommand` with the claim ID, while `app:library:scan` runs it inline and ends the claim when the scan fails or is interrupted
+2. `ScanLibraryHandler` takes the claim for its claim ID (renewing it, or claiming the library again when the claim ended, as for a retried job) and stops with a conflict when another scan holds a live claim. The scanners renew the lease through `LibraryScanLease` at most once a minute; a scan that finds its claim gone stops. Completing or failing the scan ends the claim; a lapsed claim reads as `failed`
 3. `MusicScanner` walks the directory, reads audio metadata tags, creates Catalog entities via port interfaces
 4. `CoverArtExtractor` extracts embedded cover art and dispatches `ExtractAlbumCoverCommand` to Metadata
 

@@ -9,9 +9,11 @@ use App\Library\Application\CommandHandler\CreateLibraryHandler;
 use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Application\Port\LibraryProvisioningInterface;
 use App\Library\Application\Port\ProvisionedLibraryScan;
+use App\Library\Application\Service\LibraryScanClaims;
 use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
+use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\FilesystemType;
 
 final class LibraryProvisioner implements LibraryProvisioningInterface
@@ -19,6 +21,7 @@ final class LibraryProvisioner implements LibraryProvisioningInterface
     public function __construct(
         private readonly LibraryRepositoryInterface $libraryRepository,
         private readonly CreateLibraryHandler $createLibraryHandler,
+        private readonly LibraryScanClaims $claims,
         private readonly LibraryDiscovery $discovery,
         private readonly MovieScanner $movieScanner,
     ) {
@@ -58,11 +61,11 @@ final class LibraryProvisioner implements LibraryProvisioningInterface
         $library = $this->libraryRepository->findBySlug($slug)
             ?? throw new \RuntimeException(sprintf('Library with slug "%s" not found.', $slug->toString()));
 
-        // The regular scan keeps the library status, file index and scan event
-        // current without publishing FilesDiscovered, so workers never ingest the
-        // same files. A forced rescan then collects every directory, including
-        // unchanged files, for synchronous handling.
-        $this->discovery->discover($library, false);
+        // The regular scan, under its own claim, keeps the library status, file index
+        // and scan event current without publishing FilesDiscovered, so workers never
+        // ingest the same files. A forced rescan then collects every directory,
+        // including unchanged files, for synchronous handling.
+        $this->discovery->discover($library, false, $this->claims->acquire($library, new Uuid()));
         $scanResult = $this->movieScanner->scan($library, true);
 
         $discoveries = [];

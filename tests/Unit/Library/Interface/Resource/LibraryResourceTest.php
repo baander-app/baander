@@ -19,6 +19,7 @@ final class LibraryResourceTest extends TestCase
         ?string $name = null,
         ?LibraryType $type = null,
         ?\DateTimeImmutable $lastScan = null,
+        ?string $scanStatus = null,
     ): Library {
         $id = \App\Shared\Domain\Model\Uuid::v4();
         $now = new \DateTimeImmutable('2024-06-15T12:00:00+00:00');
@@ -32,7 +33,7 @@ final class LibraryResourceTest extends TestCase
             filesystemType: FilesystemType::Local,
             sortOrder: 2,
             lastScan: $lastScan,
-            discoveryStatus: null,
+            discoveryStatus: $scanStatus,
             createdAt: $now,
             updatedAt: $now,
         ));
@@ -85,8 +86,7 @@ final class LibraryResourceTest extends TestCase
 
     public function testFromWithScanStatus(): void
     {
-        $library = $this->createLibrary();
-        $library->markDiscoveryCompleted();
+        $library = $this->createLibrary(scanStatus: 'completed');
 
         $result = LibraryResource::from($library);
 

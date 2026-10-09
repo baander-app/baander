@@ -12,6 +12,11 @@ use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use InvalidArgumentException;
 
+/**
+ * A media library. Its discovery status and last scan time are read-only here: the scan claim
+ * (LibraryRepositoryInterface::claimScan() and the methods after it) sets them, so that
+ * concurrent scans and saves cannot overwrite each other's status.
+ */
 final class Library
 {
     private function __construct(
@@ -62,25 +67,6 @@ final class Library
             $this->state->sortOrder = $sortOrder;
         }
 
-        $this->state->updatedAt = new DateTimeImmutable();
-    }
-
-    public function markDiscoveryStarted(): void
-    {
-        $this->state->discoveryStatus = 'scanning';
-        $this->state->updatedAt = new DateTimeImmutable();
-    }
-
-    public function markDiscoveryCompleted(): void
-    {
-        $this->state->lastScan = new DateTimeImmutable();
-        $this->state->discoveryStatus = 'completed';
-        $this->state->updatedAt = new DateTimeImmutable();
-    }
-
-    public function markDiscoveryFailed(): void
-    {
-        $this->state->discoveryStatus = 'failed';
         $this->state->updatedAt = new DateTimeImmutable();
     }
 

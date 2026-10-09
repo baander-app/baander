@@ -20,6 +20,7 @@ make exec cmd="php bin/console app:library:update my-music --name='Music' --sort
 |--------|---------|-------------|
 | `--name` | — | The new name. Without the option, the name stays |
 | `--sort-order` | — | The new sort order; lower numbers come first. Without the option, the order stays |
+| `--json` | — | Print only the updated library in JSON, as the API's `data` returns it |
 
 ## Details
 
