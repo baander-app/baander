@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Shared\Infrastructure\EventListener;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
+use App\Shared\Application\Exception\ServiceUnavailableException;
 use App\Shared\Infrastructure\EventListener\ExceptionSubscriber;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -50,6 +51,7 @@ final class UseCaseOutcomeMappingTest extends TestCase
         yield 'not found' => [new NotFoundException('No library has the ID "music".'), Response::HTTP_NOT_FOUND];
         yield 'conflict' => [new ConflictException('A scan of "Music" is already running.'), Response::HTTP_CONFLICT];
         yield 'invalid input' => [new InvalidInputException('The cron expression "* *" is not valid.'), Response::HTTP_UNPROCESSABLE_ENTITY];
+        yield 'service unavailable' => [new ServiceUnavailableException('LRCLIB is not reachable; try again later.'), Response::HTTP_SERVICE_UNAVAILABLE];
     }
 
     #[DataProvider('outcomes')]

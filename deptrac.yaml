@@ -33,9 +33,9 @@ deptrac:
         Auth: ['Auth Domain', 'Auth Identity Contract', 'Auth User Identifier Contract', 'Auth Device Approval Event Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
         Catalog: ['Catalog Song Lookup Contract', 'Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Resources', 'Catalog Interface']
         Filesystem: ['Filesystem Infrastructure', 'Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
-        Library: ['Library Read Scope Contract', 'Library Content Stats Contract', 'Library Files Discovered Contract', 'Library Provisioning Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
+        Library: ['Library Read Scope Contract', 'Library Content Stats Contract', 'Library Files Discovered Contract', 'Library Provisioning Contract', 'Library Media Files Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
         Lyrics: ['Lyrics Fetch Request Contract', 'Lyrics Domain', 'Lyrics Application', 'Lyrics Infrastructure', 'Lyrics Resources', 'Lyrics Interface']
-        Media: ['Media Domain', 'Media Application', 'Media Infrastructure', 'Media Resources', 'Media Interface']
+        Media: ['Media Image Contract', 'Media Domain', 'Media Application', 'Media Infrastructure', 'Media Resources', 'Media Interface']
         Metadata: ['Metadata Album Sync Request Contract', 'Metadata Domain', 'Metadata Application', 'Metadata Infrastructure', 'Metadata Interface']
         Notification: ['Notification Domain', 'Notification Application', 'Notification Infrastructure', 'Notification Resources', 'Notification Interface']
         Party: ['Party Domain', 'Party Application', 'Party Infrastructure', 'Party Resources', 'Party Interface']
@@ -218,10 +218,20 @@ deptrac:
     # =============================================
     # Filesystem (utility context, non-standard layers)
     # =============================================
-    - name: 'Filesystem Application'
+    - name: 'Filesystem MIME Contract'
       collectors:
         - type: classLike
-          value: '^App\\Filesystem\\Application\\'
+          value: '^App\\Filesystem\\Application\\Port\\MimeDetectorPortInterface$'
+
+    - name: 'Filesystem Application'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Filesystem\\Application\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Filesystem\\Application\\Port\\MimeDetectorPortInterface$'
 
     - name: 'Filesystem Command'
       collectors:
@@ -266,6 +276,11 @@ deptrac:
         - type: classLike
           value: '^App\\Library\\Application\\Port\\(LibraryProvisioningInterface|ProvisionedLibraryScan)$'
 
+    - name: 'Library Media Files Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Library\\Application\\Port\\LibraryMediaFilesInterface$'
+
     - name: 'Library Application'
       collectors:
         - type: bool
@@ -281,6 +296,8 @@ deptrac:
               value: '^App\\Library\\Application\\Message\\(FilesDiscovered|DiscoveredFile)$'
             - type: classLike
               value: '^App\\Library\\Application\\Port\\(LibraryProvisioningInterface|ProvisionedLibraryScan)$'
+            - type: classLike
+              value: '^App\\Library\\Application\\Port\\LibraryMediaFilesInterface$'
 
     - name: 'Library Infrastructure'
       collectors:
@@ -318,15 +335,30 @@ deptrac:
     # =============================================
     # Media
     # =============================================
-    - name: 'Media Domain'
+    - name: 'Media Image Contract'
       collectors:
         - type: classLike
-          value: '^App\\Media\\Domain\\'
+          value: '^App\\Media\\(Application\\Port\\(ImagePortInterface|StoragePortInterface)|Domain\\Model\\(Image|ImageState|StoredFile)|Domain\\ReadModel\\ImageReadView)$'
+
+    - name: 'Media Domain'
+      collectors:
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Media\\Domain\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Media\\(Application\\Port\\(ImagePortInterface|StoragePortInterface)|Domain\\Model\\(Image|ImageState|StoredFile)|Domain\\ReadModel\\ImageReadView)$'
 
     - name: 'Media Application'
       collectors:
-        - type: classLike
-          value: '^App\\Media\\Application\\'
+        - type: bool
+          must:
+            - type: classLike
+              value: '^App\\Media\\Application\\'
+          must_not:
+            - type: classLike
+              value: '^App\\Media\\(Application\\Port\\(ImagePortInterface|StoragePortInterface)|Domain\\Model\\(Image|ImageState|StoredFile)|Domain\\ReadModel\\ImageReadView)$'
 
     - name: 'Media Infrastructure'
       collectors:
@@ -998,6 +1030,10 @@ deptrac:
     'Catalog Domain':
       - 'Shared Domain'
     'Catalog Application':
+      - 'Media Image Contract'
+      - 'Filesystem MIME Contract'
+      - 'Playlist Deletion Preview Contract'
+      - 'Library Media Files Contract'
       - 'Lyrics Fetch Request Contract'
       - 'Metadata Album Sync Request Contract'
       - 'Library Files Discovered Contract'
@@ -1031,7 +1067,10 @@ deptrac:
       - 'Shared Interface'
 
     # --- Filesystem (utility) ---
+    'Filesystem MIME Contract':
+      - 'Shared Domain'
     'Filesystem Application':
+      - 'Filesystem MIME Contract'
       - 'Shared Domain'
     'Filesystem Command':
       - 'Filesystem Application'
@@ -1055,7 +1094,10 @@ deptrac:
       - 'Library Files Discovered Contract'
     'Library Domain':
       - 'Shared Domain'
+    'Library Media Files Contract':
+      - 'Shared Domain'
     'Library Application':
+      - 'Library Media Files Contract'
       - 'Library Files Discovered Contract'
       - 'Library Provisioning Contract'
       - 'Library Read Scope Contract'
@@ -1063,6 +1105,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Library Infrastructure':
+      - 'Library Media Files Contract'
       - 'Library Files Discovered Contract'
       - 'Library Content Stats Contract'
       - 'Auth Identity Contract'
@@ -1099,14 +1142,19 @@ deptrac:
       - 'Shared Infrastructure'
 
     # --- Media ---
+    'Media Image Contract':
+      - 'Shared Domain'
     'Media Domain':
+      - 'Media Image Contract'
       - 'Shared Domain'
     'Media Application':
+      - 'Media Image Contract'
       - 'Scheduler Schedulable Contract'
       - 'Media Domain'
       - 'Shared Domain'
       - 'Shared Application'
     'Media Infrastructure':
+      - 'Media Image Contract'
       - 'Auth Identity Contract'
       - 'Library Read Scope Contract'
       - 'Shared Application'
@@ -1115,12 +1163,14 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Infrastructure'
     'Media Resources':
+      - 'Media Image Contract'
       - 'Media Application'
       - 'Shared Application'
       - 'Media Domain'
       - 'Shared Domain'
       - 'Shared Interface'
     'Media Interface':
+      - 'Media Image Contract'
       - 'Transcode Audio Rendition Contract'
       - 'Media Resources'
       - 'Media Application'
@@ -1366,6 +1416,7 @@ deptrac:
       - 'Discovery Application'
       - 'Discovery Domain'
       - 'Shared Domain'
+      - 'Shared Application'
       - 'Shared Interface'
 
     # --- Favorites ---
