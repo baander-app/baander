@@ -363,6 +363,59 @@ final class AlbumTest extends TestCase
         $this->assertSame('Single', $album->getType());
     }
 
+    /** @return iterable<string, array{string, array<string, string|int>}> */
+    public static function everyLockableField(): iterable
+    {
+        yield 'title' => ['title', ['title' => 'New']];
+        yield 'type' => ['type', ['type' => 'EP']];
+        yield 'year' => ['year', ['year' => 2001]];
+        yield 'label' => ['label', ['label' => 'Parlophone']];
+        yield 'catalogNumber' => ['catalogNumber', ['catalogNumber' => 'PCS 7088']];
+        yield 'barcode' => ['barcode', ['barcode' => '0077774644624']];
+        yield 'country' => ['country', ['country' => 'GB']];
+        yield 'language' => ['language', ['language' => 'eng']];
+        yield 'disambiguation' => ['disambiguation', ['disambiguation' => 'remaster']];
+        yield 'annotation' => ['annotation', ['annotation' => 'note']];
+    }
+
+    /** @param array<string, string|int> $change */
+    #[\PHPUnit\Framework\Attributes\DataProvider('everyLockableField')]
+    public function testUpdateMetadataRejectsAChangeToAnyLockedField(string $field, array $change): void
+    {
+        $album = Album::create(Uuid::v4(), 'Test', 'Album');
+        $album->lockField($field);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(sprintf('Field "%s" is locked and cannot be updated.', $field));
+
+        $album->updateMetadata(...$change);
+    }
+
+    public function testARejectedUpdateChangesNoField(): void
+    {
+        $album = Album::create(Uuid::v4(), 'Test', 'Album');
+        $album->lockField('label');
+
+        try {
+            $album->updateMetadata(title: 'New', label: 'Parlophone');
+            self::fail('The locked label was changed.');
+        } catch (InvalidArgumentException) {
+        }
+
+        $this->assertSame('Test', $album->getTitle());
+        $this->assertNull($album->getLabel());
+    }
+
+    public function testUnlockingAnUnknownFieldIsRejected(): void
+    {
+        $album = Album::create(Uuid::v4(), 'Test', 'Album');
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Cannot unlock unknown field "colour".');
+
+        $album->unlockField('colour');
+    }
+
     public function testGettersReturnExpectedTypes(): void
     {
         $album = Album::create(Uuid::v4(), 'Test', 'Album');

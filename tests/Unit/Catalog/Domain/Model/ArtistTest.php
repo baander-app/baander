@@ -289,6 +289,43 @@ final class ArtistTest extends TestCase
         $artist->updateMetadata(name: 'New Name');
     }
 
+    /** @return iterable<string, array{string, array<string, mixed>}> */
+    public static function everyLockableField(): iterable
+    {
+        yield 'name' => ['name', ['name' => 'New']];
+        yield 'country' => ['country', ['country' => 'GB']];
+        yield 'gender' => ['gender', ['gender' => 'female']];
+        yield 'type' => ['type', ['type' => 'Group']];
+        yield 'lifeSpanBegin' => ['lifeSpanBegin', ['lifeSpanBegin' => new \DateTimeImmutable('1960-01-01')]];
+        yield 'lifeSpanEnd' => ['lifeSpanEnd', ['lifeSpanEnd' => new \DateTimeImmutable('1970-01-01')]];
+        yield 'disambiguation' => ['disambiguation', ['disambiguation' => 'UK band']];
+        yield 'sortName' => ['sortName', ['sortName' => 'Beatles, The']];
+        yield 'biography' => ['biography', ['biography' => 'Formed in Liverpool.']];
+    }
+
+    /** @param array<string, mixed> $change */
+    #[\PHPUnit\Framework\Attributes\DataProvider('everyLockableField')]
+    public function testUpdateMetadataRejectsAChangeToAnyLockedField(string $field, array $change): void
+    {
+        $artist = Artist::create('Test');
+        $artist->lockField($field);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage(sprintf('Field "%s" is locked and cannot be updated.', $field));
+
+        $artist->updateMetadata(...$change);
+    }
+
+    public function testUnlockingAnUnknownFieldIsRejected(): void
+    {
+        $artist = Artist::create('Test');
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Cannot unlock unknown field "colour".');
+
+        $artist->unlockField('colour');
+    }
+
     public function testUpdateMetadataAllowsUnlockedFieldWhenNameIsLocked(): void
     {
         $artist = Artist::create('Test');

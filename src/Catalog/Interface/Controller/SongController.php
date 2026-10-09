@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Controller;
 
+use App\Catalog\Application\Command\Song\UpdateSongCommand;
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Application\Port\SongSortField;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
@@ -15,6 +16,7 @@ use App\Shared\Domain\Model\Cursor;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Infrastructure\Pagination\CursorCodec;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Attribute\CliParityExemption;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
@@ -26,6 +28,8 @@ use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[OA\Tag(name: 'Catalog', description: 'Album, artist, song, movie, and genre management endpoints')]
@@ -39,6 +43,7 @@ final class SongController
         private readonly SongPortInterface $songService,
         private readonly LibraryReadScopeProviderInterface $libraryReadScopeProvider,
         private readonly CursorCodec $cursorCodec,
+        private readonly MessageBusInterface $bus,
     ) {
     }
 
@@ -162,40 +167,21 @@ final class SongController
         ],
     )]
     #[Route('/{publicId}', name: 'update', methods: ['PATCH'])]
-    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
+    #[CliCounterpart('app:song:update')]
     public function update(string $publicId, #[MapRequestPayload] UpdateSongRequest $payload): JsonResponse
     {
-        try {
-            $resolvedPublicId = PublicId::fromString($publicId);
-        } catch (\Throwable) {
-            return $this->errorResponse($this->trans('errors.invalid_public_id'));
-        }
-
-        $song = $this->songService->findByPublicId($resolvedPublicId);
-
-        if ($song === null) {
-            return $this->notFound();
-        }
-
-        try {
-            $song->updateMetadata(
-                title: $payload->title,
-                track: $payload->track,
-                disc: $payload->disc,
-                year: $payload->year,
-                comment: $payload->comment,
-                lyrics: $payload->lyrics,
-                explicit: $payload->explicit,
-            );
-        } catch (\InvalidArgumentException) {
-            return $this->errorResponse($this->trans('errors.invalid_input'), 422);
-        }
-
-        if ($payload->lockedFields !== null) {
-            $this->syncLockedFields($song, $payload->lockedFields);
-        }
-
-        $this->songService->save($song);
+        $song = $this->dispatch(new UpdateSongCommand(
+            publicId: $publicId,
+            title: $payload->title,
+            track: $payload->track,
+            disc: $payload->disc,
+            year: $payload->year,
+            comment: $payload->comment,
+            lyrics: $payload->lyrics,
+            explicit: $payload->explicit,
+            lockedFields: $payload->lockedFields,
+        ));
+        assert($song instanceof Song);
 
         $artistNames = $this->songService->getArtistNamesForSongs([$song->getId()]);
         $albumTitles = $this->songService->getAlbumTitlesByIds([$song->getAlbumId()]);
@@ -291,27 +277,9 @@ final class SongController
         return $options;
     }
 
-    /**
-     * Reconcile the aggregate's locked fields with the requested list.
-     *
-     * @param string[] $requestedFields
-     */
-    private function syncLockedFields(Song $song, array $requestedFields): void
+    /** A handler's exception reaches ExceptionSubscriber, which unwraps it to its 404 or 422 response. */
+    private function dispatch(object $message): mixed
     {
-        $current = $song->getLockedFields();
-
-        // Lock fields that are in the request but not yet locked
-        foreach ($requestedFields as $field) {
-            if (!in_array($field, $current, true)) {
-                $song->lockField($field);
-            }
-        }
-
-        // Unlock fields that are currently locked but not in the request
-        foreach ($current as $field) {
-            if (!in_array($field, $requestedFields, true)) {
-                $song->unlockField($field);
-            }
-        }
+        return $this->bus->dispatch($message)->last(HandledStamp::class)?->getResult();
     }
 }

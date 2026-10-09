@@ -109,39 +109,26 @@ final class ArtistMetadataEnricher
             return EnrichmentResult::noMatch($source, $quality);
         }
 
-        $updatedFields = [];
-
-        // Apply metadata fields
-        $artist->updateMetadata(
-            name: ($forceUpdate && $data['name'] !== null) ? $data['name'] : null,
-            country: ($forceUpdate || $artist->getCountry() === null) ? ($data['country'] ?? null) : null,
-            gender: null, // Not reliably available from current APIs
-            type: ($forceUpdate || $artist->getType() === null) ? ($data['type'] ?? null) : null,
-            lifeSpanBegin: ($forceUpdate || $artist->getLifeSpanBegin() === null) ? $this->parseDate($data['lifeSpanBegin'] ?? null) : null,
-            lifeSpanEnd: ($forceUpdate || $artist->getLifeSpanEnd() === null) ? $this->parseDate($data['lifeSpanEnd'] ?? null) : null,
-            disambiguation: ($forceUpdate || $artist->getDisambiguation() === null) ? ($data['disambiguation'] ?? null) : null,
-            sortName: ($forceUpdate || $artist->getSortName() === null) ? ($data['sortName'] ?? null) : null,
-            biography: ($forceUpdate || $artist->getBiography() === null) ? ($data['profile'] ?? null) : null,
+        // A field the operator locked keeps its value; enrichment applies the others.
+        $candidates = [
+            'name' => $forceUpdate ? ($data['name'] ?? null) : null,
+            'country' => ($forceUpdate || $artist->getCountry() === null) ? ($data['country'] ?? null) : null,
+            'type' => ($forceUpdate || $artist->getType() === null) ? ($data['type'] ?? null) : null,
+            'disambiguation' => ($forceUpdate || $artist->getDisambiguation() === null) ? ($data['disambiguation'] ?? null) : null,
+            'sortName' => ($forceUpdate || $artist->getSortName() === null) ? ($data['sortName'] ?? null) : null,
+            'biography' => ($forceUpdate || $artist->getBiography() === null) ? ($data['profile'] ?? null) : null,
+            'lifeSpanBegin' => ($forceUpdate || $artist->getLifeSpanBegin() === null) ? $this->parseDate($data['lifeSpanBegin'] ?? null) : null,
+            'lifeSpanEnd' => ($forceUpdate || $artist->getLifeSpanEnd() === null) ? $this->parseDate($data['lifeSpanEnd'] ?? null) : null,
+        ];
+        $changes = array_filter(
+            $candidates,
+            static fn (mixed $value, string $field): bool => $value !== null && $value !== '' && !$artist->isFieldLocked($field),
+            ARRAY_FILTER_USE_BOTH,
         );
 
-        // Determine which fields actually changed by comparing before/after
-        // Since updateMetadata only sets non-null values, we can check which were set
-        $fieldsMap = [
-            'name' => $data['name'],
-            'country' => $data['country'],
-            'type' => $data['type'],
-            'disambiguation' => $data['disambiguation'],
-            'sortName' => $data['sortName'],
-            'biography' => $data['profile'],
-            'lifeSpanBegin' => $data['lifeSpanBegin'],
-            'lifeSpanEnd' => $data['lifeSpanEnd'],
-        ];
-
-        foreach ($fieldsMap as $field => $value) {
-            if ($value !== null && $value !== '') {
-                $updatedFields[] = $field;
-            }
-        }
+        // Gender is not reliably available from the current providers.
+        $artist->updateMetadata(...$changes);
+        $updatedFields = array_keys($changes);
 
         // Apply identifiers
         if (!empty($data['mbid']) && ($forceUpdate || $artist->getMbid() === null)) {

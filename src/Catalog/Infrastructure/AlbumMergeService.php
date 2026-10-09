@@ -107,6 +107,11 @@ final class AlbumMergeService implements AlbumMergePortInterface
         $updateData = [];
 
         foreach ($fields as $field => $getter) {
+            // A field the target has locked keeps its value, even when that value is empty.
+            if ($target->isFieldLocked($field)) {
+                continue;
+            }
+
             $targetValue = $target->{$getter}();
             $sourceValue = $source->{$getter}();
 

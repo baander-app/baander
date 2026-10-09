@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Controller;
 
+use App\Catalog\Application\Command\Artist\CreateArtistCommand;
+use App\Catalog\Application\Command\Artist\UpdateArtistCommand;
 use App\Catalog\Application\Port\ArtistPortInterface;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Catalog\Domain\Model\Artist;
@@ -18,6 +20,7 @@ use App\Media\Application\Port\ImagePortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Attribute\CliParityExemption;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
@@ -26,7 +29,10 @@ use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -40,6 +46,7 @@ final class ArtistController
         private readonly ArtistPortInterface $artistService,
         private readonly LibraryReadScopeProviderInterface $libraryReadScopeProvider,
         private readonly ImagePortInterface $imagePort,
+        private readonly MessageBusInterface $bus,
     ) {
     }
 
@@ -68,26 +75,20 @@ final class ArtistController
     )]
     #[Route('/', name: 'store', methods: ['POST'])]
     #[IsGranted('ROLE_ADMIN')]
-    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
+    #[CliCounterpart('app:artist:create')]
     public function store(#[MapRequestPayload] CreateArtistRequest $payload): JsonResponse
     {
-        try {
-            $artist = Artist::create(
-                name: $payload->name,
-                country: $payload->country,
-                gender: $payload->gender,
-                type: $payload->type,
-                disambiguation: $payload->disambiguation,
-                sortName: $payload->sortName,
-                biography: $payload->biography,
-            );
-        } catch (\InvalidArgumentException) {
-            return $this->errorResponse($this->trans('errors.invalid_input'), 422);
-        }
+        $artist = $this->dispatch(new CreateArtistCommand(
+            name: $payload->name,
+            country: $payload->country,
+            gender: $payload->gender,
+            type: $payload->type,
+            disambiguation: $payload->disambiguation,
+            sortName: $payload->sortName,
+            biography: $payload->biography,
+        ));
 
-        $this->artistService->save($artist);
-
-        return $this->created(ArtistResource::from($artist));
+        return $this->successResponse(ArtistResource::from($artist), Response::HTTP_CREATED);
     }
 
     /**
@@ -225,40 +226,20 @@ final class ArtistController
     )]
     #[Route('/{publicId}', name: 'update', methods: ['PATCH'])]
     #[IsGranted('ROLE_ADMIN')]
-    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
+    #[CliCounterpart('app:artist:update')]
     public function update(string $publicId, #[MapRequestPayload] UpdateArtistRequest $payload): JsonResponse
     {
-        try {
-            $resolvedPublicId = PublicId::fromString($publicId);
-        } catch (\Throwable) {
-            return $this->errorResponse($this->trans('errors.invalid_public_id'));
-        }
-
-        $artist = $this->artistService->findByPublicId($resolvedPublicId);
-
-        if ($artist === null) {
-            return $this->notFound();
-        }
-
-        try {
-            $artist->updateMetadata(
-                name: $payload->name,
-                country: $payload->country,
-                gender: $payload->gender,
-                type: $payload->type,
-                disambiguation: $payload->disambiguation,
-                sortName: $payload->sortName,
-                biography: $payload->biography,
-            );
-        } catch (\InvalidArgumentException) {
-            return $this->errorResponse($this->trans('errors.invalid_input'), 422);
-        }
-
-        if ($payload->lockedFields !== null) {
-            $this->syncLockedFields($artist, $payload->lockedFields);
-        }
-
-        $this->artistService->save($artist);
+        $artist = $this->dispatch(new UpdateArtistCommand(
+            publicId: $publicId,
+            name: $payload->name,
+            country: $payload->country,
+            gender: $payload->gender,
+            type: $payload->type,
+            disambiguation: $payload->disambiguation,
+            sortName: $payload->sortName,
+            biography: $payload->biography,
+            lockedFields: $payload->lockedFields,
+        ));
 
         return $this->successResponse(ArtistResource::from($artist));
     }
@@ -553,26 +534,10 @@ final class ArtistController
         return $this->noContent();
     }
 
-    /**
-     * Reconcile the aggregate's locked fields with the requested list.
-     *
-     * @param string[] $requestedFields
-     */
-    private function syncLockedFields(Artist $artist, array $requestedFields): void
+    /** A handler's exception reaches ExceptionSubscriber, which unwraps it to its 404 or 422 response. */
+    private function dispatch(object $message): mixed
     {
-        $current = $artist->getLockedFields();
-
-        foreach ($requestedFields as $field) {
-            if (!in_array($field, $current, true)) {
-                $artist->lockField($field);
-            }
-        }
-
-        foreach ($current as $field) {
-            if (!in_array($field, $requestedFields, true)) {
-                $artist->unlockField($field);
-            }
-        }
+        return $this->bus->dispatch($message)->last(HandledStamp::class)?->getResult();
     }
 
     private function resolveArtist(string $publicId): ?Artist

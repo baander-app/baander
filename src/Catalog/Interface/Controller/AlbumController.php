@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Interface\Controller;
 
+use App\Catalog\Application\Command\Album\UpdateAlbumCommand;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Catalog\Application\Port\AlbumDuplicatePortInterface;
@@ -30,6 +31,8 @@ use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 use Throwable;
 
@@ -47,6 +50,7 @@ final class AlbumController
         private readonly ImagePortInterface $imagePort,
         private readonly AlbumDuplicatePortInterface $duplicatePort,
         private readonly AlbumMergePortInterface $mergePort,
+        private readonly MessageBusInterface $bus,
     )
     {
     }
@@ -336,43 +340,23 @@ final class AlbumController
         ],
     )]
     #[Route('/{publicId}', name: 'update', methods: ['PATCH'])]
-    #[CliParityExemption(CliParityExemption::DEFERRED_CATALOG_PLAYER_ACTION)]
+    #[CliCounterpart('app:album:update')]
     public function update(string $publicId, #[MapRequestPayload] UpdateAlbumRequest $payload): JsonResponse
     {
-        try {
-            $resolvedPublicId = PublicId::fromString($publicId);
-        } catch (Throwable) {
-            return $this->errorResponse($this->trans('errors.invalid_public_id'));
-        }
-
-        $album = $this->albumService->findByPublicId($resolvedPublicId);
-
-        if ($album === null) {
-            return $this->notFound();
-        }
-
-        try {
-            $album->updateMetadata(
-                title: $payload->title,
-                type: $payload->type,
-                year: $payload->year,
-                label: $payload->label,
-                catalogNumber: $payload->catalogNumber,
-                barcode: $payload->barcode,
-                country: $payload->country,
-                language: $payload->language,
-                disambiguation: $payload->disambiguation,
-                annotation: $payload->annotation,
-            );
-        } catch (InvalidArgumentException) {
-            return $this->errorResponse($this->trans('errors.invalid_input'), 422);
-        }
-
-        if ($payload->lockedFields !== null) {
-            $this->syncLockedFields($album, $payload->lockedFields);
-        }
-
-        $this->albumService->save($album);
+        $album = $this->dispatch(new UpdateAlbumCommand(
+            publicId: $publicId,
+            title: $payload->title,
+            type: $payload->type,
+            year: $payload->year,
+            label: $payload->label,
+            catalogNumber: $payload->catalogNumber,
+            barcode: $payload->barcode,
+            country: $payload->country,
+            language: $payload->language,
+            disambiguation: $payload->disambiguation,
+            annotation: $payload->annotation,
+            lockedFields: $payload->lockedFields,
+        ));
 
         return $this->successResponse(AlbumResource::from($album));
     }
@@ -460,25 +444,9 @@ final class AlbumController
         return $this->noContent();
     }
 
-    /**
-     * Reconcile the aggregate's locked fields with the requested list.
-     *
-     * @param string[] $requestedFields
-     */
-    private function syncLockedFields(Album $album, array $requestedFields): void
+    /** A handler's exception reaches ExceptionSubscriber, which unwraps it to its 404 or 422 response. */
+    private function dispatch(object $message): mixed
     {
-        $current = $album->getLockedFields();
-
-        foreach ($requestedFields as $field) {
-            if (!in_array($field, $current, true)) {
-                $album->lockField($field);
-            }
-        }
-
-        foreach ($current as $field) {
-            if (!in_array($field, $requestedFields, true)) {
-                $album->unlockField($field);
-            }
-        }
+        return $this->bus->dispatch($message)->last(HandledStamp::class)?->getResult();
     }
 }
