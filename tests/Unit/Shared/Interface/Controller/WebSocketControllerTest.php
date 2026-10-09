@@ -368,17 +368,32 @@ final class WebSocketControllerTest extends TestCase
 
     // --- Room join/leave ---
 
-    public function testRoomJoinStoresMembership(): void
+    public function testRoomJoinOfAnUnknownRoomIsRefusedAndLogged(): void
     {
-        $this->controller->onOpen(1, 'user-1');
+        $logger = new RefusalRecordingLogger();
+        $controller = new WebSocketController($this->registry, $this->pusher, $this->bus, new JsonEncoder(), $this->listeningSessions, null, $logger);
+        $controller->onOpen(1, 'user-1');
 
-        $this->controller->onMessage(1, json_encode([
-            'type' => 'room.join',
-            'room' => 'notifications:user-1',
-        ]));
+        $controller->onMessage(1, json_encode(['type' => 'room.join', 'room' => 'notifications:user-1'], JSON_THROW_ON_ERROR));
 
-        $this->assertSame([1], $this->registry->getRoomMembers('notifications:user-1'));
-        $this->assertLastPushMatches(1, 'room.joined', ['room' => 'notifications:user-1']);
+        $this->assertLastPushMatches(1, 'error', ['message' => 'Unknown room']);
+        self::assertSame([], $this->registry->getRoomMembers('notifications:user-1'));
+        self::assertSame([['WebSocket room join refused', 'notifications:user-1']], $logger->warnings);
+    }
+
+    /** A party room carries the party's broadcasts, so only party.join, which checks membership, adds a connection to it. */
+    public function testRoomJoinOfAPartyRoomIsRefusedSoANonMemberGetsNoPartyBroadcasts(): void
+    {
+        $sessionId = '01900000-0000-7000-8000-000000000002';
+        $this->controller->onOpen(1, '01900000-0000-7000-8000-000000000009');
+
+        $this->controller->onMessage(1, json_encode(['type' => 'room.join', 'room' => 'party:' . $sessionId], JSON_THROW_ON_ERROR));
+
+        $this->assertLastPushMatches(1, 'error', ['message' => 'Party rooms are joined with party.join']);
+        self::assertSame([], $this->registry->getRoomMembers('party:' . $sessionId));
+        $this->pushedMessages = [];
+        $this->pusher->broadcast('party:' . $sessionId, ['type' => 'party.member_event']);
+        self::assertSame([], $this->pushedMessages);
     }
 
     public function testRoomJoinWithoutRoomFieldSendsError(): void
@@ -393,18 +408,15 @@ final class WebSocketControllerTest extends TestCase
     public function testRoomLeaveRemovesMembership(): void
     {
         $this->controller->onOpen(1, 'user-1');
-        $this->controller->onMessage(1, json_encode([
-            'type' => 'room.join',
-            'room' => 'notifications:user-1',
-        ]));
+        $this->registry->joinRoom('party:01900000-0000-7000-8000-000000000002', 1);
 
         $this->controller->onMessage(1, json_encode([
             'type' => 'room.leave',
-            'room' => 'notifications:user-1',
+            'room' => 'party:01900000-0000-7000-8000-000000000002',
         ]));
 
-        $this->assertSame([], $this->registry->getRoomMembers('notifications:user-1'));
-        $this->assertLastPushMatches(1, 'room.left', ['room' => 'notifications:user-1']);
+        $this->assertSame([], $this->registry->getRoomMembers('party:01900000-0000-7000-8000-000000000002'));
+        $this->assertLastPushMatches(1, 'room.left', ['room' => 'party:01900000-0000-7000-8000-000000000002']);
     }
 
     public function testRoomLeaveNotJoinedDoesNotCrash(): void
@@ -795,29 +807,6 @@ final class WebSocketControllerTest extends TestCase
         self::assertNotNull($this->registry->getConnection(1));
     }
 
-    public function testRoomJoinTheRegistryRefusesSendsAnErrorAndRecordsNoMembership(): void
-    {
-        $this->controller->onOpen(1, 'user-1');
-        self::fillTable($this->registryTable('roomMembers'), ['joined_at' => 0]);
-
-        $this->controller->onMessage(1, json_encode(['type' => 'room.join', 'room' => 'room:full'], JSON_THROW_ON_ERROR));
-
-        $this->assertLastPushMatches(1, 'error', ['message' => 'Room limit reached; try again later']);
-        self::assertSame([], $this->registry->getRoomMembers('room:full'));
-        self::assertSame([], $this->closedConnections);
-    }
-
-    public function testRoomJoinWithANameTooLongForTheRegistrySendsAnError(): void
-    {
-        $this->controller->onOpen(1, 'user-1');
-        $room = str_repeat('r', WebSocketConnectionRegistry::MAX_ROOM_NAME_BYTES + 1);
-
-        $this->controller->onMessage(1, json_encode(['type' => 'room.join', 'room' => $room], JSON_THROW_ON_ERROR));
-
-        $this->assertLastPushMatches(1, 'error', ['message' => 'room.join "room" may be at most 52 bytes long']);
-        self::assertSame([], $this->registry->getRoomMembers($room));
-    }
-
     public function testPartyJoinTheRegistryRefusesSendsAnErrorInsteadOfJoined(): void
     {
         $sessionId = '01900000-0000-7000-8000-000000000002';
@@ -882,4 +871,17 @@ final class WebSocketControllerTest extends TestCase
         self::assertNull($this->registry->getConnection($fd));
     }
 
+}
+
+final class RefusalRecordingLogger extends \Psr\Log\AbstractLogger
+{
+    /** @var list<array{string, mixed}> */
+    public array $warnings = [];
+
+    public function log($level, \Stringable|string $message, array $context = []): void
+    {
+        if ($level === \Psr\Log\LogLevel::WARNING) {
+            $this->warnings[] = [(string) $message, $context['room'] ?? null];
+        }
+    }
 }

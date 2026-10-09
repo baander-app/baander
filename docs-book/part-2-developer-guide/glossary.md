@@ -28,7 +28,7 @@ Terms used throughout the developer documentation.
 | **PGroonga** | A PostgreSQL extension for fast full-text search, used by the `PgroongaSearchTrait` in repositories. |
 | **Port Pattern** | The canonical dependency inversion pattern in Baander. Application ports define interfaces; infrastructure implements them; controllers depend on ports. |
 | **Process Pool** | A Swoole-managed pool of worker processes used for CPU-bound tasks like FFmpeg transcoding. |
-| **WebSocket** | Bidirectional real-time communication and Baander's only real-time transport: room messaging, watch-party and listening-session sync, and server pushes to a user's connections. |
+| **WebSocket** | Bidirectional real-time communication and Baander's only real-time transport: watch-party sync and member events, listening-session sync, and server pushes to a user's connections. |
 
 ## Data Types
 

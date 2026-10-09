@@ -18,6 +18,7 @@ use App\Shared\Infrastructure\Swoole\ReconnectionTokenService;
 use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
 use App\Shared\Infrastructure\Swoole\WebSocketPusher;
 use App\Shared\Infrastructure\Swoole\WebSocketRegistrationRefused;
+use App\Shared\Interface\WebSocket\WebSocketRoomPolicy;
 use App\Transcode\Application\Command\UpdateTranscodePositionCommand;
 use InvalidArgumentException;
 use Psr\Log\LoggerInterface;
@@ -275,23 +276,15 @@ final class WebSocketController extends AbstractWebSocketController
             return;
         }
 
-        if (strlen($room) > WebSocketConnectionRegistry::MAX_ROOM_NAME_BYTES) {
-            $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
-                'message' => sprintf('room.join "room" may be at most %d bytes long', WebSocketConnectionRegistry::MAX_ROOM_NAME_BYTES),
-            ]);
-
-            return;
-        }
-
-        if (!$this->joinBroadcastRoom($fd, $userId, $room)) {
-            return;
-        }
-        $this->logger?->debug('Room joined', ['fd' => $fd, 'userId' => $userId, 'room' => $room]);
-
+        // A room's members receive its broadcasts, so no room is joined by name:
+        // WebSocketRoomPolicy lists the rooms and the message that joins each.
+        $refusal = WebSocketRoomPolicy::clientJoinRefusal($room);
+        $this->logger?->warning('WebSocket room join refused', [
+            'fd' => $fd, 'userId' => $userId, 'room' => $room, 'reason' => $refusal,
+        ]);
         $this->pusher->pushToConnection($fd, [
-            'type' => 'room.joined',
-            'room' => $room,
+            'type'    => 'error',
+            'message' => $refusal,
         ]);
     }
 
@@ -369,7 +362,7 @@ final class WebSocketController extends AbstractWebSocketController
         // Add to Swoole Table room for broadcasting. A refused membership keeps the
         // party membership: the user may already be a member through another
         // connection, so leaving the party here could remove that membership.
-        $room = sprintf('party:%s', $sessionId);
+        $room = WebSocketRoomPolicy::partyRoom($sessionId);
         if (!$this->joinBroadcastRoom($fd, $userId, $room)) {
             return;
         }
@@ -437,7 +430,7 @@ final class WebSocketController extends AbstractWebSocketController
         }
 
         // Remove from Swoole Table room
-        $room = sprintf('party:%s', $sessionId);
+        $room = WebSocketRoomPolicy::partyRoom($sessionId);
         $this->registry->leaveRoom($room, $fd);
         $this->logger?->info('Party left', ['fd' => $fd, 'userId' => $userId, 'sessionId' => $sessionId]);
 
