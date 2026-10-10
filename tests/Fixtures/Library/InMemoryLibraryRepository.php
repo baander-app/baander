@@ -8,22 +8,24 @@ use App\Library\Domain\Model\Library;
 use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
-use App\Library\Domain\ValueObject\ScanClaimRelease;
+use App\Library\Domain\ValueObject\LibraryClaimAttempt;
+use App\Library\Domain\ValueObject\LibraryClaimKind;
+use App\Library\Domain\ValueObject\LibraryClaimRelease;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use DateTimeImmutable;
 use Psr\Clock\ClockInterface;
 
 /**
- * Libraries and their scan claims in memory, with leases that lapse on the given clock, for
- * unit tests of the claim and scan use cases. LibraryScanClaimTest checks the same rules
+ * Libraries and their scan and delete claims in memory, with leases that lapse on the given
+ * clock, for unit tests of the claim and scan use cases. LibraryScanClaimTest checks the same rules
  * against the production repository on PostgreSQL.
  */
 final class InMemoryLibraryRepository implements LibraryRepositoryInterface
 {
     /** @var array<string, Library> */
     private array $libraries = [];
-    /** @var array<string, array{claim: string, expiresAt: DateTimeImmutable}> library ID => claim */
+    /** @var array<string, array{claim: string, kind: LibraryClaimKind, expiresAt: DateTimeImmutable}> library ID => claim */
     private array $claims = [];
     /** @var list<string> every claim statement, in order, for assertions */
     public array $log = [];
@@ -102,24 +104,17 @@ final class InMemoryLibraryRepository implements LibraryRepositoryInterface
         unset($this->libraries[$library->getId()->toString()], $this->claims[$library->getId()->toString()]);
     }
 
-    public function claimScan(Uuid $libraryId, Uuid $claimId, int $leaseSeconds): bool
+    public function claimScan(Uuid $libraryId, Uuid $claimId, int $leaseSeconds): LibraryClaimAttempt
     {
-        $id = $libraryId->toString();
-        $held = $this->claims[$id] ?? null;
-        if (!isset($this->libraries[$id]) || ($held !== null && $held['claim'] !== $claimId->toString() && !$this->lapsed($held))) {
-            $this->log[] = 'refused ' . $this->slug($id);
-
-            return false;
-        }
-
-        $this->claims[$id] = ['claim' => $claimId->toString(), 'expiresAt' => $this->clock->now()->modify(sprintf('+%d seconds', $leaseSeconds))];
-        $this->libraries[$id]->getState()->discoveryStatus = 'scanning';
-        $this->log[] = 'claimed ' . $this->slug($id);
-
-        return true;
+        return $this->claim($libraryId, $claimId, $leaseSeconds, LibraryClaimKind::Scan);
     }
 
-    public function renewScanClaim(Uuid $claimId, int $leaseSeconds): bool
+    public function claimDelete(Uuid $libraryId, Uuid $claimId, int $leaseSeconds): LibraryClaimAttempt
+    {
+        return $this->claim($libraryId, $claimId, $leaseSeconds, LibraryClaimKind::Delete);
+    }
+
+    public function renewClaim(Uuid $claimId, int $leaseSeconds): bool
     {
         $id = $this->holder($claimId);
         if ($id === null) {
@@ -135,7 +130,7 @@ final class InMemoryLibraryRepository implements LibraryRepositoryInterface
 
     public function endScanClaim(Uuid $claimId, bool $completed): bool
     {
-        $id = $this->holder($claimId);
+        $id = $this->holder($claimId, LibraryClaimKind::Scan);
         if ($id === null) {
             $this->log[] = 'end refused';
 
@@ -152,39 +147,80 @@ final class InMemoryLibraryRepository implements LibraryRepositoryInterface
         return true;
     }
 
-    public function releaseScanClaim(Uuid $libraryId, bool $evenIfLive): ScanClaimRelease
+    public function endDeleteClaim(Uuid $claimId): bool
+    {
+        $id = $this->holder($claimId, LibraryClaimKind::Delete);
+        if ($id === null) {
+            $this->log[] = 'end refused';
+
+            return false;
+        }
+        unset($this->claims[$id]);
+        $this->log[] = 'deleted from ' . $this->slug($id);
+
+        return true;
+    }
+
+    public function releaseClaim(Uuid $libraryId, bool $evenIfLive): LibraryClaimRelease
     {
         $id = $libraryId->toString();
         $held = $this->claims[$id] ?? null;
         if ($held === null) {
-            return ScanClaimRelease::NoClaim;
+            return LibraryClaimRelease::noClaim();
         }
         if (!$evenIfLive && !$this->lapsed($held)) {
-            return ScanClaimRelease::Live;
+            return LibraryClaimRelease::live($held['kind']);
         }
         unset($this->claims[$id]);
-        $this->libraries[$id]->getState()->discoveryStatus = 'failed';
+        if ($held['kind'] === LibraryClaimKind::Scan) {
+            $this->libraries[$id]->getState()->discoveryStatus = 'failed';
+        }
         $this->log[] = 'released ' . $this->slug($id);
 
-        return ScanClaimRelease::Released;
+        return LibraryClaimRelease::released($held['kind']);
     }
 
-    public function hasLiveScanClaim(Uuid $libraryId): bool
+    public function liveClaimKind(Uuid $libraryId): ?LibraryClaimKind
     {
         $held = $this->claims[$libraryId->toString()] ?? null;
 
-        return $held !== null && !$this->lapsed($held);
+        return $held !== null && !$this->lapsed($held) ? $held['kind'] : null;
     }
 
-    /** @param array{claim: string, expiresAt: DateTimeImmutable} $claim */
+    private function claim(Uuid $libraryId, Uuid $claimId, int $leaseSeconds, LibraryClaimKind $kind): LibraryClaimAttempt
+    {
+        $id = $libraryId->toString();
+        if (!isset($this->libraries[$id])) {
+            return LibraryClaimAttempt::noLibrary();
+        }
+        $held = $this->claims[$id] ?? null;
+        if ($held !== null && $held['claim'] !== $claimId->toString() && !$this->lapsed($held)) {
+            $this->log[] = 'refused ' . $this->slug($id);
+
+            return LibraryClaimAttempt::heldBy($held['kind']);
+        }
+
+        $this->claims[$id] = ['claim' => $claimId->toString(), 'kind' => $kind, 'expiresAt' => $this->clock->now()->modify(sprintf('+%d seconds', $leaseSeconds))];
+        $state = $this->libraries[$id]->getState();
+        if ($kind === LibraryClaimKind::Scan) {
+            $state->discoveryStatus = 'scanning';
+        } elseif ($held !== null && $held['kind'] === LibraryClaimKind::Scan) {
+            $state->discoveryStatus = 'failed';
+        }
+        $this->log[] = ($kind === LibraryClaimKind::Scan ? 'claimed ' : 'claimed for a delete ') . $this->slug($id);
+
+        return LibraryClaimAttempt::claimed();
+    }
+
+    /** @param array{claim: string, kind: LibraryClaimKind, expiresAt: DateTimeImmutable} $claim */
     private function lapsed(array $claim): bool
     {
         return $claim['expiresAt'] <= $this->clock->now();
     }
 
-    private function holder(Uuid $claimId): ?string
+    private function holder(Uuid $claimId, ?LibraryClaimKind $kind = null): ?string
     {
-        $id = array_find_key($this->claims, static fn (array $claim): bool => $claim['claim'] === $claimId->toString());
+        $id = array_find_key($this->claims, static fn (array $claim): bool => $claim['claim'] === $claimId->toString() && ($kind === null || $claim['kind'] === $kind));
 
         return is_string($id) ? $id : null;
     }

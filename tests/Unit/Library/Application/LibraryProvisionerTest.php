@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Library\Application;
 
 use App\Library\Application\CommandHandler\CreateLibraryHandler;
-use App\Library\Application\Exception\LibraryScanAlreadyRunningException;
+use App\Library\Application\Exception\LibraryBusyException;
 use App\Library\Application\LibraryDiscovery;
 use App\Library\Application\LibraryProvisioner;
 use App\Library\Application\MovieScanner;
@@ -97,7 +97,7 @@ final class LibraryProvisionerTest extends TestCase
         $provisioner->provisionMovieLibrary('E2E Test Movies', 'e2e-test-movies', $this->directory);
         (new LibraryScanClaims(new LibraryLookup($libraries), $libraries, $clock))->claim('e2e-test-movies');
 
-        $this->expectException(LibraryScanAlreadyRunningException::class);
+        $this->expectException(LibraryBusyException::class);
         $provisioner->scanExistingLibrary('e2e-test-movies');
     }
 

@@ -6,6 +6,7 @@ namespace App\Tests\Functional\Library;
 
 use App\Auth\Domain\Model\User;
 use App\Library\Application\Port\LibraryAccessPortInterface;
+use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Library\Application\Port\LibraryPortInterface;
 use App\Library\Application\Query\LibraryMembershipQueryPort;
 use App\Library\Domain\Event\LibraryScanCompleted;
@@ -13,14 +14,14 @@ use App\Library\Domain\Model\Library;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Notification\Application\DTO\CreateNotificationCommand;
 use App\Notification\Domain\Repository\NotificationRepositoryInterface;
+use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
+use App\UserPreference\Application\Port\UserSettingsContractInterface;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
-use Symfony\Component\HttpKernel\Event\RequestEvent;
-use Symfony\Component\HttpKernel\KernelEvents;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\Messenger\MessageBusInterface;
 
@@ -197,6 +198,27 @@ final class LibraryAdministrationTest extends TestCase
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries/' . $library['id'] . '/scan', $admin), 202);
     }
 
+    public function testReleaseNamesADeleteClaimAndEndsItWithoutTouchingTheScanStatus(): void
+    {
+        $admin = $this->createAdminUser();
+        $library = $this->createThroughApi('deleting-' . bin2hex(random_bytes(3)), $admin);
+        $status = $this->library($library['slug'])->getDiscoveryStatus();
+        $this->service(LibraryMediaFilesInterface::class)->claim(Uuid::fromString($library['id']));
+
+        // The delete's claim is live, so it may still be unlinking files: --release alone refuses.
+        $refused = $this->command('app:library:scan');
+        self::assertSame(Command::FAILURE, $refused->execute(['library' => $library['slug'], '--release' => true]));
+        self::assertStringContainsString('A delete with files holds a live claim', self::flat($refused->getDisplay()));
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries/' . $library['id'] . '/scan', $admin), 409);
+
+        $this->lapseClaim($library['id']);
+        $release = $this->command('app:library:scan');
+        self::assertSame(Command::SUCCESS, $release->execute(['library' => $library['slug'], '--release' => true]), $release->getDisplay());
+        self::assertStringContainsString('Released the delete claim', self::flat($release->getDisplay()));
+        self::assertSame($status, $this->library($library['slug'])->getDiscoveryStatus());
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries/' . $library['id'] . '/scan', $admin), 202);
+    }
+
     public function testScanAllSkipsLibrariesAlreadyScanningAndReportsTheOnesItStarted(): void
     {
         $admin = $this->createAdminUser();
@@ -278,32 +300,41 @@ final class LibraryAdministrationTest extends TestCase
         self::assertSame(array_diff_key($patched, ['updatedAt' => true]), array_diff_key($updated, ['updatedAt' => true]));
     }
 
-    public function testLibraryErrorsAreReportedInTheRequestLocale(): void
+    public function testLibraryErrorsAreReportedInTheUsersLanguageElseTheAcceptLanguageElseEnglish(): void
     {
         $admin = $this->createAdminUser();
         $library = $this->createThroughApi('locale-' . bin2hex(random_bytes(3)), $admin);
         $missing = Uuid::v7()->toString();
         $duplicate = ['name' => 'Again', 'path' => $this->directory, 'type' => 'music', 'slug' => $library['slug']];
 
-        $english = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries', $admin, $duplicate), 409);
+        // No saved choice: the browser's language when it is one Baander speaks, else English.
+        $english = $this->assertJsonResponse($this->requestIn('POST', '/api/libraries', $admin, 'fr-FR,fr;q=0.9', $duplicate), 409);
         self::assertSame(sprintf('A library with the slug "%s" already exists.', $library['slug']), $english['error']['message']);
-        $english = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/libraries/' . $missing, $admin), 404);
+        $english = $this->assertJsonResponse($this->requestIn('GET', '/api/libraries/' . $missing, $admin, null), 404);
         self::assertSame(sprintf('Library "%s" not found.', $missing), $english['error']['message']);
+        $thai = $this->assertJsonResponse($this->requestIn('GET', '/api/libraries/' . $missing, $admin, 'th'), 404);
+        self::assertSame(sprintf('ไม่พบไลบรารี "%s"', $missing), $thai['error']['message']);
 
-        // The app's LocaleListener (priority 240) hands the request locale to the translator.
-        $events = $this->service(EventDispatcherInterface::class);
-        $danish = static fn (RequestEvent $event) => $event->getRequest()->setLocale('da');
-        $events->addListener(KernelEvents::REQUEST, $danish, 250);
-        try {
-            $conflict = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries', $admin, $duplicate), 409);
-            $notFound = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/libraries/' . $missing, $admin), 404);
-        } finally {
-            $events->removeListener(KernelEvents::REQUEST, $danish);
-        }
+        // A saved choice wins over the browser's language.
+        $this->service(UserSettingsContractInterface::class)->set($admin->getId()->toString(), 'language', 'da');
+        $conflict = $this->assertJsonResponse($this->requestIn('POST', '/api/libraries', $admin, 'th', $duplicate), 409);
+        $notFound = $this->assertJsonResponse($this->requestIn('GET', '/api/libraries/' . $missing, $admin, 'th'), 404);
 
         self::assertSame(sprintf('Et bibliotek med slug "%s" findes allerede.', $library['slug']), $conflict['error']['message']);
         self::assertSame(['reason' => 'slug_exists'], $conflict['error']['details']);
         self::assertSame(sprintf('Biblioteket "%s" blev ikke fundet.', $missing), $notFound['error']['message']);
+    }
+
+    /** @param array<string, mixed> $content */
+    private function requestIn(string $method, string $uri, User $user, ?string $acceptLanguage, array $content = []): Response
+    {
+        $server = ['CONTENT_TYPE' => 'application/json', BaanderHeader::TestUserId->serverKey() => $user->getId()->toString()];
+        if ($acceptLanguage !== null) {
+            $server['HTTP_ACCEPT_LANGUAGE'] = $acceptLanguage;
+        }
+        $this->client->request($method, $uri, server: $server, content: $content === [] ? null : json_encode($content, JSON_THROW_ON_ERROR));
+
+        return $this->client->getResponse();
     }
 
     /** @return array<string, mixed> the created LibraryResource */
@@ -329,7 +360,7 @@ final class LibraryAdministrationTest extends TestCase
     private function lapseClaim(string $libraryId): void
     {
         self::assertSame(1, $this->entityManager->getConnection()->executeStatement(
-            "UPDATE libraries SET scan_claim_expires_at = clock_timestamp() - interval '1 second' WHERE id = ? AND scan_claim_id IS NOT NULL",
+            "UPDATE libraries SET claim_expires_at = clock_timestamp() - interval '1 second' WHERE id = ? AND claim_id IS NOT NULL",
             [$libraryId],
         ));
         // The update bypassed the unit of work, which the test client's requests share.

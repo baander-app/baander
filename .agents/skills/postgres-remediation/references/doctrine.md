@@ -135,6 +135,12 @@ Unit of Work; check stale managed state before adding selective clear/refresh.
 [Doctrine ORM 3.6 object lifecycle](https://www.doctrine-project.org/projects/doctrine-orm/en/3.6/reference/working-with-objects.html)
 explains these boundaries.
 
+`LibraryRepository` claims a library in one statement (a `SELECT … FOR UPDATE`
+CTE feeding a conditional `UPDATE`), so a refused claimant reads the winner's
+claim kind from the same locked row, and `releaseClaim()` uses PostgreSQL 18
+`RETURNING old.<column>` to report what it released. Verified on PostgreSQL 18
+by the two-session races in `tests/Integration/LibraryScanClaimTest.php`.
+
 For example, [AccessTokenRepository](../../../../src/Auth/Infrastructure/Repository/OAuth/AccessTokenRepository.php)
 honors `save(..., false)` and clears after bulk revocation. Preserve the flush
 parameter. A flush inside an outer transaction is not a commit; do not publish

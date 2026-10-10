@@ -42,16 +42,18 @@ With `--delete-files`, every song file is checked before anything changes. The c
 
 - a file, or the file a symlink points to, lies outside the album's library root (exit code 2);
 - the server cannot write a directory that holds a file (exit code 1);
-- a scan of the library is running (exit code 1);
+- a scan, or another delete with files, holds the library (exit code 1);
 - the library folder is not available, such as unmounted storage (exit code 1).
 
-The album, its songs and the songs' file index entries are then deleted together, and the files are unlinked after that. A symlink is removed as a link; its target stays. The result lists the files removed, the files that were already missing, and the files left on disk with the reason. A file left on disk has no index entry, so the next library scan imports it again. When any file is left, the command exits with code 1 although the catalog rows are gone.
+The album, its songs and the songs' file index entries are then deleted together, and the files are unlinked after that. A symlink is removed as a link; its target stays. The result lists the files removed, the files that were already missing, and the files left on disk with the reason (`outside_root`, `unlink_failed` or `claim_lost`). A file left on disk has no index entry, so the next library scan imports it again. When any file is left, the command exits with code 1 although the catalog rows are gone.
+
+A delete with `--delete-files` holds the album's library from the first check until it ends, so no scan indexes the files it removes. A scan started meanwhile, from the web or with [app:library:scan](app-library-scan.md), is refused with reason `library_busy` naming the delete. The library's scan status and last scan time stay as they were. The delete releases the library when it ends, also when it fails or SIGINT or SIGTERM interrupts it; an interrupted delete exits with 128 plus the signal number. The hold is a 15-minute lease that the delete renews while it unlinks. A process killed outright leaves it to lapse, or `app:library:scan <library> --release --force` releases it. A delete that went past its lease without renewing it, while a scan or another delete took the library over, stops unlinking and lists the remaining files as left with `claim_lost`. A delete that finds the lapsed hold of a scan that died takes the library over and marks that scan failed.
 
 Without `--delete-files` the audio files stay on disk and keep their index entries, so an incremental scan does not import them again until they change.
 
 The cover image record, file and derived files are deleted after the album, unless `--keep-cover` is given.
 
-`--dry-run` shows the album, its song count and file size, the cover, and the playlists that lose songs. With `--delete-files` it also lists the verdict for each file (`deletable`, `missing`, `outside_root` or `directory_not_writable`) and whether a scan holds the library. It needs no `--force`.
+`--dry-run` shows the album, its song count and file size, the cover, and the playlists that lose songs. With `--delete-files` it also lists the verdict for each file (`deletable`, `missing`, `outside_root` or `directory_not_writable`) and whether a scan or another delete holds the library. It needs no `--force`.
 
 To delete one song, use [app:song:delete](app-song-delete.md).
 
@@ -60,5 +62,6 @@ To delete one song, use [app:song:delete](app-song-delete.md).
 | Code | Meaning |
 |------|---------|
 | 0 | Album deleted, or the preview printed |
-| 1 | No album has the public ID, a scan holds the library, the library folder is not available, the server cannot write a song directory, a file was left on disk, the operator declined, or another error occurred; the message says why |
+| 1 | No album has the public ID, a scan or another delete holds the library, the library folder is not available, the server cannot write a song directory, a file was left on disk, the operator declined, or another error occurred; the message says why |
 | 2 | The public ID is malformed, a song file lies outside the library root, `--delete-files` was given without `--force`, or no terminal is attached and `--force` was not given; nothing was deleted |
+| 130, 143 | SIGINT or SIGTERM interrupted the delete; it released the library |

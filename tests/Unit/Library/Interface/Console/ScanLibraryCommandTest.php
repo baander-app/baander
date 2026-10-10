@@ -12,10 +12,11 @@ use App\Library\Application\Command\ScanLibraryCommand as ScanLibraryCommandMess
 use App\Library\Application\DTO\LibraryScanClaim;
 use App\Library\Application\DTO\LibraryScanClaimResult;
 use App\Library\Application\DTO\LibraryScanSummary;
-use App\Library\Application\Exception\LibraryScanAlreadyRunningException;
+use App\Library\Application\Exception\LibraryBusyException;
 use App\Library\Application\Exception\LibraryScanClaimLiveException;
 use App\Library\Application\Query\GetLibraryQuery;
 use App\Library\Domain\Model\Library;
+use App\Library\Domain\ValueObject\LibraryClaimKind;
 use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
@@ -43,6 +44,8 @@ final class ScanLibraryCommandTest extends TestCase
     private array $claimed = [];
     /** @var list<string> the libraries whose claims the command ended */
     private array $released = [];
+    /** The kind of the claim the release stub finds. */
+    private LibraryClaimKind $claimKind = LibraryClaimKind::Scan;
     /** @var list<ReleaseLibraryScanClaimCommand> */
     private array $releaseRequests = [];
     /** @var list<string> */
@@ -189,7 +192,19 @@ final class ScanLibraryCommandTest extends TestCase
         self::assertSame(Command::SUCCESS, $tester->execute(['library' => 'music', '--release' => true, '--force' => true]));
 
         self::assertTrue($this->releaseRequests[0]->force);
-        self::assertStringContainsString('Released the scan claim of "music"', $this->display($tester));
+        self::assertStringContainsString('Released the scan claim of "music" and marked its scan failed.', $this->display($tester));
+    }
+
+    public function testReleaseNamesADeleteClaimItRefusesOrReleases(): void
+    {
+        $this->claimKind = LibraryClaimKind::Delete;
+        $tester = $this->tester([], fn () => self::fail('Nothing may scan.'), liveClaim: true);
+
+        self::assertSame(Command::FAILURE, $tester->execute(['library' => 'music', '--release' => true]));
+        self::assertStringContainsString('A delete with files holds a live claim on the library "Music"', $this->display($tester));
+
+        self::assertSame(Command::SUCCESS, $tester->execute(['library' => 'music', '--release' => true, '--force' => true]));
+        self::assertStringContainsString('Released the delete claim of "music"; its scan status is unchanged.', $this->display($tester));
     }
 
     public function testJsonPrintsTheScannedLibraryAsTheApiRendersIt(): void
@@ -237,7 +252,7 @@ final class ScanLibraryCommandTest extends TestCase
         $bus->method('dispatch')->willReturnCallback(function (object $message) use ($claims, $skipped, $conflict, $liveClaim): Envelope {
             $result = match (true) {
                 $message instanceof ClaimLibraryScanCommand => $conflict
-                    ? throw LibraryScanAlreadyRunningException::forLibrary('Music')
+                    ? throw LibraryBusyException::heldBy('Music', LibraryClaimKind::Scan)
                     : $claims[0],
                 $message instanceof ClaimAllLibraryScansCommand => new LibraryScanClaimResult($claims, $skipped),
                 $message instanceof EndLibraryScanClaimCommand => $this->released[] = $this->claimed[$message->claimId]->getSlug()->toString(),
@@ -263,14 +278,14 @@ final class ScanLibraryCommandTest extends TestCase
         return new CommandTester($this->command);
     }
 
-    private function release(ReleaseLibraryScanClaimCommand $message, bool $liveClaim): bool
+    private function release(ReleaseLibraryScanClaimCommand $message, bool $liveClaim): ?string
     {
         $this->releaseRequests[] = $message;
         if ($liveClaim && !$message->force) {
-            throw LibraryScanClaimLiveException::forLibrary('Music');
+            throw LibraryScanClaimLiveException::heldBy('Music', $this->claimKind);
         }
 
-        return $liveClaim;
+        return $liveClaim ? $this->claimKind->value : null;
     }
 
     private function claim(Library $library): LibraryScanClaim

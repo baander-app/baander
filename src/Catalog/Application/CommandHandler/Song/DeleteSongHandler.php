@@ -17,8 +17,10 @@ use App\Shared\Application\Port\TransactionPortInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
- * Deletes a song. With its file, the path is checked before anything changes; the song and its
- * file index row go in one transaction, and the file is unlinked after the commit.
+ * Deletes a song. With its file, the delete claims the song's library first, so no scan runs
+ * until it ends, and releases the claim however it ends; the path is checked before anything
+ * changes; the song and its file index row go in one transaction, and the file is unlinked after
+ * the commit.
  */
 final readonly class DeleteSongHandler
 {
@@ -33,7 +35,7 @@ final readonly class DeleteSongHandler
     /**
      * @throws InvalidInputException when the public ID is malformed, or the file lies outside the library root
      * @throws NotFoundException     when no song has the public ID
-     * @throws ConflictException     with the file, when a scan holds the library or the server cannot write the song's directory
+     * @throws ConflictException     with the file, when a scan or another delete holds the library or the server cannot write the song's directory
      */
     #[AsMessageHandler]
     public function __invoke(DeleteSongCommand $command): CatalogDeletionResult
@@ -41,24 +43,31 @@ final readonly class DeleteSongHandler
         $song = $this->songs->findByPublicId(CatalogInput::publicId($command->publicId))
             ?? throw new NotFoundException(sprintf('Song "%s" not found.', $command->publicId));
 
-        $deletion = null;
+        $claim = null;
         if ($command->deleteFile) {
             // songs.album_id is a non-null foreign key, so a song's album exists while the song does.
             $album = $this->albums->findByUuid($song->getAlbumId())
                 ?? throw new NotFoundException(sprintf('The album of song "%s" was not found.', $command->publicId));
-            $deletion = $this->mediaFiles->prepareDeletion($album->getLibraryId(), [$song->getPath()]);
+            $claim = $this->mediaFiles->claim($album->getLibraryId());
         }
 
-        $this->transaction->run(function () use ($song, $deletion): void {
-            $this->songs->delete($song);
-            if ($deletion !== null) {
-                $this->mediaFiles->deleteIndexRows($deletion);
-            }
-        });
+        try {
+            $deletion = $claim !== null ? $this->mediaFiles->prepareDeletion($claim, [$song->getPath()]) : null;
 
-        return CatalogDeletionResult::of(
-            ['songs' => 1],
-            $deletion !== null ? $this->mediaFiles->deleteFiles($deletion) : null,
-        );
+            $this->transaction->run(function () use ($song, $deletion): void {
+                $this->songs->delete($song);
+                if ($deletion !== null) {
+                    $this->mediaFiles->deleteIndexRows($deletion);
+                }
+            });
+
+            $files = $claim !== null && $deletion !== null ? $this->mediaFiles->deleteFiles($claim, $deletion) : null;
+        } finally {
+            if ($claim !== null) {
+                $this->mediaFiles->release($claim);
+            }
+        }
+
+        return CatalogDeletionResult::of(['songs' => 1], $files);
     }
 }

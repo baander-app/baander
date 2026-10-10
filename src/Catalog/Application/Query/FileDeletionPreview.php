@@ -29,7 +29,7 @@ final readonly class FileDeletionPreview
     {
         return new self(
             $inspection->allowsDeletion(),
-            $inspection->scanInProgress,
+            $inspection->libraryBusy,
             array_map(
                 static fn (LibraryMediaFileCheck $file): array => ['path' => $file->path, 'verdict' => $file->verdict->value, 'directory' => $file->directory],
                 $inspection->files,

@@ -30,7 +30,7 @@ use OpenApi\Attributes as OA;
                 type: 'array',
                 items: new OA\Items(properties: [
                     new OA\Property(property: 'path', type: 'string'),
-                    new OA\Property(property: 'reason', type: 'string', enum: ['outside_root', 'unlink_failed']),
+                    new OA\Property(property: 'reason', type: 'string', enum: ['outside_root', 'unlink_failed', 'claim_lost']),
                     new OA\Property(property: 'detail', type: 'string'),
                 ]),
             ),

@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Library\Application\Exception;
 
 use App\Library\Application\Exception\InvalidLibraryTypeException;
+use App\Library\Application\Exception\LibraryBusyException;
 use App\Library\Application\Exception\LibraryNotFoundException;
-use App\Library\Application\Exception\LibraryScanAlreadyRunningException;
 use App\Library\Application\Exception\LibrarySlugTakenException;
+use App\Library\Domain\ValueObject\LibraryClaimKind;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Translation\Loader\YamlFileLoader;
@@ -25,7 +26,8 @@ final class LibraryErrorTranslationTest extends TestCase
     {
         yield 'slug taken' => [LibrarySlugTakenException::forSlug('jazz')];
         yield 'not found' => [LibraryNotFoundException::forIdentifier('jazz')];
-        yield 'scan running' => [LibraryScanAlreadyRunningException::forLibrary('Jazz')];
+        yield 'scan running' => [LibraryBusyException::heldBy('Jazz', LibraryClaimKind::Scan)];
+        yield 'delete running' => [LibraryBusyException::heldBy('Jazz', LibraryClaimKind::Delete)];
         yield 'invalid type' => [InvalidLibraryTypeException::forType('vinyl')];
     }
 
@@ -40,11 +42,13 @@ final class LibraryErrorTranslationTest extends TestCase
     {
         yield 'slug taken, da' => [LibrarySlugTakenException::forSlug('jazz'), 'da', 'Et bibliotek med slug "jazz" findes allerede.'];
         yield 'not found, da' => [LibraryNotFoundException::forIdentifier('jazz'), 'da', 'Biblioteket "jazz" blev ikke fundet.'];
-        yield 'scan running, da' => [LibraryScanAlreadyRunningException::forLibrary('Jazz'), 'da', 'En scanning er allerede i gang for biblioteket "Jazz".'];
+        yield 'scan running, da' => [LibraryBusyException::heldBy('Jazz', LibraryClaimKind::Scan), 'da', 'En scanning er allerede i gang for biblioteket "Jazz".'];
+        yield 'delete running, da' => [LibraryBusyException::heldBy('Jazz', LibraryClaimKind::Delete), 'da', 'En sletning med filer er i gang for biblioteket "Jazz".'];
         yield 'invalid type, da' => [InvalidLibraryTypeException::forType('vinyl'), 'da', 'Ugyldig bibliotekstype "vinyl". Tilladte: music, podcast, audiobook, movie, tv_show.'];
         yield 'slug taken, th' => [LibrarySlugTakenException::forSlug('jazz'), 'th', 'มีไลบรารีที่ใช้ slug "jazz" อยู่แล้ว'];
         yield 'not found, th' => [LibraryNotFoundException::forIdentifier('jazz'), 'th', 'ไม่พบไลบรารี "jazz"'];
-        yield 'scan running, th' => [LibraryScanAlreadyRunningException::forLibrary('Jazz'), 'th', 'มีการสแกนอยู่แล้วสำหรับไลบรารี "Jazz"'];
+        yield 'scan running, th' => [LibraryBusyException::heldBy('Jazz', LibraryClaimKind::Scan), 'th', 'มีการสแกนอยู่แล้วสำหรับไลบรารี "Jazz"'];
+        yield 'delete running, th' => [LibraryBusyException::heldBy('Jazz', LibraryClaimKind::Delete), 'th', 'มีการลบพร้อมไฟล์กำลังดำเนินการอยู่สำหรับไลบรารี "Jazz"'];
         yield 'invalid type, th' => [InvalidLibraryTypeException::forType('vinyl'), 'th', 'ประเภทไลบรารี "vinyl" ไม่ถูกต้อง ต้องเป็นค่าหนึ่งใน: music, podcast, audiobook, movie, tv_show'];
     }
 

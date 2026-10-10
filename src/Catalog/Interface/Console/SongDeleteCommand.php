@@ -11,6 +11,7 @@ use App\Catalog\Interface\Resource\SongDeletePreviewResource;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Command\SignalableCommandInterface;
 use Symfony\Component\Console\Helper\Helper;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -21,13 +22,17 @@ use Throwable;
 /**
  * The CLI counterpart of DELETE /api/admin/songs/{publicId} (and DELETE /api/songs/{publicId});
  * --dry-run is the counterpart of GET /api/admin/songs/{publicId}/delete-preview.
+ *
+ * SIGINT or SIGTERM during the delete interrupts it, which releases its library claim.
  */
 #[AsCommand(
     name: 'app:song:delete',
     description: 'Delete a song, optionally with its audio file.',
 )]
-final class SongDeleteCommand extends Command
+final class SongDeleteCommand extends Command implements SignalableCommandInterface
 {
+    use InterruptibleDelete;
+
     public function __construct(
         private readonly AdminCommandSupport $support,
     ) {
@@ -58,10 +63,9 @@ final class SongDeleteCommand extends Command
             return $refused;
         }
 
-        try {
-            $result = $this->support->dispatch(new DeleteSongCommand(publicId: $publicId, deleteFile: $deleteFile));
-        } catch (Throwable $exception) {
-            return AdminCommandSupport::fail($io, $exception);
+        $result = $this->dispatchDelete($this->support, $io, new DeleteSongCommand(publicId: $publicId, deleteFile: $deleteFile));
+        if (is_int($result)) {
+            return $result;
         }
 
         return CatalogDeleteOutput::result($input, $io, $result, sprintf('Song %s', $publicId));

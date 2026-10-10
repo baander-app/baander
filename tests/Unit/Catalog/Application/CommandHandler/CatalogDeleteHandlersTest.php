@@ -23,6 +23,7 @@ use App\Catalog\Domain\Model\Movie;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Library\Application\Port\LibraryMediaFileCheck;
+use App\Library\Application\Port\LibraryMediaFileClaim;
 use App\Library\Application\Port\LibraryMediaFileDeletionResult;
 use App\Library\Application\Port\LibraryMediaFileInspection;
 use App\Library\Application\Port\LibraryMediaFileLeft;
@@ -32,6 +33,7 @@ use App\Library\Application\Port\LibraryMediaFileVerdict;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Media\Application\Port\StoragePortInterface;
 use App\Media\Domain\Model\Image;
+use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\Port\TransactionPortInterface;
@@ -48,7 +50,10 @@ final class CatalogDeleteHandlersTest extends TestCase
 {
     /** @var list<string> what happened, in order */
     private array $log = [];
+    private ?\Throwable $claimFailure = null;
     private ?\Throwable $prepareFailure = null;
+    private ?\Throwable $transactionFailure = null;
+    private ?LibraryMediaFileClaim $claim = null;
     /** @var list<LibraryMediaFileLeft> */
     private array $leftOnDisk = [];
     /** @var list<array{Uuid, list<string>}> */
@@ -63,7 +68,7 @@ final class CatalogDeleteHandlersTest extends TestCase
         $result = $this->albumHandler($album, $songs)(new DeleteAlbumCommand($album->getPublicId()->toString(), deleteFiles: true));
 
         self::assertSame(
-            ['prepare', 'begin', 'delete album', 'delete index rows', 'commit', 'delete image', 'delete image file', 'delete files'],
+            ['claim', 'prepare', 'begin', 'delete album', 'delete index rows', 'commit', 'delete image', 'delete image file', 'delete files', 'release'],
             $this->log,
         );
         self::assertEquals([[$album->getLibraryId(), ['/music/a.flac', '/music/b.flac']]], $this->prepared);
@@ -83,7 +88,37 @@ final class CatalogDeleteHandlersTest extends TestCase
         } catch (InvalidInputException) {
         }
 
-        self::assertSame(['prepare'], $this->log);
+        self::assertSame(['claim', 'prepare', 'release'], $this->log);
+    }
+
+    public function testALibraryAnotherHolderClaimedRefusesTheDeleteBeforeAnyCheck(): void
+    {
+        $album = $this->albumWithCover();
+        $this->claimFailure = new ConflictException('A scan is already in progress for the library "Music".', ['reason' => 'library_busy', 'holder' => 'scan']);
+
+        $this->expectOutcome(ConflictException::class, fn () => $this->albumHandler($album, [$this->song($album, '/music/a.flac')])(
+            new DeleteAlbumCommand($album->getPublicId()->toString(), deleteFiles: true),
+        ));
+
+        self::assertSame(['claim'], $this->log, 'Nothing was claimed, so nothing is released.');
+    }
+
+    public function testAFailedTransactionReleasesTheClaimAndUnlinksNothing(): void
+    {
+        $album = $this->albumWithCover();
+        $this->transactionFailure = new \RuntimeException('The catalog delete failed.');
+
+        $this->expectOutcome(\RuntimeException::class, fn () => $this->albumHandler($album, [$this->song($album, '/music/a.flac')])(
+            new DeleteAlbumCommand($album->getPublicId()->toString(), deleteFiles: true),
+        ));
+        $this->expectOutcome(\RuntimeException::class, fn () => $this->songHandler($album, $this->song($album, '/music/b.flac'))(
+            new DeleteSongCommand($this->song($album, '/music/c.flac')->getPublicId()->toString(), deleteFile: true),
+        ));
+
+        self::assertSame(
+            ['claim', 'prepare', 'begin', 'delete album', 'delete index rows', 'rollback', 'release', 'claim', 'prepare', 'begin', 'delete song', 'delete index rows', 'rollback', 'release'],
+            $this->log,
+        );
     }
 
     public function testAFileLeftOnDiskIsReportedAfterTheRowsAreDeleted(): void
@@ -126,19 +161,10 @@ final class CatalogDeleteHandlersTest extends TestCase
     {
         $album = Album::create(new Uuid(), 'Album', 'album');
         $song = $this->song($album, '/music/a.flac');
-        $songs = $this->createStub(SongPortInterface::class);
-        $songs->method('findByPublicId')->willReturn($song);
-        $songs->method('delete')->willReturnCallback(function (): void {
-            $this->log[] = 'delete song';
-        });
-        $albums = $this->createStub(AlbumPortInterface::class);
-        $albums->method('findByUuid')->willReturn($album);
 
-        $result = (new DeleteSongHandler($songs, $albums, $this->mediaFiles(), $this->transaction()))(
-            new DeleteSongCommand($song->getPublicId()->toString(), deleteFile: true),
-        );
+        $result = $this->songHandler($album, $song)(new DeleteSongCommand($song->getPublicId()->toString(), deleteFile: true));
 
-        self::assertSame(['prepare', 'begin', 'delete song', 'delete index rows', 'commit', 'delete files'], $this->log);
+        self::assertSame(['claim', 'prepare', 'begin', 'delete song', 'delete index rows', 'commit', 'delete files', 'release'], $this->log);
         self::assertEquals([[$album->getLibraryId(), ['/music/a.flac']]], $this->prepared);
         self::assertSame(['songs' => 1], $result->deleted);
         self::assertSame(['/music/a.flac'], $result->removed);
@@ -214,6 +240,19 @@ final class CatalogDeleteHandlersTest extends TestCase
         return new DeleteAlbumHandler($albums, $songPort, $this->mediaFiles(), $this->transaction(), $this->discarder());
     }
 
+    private function songHandler(Album $album, Song $song): DeleteSongHandler
+    {
+        $songs = $this->createStub(SongPortInterface::class);
+        $songs->method('findByPublicId')->willReturn($song);
+        $songs->method('delete')->willReturnCallback(function (): void {
+            $this->log[] = 'delete song';
+        });
+        $albums = $this->createStub(AlbumPortInterface::class);
+        $albums->method('findByUuid')->willReturn($album);
+
+        return new DeleteSongHandler($songs, $albums, $this->mediaFiles(), $this->transaction());
+    }
+
     private function albumWithCover(): Album
     {
         $album = Album::create(new Uuid(), 'Album', 'album');
@@ -267,7 +306,7 @@ final class CatalogDeleteHandlersTest extends TestCase
             {
                 $this->test->record('begin');
                 $result = $operation();
-                $this->test->record('commit');
+                $this->test->commit();
 
                 return $result;
             }
@@ -286,9 +325,14 @@ final class CatalogDeleteHandlersTest extends TestCase
                 throw new \LogicException('A delete does not inspect.');
             }
 
-            public function prepareDeletion(Uuid $libraryId, array $paths): LibraryMediaFileInspection
+            public function claim(Uuid $libraryId): LibraryMediaFileClaim
             {
-                return $this->test->recordPrepare($libraryId, $paths);
+                return $this->test->recordClaim($libraryId);
+            }
+
+            public function prepareDeletion(LibraryMediaFileClaim $claim, array $paths): LibraryMediaFileInspection
+            {
+                return $this->test->recordPrepare($claim, $paths);
             }
 
             public function deleteIndexRows(LibraryMediaFileInspection $deletion): void
@@ -296,27 +340,45 @@ final class CatalogDeleteHandlersTest extends TestCase
                 $this->test->record('delete index rows');
             }
 
-            public function deleteFiles(LibraryMediaFileInspection $deletion): LibraryMediaFileDeletionResult
+            public function deleteFiles(LibraryMediaFileClaim $claim, LibraryMediaFileInspection $deletion): LibraryMediaFileDeletionResult
             {
-                return $this->test->recordDeleteFiles($deletion);
+                return $this->test->recordDeleteFiles($claim, $deletion);
+            }
+
+            public function release(LibraryMediaFileClaim $claim): void
+            {
+                $this->test->recordRelease($claim);
             }
         };
+    }
+
+    /** @internal for the media files fake */
+    public function recordClaim(Uuid $libraryId): LibraryMediaFileClaim
+    {
+        $this->log[] = 'claim';
+        if ($this->claimFailure !== null) {
+            throw $this->claimFailure;
+        }
+        $this->claim = new LibraryMediaFileClaim($libraryId, new Uuid());
+
+        return $this->claim;
     }
 
     /**
      * @internal for the media files fake
      * @param list<string> $paths
      */
-    public function recordPrepare(Uuid $libraryId, array $paths): LibraryMediaFileInspection
+    public function recordPrepare(LibraryMediaFileClaim $claim, array $paths): LibraryMediaFileInspection
     {
+        self::assertSame($this->claim, $claim, 'The delete prepares under its own claim.');
         $this->log[] = 'prepare';
         if ($this->prepareFailure !== null) {
             throw $this->prepareFailure;
         }
-        $this->prepared[] = [$libraryId, $paths];
+        $this->prepared[] = [$claim->libraryId, $paths];
 
         return new LibraryMediaFileInspection(
-            $libraryId,
+            $claim->libraryId,
             '/music',
             array_map(static fn (string $path): LibraryMediaFileCheck => new LibraryMediaFileCheck($path, LibraryMediaFileVerdict::Deletable), $paths),
             false,
@@ -330,9 +392,28 @@ final class CatalogDeleteHandlersTest extends TestCase
         $this->log[] = $event;
     }
 
-    /** @internal for the media files fake */
-    public function recordDeleteFiles(LibraryMediaFileInspection $deletion): LibraryMediaFileDeletionResult
+    /** @internal for the transaction fake */
+    public function commit(): void
     {
+        if ($this->transactionFailure !== null) {
+            $this->log[] = 'rollback';
+
+            throw $this->transactionFailure;
+        }
+        $this->log[] = 'commit';
+    }
+
+    /** @internal for the media files fake */
+    public function recordRelease(LibraryMediaFileClaim $claim): void
+    {
+        self::assertSame($this->claim, $claim, 'The delete releases its own claim.');
+        $this->log[] = 'release';
+    }
+
+    /** @internal for the media files fake */
+    public function recordDeleteFiles(LibraryMediaFileClaim $claim, LibraryMediaFileInspection $deletion): LibraryMediaFileDeletionResult
+    {
+        self::assertSame($this->claim, $claim, 'The delete unlinks under its own claim.');
         $this->log[] = 'delete files';
         $left = array_map(static fn (LibraryMediaFileLeft $file): string => $file->path, $this->leftOnDisk);
 

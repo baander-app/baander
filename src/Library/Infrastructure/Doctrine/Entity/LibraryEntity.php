@@ -10,7 +10,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity]
 #[ORM\Table(name: 'libraries')]
 #[ORM\UniqueConstraint(name: 'uniq_libraries_slug', columns: ['slug'])]
-#[ORM\UniqueConstraint(name: 'uniq_libraries_scan_claim_id', columns: ['scan_claim_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_libraries_claim_id', columns: ['claim_id'])]
 class LibraryEntity
 {
     #[ORM\Id]
@@ -46,15 +46,19 @@ class LibraryEntity
     private ?string $scanStatus = null;
 
     /**
-     * The token of the scan that holds the claim, while the status is `scanning`. The claim
+     * The token of the scan or delete with files that holds the library's claim. The claim
      * columns are written only by LibraryRepository's claim statements, never by a flush.
      */
     #[ORM\Column(type: 'uuid', nullable: true)]
-    private ?Uuid $scanClaimId = null;
+    private ?Uuid $claimId = null;
 
-    /** When the claim lapses unless its scan renews it; a lapsed claim may be taken over. */
+    /** What holds the claim: `scan`, while the status is `scanning`, or `delete`. */
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $claimKind = null;
+
+    /** When the claim lapses unless its holder renews it; a lapsed claim may be taken over. */
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
-    private ?\DateTimeImmutable $scanClaimExpiresAt = null;
+    private ?\DateTimeImmutable $claimExpiresAt = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $updatedAt;
@@ -160,14 +164,14 @@ class LibraryEntity
         return $this->scanStatus;
     }
 
-    public function getScanClaimId(): ?Uuid
+    public function getClaimKind(): ?string
     {
-        return $this->scanClaimId;
+        return $this->claimKind;
     }
 
-    public function getScanClaimExpiresAt(): ?\DateTimeImmutable
+    public function getClaimExpiresAt(): ?\DateTimeImmutable
     {
-        return $this->scanClaimExpiresAt;
+        return $this->claimExpiresAt;
     }
 
     public function getCreatedAt(): \DateTimeImmutable

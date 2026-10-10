@@ -36,6 +36,10 @@ final class CatalogDeleteCommandsTest extends TestCase
     private array $dispatched = [];
     private ?\Throwable $failure = null;
     private CatalogDeletionResult $result;
+    /** Runs inside the delete's handler, as a signal arriving while the delete runs. */
+    private ?\Closure $duringDelete = null;
+    /** @var list<string> what the handler's finally blocks did */
+    private array $unwound = [];
 
     protected function setUp(): void
     {
@@ -135,12 +139,46 @@ final class CatalogDeleteCommandsTest extends TestCase
         self::assertEquals([new DeleteMovieCommand(self::ALBUM), new DeleteArtistCommand('nope')], $this->dispatched);
     }
 
+    public function testASignalWhileADeleteRunsUnwindsItsHandlerAndExitsWithTheSignal(): void
+    {
+        foreach ([AlbumDeleteCommand::class, SongDeleteCommand::class] as $class) {
+            $command = new $class($this->support());
+            $this->duringDelete = static fn (): int|false => $command->handleSignal(\SIGTERM);
+            $tester = new CommandTester($command);
+
+            self::assertSame(128 + \SIGTERM, $tester->execute(
+                ['public-id' => self::ALBUM, '--delete-files' => true, '--force' => true],
+                ['interactive' => false, 'capture_stderr_separately' => true],
+            ), $class);
+            self::assertStringContainsString('Interrupted by signal ' . \SIGTERM, $tester->getErrorOutput());
+            self::assertSame('', $tester->getDisplay());
+        }
+
+        // The handler's finally block, which releases the library claim, ran in both.
+        self::assertSame(['finally', 'finally'], $this->unwound);
+    }
+
+    public function testASignalWhileNoDeleteRunsEndsTheCommandWithTheSignal(): void
+    {
+        foreach ([new AlbumDeleteCommand($this->support()), new SongDeleteCommand($this->support())] as $command) {
+            self::assertSame([\SIGINT, \SIGTERM], $command->getSubscribedSignals());
+            self::assertSame(128 + \SIGINT, $command->handleSignal(\SIGINT));
+        }
+    }
+
     private function support(): AdminCommandSupport
     {
         $handle = function (object $message): mixed {
             $this->dispatched[] = $message;
             if ($this->failure !== null) {
                 throw $this->failure;
+            }
+            if ($this->duringDelete !== null) {
+                try {
+                    ($this->duringDelete)();
+                } finally {
+                    $this->unwound[] = 'finally';
+                }
             }
 
             return $message instanceof GetAlbumDeletePreviewQuery ? $this->preview() : $this->result;

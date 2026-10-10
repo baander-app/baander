@@ -11,6 +11,7 @@ use App\Catalog\Interface\Resource\AlbumDeletePreviewResource;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Command\SignalableCommandInterface;
 use Symfony\Component\Console\Helper\Helper;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
@@ -22,13 +23,17 @@ use Throwable;
 /**
  * The CLI counterpart of DELETE /api/admin/albums/{publicId} (and DELETE /api/albums/{publicId});
  * --dry-run is the counterpart of GET /api/admin/albums/{publicId}/delete-preview.
+ *
+ * SIGINT or SIGTERM during the delete interrupts it, which releases its library claim.
  */
 #[AsCommand(
     name: 'app:album:delete',
     description: 'Delete an album and every song on it, optionally with the audio files.',
 )]
-final class AlbumDeleteCommand extends Command
+final class AlbumDeleteCommand extends Command implements SignalableCommandInterface
 {
+    use InterruptibleDelete;
+
     private const string KEEP_COVER = 'keep-cover';
 
     public function __construct(
@@ -62,14 +67,13 @@ final class AlbumDeleteCommand extends Command
             return $refused;
         }
 
-        try {
-            $result = $this->support->dispatch(new DeleteAlbumCommand(
-                publicId: $publicId,
-                deleteFiles: $deleteFiles,
-                deleteCover: $input->getOption(self::KEEP_COVER) !== true,
-            ));
-        } catch (Throwable $exception) {
-            return AdminCommandSupport::fail($io, $exception);
+        $result = $this->dispatchDelete($this->support, $io, new DeleteAlbumCommand(
+            publicId: $publicId,
+            deleteFiles: $deleteFiles,
+            deleteCover: $input->getOption(self::KEEP_COVER) !== true,
+        ));
+        if (is_int($result)) {
+            return $result;
         }
 
         return CatalogDeleteOutput::result($input, $io, $result, sprintf('Album %s', $publicId));

@@ -2,4 +2,6 @@ errors:
   invalid_type_with_allowed: 'Ugyldig bibliotekstype "{type}". Tilladte: {allowed}.'
   slug_exists: 'Et bibliotek med slug "{slug}" findes allerede.'
   not_found: 'Biblioteket "{library}" blev ikke fundet.'
-  scan_in_progress: 'En scanning er allerede i gang for biblioteket "{library}".'
+  library_busy:
+    scan: 'En scanning er allerede i gang for biblioteket "{library}".'
+    delete: 'En sletning med filer er i gang for biblioteket "{library}".'

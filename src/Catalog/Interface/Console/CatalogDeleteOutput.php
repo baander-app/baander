@@ -103,7 +103,7 @@ final class CatalogDeleteOutput
         }
 
         $io->warning($preview->scanInProgress
-            ? 'A scan holds the library; a delete with --delete-files would be refused.'
+            ? 'A scan or another delete with files holds the library; a delete with --delete-files would be refused.'
             : 'A delete with --delete-files would be refused; nothing would be deleted.');
     }
 }

@@ -63,8 +63,8 @@ final class ScanLibraryCommand extends Command implements SignalableCommandInter
             ->addArgument('library', InputArgument::OPTIONAL, 'Library UUID or slug')
             ->addOption('all', null, InputOption::VALUE_NONE, 'Scan every library that is not already scanning, one after another')
             ->addOption('rescan', null, InputOption::VALUE_NONE, 'Re-read files the index already knows')
-            ->addOption('release', null, InputOption::VALUE_NONE, 'Only release the scan claim of a scan that is gone, marking that scan failed; refused while the claim is live')
-            ->addOption('force', null, InputOption::VALUE_NONE, 'With --release, release a live claim too, whose scan may still be running');
+            ->addOption('release', null, InputOption::VALUE_NONE, 'Only release the claim of a scan or delete with files that is gone; a scan claim marks that scan failed; refused while the claim is live')
+            ->addOption('force', null, InputOption::VALUE_NONE, 'With --release, release a live claim too, whose scan or delete may still be running');
         AdminCommandSupport::addJsonOption($this);
     }
 
@@ -264,16 +264,18 @@ final class ScanLibraryCommand extends Command implements SignalableCommandInter
         try {
             $released = $this->support->dispatch(new ReleaseLibraryScanClaimCommand($library, $force));
         } catch (LibraryScanClaimLiveException $exception) {
-            $io->getErrorStyle()->error($exception->getMessage() . ' Release it anyway with --force once you know that scan is gone.');
+            $io->getErrorStyle()->error($exception->getMessage() . ' Release it anyway with --force once you know that process is gone.');
 
             return Command::FAILURE;
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
         }
 
-        $io->success($released
-            ? sprintf('Released the scan claim of "%s" and marked its scan failed.', $library)
-            : sprintf('"%s" has no scan claim; nothing changed.', $library));
+        $io->success(match ($released) {
+            'scan' => sprintf('Released the scan claim of "%s" and marked its scan failed.', $library),
+            'delete' => sprintf('Released the delete claim of "%s"; its scan status is unchanged.', $library),
+            default => sprintf('"%s" has no claim; nothing changed.', $library),
+        });
 
         return Command::SUCCESS;
     }
