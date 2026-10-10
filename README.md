@@ -16,7 +16,7 @@ Self-hosted media library server for music, movies, and video. Organizes your co
 
 **Notifications** — Web push notifications and webhook delivery for events like new library additions.
 
-**Audio analysis** — Essentia and FFmpeg integration for audio feature extraction.
+**Audio analysis** — FFmpeg measures track loudness with its loudnorm filter so transcodes can be normalized to a target level. Baander does not extract audio features such as energy or danceability.
 
 ## Project Structure
 
@@ -53,7 +53,7 @@ src/<Context>/
 - Redis (caching, message queue)
 - Doctrine ORM 3.6
 - Nginx reverse proxy
-- FFmpeg / Essentia for audio analysis
+- FFmpeg for transcoding and loudness measurement
 
 ## Setup
 
