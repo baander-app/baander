@@ -30,6 +30,10 @@ git log --oneline <current-tag>..HEAD
 
 If you only need to migrate the main database (for example, on a production server without a test database), use `make migrate-no-test` instead.
 
+`Version20261010180000` converts every timestamp column to microsecond `timestamptz`, which changes column types on busy tables, so it sets a 5-second lock timeout. If a running request or job holds one of those tables, the migration fails with a lock timeout and applies nothing, rather than stalling every query queued behind it. Run `make migrate` again with the web server and the worker stopped or idle.
+
+`make migrate` refuses to run when the database records executed migrations that the `migrations/` directory does not have, such as a database migrated under former migration class names. Doctrine would otherwise rerun migrations already applied under the old names. Reconcile the recorded history with `php bin/console doctrine:migrations:version` first, or reset a database whose data you do not need.
+
 ## When to Rebuild Docker Images
 
 `make build` is necessary when any of the following have changed:

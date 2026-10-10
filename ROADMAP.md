@@ -19,7 +19,7 @@ and CI workflow are the executable detail. Measurements in later historical
 batches describe their own checkpoints; the current gate below takes precedence.
 
 The backend release-gate package is complete (see the next two sections). Three
-plans come next, in this order:
+plans followed it, in this order, and all three are delivered:
 
 1. [General settings and email language](docs/plans/2026-10-07-1736-feat-general-settings-email-language-plan.md):
    one definition-driven settings mechanism, the per-user email language, and the
@@ -84,8 +84,33 @@ plans come next, in this order:
    SSE docs are gone; the WebSocket registry, reconnection tokens and CPU pool tables
    hold the rows they promise; the Swoole timers that log release pooled services;
    `room.join` no longer lets any user join another party's room.
-3. Timestamp convention: 130 `timestamptz(0)` columns, 13 `timestamp without time
-   zone` columns, and ORM writes without offset or fraction. Not yet planned.
+3. [Timestamp convention](docs/plans/2026-10-10-1752-refactor-timestamp-convention-plan.md):
+   every instant column is `timestamptz` at microsecond precision, written and read in
+   UTC. Delivered on 2026-10-10. `InstantType` replaces Doctrine's `datetime_immutable`
+   and `datetimetz_immutable`, and every PostgreSQL connection sets its session time
+   zone to UTC. Migration `Version20261010180000` relaxes 125 `timestamptz(0)` columns
+   and converts 11 zone-less columns in 5 tables, reading their values as UTC.
+   `doctrine_migration_versions.executed_at` stays zone-less, because Doctrine
+   Migrations parses it that way. Hand-written binds in the outbox, notification
+   delivery, the recommendation pool and the token repositories keep microseconds and
+   the offset. The song "added" cursor pages exactly within one second. API output
+   keeps whole seconds (`Y-m-d\TH:i:sP`): the transcode and recommendation fields that
+   returned PostgreSQL's raw text now use that format. `InstantColumnConventionTest`
+   and `InstantBindConventionTest` fail on a regression. Nothing is open.
+
+   Found and fixed on the way: both transcode `/list` endpoints answered 500 because a
+   parameter route caught `list`; `TranscodeJobDto` read two columns that do not
+   exist; the recommendation pool did not percent-decode the database password; and
+   `doctrine:migrations:migrate` now refuses a database that records migrations the
+   directory lacks, where Doctrine would have rerun them. Accepted limits: a `since`
+   filter at whole-second API precision can return a row from its own second again,
+   and a cursor issued before the change may repeat one row.
+
+The local dev database (`baander` in `baander-postgres`) records the migration class
+names from before the rename and is about 40 migrations behind (last migrated on
+2026-07-15). `make migrate` now refuses it. Reconcile its recorded history with
+`doctrine:migrations:version`, or reset it, before it can reach the timestamp
+migration (user decision, 2026-10-10: kept out of item 3).
 
 Other local work can proceed independently: finish the browser credential/session
 integration below; qualify the registry's remaining failure, fixed-runner load,

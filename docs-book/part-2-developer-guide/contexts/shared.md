@@ -93,6 +93,15 @@ See the [CQRS and Messaging](../cqrs-and-messaging.md) page for dispatching patt
 | `UuidType` | Custom Doctrine column type for `Uuid` |
 | `PublicIdType` | Custom Doctrine column type for `PublicId` |
 | `GeneratePublicIdListener` | Doctrine event listener that auto-generates `PublicId` values on persist |
+| `InstantType` | Replaces Doctrine's `datetime_immutable` and `datetimetz_immutable`: a `timestamptz` instant written and read in UTC with microseconds |
+| `DedicatedConnectionFactory` | Builds a DBAL connection outside DoctrineBundle with the same driver middleware |
+| `UnknownExecutedMigrationGuard` | Refuses `doctrine:migrations:migrate` when the database records executed migrations the migration directory lacks |
+
+Instants follow one convention. Every instant column is `timestamptz` with no explicit precision, mapped as `datetime_immutable`; `InstantColumnConventionTest` fails on a zone-less or fixed-precision instant column. The only zone-less column is Doctrine Migrations' own `doctrine_migration_versions.executed_at`, which that library parses as `Y-m-d H:i:s`.
+
+`InstantType` writes the UTC instant as `Y-m-d H:i:s.uP`, so neither PHP's time zone nor the session's can shift it, and it reads values back in UTC. `BaanderDriverMiddleware` sets every PostgreSQL session's `TimeZone` to UTC, so zone-dependent SQL such as `::date` and `date_trunc` gives the same answer on every server. A connection built outside DoctrineBundle gets the middleware from `DedicatedConnectionFactory`, or sets the zone itself as the recommendation pool's PDO connection does. SQL written by hand binds an instant through the type (`Types::DATETIME_IMMUTABLE`) or as a UTC `Y-m-d H:i:s.uP` string, and compares ranges half-open; `InstantBindConventionTest` fails on a zone-less or whole-second format in database code.
+
+API output keeps whole seconds (`Y-m-d\TH:i:sP`); cursors keep the microseconds.
 
 ## Caching
 

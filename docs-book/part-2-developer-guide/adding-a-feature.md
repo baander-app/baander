@@ -266,7 +266,7 @@ final class Version20261007120000 extends AbstractMigration
 }
 ```
 
-`added_at` records an instant, so the migration declares it `TIMESTAMPTZ` without a precision. Do not copy the type from Doctrine's generated SQL: for a `datetime_immutable` mapping Doctrine emits `TIMESTAMP(0) WITHOUT TIME ZONE`, which stores no time zone and rounds to whole seconds. The entity still maps the column as `datetime_immutable`. The `mapping_types` entry in `config/packages/doctrine.yaml` reads every `TIMESTAMPTZ` column back as `datetime_immutable`, so schema comparison finds no difference.
+`added_at` records an instant, so the migration declares it `TIMESTAMPTZ` without a precision: every instant column in Baander is `timestamptz` at PostgreSQL's native microsecond precision. The entity maps the column as `datetime_immutable`. Baander replaces that Doctrine type with `InstantType` (see [Shared Kernel](contexts/shared.md#doctrine)), which declares `TIMESTAMPTZ` and writes and reads the instant in UTC with its microseconds. The `mapping_types` entry in `config/packages/doctrine.yaml` reads every `TIMESTAMPTZ` column back as `datetime_immutable`, so schema comparison finds no difference. Schema comparison cannot see a precision such as `TIMESTAMPTZ(0)`; `InstantColumnConventionTest` fails on one.
 
 Run the migration:
 

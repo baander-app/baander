@@ -6,9 +6,9 @@ below are relative to this reference. Recheck them after dependency upgrades.
 ## Identify the environment
 
 [composer.lock](../../../../composer.lock) records DBAL 4.4.3, ORM 3.6.6,
-DoctrineBundle 3.2.2, Migrations 3.9.7 and MigrationsBundle 4.0.0 at this review.
-Installed vendor metadata currently differs (ORM 3.6.7, DoctrineBundle 3.2.4).
-Inspect both; a fresh lockfile install and the current runtime need not match.
+DoctrineBundle 3.2.2, Migrations 3.9.7 and MigrationsBundle 4.0.0 at this review;
+the installed vendor tree matched the lock on 2026-10-10. Inspect both; a fresh
+lockfile install and the current runtime need not match.
 DBAL 4.4.3's PostgreSQL exception converter leaves lock timeout SQLSTATE `55P03`
 as a generic `DriverException`; do not assume `LockWaitTimeoutException` applies.
 Check `getSQLState()` and the installed converter when classifying database errors.
@@ -22,9 +22,27 @@ for the relevant packages. Read installed implementation for generated SQL claim
 from schema introspection. Domain aggregates are separate from Doctrine entities;
 read the repository's conversion and synchronization methods, not just domain fields.
 `mapping_types: timestamptz: datetime_immutable` is reverse database-type mapping;
-it does not make every `datetime_immutable` column emit `timestamptz`.
+on its own it does not make a `datetime_immutable` column emit `timestamptz`.
 
-Custom `uuid`, `public_id`, `citext`, and `job_status` types are registered both in
+Instants follow one convention: every instant column is `timestamptz` with no
+explicit precision (microseconds), mapped as `datetime_immutable`.
+`InstantColumnConventionTest` fails on a zone-less or fixed-precision instant
+column. The one exception is `doctrine_migration_versions.executed_at`, which stays
+`timestamp(0) without time zone`: Doctrine Migrations' `TableMetadataStorage`
+parses it with `Y-m-d H:i:s` and drops a non-matching value to null.
+
+[InstantType](../../../../src/Shared/Infrastructure/Doctrine/Type/InstantType.php)
+replaces Doctrine's `datetime_immutable` and `datetimetz_immutable`. It declares
+`TIMESTAMPTZ`, writes the UTC instant as `Y-m-d H:i:s.uP`, rejects a mutable
+`DateTime`, and reads PostgreSQL's text back into a UTC `DateTimeImmutable`.
+Every PostgreSQL connection also sets its session `TimeZone` to UTC.
+[BaanderDriverMiddleware](../../../../src/Shared/Infrastructure/Doctrine/Platform/BaanderDriverMiddleware.php)
+does it on connect, [DedicatedConnectionFactory](../../../../src/Shared/Infrastructure/Doctrine/DedicatedConnectionFactory.php)
+adds that middleware to connections built outside DoctrineBundle, and
+`RecommendationPoolWorker` sets it on its own PDO connection. Any new connection
+that bypasses both must set the zone the same way.
+
+Custom `uuid`, `public_id`, `citext`, `job_status` and the instant types are registered both in
 configuration and [CustomTypesRegistrar](../../../../src/Shared/Infrastructure/Doctrine/Type/CustomTypesRegistrar.php),
 called by [Kernel::boot](../../../../src/Kernel.php). Swoole's connection creation
 can bypass DoctrineBundle's type initialization. New types need compatible
@@ -36,7 +54,7 @@ inferred fixed-width SQL identifier.
 
 Installed `vendor/doctrine/dbal/src/Platforms/PostgreSQLPlatform.php` emits
 `TIMESTAMP(0) WITHOUT TIME ZONE` for datetime and `TIMESTAMP(0) WITH TIME ZONE`
-for datetimetz. `vendor/doctrine/orm/src/Tools/SchemaTool.php` supplies length 255
+for datetimetz; the project's `InstantType` replaces both immutable variants. `vendor/doctrine/orm/src/Tools/SchemaTool.php` supplies length 255
 for a string mapping without length. These are framework choices, not proof the
 application requires second precision or a 255-character bound. Apply the
 PostgreSQL guidance to the actual data meaning; explain any retained exception.
@@ -47,15 +65,27 @@ PostgreSQL rejects `ALTER COLUMN … TYPE` on a column that a generated column
 reads: drop and re-add the generated column in the same migration (verified on
 PG 18.4 with `job_monitors.duration_microseconds`, Version20261006340000).
 Relaxing `timestamptz(0)` to `timestamptz` keeps stored values without a rewrite;
-re-adding a STORED column rewrites the table. Because `mapping_types: timestamptz:
-datetime_immutable` introspects every timestamptz column as `datetime_immutable`,
-schema comparison cannot see timestamptz precision, and mapping a timestamptz
-column as `datetimetz_immutable` creates drift; keep `datetime_immutable` until
-the convention changes. `DateTimeImmutableType` writes `Y-m-d H:i:s` with no
-offset and no fraction, so hand-written SQL binds instants as `Y-m-d H:i:s.uP`
-strings. On a `timestamptz(0)` column PostgreSQL rounds a raw fractional instant
-(23:59:59.5 becomes the next midnight), while ORM writes are already truncated in
-PHP; ranges therefore use `[day start, next day start)` rather than relying on either.
+re-adding a STORED column rewrites the table. On PostgreSQL 18, `ALTER COLUMN …
+TYPE` still rebuilds a partial index whose predicate reads the altered column
+when the table itself is not rewritten (the three `domain_event_outbox` partial
+indexes in Version20261010180000), and converting a zone-less column with
+`USING … AT TIME ZONE 'UTC'` rewrites the table and all its indexes. Every such
+ALTER takes ACCESS EXCLUSIVE; that migration sets `lock_timeout` so it fails
+rather than queueing behind a running process.
+
+`mapping_types: timestamptz: datetime_immutable` introspects every timestamptz
+column as `datetime_immutable`, so schema comparison cannot see timestamptz
+precision; `InstantColumnConventionTest` checks it in the catalog instead.
+Comparison does see a zone-less column: it introspects as `datetime`, which
+declares `TIMESTAMP(0) WITHOUT TIME ZONE` where `InstantType` declares `TIMESTAMPTZ`.
+
+Doctrine's stock `DateTimeImmutableType` writes `Y-m-d H:i:s`, with no offset and
+no fraction. `InstantType` replaces it for every mapping and typed bind, but a
+hand-written bind that formats its own string bypasses any type. Bind instants with
+the type (`Types::DATETIME_IMMUTABLE`) or as a UTC `Y-m-d H:i:s.uP` string, never
+as `Y-m-d H:i:s`, ATOM or `'c'`. `InstantBindConventionTest` fails on those formats
+in database code, and on the mutable and `tz` instant type names anywhere in `src/`.
+Ranges over instants are half-open (`[day start, next day start)`).
 When widening timestamp precision, widen cursor sort values too
 (`JobMonitorService::extractSortValue`): a whole-second cursor re-includes its own row.
 
@@ -101,7 +131,12 @@ and [doctrine_migrations.yaml](../../../../config/packages/doctrine_migrations.y
 order legacy numbered classes before later timestamped migrations. Filenames are
 not necessarily migration class identities. Preserve executed FQCN metadata;
 changing sort order must not rename/reexecute applied migrations. Check current,
-latest and reverse plans; unknown formats require an ordering decision. Some
+latest and reverse plans; unknown formats require an ordering decision.
+Migrations 3.9.7 only warns about executed migrations the directory lacks, and
+`--no-interaction` proceeds, which would rerun migrations applied under former
+class names; [UnknownExecutedMigrationGuard](../../../../src/Shared/Infrastructure/Doctrine/EventListener/UnknownExecutedMigrationGuard.php)
+makes `doctrine:migrations:migrate` refuse instead. Reconcile such a history with
+`doctrine:migrations:version` before migrating. Some
 historical down migrations are irreversible or destructive: a reverse plan
 alone does not prove rollback safety.
 
