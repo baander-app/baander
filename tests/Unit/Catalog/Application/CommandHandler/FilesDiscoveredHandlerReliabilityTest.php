@@ -22,6 +22,7 @@ use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
+use App\Tests\Fixtures\Catalog\PassThroughTransaction;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -91,6 +92,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             $this->createStub(AlbumMetadataSyncRequestInterface::class),
             $logger,
             $this->createStub(LibraryMediaFilesInterface::class),
+            new PassThroughTransaction(),
         );
 
         $message = new FilesDiscovered($libraryId, 'music', $directory, [$file]);
@@ -163,6 +165,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             $this->createStub(AlbumMetadataSyncRequestInterface::class),
             $logger,
             $this->createStub(LibraryMediaFilesInterface::class),
+            new PassThroughTransaction(),
         );
 
         $message = new FilesDiscovered($libraryId, 'music', $directory, [$fileOne, $fileTwo]);
@@ -213,7 +216,8 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
 
     public function testRetryDispatchesCoverForExistingAlbumAndDeduplicatedSong(): void
     {
-        [$handler, $message, $songPort, $bus, $state] = $this->prepareCoverFanout(attempts: 2);
+        // The retry finds the song by its hash and writes nothing.
+        [$handler, $message, $songPort, $bus, $state] = $this->prepareCoverFanout(writes: 1);
         $songPort->expects($this->once())->method('persist');
         $failure = new RuntimeException('First cover delivery rejected');
         $dispatches = 0;
@@ -282,9 +286,11 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
     }
 
     /**
+     * @param int $writes how many batches of songs the handler writes, each with one flush of songs and genres
+     *
      * @return array{FilesDiscoveredHandler, FilesDiscovered, SongPortInterface&MockObject, MessageBusInterface&MockObject, object{album: Album|null, pendingSongs: list<Song>, visibleSongs: list<Song>, events: list<string>} & \stdClass}
      */
-    private function prepareCoverFanout(int $attempts = 1, ?Album $existingAlbum = null, ?LoggerInterface $logger = null, ?RuntimeException $persistFailure = null, ?RuntimeException $flushFailure = null): array
+    private function prepareCoverFanout(int $writes = 1, ?Album $existingAlbum = null, ?LoggerInterface $logger = null, ?RuntimeException $persistFailure = null, ?RuntimeException $flushFailure = null): array
     {
         $libraryId = Uuid::v7();
         $state = $this->createCoverFanoutState($existingAlbum);
@@ -302,7 +308,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             $state->pendingSongs[] = $song;
             $state->events[] = 'song persisted';
         });
-        $songPort->expects($this->exactly($attempts))->method('flush')->willReturnCallback(static function () use ($state, $flushFailure): void {
+        $songPort->expects($this->exactly($writes))->method('flush')->willReturnCallback(static function () use ($state, $flushFailure): void {
             if ($flushFailure !== null) {
                 throw $flushFailure;
             }
@@ -311,7 +317,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             $state->events[] = 'songs flushed';
         });
         $genrePort = $this->createMock(GenrePortInterface::class);
-        $genrePort->expects($this->exactly($flushFailure === null ? $attempts : 0))->method('flush')->willReturnCallback(static function () use ($state): void {
+        $genrePort->expects($this->exactly($flushFailure === null ? $writes : 0))->method('flush')->willReturnCallback(static function () use ($state): void {
             $state->events[] = 'genres flushed';
         });
         $metadataReader = $this->createStub(MetadataContentReaderPortInterface::class);
@@ -330,6 +336,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             $this->createStub(AlbumMetadataSyncRequestInterface::class),
             $logger ?? new NullLogger(),
             $this->createStub(LibraryMediaFilesInterface::class),
+            new PassThroughTransaction(),
         );
         $file = new DiscoveredFile('/music/Test Album/01-track.mp3', 'Test Album/01-track.mp3', 'mp3', 1_000_000, time(), 'cover-fanout-hash');
         $message = new FilesDiscovered($libraryId, 'music', '/music/Test Album', [$file]);

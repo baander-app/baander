@@ -187,6 +187,12 @@ final class InMemoryLibraryRepository implements LibraryRepositoryInterface
         return $held !== null && !$this->lapsed($held) ? $held['kind'] : null;
     }
 
+    /** Takes no lock: one process, no concurrent claims. */
+    public function liveClaimKindForImport(Uuid $libraryId): ?LibraryClaimKind
+    {
+        return $this->liveClaimKind($libraryId);
+    }
+
     private function claim(Uuid $libraryId, Uuid $claimId, int $leaseSeconds, LibraryClaimKind $kind): LibraryClaimAttempt
     {
         $id = $libraryId->toString();

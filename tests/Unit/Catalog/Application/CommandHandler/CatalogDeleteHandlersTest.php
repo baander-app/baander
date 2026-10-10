@@ -59,6 +59,40 @@ final class CatalogDeleteHandlersTest extends TestCase
     /** @var list<array{Uuid, list<string>}> */
     private array $prepared = [];
     private ?Image $cover = null;
+    /** Runs while the claim is taken, as an import's write that the claim waits for. */
+    private ?\Closure $duringClaim = null;
+
+    /**
+     * The claim waits for an import's write in flight, and no import writes after it, so the
+     * songs read after the claim are all the songs the album delete removes.
+     */
+    public function testAnAlbumDeleteWithFilesReadsItsSongsAfterTheClaimSoItChecksSongsAnImportCommittedFirst(): void
+    {
+        $album = $this->albumWithCover();
+        $songs = [$this->song($album, '/music/a.flac')];
+        $this->duringClaim = function () use (&$songs, $album): void {
+            $songs[] = $this->song($album, '/music/b.flac');
+        };
+        $albums = $this->createStub(AlbumPortInterface::class);
+        $albums->method('findByPublicId')->willReturn($album);
+        $albums->method('delete')->willReturnCallback(function (): void {
+            $this->log[] = 'delete album';
+        });
+        $songPort = $this->createStub(SongPortInterface::class);
+        $songPort->method('findByAlbumSortedByTrack')->willReturnCallback(function () use (&$songs): array {
+            $this->log[] = 'read songs';
+
+            return $songs;
+        });
+        $handler = new DeleteAlbumHandler($albums, $songPort, $this->mediaFiles(), $this->transaction(), $this->discarder());
+
+        $result = $handler(new DeleteAlbumCommand($album->getPublicId()->toString(), deleteFiles: true));
+
+        self::assertSame(['claim', 'read songs', 'prepare'], array_slice($this->log, 0, 3));
+        self::assertEquals([[$album->getLibraryId(), ['/music/a.flac', '/music/b.flac']]], $this->prepared);
+        self::assertSame(['albums' => 1, 'songs' => 2, 'coverImages' => 1], $result->deleted);
+        self::assertSame(['/music/a.flac', '/music/b.flac'], $result->removed);
+    }
 
     public function testAnAlbumDeleteWithFilesChecksFirstThenDeletesRowsAndIndexRowsTogetherAndUnlinksAfterTheCommit(): void
     {
@@ -330,7 +364,12 @@ final class CatalogDeleteHandlersTest extends TestCase
                 throw new \LogicException('A delete does not ask whether a delete holds the library.');
             }
 
-            public function missingPaths(array $paths): array
+            public function isHeldByDeleteForImport(Uuid $libraryId): bool
+            {
+                throw new \LogicException('A delete does not ask whether a delete holds the library.');
+            }
+
+            public function forgetMissing(Uuid $libraryId, array $paths): array
             {
                 throw new \LogicException('A delete does not look for missing paths.');
             }
@@ -368,6 +407,9 @@ final class CatalogDeleteHandlersTest extends TestCase
         $this->log[] = 'claim';
         if ($this->claimFailure !== null) {
             throw $this->claimFailure;
+        }
+        if ($this->duringClaim !== null) {
+            ($this->duringClaim)();
         }
         $this->claim = new LibraryMediaFileClaim($libraryId, new Uuid());
 

@@ -57,14 +57,27 @@ final readonly class LibraryMediaFiles implements LibraryMediaFilesInterface
         return $this->libraries->liveClaimKind($libraryId) === LibraryClaimKind::Delete;
     }
 
-    public function missingPaths(array $paths): array
+    public function isHeldByDeleteForImport(Uuid $libraryId): bool
+    {
+        return $this->libraries->liveClaimKindForImport($libraryId) === LibraryClaimKind::Delete;
+    }
+
+    public function forgetMissing(Uuid $libraryId, array $paths): array
     {
         // PHP caches file status; a file deleted since an earlier check must count.
-        return array_values(array_filter($paths, static function (string $path): bool {
+        $missing = array_values(array_filter($paths, static function (string $path): bool {
             clearstatcache(true, $path);
 
             return !file_exists($path);
         }));
+
+        // The scan indexed these paths when it found the files. Left in the index, a file that
+        // comes back unchanged would read as known to every incremental scan and never be imported.
+        if ($missing !== []) {
+            $this->fileIndex->removeByPaths($libraryId, $missing);
+        }
+
+        return $missing;
     }
 
     public function claim(Uuid $libraryId): LibraryMediaFileClaim
@@ -140,7 +153,13 @@ final readonly class LibraryMediaFiles implements LibraryMediaFilesInterface
     public function release(LibraryMediaFileClaim $claim): void
     {
         try {
-            $this->libraries->endDeleteClaim($claim->claimId);
+            try {
+                $this->libraries->endDeleteClaim($claim->claimId);
+            } catch (Throwable) {
+                // Ending the claim is idempotent. A second attempt also ends it when the first was
+                // cut short by an interruption that a console delete throws into it.
+                $this->libraries->endDeleteClaim($claim->claimId);
+            }
         } catch (Throwable $exception) {
             $this->logger->error('The claim of a delete with files was not released; it lapses with its lease, or run app:library:scan <library> --release --force', [
                 'library_id' => $claim->libraryId->toString(),

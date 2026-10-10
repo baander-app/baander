@@ -21,6 +21,7 @@ use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
 use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
+use App\Tests\Fixtures\Catalog\PassThroughTransaction;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Messenger\Envelope;
@@ -43,7 +44,7 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
         $mediaFiles->expects($this->exactly(2))->method('isHeldByDelete')
             ->with($message->libraryId)
             ->willReturnOnConsecutiveCalls(true, false);
-        $mediaFiles->method('missingPaths')->willReturn([]);
+        $mediaFiles->method('forgetMissing')->willReturn([]);
         $events = [];
         $requeueStamps = [];
         $songs = $this->createMock(SongPortInterface::class);
@@ -83,7 +84,7 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
             $this->file('/music/Album/02 Two.mp3', 'hash-two'),
         );
         $mediaFiles = $this->createStub(LibraryMediaFilesInterface::class);
-        $mediaFiles->method('missingPaths')->willReturn(['/music/Album/01 One.mp3', '/music/Album/02 Two.mp3']);
+        $mediaFiles->method('forgetMissing')->willReturn(['/music/Album/01 One.mp3', '/music/Album/02 Two.mp3']);
         $albums = $this->createMock(AlbumPortInterface::class);
         $albums->expects($this->never())->method('findByTitleAndLibrary');
         $albums->expects($this->never())->method('persist');
@@ -102,8 +103,8 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
             $this->file('/music/Album/02 Here.mp3', 'hash-here'),
         );
         $mediaFiles = $this->createStub(LibraryMediaFilesInterface::class);
-        $mediaFiles->method('missingPaths')->willReturnCallback(
-            static fn (array $paths): array => array_values(array_intersect($paths, ['/music/Album/01 Gone.mp3'])),
+        $mediaFiles->method('forgetMissing')->willReturnCallback(
+            static fn (Uuid $libraryId, array $paths): array => array_values(array_intersect($paths, ['/music/Album/01 Gone.mp3'])),
         );
         $read = [];
         $metadata = $this->createStub(MetadataContentReaderPortInterface::class);
@@ -130,13 +131,89 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
             new DiscoveredFile('/movies/Gone Movie/movie.mkv', 'Gone Movie/movie.mkv', 'mkv', 1_000_000, 1_700_000_000, 'hash-movie'),
         ]);
         $mediaFiles = $this->createStub(LibraryMediaFilesInterface::class);
-        $mediaFiles->method('missingPaths')->willReturn(['/movies/Gone Movie/movie.mkv']);
+        $mediaFiles->method('forgetMissing')->willReturn(['/movies/Gone Movie/movie.mkv']);
         $movies = $this->createMock(MoviePortInterface::class);
         $movies->expects($this->never())->method('persist');
         $videos = $this->createMock(VideoRepositoryInterface::class);
         $videos->expects($this->never())->method('save');
 
         $this->handler($mediaFiles, movies: $movies, videos: $videos)($message);
+    }
+
+    /**
+     * The scan indexed the files before it queued their import. An import that finds a file gone
+     * has the index forget it, so that the next incremental scan reads the file as new when it
+     * comes back unchanged (LibraryMediaFilesTest checks that scan) instead of skipping it as known.
+     */
+    public function testAnImportHasTheIndexForgetItsMissingFilesForMusicAndMovies(): void
+    {
+        $messages = [
+            $this->music($this->file('/music/Album/01 Gone.mp3', 'hash-gone'), $this->file('/music/Album/02 Here.mp3', 'hash-here')),
+            new FilesDiscovered(Uuid::v7(), 'movie', '/movies/Gone Movie', [
+                new DiscoveredFile('/movies/Gone Movie/movie.mkv', 'Gone Movie/movie.mkv', 'mkv', 1_000_000, 1_700_000_000, 'hash-movie'),
+            ]),
+        ];
+
+        foreach ($messages as $message) {
+            $paths = array_map(static fn (DiscoveredFile $file): string => $file->absolutePath, $message->files);
+            $mediaFiles = $this->createMock(LibraryMediaFilesInterface::class);
+            $mediaFiles->expects($this->once())->method('forgetMissing')
+                ->with($message->libraryId, $paths)
+                ->willReturn([$paths[0]]);
+
+            $this->handler($mediaFiles)($message);
+        }
+    }
+
+    /**
+     * A delete with files that claims the library while an import runs stops it at its next
+     * write: the songs already committed stay, and the files whose songs were not written go back
+     * to the queue, to be imported once the delete ends.
+     */
+    public function testADeleteClaimedBetweenBatchWritesStopsTheRemainingWritesAndRequeuesTheirFiles(): void
+    {
+        $files = [];
+        for ($track = 1; $track <= 52; $track++) {
+            $files[] = $this->file(sprintf('/music/Album/%02d Track.mp3', $track), 'hash-' . $track);
+        }
+        $message = $this->music(...$files);
+        $transaction = new PassThroughTransaction();
+        $mediaFiles = $this->createMock(LibraryMediaFilesInterface::class);
+        $mediaFiles->method('forgetMissing')->willReturn([]);
+        // Free when the import starts and at its first write; claimed before its second.
+        $mediaFiles->expects($this->once())->method('isHeldByDelete')->willReturn(false);
+        $mediaFiles->expects($this->exactly(2))->method('isHeldByDeleteForImport')
+            ->with($message->libraryId)
+            ->willReturnCallback(static function () use ($transaction): bool {
+                self::assertTrue($transaction->active, 'The write checks the claim inside its own transaction.');
+
+                return $transaction->runs === 2;
+            });
+        $persisted = [];
+        $songs = $this->createStub(SongPortInterface::class);
+        $songs->method('persist')->willReturnCallback(static function (Song $song) use (&$persisted, $transaction): void {
+            self::assertTrue($transaction->active, 'Songs are written inside the transaction that checked the claim.');
+            $persisted[] = $song->getPath();
+        });
+        $dispatched = [];
+        $bus = $this->createStub(MessageBusInterface::class);
+        $bus->method('dispatch')->willReturnCallback(
+            /** @param array<StampInterface> $stamps */
+            static function (object $command, array $stamps = []) use (&$dispatched): Envelope {
+                $dispatched[] = [$command, $stamps];
+
+                return new Envelope($command);
+            },
+        );
+
+        $this->handler($mediaFiles, songs: $songs, bus: $bus, transaction: $transaction)($message);
+
+        self::assertSame(array_map(static fn (DiscoveredFile $file): string => $file->absolutePath, array_slice($files, 0, 50)), $persisted);
+        self::assertCount(1, $dispatched, 'Only the requeue is dispatched; the cover waits for the import to finish.');
+        [$requeued, $stamps] = $dispatched[0];
+        self::assertEquals(new FilesDiscovered($message->libraryId, 'music', '/music/Album', array_slice($files, 50)), $requeued);
+        self::assertSame(['async'], $this->stamp($stamps, TransportNamesStamp::class)->getTransportNames());
+        self::assertGreaterThan(0, $this->stamp($stamps, DelayStamp::class)->getDelay());
     }
 
     private function handler(
@@ -147,6 +224,7 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
         ?MoviePortInterface $movies = null,
         ?VideoRepositoryInterface $videos = null,
         ?MessageBusInterface $bus = null,
+        ?PassThroughTransaction $transaction = null,
     ): FilesDiscoveredHandler {
         if ($albums === null) {
             $albums = $this->createStub(AlbumPortInterface::class);
@@ -174,6 +252,7 @@ final class FilesDiscoveredMissingFilesTest extends TestCase
             $this->createStub(AlbumMetadataSyncRequestInterface::class),
             new NullLogger(),
             $mediaFiles,
+            $transaction ?? new PassThroughTransaction(),
         );
     }
 

@@ -57,7 +57,8 @@ interface LibraryRepositoryInterface
     /**
      * Claims the library for the delete with files $claimId, as claimScan() claims it for a
      * scan, but leaves the discovery status and the last scan time alone. A lapsed scan claim it
-     * takes over belonged to a scan that died, which it marks failed.
+     * takes over belonged to a scan that died, which it marks failed. It first waits for every
+     * transaction that read the claim through liveClaimKindForImport() to end.
      */
     public function claimDelete(Uuid $libraryId, Uuid $claimId, int $leaseSeconds): LibraryClaimAttempt;
 
@@ -93,4 +94,12 @@ interface LibraryRepositoryInterface
 
     /** The kind of the claim on the library that has not lapsed, by the database clock; null when none. */
     public function liveClaimKind(Uuid $libraryId): ?LibraryClaimKind;
+
+    /**
+     * Reads the live claim as liveClaimKind() does, inside the caller's transaction, which must be
+     * open, and keeps claimDelete() of the library waiting until that transaction ends. A write
+     * in the same transaction that runs only when this is not a delete claim therefore commits
+     * before a delete with files claims the library, or sees its claim.
+     */
+    public function liveClaimKindForImport(Uuid $libraryId): ?LibraryClaimKind;
 }

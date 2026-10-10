@@ -19,10 +19,18 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use Doctrine\DBAL\ParameterType;
 use Doctrine\ORM\EntityManagerInterface;
+use LogicException;
 use Psr\Clock\ClockInterface;
 
 final class LibraryRepository implements LibraryRepositoryInterface
 {
+    /**
+     * The seed that keys the advisory lock between imports and delete claims of one library:
+     * hashtextextended(library ID, seed). Its own seed keeps it apart from the other advisory
+     * locks of the application; a hash collision only makes two libraries wait for each other.
+     */
+    private const int IMPORT_LOCK_SEED = 20261010120000;
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly ClockInterface $clock,
@@ -163,16 +171,27 @@ final class LibraryRepository implements LibraryRepositoryInterface
 
     public function claimDelete(Uuid $libraryId, Uuid $claimId, int $leaseSeconds): LibraryClaimAttempt
     {
-        // A lapsed scan claim ends as failed, as releasing it would end it, so the library never
-        // reads as scanning while a delete holds it.
-        return $this->claim(
-            $libraryId,
-            $claimId,
-            $leaseSeconds,
-            LibraryClaimKind::Delete,
-            "scan_status = CASE WHEN held.claim_kind = 'scan' THEN 'failed' ELSE libraries.scan_status END,
-             updated_at = CASE WHEN held.claim_kind = 'scan' THEN now() ELSE libraries.updated_at END",
-        );
+        $connection = $this->entityManager->getConnection();
+
+        return $connection->transactional(function () use ($connection, $libraryId, $claimId, $leaseSeconds): LibraryClaimAttempt {
+            // Waits for the imports that hold the shared lock, so the songs they write commit
+            // before the claim does; an import that takes the lock later sees the claim.
+            $connection->executeQuery(
+                'SELECT pg_advisory_xact_lock(hashtextextended(:id, ' . self::IMPORT_LOCK_SEED . '))',
+                ['id' => $libraryId->toString()],
+            )->free();
+
+            // A lapsed scan claim ends as failed, as releasing it would end it, so the library
+            // never reads as scanning while a delete holds it.
+            return $this->claim(
+                $libraryId,
+                $claimId,
+                $leaseSeconds,
+                LibraryClaimKind::Delete,
+                "scan_status = CASE WHEN held.claim_kind = 'scan' THEN 'failed' ELSE libraries.scan_status END,
+                 updated_at = CASE WHEN held.claim_kind = 'scan' THEN now() ELSE libraries.updated_at END",
+            );
+        });
     }
 
     public function renewClaim(Uuid $claimId, int $leaseSeconds): bool
@@ -251,6 +270,24 @@ final class LibraryRepository implements LibraryRepositoryInterface
         );
 
         return is_string($kind) ? LibraryClaimKind::from($kind) : null;
+    }
+
+    public function liveClaimKindForImport(Uuid $libraryId): ?LibraryClaimKind
+    {
+        $connection = $this->entityManager->getConnection();
+        // Outside a transaction the lock would end with its own statement.
+        if (!$connection->isTransactionActive()) {
+            throw new LogicException('Read the claim for an import inside the transaction that writes the import.');
+        }
+
+        $connection->executeQuery(
+            'SELECT pg_advisory_xact_lock_shared(hashtextextended(:id, ' . self::IMPORT_LOCK_SEED . '))',
+            ['id' => $libraryId->toString()],
+        )->free();
+
+        // A statement of its own: under READ COMMITTED it reads a snapshot taken after the lock
+        // was granted, so it sees a delete claim that committed while it waited.
+        return $this->liveClaimKind($libraryId);
     }
 
     // --- Internal ---

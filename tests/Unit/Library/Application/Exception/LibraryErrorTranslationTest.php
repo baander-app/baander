@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Library\Application\Exception;
 
 use App\Library\Application\Exception\InvalidLibraryTypeException;
 use App\Library\Application\Exception\LibraryBusyException;
+use App\Library\Application\Exception\LibraryMediaFilesAllMissingException;
 use App\Library\Application\Exception\LibraryNotFoundException;
 use App\Library\Application\Exception\LibraryRootOverlapsException;
 use App\Library\Application\Exception\LibrarySlugTakenException;
@@ -31,6 +32,7 @@ final class LibraryErrorTranslationTest extends TestCase
         yield 'delete running' => [LibraryBusyException::heldBy('Jazz', LibraryClaimKind::Delete)];
         yield 'invalid type' => [InvalidLibraryTypeException::forType('vinyl')];
         yield 'root overlaps' => [LibraryRootOverlapsException::with('/data/music/jazz', 'music', '/data/music')];
+        yield 'all files missing' => [LibraryMediaFilesAllMissingException::underRoot('/data/music')];
     }
 
     #[DataProvider('exceptions')]
@@ -53,6 +55,8 @@ final class LibraryErrorTranslationTest extends TestCase
         yield 'delete running, th' => [LibraryBusyException::heldBy('Jazz', LibraryClaimKind::Delete), 'th', 'มีการลบพร้อมไฟล์กำลังดำเนินการอยู่สำหรับไลบรารี "Jazz"'];
         yield 'root overlaps, da' => [LibraryRootOverlapsException::with('/data/music/jazz', 'music', '/data/music'), 'da', 'Stien "/data/music/jazz" ligger inden i eller indeholder roden "/data/music" for biblioteket "music".'];
         yield 'root overlaps, th' => [LibraryRootOverlapsException::with('/data/music/jazz', 'music', '/data/music'), 'th', 'พาธ "/data/music/jazz" อยู่ภายในหรือครอบคลุมรูท "/data/music" ของไลบรารี "music"'];
+        yield 'all files missing, da' => [LibraryMediaFilesAllMissingException::underRoot('/data/music'), 'da', 'Ingen af filerne findes i biblioteksmappen /data/music; dens lager er måske ikke monteret. Intet blev slettet.'];
+        yield 'all files missing, th' => [LibraryMediaFilesAllMissingException::underRoot('/data/music'), 'th', 'ไม่พบไฟล์ใดเลยในโฟลเดอร์ไลบรารี /data/music อาจยังไม่ได้เมานต์ที่เก็บข้อมูล ไม่มีการลบใดๆ'];
         yield 'invalid type, th' => [InvalidLibraryTypeException::forType('vinyl'), 'th', 'ประเภทไลบรารี "vinyl" ไม่ถูกต้อง ต้องเป็นค่าหนึ่งใน: music, podcast, audiobook, movie, tv_show'];
     }
 

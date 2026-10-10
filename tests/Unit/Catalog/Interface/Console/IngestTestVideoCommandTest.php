@@ -23,6 +23,7 @@ use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
 use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
+use App\Tests\Fixtures\Catalog\PassThroughTransaction;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -110,6 +111,7 @@ final class IngestTestVideoCommandTest extends TestCase
             $videos, $this->createStub(MetadataContentReaderPortInterface::class), new FFprobeAdapter(new JsonEncoder()), $bus,
             $this->createStub(LyricsFetchRequestInterface::class), $this->createStub(AlbumMetadataSyncRequestInterface::class), new NullLogger(),
             $this->createStub(LibraryMediaFilesInterface::class),
+            new PassThroughTransaction(),
         );
 
         return new IngestTestVideoCommand(new MovieLibraryIngest($provisioning, $handler, $videos));

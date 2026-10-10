@@ -51,19 +51,32 @@ interface LibraryMediaFilesInterface
     public function isHeldByDelete(Uuid $libraryId): bool;
 
     /**
-     * The paths at which no file exists now, or a symlink points to nothing, in request order. An
-     * import drops them, so a file deleted since the scan found it becomes no song or video.
+     * Answers as isHeldByDelete() does, inside the caller's transaction, which must be open, and
+     * keeps a delete with files from claiming the library until that transaction ends. An import
+     * that writes songs in the same transaction only when this returns false never writes a song
+     * that such a delete misses, or one whose file it is about to unlink: the delete's claim
+     * waits for the write to commit, and a write after the claim sees it.
+     */
+    public function isHeldByDeleteForImport(Uuid $libraryId): bool;
+
+    /**
+     * The paths at which no file exists now, or a symlink points to nothing, in request order,
+     * after deleting their file index rows. An import drops these paths, so a file deleted since
+     * the scan found it becomes no song or video; without its index row, a file that comes back
+     * at the path unchanged reads as new to the next incremental scan, which imports it.
      *
      * @param list<string> $paths absolute paths, as the scanner stored them
      *
      * @return list<string>
      */
-    public function missingPaths(array $paths): array;
+    public function forgetMissing(Uuid $libraryId, array $paths): array;
 
     /**
      * Claims the library for a delete with files, with a lease that deleteFiles() renews. A claim
      * whose holder stopped renewing it has lapsed and is taken over; a lapsed scan claim belonged
-     * to a scan that died, which is marked failed.
+     * to a scan that died, which is marked failed. It first waits for the import writes in flight
+     * on the library (see isHeldByDeleteForImport()) to commit, so the catalog rows a caller
+     * reads after the claim include every song an import wrote.
      *
      * @throws NotFoundException when no library has the ID
      * @throws ConflictException when a scan or another delete with files holds a live claim on the
@@ -106,8 +119,8 @@ interface LibraryMediaFilesInterface
 
     /**
      * Ends the claim. Does nothing when it already ended or another holder took it over. A
-     * failure to end it is logged rather than thrown, so that it never hides the outcome of the
-     * delete; the claim then lapses with its lease.
+     * failure to end it is retried once, then logged rather than thrown, so that it never hides
+     * the outcome of the delete; the claim then lapses with its lease.
      */
     public function release(LibraryMediaFileClaim $claim): void;
 }

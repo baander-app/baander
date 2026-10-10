@@ -22,6 +22,7 @@ use App\Library\Application\Message\FilesDiscovered;
 use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
 use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
 use Psr\Log\LoggerInterface;
@@ -51,6 +52,7 @@ final class FilesDiscoveredHandler
         private readonly AlbumMetadataSyncRequestInterface $albumMetadataSync,
         private readonly LoggerInterface $logger,
         private readonly LibraryMediaFilesInterface $mediaFiles,
+        private readonly TransactionPortInterface $transaction,
     ) {
     }
 
@@ -59,7 +61,7 @@ final class FilesDiscoveredHandler
     {
         // A delete with files that holds the library may be about to unlink some of these files,
         // and a song imported from one now would stay in the catalog without its file. Wait for
-        // the delete to end.
+        // the delete to end. Each write checks again, for a delete that claims the library later.
         if ($this->mediaFiles->isHeldByDelete($message->libraryId)) {
             $this->requeueWhileHeld($message);
 
@@ -67,7 +69,7 @@ final class FilesDiscoveredHandler
         }
 
         // Files deleted since the scan found them become no song, video or album.
-        $files = $this->presentFiles($message->files);
+        $files = $this->presentFiles($message);
         if ($files === []) {
             return;
         }
@@ -79,14 +81,22 @@ final class FilesDiscoveredHandler
         };
     }
 
-    /** @param list<DiscoveredFile> $files the message's files that still exist */
+    /**
+     * Reads the metadata of each batch of files first, then writes the batch's songs, artist
+     * links and genres in one transaction during which no delete with files can claim the
+     * library. When a delete claimed it before that transaction, the import stops and the files
+     * whose songs no transaction committed go back to the queue, as a held import does.
+     *
+     * @param list<DiscoveredFile> $files the message's files that still exist
+     */
     private function processMusicFiles(FilesDiscovered $message, array $files): void
     {
         $libraryId = $message->libraryId;
-        $batchCount = 0;
         $failures = [];
-        // New songs without sidecar lyrics, waiting for the flush that commits them.
+        // Committed songs without sidecar lyrics, waiting for a successful lyrics request.
         $songsAwaitingLyrics = [];
+        /** @var array<string, true> $committedPaths */
+        $committedPaths = [];
 
         // Resolve album from directory
         [$album, $wasCreated] = $this->resolveAlbum($libraryId, $message->directory, $files);
@@ -99,106 +109,174 @@ final class FilesDiscoveredHandler
             $this->requestAlbumSync($album);
         }
 
-        foreach ($files as $file) {
-            if (!$file->isAudio()) {
+        $audioFiles = array_values(array_filter($files, static fn (DiscoveredFile $file): bool => $file->isAudio()));
+        foreach (array_chunk($audioFiles, self::BATCH_SIZE) as $batch) {
+            $songs = [];
+            foreach ($batch as $file) {
+                try {
+                    $song = $this->readSong($album, $file);
+                    if ($song !== null) {
+                        $songs[] = $song;
+                    }
+                } catch (\Throwable $e) {
+                    $failures[] = $this->fileFailed($file, $e);
+                }
+            }
+            if ($songs === []) {
                 continue;
             }
 
-            try {
-                // Dedup by hash
-                $existing = $this->songService->findByHash($file->hash);
-                if ($existing !== null) {
-                    continue;
-                }
+            $written = $this->writeSongs($libraryId, $songs, $failures);
+            if ($written === null) {
+                // A delete with files claimed the library since the import began. The songs
+                // committed so far stay; the requeued import skips them by hash.
+                $this->requeueWhileHeld(new FilesDiscovered(
+                    $libraryId,
+                    $message->libraryType,
+                    $message->directory,
+                    array_values(array_filter($files, static fn (DiscoveredFile $file): bool => !isset($committedPaths[$file->absolutePath]))),
+                ));
 
-                $metadata = $this->metadataReader->readMetadata($file->absolutePath);
-                if ($metadata === null) {
-                    $this->logger->warning('No metadata for file', ['path' => $file->absolutePath]);
-                    continue;
-                }
-
-                $title = $metadata->getTitle() ?? pathinfo($file->absolutePath, PATHINFO_FILENAME);
-                if (trim($title) === '') {
-                    $title = pathinfo($file->absolutePath, PATHINFO_FILENAME);
-                }
-
-                $track = $metadata->getTrackNumber() ?? $this->extractTrackNumberFromFilename($file->absolutePath);
-                $lyrics = $this->findLyricsFile($file->absolutePath);
-
-                $song = Song::create(
-                    album: $album->getId(),
-                    title: $title,
-                    path: $file->absolutePath,
-                    size: $file->size,
-                    mimeType: $this->detectMimeType($file->extension),
-                    length: $metadata->getDuration(),
-                    lyrics: $lyrics,
-                    track: $track,
-                    disc: $metadata->getDiscNumber(),
-                    year: $metadata->getYear(),
-                    comment: $metadata->getComment(),
-                    hash: $file->hash,
-                    bitrate: $metadata->getBitrate(),
-                    sampleRate: $metadata->getSampleRate(),
-                    channels: $metadata->getChannels(),
-                );
-
-                $this->songService->persist($song);
-                if ($lyrics === null) {
-                    $songsAwaitingLyrics[] = $song->getId();
-                }
-
-                // Link artist
-                $artistName = $metadata->getArtist();
-                if ($artistName !== null && trim($artistName) !== '') {
-                    $this->songService->linkArtistToSong($song->getId(), trim($artistName), ArtistRole::Primary->value);
-                }
-
-                // Link genres
-                foreach ($metadata->getGenre() as $genreName) {
-                    $genreName = trim($genreName);
-                    if ($genreName === '') {
-                        continue;
-                    }
-                    $genre = $this->genreService->findOrCreateByName($genreName);
-                    $this->genreService->addSongToGenre($genre->getId(), $song->getId());
-                }
-
-                $batchCount++;
-                if ($batchCount >= self::BATCH_SIZE) {
-                    $this->songService->flush();
-                    $this->genreService->flush();
-                    $batchCount = 0;
-                    $this->requestLyricsFetch($songsAwaitingLyrics);
-                }
-            } catch (\Throwable $e) {
-                $failures[] = [
-                    'path' => $file->absolutePath,
-                    'error' => $e->getMessage(),
-                ];
-
-                $this->logger->warning('Failed to process file', [
-                    'path' => $file->absolutePath,
-                    'error' => $e->getMessage(),
-                ]);
+                return;
             }
-        }
 
-        $this->songService->flush();
-        $this->genreService->flush();
-        // A retry skips these songs as duplicates, so request their lyrics before
-        // reporting failed files.
-        $this->requestLyricsFetch($songsAwaitingLyrics);
+            foreach ($written as $song) {
+                $committedPaths[$song['song']->getPath()] = true;
+                if ($song['song']->getLyrics() === null) {
+                    $songsAwaitingLyrics[] = $song['song']->getId();
+                }
+            }
+            // A retry skips the committed songs as duplicates, so request their lyrics now,
+            // before any failed file is reported.
+            $this->requestLyricsFetch($songsAwaitingLyrics);
+        }
 
         if ($failures !== []) {
             throw new RuntimeException($this->buildFailureMessage($failures));
         }
 
-        // A consumer can run immediately after dispatch. Flush songs first, and
+        // A consumer can run immediately after dispatch. Commit songs first, and
         // retry cover dispatch even when an earlier delivery created the album.
         if ($album->getCoverImageId() === null) {
             $this->dispatchCoverExtraction($album);
         }
+    }
+
+    /**
+     * The song a file becomes, with the artist and genres to link it to; null when a song
+     * already has the file's hash or the file has no metadata. Writes nothing.
+     *
+     * @return array{file: DiscoveredFile, song: Song, artist: ?string, genres: list<string>}|null
+     */
+    private function readSong(Album $album, DiscoveredFile $file): ?array
+    {
+        // Dedup by hash
+        if ($this->songService->findByHash($file->hash) !== null) {
+            return null;
+        }
+
+        $metadata = $this->metadataReader->readMetadata($file->absolutePath);
+        if ($metadata === null) {
+            $this->logger->warning('No metadata for file', ['path' => $file->absolutePath]);
+
+            return null;
+        }
+
+        $title = $metadata->getTitle() ?? pathinfo($file->absolutePath, PATHINFO_FILENAME);
+        if (trim($title) === '') {
+            $title = pathinfo($file->absolutePath, PATHINFO_FILENAME);
+        }
+
+        $song = Song::create(
+            album: $album->getId(),
+            title: $title,
+            path: $file->absolutePath,
+            size: $file->size,
+            mimeType: $this->detectMimeType($file->extension),
+            length: $metadata->getDuration(),
+            lyrics: $this->findLyricsFile($file->absolutePath),
+            track: $metadata->getTrackNumber() ?? $this->extractTrackNumberFromFilename($file->absolutePath),
+            disc: $metadata->getDiscNumber(),
+            year: $metadata->getYear(),
+            comment: $metadata->getComment(),
+            hash: $file->hash,
+            bitrate: $metadata->getBitrate(),
+            sampleRate: $metadata->getSampleRate(),
+            channels: $metadata->getChannels(),
+        );
+
+        $artist = trim($metadata->getArtist() ?? '');
+        $genres = array_values(array_filter(
+            array_map(trim(...), $metadata->getGenre()),
+            static fn (string $genre): bool => $genre !== '',
+        ));
+
+        return ['file' => $file, 'song' => $song, 'artist' => $artist !== '' ? $artist : null, 'genres' => $genres];
+    }
+
+    /**
+     * Writes the songs and their links in one transaction, unless a delete with files holds the
+     * library. A song that fails is added to $failures and the others are written; a failed
+     * statement fails the transaction and with it the message.
+     *
+     * @param list<array{file: DiscoveredFile, song: Song, artist: ?string, genres: list<string>}> $songs
+     * @param list<array{path: string, error: string}>                                            $failures
+     *
+     * @return list<array{file: DiscoveredFile, song: Song, artist: ?string, genres: list<string>}>|null
+     *         the songs the transaction committed; null when a delete holds the library and nothing was written
+     */
+    private function writeSongs(Uuid $libraryId, array $songs, array &$failures): ?array
+    {
+        $songFailures = [];
+        $written = $this->transaction->run(function () use ($libraryId, $songs, &$songFailures): ?array {
+            if ($this->mediaFiles->isHeldByDeleteForImport($libraryId)) {
+                return null;
+            }
+
+            $written = [];
+            foreach ($songs as $song) {
+                try {
+                    $this->writeSong($song['song'], $song['artist'], $song['genres']);
+                    $written[] = $song;
+                } catch (\Throwable $e) {
+                    $songFailures[] = $this->fileFailed($song['file'], $e);
+                }
+            }
+
+            $this->songService->flush();
+            $this->genreService->flush();
+
+            return $written;
+        });
+        array_push($failures, ...$songFailures);
+
+        return $written;
+    }
+
+    /** @param list<string> $genres */
+    private function writeSong(Song $song, ?string $artist, array $genres): void
+    {
+        $this->songService->persist($song);
+
+        if ($artist !== null) {
+            $this->songService->linkArtistToSong($song->getId(), $artist, ArtistRole::Primary->value);
+        }
+
+        foreach ($genres as $genreName) {
+            $genre = $this->genreService->findOrCreateByName($genreName);
+            $this->genreService->addSongToGenre($genre->getId(), $song->getId());
+        }
+    }
+
+    /** @return array{path: string, error: string} */
+    private function fileFailed(DiscoveredFile $file, \Throwable $e): array
+    {
+        $this->logger->warning('Failed to process file', [
+            'path' => $file->absolutePath,
+            'error' => $e->getMessage(),
+        ]);
+
+        return ['path' => $file->absolutePath, 'error' => $e->getMessage()];
     }
 
     /** @param list<DiscoveredFile> $files the message's files that still exist */
@@ -339,8 +417,9 @@ final class FilesDiscoveredHandler
     }
 
     /**
-     * Puts the message back on its queue with a delay. The delete renews its claim while it runs
-     * and the claim lapses with its lease when the delete dies, so the import runs in the end.
+     * Puts the message, or what is left of it, back on its queue with a delay. The delete renews
+     * its claim while it runs and the claim lapses with its lease when the delete dies, so the
+     * import runs in the end.
      */
     private function requeueWhileHeld(FilesDiscovered $message): void
     {
@@ -356,19 +435,23 @@ final class FilesDiscoveredHandler
     }
 
     /**
-     * @param array<DiscoveredFile> $files
+     * The message's files that still exist. The others also lose their file index rows, so the
+     * next incremental scan imports a file that comes back at its path.
      *
      * @return list<DiscoveredFile>
      */
-    private function presentFiles(array $files): array
+    private function presentFiles(FilesDiscovered $message): array
     {
-        $files = array_values($files);
-        $missing = $this->mediaFiles->missingPaths(array_map(static fn (DiscoveredFile $file): string => $file->absolutePath, $files));
+        $files = array_values($message->files);
+        $missing = $this->mediaFiles->forgetMissing(
+            $message->libraryId,
+            array_map(static fn (DiscoveredFile $file): string => $file->absolutePath, $files),
+        );
         if ($missing === []) {
             return $files;
         }
 
-        $this->logger->info('Skipping {count} file(s) deleted since the scan found them.', [
+        $this->logger->info('Skipping {count} file(s) deleted since the scan found them; a scan imports any that come back.', [
             'count' => count($missing),
             'paths' => $missing,
         ]);

@@ -7,3 +7,4 @@ errors:
   library_busy:
     scan: 'A scan is already in progress for the library "{library}".'
     delete: 'A delete with files is in progress for the library "{library}".'
+  all_files_missing: 'None of the files exist in the library folder {root}; its storage may not be mounted. Nothing was deleted.'

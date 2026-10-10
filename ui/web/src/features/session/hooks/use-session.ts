@@ -205,9 +205,6 @@ export function useSession() {
         // Significant drift — seek to server position (handles long disconnections)
         local.seekTo(state.position)
       },
-      onReconnect: () => {
-        bus.sendSync()
-      },
       onError: (err) => {
         logger.warn('[useSession] WS error:', err.message)
       },

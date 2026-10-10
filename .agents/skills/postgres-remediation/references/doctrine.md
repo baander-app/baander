@@ -140,6 +140,11 @@ CTE feeding a conditional `UPDATE`), so a refused claimant reads the winner's
 claim kind from the same locked row, and `releaseClaim()` uses PostgreSQL 18
 `RETURNING old.<column>` to report what it released. Verified on PostgreSQL 18
 by the two-session races in `tests/Integration/LibraryScanClaimTest.php`.
+`claimDelete()` runs that statement in a transaction after
+`pg_advisory_xact_lock(hashtextextended(<library id>, 20261010120000))`; import
+writes take the shared form first (`liveClaimKindForImport()`), then read the
+claim in a separate statement so its READ COMMITTED snapshot postdates the lock.
+Verified by the two-session import/delete tests in the same file.
 
 For example, [AccessTokenRepository](../../../../src/Auth/Infrastructure/Repository/OAuth/AccessTokenRepository.php)
 honors `save(..., false)` and clears after bulk revocation. Preserve the flush
