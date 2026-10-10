@@ -2,7 +2,7 @@
  * Mediator tests.
  */
 
-import { register, dispatch, type MediatorAction } from '../types';
+import { register, dispatch, type MediatorAction } from './types';
 
 describe('Mediator', () => {
   beforeEach(() => {
