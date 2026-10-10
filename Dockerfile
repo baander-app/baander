@@ -27,17 +27,7 @@ RUN set -xe && \
         build-essential \
         git \
         python3 \
-        python3-pip \
-        libeigen3-dev \
         libyaml-dev \
-        libfftw3-dev \
-        libavcodec-dev \
-        libavformat-dev \
-        libavutil-dev \
-        libswresample-dev \
-        libsamplerate0-dev \
-        libtag1-dev \
-        libchromaprint-dev \
         ca-certificates \
         bison \
         cron \
@@ -114,7 +104,7 @@ RUN set -xe && \
 
 # -----------------------------------------------------------------------------
 # Stage 2a: builder-php
-# PHP core extensions, liburing, PECL extensions, essentia, and Composer.
+# PHP core extensions, liburing, PECL extensions, and Composer.
 # Runs in parallel with builder-swoole and builder-tsduck.
 # -----------------------------------------------------------------------------
 FROM base AS builder-php
@@ -193,11 +183,6 @@ RUN --mount=type=cache,target=/tmp/pecl \
     && pecl bundle -d /tmp/pecl uv \
     && docker-php-ext-configure /tmp/pecl/uv \
     && docker-php-ext-install -j$(nproc) /tmp/pecl/uv
-
-# Install essentia via pip.
-# --mount=type=cache reuses downloaded wheels and build artifacts.
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --break-system-packages essentia
 
 # Install Composer from official image
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -349,11 +334,6 @@ RUN set -xe && \
         libuv1 \
         libc-ares2 \
         libssh2-1 \
-        # Essentia runtime dependencies
-        libfftw3-double3 \
-        libsamplerate0 \
-        libtag1v5 \
-        libchromaprint1 \
         # libavif runtime
         libavif15 \
         # TSDuck runtime dependencies
