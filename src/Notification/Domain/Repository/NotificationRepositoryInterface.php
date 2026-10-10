@@ -34,9 +34,4 @@ interface NotificationRepositoryInterface
     public function markAllAsRead(Uuid $userId): void;
 
     public function delete(Notification $notification): void;
-
-    /**
-     * @return list<Notification> Notifications created after the given UUID for SSE replay
-     */
-    public function findAfterId(Uuid $userId, Uuid $afterId): array;
 }

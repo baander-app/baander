@@ -229,7 +229,6 @@ final class NotificationOwnershipPersistenceTest extends TestCase
             $titles($repository->findByUserId($first, since: new \DateTimeImmutable('2026-10-06T14:00:15+02:00'))),
         );
         self::assertSame(['b2'], $titles($repository->findByUserId($second, since: new \DateTimeImmutable('2026-10-06T12:00:15Z'))));
-        self::assertSame(['a2', 'a3'], $titles($repository->findAfterId($first, $ids['a1'])));
 
         $repository->markAllAsRead($first);
         $this->manager->clear();

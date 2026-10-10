@@ -148,22 +148,6 @@ final class NotificationRepository implements NotificationRepositoryInterface
         }
     }
 
-    public function findAfterId(Uuid $userId, Uuid $afterId): array
-    {
-        $entities = $this->entityManager->createQueryBuilder()
-            ->select('e')
-            ->from(NotificationEntity::class, 'e')
-            ->where('e.userId = :userId')
-            ->andWhere('e.id > :afterId')
-            ->setParameter('userId', $userId, 'uuid')
-            ->setParameter('afterId', $afterId->toString())
-            ->orderBy('e.id', 'ASC')
-            ->getQuery()
-            ->getResult();
-
-        return array_map(fn (NotificationEntity $e) => $this->toDomain($e), $entities);
-    }
-
     private function toDomain(NotificationEntity $entity): Notification
     {
         return Notification::reconstitute(

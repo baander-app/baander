@@ -2,7 +2,7 @@
  * useAlbums hook tests.
  */
 
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react-native';
 import { useAlbums } from '../hooks/useAlbums';
 import * as catalogApi from '../api/catalog-api';
 
