@@ -7,6 +7,7 @@ namespace App\Party\Application\CommandHandler;
 use App\Party\Application\Command\LeavePartySessionCommand;
 use App\Party\Application\Port\PartyMemberPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
+use App\Party\Domain\Event\MemberLeft;
 use App\Party\Domain\Event\PartySessionEnded;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -32,6 +33,11 @@ final class LeavePartySessionHandler
         $isHost = $session->getHostUserId()->toString() === $leavingUserId->toString();
 
         $this->memberPort->removeMember($leavingUserId, $command->getSessionId());
+        // Before PartySessionEnded, so the session's live room drops the member first.
+        $this->eventDispatcher->dispatch(new MemberLeft(
+            sessionId: $session->getId(),
+            userId: $leavingUserId,
+        ));
 
         if ($isHost) {
             $remainingMembers = $this->memberPort->findBySession($command->getSessionId());

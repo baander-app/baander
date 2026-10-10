@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Infrastructure\Swoole\Control\Operation;
 
 use App\Shared\Infrastructure\Swoole\Control\Operation\WebSocketUserDisconnectOperation;
-use App\Shared\Infrastructure\Swoole\ReconnectionTokenService;
 use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
 use App\Shared\Infrastructure\Swoole\WebSocketPusher;
 use PHPUnit\Framework\TestCase;
@@ -23,13 +22,11 @@ final class WebSocketUserDisconnectOperationTest extends TestCase
         }
     }
 
-    public function testClosesTheUsersConnectionsAndVoidsItsReconnectionTokens(): void
+    public function testClosesEveryConnectionOfTheUser(): void
     {
         $registry = WebSocketConnectionRegistry::create(16, 64);
         $registry->addConnection(7, self::USER, 0);
         $registry->addConnection(8, self::USER, 1);
-        $tokens = ReconnectionTokenService::create(16);
-        $token = $tokens->generate(self::USER);
 
         $server = $this->createMock(Server::class);
         $server->method('isEstablished')->willReturn(true);
@@ -39,19 +36,17 @@ final class WebSocketUserDisconnectOperationTest extends TestCase
         $pusher = new WebSocketPusher($registry, new JsonEncoder());
         $pusher->setServer($server);
 
-        $operation = new WebSocketUserDisconnectOperation($pusher, $tokens);
+        $operation = new WebSocketUserDisconnectOperation($pusher);
 
         self::assertSame('websocket.user.disconnect', $operation->name());
-        self::assertFalse($operation->fansOut(), 'The connection and token tables are shared, so one worker does the whole job.');
-        self::assertSame(['closed' => 2, 'reconnect_tokens_revoked' => 1], $operation->handle(['user_id' => self::USER]));
-        self::assertNull($tokens->consume($token));
+        self::assertFalse($operation->fansOut(), 'The connection table is shared, so one worker does the whole job.');
+        self::assertSame(['closed' => 2], $operation->handle(['user_id' => self::USER]));
     }
 
     public function testRejectsAPayloadWithoutAUserUuid(): void
     {
         $operation = new WebSocketUserDisconnectOperation(
             new WebSocketPusher(WebSocketConnectionRegistry::create(16, 64), new JsonEncoder()),
-            ReconnectionTokenService::create(16),
         );
 
         $rejected = 0;

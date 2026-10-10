@@ -275,7 +275,7 @@ Besides Baander's own apps, other clients can obtain tokens through the OAuth 2.
 
 ### Disabled accounts
 
-Disabling a user, from the admin panel or with [app:user:disable](commands/app-user-disable.md), revokes the user's access and refresh tokens in the transaction that saves the disable. Every authenticator then refuses the account: API requests, token refresh and new WebSocket handshakes. After the commit, the web server closes the user's open WebSocket connections on every worker and voids their reconnection tokens. The command reaches the server through its control socket, so run it in the web container. In a container without a web server, it disables the account but logs a warning that the open connections were not closed.
+Disabling a user, from the admin panel or with [app:user:disable](commands/app-user-disable.md), revokes the user's access and refresh tokens in the transaction that saves the disable. Every authenticator then refuses the account: API requests, token refresh and new WebSocket handshakes. After the commit, the web server closes the user's open WebSocket connections on every worker. The command reaches the server through its control socket, so run it in the web container. In a container without a web server, it disables the account but logs a warning that the open connections were not closed.
 
 Two kinds of media access outlive the disable:
 

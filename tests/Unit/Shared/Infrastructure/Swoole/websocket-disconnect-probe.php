@@ -23,7 +23,6 @@ use App\Shared\Infrastructure\Swoole\Control\ServerControlCoordinator;
 use App\Shared\Infrastructure\Swoole\Control\ServerControlOperationRegistry;
 use App\Shared\Infrastructure\Swoole\Control\SocketServerControlClient;
 use App\Shared\Infrastructure\Swoole\Control\SwooleServerWorkers;
-use App\Shared\Infrastructure\Swoole\ReconnectionTokenService;
 use App\Shared\Infrastructure\Swoole\SwooleLiveConnections;
 use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
 use App\Shared\Infrastructure\Swoole\WebSocketPusher;
@@ -95,7 +94,7 @@ function sendText($socket, string $text): void
 /**
  * Opens a WebSocket connection for the user and reads the server's greeting.
  *
- * @return array{socket: resource, worker: int, token: string}
+ * @return array{socket: resource, worker: int}
  */
 function connectAs(int $port, string $userId): array
 {
@@ -120,13 +119,13 @@ function connectAs(int $port, string $userId): array
         probeFail('greeting: ' . $greeting['payload']);
     }
 
-    return ['socket' => $socket, 'worker' => $message['worker'], 'token' => $message['reconnectToken']];
+    return ['socket' => $socket, 'worker' => $message['worker']];
 }
 
 /**
  * The connection receives a close frame with the policy-violation code, then ends.
  *
- * @param array{socket: resource, worker: int, token: string} $connection
+ * @param array{socket: resource, worker: int} $connection
  */
 function assertClosedByServer(array $connection, string $what): void
 {
@@ -141,7 +140,7 @@ function assertClosedByServer(array $connection, string $what): void
     fclose($connection['socket']);
 }
 
-/** @param array{socket: resource, worker: int, token: string} $connection */
+/** @param array{socket: resource, worker: int} $connection */
 function assertAlive(array $connection, string $what): void
 {
     sendText($connection['socket'], 'ping');
@@ -168,11 +167,10 @@ $socketPath = $directory . '/control.sock';
 
 // Shared memory exists before the fork, so the console-side process sees the same tables.
 $registry = WebSocketConnectionRegistry::create(64, 256);
-$reconnectTokens = ReconnectionTokenService::create(64);
 $pusher = new WebSocketPusher($registry, new JsonEncoder());
 
 $workers = new SwooleServerWorkers();
-$operations = new ServerControlOperationRegistry([new WebSocketUserDisconnectOperation($pusher, $reconnectTokens)]);
+$operations = new ServerControlOperationRegistry([new WebSocketUserDisconnectOperation($pusher)]);
 $coordinator = new ServerControlCoordinator($operations, $workers);
 $client = new SocketServerControlClient($socketPath, 5.0);
 $liveConnections = new SwooleLiveConnections(new ServerControl($coordinator, $client));
@@ -232,15 +230,9 @@ if ($child === 0) {
     }
     foreach ($cliUser as $index => $connection) {
         assertClosedByServer($connection, 'console path connection ' . $index);
-        if ($reconnectTokens->exists($connection['token'])) {
-            probeFail('a closed connection kept its reconnection token');
-        }
     }
     waitForRegistryCleanup($registry, $disabledByCli);
     assertAlive($other, 'bystander after the console path');
-    if (!$reconnectTokens->exists($other['token'])) {
-        probeFail('the bystander lost its reconnection token');
-    }
 
     // 4. Inside an HTTP worker, as the admin API does.
     $http = stream_socket_client('tcp://127.0.0.1:' . $port, $errno, $error, 2.0);
@@ -280,7 +272,7 @@ $server->on('WorkerStart', static function (Server $server) use ($pusher, $regis
     $pusher->setServer($server);
     $registry->setWorkerId($server->worker_id);
 });
-$server->on('Handshake', static function (Request $request, Response $response) use ($server, $registry, $reconnectTokens, $pusher): void {
+$server->on('Handshake', static function (Request $request, Response $response) use ($server, $registry, $pusher): void {
     $key = $request->header['sec-websocket-key'] ?? '';
     $response->header('Upgrade', 'websocket');
     $response->header('Connection', 'Upgrade');
@@ -293,7 +285,6 @@ $server->on('Handshake', static function (Request $request, Response $response) 
     $pusher->pushToConnection($fd, [
         'type' => 'connected',
         'worker' => $server->worker_id,
-        'reconnectToken' => $reconnectTokens->generate($userId),
     ]);
 });
 $server->on('Message', static function (WebSocketServer $server, Frame $frame): void {

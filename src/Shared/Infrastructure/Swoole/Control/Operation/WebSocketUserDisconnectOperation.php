@@ -6,16 +6,15 @@ namespace App\Shared\Infrastructure\Swoole\Control\Operation;
 
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Swoole\Control\ServerControlOperation;
-use App\Shared\Infrastructure\Swoole\ReconnectionTokenService;
 use App\Shared\Infrastructure\Swoole\WebSocketPusher;
 use InvalidArgumentException;
 
 /**
- * Closes a user's WebSocket connections and voids the user's reconnection tokens.
+ * Closes a user's WebSocket connections.
  *
- * The connection and token tables are shared by every worker, and a process-mode
- * server closes any worker's connection from the accepting worker, so one worker
- * does the whole job.
+ * The connection table is shared by every worker, and a process-mode server closes
+ * any worker's connection from the accepting worker, so one worker does the whole
+ * job.
  */
 final readonly class WebSocketUserDisconnectOperation implements ServerControlOperation
 {
@@ -28,7 +27,6 @@ final readonly class WebSocketUserDisconnectOperation implements ServerControlOp
 
     public function __construct(
         private WebSocketPusher $pusher,
-        private ReconnectionTokenService $reconnectionTokens,
     ) {
     }
 
@@ -42,7 +40,7 @@ final readonly class WebSocketUserDisconnectOperation implements ServerControlOp
         return false;
     }
 
-    /** @return array{closed: int, reconnect_tokens_revoked: int} */
+    /** @return array{closed: int} */
     public function handle(array $payload): array
     {
         $userId = $payload['user_id'] ?? null;
@@ -51,13 +49,6 @@ final readonly class WebSocketUserDisconnectOperation implements ServerControlOp
         }
         $userId = Uuid::fromString($userId)->toString();
 
-        // Tokens first, so no connection can take on the user's identity through
-        // auth.reconnect while the user's connections close.
-        $revoked = $this->reconnectionTokens->revokeForUser($userId);
-
-        return [
-            'closed' => $this->pusher->disconnectUser($userId, self::CLOSE_CODE, self::CLOSE_REASON),
-            'reconnect_tokens_revoked' => $revoked,
-        ];
+        return ['closed' => $this->pusher->disconnectUser($userId, self::CLOSE_CODE, self::CLOSE_REASON)];
     }
 }

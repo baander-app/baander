@@ -14,7 +14,6 @@ use App\Party\Domain\ValueObject\PlaybackAction;
 use App\Shared\Application\Port\ListeningSessionInteractionInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Messenger\Stamp\PartyMemberResultStamp;
-use App\Shared\Infrastructure\Swoole\ReconnectionTokenService;
 use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
 use App\Shared\Infrastructure\Swoole\WebSocketPusher;
 use App\Shared\Infrastructure\Swoole\WebSocketRegistrationRefused;
@@ -48,7 +47,6 @@ final class WebSocketController extends AbstractWebSocketController
         private readonly MessageBusInterface $bus,
         private readonly JsonEncoder $jsonEncoder,
         private readonly ListeningSessionInteractionInterface $listeningSessions,
-        private readonly ?ReconnectionTokenService $reconnectionTokens = null,
         private readonly ?LoggerInterface $logger = null,
     )
     {
@@ -62,14 +60,7 @@ final class WebSocketController extends AbstractWebSocketController
 
         $this->logger?->debug('WebSocket connected', ['fd' => $fd, 'userId' => $userId, 'workerId' => $this->registry->getWorkerId()]);
 
-        $message = ['type' => 'connected'];
-
-        $token = $this->reconnectionTokens?->generate($userId);
-        if ($token !== null) {
-            $message['reconnectToken'] = $token;
-        }
-
-        $this->pusher->pushToConnection($fd, $message);
+        $this->pusher->pushToConnection($fd, ['type' => 'connected']);
     }
 
     /**
@@ -120,11 +111,6 @@ final class WebSocketController extends AbstractWebSocketController
     public function onMessage(int $fd, string $data): void
     {
         $payload = $this->deserialize($fd, $data);
-        if ($payload !== null && ($payload['type'] ?? '') === 'auth.reconnect') {
-            $this->handleAuthReconnect($fd, $payload);
-
-            return;
-        }
 
         if (!$this->checkRateLimit($fd)) {
             $this->logger?->warning('WebSocket rate limited', ['fd' => $fd]);
@@ -199,57 +185,6 @@ final class WebSocketController extends AbstractWebSocketController
         }
 
         return $payload;
-    }
-
-    /** @param array<array-key, mixed> $payload */
-    private function handleAuthReconnect(int $fd, array $payload): void
-    {
-        if ($this->reconnectionTokens === null) {
-            $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
-                'message' => 'Reconnection not supported',
-            ]);
-
-            return;
-        }
-
-        $token = $payload['reconnectToken'] ?? null;
-        if (!is_string($token) || $token === '') {
-            $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
-                'message' => 'auth.reconnect requires a "reconnectToken" field',
-            ]);
-
-            return;
-        }
-
-        $userId = $this->reconnectionTokens->consume($token);
-        if ($userId === null) {
-            $this->pusher->pushToConnection($fd, [
-                'type'    => 'error',
-                'message' => 'Invalid or expired reconnection token',
-            ]);
-
-            return;
-        }
-
-        // Re-register the connection with the restored user identity
-        $this->registry->removeConnection($fd);
-        if (!$this->register($fd, $userId)) {
-            return;
-        }
-
-        $this->logger?->info('WebSocket reconnected', ['fd' => $fd, 'userId' => $userId]);
-
-        $message = ['type' => 'connected'];
-        // A new reconnection token, when the table can store one
-        $newToken = $this->reconnectionTokens->generate($userId);
-        if ($newToken !== null) {
-            $message['reconnectToken'] = $newToken;
-        }
-        $message['reconnected'] = true;
-
-        $this->pusher->pushToConnection($fd, $message);
     }
 
     private function checkRateLimit(int $fd): bool
@@ -429,18 +364,9 @@ final class WebSocketController extends AbstractWebSocketController
             return;
         }
 
-        // Remove from Swoole Table room
-        $room = WebSocketRoomPolicy::partyRoom($sessionId);
-        $this->registry->leaveRoom($room, $fd);
+        // The leave handler's MemberLeft takes every socket of the user out of the
+        // party room and tells the members left in it, as for a leave over HTTP.
         $this->logger?->info('Party left', ['fd' => $fd, 'userId' => $userId, 'sessionId' => $sessionId]);
-
-        // Broadcast member event to room
-        $this->pusher->broadcast($room, [
-            'type'      => 'party.member_event',
-            'sessionId' => $sessionId,
-            'action'    => 'leave',
-            'userId'    => $userId,
-        ]);
     }
 
     /** @param array<array-key, mixed> $payload */

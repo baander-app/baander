@@ -88,15 +88,6 @@ services:
     App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry:
         factory: [ 'App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry', 'create' ]
 
-    # --- WebSocket Handler ---
-    # Registers onHandshake/onOpen/onMessage/onClose on the WebSocket server.
-    # Required because HttpServerFactory creates a Swoole\WebSocket\Server which
-    # demands an onMessage callback before start().
-    App\Shared\Infrastructure\Swoole\ReconnectionTokenService:
-        factory: [ 'App\Shared\Infrastructure\Swoole\ReconnectionTokenService', 'create' ]
-        arguments:
-            $logger: '@monolog.logger.swoole'
-
     App\Shared\Application\Port\ListeningSessionInteractionInterface:
         alias: App\Session\Infrastructure\Messaging\ListeningSessionInteractionAdapter
 
@@ -104,6 +95,10 @@ services:
         tags:
             - { name: 'monolog.logger', channel: 'swoole' }
 
+    # --- WebSocket Handler ---
+    # Registers onHandshake/onOpen/onMessage/onClose on the WebSocket server.
+    # Required because HttpServerFactory creates a Swoole\WebSocket\Server which
+    # demands an onMessage callback before start().
     SwooleBundle\SwooleBundle\Server\Configurator\WithWebSocketHandler:
         arguments:
             $controller: '@App\Shared\Interface\Controller\WebSocketController'
