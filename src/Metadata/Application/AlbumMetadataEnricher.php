@@ -139,6 +139,18 @@ final class AlbumMetadataEnricher
             return EnrichmentResult::noMatch($source, $quality);
         }
 
+        // The lookups take seconds: decide and write against the stored state, so an edit, lock
+        // or cover set meanwhile survives.
+        $current = $this->albumService->findFreshByUuid($album->getId());
+
+        if ($current === null) {
+            $this->logger->info('Album deleted during enrichment', ['album_id' => $album->getId()]);
+
+            return EnrichmentResult::failure($source, $quality);
+        }
+
+        $album = $current;
+
         // A field the operator locked keeps its value; enrichment applies the others.
         $updatedFields = [];
 

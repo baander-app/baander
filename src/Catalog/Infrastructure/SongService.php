@@ -79,6 +79,11 @@ final class SongService implements SongPortInterface
         return $this->songRepository->findByUuid($uuid);
     }
 
+    public function findFreshByUuid(Uuid $uuid): ?Song
+    {
+        return $this->songRepository->findFreshByUuid($uuid);
+    }
+
     public function findByPath(string $path): ?Song
     {
         return $this->songRepository->findByPath($path);

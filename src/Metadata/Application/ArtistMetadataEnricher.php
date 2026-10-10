@@ -109,6 +109,18 @@ final class ArtistMetadataEnricher
             return EnrichmentResult::noMatch($source, $quality);
         }
 
+        // The lookups take seconds: decide and write against the stored state, so an edit, lock
+        // or cover set meanwhile survives.
+        $current = $this->artistService->findFreshByUuid($artist->getId());
+
+        if ($current === null) {
+            $this->logger->info('Artist deleted during enrichment', ['artist_id' => $artist->getId()]);
+
+            return EnrichmentResult::failure($source, $quality);
+        }
+
+        $artist = $current;
+
         // A field the operator locked keeps its value; enrichment applies the others.
         $candidates = [
             'name' => $forceUpdate ? ($data['name'] ?? null) : null,

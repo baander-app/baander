@@ -53,6 +53,12 @@ interface SongRepositoryInterface extends Searchable
 
     public function findByUuid(Uuid $uuid): ?Song;
 
+    /**
+     * Re-reads the song from the database, replacing any state this process holds for it, so a
+     * decision taken after slow work sees edits other processes committed meanwhile.
+     */
+    public function findFreshByUuid(Uuid $uuid): ?Song;
+
     public function findByPublicId(PublicId $publicId): ?Song;
 
     public function getLibraryIdByPublicId(PublicId $publicId): ?Uuid;
