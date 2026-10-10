@@ -117,6 +117,77 @@ final class LibraryAccessTransactionTest extends TestCase
         self::assertFalse($this->writer->isTransactionActive());
     }
 
+    /**
+     * Two grants of one membership race: the second waits on the first's uncommitted row and,
+     * once that commits, inserts nothing and still succeeds.
+     */
+    public function testConcurrentGrantsOfOneMembershipBothSucceed(): void
+    {
+        $this->observer->executeStatement('DELETE FROM user_library_access');
+        $this->observer->beginTransaction();
+        $this->observer->executeStatement(
+            'INSERT INTO user_library_access (user_id, library_id) VALUES (:userId, :libraryId)',
+            ['userId' => $this->userId->toString(), 'libraryId' => $this->libraryId->toString()],
+        );
+
+        $application = 'library_access_' . bin2hex(random_bytes(6));
+        $output = tmpfile();
+        self::assertIsResource($output);
+        $process = proc_open(
+            [PHP_BINARY, dirname(__DIR__) . '/Fixtures/Library/library-access-grant.php', $this->schemaName, $application, $this->userId->toString(), $this->libraryId->toString()],
+            [0 => ['file', '/dev/null', 'r'], 1 => $output, 2 => $output],
+            $pipes,
+        );
+        self::assertIsResource($process);
+
+        try {
+            $this->awaitLockWait($application, $process, $output);
+        } finally {
+            $this->observer->commit();
+        }
+
+        $deadline = microtime(true) + 10;
+        while (proc_get_status($process)['running']) {
+            if (microtime(true) > $deadline) {
+                proc_terminate($process, 9);
+                self::fail('The second grant did not finish after the first committed.');
+            }
+            usleep(1000);
+        }
+        rewind($output);
+        $result = (string) stream_get_contents($output);
+        fclose($output);
+
+        self::assertSame(0, proc_close($process), $result);
+        self::assertSame(['granted' => true], json_decode($result, true, flags: JSON_THROW_ON_ERROR));
+        self::assertSame(1, $this->membershipCount());
+    }
+
+    /**
+     * @param resource $process
+     * @param resource $output
+     */
+    private function awaitLockWait(string $application, $process, $output): void
+    {
+        $deadline = microtime(true) + 5;
+        while (true) {
+            // The observer is inside its transaction; drop its cached statistics snapshot.
+            $this->observer->executeQuery('SELECT pg_stat_clear_snapshot()')->free();
+            $waiting = $this->observer->fetchOne(
+                "SELECT 1 FROM pg_stat_activity WHERE application_name = ? AND wait_event_type = 'Lock'",
+                [$application],
+            );
+            if ($waiting !== false) {
+                return;
+            }
+            if (microtime(true) > $deadline || !proc_get_status($process)['running']) {
+                rewind($output);
+                self::fail('The second grant must wait on the uncommitted membership: ' . stream_get_contents($output));
+            }
+            usleep(1000);
+        }
+    }
+
     private function membershipCount(): int
     {
         return (int) $this->observer->fetchOne(

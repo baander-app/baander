@@ -20,6 +20,7 @@ vi.mock('../../components/users/UserRowActions', () => ({ UserRowActions: () => 
 vi.mock('../../components/users/CreateUserDialog', () => ({ CreateUserDialog: () => null }))
 vi.mock('../../components/users/EditUserDialog', () => ({ EditUserDialog: () => null }))
 vi.mock('../../components/users/AssignRolesDialog', () => ({ AssignRolesDialog: () => null }))
+vi.mock('../../components/users/LibraryAccessDialog', () => ({ LibraryAccessDialog: () => null }))
 vi.mock('../../components/users/ResetPasswordDialog', () => ({ ResetPasswordDialog: () => null }))
 vi.mock('../../components/users/DeleteUserDialog', () => ({ DeleteUserDialog: () => null }))
 
@@ -58,7 +59,7 @@ describe('admin user pagination', () => {
       return { data: {
         data: Array.from({ length: Math.max(0, Math.min(limit, total - offset)) }, (_, i) => ({
           id: `${offset + i}`, email: `user${offset + i}@baander.app`, name: `User ${offset + i}`,
-          roles: ['ROLE_USER'], disabled: false, createdAt: '2026-10-01T00:00:00Z', libraryAccess: [],
+          roles: ['ROLE_USER'], disabled: false, createdAt: '2026-10-01T00:00:00Z',
         })),
         meta: { total, limit, offset },
       } }

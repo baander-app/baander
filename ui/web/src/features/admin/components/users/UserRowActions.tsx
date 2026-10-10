@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import { type AdminUser } from '../../api/user-admin-api'
 import { Button } from '@/shared/components/ui/button'
 import {
@@ -15,16 +16,29 @@ interface UserRowActionsProps {
   canManage: boolean
   onEdit: () => void
   onAssignRoles: () => void
+  /** Receives the menu trigger, so the dialog it opens can return focus to it. */
+  onLibraryAccess: (trigger: HTMLElement | null) => void
   onResetPassword: () => void
   onToggle: () => void
   onDelete: () => void
 }
 
-export function UserRowActions({ user, canManage, onEdit, onAssignRoles, onResetPassword, onToggle, onDelete }: UserRowActionsProps) {
+export function UserRowActions({
+  user,
+  canManage,
+  onEdit,
+  onAssignRoles,
+  onLibraryAccess,
+  onResetPassword,
+  onToggle,
+  onDelete,
+}: UserRowActionsProps) {
+  const triggerRef = useRef<HTMLButtonElement>(null)
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon-xs" aria-label={`Actions for ${user.email}`}>
+        <Button ref={triggerRef} variant="ghost" size="icon-xs" aria-label={`Actions for ${user.email}`}>
           <MoreHorizontal size={14} />
         </Button>
       </DropdownMenuTrigger>
@@ -36,6 +50,9 @@ export function UserRowActions({ user, canManage, onEdit, onAssignRoles, onReset
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={onAssignRoles}>
               <ShieldAlert size={14} /> Assign Roles
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => onLibraryAccess(triggerRef.current)}>
+              Library access
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={onResetPassword}>
               <KeyRound size={14} /> Reset Password

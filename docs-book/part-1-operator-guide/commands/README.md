@@ -171,6 +171,9 @@ own exit code without JSON. Error output contains no credentials or raw diagnost
 | [app:library:create](app-library-create.md) | Register a new media library |
 | [app:library:delete](app-library-delete.md) | Delete a media library |
 | [app:library:list](app-library-list.md) | List every media library |
+| [app:library:member:grant](app-library-member-grant.md) | Let a user see a library |
+| [app:library:member:list](app-library-member-list.md) | List every library with whether a user may see it |
+| [app:library:member:revoke](app-library-member-revoke.md) | Stop a user seeing a library |
 | [app:library:scan](app-library-scan.md) | Scan a media library, or every library, in this process |
 | [app:library:show](app-library-show.md) | Show one media library |
 | [app:library:stats](app-library-stats.md) | Show the content counts of one media library |
