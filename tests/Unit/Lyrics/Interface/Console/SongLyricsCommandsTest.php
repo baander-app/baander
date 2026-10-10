@@ -56,6 +56,17 @@ final class SongLyricsCommandsTest extends TestCase
             /** @var array<string, Lyrics> */
             public array $bySong = [];
 
+            public function add(Lyrics $lyrics): bool
+            {
+                $key = $lyrics->getSongId()->toString();
+                if (isset($this->bySong[$key])) {
+                    return false;
+                }
+                $this->bySong[$key] = $lyrics;
+
+                return true;
+            }
+
             public function save(Lyrics $lyrics): void
             {
                 $this->bySong[$lyrics->getSongId()->toString()] = $lyrics;

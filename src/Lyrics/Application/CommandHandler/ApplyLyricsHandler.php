@@ -48,8 +48,11 @@ final readonly class ApplyLyricsHandler
             throw new NotFoundException(sprintf('LRCLIB has no lyrics with ID %d.', $command->lrclibResultId));
         }
 
+        // A fetch may have stored lyrics for the song since the check above.
         $lyrics = $result->toLyrics($songId);
-        $this->lyricsRepository->save($lyrics);
+        if (!$this->lyricsRepository->add($lyrics)) {
+            throw new ConflictException('The song already has lyrics.');
+        }
 
         $this->logger->info('Applied LRCLIB search result to song', [
             'song_id' => $songId->toString(),

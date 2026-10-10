@@ -24,6 +24,8 @@ final class LrclibClient implements LrclibClientInterface
 {
     private const DEFAULT_BASE_URL = 'https://lrclib.net';
     private const USER_AGENT = 'Baander';
+    /** Seconds a request may wait for data, and may take in all, before LRCLIB counts as unavailable. */
+    private const TIMEOUT_SECONDS = 10;
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
@@ -128,7 +130,8 @@ final class LrclibClient implements LrclibClientInterface
      * Execute an HTTP request against the LRCLIB API.
      *
      * Returns null on 404 (no record), and LrclibUnavailable, after logging a warning, when
-     * the request fails, LRCLIB answers with another error status, or the body is not JSON.
+     * the request fails or times out, LRCLIB answers with another error status, or the body
+     * is not JSON.
      * Never throws to callers.
      *
      * @param array<string, mixed> $params
@@ -146,6 +149,8 @@ final class LrclibClient implements LrclibClientInterface
                     'User-Agent' => self::USER_AGENT,
                     'Accept' => 'application/json',
                 ],
+                'timeout' => self::TIMEOUT_SECONDS,
+                'max_duration' => self::TIMEOUT_SECONDS,
             ]);
 
             $statusCode = $response->getStatusCode();

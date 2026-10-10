@@ -39,7 +39,7 @@ final class ApplyLyricsHandlerTest extends TestCase
         $this->lyrics->method('findBySongId')->willReturn(null);
         $this->lrclib->expects($this->once())->method('getById')->with(912345)
             ->willReturn(new LrclibResult(912345, 'Song', 'Artist', 'Album', 200.0, false, 'Applied lyrics', '[00:01.00] Applied lyrics'));
-        $this->lyrics->expects($this->once())->method('save')->with($this->isInstanceOf(Lyrics::class));
+        $this->lyrics->expects($this->once())->method('add')->with($this->isInstanceOf(Lyrics::class))->willReturn(true);
 
         $stored = ($this->handler)(new ApplyLyricsCommand(912345, $songId));
 
@@ -55,12 +55,36 @@ final class ApplyLyricsHandlerTest extends TestCase
         $songId = Uuid::v7();
         $this->lyrics->method('findBySongId')->willReturn(Lyrics::create($songId, 'Existing lyrics', 'embedded'));
         $this->lrclib->expects($this->never())->method('getById');
-        $this->lyrics->expects($this->never())->method('save');
+        $this->lyrics->expects($this->never())->method('add');
 
         $this->expectException(ConflictException::class);
         $this->expectExceptionMessage('The song already has lyrics.');
 
         ($this->handler)(new ApplyLyricsCommand(912345, $songId));
+    }
+
+    /** A fetch stored lyrics for the song after the check: the apply still answers the conflict. */
+    #[AllowMockObjectsWithoutExpectations]
+    public function testLosingTheRaceToAConcurrentFetchIsAConflictAndKeepsTheStoredLyrics(): void
+    {
+        $songId = Uuid::v7();
+        $repository = $this->inMemoryRepository();
+        $stored = Lyrics::create($songId, 'Fetched meanwhile', 'lrclib', lrclibId: 777);
+        $this->lrclib->expects($this->once())->method('getById')->with(912345)
+            ->willReturnCallback(static function () use ($repository, $stored): LrclibResult {
+                $repository->add($stored);
+
+                return new LrclibResult(912345, 'Song', 'Artist', 'Album', 200.0, false, 'Applied lyrics', null);
+            });
+
+        try {
+            (new ApplyLyricsHandler($this->lrclib, $repository, new NullLogger()))(new ApplyLyricsCommand(912345, $songId));
+            $this->fail('The apply that lost the race must be a conflict.');
+        } catch (ConflictException $e) {
+            $this->assertSame('The song already has lyrics.', $e->getMessage());
+        }
+
+        $this->assertSame($stored, $repository->findBySongId($songId));
     }
 
     /** The same recording on an album and a compilation, or in two libraries, shares one LRCLIB record. */
@@ -69,9 +93,57 @@ final class ApplyLyricsHandlerTest extends TestCase
     {
         $otherSong = Uuid::v7();
         $songId = Uuid::v7();
-        $repository = new class implements LyricsRepositoryInterface {
+        $repository = $this->inMemoryRepository();
+        $repository->add(Lyrics::create($otherSong, 'This was a triumph', 'lrclib', lrclibId: 912345));
+        $this->lrclib->expects($this->once())->method('getById')->with(912345)
+            ->willReturn(new LrclibResult(912345, 'Still Alive', 'GLaDOS', 'Portal', 175.0, false, 'This was a triumph', null));
+
+        $stored = (new ApplyLyricsHandler($this->lrclib, $repository, new NullLogger()))(new ApplyLyricsCommand(912345, $songId));
+
+        $this->assertSame($stored, $repository->findBySongId($songId));
+        $this->assertSame(912345, $stored->getLrclibId());
+        $this->assertSame(912345, $repository->findBySongId($otherSong)?->getLrclibId());
+    }
+
+    public function testAnUnknownResultIsNotFound(): void
+    {
+        $this->lyrics->method('findBySongId')->willReturn(null);
+        $this->lrclib->expects($this->once())->method('getById')->with(404404)->willReturn(null);
+        $this->lyrics->expects($this->never())->method('add');
+
+        $this->expectException(NotFoundException::class);
+        $this->expectExceptionMessage('LRCLIB has no lyrics with ID 404404.');
+
+        ($this->handler)(new ApplyLyricsCommand(404404, Uuid::v7()));
+    }
+
+    public function testAnOutageIsReportedAsProviderUnavailable(): void
+    {
+        $this->lyrics->method('findBySongId')->willReturn(null);
+        $this->lrclib->expects($this->once())->method('getById')->willReturn(new LrclibUnavailable('HTTP 502'));
+        $this->lyrics->expects($this->never())->method('add');
+
+        $this->expectException(LyricsProviderUnavailableException::class);
+
+        ($this->handler)(new ApplyLyricsCommand(912345, Uuid::v7()));
+    }
+
+    private function inMemoryRepository(): LyricsRepositoryInterface
+    {
+        return new class implements LyricsRepositoryInterface {
             /** @var array<string, Lyrics> */
-            public array $bySong = [];
+            private array $bySong = [];
+
+            public function add(Lyrics $lyrics): bool
+            {
+                $key = $lyrics->getSongId()->toString();
+                if (isset($this->bySong[$key])) {
+                    return false;
+                }
+                $this->bySong[$key] = $lyrics;
+
+                return true;
+            }
 
             public function save(Lyrics $lyrics): void
             {
@@ -88,37 +160,5 @@ final class ApplyLyricsHandlerTest extends TestCase
                 unset($this->bySong[$lyrics->getSongId()->toString()]);
             }
         };
-        $repository->save(Lyrics::create($otherSong, 'This was a triumph', 'lrclib', lrclibId: 912345));
-        $this->lrclib->expects($this->once())->method('getById')->with(912345)
-            ->willReturn(new LrclibResult(912345, 'Still Alive', 'GLaDOS', 'Portal', 175.0, false, 'This was a triumph', null));
-
-        $stored = (new ApplyLyricsHandler($this->lrclib, $repository, new NullLogger()))(new ApplyLyricsCommand(912345, $songId));
-
-        $this->assertSame($stored, $repository->findBySongId($songId));
-        $this->assertSame(912345, $stored->getLrclibId());
-        $this->assertSame(912345, $repository->findBySongId($otherSong)?->getLrclibId());
-    }
-
-    public function testAnUnknownResultIsNotFound(): void
-    {
-        $this->lyrics->method('findBySongId')->willReturn(null);
-        $this->lrclib->expects($this->once())->method('getById')->with(404404)->willReturn(null);
-        $this->lyrics->expects($this->never())->method('save');
-
-        $this->expectException(NotFoundException::class);
-        $this->expectExceptionMessage('LRCLIB has no lyrics with ID 404404.');
-
-        ($this->handler)(new ApplyLyricsCommand(404404, Uuid::v7()));
-    }
-
-    public function testAnOutageIsReportedAsProviderUnavailable(): void
-    {
-        $this->lyrics->method('findBySongId')->willReturn(null);
-        $this->lrclib->expects($this->once())->method('getById')->willReturn(new LrclibUnavailable('HTTP 502'));
-        $this->lyrics->expects($this->never())->method('save');
-
-        $this->expectException(LyricsProviderUnavailableException::class);
-
-        ($this->handler)(new ApplyLyricsCommand(912345, Uuid::v7()));
     }
 }
