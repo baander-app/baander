@@ -29,7 +29,8 @@ WebSocket connection is handled through `Shared\Infrastructure\Swoole\WebSocketC
 | Event | Category | Consumers |
 |-------|----------|-----------|
 | `PartySessionCreated` | — | none |
-| `PartySessionEnded` | — | none |
+| `PartySessionEnded` | — | `LivePartyRoomListener` (Party Infrastructure) |
+| `MemberLeft` | — | `LivePartyRoomListener` (Party Infrastructure) |
 | `MemberJoined` | — | none |
 
 ## Interactions

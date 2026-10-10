@@ -15,8 +15,7 @@ use App\Shared\Domain\Model\Uuid;
 interface LiveConnectionsPortInterface
 {
     /**
-     * Closes every open WebSocket connection of the user, on every worker, and voids
-     * the user's pending WebSocket reconnection tokens.
+     * Closes every open WebSocket connection of the user, on every worker.
      *
      * @return int the number of connections closed
      *

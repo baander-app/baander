@@ -8,6 +8,7 @@ use App\Party\Application\Command\LeavePartySessionCommand;
 use App\Party\Application\CommandHandler\LeavePartySessionHandler;
 use App\Party\Application\Port\PartyMemberPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
+use App\Party\Domain\Event\MemberLeft;
 use App\Party\Domain\Event\PartySessionEnded;
 use App\Party\Domain\Model\PartyMember;
 use App\Party\Domain\Model\PartyMemberState;
@@ -18,6 +19,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
@@ -25,19 +27,27 @@ final class LeavePartySessionHandlerTest extends TestCase
 {
     private PartySessionPortInterface&MockObject $sessionPort;
     private PartyMemberPortInterface&MockObject $memberPort;
-    private EventDispatcherInterface&MockObject $eventDispatcher;
+    private EventDispatcherInterface&Stub $eventDispatcher;
     private LeavePartySessionHandler $handler;
+
+    /** @var list<object> */
+    private array $dispatched = [];
 
     protected function setUp(): void
     {
         $this->sessionPort = $this->createMock(PartySessionPortInterface::class);
         $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
-        $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
-        $this->eventDispatcher->method('dispatch')->willReturnCallback(fn (object $e) => $e);
+        $this->eventDispatcher = $this->createStub(EventDispatcherInterface::class);
+        $this->dispatched = [];
+        $this->eventDispatcher->method('dispatch')->willReturnCallback(function (object $e): object {
+            $this->dispatched[] = $e;
+
+            return $e;
+        });
         $this->handler = new LeavePartySessionHandler($this->sessionPort, $this->memberPort, $this->eventDispatcher);
     }
 
-    public function testNonHostMemberLeavesAndIsRemovedWithoutPromotion(): void
+    public function testNonHostMemberLeavesAndIsRemovedWithoutPromotionAndMemberLeftIsDispatched(): void
     {
         $hostUserId = Uuid::v4();
         $memberUserId = Uuid::v4();
@@ -52,9 +62,10 @@ final class LeavePartySessionHandlerTest extends TestCase
         $this->memberPort->expects($this->never())->method('findBySession');
         $this->memberPort->expects($this->never())->method('save');
         $this->sessionPort->expects($this->never())->method('save');
-        $this->eventDispatcher->expects($this->never())->method('dispatch');
 
         ($this->handler)(new LeavePartySessionCommand($memberUserId, $session->getId()));
+
+        $this->assertMemberLeft($session->getId(), $memberUserId);
     }
 
     public function testHostLeavingWithRemainingMembersPromotesEarliestJoined(): void
@@ -91,9 +102,10 @@ final class LeavePartySessionHandlerTest extends TestCase
             }));
 
         $this->sessionPort->expects($this->never())->method('save');
-        $this->eventDispatcher->expects($this->never())->method('dispatch');
 
         ($this->handler)(new LeavePartySessionCommand($hostUserId, $sessionId));
+
+        $this->assertMemberLeft($sessionId, $hostUserId);
     }
 
     public function testHostLeavingWithNoRemainingMembersEndsSessionAndDispatchesEvent(): void
@@ -123,16 +135,16 @@ final class LeavePartySessionHandlerTest extends TestCase
                 return true;
             }));
 
-        $this->eventDispatcher->expects($this->once())
-            ->method('dispatch')
-            ->with($this->callback(function (PartySessionEnded $event) use ($sessionId, $hostUserId): bool {
-                $this->assertTrue($event->getSessionId()->equals($sessionId));
-                $this->assertTrue($event->getHostUserId()->equals($hostUserId));
-
-                return true;
-            }));
-
         ($this->handler)(new LeavePartySessionCommand($hostUserId, $sessionId));
+
+        // The member leaves first, then the session ends: one event each.
+        self::assertCount(2, $this->dispatched);
+        self::assertInstanceOf(MemberLeft::class, $this->dispatched[0]);
+        self::assertTrue($this->dispatched[0]->getUserId()->equals($hostUserId));
+        $ended = $this->dispatched[1];
+        self::assertInstanceOf(PartySessionEnded::class, $ended);
+        self::assertTrue($ended->getSessionId()->equals($sessionId));
+        self::assertTrue($ended->getHostUserId()->equals($hostUserId));
     }
 
     public function testNoOpWhenSessionNotFound(): void
@@ -147,9 +159,19 @@ final class LeavePartySessionHandlerTest extends TestCase
         $this->memberPort->expects($this->never())->method('removeMember');
         $this->memberPort->expects($this->never())->method('findBySession');
         $this->sessionPort->expects($this->never())->method('save');
-        $this->eventDispatcher->expects($this->never())->method('dispatch');
 
         ($this->handler)(new LeavePartySessionCommand(Uuid::v4(), $sessionId));
+
+        self::assertSame([], $this->dispatched);
+    }
+
+    private function assertMemberLeft(Uuid $sessionId, Uuid $userId): void
+    {
+        self::assertCount(1, $this->dispatched);
+        $event = $this->dispatched[0];
+        self::assertInstanceOf(MemberLeft::class, $event);
+        self::assertTrue($event->getSessionId()->equals($sessionId));
+        self::assertTrue($event->getUserId()->equals($userId));
     }
 
     private function buildMember(Uuid $sessionId, DateTimeImmutable $joinedAt): PartyMember

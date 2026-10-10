@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Party\Domain\Event;
 
 use App\Party\Domain\Event\MemberJoined;
+use App\Party\Domain\Event\MemberLeft;
 use App\Party\Domain\Event\PartySessionCreated;
 use App\Party\Domain\Event\PartySessionEnded;
 use App\Shared\Domain\Model\Uuid;
@@ -83,6 +84,19 @@ final class DomainEventRoundTripTest extends TestCase
         $this->assertTrue($original->getSessionId()->equals($restored->getSessionId()));
         $this->assertTrue($original->getUserId()->equals($restored->getUserId()));
         $this->assertSame('host', $restored->getRole());
+        $this->assertSame($occurredAt->format(DateTimeImmutable::ATOM), $restored->occurredAt()->format(DateTimeImmutable::ATOM));
+    }
+
+    public function testMemberLeftRoundTrip(): void
+    {
+        $occurredAt = new DateTimeImmutable('2026-10-10T12:00:00+00:00');
+        $original = new MemberLeft(Uuid::v4(), Uuid::v4(), $occurredAt);
+
+        $restored = MemberLeft::fromPayload($original->toPayload());
+
+        $this->assertSame('party.member_left', $restored->eventName());
+        $this->assertTrue($original->getSessionId()->equals($restored->getSessionId()));
+        $this->assertTrue($original->getUserId()->equals($restored->getUserId()));
         $this->assertSame($occurredAt->format(DateTimeImmutable::ATOM), $restored->occurredAt()->format(DateTimeImmutable::ATOM));
     }
 

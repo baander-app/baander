@@ -5,22 +5,28 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Interface\Controller;
 
 use App\Party\Application\Command\JoinPartySessionCommand;
+use App\Party\Application\Command\LeavePartySessionCommand;
 use App\Party\Application\Command\SyncPlaybackCommand;
+use App\Party\Domain\Event\MemberLeft;
 use App\Party\Domain\Model\PartyMember;
 use App\Party\Domain\ValueObject\MemberRole;
+use App\Party\Infrastructure\EventListener\LivePartyRoomListener;
 use App\Shared\Application\Port\ListeningSessionInteractionInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Messenger\ResultStampMiddleware;
 use App\Shared\Infrastructure\Messenger\Stamp\PartyMemberResultStamp;
-use App\Shared\Infrastructure\Swoole\ReconnectionTokenService;
+use App\Shared\Infrastructure\Swoole\Control\ServerWorkers;
+use App\Shared\Infrastructure\Swoole\SwooleLivePartyRooms;
 use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
 use App\Shared\Infrastructure\Swoole\WebSocketPusher;
+use App\Shared\Infrastructure\Swoole\WebSocketRooms;
 use App\Shared\Interface\Controller\WebSocketController;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Swoole\Table;
 use Swoole\WebSocket\Server;
+use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\Handler\HandlersLocator;
@@ -36,7 +42,6 @@ final class WebSocketControllerTest extends TestCase
     private WebSocketPusher $pusher;
     private Server&Stub $server;
     private MessageBusInterface&Stub $bus;
-    private ReconnectionTokenService $reconnectionTokens;
     private WebSocketController $controller;
     private ListeningSessionInteractionInterface&Stub $listeningSessions;
 
@@ -87,15 +92,12 @@ final class WebSocketControllerTest extends TestCase
         $this->bus = $this->createStub(MessageBusInterface::class);
         $this->listeningSessions = $this->createStub(ListeningSessionInteractionInterface::class);
 
-        $this->reconnectionTokens = ReconnectionTokenService::create(maxTokens: 64);
-
         $this->controller = new WebSocketController(
             $this->registry,
             $this->pusher,
             $this->bus,
             new JsonEncoder(),
             $this->listeningSessions,
-            $this->reconnectionTokens,
         );
     }
 
@@ -278,7 +280,6 @@ final class WebSocketControllerTest extends TestCase
             $this->bus,
             new JsonEncoder(),
             $this->listeningSessions,
-            $this->reconnectionTokens,
         );
 
         $controller->onOpen(5, 'user-uuid-2');
@@ -288,15 +289,11 @@ final class WebSocketControllerTest extends TestCase
         $this->assertSame(1, $conn['worker_id']);
     }
 
-    public function testOnOpenSendsConnectedMessageWithReconnectToken(): void
+    public function testOnOpenSendsAConnectedMessageWithoutAReconnectToken(): void
     {
         $this->controller->onOpen(1, 'user-1');
 
-        $this->assertLastPushMatches(1, 'connected');
-        $payload = $this->lastPushedPayload();
-        $this->assertArrayHasKey('reconnectToken', $payload);
-        $this->assertIsString($payload['reconnectToken']);
-        $this->assertGreaterThan(0, strlen($payload['reconnectToken']));
+        self::assertSame([['fd' => 1, 'payload' => ['type' => 'connected']]], $this->allPushedPayloads());
     }
 
     // --- onMessage ---
@@ -371,7 +368,7 @@ final class WebSocketControllerTest extends TestCase
     public function testRoomJoinOfAnUnknownRoomIsRefusedAndLogged(): void
     {
         $logger = new RefusalRecordingLogger();
-        $controller = new WebSocketController($this->registry, $this->pusher, $this->bus, new JsonEncoder(), $this->listeningSessions, null, $logger);
+        $controller = new WebSocketController($this->registry, $this->pusher, $this->bus, new JsonEncoder(), $this->listeningSessions, $logger);
         $controller->onOpen(1, 'user-1');
 
         $controller->onMessage(1, json_encode(['type' => 'room.join', 'room' => 'notifications:user-1'], JSON_THROW_ON_ERROR));
@@ -683,87 +680,58 @@ final class WebSocketControllerTest extends TestCase
         $this->assertSame([], $this->registry->getRoomMembers('room:123'));
     }
 
-    // --- Reconnection ---
+    // --- Identity ---
 
-    public function testAuthReconnectWithValidTokenRestoresConnection(): void
+    public function testAuthReconnectIsAnUnknownMessageAndTheConnectionKeepsItsIdentity(): void
     {
-        // Open connection as user-1, get reconnect token
         $this->controller->onOpen(1, 'user-1');
-        $connectedPayload = $this->lastPushedPayload();
-        $reconnectToken = $connectedPayload['reconnectToken'];
+        $this->registry->addConnection(2, 'user-2', 0);
 
-        // Close the connection
-        $this->controller->onClose(1);
-        $this->assertConnectionMissing(1);
-
-        // Simulate a new connection on the same FD (as would happen after reconnect)
-        // The WithWebSocketHandler will call onOpen, but we test auth.reconnect directly
-        $this->pushedMessages = [];
         $this->controller->onMessage(1, json_encode([
             'type' => 'auth.reconnect',
-            'reconnectToken' => $reconnectToken,
-        ]));
+            'reconnectToken' => 'a-token-of-user-2',
+        ], JSON_THROW_ON_ERROR));
 
-        // Connection should be restored
-        $conn = $this->registry->getConnection(1);
-        $this->assertNotNull($conn);
-        $this->assertSame('user-1', $conn['user_id']);
-
-        // Should receive a new connected message with a new token
-        $this->assertLastPushMatches(1, 'connected');
-        $payload = $this->lastPushedPayload();
-        $this->assertArrayHasKey('reconnectToken', $payload);
-        $this->assertArrayHasKey('reconnected', $payload);
-        $this->assertTrue($payload['reconnected']);
-        $this->assertNotSame($reconnectToken, $payload['reconnectToken']);
+        $this->assertLastPushMatches(1, 'error', ['message' => 'Unknown message type: "auth.reconnect"']);
+        self::assertSame('user-1', $this->registry->getConnection(1)['user_id'] ?? null);
+        self::assertSame([1], $this->registry->getUserConnectionFds('user-1'));
     }
 
-    public function testAuthReconnectWithInvalidTokenFails(): void
+    // --- Party leave ---
+
+    public function testPartyLeaveTakesEverySocketOfTheUserOutOfTheRoomAndTellsTheOthersOnce(): void
     {
-        $this->controller->onOpen(1, 'user-1');
+        $leaver = '01900000-0000-7000-8000-000000000001';
+        $member = '01900000-0000-7000-8000-000000000002';
+        $sessionId = '01900000-0000-7000-8000-00000000000a';
+        $room = WebSocketRooms::party($sessionId);
+        // The Leave handler dispatches MemberLeft; the Party listener changes the room.
+        $workers = $this->createStub(ServerWorkers::class);
+        $workers->method('currentHttpWorkerId')->willReturn(0);
+        $listener = new LivePartyRoomListener(new SwooleLivePartyRooms($workers, $this->registry, $this->pusher));
+        $events = new EventDispatcher();
+        $events->addListener(MemberLeft::class, $listener->onMemberLeft(...));
+        $bus = new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
+            LeavePartySessionCommand::class => [static function (LeavePartySessionCommand $command) use ($events): void {
+                $events->dispatch(new MemberLeft($command->getSessionId(), $command->getUserId()));
+            }],
+        ]))]);
+        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions);
+        $controller->onOpen(1, $leaver);
+        $controller->onOpen(2, $leaver);
+        $controller->onOpen(3, $member);
+        foreach ([1, 2, 3] as $fd) {
+            $this->registry->joinRoom($room, $fd);
+        }
         $this->pushedMessages = [];
 
-        $this->controller->onMessage(1, json_encode([
-            'type' => 'auth.reconnect',
-            'reconnectToken' => 'invalid-token-here',
-        ]));
+        $controller->onMessage(1, json_encode(['type' => 'party.leave', 'sessionId' => $sessionId], JSON_THROW_ON_ERROR));
 
-        $this->assertLastPushMatches(1, 'error', ['message' => 'Invalid or expired reconnection token']);
-    }
-
-    public function testAuthReconnectWithMissingTokenFails(): void
-    {
-        $this->controller->onOpen(1, 'user-1');
-        $this->pushedMessages = [];
-
-        $this->controller->onMessage(1, json_encode([
-            'type' => 'auth.reconnect',
-        ]));
-
-        $this->assertLastPushMatches(1, 'error', ['message' => 'auth.reconnect requires a "reconnectToken" field']);
-    }
-
-    public function testAuthReconnectTokenIsSingleUse(): void
-    {
-        $this->controller->onOpen(1, 'user-1');
-        $reconnectToken = $this->lastPushedPayload()['reconnectToken'];
-
-        $this->controller->onClose(1);
-        $this->pushedMessages = [];
-
-        // First use succeeds
-        $this->controller->onMessage(1, json_encode([
-            'type' => 'auth.reconnect',
-            'reconnectToken' => $reconnectToken,
-        ]));
-        $this->assertLastPushMatches(1, 'connected');
-
-        // Try to use the same token again (without closing first)
-        $this->controller->onMessage(1, json_encode([
-            'type' => 'auth.reconnect',
-            'reconnectToken' => $reconnectToken,
-        ]));
-        $this->assertLastPushMatches(1, 'error', ['message' => 'Invalid or expired reconnection token']);
+        self::assertSame([3], $this->registry->getRoomMembers($room));
+        self::assertSame([[
+            'fd' => 3,
+            'payload' => ['type' => 'party.member_event', 'sessionId' => $sessionId, 'action' => 'leave', 'userId' => $leaver],
+        ]], $this->allPushedPayloads());
     }
 
     // --- Registrations the registry refuses ---
@@ -795,18 +763,6 @@ final class WebSocketControllerTest extends TestCase
         $this->assertConnectionMissing(1);
     }
 
-    public function testOnOpenWithoutAStoredReconnectTokenStillConnects(): void
-    {
-        $tokens = (new \ReflectionProperty($this->reconnectionTokens, 'tokens'))->getValue($this->reconnectionTokens);
-        self::assertInstanceOf(Table::class, $tokens);
-        self::fillTable($tokens, ['user_id' => 'filler', 'created_at' => time()]);
-
-        $this->controller->onOpen(1, 'user-1');
-
-        self::assertSame([['fd' => 1, 'payload' => ['type' => 'connected']]], $this->allPushedPayloads());
-        self::assertNotNull($this->registry->getConnection(1));
-    }
-
     public function testPartyJoinTheRegistryRefusesSendsAnErrorInsteadOfJoined(): void
     {
         $sessionId = '01900000-0000-7000-8000-000000000002';
@@ -824,23 +780,6 @@ final class WebSocketControllerTest extends TestCase
         foreach ($this->allPushedPayloads() as $push) {
             self::assertNotSame('party.joined', $push['payload']['type']);
         }
-    }
-
-    public function testAuthReconnectOverTheUserLimitClosesTheConnection(): void
-    {
-        $this->controller->onOpen(1, 'user-1');
-        for ($fd = 2; $fd <= 11; ++$fd) {
-            $this->registry->addConnection($fd, 'user-2', 0);
-        }
-        $user2Token = $this->reconnectionTokens->generate('user-2');
-        self::assertNotNull($user2Token);
-
-        $this->controller->onMessage(1, json_encode(['type' => 'auth.reconnect', 'reconnectToken' => $user2Token], JSON_THROW_ON_ERROR));
-
-        self::assertSame([['fd' => 1, 'code' => 1008, 'reason' => 'Too many connections for this user']], $this->closedConnections);
-        $this->assertConnectionMissing(1);
-        $this->controller->onMessage(1, '{"type":"ping"}');
-        $this->assertLastPushMatches(1, 'error', ['message' => 'Not authenticated']);
     }
 
     private function registryTable(string $property): Table

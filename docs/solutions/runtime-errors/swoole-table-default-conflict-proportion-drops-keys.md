@@ -90,7 +90,7 @@ The registry tables showed that sequential keys can fare worse than random ones.
 the default proportion, a 1,024-row connection table keyed by fd (`"1"`, `"2"`, ...)
 refused connection 455; random keys got to about 70%.
 
-Other `Swoole\Table` uses in `src/`, as of 2026-10-09 (`grep -rn "new Table(" src/`):
+Other `Swoole\Table` uses in `src/`, as of 2026-10-10 (`grep -rn "new Table(" src/`). The reconnection token table was removed with `auth.reconnect` on 2026-10-10:
 
 | Table | Size | Keys | Headroom / failure handling |
 |---|---|---|---|
@@ -99,7 +99,6 @@ Other `Swoole\Table` uses in `src/`, as of 2026-10-09 (`grep -rn "new Table(" sr
 | `CpuProcessPool` health table | `workerCount + 1` | `pool` plus one per worker | Proportion 1.0. `publishHealth()` throws when `set()` fails. |
 | `CpuProcessPool` result table | 8192 | one per job not yet read | Default proportion. Rows used to stay after `readResult()`, so the table filled up after a few thousand jobs and kept up to 64 KB of shared memory per finished job; a refused `set()` under a throwing error handler stopped the pool worker. `readResult()` now deletes the row, and `writeResult()` writes the row best effort with `@`, because the result file is the source of truth. |
 | `CpuProcessPool` limit table | 64 | one per limit key | Proportion 1.0. A failed `incr()` refuses the dispatch as if at the limit and logs a warning. |
-| `src/Shared/Infrastructure/Swoole/ReconnectionTokenService.php` | 4096 | one per token, 5-minute TTL | Proportion 1.0 (0.64 MB); with the default, the 4,096-row table refused about the 2,900th token. Nothing swept expired tokens, so `generate()` drops them when the table is full and retries once. It returns `null` and logs when the token still cannot be stored, and the connection then gets no reconnection token. |
 | `src/Shared/Infrastructure/Swoole/WebSocketConnectionRegistry.php` | 1024 connections, 8192 room memberships | one per connection / membership | Proportion 1.0 (about 2.5 MB for the three tables). A refused write throws `WebSocketRegistrationRefused` after removing anything it wrote. `WebSocketController` closes a refused connection (1013, or 1008 over the per-user limit) and answers a refused room join with an error. Room names are limited to 52 bytes so membership keys stay within 63 bytes. |
 | `src/Transcode/Infrastructure/Swoole/SegmentAvailabilityTable.php:61` | 16384 by default | one per ready segment | Sized with headroom (see its docblock). It checks `set()`, warns, and falls back to polling the file system. |
 

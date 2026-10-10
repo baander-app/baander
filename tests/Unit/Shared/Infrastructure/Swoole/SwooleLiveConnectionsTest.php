@@ -20,7 +20,7 @@ final class SwooleLiveConnectionsTest extends TestCase
         $serverControl = $this->createMock(ServerControlPortInterface::class);
         $serverControl->expects(self::once())->method('execute')
             ->with('websocket.user.disconnect', ['user_id' => $userId->toString()])
-            ->willReturn(new ServerControlResult([2 => ['closed' => 3, 'reconnect_tokens_revoked' => 1]]));
+            ->willReturn(new ServerControlResult([2 => ['closed' => 3]]));
 
         self::assertSame(3, (new SwooleLiveConnections($serverControl))->closeForUser($userId));
     }

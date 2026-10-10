@@ -32,11 +32,13 @@ All payloads are JSON-encoded before sending. Failed pushes (disconnected client
 
 ### Rooms
 
-A room's members receive everything broadcast to it, so a connection joins a room only through the message that checks it may. `WebSocketRoomPolicy` names the rooms and holds the join rules:
+A room's members receive everything broadcast to it, so a connection joins a room only through the message that checks it may. `WebSocketRoomPolicy` holds the join rules; the names come from `WebSocketRooms` in Shared Infrastructure, which `SwooleLivePartyRooms` also uses:
 
 | Room | Joined by | Left by | Broadcasts |
 |------|-----------|---------|------------|
-| `party:{sessionId}` | `party.join`, after `JoinPartySessionCommand` accepts the user as a member of the party | `party.leave`, `room.leave`, or closing the connection | `party.member_event` |
+| `party:{sessionId}` | `party.join`, after `JoinPartySessionCommand` accepts the user as a member of the party | Every socket of a member who leaves the party, with `party.leave` or `POST /api/party/sessions/{uuid}/leave`; every socket when the party ends; one socket with `room.leave` or by closing | `party.member_event` |
+
+A party room follows the party's membership. `LeavePartySessionHandler` dispatches `MemberLeft`, and `EndPartySessionHandler` (or a leave that ends the party) dispatches `PartySessionEnded`. `LivePartyRoomListener` in Party Infrastructure hears both and calls `LivePartyRoomsPortInterface`. Its implementation, `SwooleLivePartyRooms`, takes every socket of the member out of the room and sends the sockets left in it one `party.member_event` leave event, or empties the room when the party ends. The registry's tables are shared by every worker, so the worker that runs the leave changes sockets on any worker. Outside an HTTP worker of the running server (a console command, a Messenger worker, a test kernel) the port does nothing.
 
 No other room exists. Pushes to one user, such as `session.claimed` and `session.state`, go through `push(userId, payload)` and need no room. `room.join` joins nothing: it answers a party room with `Party rooms are joined with party.join` and any other name with `Unknown room`, and logs a warning. No client sends it. A new room kind gets its join rule in `WebSocketRoomPolicy` and a row here.
 
@@ -48,8 +50,7 @@ The controller dispatches messages by `type` field:
 
 | Message type | Direction | Description |
 |-------------|-----------|-------------|
-| `connected` | Server to client | Sent on successful handshake, includes `reconnectToken` |
-| `auth.reconnect` | Client to server | Restore identity with a previously issued token |
+| `connected` | Server to client | Sent on successful handshake |
 | `ping` / `pong` | Both | Keep-alive |
 | `room.join` | Client to server | Refused for every room; see [Rooms](#rooms) |
 | `room.leave` | Client to server | Leave a room the connection is in; answered with `room.left` |
@@ -57,7 +58,7 @@ The controller dispatches messages by `type` field:
 | `party.playback` | Client to server | Play, pause, or seek (host only) |
 | `party.sync` | Client to server | Report client position for drift correction |
 | `party.sync_response` | Server to client | Server-adjusted position after sync |
-| `party.member_event` | Server to room broadcast | Member joined or left |
+| `party.member_event` | Server to room broadcast | Member joined (from `party.join`) or left (from `SwooleLivePartyRooms`, for a leave over the WebSocket or HTTP) |
 | `session.join` | Client to server | Join the user's listening session from a device; answered with `session.joined` |
 | `session.playback` | Client to server | Play, pause or seek the listening session; answered with `session.playback_result` |
 | `session.sync` | Client to server | Report a device's position; answered with `session.sync_result` |
@@ -67,9 +68,9 @@ The controller dispatches messages by `type` field:
 
 Rate limiting is enforced per connection: 30 messages per second. Exceeding this returns an `error` message and the excess messages are dropped.
 
-### Reconnection
+### Identity
 
-On open, the server issues a `reconnectToken` (via `ReconnectionTokenService`). If the connection drops, the client can reconnect and send `auth.reconnect` with the token to restore its identity without re-authenticating through the full OAuth handshake. A new token is issued on each successful reconnection.
+A connection's user is fixed at its handshake, which authenticates the access token (see [Authentication](#authentication)). No message changes it. A client whose connection drops opens a new one with a current access token.
 
 ## Delivery without a stream
 
