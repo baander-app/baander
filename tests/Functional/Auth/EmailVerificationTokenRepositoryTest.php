@@ -30,18 +30,29 @@ final class EmailVerificationTokenRepositoryTest extends TestCase
         $this->assertNull($this->tokens()->redeem('unknown-token', new \DateTimeImmutable()));
     }
 
-    public function testATokenExpiresAtItsExpiryInstant(): void
+    public function testATokenExpiresAtItsExactExpiryInstantInAnySessionZone(): void
     {
         $user = $this->createTestUser();
         $email = new Email($user->getEmail());
-        $expiresAt = new \DateTimeImmutable('2030-01-02T03:04:05+00:00');
+        $connection = $this->entityManager->getConnection();
+        // Transaction-scoped: the test transaction rolls it back with the rows.
+        $connection->executeStatement("SET LOCAL TIME ZONE 'America/St_Johns'");
+        $this->assertSame('America/St_Johns', $connection->fetchOne('SHOW TIME ZONE'));
+        // 2030-01-02 03:04:05.500000 UTC, given in a zone whose offset is not a whole hour.
+        $expiresAt = new \DateTimeImmutable('2030-01-02 08:49:05.500000', new \DateTimeZone('Asia/Kathmandu'));
 
         $this->tokens()->issue($user->getId(), $email, 'raw-token-b', $expiresAt);
+        $this->assertSame('2030-01-02 03:04:05.500000', $connection->fetchOne(
+            "SELECT to_char(expires_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS.US') FROM email_verification_tokens",
+        ));
         $this->assertNull($this->tokens()->redeem('raw-token-b', $expiresAt), 'The expiry instant is already too late.');
         $this->assertSame(0, $this->outstanding(), 'An expired token is removed when presented.');
 
         $this->tokens()->issue($user->getId(), $email, 'raw-token-b', $expiresAt);
-        $this->assertNotNull($this->tokens()->redeem('raw-token-b', $expiresAt->modify('-1 second')));
+        $this->assertNotNull(
+            $this->tokens()->redeem('raw-token-b', $expiresAt->modify('-1 microsecond')),
+            'A microsecond before expiry, in the same second, the token is still valid.',
+        );
     }
 
     public function testIssuingReplacesTheUsersEarlierTokenAndAddress(): void

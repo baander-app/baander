@@ -6,6 +6,7 @@ namespace App\Shared\Domain\Event\Outbox;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\ParameterType;
+use Doctrine\DBAL\Types\Types;
 
 final class OutboxRepository
 {
@@ -21,12 +22,12 @@ final class OutboxRepository
             'event_class' => $eventClass,
             'event_name' => $eventName,
             'payload' => json_encode($payload, JSON_THROW_ON_ERROR),
-            'created_at' => (new \DateTimeImmutable())->format(\DateTimeImmutable::ATOM),
+            'created_at' => new \DateTimeImmutable(),
             'relayed_at' => null,
             'attempts' => 0,
             'next_attempt_at' => null,
             'dead_lettered_at' => null,
-        ]);
+        ], ['created_at' => Types::DATETIME_IMMUTABLE]);
     }
 
     /**
@@ -92,9 +93,9 @@ final class OutboxRepository
              WHERE id = :id AND lease_token = :leaseToken AND lease_until > NOW() AND relayed_at IS NULL',
             [
                 'id' => $id, 'leaseToken' => $leaseToken, 'attempts' => $attempts,
-                'nextAttemptAt' => $nextAttemptAt?->format(\DateTimeImmutable::ATOM),
-                'deadLetteredAt' => $deadLetteredAt?->format(\DateTimeImmutable::ATOM),
+                'nextAttemptAt' => $nextAttemptAt, 'deadLetteredAt' => $deadLetteredAt,
             ],
+            ['nextAttemptAt' => Types::DATETIME_IMMUTABLE, 'deadLetteredAt' => Types::DATETIME_IMMUTABLE],
         ) === 1;
     }
 }

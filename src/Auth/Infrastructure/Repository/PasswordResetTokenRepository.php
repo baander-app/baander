@@ -39,8 +39,8 @@ final class PasswordResetTokenRepository implements PasswordResetTokenRepository
                 'expiresAt' => $expiresAt,
             ],
             [
-                'createdAt' => Types::DATETIMETZ_IMMUTABLE,
-                'expiresAt' => Types::DATETIMETZ_IMMUTABLE,
+                'createdAt' => Types::DATETIME_IMMUTABLE,
+                'expiresAt' => Types::DATETIME_IMMUTABLE,
             ],
         );
     }
@@ -52,7 +52,7 @@ final class PasswordResetTokenRepository implements PasswordResetTokenRepository
         $row = $this->connection->fetchAssociative(
             'DELETE FROM password_reset_tokens WHERE token_hash = :tokenHash RETURNING user_id, expires_at > :at AS valid',
             ['tokenHash' => self::hash($token), 'at' => $at],
-            ['at' => Types::DATETIMETZ_IMMUTABLE],
+            ['at' => Types::DATETIME_IMMUTABLE],
         );
 
         if ($row === false || $row['valid'] !== true) {

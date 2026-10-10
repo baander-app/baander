@@ -321,7 +321,9 @@ final class RecommendationPoolWorker implements ProcessPoolWorkerInterface
      */
     private function updateJobStatus(\PDO $pdo, string $jobId, string $status, ?string $failReason = null, ?array $strategyCounts = null, array $from = ['pending']): int
     {
-        $fields = ['status' => $status, 'updated_at' => new \DateTime()];
+        // The exact UTC instant with its offset: right in any PHP zone and any session zone.
+        $now = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->format('Y-m-d H:i:s.uP');
+        $fields = ['status' => $status, 'updated_at' => $now];
         if ($failReason !== null) {
             $fields['fail_reason'] = $failReason;
         }
@@ -329,20 +331,16 @@ final class RecommendationPoolWorker implements ProcessPoolWorkerInterface
             $fields['strategy_counts'] = json_encode($strategyCounts);
         }
         if ($status === 'completed') {
-            $fields['completed_at'] = new \DateTime();
+            $fields['completed_at'] = $now;
         } elseif ($status === 'in_progress') {
-            $fields['started_at'] = new \DateTime();
+            $fields['started_at'] = $now;
         }
 
         $setParts = [];
         $params = [];
         foreach ($fields as $key => $value) {
             $setParts[] = "$key = ?";
-            if ($value instanceof \DateTime) {
-                $params[] = $value->format('Y-m-d H:i:s');
-            } else {
-                $params[] = $value;
-            }
+            $params[] = $value;
         }
         $params[] = $jobId;
         array_push($params, ...$from);
@@ -391,7 +389,11 @@ final class RecommendationPoolWorker implements ProcessPoolWorkerInterface
             ltrim($url['path'], '/')
         );
 
-        $pdo = new \PDO($dsn, $url['user'] ?? null, $url['pass'] ?? null, [
+        // parse_url leaves user and password percent-encoded; decode them as DBAL's DsnParser does.
+        $user = isset($url['user']) ? rawurldecode($url['user']) : null;
+        $password = isset($url['pass']) ? rawurldecode($url['pass']) : null;
+
+        $pdo = new \PDO($dsn, $user, $password, [
             \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
         ]);
         // This connection bypasses the DBAL middleware; pin the session zone the same way.

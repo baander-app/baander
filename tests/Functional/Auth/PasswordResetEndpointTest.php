@@ -90,7 +90,8 @@ final class PasswordResetEndpointTest extends TestCase
         $after = time();
 
         $expiresAt = $this->entityManager->getConnection()->fetchOne(
-            'SELECT extract(epoch FROM expires_at)::bigint FROM password_reset_tokens WHERE user_id = ?',
+            // Whole seconds, truncated like time(): a bigint cast would round a microsecond expiry up.
+            'SELECT floor(extract(epoch FROM expires_at))::bigint FROM password_reset_tokens WHERE user_id = ?',
             [$user->getId()->toString()],
         );
         $this->assertGreaterThanOrEqual($before + $minutes * 60, (int) $expiresAt);

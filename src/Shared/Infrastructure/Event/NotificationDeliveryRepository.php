@@ -6,6 +6,7 @@ namespace App\Shared\Infrastructure\Event;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\ParameterType;
+use Doctrine\DBAL\Types\Types;
 
 final readonly class NotificationDeliveryRepository
 {
@@ -80,9 +81,9 @@ final readonly class NotificationDeliveryRepository
              WHERE id = :id AND lease_token = :leaseToken AND lease_until > NOW() AND relayed_at IS NULL',
             [
                 'id' => $id, 'leaseToken' => $leaseToken, 'attempts' => $attempts,
-                'nextAttemptAt' => $nextAttemptAt?->format(\DateTimeImmutable::ATOM),
-                'deadLetteredAt' => $deadLetteredAt?->format(\DateTimeImmutable::ATOM),
+                'nextAttemptAt' => $nextAttemptAt, 'deadLetteredAt' => $deadLetteredAt,
             ],
+            ['nextAttemptAt' => Types::DATETIME_IMMUTABLE, 'deadLetteredAt' => Types::DATETIME_IMMUTABLE],
         ) === 1;
     }
 }
