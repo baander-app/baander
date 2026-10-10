@@ -17,6 +17,7 @@ function renderActions(canManage: boolean) {
   const handlers = {
     onEdit: vi.fn(),
     onAssignRoles: vi.fn(),
+    onLibraryAccess: vi.fn(),
     onResetPassword: vi.fn(),
     onToggle: vi.fn(),
     onDelete: vi.fn(),
@@ -41,8 +42,19 @@ describe('UserRowActions', () => {
     await user.click(screen.getByRole('button', { name: 'Actions for alice@baander.app' }))
 
     expect(screen.getAllByRole('menuitem').map((item) => item.textContent?.trim())).toEqual([
-      'Edit', 'Assign Roles', 'Reset Password', 'Disable', 'Delete',
+      'Edit', 'Assign Roles', 'Library access', 'Reset Password', 'Disable', 'Delete',
     ])
+  })
+
+  it('opens library access for a super admin', async () => {
+    const user = userEvent.setup()
+    const handlers = renderActions(true)
+
+    const trigger = screen.getByRole('button', { name: 'Actions for alice@baander.app' })
+    await user.click(trigger)
+    await user.click(screen.getByRole('menuitem', { name: 'Library access' }))
+
+    expect(handlers.onLibraryAccess).toHaveBeenCalledExactlyOnceWith(trigger)
   })
 
   it('offers an admin who is not a super admin only a view of the user', async () => {

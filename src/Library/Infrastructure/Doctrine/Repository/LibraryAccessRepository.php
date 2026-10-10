@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Library\Infrastructure\Doctrine\Repository;
 
 use App\Library\Application\Port\LibraryAccessPortInterface;
-use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Library\Infrastructure\Doctrine\Entity\UserLibraryAccessEntity;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
@@ -17,21 +16,17 @@ final class LibraryAccessRepository implements LibraryAccessPortInterface
     ) {
     }
 
+    /**
+     * One statement, so a concurrent grant of the same membership waits for this one and then
+     * inserts nothing. A unique violation caught after a flush would close the EntityManager.
+     */
     public function grant(Uuid $userId, Uuid $libraryId): void
     {
-        $existing = $this->findEntity($userId, $libraryId);
-        if ($existing !== null) {
-            return; // Idempotent
-        }
-
-        $entity = new UserLibraryAccessEntity(
-            userId: $userId,
-            library: $this->entityManager->getReference(LibraryEntity::class, $libraryId),
-            grantedAt: new \DateTimeImmutable(),
+        $this->entityManager->getConnection()->executeStatement(
+            'INSERT INTO user_library_access (user_id, library_id, granted_at) VALUES (:userId, :libraryId, now())
+             ON CONFLICT (user_id, library_id) DO NOTHING',
+            ['userId' => $userId->toString(), 'libraryId' => $libraryId->toString()],
         );
-
-        $this->entityManager->persist($entity);
-        $this->entityManager->flush();
     }
 
     public function revoke(Uuid $userId, Uuid $libraryId): void

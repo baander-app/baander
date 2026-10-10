@@ -14,12 +14,14 @@ import { UserRowActions } from '../components/users/UserRowActions'
 import { CreateUserDialog } from '../components/users/CreateUserDialog'
 import { EditUserDialog } from '../components/users/EditUserDialog'
 import { AssignRolesDialog } from '../components/users/AssignRolesDialog'
+import { LibraryAccessDialog } from '../components/users/LibraryAccessDialog'
 import { ResetPasswordDialog } from '../components/users/ResetPasswordDialog'
 import { DeleteUserDialog } from '../components/users/DeleteUserDialog'
 
 type ActiveDialog =
   | { type: 'edit'; user: AdminUser }
   | { type: 'roles'; user: AdminUser }
+  | { type: 'libraries'; user: AdminUser; trigger: HTMLElement | null }
   | { type: 'password'; user: AdminUser }
   | { type: 'delete'; user: AdminUser }
   | null
@@ -267,6 +269,7 @@ export function AdminUsersPage() {
                     canManage={isSuperAdmin}
                     onEdit={() => setActiveDialog({ type: 'edit', user })}
                     onAssignRoles={() => setActiveDialog({ type: 'roles', user })}
+                    onLibraryAccess={(trigger) => setActiveDialog({ type: 'libraries', user, trigger })}
                     onResetPassword={() => setActiveDialog({ type: 'password', user })}
                     onToggle={() => toggleUser.mutate({ id: user.id, disabled: user.disabled })}
                     onDelete={() => setActiveDialog({ type: 'delete', user })}
@@ -300,6 +303,12 @@ export function AdminUsersPage() {
         user={activeUser}
         open={activeDialog?.type === 'roles'}
         onOpenChange={(v) => { if (!v) setActiveDialog(null) }}
+      />
+      <LibraryAccessDialog
+        user={activeUser}
+        open={activeDialog?.type === 'libraries'}
+        onOpenChange={(v) => { if (!v) setActiveDialog(null) }}
+        returnFocusTo={activeDialog?.type === 'libraries' ? activeDialog.trigger : null}
       />
       <ResetPasswordDialog
         user={activeUser}

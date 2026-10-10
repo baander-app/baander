@@ -1097,6 +1097,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Library Application':
+      - 'Auth User Identifier Contract'
       - 'Library Media Files Contract'
       - 'Library Files Discovered Contract'
       - 'Library Provisioning Contract'

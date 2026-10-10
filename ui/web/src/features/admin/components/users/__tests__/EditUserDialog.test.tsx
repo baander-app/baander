@@ -25,7 +25,6 @@ const ALICE: AdminUser = {
   roles: ['ROLE_USER'],
   disabled: false,
   createdAt: '2026-10-01T00:00:00Z',
-  libraryAccess: [],
 }
 
 const SETTINGS_URL = `/api/admin/users/${ALICE.id}/settings`

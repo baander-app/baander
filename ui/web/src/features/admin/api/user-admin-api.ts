@@ -10,7 +10,19 @@ export interface AdminUser {
   roles: string[]
   disabled: boolean
   createdAt: string
-  libraryAccess: string[]
+}
+
+/** One library and whether the user may see it. */
+export interface AdminUserLibraryAccess {
+  libraryId: string
+  name: string
+  slug: string
+  type: string
+  granted: boolean
+}
+
+interface DataEnvelope<T> {
+  data: T
 }
 
 export interface AdminUserListResponse {
@@ -61,4 +73,26 @@ export const userAdminApi = {
     await AXIOS_INSTANCE.post(`/api/admin/users/${id}/enable`)
   },
 
+  /** Every library in display order, each with whether the user has access. */
+  libraryAccess: async (id: string, signal?: AbortSignal): Promise<AdminUserLibraryAccess[]> => {
+    const { data } = await AXIOS_INSTANCE.get<DataEnvelope<AdminUserLibraryAccess[]>>(
+      `/api/admin/users/${id}/libraries`,
+      { signal },
+    )
+    return data.data
+  },
+
+  grantLibraryAccess: async (id: string, libraryId: string): Promise<AdminUserLibraryAccess> => {
+    const { data } = await AXIOS_INSTANCE.put<DataEnvelope<AdminUserLibraryAccess>>(
+      `/api/admin/users/${id}/libraries/${libraryId}`,
+    )
+    return data.data
+  },
+
+  revokeLibraryAccess: async (id: string, libraryId: string): Promise<AdminUserLibraryAccess> => {
+    const { data } = await AXIOS_INSTANCE.delete<DataEnvelope<AdminUserLibraryAccess>>(
+      `/api/admin/users/${id}/libraries/${libraryId}`,
+    )
+    return data.data
+  },
 }
