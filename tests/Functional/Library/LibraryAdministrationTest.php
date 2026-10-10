@@ -31,13 +31,13 @@ use Symfony\Component\Messenger\MessageBusInterface;
  */
 final class LibraryAdministrationTest extends TestCase
 {
+    /** Holds this test's library roots; never a root itself, as roots may not overlap. */
     private string $directory;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->directory = sys_get_temp_dir() . '/baander-library-admin-' . bin2hex(random_bytes(4));
-        (new Filesystem())->dumpFile($this->directory . '/Album/track.flac', 'not really audio');
     }
 
     protected function tearDown(): void
@@ -66,9 +66,11 @@ final class LibraryAdministrationTest extends TestCase
     {
         $admin = $this->createAdminUser();
         $suffix = bin2hex(random_bytes(3));
+        // Two libraries cannot share a root, so each gets its own.
+        [$apiRoot, $cliRoot] = [$this->root(), $this->root()];
         $api = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries', $admin, [
             'name' => 'Shared Music ' . $suffix,
-            'path' => $this->directory,
+            'path' => $apiRoot . '/',
             'type' => 'music',
             'sortOrder' => 3,
         ]), 201, 'data')['data'];
@@ -76,7 +78,7 @@ final class LibraryAdministrationTest extends TestCase
         $create = $this->command('app:library:create');
         self::assertSame(Command::SUCCESS, $create->execute([
             'name' => 'Shared Music ' . $suffix,
-            'path' => $this->directory,
+            'path' => $cliRoot . '/',
             'type' => 'music',
             '--slug' => 'cli-' . $api['slug'],
             '--sort-order' => '3',
@@ -87,22 +89,22 @@ final class LibraryAdministrationTest extends TestCase
         foreach (['getName', 'getType', 'getFilesystemType', 'getSortOrder', 'getDiscoveryStatus'] as $field) {
             self::assertEquals($fromApi->{$field}(), $fromCli->{$field}(), $field);
         }
-        self::assertSame($fromApi->getPath()->toString(), $fromCli->getPath()->toString());
+        self::assertSame([$apiRoot, $cliRoot], [$fromApi->getPath()->toString(), $fromCli->getPath()->toString()]);
 
         $duplicate = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries', $admin, [
-            'name' => 'Again', 'path' => $this->directory, 'type' => 'music', 'slug' => $api['slug'],
+            'name' => 'Again', 'path' => $this->root(), 'type' => 'music', 'slug' => $api['slug'],
         ]), 409);
         $again = $this->command('app:library:create');
         self::assertSame(Command::FAILURE, $again->execute([
-            'name' => 'Again', 'path' => $this->directory, 'type' => 'music', '--slug' => $api['slug'],
+            'name' => 'Again', 'path' => $this->root(), 'type' => 'music', '--slug' => $api['slug'],
         ]));
         self::assertStringContainsString($duplicate['error']['message'], self::flat($again->getDisplay()));
 
         $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries', $admin, [
-            'name' => 'Bad', 'path' => $this->directory, 'type' => 'invalid_type',
+            'name' => 'Bad', 'path' => $this->root(), 'type' => 'invalid_type',
         ]), 422);
         self::assertSame(Command::INVALID, $this->command('app:library:create')->execute([
-            'name' => 'Bad', 'path' => $this->directory, 'type' => 'invalid_type',
+            'name' => 'Bad', 'path' => $this->root(), 'type' => 'invalid_type',
         ]));
     }
 
@@ -112,7 +114,7 @@ final class LibraryAdministrationTest extends TestCase
         $api = $this->createThroughApi('notified-' . bin2hex(random_bytes(3)), $admin);
         $create = $this->command('app:library:create');
         $cliSlug = 'console-' . bin2hex(random_bytes(3));
-        self::assertSame(Command::SUCCESS, $create->execute(['name' => 'Console', 'path' => $this->directory, 'type' => 'music', '--slug' => $cliSlug]));
+        self::assertSame(Command::SUCCESS, $create->execute(['name' => 'Console', 'path' => $this->root(), 'type' => 'music', '--slug' => $cliSlug]));
         $cli = $this->library($cliSlug);
 
         $members = $this->service(LibraryMembershipQueryPort::class);
@@ -287,7 +289,7 @@ final class LibraryAdministrationTest extends TestCase
         $slug = 'json-' . bin2hex(random_bytes(3));
 
         $create = $this->command('app:library:create');
-        self::assertSame(Command::SUCCESS, $create->execute(['name' => 'JSON library', 'path' => $this->directory, 'type' => 'music', '--slug' => $slug, '--json' => true]), $create->getDisplay());
+        self::assertSame(Command::SUCCESS, $create->execute(['name' => 'JSON library', 'path' => $this->root(), 'type' => 'music', '--slug' => $slug, '--json' => true]), $create->getDisplay());
         $created = json_decode($create->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
         $shown = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/libraries/' . $slug, $admin), 200, 'data')['data'];
         self::assertSame($shown, $created);
@@ -300,12 +302,39 @@ final class LibraryAdministrationTest extends TestCase
         self::assertSame(array_diff_key($patched, ['updatedAt' => true]), array_diff_key($updated, ['updatedAt' => true]));
     }
 
+    public function testARootInsideOrContainingAnotherLibrarysRootIsRefusedOnBothPaths(): void
+    {
+        $admin = $this->createAdminUser();
+        $library = $this->createThroughApi('outer-' . bin2hex(random_bytes(3)), $admin);
+        $inside = $library['path'] . '/Album';
+        $sibling = $library['path'] . '-2';
+
+        $conflict = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries', $admin, [
+            'name' => 'Inside', 'path' => $inside, 'type' => 'music',
+        ]), 409);
+        self::assertSame(['reason' => 'root_overlaps', 'library' => $library['slug']], $conflict['error']['details']);
+        $create = $this->command('app:library:create');
+        self::assertSame(Command::FAILURE, $create->execute(['name' => 'Inside', 'path' => $inside, 'type' => 'music']));
+        self::assertStringContainsString($conflict['error']['message'], self::flat($create->getDisplay()));
+
+        $containing = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries', $admin, [
+            'name' => 'Containing', 'path' => $this->directory, 'type' => 'music',
+        ]), 409);
+        self::assertSame(['reason' => 'root_overlaps', 'library' => $library['slug']], $containing['error']['details']);
+        self::assertSame(Command::FAILURE, $this->command('app:library:create')->execute(['name' => 'Containing', 'path' => $this->directory, 'type' => 'music']));
+
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries', $admin, [
+            'name' => 'Sibling', 'path' => $sibling, 'type' => 'music',
+        ]), 201);
+    }
+
     public function testLibraryErrorsAreReportedInTheUsersLanguageElseTheAcceptLanguageElseEnglish(): void
     {
         $admin = $this->createAdminUser();
         $library = $this->createThroughApi('locale-' . bin2hex(random_bytes(3)), $admin);
         $missing = Uuid::v7()->toString();
-        $duplicate = ['name' => 'Again', 'path' => $this->directory, 'type' => 'music', 'slug' => $library['slug']];
+        // The same root as well: the slug is reported, not the overlap.
+        $duplicate = ['name' => 'Again', 'path' => $library['path'], 'type' => 'music', 'slug' => $library['slug']];
 
         // No saved choice: the browser's language when it is one Baander speaks, else English.
         $english = $this->assertJsonResponse($this->requestIn('POST', '/api/libraries', $admin, 'fr-FR,fr;q=0.9', $duplicate), 409);
@@ -343,9 +372,18 @@ final class LibraryAdministrationTest extends TestCase
         return $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries', $admin ?? $this->createAdminUser(), [
             'name' => 'Library ' . $slug,
             'slug' => $slug,
-            'path' => $this->directory,
+            'path' => $this->root(),
             'type' => $type,
         ]), 201, 'data')['data'];
+    }
+
+    /** A new library root under this test's directory, beside the others, holding one track. */
+    private function root(): string
+    {
+        $root = $this->directory . '/' . bin2hex(random_bytes(4));
+        (new Filesystem())->dumpFile($root . '/Album/track.flac', 'not really audio');
+
+        return $root;
     }
 
     private function library(string $slug): Library

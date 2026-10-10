@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Library\Application\Exception;
 use App\Library\Application\Exception\InvalidLibraryTypeException;
 use App\Library\Application\Exception\LibraryBusyException;
 use App\Library\Application\Exception\LibraryNotFoundException;
+use App\Library\Application\Exception\LibraryRootOverlapsException;
 use App\Library\Application\Exception\LibrarySlugTakenException;
 use App\Library\Domain\ValueObject\LibraryClaimKind;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -29,6 +30,7 @@ final class LibraryErrorTranslationTest extends TestCase
         yield 'scan running' => [LibraryBusyException::heldBy('Jazz', LibraryClaimKind::Scan)];
         yield 'delete running' => [LibraryBusyException::heldBy('Jazz', LibraryClaimKind::Delete)];
         yield 'invalid type' => [InvalidLibraryTypeException::forType('vinyl')];
+        yield 'root overlaps' => [LibraryRootOverlapsException::with('/data/music/jazz', 'music', '/data/music')];
     }
 
     #[DataProvider('exceptions')]
@@ -49,6 +51,8 @@ final class LibraryErrorTranslationTest extends TestCase
         yield 'not found, th' => [LibraryNotFoundException::forIdentifier('jazz'), 'th', 'ไม่พบไลบรารี "jazz"'];
         yield 'scan running, th' => [LibraryBusyException::heldBy('Jazz', LibraryClaimKind::Scan), 'th', 'มีการสแกนอยู่แล้วสำหรับไลบรารี "Jazz"'];
         yield 'delete running, th' => [LibraryBusyException::heldBy('Jazz', LibraryClaimKind::Delete), 'th', 'มีการลบพร้อมไฟล์กำลังดำเนินการอยู่สำหรับไลบรารี "Jazz"'];
+        yield 'root overlaps, da' => [LibraryRootOverlapsException::with('/data/music/jazz', 'music', '/data/music'), 'da', 'Stien "/data/music/jazz" ligger inden i eller indeholder roden "/data/music" for biblioteket "music".'];
+        yield 'root overlaps, th' => [LibraryRootOverlapsException::with('/data/music/jazz', 'music', '/data/music'), 'th', 'พาธ "/data/music/jazz" อยู่ภายในหรือครอบคลุมรูท "/data/music" ของไลบรารี "music"'];
         yield 'invalid type, th' => [InvalidLibraryTypeException::forType('vinyl'), 'th', 'ประเภทไลบรารี "vinyl" ไม่ถูกต้อง ต้องเป็นค่าหนึ่งใน: music, podcast, audiobook, movie, tv_show'];
     }
 

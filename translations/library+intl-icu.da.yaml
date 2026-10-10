@@ -1,6 +1,7 @@
 errors:
   invalid_type_with_allowed: 'Ugyldig bibliotekstype "{type}". Tilladte: {allowed}.'
   slug_exists: 'Et bibliotek med slug "{slug}" findes allerede.'
+  root_overlaps: 'Stien "{path}" ligger inden i eller indeholder roden "{root}" for biblioteket "{library}".'
   not_found: 'Biblioteket "{library}" blev ikke fundet.'
   library_busy:
     scan: 'En scanning er allerede i gang for biblioteket "{library}".'
