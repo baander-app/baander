@@ -148,9 +148,16 @@ final class FetchLyricsHandler
             return LyricsFetchResult::notFound();
         }
 
-        // 9. Create and persist lyrics
+        // 9. Create and persist lyrics; an apply or another fetch may have stored some meanwhile
         $lyrics = $result->toLyrics($songId);
-        $this->lyricsRepository->save($lyrics);
+        if (!$this->lyricsRepository->add($lyrics)) {
+            $this->logger->debug('Lyrics were stored for song during the fetch, returning them', [
+                'song_id' => $songId->toString(),
+            ]);
+            $stored = $this->lyricsRepository->findBySongId($songId);
+
+            return $stored !== null ? LyricsFetchResult::found($stored) : LyricsFetchResult::notFound();
+        }
 
         $this->logger->info('Fetched and stored lyrics from LRCLIB', [
             'song_id' => $songId->toString(),

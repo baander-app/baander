@@ -211,6 +211,46 @@ final class LyricsRepositoryTest extends TestCase
         $this->assertSame('Song two lyrics', $found2->getLyrics());
     }
 
+    // --- add: insert only when the song has no lyrics ---
+
+    public function testAddStoresLyricsForASongWithoutLyrics(): void
+    {
+        $songId = $this->createSongFixture();
+        $lyrics = Lyrics::create($songId, 'Applied lyrics', 'lrclib', syncedLyrics: '[00:01.00] Applied lyrics', lrclibId: 912345);
+
+        $this->assertTrue($this->lyricsRepository->add($lyrics));
+
+        $this->entityManager->clear();
+        $found = $this->lyricsRepository->findBySongId($songId);
+        $this->assertNotNull($found);
+        $this->assertTrue($found->getId()->equals($lyrics->getId()));
+        $this->assertSame('Applied lyrics', $found->getLyrics());
+        $this->assertSame('[00:01.00] Applied lyrics', $found->getSyncedLyrics());
+        $this->assertSame('lrclib', $found->getSource());
+        $this->assertSame(912345, $found->getLrclibId());
+        $this->assertSame($lyrics->getCreatedAt()->getTimestamp(), $found->getCreatedAt()->getTimestamp());
+        $this->assertSame($lyrics->getUpdatedAt()->getTimestamp(), $found->getUpdatedAt()->getTimestamp());
+    }
+
+    /** The loser of a race between an apply and a fetch: nothing is stored, and the entity manager stays usable. */
+    public function testAddForASongThatHasLyricsReportsNotInsertedAndKeepsTheStoredRow(): void
+    {
+        $songId = $this->createSongFixture();
+        $stored = Lyrics::create($songId, 'Stored lyrics', 'embedded');
+        $this->lyricsRepository->save($stored);
+
+        $this->assertFalse($this->lyricsRepository->add(Lyrics::create($songId, 'Late lyrics', 'lrclib', lrclibId: 912345)));
+
+        $this->assertTrue($this->entityManager->isOpen());
+        $this->entityManager->clear();
+        $found = $this->lyricsRepository->findBySongId($songId);
+        $this->assertNotNull($found);
+        $this->assertTrue($found->getId()->equals($stored->getId()));
+        $this->assertSame('Stored lyrics', $found->getLyrics());
+        $this->assertSame('embedded', $found->getSource());
+        $this->assertNull($found->getLrclibId());
+    }
+
     // --- Edge case: findBySongId with non-existent song ---
 
     public function testFindBySongIdReturnsNullForNonExistent(): void

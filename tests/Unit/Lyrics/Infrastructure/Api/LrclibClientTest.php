@@ -11,6 +11,8 @@ use App\Lyrics\Infrastructure\Api\LrclibClient;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 
@@ -300,6 +302,34 @@ final class LrclibClientTest extends TestCase
         $result = $this->client->getBySignatureCached('Song', 'Artist', 'Album', 100.0);
 
         $this->assertInstanceOf(LrclibUnavailable::class, $result);
+    }
+
+    /** A stalled LRCLIB cannot hold a request open: every call is bounded, and a timeout is an outage. */
+    public function testRequestsAreBoundedAndATimeoutIsReportedAsUnavailable(): void
+    {
+        $options = [];
+        $client = new LrclibClient(
+            new MockHttpClient(static function (string $method, string $url, array $requestOptions) use (&$options): MockResponse {
+                $options[] = $requestOptions;
+
+                return new MockResponse((static function (): \Generator {
+                    yield '';
+                })());
+            }),
+            $this->logger,
+            'https://lrclib.net',
+        );
+
+        $this->assertInstanceOf(LrclibUnavailable::class, $client->getBySignatureCached('Song', 'Artist', 'Album', 100.0));
+        $this->assertInstanceOf(LrclibUnavailable::class, $client->getBySignature('Song', 'Artist', 'Album', 100.0));
+        $this->assertInstanceOf(LrclibUnavailable::class, $client->getById(912345));
+        $this->assertInstanceOf(LrclibUnavailable::class, $client->search('Still Alive'));
+
+        $this->assertCount(4, $options);
+        foreach ($options as $requestOptions) {
+            $this->assertSame(10.0, (float) $requestOptions['timeout']);
+            $this->assertSame(10.0, (float) $requestOptions['max_duration']);
+        }
     }
 
     public function testReportsAnUnexpectedExceptionAsUnavailable(): void
