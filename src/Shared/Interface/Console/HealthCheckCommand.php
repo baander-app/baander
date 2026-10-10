@@ -31,9 +31,15 @@ final class HealthCheckCommand extends Command
 
         $rows = [];
         $allHealthy = true;
+        /** @var list<string> $unhealthyElsewhere */
+        $unhealthyElsewhere = [];
         foreach ($results as $result) {
             if ($result->status === HealthStatus::Unhealthy) {
-                $allHealthy = false;
+                if (HealthCheckService::affectsContainerHealth($result)) {
+                    $allHealthy = false;
+                } else {
+                    $unhealthyElsewhere[] = $result->component;
+                }
             }
 
             $detailStrs = [];
@@ -55,8 +61,15 @@ final class HealthCheckCommand extends Command
 
         $io->table(['Component', 'Status', 'Latency', 'Details'], $rows);
 
+        if ($unhealthyElsewhere !== []) {
+            $io->warning(sprintf(
+                'Unhealthy but not counted toward this container: %s.',
+                implode(', ', $unhealthyElsewhere),
+            ));
+        }
+
         if ($allHealthy) {
-            $io->success('All systems healthy.');
+            $io->success('This container is healthy.');
 
             return Command::SUCCESS;
         }

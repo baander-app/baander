@@ -5,13 +5,21 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Health;
 
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
+use App\Shared\Infrastructure\Swoole\WorkerMemoryTable;
 use Doctrine\DBAL\Connection;
 use Swoole\Server;
 use Throwable;
 
 final class HealthCheckService
 {
+    /** The PostgreSQL check's component name; health alerts wait for it before delivering. */
+    public const string POSTGRESQL = 'postgresql';
+    /** The memory check's component name; it alerts but does not decide the container's health. */
+    public const string MEMORY = 'memory';
+
     private const float MEGABYTE = 1_048_576;
+    /** A worker at or above this share of the memory limit makes the memory check unhealthy. */
+    private const float MEMORY_UNHEALTHY_SHARE = 0.9;
 
     /**
      * @param array<string, string> $apiKeys External API keys keyed by service name
@@ -27,6 +35,7 @@ final class HealthCheckService
         private readonly string $vapidPublicKey,
         private readonly string $vapidPrivateKey,
         private readonly MessengerWorkerHealth $messengerWorkerHealth,
+        private readonly WorkerMemoryTable $workerMemory = new WorkerMemoryTable(),
         private readonly array $apiKeys = [],
     )
     {
@@ -47,7 +56,9 @@ final class HealthCheckService
     }
 
     /**
-     * Dependency readiness — checks if PostgreSQL, Redis, and memory are available.
+     * Dependency readiness — checks if PostgreSQL and Redis are available. The
+     * background worker and memory are left out: check() still reports them and the
+     * health monitor alerts on them, but neither makes the web container unready.
      *
      * @return HealthCheckResult[]
      */
@@ -56,9 +67,16 @@ final class HealthCheckService
         return [
             $this->checkPostgreSQL(),
             $this->checkRedis(),
-            $this->messengerWorkerHealth->check(),
-            $this->checkMemory(),
         ];
+    }
+
+    /**
+     * Whether a result decides the web container's own health. The background
+     * worker's and memory's do not: they alert administrators instead.
+     */
+    public static function affectsContainerHealth(HealthCheckResult $result): bool
+    {
+        return $result->component !== MessengerWorkerHealth::COMPONENT && $result->component !== self::MEMORY;
     }
 
     /**
@@ -122,14 +140,14 @@ final class HealthCheckService
             $elapsed = (microtime(true) - $start) * 1000;
 
             return new HealthCheckResult(
-                component: 'postgresql',
+                component: self::POSTGRESQL,
                 status: HealthStatus::Healthy,
                 responseTimeMs: $elapsed,
                 details: ['connected' => true],
             );
         } catch (Throwable $e) {
             return new HealthCheckResult(
-                component: 'postgresql',
+                component: self::POSTGRESQL,
                 status: HealthStatus::Unhealthy,
                 responseTimeMs: (microtime(true) - $start) * 1000,
                 details: ['error' => $e->getMessage()],
@@ -197,22 +215,33 @@ final class HealthCheckService
         );
     }
 
+    /**
+     * The HTTP worker using the most real memory, against PHP's memory limit. Inside
+     * the server the workers' own reports decide (WorkerMemoryTable); outside it
+     * (console, tests), or before any worker has reported, the calling process is
+     * measured and workerId is null.
+     */
     private function checkMemory(): HealthCheckResult
     {
         $start = microtime(true);
-        $mb = self::MEGABYTE;
+        $limit = MemoryLimit::parse((string) ini_get('memory_limit'));
+        $worst = $this->workerMemory->largest(time());
+        $bytes = $worst['bytes'] ?? memory_get_usage(true);
+        $share = $limit === null ? null : $bytes / $limit;
 
         return new HealthCheckResult(
-            component: 'memory',
-            status: HealthStatus::Healthy,
+            component: self::MEMORY,
+            status: match (true) {
+                $share === null => HealthStatus::NotAvailable,
+                $share >= self::MEMORY_UNHEALTHY_SHARE => HealthStatus::Unhealthy,
+                default => HealthStatus::Healthy,
+            },
             responseTimeMs: (microtime(true) - $start) * 1000,
             details: [
-                'usageMb' => round(memory_get_usage() / $mb, 2),
-                'peakMb'  => round(memory_get_peak_usage() / $mb, 2),
-                'realMb'  => round(memory_get_usage(true) / $mb, 2),
-                'limitMb' => ini_get('memory_limit') !== '-1'
-                    ? (int)ini_get('memory_limit')
-                    : null,
+                'workerId' => $worst['workerId'] ?? null,
+                'usageMb' => round($bytes / self::MEGABYTE, 2),
+                'limitMb' => $limit === null ? null : round($limit / self::MEGABYTE, 2),
+                'usagePercent' => $share === null ? null : round($share * 100, 1),
             ],
         );
     }

@@ -165,7 +165,7 @@ jobs:
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
                     BAANDER_TEST_POSTGRES_IMAGE="${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE }}:latest" \
                     BAANDER_TEST_CHECKOUT_IN_IMAGE=1 \
-                      timeout 180 bash scripts/test-worker-runtime-container.sh
+                      timeout 300 bash scripts/test-worker-runtime-container.sh
 
             -   name: Worker command lifecycle and delivery
                 run: |
@@ -195,6 +195,13 @@ jobs:
                     BAANDER_TEST_POSTGRES_IMAGE="${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE }}:latest" \
                     BAANDER_TEST_CHECKOUT_IN_IMAGE=1 \
                       timeout 180 bash scripts/test-producer-runtime-container.sh
+
+            -   name: Web server mail language, audio streaming and health alerts
+                run: |
+                    BAANDER_TEST_IMAGE="$CI_IMAGE" \
+                    BAANDER_TEST_POSTGRES_IMAGE="${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE }}:latest" \
+                    BAANDER_TEST_CHECKOUT_IN_IMAGE=1 \
+                      timeout 180 bash scripts/test-web-runtime-container.sh
 
             -   name: Extract coverage metrics
                 continue-on-error: true

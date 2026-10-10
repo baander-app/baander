@@ -249,6 +249,7 @@ Constrains how many distinct IPs a single token can bind to, to detect token the
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DEFAULT_URI` | `https://localhost` | Base URL used by the router for generating absolute URLs. Should match `APP_URL` in production. |
+| `HEALTH_MONITOR_INTERVAL_SECONDS` | `60` | Seconds between the web server's health checks, which raise [health alerts](notifications.md#health-alerts). |
 
 ### Swoole
 
@@ -350,7 +351,7 @@ A stored value can stop being allowed, for example when a setting's allowed valu
 | `i18n.default_language` | `en` | The language of emails to users who have not chosen one: `en` (English), `da` (Dansk) or `th` (ไทย). See [Email language](#email-language). |
 | `lyrics.auto_fetch` | `false` | Fetch lyrics from LRCLIB for each new track a scan adds that has no `.lrc` file beside it. See [Library Management](library-management.md#what-happens-to-new-music). |
 | `metadata.auto_sync` | `false` | Sync each new album a scan adds from the external metadata services. See [Library Management](library-management.md#what-happens-to-new-music). |
-| `notifications.admin_alerts` | `true` | Alert administrators when a health check stops reporting healthy. The **Check system health** job runs the checks every five minutes. See [Health alerts](notifications.md#health-alerts). |
+| `notifications.admin_alerts` | `true` | Alert administrators when a component's health check reads unhealthy. The web server runs the checks every 60 seconds. See [Health alerts](notifications.md#health-alerts). |
 | `notifications.push_enabled` | `true` | Deliver browser push notifications. See [Notifications](notifications.md#server-settings). |
 | `recommendations.auto_generate` | `false` | Let the daily **Generate recommendations** job generate. See [Scheduled recommendations](#scheduled-recommendations). |
 | `transcode.enabled` | `false` | Allow on-the-fly audio transcoding. See [Audio transcoding](transcoding.md#audio-transcoding). |

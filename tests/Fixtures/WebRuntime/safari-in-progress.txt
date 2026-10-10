@@ -1,0 +1,38 @@
+# Answers to Safari's opening requests for an MP3 rendition that is still encoding.
+# Written by tests/Fixtures/web-runtime.php safari; dates and DPoP nonces are normalised.
+# Each request: GET /api/stream/track?format=mp3, User-Agent: Safari 17.4 (macOS), Accept: */*,
+# X-Playback-Session-Id: <one id per sequence>, DPoP-bound Authorization.
+
+> Range: bytes=0-1
+< HTTP/1.1 200 OK
+< Content-Type: audio/mpeg
+< Accept-Ranges: none
+< Cache-Control: no-store, private
+< Date: <date>
+< X-Content-Type-Options: nosniff
+< X-Frame-Options: DENY
+< X-Xss-Protection: 0
+< Referrer-Policy: strict-origin-when-cross-origin
+< Permissions-Policy: camera=(), microphone=(), geolocation=()
+< Dpop-Nonce: <nonce>
+< Vary: Origin
+< Server: swoole-http-server
+< Connection: keep-alive
+< Transfer-Encoding: chunked
+
+> Range: bytes=0-65535
+< HTTP/1.1 200 OK
+< Content-Type: audio/mpeg
+< Accept-Ranges: none
+< Cache-Control: no-store, private
+< Date: <date>
+< X-Content-Type-Options: nosniff
+< X-Frame-Options: DENY
+< X-Xss-Protection: 0
+< Referrer-Policy: strict-origin-when-cross-origin
+< Permissions-Policy: camera=(), microphone=(), geolocation=()
+< Dpop-Nonce: <nonce>
+< Vary: Origin
+< Server: swoole-http-server
+< Connection: keep-alive
+< Transfer-Encoding: chunked

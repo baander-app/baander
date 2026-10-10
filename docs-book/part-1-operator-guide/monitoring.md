@@ -8,11 +8,13 @@ Baander exposes three HTTP endpoints for health probing. None of these require a
 
 | Endpoint | Purpose | Healthy status | Unhealthy status |
 |----------|---------|---------------|-----------------|
-| `GET /health` | Full system health (PostgreSQL, Redis, Swoole, memory) | `200` with `"status": "healthy"` | `503` with `"status": "unhealthy"` |
-| `GET /ready` | Dependency readiness (PostgreSQL, Redis, memory) | `200` with `"status": "ready"` | `503` with `"status": "not_ready"` |
+| `GET /health` | Full system health (PostgreSQL, Redis, background worker, Swoole, memory) | `200` with `"status": "healthy"` | `503` with `"status": "unhealthy"` |
+| `GET /ready` | Dependency readiness (PostgreSQL, Redis) | `200` with `"status": "ready"` | `503` with `"status": "not_ready"` |
 | `GET /live` | Process liveness (Swoole worker alive) | `200` with `"status": "alive"` | N/A (always 200 if responding) |
 
-These are designed for orchestration use. The `/health` endpoint is used by the Docker healthcheck defined in `docker-compose.yml`:
+`/health` lists the background worker and memory, but neither decides the response code: a worker outage or a web server worker near its memory limit does not turn `/health` into `503`, and `/ready` checks neither. The web server [alerts administrators](notifications.md#health-alerts) about both instead.
+
+These are designed for orchestration use. The Docker healthcheck does not call an endpoint; it runs the `app:health:check` command. The web image defines it in `Dockerfile`, and the development stack in `docker-compose.yml`:
 
 ```yaml
 healthcheck:
@@ -31,18 +33,21 @@ You can also run the health check from the command line inside the container. It
 make exec cmd="php bin/console app:health:check"
 ```
 
-This runs the same checks as the `/health` endpoint and exits with code 0 on success or 1 if any component is unhealthy. See the [full command reference](commands/app-health-check.md).
+This runs the same checks as the `/health` endpoint and exits with code 0 on success or 1 if any component other than the background worker and memory is unhealthy. The command runs in its own process, so its memory row measures that process, not the web server's workers. See the [full command reference](commands/app-health-check.md).
 
 ### What is checked
 
-The health check verifies four components:
+The health check verifies five components:
 
 | Component | What it checks |
 |-----------|---------------|
 | PostgreSQL | Connection to the database via `SELECT 1` |
 | Redis | `PING` command and database size |
+| Messenger (background worker) | The age of the heartbeat the worker writes to Redis. Unhealthy after 45 seconds without a renewal while idle or 90 seconds while handling a message, and when the heartbeat disappears. A heartbeat that says the worker stopped reads not available for 45 seconds and unhealthy after that; the 45 seconds give a restarted worker time to report in. Not available until a heartbeat has been seen, and while Redis is unreachable. |
 | Swoole | Whether the Swoole extension is loaded and the worker process is running |
-| Memory | Current usage, peak usage, and real memory allocation |
+| Memory | The real memory use of each HTTP worker of the web server against PHP's `memory_limit`. Each worker reports every 5 seconds, and the check reads the worker using the most. Unhealthy at 90 percent of the limit; not available when the limit is `-1`. |
+
+The web server runs these checks every 60 seconds and alerts administrators once per outage; see [Health alerts](notifications.md#health-alerts).
 
 ## Job Monitoring
 
