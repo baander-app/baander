@@ -10,11 +10,10 @@ use App\Scheduler\Application\Exception\ScheduledOccurrenceJobBusy;
 use App\Scheduler\Application\Port\SchedulerOccurrenceExecutionStoreInterface;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\DriverManager;
-use Doctrine\DBAL\Tools\DsnParser;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 /** Permanent occurrence admission with durable per-job wrapper serialization; no automatic reclaim. */
@@ -52,7 +51,7 @@ final class DoctrineSchedulerOccurrenceExecutionStore implements SchedulerOccurr
                 throw new \RuntimeException('Scheduler execution authority context is invalid.');
             }
         }
-        return new self(DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($databaseUrl)), $authority);
+        return new self(DedicatedConnectionFactory::fromUrl($databaseUrl), $authority);
     }
 
     public function begin(Uuid $occurrenceId, Uuid $attemptId): ?SchedulerOccurrence

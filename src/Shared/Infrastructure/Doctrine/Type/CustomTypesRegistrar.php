@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Doctrine\Type;
 
 use Doctrine\DBAL\Types\Type;
+use Doctrine\DBAL\Types\Types;
 
 /**
  * Registers custom DBAL types into the global {@see Type} registry.
@@ -16,7 +17,8 @@ use Doctrine\DBAL\Types\Type;
  * As a result {@see ConnectionFactory::initializeTypes()} never runs, so the
  * `dbal.types` block in `config/packages/doctrine.yaml` is silently ignored
  * and every entity referencing `uuid`/`public_id`/`citext`/`job_status` fails
- * schema validation / migration diffing with "non-existent type".
+ * schema validation / migration diffing with "non-existent type", while
+ * `datetime_immutable` silently keeps Doctrine's zone-less, whole-second type.
  *
  * Registering the types at kernel boot (before any EntityManager is built)
  * restores them for both the HTTP worker and every console command
@@ -34,6 +36,9 @@ final class CustomTypesRegistrar
         JobStatusType::NAME => JobStatusType::class,
         PublicIdType::NAME => PublicIdType::class,
         UuidType::NAME => UuidType::class,
+        // Doctrine's own instant names, so every mapping and typed bind stores the exact instant.
+        Types::DATETIME_IMMUTABLE => InstantType::class,
+        Types::DATETIMETZ_IMMUTABLE => InstantType::class,
     ];
 
     public static function register(): void

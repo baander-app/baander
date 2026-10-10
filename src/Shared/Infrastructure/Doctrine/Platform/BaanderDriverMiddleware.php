@@ -17,6 +17,10 @@ use Doctrine\DBAL\ServerVersionProvider;
  *
  * This ensures all schema operations use our custom platform that
  * supports pgroonga, GIN with operator classes, and WITH options.
+ *
+ * Every PostgreSQL connection also pins its session time zone to UTC, so the
+ * text form of an instant and zone-dependent SQL (`::date`, `date_trunc`) do
+ * not depend on the server's or the client's default zone.
  */
 #[AsMiddleware(priority: 1)]
 class BaanderDriverMiddleware implements MiddlewareInterface
@@ -33,7 +37,12 @@ class BaanderDriverMiddleware implements MiddlewareInterface
                 #[\SensitiveParameter]
                 array $params,
             ): Driver\Connection {
-                return $this->inner->connect($params);
+                $connection = $this->inner->connect($params);
+                if ($this->inner->getDatabasePlatform($connection) instanceof PostgreSQLPlatform) {
+                    $connection->exec("SET TIME ZONE 'UTC'");
+                }
+
+                return $connection;
             }
 
             public function getDatabasePlatform(ServerVersionProvider $versionProvider): AbstractPlatform

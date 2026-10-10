@@ -6,6 +6,9 @@ doctrine:
         schema_manager_factory: App\Shared\Infrastructure\Doctrine\Platform\BaanderSchemaManagerFactory
         types:
             citext: App\Shared\Infrastructure\Doctrine\Type\CitextType
+            # Instants: timestamptz with microseconds, written and read in UTC.
+            datetime_immutable: App\Shared\Infrastructure\Doctrine\Type\InstantType
+            datetimetz_immutable: App\Shared\Infrastructure\Doctrine\Type\InstantType
             job_status: App\Shared\Infrastructure\Doctrine\Type\JobStatusType
             public_id: App\Shared\Infrastructure\Doctrine\Type\PublicIdType
             uuid: App\Shared\Infrastructure\Doctrine\Type\UuidType

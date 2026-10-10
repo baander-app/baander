@@ -177,7 +177,8 @@ final class DeviceControllerTest extends TestCase
         );
 
         $this->assertCount(2, $listA['data'], 'User A must only see their own devices.');
-        $this->assertSame(['A1', 'A2'], array_column($listA['data'], 'name'));
+        // Most recently seen first; last_seen_at keeps microseconds, so A2, registered after A1, leads.
+        $this->assertSame(['A2', 'A1'], array_column($listA['data'], 'name'));
         $this->assertCount(1, $listB['data'], 'User B must only see their own devices.');
         $this->assertSame(['B1'], array_column($listB['data'], 'name'));
     }

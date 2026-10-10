@@ -55,7 +55,7 @@ final class NotificationSinceFilterTest extends TestCase
         $connection = $this->entityManager->getConnection();
         $timezone = $connection->fetchOne('SHOW TIME ZONE');
         $columnType = $connection->fetchOne("SELECT format_type(atttypid, atttypmod) FROM pg_attribute WHERE attrelid = 'notifications'::regclass AND attname = 'created_at'");
-        $this->assertSame('timestamp(0) with time zone', $columnType);
+        $this->assertSame('timestamp with time zone', $columnType);
 
         try {
             $connection->executeStatement("SET LOCAL TIME ZONE 'Asia/Kathmandu'");

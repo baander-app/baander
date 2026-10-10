@@ -11,10 +11,9 @@ use App\Scheduler\Application\DTO\SchedulerOccurrenceOrigin;
 use App\Scheduler\Application\Port\SchedulerManualOccurrenceRecorderInterface;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\DriverManager;
-use Doctrine\DBAL\Tools\DsnParser;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 /** Durable manual requests; the occurrence ID preserves retry identity independently of the job. */
@@ -36,7 +35,7 @@ final class DoctrineSchedulerManualOccurrenceRecorder implements SchedulerManual
         if ($databaseUrl === '' || str_contains($databaseUrl, "\0")) {
             throw new \InvalidArgumentException('Scheduler manual recording requires an explicit database URL.');
         }
-        return new self(DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($databaseUrl)));
+        return new self(DedicatedConnectionFactory::fromUrl($databaseUrl));
     }
 
     public function record(Uuid $jobId, Uuid $requestId): ?SchedulerOccurrence

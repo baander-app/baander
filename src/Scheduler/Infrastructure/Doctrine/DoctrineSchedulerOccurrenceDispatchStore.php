@@ -7,10 +7,9 @@ namespace App\Scheduler\Infrastructure\Doctrine;
 use App\Scheduler\Application\DTO\SchedulerOccurrenceDispatchClaim;
 use App\Scheduler\Application\Port\SchedulerOccurrenceDispatchStoreInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory;
 use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\ParameterType;
-use Doctrine\DBAL\Tools\DsnParser;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 /** Durable retry reservations and transport acceptance receipts, never execution admission. */
@@ -32,7 +31,7 @@ final class DoctrineSchedulerOccurrenceDispatchStore implements SchedulerOccurre
         if ($databaseUrl === '' || str_contains($databaseUrl, "\0")) {
             throw new \InvalidArgumentException('Scheduler dispatch requires a nonempty database DSN.');
         }
-        return new self(DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($databaseUrl)));
+        return new self(DedicatedConnectionFactory::fromUrl($databaseUrl));
     }
 
     public function claimPending(int $limit = 100, int $retrySeconds = 60): array

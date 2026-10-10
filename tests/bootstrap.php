@@ -1,7 +1,6 @@
 <?php
 
-use Doctrine\DBAL\Types\StringType;
-use Doctrine\DBAL\Types\Type;
+use App\Shared\Infrastructure\Doctrine\Type\CustomTypesRegistrar;
 use Symfony\Component\Dotenv\Dotenv;
 
 require dirname(__DIR__).'/vendor/autoload.php';
@@ -10,7 +9,5 @@ require dirname(__DIR__).'/vendor/autoload.php';
 // $_SERVER — Dotenv checks $_SERVER to determine which .env files to load.
 (new Dotenv())->bootEnv(dirname(__DIR__).'/.env');
 
-// Register citext as a string type for PostgreSQL
-if (!Type::hasType('citext')) {
-    Type::addType('citext', StringType::class);
-}
+// The application's DBAL types, as the kernel registers them, for tests that use DBAL without it.
+CustomTypesRegistrar::register();

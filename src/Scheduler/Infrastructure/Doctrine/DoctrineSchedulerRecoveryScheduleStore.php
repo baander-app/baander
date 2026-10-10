@@ -6,10 +6,9 @@ namespace App\Scheduler\Infrastructure\Doctrine;
 
 use App\Scheduler\Application\Port\SchedulerRecoveryScheduleStoreInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory;
 use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\ParameterType;
-use Doctrine\DBAL\Tools\DsnParser;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 /** Durable fair selection only: never materializes intents, publishes messages or admits execution. */
@@ -31,7 +30,7 @@ final class DoctrineSchedulerRecoveryScheduleStore implements SchedulerRecoveryS
         if ($databaseUrl === '' || str_contains($databaseUrl, "\0")) {
             throw new \InvalidArgumentException('Scheduler recovery selection requires a nonempty database DSN.');
         }
-        return new self(DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($databaseUrl)));
+        return new self(DedicatedConnectionFactory::fromUrl($databaseUrl));
     }
 
     public function claimPendingJobs(int $limit = 10, int $retrySeconds = 60): array

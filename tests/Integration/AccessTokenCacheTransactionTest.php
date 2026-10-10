@@ -64,7 +64,7 @@ final class AccessTokenCacheTransactionTest extends TestCase
         $config->setNamingStrategy(new UnderscoreNamingStrategy());
         $config->enableNativeLazyObjects(true);
         $this->entityManager = new EntityManager($this->writer, $config);
-        // Preserve actual production mappings, including inherited timezone-free timestamps.
+        // Preserve actual production mappings, including the registered instant type.
         (new SchemaTool($this->entityManager))->createSchema(array_map(
             $this->entityManager->getClassMetadata(...),
             [UserEntity::class, ClientEntity::class, AccessTokenEntity::class],

@@ -394,6 +394,8 @@ final class RecommendationPoolWorker implements ProcessPoolWorkerInterface
         $pdo = new \PDO($dsn, $url['user'] ?? null, $url['pass'] ?? null, [
             \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
         ]);
+        // This connection bypasses the DBAL middleware; pin the session zone the same way.
+        $pdo->exec("SET TIME ZONE 'UTC'");
 
         return $pdo;
     }

@@ -8,12 +8,11 @@ use App\Scheduler\Application\DTO\SchedulerOccurrence;
 use App\Scheduler\Application\Port\SchedulerOccurrenceMaterializerInterface;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory;
 use Cron\CronExpression;
 use DateTimeImmutable;
 use DateTimeZone;
 use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\DriverManager;
-use Doctrine\DBAL\Tools\DsnParser;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 /** Per-job recovery primitive, deliberately not wired into a poller or dispatch loop. */
@@ -35,7 +34,7 @@ final class DoctrineSchedulerOccurrenceMaterializer implements SchedulerOccurren
         if ($databaseUrl === '' || str_contains($databaseUrl, "\0")) {
             throw new \InvalidArgumentException('Scheduler recovery requires an explicit database URL.');
         }
-        return new self(DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($databaseUrl)));
+        return new self(DedicatedConnectionFactory::fromUrl($databaseUrl));
     }
 
     public function materialize(Uuid $jobId, int $minuteLimit = 60): int

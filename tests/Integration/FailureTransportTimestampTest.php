@@ -6,6 +6,7 @@ namespace App\Tests\Integration;
 
 use App\Tests\Fixtures\Messaging\FailureTransportProbe;
 use Doctrine\DBAL\Connection;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Stamp\TransportMessageIdStamp;
@@ -13,10 +14,9 @@ use Symfony\Component\Messenger\Transport\Receiver\ListableReceiverInterface;
 use Symfony\Component\Messenger\Transport\TransportInterface;
 
 /**
- * symfony/doctrine-messenger binds instants as UTC wall-clock text without an
- * offset. The failed_messages timestamptz columns store the right instant only in
- * a UTC session, which is the database default; a session in another zone shifts
- * the stored instant but keeps the transport's own comparisons consistent.
+ * symfony/doctrine-messenger binds its instants with Doctrine's `datetime_immutable` type, which
+ * the project instant type replaces: failed_messages stores the send instant with its
+ * microseconds in any session zone, and the receiver's own comparisons still find the message.
  */
 final class FailureTransportTimestampTest extends KernelTestCase
 {
@@ -26,27 +26,39 @@ final class FailureTransportTimestampTest extends KernelTestCase
         parent::tearDown();
     }
 
-    public function testAUtcSessionStoresTheSendInstant(): void
+    /** @return iterable<string, array{?string}> */
+    public static function sessionZones(): iterable
     {
-        self::bootKernel();
-        self::assertSame('UTC', $this->connection()->fetchOne("SELECT to_char(now(), 'TZ')"));
-        $before = time();
-
-        $id = $this->send('utc');
-
-        self::assertEqualsWithDelta($before, $this->createdAtEpoch($id), 2);
+        yield 'UTC session' => [null];
+        // Transaction-scoped: the test transaction rolls it back with the row.
+        yield 'Kiritimati session' => ['Pacific/Kiritimati'];
     }
 
-    public function testAnotherSessionZoneShiftsTheInstantButTheReceiverStillFindsTheMessage(): void
+    #[DataProvider('sessionZones')]
+    public function testTheStoredInstantsAreTheSendInstantAndTheReceiverFindsTheMessage(?string $zone): void
     {
         self::bootKernel();
-        // Transaction-scoped: the test transaction rolls it back with the row.
-        $this->connection()->executeStatement("SET LOCAL TIME ZONE 'Pacific/Kiritimati'");
-        $before = time();
+        if ($zone !== null) {
+            $this->connection()->executeStatement("SET LOCAL TIME ZONE '" . $zone . "'");
+        }
+        $before = $this->now();
 
-        $id = $this->send('shifted');
+        $id = $this->send($zone ?? 'utc');
 
-        self::assertEqualsWithDelta($before - 14 * 3600, $this->createdAtEpoch($id), 2);
+        $after = $this->now();
+        $stored = $this->connection()->fetchAssociative(
+            "SELECT to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS.US') AS created_at,
+                    to_char(available_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS.US') AS available_at
+             FROM failed_messages WHERE id = ?",
+            [$id],
+        );
+        self::assertIsArray($stored);
+        // Microsecond text compares in time order; a whole-second value falls outside the window.
+        foreach ($stored as $column => $instant) {
+            self::assertGreaterThanOrEqual($before, $instant, $column);
+            self::assertLessThanOrEqual($after, $instant, $column);
+        }
+
         $receiver = $this->transport();
         self::assertInstanceOf(ListableReceiverInterface::class, $receiver);
         self::assertNotNull($receiver->find($id));
@@ -57,17 +69,17 @@ final class FailureTransportTimestampTest extends KernelTestCase
         self::assertContains($id, $listed);
     }
 
+    private function now(): string
+    {
+        return (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->format('Y-m-d H:i:s.u');
+    }
+
     private function send(string $label): string
     {
         $id = $this->transport()->send(new Envelope(new FailureTransportProbe($label, true)))->last(TransportMessageIdStamp::class)?->getId();
         self::assertNotNull($id);
 
         return (string) $id;
-    }
-
-    private function createdAtEpoch(string $id): int
-    {
-        return (int) $this->connection()->fetchOne('SELECT extract(epoch FROM created_at)::bigint FROM failed_messages WHERE id = ?', [$id]);
     }
 
     private function transport(): TransportInterface

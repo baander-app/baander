@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace App\Scheduler\Infrastructure\Doctrine;
 
 use App\Scheduler\Application\Port\SchedulerWorkerAuthorityInterface;
+use App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\DriverManager;
-use Doctrine\DBAL\Tools\DsnParser;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
 /** Scheduler preflight on a dedicated connection; never acquires, renews or releases a lease. */
@@ -48,7 +47,7 @@ final class DoctrineSchedulerWorkerAuthority implements SchedulerWorkerAuthority
                 }
             }
         }
-        return new self(DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($databaseUrl)), $authority);
+        return new self(DedicatedConnectionFactory::fromUrl($databaseUrl), $authority);
     }
 
     /** Statement/lock timeouts do not bound connection setup, network I/O or commit. */

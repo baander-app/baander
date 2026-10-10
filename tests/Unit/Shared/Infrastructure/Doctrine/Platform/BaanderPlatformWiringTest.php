@@ -28,6 +28,18 @@ final class BaanderPlatformWiringTest extends TestCase
         self::assertSame($platform, $wrapped->getDatabasePlatform($this->createStub(ServerVersionProvider::class)));
     }
 
+    /** The UTC session zone is PostgreSQL syntax; real PostgreSQL connections are covered by InstantRuntimeConfigurationTest. */
+    public function testMiddlewareLeavesANonPostgresSessionAlone(): void
+    {
+        $connection = $this->createMock(Driver\Connection::class);
+        $connection->expects(self::never())->method('exec');
+        $driver = $this->createStub(Driver::class);
+        $driver->method('connect')->willReturn($connection);
+        $driver->method('getDatabasePlatform')->willReturn(new SQLitePlatform());
+
+        self::assertSame($connection, (new BaanderDriverMiddleware())->wrap($driver)->connect([]));
+    }
+
     public function testMiddlewareSelectsCustomPostgresPlatform(): void
     {
         $driver = $this->createStub(Driver::class);
