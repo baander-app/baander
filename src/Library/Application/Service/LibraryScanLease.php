@@ -36,7 +36,7 @@ final class LibraryScanLease
         return $this->claimId;
     }
 
-    /** @throws LibraryScanClaimLostException when the claim was released or another scan took it over */
+    /** @throws LibraryScanClaimLostException when the claim was released or another scan or delete took it over */
     public function renew(): void
     {
         $now = $this->clock->now();
@@ -46,7 +46,7 @@ final class LibraryScanLease
             return;
         }
 
-        if (!$this->libraries->renewScanClaim($this->claimId, $this->leaseSeconds)) {
+        if (!$this->libraries->renewClaim($this->claimId, $this->leaseSeconds)) {
             throw LibraryScanClaimLostException::forLibrary($this->library->getName());
         }
         $this->renewedAt = $now;
@@ -64,7 +64,7 @@ final class LibraryScanLease
         }
     }
 
-    /** Ends the claim with the scan failed; a claim another scan holds now stays as it is. */
+    /** Ends the claim with the scan failed; a claim another holder took over stays as it is. */
     public function fail(): void
     {
         $this->libraries->endScanClaim($this->claimId, completed: false);

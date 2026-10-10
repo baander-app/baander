@@ -26,7 +26,7 @@ use LogicException;
 final class MediaFileGuard
 {
     /** @param list<string> $paths */
-    public function inspect(Uuid $libraryId, string $libraryPath, array $paths, bool $scanInProgress): LibraryMediaFileInspection
+    public function inspect(Uuid $libraryId, string $libraryPath, array $paths, bool $libraryBusy): LibraryMediaFileInspection
     {
         // PHP caches resolved paths; a symlink changed since then must count.
         clearstatcache(true);
@@ -37,16 +37,20 @@ final class MediaFileGuard
             $files[] = $this->check($root, $path);
         }
 
-        return new LibraryMediaFileInspection($libraryId, $root, $files, $scanInProgress, is_dir($root));
+        return new LibraryMediaFileInspection($libraryId, $root, $files, $libraryBusy, is_dir($root));
     }
 
     /**
      * Unlinks every file the inspection found deletable, checking each again first. Run it after
      * the commit that deleted the files' catalog and index rows.
      *
+     * @param callable(): bool $stillClaimed asked before each unlink whether the delete still holds
+     *                                       its claim on the library; once it answers false, every
+     *                                       file not yet unlinked is left
+     *
      * @throws LogicException when the inspection refuses the deletion
      */
-    public function delete(LibraryMediaFileInspection $deletion): LibraryMediaFileDeletionResult
+    public function delete(LibraryMediaFileInspection $deletion, callable $stillClaimed): LibraryMediaFileDeletionResult
     {
         if (!$deletion->allowsDeletion()) {
             throw new LogicException('Only an inspection that allows the deletion can delete files.');
@@ -55,9 +59,16 @@ final class MediaFileGuard
         $removed = [];
         $missing = [];
         $left = [];
+        $claimed = true;
         foreach ($deletion->files as $file) {
             if ($file->verdict === LibraryMediaFileVerdict::Missing) {
                 $missing[] = $file->path;
+                continue;
+            }
+
+            $claimed = $claimed && $stillClaimed();
+            if (!$claimed) {
+                $left[] = new LibraryMediaFileLeft($file->path, LibraryMediaFileLeftReason::ClaimLost, 'Another scan or delete took the library over.');
                 continue;
             }
 

@@ -4,16 +4,24 @@ declare(strict_types=1);
 
 namespace App\Library\Application\Exception;
 
+use App\Library\Domain\ValueObject\LibraryClaimKind;
 use App\Shared\Application\Exception\ConflictException;
 
-/** An operator asked to release a scan claim whose scan renewed it within its lease, so the scan may still run. */
+/**
+ * An operator asked to release a library's claim whose holder, a scan or a delete with files,
+ * renewed it within its lease, so it may still run.
+ */
 final class LibraryScanClaimLiveException extends ConflictException
 {
-    public static function forLibrary(string $name): self
+    public static function heldBy(string $name, LibraryClaimKind $holder): self
     {
         return new self(
-            sprintf('A scan holds a live claim on the library "%s": it renewed the claim within its lease and may still be running.', $name),
-            ['reason' => 'scan_claim_live'],
+            sprintf(
+                '%s holds a live claim on the library "%s": it renewed the claim within its lease and may still be running.',
+                $holder === LibraryClaimKind::Scan ? 'A scan' : 'A delete with files',
+                $name,
+            ),
+            ['reason' => 'scan_claim_live', 'holder' => $holder->value],
         );
     }
 }

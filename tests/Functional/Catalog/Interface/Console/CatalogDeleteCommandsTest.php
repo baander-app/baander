@@ -10,6 +10,7 @@ use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieVideoEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
+use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Media\Application\Port\StoragePortInterface;
 use App\Shared\Domain\Model\PublicId;
@@ -44,6 +45,11 @@ final class CatalogDeleteCommandsTest extends TestCase
     {
         $admin = $this->createAdminUser();
         $fixture = $this->albumWithSongs(3);
+        $this->entityManager->getConnection()->executeStatement(
+            "UPDATE libraries SET scan_status = 'completed', last_scan = now() - interval '1 day' WHERE id = ?",
+            [$fixture['library']],
+        );
+        $scanState = $this->scanState($fixture['library']);
 
         $response = $this->assertJsonResponse(
             $this->authenticatedRequest('DELETE', '/api/admin/albums/' . $fixture['album'] . '?deleteFiles=true', $admin),
@@ -60,6 +66,8 @@ final class CatalogDeleteCommandsTest extends TestCase
         self::assertSame(0, $this->rows('albums', 'public_id', $fixture['album']));
         self::assertSame(0, $this->rows('songs', 'album_id', $fixture['albumId']));
         self::assertSame(0, $this->indexRows($fixture['library']));
+        self::assertSame($scanState, $this->scanState($fixture['library']), 'The delete held and released the library without touching its scan status.');
+        self::assertNull($scanState['claim_id']);
     }
 
     public function testDeletingAnAlbumWithSongsRemovesItsCoverImageAndKeepCoverKeepsIt(): void
@@ -125,23 +133,49 @@ final class CatalogDeleteCommandsTest extends TestCase
         }
     }
 
-    public function testDeletingFilesOfALibraryThatIsBeingScannedIsAConflictOnBothPaths(): void
+    public function testDeletingFilesOfALibraryThatIsBeingScannedIsAConflictNamingTheScanOnBothPaths(): void
     {
         $admin = $this->createAdminUser();
         $fixture = $this->albumWithSongs(1);
         $song = $this->songPublicId($fixture['albumId']);
         $this->entityManager->getConnection()->executeStatement(
-            "UPDATE libraries SET scan_status = 'scanning', scan_claim_id = ?, scan_claim_expires_at = clock_timestamp() + interval '15 minutes' WHERE id = ?",
+            "UPDATE libraries SET scan_status = 'scanning', claim_id = ?, claim_kind = 'scan', claim_expires_at = clock_timestamp() + interval '15 minutes' WHERE id = ?",
             [(new Uuid())->toString(), $fixture['library']],
         );
 
-        $this->assertJsonResponse($this->authenticatedRequest('DELETE', '/api/admin/albums/' . $fixture['album'] . '?deleteFiles=true', $admin), 409);
+        $album = $this->assertJsonResponse($this->authenticatedRequest('DELETE', '/api/admin/albums/' . $fixture['album'] . '?deleteFiles=true', $admin), 409);
         $this->assertJsonResponse($this->authenticatedRequest('DELETE', '/api/admin/songs/' . $song . '?deleteFile=true', $admin), 409);
         $delete = $this->command('app:song:delete');
         self::assertSame(Command::FAILURE, $delete->execute(['public-id' => $song, '--delete-files' => true, '--force' => true], ['interactive' => false]));
 
+        self::assertSame(['reason' => 'library_busy', 'holder' => 'scan'], $album['error']['details']);
+        self::assertStringContainsString('A scan is already in progress for the library', $album['error']['message']);
+        self::assertStringContainsString('A scan is already in progress for the library', $delete->getDisplay());
         self::assertSame(1, $this->rows('songs', 'public_id', $song));
         self::assertFileExists($fixture['paths'][0]);
+    }
+
+    public function testAScanStartedWhileADeleteHoldsTheLibraryIsAConflictNamingTheDelete(): void
+    {
+        $admin = $this->createAdminUser();
+        $fixture = $this->albumWithSongs(1);
+        $files = static::getContainer()->get(LibraryMediaFilesInterface::class);
+        self::assertInstanceOf(LibraryMediaFilesInterface::class, $files);
+        $claim = $files->claim(Uuid::fromString($fixture['library']));
+        $this->entityManager->clear();
+
+        try {
+            $refused = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries/' . $fixture['library'] . '/scan', $admin), 409);
+            $scan = $this->command('app:library:scan');
+            self::assertSame(Command::FAILURE, $scan->execute(['library' => $fixture['library']], ['interactive' => false]));
+        } finally {
+            $files->release($claim);
+        }
+
+        self::assertSame(['reason' => 'library_busy', 'holder' => 'delete'], $refused['error']['details']);
+        self::assertStringContainsString('A delete with files is in progress for the library', $refused['error']['message']);
+        self::assertStringContainsString('A delete with files is in progress for the library', $scan->getDisplay());
+        self::assertNull($this->scanState($fixture['library'])['scan_status'], 'The refused scans left the status alone.');
     }
 
     public function testDeleteFilesWithoutForceOnATerminalExitsInvalidAndChangesNothing(): void
@@ -336,6 +370,19 @@ final class CatalogDeleteCommandsTest extends TestCase
             'albumId' => $album->getId()->toString(),
             'paths' => $paths,
         ];
+    }
+
+    /** @return array{scan_status: ?string, last_scan: ?string, claim_id: ?string} */
+    private function scanState(string $libraryId): array
+    {
+        $row = $this->entityManager->getConnection()->fetchAssociative(
+            'SELECT scan_status, last_scan, claim_id FROM libraries WHERE id = ?',
+            [$libraryId],
+        );
+        self::assertIsArray($row);
+
+        /** @var array{scan_status: ?string, last_scan: ?string, claim_id: ?string} $row */
+        return $row;
     }
 
     private function library(): LibraryEntity

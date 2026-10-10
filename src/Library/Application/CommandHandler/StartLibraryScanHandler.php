@@ -7,7 +7,7 @@ namespace App\Library\Application\CommandHandler;
 use App\Library\Application\Command\ScanLibraryCommand;
 use App\Library\Application\Command\StartLibraryScanCommand;
 use App\Library\Application\Exception\LibraryNotFoundException;
-use App\Library\Application\Exception\LibraryScanAlreadyRunningException;
+use App\Library\Application\Exception\LibraryBusyException;
 use App\Library\Application\Service\LibraryScanClaims;
 use App\Library\Domain\Model\Library;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -28,7 +28,7 @@ final readonly class StartLibraryScanHandler
 
     /**
      * @throws LibraryNotFoundException
-     * @throws LibraryScanAlreadyRunningException
+     * @throws LibraryBusyException
      */
     #[AsMessageHandler]
     public function __invoke(StartLibraryScanCommand $command): Library

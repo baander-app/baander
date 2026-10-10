@@ -7,7 +7,7 @@ namespace App\Library\Application\CommandHandler;
 use App\Library\Application\Command\ScanLibraryCommand;
 use App\Library\Application\DTO\LibraryScanSummary;
 use App\Library\Application\Exception\LibraryNotFoundException;
-use App\Library\Application\Exception\LibraryScanAlreadyRunningException;
+use App\Library\Application\Exception\LibraryBusyException;
 use App\Library\Application\Exception\LibraryScanClaimLostException;
 use App\Library\Application\LibraryDiscovery;
 use App\Library\Application\Message\FilesDiscovered;
@@ -34,7 +34,7 @@ final class ScanLibraryHandler
 
     /**
      * @throws LibraryNotFoundException
-     * @throws LibraryScanAlreadyRunningException when another scan holds a live claim on the library
+     * @throws LibraryBusyException when another scan holds a live claim on the library
      * @throws LibraryScanClaimLostException      when another scan took the claim over during the scan
      */
     #[AsMessageHandler]

@@ -6,13 +6,13 @@ namespace App\Library\Application\Port;
 
 use App\Shared\Domain\Model\Uuid;
 
-/** The checked media files of one library, and whether a scan holds it. */
+/** The checked media files of one library, and whether a scan or another delete holds it. */
 final readonly class LibraryMediaFileInspection
 {
     /**
      * @param string                     $root           the library root's real path the files were checked against
      * @param list<LibraryMediaFileCheck> $files          one per distinct requested path, in request order
-     * @param bool                       $scanInProgress a scan holds a live claim on the library
+     * @param bool                       $libraryBusy    a scan or another delete with files holds a live claim on the library
      * @param bool                       $rootAvailable  the library root is an existing directory; when it is not
      *                                                   (unmounted storage), every file reads as missing
      */
@@ -20,14 +20,14 @@ final readonly class LibraryMediaFileInspection
         public Uuid $libraryId,
         public string $root,
         public array $files,
-        public bool $scanInProgress,
+        public bool $libraryBusy,
         public bool $rootAvailable,
     ) {
     }
 
     public function allowsDeletion(): bool
     {
-        if ($this->scanInProgress || !$this->rootAvailable) {
+        if ($this->libraryBusy || !$this->rootAvailable) {
             return false;
         }
 

@@ -3,4 +3,6 @@ errors:
   invalid_type_with_allowed: 'Invalid library type "{type}". Allowed: {allowed}.'
   slug_exists: 'A library with the slug "{slug}" already exists.'
   not_found: 'Library "{library}" not found.'
-  scan_in_progress: 'A scan is already in progress for the library "{library}".'
+  library_busy:
+    scan: 'A scan is already in progress for the library "{library}".'
+    delete: 'A delete with files is in progress for the library "{library}".'

@@ -7,10 +7,13 @@ namespace App\Tests\Integration\Library;
 use App\Library\Application\Exception\LibraryMediaDirectoryNotWritableException;
 use App\Library\Application\Exception\LibraryMediaFileOutsideRootException;
 use App\Library\Application\Exception\LibraryRootUnavailableException;
-use App\Library\Application\Exception\LibraryScanAlreadyRunningException;
+use App\Library\Application\Exception\LibraryBusyException;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\MusicScanner;
+use App\Library\Application\Port\LibraryMediaFileClaim;
+use App\Library\Application\Port\LibraryMediaFileDeletionResult;
 use App\Library\Application\Port\LibraryMediaFileInspection;
+use App\Library\Application\Port\LibraryMediaFileLeft;
 use App\Library\Application\Port\LibraryMediaFileLeftReason;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\ValueObject\LibraryPath;
@@ -65,7 +68,7 @@ final class LibraryMediaFilesTest extends TestCase
 
         $this->libraries = new LibraryRepository($this->manager, new NativeClock());
         $this->fileIndex = new LibraryFileIndexRepository($this->manager);
-        $this->files = new LibraryMediaFiles($this->libraries, $this->fileIndex, new MediaFileGuard(), $this->manager);
+        $this->files = new LibraryMediaFiles($this->libraries, $this->fileIndex, new MediaFileGuard(), $this->manager, new NativeClock(), new NullLogger());
         $this->scanner = new MusicScanner(
             new DirectoryScanner(),
             $this->fileIndex,
@@ -86,19 +89,39 @@ final class LibraryMediaFilesTest extends TestCase
         $this->harnessTearDown();
     }
 
-    public function testDeletesAFileInsideTheRootAndItsIndexRow(): void
+    public function testDeletesAFileInsideTheRootAndItsIndexRowAndLeavesTheScanStatusAlone(): void
     {
         [$library, $first, $second] = $this->scannedAlbum();
+        $this->manager->getConnection()->executeStatement(
+            "UPDATE libraries SET scan_status = 'completed', last_scan = now() - interval '1 day' WHERE id = ?",
+            [$library->getId()->toString()],
+        );
+        $before = $this->claimRow($library);
 
-        $deletion = $this->files->prepareDeletion($library->getId(), [$first]);
-        $this->inCallerTransaction(fn () => $this->files->deleteIndexRows($deletion));
-        $result = $this->files->deleteFiles($deletion);
+        $result = $this->deleteWithFiles($library, [$first]);
 
         self::assertSame([$first], $result->removed);
         self::assertSame([], $result->left);
         self::assertFileDoesNotExist($first);
         self::assertFileExists($second);
         self::assertSame([$second], $this->indexedPaths($library));
+        self::assertSame($before, $this->claimRow($library));
+        self::assertNull($before['claim_id']);
+    }
+
+    public function testADeleteHoldsTheLibraryAgainstScansAndOtherDeletesUntilItIsReleased(): void
+    {
+        [$library, $first] = $this->scannedAlbum();
+        $claim = $this->files->claim($library->getId());
+
+        self::assertFalse($this->libraries->claimScan($library->getId(), new Uuid(), 900)->claimed);
+        self::assertTrue($this->files->inspect($library->getId(), [$first])->libraryBusy);
+        $this->expectBusy(fn () => $this->files->claim($library->getId()), 'delete');
+
+        $this->files->release($claim);
+        self::assertNull($this->claimRow($library)['claim_id']);
+        self::assertFalse($this->files->inspect($library->getId(), [$first])->libraryBusy);
+        $this->files->release($claim);
     }
 
     public function testAPathOutsideTheRootRefusesTheWholeRequest(): void
@@ -107,7 +130,7 @@ final class LibraryMediaFilesTest extends TestCase
         $outside = $this->write($this->base . '/elsewhere/03.flac', 'outside');
 
         try {
-            $this->files->prepareDeletion($library->getId(), [$first, $outside]);
+            $this->files->prepareDeletion($this->files->claim($library->getId()), [$first, $outside]);
             self::fail('A path outside the root must refuse the deletion.');
         } catch (LibraryMediaFileOutsideRootException $refusal) {
             self::assertInstanceOf(InvalidInputException::class, $refusal);
@@ -125,7 +148,7 @@ final class LibraryMediaFilesTest extends TestCase
         self::assertTrue(rename($this->base . '/library', $this->base . '/unmounted'));
 
         try {
-            $this->files->prepareDeletion($library->getId(), [$first, $second]);
+            $this->files->prepareDeletion($this->files->claim($library->getId()), [$first, $second]);
             self::fail('An unavailable library root must refuse the deletion.');
         } catch (LibraryRootUnavailableException $refusal) {
             self::assertInstanceOf(ConflictException::class, $refusal);
@@ -141,7 +164,7 @@ final class LibraryMediaFilesTest extends TestCase
         $this->makeReadOnly($this->album);
 
         try {
-            $this->files->prepareDeletion($library->getId(), [$first, $second]);
+            $this->files->prepareDeletion($this->files->claim($library->getId()), [$first, $second]);
             self::fail('An unwritable directory must refuse the deletion.');
         } catch (LibraryMediaDirectoryNotWritableException $refusal) {
             self::assertInstanceOf(ConflictException::class, $refusal);
@@ -152,33 +175,72 @@ final class LibraryMediaFilesTest extends TestCase
         self::assertSame([$first, $second], $this->indexedPaths($library));
     }
 
-    public function testALiveScanClaimRefusesTheRequestAndALapsedOneDoesNot(): void
+    public function testALiveScanClaimRefusesTheDeleteNamingTheScan(): void
     {
         [$library, $first] = $this->scannedAlbum();
-        self::assertTrue($this->libraries->claimScan($library->getId(), new Uuid(), -1), 'A claim whose lease has lapsed.');
-        self::assertFalse($this->files->prepareDeletion($library->getId(), [$first])->scanInProgress);
+        self::assertTrue($this->libraries->claimScan($library->getId(), new Uuid(), 900)->claimed);
 
-        self::assertTrue($this->libraries->claimScan($library->getId(), new Uuid(), 900));
         $inspection = $this->files->inspect($library->getId(), [$first]);
-        self::assertTrue($inspection->scanInProgress);
+        self::assertTrue($inspection->libraryBusy);
         self::assertFalse($inspection->allowsDeletion());
-        try {
-            $this->files->prepareDeletion($library->getId(), [$first]);
-            self::fail('A live scan claim must refuse the deletion.');
-        } catch (LibraryScanAlreadyRunningException $refusal) {
-            self::assertInstanceOf(ConflictException::class, $refusal);
-        }
+        $this->expectBusy(fn () => $this->files->claim($library->getId()), 'scan');
+        self::assertSame('scan', $this->claimRow($library)['claim_kind']);
         self::assertFileExists($first);
+    }
+
+    public function testADeleteOnALibraryWhoseScanDiedTakesTheLapsedClaimAndLeavesTheScanFailed(): void
+    {
+        [$library, $first, $second] = $this->scannedAlbum();
+        self::assertTrue($this->libraries->claimScan($library->getId(), new Uuid(), -1)->claimed, 'A claim whose lease has lapsed.');
+        self::assertFalse($this->files->inspect($library->getId(), [$first])->libraryBusy);
+
+        $result = $this->deleteWithFiles($library, [$first]);
+
+        self::assertSame([$first], $result->removed);
+        self::assertSame([$second], $this->indexedPaths($library));
+        $row = $this->claimRow($library);
+        self::assertSame(['failed', null, null], [$row['scan_status'], $row['claim_id'], $row['claim_kind']]);
+    }
+
+    public function testADeleteWhoseClaimAnotherHolderTookOverStopsUnlinkingAndReportsTheFilesAsLeft(): void
+    {
+        [$library, $first, $second] = $this->scannedAlbum();
+        $claim = $this->files->claim($library->getId());
+        $deletion = $this->files->prepareDeletion($claim, [$first, $second]);
+        $this->inCallerTransaction(fn () => $this->files->deleteIndexRows($deletion));
+        // The delete stalled past its lease, and a scan took the library over.
+        $this->manager->getConnection()->executeStatement(
+            "UPDATE libraries SET claim_expires_at = clock_timestamp() - interval '1 second' WHERE id = ?",
+            [$library->getId()->toString()],
+        );
+        $scan = new Uuid();
+        self::assertTrue($this->libraries->claimScan($library->getId(), $scan, 900)->claimed);
+
+        $result = $this->files->deleteFiles($claim, $deletion);
+        $this->files->release($claim);
+
+        self::assertSame([], $result->removed);
+        self::assertSame([$first, $second], array_map(static fn (LibraryMediaFileLeft $left): string => $left->path, $result->left));
+        self::assertSame(
+            [LibraryMediaFileLeftReason::ClaimLost, LibraryMediaFileLeftReason::ClaimLost],
+            array_map(static fn (LibraryMediaFileLeft $left): LibraryMediaFileLeftReason => $left->reason, $result->left),
+        );
+        self::assertFileExists($first);
+        self::assertFileExists($second);
+        $row = $this->claimRow($library);
+        self::assertSame([$scan->toString(), 'scan'], [$row['claim_id'], $row['claim_kind']], 'Releasing the lost claim leaves the scan\'s alone.');
     }
 
     public function testAFileLeftAfterTheCommitHasNoIndexRowAndTheNextScanImportsIt(): void
     {
         [$library, $first, $second] = $this->scannedAlbum();
 
-        $deletion = $this->files->prepareDeletion($library->getId(), [$first, $second]);
+        $claim = $this->files->claim($library->getId());
+        $deletion = $this->files->prepareDeletion($claim, [$first, $second]);
         $this->inCallerTransaction(fn () => $this->files->deleteIndexRows($deletion));
         $this->makeReadOnly($this->album);
-        $result = $this->files->deleteFiles($deletion);
+        $result = $this->files->deleteFiles($claim, $deletion);
+        $this->files->release($claim);
 
         self::assertSame([], $result->removed);
         self::assertSame([$first, $second], array_map(static fn ($left): string => $left->path, $result->left));
@@ -204,7 +266,7 @@ final class LibraryMediaFilesTest extends TestCase
     public function testIndexRowsComeBackWhenTheCallersTransactionRollsBack(): void
     {
         [$library, $first, $second] = $this->scannedAlbum();
-        $deletion = $this->files->prepareDeletion($library->getId(), [$first]);
+        $deletion = $this->files->prepareDeletion($this->files->claim($library->getId()), [$first]);
 
         try {
             $this->inCallerTransaction(function () use ($deletion, $library, $second): void {
@@ -235,7 +297,50 @@ final class LibraryMediaFilesTest extends TestCase
     {
         $this->expectException(NotFoundException::class);
 
-        $this->files->prepareDeletion(new Uuid(), []);
+        $this->files->claim(new Uuid());
+    }
+
+    /**
+     * Runs a delete with files the way the catalog delete handlers do.
+     *
+     * @param list<string> $paths
+     */
+    private function deleteWithFiles(Library $library, array $paths): LibraryMediaFileDeletionResult
+    {
+        $claim = $this->files->claim($library->getId());
+        try {
+            $deletion = $this->files->prepareDeletion($claim, $paths);
+            $this->inCallerTransaction(fn () => $this->files->deleteIndexRows($deletion));
+
+            return $this->files->deleteFiles($claim, $deletion);
+        } finally {
+            $this->files->release($claim);
+        }
+    }
+
+    /** @param callable(): LibraryMediaFileClaim $claim */
+    private function expectBusy(callable $claim, string $holder): void
+    {
+        try {
+            $claim();
+            self::fail('A library another holder claimed must refuse the delete.');
+        } catch (LibraryBusyException $refusal) {
+            self::assertInstanceOf(ConflictException::class, $refusal);
+            self::assertSame(['reason' => 'library_busy', 'holder' => $holder], $refusal->details);
+        }
+    }
+
+    /** @return array{scan_status: ?string, last_scan: ?string, claim_id: ?string, claim_kind: ?string} */
+    private function claimRow(Library $library): array
+    {
+        $row = $this->manager->getConnection()->fetchAssociative(
+            'SELECT scan_status, last_scan, claim_id, claim_kind FROM libraries WHERE id = ?',
+            [$library->getId()->toString()],
+        );
+        self::assertIsArray($row);
+
+        /** @var array{scan_status: ?string, last_scan: ?string, claim_id: ?string, claim_kind: ?string} $row */
+        return $row;
     }
 
     /** @return array{Library, string, string} the library and its two indexed files, as the scanner stored their paths */

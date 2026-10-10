@@ -6,7 +6,7 @@ namespace App\Tests\Unit\Library\Application\CommandHandler;
 
 use App\Library\Application\Command\ScanLibraryCommand;
 use App\Library\Application\CommandHandler\ScanLibraryHandler;
-use App\Library\Application\Exception\LibraryScanAlreadyRunningException;
+use App\Library\Application\Exception\LibraryBusyException;
 use App\Library\Application\Exception\LibraryScanClaimLostException;
 use App\Library\Application\LibraryDiscovery;
 use App\Library\Application\Message\FilesDiscovered;
@@ -116,7 +116,7 @@ final class ScanLibraryHandlerTest extends TestCase
         try {
             ($this->handler(publish: static fn () => self::fail('Nothing may be published.')))(new ScanLibraryCommand(new LibrarySlug('movies'), claimId: new Uuid()));
             self::fail('The scan must conflict with the live claim.');
-        } catch (LibraryScanAlreadyRunningException) {
+        } catch (LibraryBusyException) {
         }
 
         self::assertSame($other->claimId->toString(), $this->libraries->claimOf($this->library));
@@ -133,7 +133,7 @@ final class ScanLibraryHandlerTest extends TestCase
         try {
             ($this->handler(publish: static fn () => self::fail('Nothing may be published.')))(new ScanLibraryCommand(new LibrarySlug('movies'), claimId: $lost->claimId));
             self::fail('The late scan must conflict with the live claim.');
-        } catch (LibraryScanAlreadyRunningException) {
+        } catch (LibraryBusyException) {
         }
 
         $result = ($this->handler())(new ScanLibraryCommand(new LibrarySlug('movies'), claimId: $current->claimId));

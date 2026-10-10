@@ -2,4 +2,6 @@ errors:
   invalid_type_with_allowed: 'ประเภทไลบรารี "{type}" ไม่ถูกต้อง ต้องเป็นค่าหนึ่งใน: {allowed}'
   slug_exists: 'มีไลบรารีที่ใช้ slug "{slug}" อยู่แล้ว'
   not_found: 'ไม่พบไลบรารี "{library}"'
-  scan_in_progress: 'มีการสแกนอยู่แล้วสำหรับไลบรารี "{library}"'
+  library_busy:
+    scan: 'มีการสแกนอยู่แล้วสำหรับไลบรารี "{library}"'
+    delete: 'มีการลบพร้อมไฟล์กำลังดำเนินการอยู่สำหรับไลบรารี "{library}"'

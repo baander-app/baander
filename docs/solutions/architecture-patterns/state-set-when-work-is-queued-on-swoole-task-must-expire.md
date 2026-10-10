@@ -37,8 +37,8 @@ Anything written when work is queued on `swoole_task`, and cleared only when tha
 
 The library scan claim now does both (migration `migrations/Version20261008200000.php`):
 
-- `libraries.scan_claim_id` and `scan_claim_expires_at` hold the claim. A check constraint ties `scan_status = 'scanning'` to a claim being present.
-- The lease is 15 minutes (`LibraryScanClaims::DEFAULT_LEASE_SECONDS = 900`), measured on the database clock: `scan_claim_expires_at = clock_timestamp() + make_interval(secs => :lease)` (`src/Library/Infrastructure/Doctrine/Repository/LibraryRepository.php:164`).
+- `libraries.claim_id`, `claim_expires_at` and `claim_kind` hold the claim (renamed from `scan_claim_*` on 2026-10-10, when deletes with files began to hold the library too). A check constraint ties `scan_status = 'scanning'` to a `scan` claim; a `delete` claim leaves the scan status alone.
+- The lease is 15 minutes (`LibraryScanClaims::DEFAULT_LEASE_SECONDS = 900`), measured on the database clock: `claim_expires_at = clock_timestamp() + make_interval(secs => :lease)` (`LibraryRepository`'s claim and renew statements).
 - `MusicScanner` and `MovieScanner` call `LibraryScanLease::renew()` at each directory, file hash and publish. `renew()` writes to the database at most once a minute (`RENEWAL_INTERVAL_SECONDS = 60`), so frequent calls are cheap.
 - One `UPDATE` takes the claim when it is free, already this holder's, or lapsed (`LibraryRepository.php:166`). Of two concurrent takeovers, exactly one updates a row.
 - The claim ID travels in `ScanLibraryCommand`. When the scan starts, `ScanLibraryHandler` calls `acquire($library, $claimId)`. A retried job therefore re-claims the free library under its old ID, and stops with a conflict if a newer scan holds a live claim.

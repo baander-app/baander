@@ -12,4 +12,10 @@ enum LibraryMediaFileLeftReason: string
 
     /** The file system refused the unlink. */
     case UnlinkFailed = 'unlink_failed';
+
+    /**
+     * The delete went longer than its lease without renewing its claim on the library, and a
+     * scan or another delete took the library over, so it stopped unlinking.
+     */
+    case ClaimLost = 'claim_lost';
 }

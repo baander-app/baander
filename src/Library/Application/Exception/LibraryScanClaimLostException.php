@@ -8,8 +8,8 @@ use App\Shared\Application\Exception\ConflictException;
 
 /**
  * A running scan found that its claim is gone: it went longer than its lease without renewing
- * it and another scan took the library over, or an operator released the claim. The scan stops
- * so that two scans never write the same library's file index.
+ * it and another scan or a delete with files took the library over, or an operator released
+ * the claim. The scan stops so that the library's file index has one writer.
  */
 final class LibraryScanClaimLostException extends ConflictException
 {

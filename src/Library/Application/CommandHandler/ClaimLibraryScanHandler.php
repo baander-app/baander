@@ -7,7 +7,7 @@ namespace App\Library\Application\CommandHandler;
 use App\Library\Application\Command\ClaimLibraryScanCommand;
 use App\Library\Application\DTO\LibraryScanClaim;
 use App\Library\Application\Exception\LibraryNotFoundException;
-use App\Library\Application\Exception\LibraryScanAlreadyRunningException;
+use App\Library\Application\Exception\LibraryBusyException;
 use App\Library\Application\Service\LibraryScanClaims;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
@@ -21,7 +21,7 @@ final readonly class ClaimLibraryScanHandler
 
     /**
      * @throws LibraryNotFoundException
-     * @throws LibraryScanAlreadyRunningException
+     * @throws LibraryBusyException
      */
     #[AsMessageHandler]
     public function __invoke(ClaimLibraryScanCommand $command): LibraryScanClaim

@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Library\Domain\Repository;
 
 use App\Library\Domain\Model\Library;
+use App\Library\Domain\ValueObject\LibraryClaimAttempt;
+use App\Library\Domain\ValueObject\LibraryClaimKind;
+use App\Library\Domain\ValueObject\LibraryClaimRelease;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
-use App\Library\Domain\ValueObject\ScanClaimRelease;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 
@@ -45,22 +47,27 @@ interface LibraryRepositoryInterface
 
     /**
      * Claims the library for the scan $claimId until $leaseSeconds from now, by the database
-     * clock. One conditional update: it succeeds while no other scan holds a live claim, that
-     * is when the library holds no claim, its claim has lapsed, or the claim is already
-     * $claimId's, so of two concurrent claims exactly one wins. A claim sets the discovery
-     * status to `scanning`; ending or releasing it sets the outcome.
-     *
-     * @return bool false when another scan holds a live claim or the library does not exist
+     * clock. One statement that locks the library row: it succeeds while no other live claim
+     * holds the library, that is when the library holds no claim, its claim has lapsed, or the
+     * claim is already $claimId's, so of two concurrent claims exactly one wins. A scan claim
+     * sets the discovery status to `scanning`; ending or releasing it sets the outcome.
      */
-    public function claimScan(Uuid $libraryId, Uuid $claimId, int $leaseSeconds): bool;
+    public function claimScan(Uuid $libraryId, Uuid $claimId, int $leaseSeconds): LibraryClaimAttempt;
 
     /**
-     * Extends the lease of the scan $claimId to $leaseSeconds from now, even if it has lapsed,
-     * as long as no other scan took the claim over.
-     *
-     * @return bool false when the claim was released or another scan took it over
+     * Claims the library for the delete with files $claimId, as claimScan() claims it for a
+     * scan, but leaves the discovery status and the last scan time alone. A lapsed scan claim it
+     * takes over belonged to a scan that died, which it marks failed.
      */
-    public function renewScanClaim(Uuid $claimId, int $leaseSeconds): bool;
+    public function claimDelete(Uuid $libraryId, Uuid $claimId, int $leaseSeconds): LibraryClaimAttempt;
+
+    /**
+     * Extends the lease of the claim $claimId, of either kind, to $leaseSeconds from now, even if
+     * it has lapsed, as long as no other holder took the claim over.
+     *
+     * @return bool false when the claim was released or another holder took it over
+     */
+    public function renewClaim(Uuid $claimId, int $leaseSeconds): bool;
 
     /**
      * Ends the claim of the scan $claimId with its outcome: `completed`, which records the scan
@@ -71,11 +78,19 @@ interface LibraryRepositoryInterface
     public function endScanClaim(Uuid $claimId, bool $completed): bool;
 
     /**
-     * Ends whichever claim holds the library and marks its scan failed, for a claim whose scan
-     * will not finish. A live claim is released only when $evenIfLive is true.
+     * Ends the claim of the delete with files $claimId and leaves the discovery status alone.
+     * Does nothing when the claim is no longer that delete's.
+     *
+     * @return bool whether the delete still held its claim
      */
-    public function releaseScanClaim(Uuid $libraryId, bool $evenIfLive): ScanClaimRelease;
+    public function endDeleteClaim(Uuid $claimId): bool;
 
-    /** Whether a scan holds a claim on the library that has not lapsed, by the database clock. */
-    public function hasLiveScanClaim(Uuid $libraryId): bool;
+    /**
+     * Ends whichever claim holds the library, for a holder that will not finish; a scan claim
+     * marks its scan failed. A live claim is released only when $evenIfLive is true.
+     */
+    public function releaseClaim(Uuid $libraryId, bool $evenIfLive): LibraryClaimRelease;
+
+    /** The kind of the claim on the library that has not lapsed, by the database clock; null when none. */
+    public function liveClaimKind(Uuid $libraryId): ?LibraryClaimKind;
 }

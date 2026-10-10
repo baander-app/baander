@@ -10,13 +10,14 @@ use App\Library\Application\Command\StartLibraryScanCommand;
 use App\Library\Application\CommandHandler\ScanAllLibrariesHandler;
 use App\Library\Application\CommandHandler\StartLibraryScanHandler;
 use App\Library\Application\DTO\LibraryScanClaim;
-use App\Library\Application\Exception\LibraryScanAlreadyRunningException;
+use App\Library\Application\Exception\LibraryBusyException;
 use App\Library\Application\Service\LibraryLookup;
 use App\Library\Application\Service\LibraryScanClaims;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
+use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Tests\Fixtures\Library\InMemoryLibraryRepository;
 use PHPUnit\Framework\TestCase;
@@ -60,10 +61,26 @@ final class LibraryScanStartTest extends TestCase
         try {
             (new StartLibraryScanHandler($this->claims(), $this->bus()))(new StartLibraryScanCommand($music->getId()->toString()));
             self::fail('The second start must conflict.');
-        } catch (LibraryScanAlreadyRunningException $conflict) {
-            self::assertSame(['reason' => 'scan_in_progress'], $conflict->details);
+        } catch (LibraryBusyException $conflict) {
+            self::assertSame(['reason' => 'library_busy', 'holder' => 'scan'], $conflict->details);
         }
         self::assertSame([], $this->queued);
+    }
+
+    public function testAStartOnALibraryADeleteHoldsIsAConflictNamingTheDelete(): void
+    {
+        $music = $this->library('music');
+        self::assertTrue($this->libraries->claimDelete($music->getId(), new Uuid(), LibraryScanClaims::DEFAULT_LEASE_SECONDS)->claimed);
+
+        try {
+            (new StartLibraryScanHandler($this->claims(), $this->bus()))(new StartLibraryScanCommand($music->getId()->toString()));
+            self::fail('A start while a delete holds the library must conflict.');
+        } catch (LibraryBusyException $conflict) {
+            self::assertSame(['reason' => 'library_busy', 'holder' => 'delete'], $conflict->details);
+            self::assertSame('A delete with files is in progress for the library "Music".', $conflict->getMessage());
+        }
+        self::assertSame([], $this->queued);
+        self::assertNull($music->getDiscoveryStatus(), 'The refused scan left the status alone.');
     }
 
     public function testAScanThatCannotBeQueuedReleasesItsClaim(): void
@@ -92,7 +109,7 @@ final class LibraryScanStartTest extends TestCase
         try {
             $start(new StartLibraryScanCommand('music'));
             self::fail('A live claim must refuse the start.');
-        } catch (LibraryScanAlreadyRunningException) {
+        } catch (LibraryBusyException) {
         }
 
         $this->clock->sleep(1);
