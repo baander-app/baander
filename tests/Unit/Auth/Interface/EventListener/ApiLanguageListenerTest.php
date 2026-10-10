@@ -44,7 +44,7 @@ final class ApiLanguageListenerTest extends TestCase
 
         $this->listener($language)->onRequest(new RequestEvent($this->createStub(HttpKernelInterface::class), $request, HttpKernelInterface::MAIN_REQUEST));
 
-        self::assertSame($expected, $request->attributes->get(RequestLocale::ATTRIBUTE));
+        self::assertSame($expected, RequestLocale::of($request->attributes->get(RequestLocale::ATTRIBUTE)));
     }
 
     public function testARequestTheFirewallRefusedIsResolvedWhenTheErrorIsRendered(): void
@@ -53,7 +53,7 @@ final class ApiLanguageListenerTest extends TestCase
 
         $this->listener(self::language('da', 'user'))->onException($this->exception($request));
 
-        self::assertSame('da', $request->attributes->get(RequestLocale::ATTRIBUTE));
+        self::assertSame('da', RequestLocale::of($request->attributes->get(RequestLocale::ATTRIBUTE)));
     }
 
     public function testAnErrorAfterResolutionKeepsTheResolvedLanguage(): void
@@ -74,7 +74,28 @@ final class ApiLanguageListenerTest extends TestCase
 
         (new ApiLanguageListener($this->signedIn(), $settings, new AcceptLanguageMatcher()))->onException($this->exception($request));
 
-        self::assertSame('th', $request->attributes->get(RequestLocale::ATTRIBUTE));
+        self::assertSame('th', RequestLocale::of($request->attributes->get(RequestLocale::ATTRIBUTE)));
+    }
+
+    public function testTheSavedChoiceIsReadOnlyWhenAMessageIsTranslatedAndOnce(): void
+    {
+        $reads = 0;
+        $settings = $this->createStub(UserSettingsContractInterface::class);
+        $settings->method('setting')->willReturnCallback(static function () use (&$reads): UserSettingView {
+            ++$reads;
+
+            return self::language('da', 'user');
+        });
+        $request = $this->request('th');
+
+        (new ApiLanguageListener($this->signedIn(), $settings, new AcceptLanguageMatcher()))
+            ->onRequest(new RequestEvent($this->createStub(HttpKernelInterface::class), $request, HttpKernelInterface::MAIN_REQUEST));
+        $resolver = $request->attributes->get(RequestLocale::ATTRIBUTE);
+        self::assertSame(0, $reads);
+
+        self::assertSame('da', RequestLocale::of($resolver));
+        self::assertSame('da', RequestLocale::of($resolver));
+        self::assertSame(1, $reads);
     }
 
     private static function language(?string $stored, string $source, bool $valid = true): UserSettingView

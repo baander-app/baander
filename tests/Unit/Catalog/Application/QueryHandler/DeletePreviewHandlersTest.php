@@ -80,7 +80,7 @@ final class DeletePreviewHandlersTest extends TestCase
 
         self::assertSame([
             'allowed' => false,
-            'scanInProgress' => false,
+            'libraryBusy' => false,
             'files' => [
                 ['path' => '/music/inside.flac', 'verdict' => 'deletable', 'directory' => null],
                 ['path' => '/elsewhere/outside.flac', 'verdict' => 'outside_root', 'directory' => null],
@@ -133,7 +133,7 @@ final class DeletePreviewHandlersTest extends TestCase
 
         self::assertSame(['id' => $album->getPublicId()->toString(), 'title' => 'Album'], $data['song']['album']);
         self::assertSame(
-            ['allowed' => false, 'scanInProgress' => true, 'files' => [['path' => '/music/song.flac', 'verdict' => 'deletable', 'directory' => null]]],
+            ['allowed' => false, 'libraryBusy' => true, 'files' => [['path' => '/music/song.flac', 'verdict' => 'deletable', 'directory' => null]]],
             $data['fileDeletion'],
         );
     }

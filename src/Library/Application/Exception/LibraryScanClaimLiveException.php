@@ -18,7 +18,10 @@ final class LibraryScanClaimLiveException extends ConflictException
         return new self(
             sprintf(
                 '%s holds a live claim on the library "%s": it renewed the claim within its lease and may still be running.',
-                $holder === LibraryClaimKind::Scan ? 'A scan' : 'A delete with files',
+                match ($holder) {
+                    LibraryClaimKind::Scan => 'A scan',
+                    LibraryClaimKind::Delete => 'A delete with files',
+                },
                 $name,
             ),
             ['reason' => 'scan_claim_live', 'holder' => $holder->value],

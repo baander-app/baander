@@ -63,10 +63,10 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
         try {
             $data = $this->jsonEncoder->decode((string) $request->getContent(), 'json');
         } catch (\Throwable) {
-            throw new BadCredentialsException('Invalid credentials.');
+            throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
         }
         if (!is_array($data)) {
-            throw new BadCredentialsException('Invalid credentials.');
+            throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
         }
 
         $challengeKey = $data['challengeKey'] ?? '';
@@ -75,7 +75,7 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
 
         if (!is_string($challengeKey) || $challengeKey === '' || !is_array($response)
             || ($claimedUserId !== null && !is_string($claimedUserId))) {
-            throw new BadCredentialsException('Invalid credentials.');
+            throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
         }
 
         $command = new AuthenticatePasskeyCommand(
@@ -87,12 +87,12 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
         try {
             $userId = $this->commandBus->dispatch($command)->last(HandledStamp::class)?->getResult();
             if (!is_string($userId)) {
-                throw new BadCredentialsException('Invalid credentials.');
+                throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
             }
             $uuid = Uuid::fromString($userId);
         } catch (\Throwable $e) {
             $this->logger->debug('Passkey authentication failed.', ['exception' => $e]);
-            throw new BadCredentialsException('Invalid credentials.', 0, $e);
+            throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS, 0, $e);
         }
 
         $request->attributes->set(VerifiedPasskeyLogin::class, new VerifiedPasskeyLogin(
@@ -107,11 +107,11 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
             new UserBadge((string) $userId, function () use ($uuid): SecurityUser {
                 $user = $this->userRepository->findByUuid($uuid);
                 if ($user === null) {
-                    throw new BadCredentialsException('Invalid credentials.');
+                    throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
                 }
                 // Same rule as password login: a disabled account cannot sign in.
                 if ($user->isDisabled()) {
-                    throw new CustomUserMessageAuthenticationException('This account has been disabled.');
+                    throw new CustomUserMessageAuthenticationException(AuthenticationFailureMessage::ACCOUNT_DISABLED);
                 }
                 return new SecurityUser(
                     $user->getId()->toString(),

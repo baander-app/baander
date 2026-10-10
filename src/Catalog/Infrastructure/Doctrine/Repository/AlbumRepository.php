@@ -19,10 +19,10 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Doctrine\Repository\RefreshedEntityTrait;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Infrastructure\Doctrine\Repository\PgroongaSearchTrait;
 use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\Query;
 
 /**
  * Pure domain repository for albums.
@@ -30,6 +30,7 @@ use Doctrine\ORM\Query;
 final class AlbumRepository implements AlbumRepositoryInterface
 {
     use PgroongaSearchTrait;
+    use RefreshedEntityTrait;
 
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
@@ -124,18 +125,9 @@ final class AlbumRepository implements AlbumRepositoryInterface
 
     public function findFreshByUuid(Uuid $uuid): ?Album
     {
-        // find() answers from the identity map; the refresh hint overwrites a managed entity
-        // with the stored row instead.
-        $entity = $this->entityManager
-            ->getRepository(AlbumEntity::class)
-            ->createQueryBuilder('fresh')
-            ->where('fresh.id = :id')
-            ->setParameter('id', $uuid)
-            ->getQuery()
-            ->setHint(Query::HINT_REFRESH, true)
-            ->getOneOrNullResult();
+        $entity = $this->findRefreshedEntity($this->entityManager, AlbumEntity::class, $uuid);
 
-        return $entity instanceof AlbumEntity ? $this->toDomain($entity) : null;
+        return $entity === null ? null : $this->toDomain($entity);
     }
 
     public function findByPublicId(PublicId $publicId): ?Album

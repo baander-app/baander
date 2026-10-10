@@ -15,15 +15,13 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  */
 final class LibraryBusyException extends ConflictException implements TranslatableInterface
 {
-    private const array MESSAGES = [
-        'scan' => 'A scan is already in progress for the library "%s".',
-        'delete' => 'A delete with files is in progress for the library "%s".',
-    ];
-
     private function __construct(private readonly string $name, private readonly LibraryClaimKind $holder)
     {
         parent::__construct(
-            sprintf(self::MESSAGES[$holder->value], $name),
+            sprintf(match ($holder) {
+                LibraryClaimKind::Scan => 'A scan is already in progress for the library "%s".',
+                LibraryClaimKind::Delete => 'A delete with files is in progress for the library "%s".',
+            }, $name),
             ['reason' => 'library_busy', 'holder' => $holder->value],
         );
     }

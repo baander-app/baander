@@ -102,7 +102,7 @@ final class CatalogDeleteOutput
             return;
         }
 
-        $io->warning($preview->scanInProgress
+        $io->warning($preview->libraryBusy
             ? 'A scan or another delete with files holds the library; a delete with --delete-files would be refused.'
             : 'A delete with --delete-files would be refused; nothing would be deleted.');
     }

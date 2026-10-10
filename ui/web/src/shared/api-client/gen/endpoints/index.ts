@@ -1352,7 +1352,7 @@ export interface FileDeletionPreviewResource {
   /** The delete with files would go ahead */
   allowed: boolean;
   /** A scan or another delete with files holds the library, which refuses the delete */
-  scanInProgress: boolean;
+  libraryBusy: boolean;
   files: FileDeletionPreviewResourceFilesItem[];
 }
 

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Library\Infrastructure\Filesystem;
 
-use App\Library\Application\Exception\LibraryBusyException;
 use App\Library\Application\Exception\LibraryMediaDirectoryNotWritableException;
 use App\Library\Application\Exception\LibraryMediaFileOutsideRootException;
 use App\Library\Application\Exception\LibraryMediaFilesAllMissingException;
@@ -16,13 +15,13 @@ use App\Library\Application\Port\LibraryMediaFileDeletionResult;
 use App\Library\Application\Port\LibraryMediaFileInspection;
 use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Library\Application\Port\LibraryMediaFileVerdict;
+use App\Library\Application\Service\LibraryClaimRenewal;
 use App\Library\Application\Service\LibraryScanClaims;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\Repository\LibraryFileIndexRepositoryInterface;
 use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Library\Domain\ValueObject\LibraryClaimKind;
 use App\Shared\Domain\Model\Uuid;
-use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use LogicException;
 use Psr\Clock\ClockInterface;
@@ -61,21 +60,21 @@ final readonly class LibraryMediaFiles implements LibraryMediaFilesInterface
     public function missingPaths(array $paths): array
     {
         // PHP caches file status; a file deleted since an earlier check must count.
-        clearstatcache(true);
+        return array_values(array_filter($paths, static function (string $path): bool {
+            clearstatcache(true, $path);
 
-        return array_values(array_filter($paths, static fn (string $path): bool => !file_exists($path)));
+            return !file_exists($path);
+        }));
     }
 
     public function claim(Uuid $libraryId): LibraryMediaFileClaim
     {
         $library = $this->library($libraryId);
         $claimId = new Uuid();
-        $attempt = $this->libraries->claimDelete($library->getId(), $claimId, LibraryScanClaims::DEFAULT_LEASE_SECONDS);
-        if (!$attempt->claimed) {
-            throw $attempt->holder === null
-                ? LibraryNotFoundException::forIdentifier($libraryId->toString())
-                : LibraryBusyException::heldBy($library->getName(), $attempt->holder);
-        }
+        LibraryScanClaims::ensureClaimed(
+            $library,
+            $this->libraries->claimDelete($library->getId(), $claimId, LibraryScanClaims::DEFAULT_LEASE_SECONDS),
+        );
 
         return new LibraryMediaFileClaim($library->getId(), $claimId);
     }
@@ -126,25 +125,16 @@ final readonly class LibraryMediaFiles implements LibraryMediaFilesInterface
     {
         // The first file renews the claim, which also proves it is still this delete's after the
         // transaction; later files renew it once per renewal interval, as a scan does.
-        $renewedAt = null;
-        $stillClaimed = function () use ($claim, &$renewedAt): bool {
-            $now = $this->clock->now();
-            if ($renewedAt instanceof DateTimeImmutable) {
-                $elapsed = $now->getTimestamp() - $renewedAt->getTimestamp();
-                // A wall clock set back counts as due, so a clock change cannot starve the lease.
-                if ($elapsed >= 0 && $elapsed < LibraryScanClaims::RENEWAL_INTERVAL_SECONDS) {
-                    return true;
-                }
-            }
-            if (!$this->libraries->renewClaim($claim->claimId, LibraryScanClaims::DEFAULT_LEASE_SECONDS)) {
-                return false;
-            }
-            $renewedAt = $now;
+        $renewal = new LibraryClaimRenewal(
+            $this->libraries,
+            $this->clock,
+            $claim->claimId,
+            LibraryScanClaims::DEFAULT_LEASE_SECONDS,
+            LibraryScanClaims::RENEWAL_INTERVAL_SECONDS,
+            renewedAt: null,
+        );
 
-            return true;
-        };
-
-        return $this->guard->delete($deletion, $stillClaimed);
+        return $this->guard->delete($deletion, $renewal->renew(...));
     }
 
     public function release(LibraryMediaFileClaim $claim): void
