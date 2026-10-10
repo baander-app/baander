@@ -15,6 +15,9 @@ final readonly class LibraryMediaFileInspection
      * @param bool                       $libraryBusy    a scan or another delete with files holds a live claim on the library
      * @param bool                       $rootAvailable  the library root is an existing directory; when it is not
      *                                                   (unmounted storage), every file reads as missing
+     *
+     * A deletion is refused when a holder is busy, the root is unavailable, every requested file
+     * is missing, or any file lies outside the root or in a directory the server cannot write.
      */
     public function __construct(
         public Uuid $libraryId,
@@ -27,7 +30,7 @@ final readonly class LibraryMediaFileInspection
 
     public function allowsDeletion(): bool
     {
-        if ($this->libraryBusy || !$this->rootAvailable) {
+        if ($this->libraryBusy || !$this->rootAvailable || $this->allFilesMissing()) {
             return false;
         }
 
@@ -38,6 +41,15 @@ final readonly class LibraryMediaFileInspection
         }
 
         return true;
+    }
+
+    /**
+     * Every requested file reads as missing, as when the storage under part of the library is not
+     * mounted. False for a request without files, such as an album without songs.
+     */
+    public function allFilesMissing(): bool
+    {
+        return $this->files !== [] && count($this->withVerdict(LibraryMediaFileVerdict::Missing)) === count($this->files);
     }
 
     /** @return list<string> */

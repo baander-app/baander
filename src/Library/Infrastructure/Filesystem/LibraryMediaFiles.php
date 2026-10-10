@@ -7,6 +7,7 @@ namespace App\Library\Infrastructure\Filesystem;
 use App\Library\Application\Exception\LibraryBusyException;
 use App\Library\Application\Exception\LibraryMediaDirectoryNotWritableException;
 use App\Library\Application\Exception\LibraryMediaFileOutsideRootException;
+use App\Library\Application\Exception\LibraryMediaFilesAllMissingException;
 use App\Library\Application\Exception\LibraryNotFoundException;
 use App\Library\Application\Exception\LibraryRootUnavailableException;
 use App\Library\Application\Port\LibraryMediaFileCheck;
@@ -19,6 +20,7 @@ use App\Library\Application\Service\LibraryScanClaims;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\Repository\LibraryFileIndexRepositoryInterface;
 use App\Library\Domain\Repository\LibraryRepositoryInterface;
+use App\Library\Domain\ValueObject\LibraryClaimKind;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
@@ -51,6 +53,19 @@ final readonly class LibraryMediaFiles implements LibraryMediaFilesInterface
         );
     }
 
+    public function isHeldByDelete(Uuid $libraryId): bool
+    {
+        return $this->libraries->liveClaimKind($libraryId) === LibraryClaimKind::Delete;
+    }
+
+    public function missingPaths(array $paths): array
+    {
+        // PHP caches file status; a file deleted since an earlier check must count.
+        clearstatcache(true);
+
+        return array_values(array_filter($paths, static fn (string $path): bool => !file_exists($path)));
+    }
+
     public function claim(Uuid $libraryId): LibraryMediaFileClaim
     {
         $library = $this->library($libraryId);
@@ -73,6 +88,10 @@ final readonly class LibraryMediaFiles implements LibraryMediaFilesInterface
 
         if (!$inspection->rootAvailable) {
             throw LibraryRootUnavailableException::forRoot($library->getPath()->toString());
+        }
+
+        if ($inspection->allFilesMissing()) {
+            throw LibraryMediaFilesAllMissingException::underRoot($library->getPath()->toString());
         }
 
         $outside = $inspection->withVerdict(LibraryMediaFileVerdict::OutsideRoot);

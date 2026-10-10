@@ -17,7 +17,9 @@ use App\Catalog\Domain\Model\Video;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Catalog\Domain\ValueObject\AlbumType;
 use App\Catalog\Domain\ValueObject\ArtistRole;
+use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Message\FilesDiscovered;
+use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
 use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
 use App\Shared\Domain\Model\Uuid;
@@ -26,10 +28,15 @@ use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\DelayStamp;
+use Symfony\Component\Messenger\Stamp\TransportNamesStamp;
 
 final class FilesDiscoveredHandler
 {
     private const int BATCH_SIZE = 50;
+
+    /** How long an import waits before asking again whether a delete with files still holds its library. */
+    private const int HELD_LIBRARY_RETRY_DELAY_MS = 30_000;
 
     public function __construct(
         private readonly AlbumPortInterface $albumService,
@@ -43,20 +50,37 @@ final class FilesDiscoveredHandler
         private readonly LyricsFetchRequestInterface $lyricsFetch,
         private readonly AlbumMetadataSyncRequestInterface $albumMetadataSync,
         private readonly LoggerInterface $logger,
+        private readonly LibraryMediaFilesInterface $mediaFiles,
     ) {
     }
 
     #[AsMessageHandler]
     public function __invoke(FilesDiscovered $message): void
     {
+        // A delete with files that holds the library may be about to unlink some of these files,
+        // and a song imported from one now would stay in the catalog without its file. Wait for
+        // the delete to end.
+        if ($this->mediaFiles->isHeldByDelete($message->libraryId)) {
+            $this->requeueWhileHeld($message);
+
+            return;
+        }
+
+        // Files deleted since the scan found them become no song, video or album.
+        $files = $this->presentFiles($message->files);
+        if ($files === []) {
+            return;
+        }
+
         match ($message->libraryType) {
-            'music' => $this->processMusicFiles($message),
-            'movie' => $this->processMovieFiles($message),
+            'music' => $this->processMusicFiles($message, $files),
+            'movie' => $this->processMovieFiles($message, $files),
             default => throw new RuntimeException(sprintf('Unknown library type: %s', $message->libraryType)),
         };
     }
 
-    private function processMusicFiles(FilesDiscovered $message): void
+    /** @param list<DiscoveredFile> $files the message's files that still exist */
+    private function processMusicFiles(FilesDiscovered $message, array $files): void
     {
         $libraryId = $message->libraryId;
         $batchCount = 0;
@@ -65,7 +89,7 @@ final class FilesDiscoveredHandler
         $songsAwaitingLyrics = [];
 
         // Resolve album from directory
-        [$album, $wasCreated] = $this->resolveAlbum($libraryId, $message->directory, $message->files);
+        [$album, $wasCreated] = $this->resolveAlbum($libraryId, $message->directory, $files);
         if ($album === null) {
             return;
         }
@@ -75,7 +99,7 @@ final class FilesDiscoveredHandler
             $this->requestAlbumSync($album);
         }
 
-        foreach ($message->files as $file) {
+        foreach ($files as $file) {
             if (!$file->isAudio()) {
                 continue;
             }
@@ -177,7 +201,8 @@ final class FilesDiscoveredHandler
         }
     }
 
-    private function processMovieFiles(FilesDiscovered $message): void
+    /** @param list<DiscoveredFile> $files the message's files that still exist */
+    private function processMovieFiles(FilesDiscovered $message, array $files): void
     {
         $libraryId = $message->libraryId;
         $movieTitle = basename($message->directory);
@@ -189,7 +214,7 @@ final class FilesDiscoveredHandler
 
         $batchCount = 0;
         $failures = [];
-        foreach ($message->files as $file) {
+        foreach ($files as $file) {
             if (!$file->isVideo()) {
                 continue;
             }
@@ -247,7 +272,7 @@ final class FilesDiscoveredHandler
     }
 
     /**
-     * @param array<\App\Library\Application\Message\DiscoveredFile> $files
+     * @param list<DiscoveredFile> $files
      * @return array{Album|null, bool}
      */
     private function resolveAlbum(Uuid $libraryId, string $directory, array $files): array
@@ -311,6 +336,44 @@ final class FilesDiscoveredHandler
         $this->movieService->persist($movie);
 
         return [$movie, true];
+    }
+
+    /**
+     * Puts the message back on its queue with a delay. The delete renews its claim while it runs
+     * and the claim lapses with its lease when the delete dies, so the import runs in the end.
+     */
+    private function requeueWhileHeld(FilesDiscovered $message): void
+    {
+        $this->logger->info('A delete with files holds library {library_id}; the import of {directory} waits for it.', [
+            'library_id' => $message->libraryId->toString(),
+            'directory' => $message->directory,
+        ]);
+
+        $this->messageBus->dispatch($message, [
+            new TransportNamesStamp(['async']),
+            new DelayStamp(self::HELD_LIBRARY_RETRY_DELAY_MS),
+        ]);
+    }
+
+    /**
+     * @param array<DiscoveredFile> $files
+     *
+     * @return list<DiscoveredFile>
+     */
+    private function presentFiles(array $files): array
+    {
+        $files = array_values($files);
+        $missing = $this->mediaFiles->missingPaths(array_map(static fn (DiscoveredFile $file): string => $file->absolutePath, $files));
+        if ($missing === []) {
+            return $files;
+        }
+
+        $this->logger->info('Skipping {count} file(s) deleted since the scan found them.', [
+            'count' => count($missing),
+            'paths' => $missing,
+        ]);
+
+        return array_values(array_filter($files, static fn (DiscoveredFile $file): bool => !in_array($file->absolutePath, $missing, true)));
     }
 
     private function detectMimeType(string $extension): string

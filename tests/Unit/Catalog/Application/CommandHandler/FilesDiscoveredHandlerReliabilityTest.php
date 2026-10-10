@@ -14,6 +14,7 @@ use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Library\Application\Message\FilesDiscovered;
+use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
 use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
@@ -89,6 +90,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             $this->createStub(LyricsFetchRequestInterface::class),
             $this->createStub(AlbumMetadataSyncRequestInterface::class),
             $logger,
+            $this->createStub(LibraryMediaFilesInterface::class),
         );
 
         $message = new FilesDiscovered($libraryId, 'music', $directory, [$file]);
@@ -160,6 +162,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             $this->createStub(LyricsFetchRequestInterface::class),
             $this->createStub(AlbumMetadataSyncRequestInterface::class),
             $logger,
+            $this->createStub(LibraryMediaFilesInterface::class),
         );
 
         $message = new FilesDiscovered($libraryId, 'music', $directory, [$fileOne, $fileTwo]);
@@ -326,6 +329,7 @@ final class FilesDiscoveredHandlerReliabilityTest extends TestCase
             $this->createStub(LyricsFetchRequestInterface::class),
             $this->createStub(AlbumMetadataSyncRequestInterface::class),
             $logger ?? new NullLogger(),
+            $this->createStub(LibraryMediaFilesInterface::class),
         );
         $file = new DiscoveredFile('/music/Test Album/01-track.mp3', 'Test Album/01-track.mp3', 'mp3', 1_000_000, time(), 'cover-fanout-hash');
         $message = new FilesDiscovered($libraryId, 'music', '/music/Test Album', [$file]);

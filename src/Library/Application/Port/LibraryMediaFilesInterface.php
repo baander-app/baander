@@ -44,6 +44,23 @@ interface LibraryMediaFilesInterface
     public function inspect(Uuid $libraryId, array $paths): LibraryMediaFileInspection;
 
     /**
+     * Whether a delete with files holds a live claim on the library. An import of files the
+     * scanner found waits while one does, since it could import a file the delete is about to
+     * unlink. False for an unknown library.
+     */
+    public function isHeldByDelete(Uuid $libraryId): bool;
+
+    /**
+     * The paths at which no file exists now, or a symlink points to nothing, in request order. An
+     * import drops them, so a file deleted since the scan found it becomes no song or video.
+     *
+     * @param list<string> $paths absolute paths, as the scanner stored them
+     *
+     * @return list<string>
+     */
+    public function missingPaths(array $paths): array;
+
+    /**
      * Claims the library for a delete with files, with a lease that deleteFiles() renews. A claim
      * whose holder stopped renewing it has lapsed and is taken over; a lapsed scan claim belonged
      * to a scan that died, which is marked failed.
@@ -64,7 +81,9 @@ interface LibraryMediaFilesInterface
      *
      * @throws NotFoundException     when the library is gone
      * @throws ConflictException     when the library root is not an existing directory (unmounted
-     *                               storage), or the server cannot write a directory that holds
+     *                               storage), every requested file is missing (reason
+     *                               `all_files_missing`; a request without paths is not refused
+     *                               for it), or the server cannot write a directory that holds
      *                               one of the files
      * @throws InvalidInputException when a path, or the file a symlink at it points to, lies outside the library root
      */

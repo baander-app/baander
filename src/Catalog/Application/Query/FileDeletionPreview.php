@@ -8,9 +8,10 @@ use App\Library\Application\Port\LibraryMediaFileCheck;
 use App\Library\Application\Port\LibraryMediaFileInspection;
 
 /**
- * What a delete with the audio files would do with each file. A delete is refused when a scan
- * holds the library, or when any file lies outside the library root or in a directory the server
- * cannot write.
+ * What a delete with the audio files would do with each file. A delete is refused when a scan or
+ * another delete with files holds the library, when the library root is unavailable, when every
+ * file is missing (an entry without files is not refused for that), or when any file lies outside
+ * the library root or in a directory the server cannot write.
  */
 final readonly class FileDeletionPreview
 {

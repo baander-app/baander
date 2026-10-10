@@ -15,6 +15,7 @@ use App\Catalog\Domain\Model\Song;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Message\FilesDiscovered;
+use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
 use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
 use App\Metadata\Domain\Model\ExtractedMetadata;
@@ -184,6 +185,7 @@ final class FilesDiscoveredAlbumSyncRequestTest extends TestCase
             $this->createStub(LyricsFetchRequestInterface::class),
             $sync,
             $logger ?? new NullLogger(),
+            $this->createStub(LibraryMediaFilesInterface::class),
         );
     }
 
