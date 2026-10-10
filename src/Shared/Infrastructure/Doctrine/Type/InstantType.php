@@ -24,7 +24,8 @@ use Doctrine\DBAL\Types\Type;
  */
 final class InstantType extends Type implements PhpDateTimeMappingType
 {
-    private const string WRITE_FORMAT = 'Y-m-d H:i:s.uP';
+    /** An instant as PostgreSQL parses it exactly: microseconds and the offset. */
+    public const string WRITE_FORMAT = 'Y-m-d H:i:s.uP';
 
     /** PostgreSQL omits a zero fraction; a zone-less value, as from a `timestamp` column, is UTC. */
     private const array READ_FORMATS = ['!Y-m-d H:i:s.uP', '!Y-m-d H:i:sP', '!Y-m-d H:i:s.u', '!Y-m-d H:i:s'];

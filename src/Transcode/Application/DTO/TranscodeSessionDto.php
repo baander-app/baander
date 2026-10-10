@@ -72,8 +72,8 @@ final readonly class TranscodeSessionDto
             currentSegmentIndex: (int) $row['current_segment_index'],
             wallClockOffset: (float) $row['wall_clock_offset'],
             metrics: \is_string($row['metrics']) ? json_decode($row['metrics'], true, 512, JSON_THROW_ON_ERROR) : (array) $row['metrics'],
-            createdAt: self::apiInstant($row['created_at']),
-            updatedAt: self::apiInstant($row['updated_at']),
+            createdAt: ApiInstant::fromDatabase($row['created_at']),
+            updatedAt: ApiInstant::fromDatabase($row['updated_at']),
         );
     }
 
@@ -97,11 +97,5 @@ final readonly class TranscodeSessionDto
             'createdAt' => $this->createdAt,
             'updatedAt' => $this->updatedAt,
         ];
-    }
-
-    /** A `timestamptz` value as PostgreSQL prints it, in the API format: whole seconds at +00:00. */
-    private static function apiInstant(mixed $value): string
-    {
-        return (new \DateTimeImmutable((string) $value))->setTimezone(new \DateTimeZone('UTC'))->format(\DateTimeInterface::ATOM);
     }
 }

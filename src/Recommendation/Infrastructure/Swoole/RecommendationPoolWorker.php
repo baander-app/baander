@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Recommendation\Infrastructure\Swoole;
 
+use App\Shared\Infrastructure\Doctrine\Type\InstantType;
 use App\Shared\Infrastructure\Swoole\Async;
 use App\Shared\Infrastructure\Swoole\ProcessPool\ProcessPoolWorkerInterface;
 use RuntimeException;
@@ -322,7 +323,7 @@ final class RecommendationPoolWorker implements ProcessPoolWorkerInterface
     private function updateJobStatus(\PDO $pdo, string $jobId, string $status, ?string $failReason = null, ?array $strategyCounts = null, array $from = ['pending']): int
     {
         // The exact UTC instant with its offset: right in any PHP zone and any session zone.
-        $now = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->format('Y-m-d H:i:s.uP');
+        $now = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->format(InstantType::WRITE_FORMAT);
         $fields = ['status' => $status, 'updated_at' => $now];
         if ($failReason !== null) {
             $fields['fail_reason'] = $failReason;

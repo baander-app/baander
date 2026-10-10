@@ -21,6 +21,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Doctrine\Repository\RefreshedEntityTrait;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Infrastructure\Doctrine\Repository\PgroongaSearchTrait;
+use App\Shared\Infrastructure\Doctrine\Type\InstantType;
 use App\Shared\Infrastructure\Pagination\CursorCodec;
 use App\Shared\Infrastructure\Pagination\CursorPaginator;
 use Doctrine\ORM\EntityManagerInterface;
@@ -703,7 +704,7 @@ final class SongRepository implements SongRepositoryInterface
             SongSortField::Album => fn (SongEntity $e): array => ['sort' => $e->getAlbum()->getTitle(), 'id' => $e->getId()->toString()],
             SongSortField::Year => fn (SongEntity $e): array => ['sort' => $e->getAlbum()->getYear(), 'id' => $e->getId()->toString()],
             // Keep the microseconds: a whole-second cursor sorts before its own row and repeats or skips songs added within that second.
-            SongSortField::Added => fn (SongEntity $e): array => ['sort' => $e->getCreatedAt()->format('Y-m-d H:i:s.uP'), 'id' => $e->getId()->toString()],
+            SongSortField::Added => fn (SongEntity $e): array => ['sort' => $e->getCreatedAt()->format(InstantType::WRITE_FORMAT), 'id' => $e->getId()->toString()],
             SongSortField::Title => fn (SongEntity $e): array => ['sort' => $e->getTitle(), 'id' => $e->getId()->toString()],
         };
     }
