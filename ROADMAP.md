@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-10-09. This is the working delivery record for the remediation,
+Updated: 2026-10-10. This is the working delivery record for the remediation,
 registry, and web-state plans. Update it when scope changes or a stage is verified.
 Completed code is not proof of production or performance qualification.
 
@@ -46,38 +46,27 @@ plans come next, in this order:
    delete), webhook administration and server discovery registration. No deferred
    exemption remains, and the parity test fails on an exemption that defers its
    command. The admin notification bell needs no command: it reads the
-   administrator's own inbox. Still open:
-   - a delete with its audio files refuses only while a scan holds the library; a scan
-     that reads a file between the delete's commit and the unlink imports it again as
-     a song whose file is gone, and a `FilesDiscovered` message already queued can do
-     the same;
-   - libraries whose roots overlap can index one file twice, so deleting it for one
-     library removes it from the other;
-   - PHP has no `unlinkat()`, so a parent directory swapped for a symlink between the
-     last check and the unlink is not caught;
-   - a delete with files refuses a library whose folder is missing, but an empty mount
-     point reads as every file missing, so the delete drops their index rows and the next
-     scan after remounting imports the songs again;
-   - applying LRCLIB lyrics checks for existing lyrics, asks LRCLIB, then inserts; a queued
-     fetch that stores lyrics for the same song in between turns the insert into a
-     unique-violation 500 instead of a 409 (the fetch has the same shape);
-   - metadata enrichment loads an album, spends seconds on provider lookups, then saves
-     that snapshot, so a cover set or field edit made during the lookup is reverted;
-   - `LrclibClient` sets no request timeout, so a stalled LRCLIB holds a per-song fetch
-     for two socket timeouts (cached lookup, then full lookup);
-   - no action grants or revokes a member's access to a library;
-   - no API request selects a non-English locale, so the translated library errors
-     are never returned;
-   - `auth.reconnect` lets an authenticated WebSocket take another user's identity
-     with a valid reconnection token; review that design;
-   - `ui/rn`'s test setup is broken: 10 of its 12 Jest suites fail before running
-     (`@testing-library/react` missing, `@react-navigation` not transformed) and
-     `tsc` reports 280 errors, Jest globals among them. The TV QoL tests pass under it;
-   - `NotificationRepositoryInterface::findAfterId()`, written for SSE replay, has no
-     production caller since SSE was removed;
-   - a member who leaves a party over HTTP instead of `party.leave` keeps their
-     WebSocket in the party room and still receives `party.member_event` until the
-     connection closes; end the room membership with the party membership.
+   administrator's own inbox. The
+   [open-items follow-up](docs/plans/2026-10-10-1012-fix-item2-open-items-plan.md)
+   closed the rest on 2026-10-10 (see below). Still open:
+   - `ui/rn` feature drift: the test setup loads again, but `tsc` reports 84 errors and
+     25 Jest tests fail, from missing `ui/shared` exports (`TVStatusCard`,
+     `TVTable`), API response shapes in `catalog-api.ts`, React Native 0.86 removals
+     (`StyleSheet.absoluteFillObject`), missing `tvSpacing` tokens and TV components that
+     do not forward `testID`. Deferred with React Native work (user decision,
+     2026-10-10); a `ui/rn` CI job waits until they pass.
+
+   Closed on 2026-10-10: a delete with audio files holds the library under a claim of
+   its own kind, so scans wait for it and a queued import waits, then skips files that
+   are gone; a delete with files refuses when every file is missing (an empty mount)
+   or the library folder is gone; nested library roots are refused at creation; the
+   missing `unlinkat()` is an accepted, documented limit; a lyrics insert race answers
+   409 or the stored lyrics, and LRCLIB requests time out after 10 seconds; enrichment
+   re-reads its target before applying; admins grant and revoke library access from
+   the admin user page and with `app:library:member:*`; API messages follow the user's
+   saved language, then `Accept-Language`, per request; `auth.reconnect` and its tokens
+   are gone; leaving or ending a party removes the sockets from its room;
+   `findAfterId()` is gone.
 
    Closed on 2026-10-09: a finished lyrics run's queued fetches can be cancelled from
    the job monitor; every admin write command has `--json`; the dead SSE counter and
@@ -96,20 +85,22 @@ pairing endpoint that does not exist and needs a decision when that work resumes
 
 ## Current quality-gate checkpoint
 
-Last recorded on 2026-10-08, at the end of the general-settings work and the OAuth
-web pages (`master` at `0802baac`):
+Last recorded on 2026-10-10, at the end of the ROADMAP item 2 open-items work
+(branch `plan/item2-open-items`), all in the CI image unless noted:
 
-- Unit suite: 5,063 tests pass.
-- Web: the full suite passed 1,796 tests at `93814191`, with typecheck and lint at
-  zero errors; the later `0802baac` change was checked with the auth and admin
-  suites (190 tests), typecheck and lint.
-- Deptrac: 0 violations. Container lint passes. The OpenAPI specification check
-  passes in the CI image.
-- Functional (1,280) and Integration (924) suites ran during the work. Their only
-  failures came from a local `vendor/` missing `symfony/doctrine-messenger`
-  (failed-transport tests), not from the code under test; a clean CI-image run is
-  still to be recorded.
-- A full PHPStan scan was not rerun for this checkpoint.
+- Unit suite: 5,832 tests pass. Functional: 1,438 tests in 129 shards; Integration:
+  977 tests in 95 shards; no failures.
+- PHPStan: no errors on a full scan. Deptrac: 0 violations. Container lint passes.
+  The OpenAPI specification check passes in the CI image, and on the host with a
+  fresh cache (a stale host test cache reports a false mismatch).
+- Web: 1,842 tests in 173 files pass; typecheck and lint at zero errors (four
+  existing lint warnings).
+- `ui/rn`: the test setup loads; 84 `tsc` errors and 25 Jest failures remain as
+  deferred React Native drift (item 2); no CI job runs `ui/rn` yet.
+
+The previous checkpoint, on 2026-10-09 at `master` `f40085e9`: unit 5,799;
+functional 1,422; integration 959; web 1,836 with typecheck and lint at zero
+errors; PHPStan clean; Deptrac 0; container lint and the OpenAPI check passing.
 
 ## Backend release-gate package (2026-10-06 to 2026-10-07)
 

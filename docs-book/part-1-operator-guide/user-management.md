@@ -136,9 +136,9 @@ The command accepts the current email address or the UUID. All three ways make t
 
 ## User Settings
 
-Each user has settings of their own. Currently there is one, `language`, the language Baander emails the user in; it follows the server default until the user or an administrator chooses a language. [Email language](configuration.md#email-language) explains how Baander picks the language of each email.
+Each user has settings of their own. Currently there is one, `language`, the language of the emails Baander sends the user and of the messages its API returns; emails follow the server default until the user or an administrator chooses a language. [Email language](configuration.md#email-language) explains how Baander picks the language of each email.
 
-Users change their own email language in **Settings**. Administrators see a user's language in the admin user dialog; super administrators can change it there, and other administrators see it read-only. Operators use the CLI:
+Users change their own language in **Settings**. Administrators see a user's language in the admin user dialog; super administrators can change it there, and other administrators see it read-only. Operators use the CLI:
 
 ```bash
 make exec cmd="php bin/console app:user:setting get alice@baander.app"

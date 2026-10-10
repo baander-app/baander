@@ -1351,7 +1351,7 @@ export type FileDeletionPreviewResourceFilesItem = {
 export interface FileDeletionPreviewResource {
   /** The delete with files would go ahead */
   allowed: boolean;
-  /** A scan holds the library, which refuses the delete */
+  /** A scan or another delete with files holds the library, which refuses the delete */
   scanInProgress: boolean;
   files: FileDeletionPreviewResourceFilesItem[];
 }
@@ -1400,6 +1400,7 @@ export type CatalogDeletionResourceFilesLeftItemReason = typeof CatalogDeletionR
 export const CatalogDeletionResourceFilesLeftItemReason = {
   outside_root: 'outside_root',
   unlink_failed: 'unlink_failed',
+  claim_lost: 'claim_lost',
 } as const;
 
 export type CatalogDeletionResourceFilesLeftItem = {
@@ -1855,6 +1856,33 @@ export interface FavoriteResource {
   entityPublicId: string;
   /** Creation timestamp */
   createdAt: string;
+}
+
+/**
+ * Library type
+ */
+export type LibraryAccessResourceType = typeof LibraryAccessResourceType[keyof typeof LibraryAccessResourceType];
+
+
+export const LibraryAccessResourceType = {
+  music: 'music',
+  podcast: 'podcast',
+  audiobook: 'audiobook',
+  movie: 'movie',
+  tv_show: 'tv_show',
+} as const;
+
+export interface LibraryAccessResource {
+  /** Library UUID */
+  libraryId: string;
+  /** Library name */
+  name: string;
+  /** URL-friendly slug */
+  slug: string;
+  /** Library type */
+  type: LibraryAccessResourceType;
+  /** Whether the user may see the library */
+  granted: boolean;
 }
 
 /**
@@ -4085,6 +4113,18 @@ export type PostFavoritesAdd201 = {
 
 export type DeleteFavoritesRemove200 = {
   message?: string;
+};
+
+export type GetAdminUserLibrariesIndex200 = {
+  data?: LibraryAccessResource[];
+};
+
+export type PutAdminUserLibrariesGrant200 = {
+  data?: LibraryAccessResource;
+};
+
+export type DeleteAdminUserLibrariesRevoke200 = {
+  data?: LibraryAccessResource;
 };
 
 export type GetLibraryIndexParams = {
@@ -15866,6 +15906,253 @@ export const useDeleteFavoritesRemove = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeleteFavoritesRemoveMutationOptions(options), queryClient);
+    }
+
+export const getGetAdminUserLibrariesIndexUrl = (userId: string,) => {
+
+
+
+
+  return `/api/admin/users/${userId}/libraries`
+}
+
+/**
+ * @summary List every library with the user's access to it
+ */
+export const getAdminUserLibrariesIndex = async (userId: string, options?: RequestInit): Promise<GetAdminUserLibrariesIndex200> => {
+
+  return customInstance<GetAdminUserLibrariesIndex200>(getGetAdminUserLibrariesIndexUrl(userId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminUserLibrariesIndexQueryKey = (userId: string,) => {
+    return [
+    `/api/admin/users/${userId}/libraries`
+    ] as const;
+    }
+
+
+export const getGetAdminUserLibrariesIndexQueryOptions = <TData = Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>, TError = ErrorType<ApiError>>(userId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminUserLibrariesIndexQueryKey(userId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>> = ({ signal }) => getAdminUserLibrariesIndex(userId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: userId !== null && userId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetAdminUserLibrariesIndexQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>>
+export type GetAdminUserLibrariesIndexQueryError = ErrorType<ApiError>
+
+
+export function useGetAdminUserLibrariesIndex<TData = Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>, TError = ErrorType<ApiError>>(
+ userId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminUserLibrariesIndex<TData = Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>, TError = ErrorType<ApiError>>(
+ userId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>,
+          TError,
+          Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetAdminUserLibrariesIndex<TData = Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>, TError = ErrorType<ApiError>>(
+ userId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List every library with the user's access to it
+ */
+
+export function useGetAdminUserLibrariesIndex<TData = Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>, TError = ErrorType<ApiError>>(
+ userId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserLibrariesIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetAdminUserLibrariesIndexQueryOptions(userId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getPutAdminUserLibrariesGrantUrl = (userId: string,
+    libraryId: string,) => {
+
+
+
+
+  return `/api/admin/users/${userId}/libraries/${libraryId}`
+}
+
+/**
+ * Granting access the user already has changes nothing.
+ * @summary Let the user see a library
+ */
+export const putAdminUserLibrariesGrant = async (userId: string,
+    libraryId: string, options?: RequestInit): Promise<PutAdminUserLibrariesGrant200> => {
+
+  return customInstance<PutAdminUserLibrariesGrant200>(getPutAdminUserLibrariesGrantUrl(userId,libraryId),
+  {
+    ...options,
+    method: 'PUT'
+
+
+  }
+);}
+
+
+
+
+export const getPutAdminUserLibrariesGrantMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAdminUserLibrariesGrant>>, TError,{userId: string;libraryId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof putAdminUserLibrariesGrant>>, TError,{userId: string;libraryId: string}, TContext> => {
+
+const mutationKey = ['putAdminUserLibrariesGrant'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putAdminUserLibrariesGrant>>, {userId: string;libraryId: string}> = (props) => {
+          const {userId,libraryId} = props ?? {};
+
+          return  putAdminUserLibrariesGrant(userId,libraryId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutAdminUserLibrariesGrantMutationResult = NonNullable<Awaited<ReturnType<typeof putAdminUserLibrariesGrant>>>
+
+    export type PutAdminUserLibrariesGrantMutationError = ErrorType<ApiError>
+
+    /**
+ * @summary Let the user see a library
+ */
+export const usePutAdminUserLibrariesGrant = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAdminUserLibrariesGrant>>, TError,{userId: string;libraryId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof putAdminUserLibrariesGrant>>,
+        TError,
+        {userId: string;libraryId: string},
+        TContext
+      > => {
+      return useMutation(getPutAdminUserLibrariesGrantMutationOptions(options), queryClient);
+    }
+
+export const getDeleteAdminUserLibrariesRevokeUrl = (userId: string,
+    libraryId: string,) => {
+
+
+
+
+  return `/api/admin/users/${userId}/libraries/${libraryId}`
+}
+
+/**
+ * Revoking access the user lacks changes nothing. The user's next request is refused; signed media URLs already issued stay valid until they expire.
+ * @summary Stop the user seeing a library
+ */
+export const deleteAdminUserLibrariesRevoke = async (userId: string,
+    libraryId: string, options?: RequestInit): Promise<DeleteAdminUserLibrariesRevoke200> => {
+
+  return customInstance<DeleteAdminUserLibrariesRevoke200>(getDeleteAdminUserLibrariesRevokeUrl(userId,libraryId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteAdminUserLibrariesRevokeMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUserLibrariesRevoke>>, TError,{userId: string;libraryId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUserLibrariesRevoke>>, TError,{userId: string;libraryId: string}, TContext> => {
+
+const mutationKey = ['deleteAdminUserLibrariesRevoke'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAdminUserLibrariesRevoke>>, {userId: string;libraryId: string}> = (props) => {
+          const {userId,libraryId} = props ?? {};
+
+          return  deleteAdminUserLibrariesRevoke(userId,libraryId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteAdminUserLibrariesRevokeMutationResult = NonNullable<Awaited<ReturnType<typeof deleteAdminUserLibrariesRevoke>>>
+
+    export type DeleteAdminUserLibrariesRevokeMutationError = ErrorType<ApiError>
+
+    /**
+ * @summary Stop the user seeing a library
+ */
+export const useDeleteAdminUserLibrariesRevoke = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUserLibrariesRevoke>>, TError,{userId: string;libraryId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deleteAdminUserLibrariesRevoke>>,
+        TError,
+        {userId: string;libraryId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteAdminUserLibrariesRevokeMutationOptions(options), queryClient);
     }
 
 export const getGetLibraryIndexUrl = (params?: GetLibraryIndexParams,) => {

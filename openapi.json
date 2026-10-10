@@ -7461,6 +7461,203 @@
                 }
             }
         },
+        "/api/admin/users/{userId}/libraries": {
+            "get": {
+                "tags": [
+                    "Admin / Users"
+                ],
+                "summary": "List every library with the user's access to it",
+                "operationId": "get_admin_user_libraries_index",
+                "parameters": [
+                    {
+                        "name": "userId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Every library in display order",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/LibraryAccessResource"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden; admins need the admin.can_view_users setting, as for the user list",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/users/{userId}/libraries/{libraryId}": {
+            "put": {
+                "tags": [
+                    "Admin / Users"
+                ],
+                "summary": "Let the user see a library",
+                "description": "Granting access the user already has changes nothing.",
+                "operationId": "put_admin_user_libraries_grant",
+                "parameters": [
+                    {
+                        "name": "userId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+                        }
+                    },
+                    {
+                        "name": "libraryId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The library with the access granted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/LibraryAccessResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User or library not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Admin / Users"
+                ],
+                "summary": "Stop the user seeing a library",
+                "description": "Revoking access the user lacks changes nothing. The user's next request is refused; signed media URLs already issued stay valid until they expire.",
+                "operationId": "delete_admin_user_libraries_revoke",
+                "parameters": [
+                    {
+                        "name": "userId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+                        }
+                    },
+                    {
+                        "name": "libraryId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The library with the access revoked",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/LibraryAccessResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "User or library not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/libraries": {
             "get": {
                 "tags": [
@@ -22691,7 +22888,7 @@
                     },
                     "label": {
                         "type": "string",
-                        "example": "Email language"
+                        "example": "Language"
                     },
                     "type": {
                         "type": "string",
@@ -23219,7 +23416,7 @@
                         "type": "boolean"
                     },
                     "scanInProgress": {
-                        "description": "A scan holds the library, which refuses the delete",
+                        "description": "A scan or another delete with files holds the library, which refuses the delete",
                         "type": "boolean"
                     },
                     "files": {
@@ -23357,7 +23554,8 @@
                                             "type": "string",
                                             "enum": [
                                                 "outside_root",
-                                                "unlink_failed"
+                                                "unlink_failed",
+                                                "claim_lost"
                                             ]
                                         },
                                         "detail": {
@@ -24090,6 +24288,46 @@
                         "description": "Creation timestamp",
                         "type": "string",
                         "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "LibraryAccessResource": {
+                "required": [
+                    "libraryId",
+                    "name",
+                    "slug",
+                    "type",
+                    "granted"
+                ],
+                "properties": {
+                    "libraryId": {
+                        "description": "Library UUID",
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "name": {
+                        "description": "Library name",
+                        "type": "string"
+                    },
+                    "slug": {
+                        "description": "URL-friendly slug",
+                        "type": "string"
+                    },
+                    "type": {
+                        "description": "Library type",
+                        "type": "string",
+                        "enum": [
+                            "music",
+                            "podcast",
+                            "audiobook",
+                            "movie",
+                            "tv_show"
+                        ]
+                    },
+                    "granted": {
+                        "description": "Whether the user may see the library",
+                        "type": "boolean"
                     }
                 },
                 "type": "object"
