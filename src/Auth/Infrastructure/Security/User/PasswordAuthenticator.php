@@ -8,6 +8,7 @@ use App\Auth\Application\Port\PasswordHasherInterface;
 use App\Auth\Domain\Model\LoginBlock;
 use App\Auth\Domain\Repository\LoginBlockRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
+use App\Auth\Infrastructure\Security\AuthenticationFailureMessage;
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Auth\Infrastructure\Security\Totp\TotpService;
 use App\Shared\Domain\Model\Email;
@@ -33,6 +34,7 @@ final class PasswordAuthenticator extends AbstractAuthenticator
         private readonly LoginBlockRepositoryInterface $loginBlockRepository,
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
+        private readonly AuthenticationFailureMessage $failureMessage,
     ) {
     }
 
@@ -125,7 +127,7 @@ final class PasswordAuthenticator extends AbstractAuthenticator
 
         $error = [
             'error' => [
-                'message' => $exception->getMessageKey(),
+                'message' => $this->failureMessage->of($exception, $request),
                 'code' => $errorCode,
             ],
         ];

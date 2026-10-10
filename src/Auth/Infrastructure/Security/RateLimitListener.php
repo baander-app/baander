@@ -24,8 +24,7 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
  * Returns 429 Too Many Requests with a Retry-After header when limits are exceeded.
  *
  * Priority 10 ensures this runs before authentication (priority 0) and
- * before the OAuth2 authenticator, but after ForceJsonListener (256) and
- * LocaleListener (240).
+ * before the OAuth2 authenticator, but after ForceJsonListener (256).
  */
 final class RateLimitListener
 {

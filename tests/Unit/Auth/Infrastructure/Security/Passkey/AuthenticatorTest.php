@@ -14,12 +14,14 @@ use App\Auth\Infrastructure\Security\Totp\TotpService;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Fixtures\Auth\AuthenticationFailureMessages;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
+use Symfony\Component\Security\Core\Exception\AuthenticationException;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class PasswordAuthenticatorTest extends TestCase
@@ -43,6 +45,7 @@ final class PasswordAuthenticatorTest extends TestCase
             $this->createStub(LoginBlockRepositoryInterface::class),
             $this->logger,
             new JsonEncoder(),
+            AuthenticationFailureMessages::create(),
         );
     }
 
@@ -240,6 +243,29 @@ final class PasswordAuthenticatorTest extends TestCase
         $this->assertArrayHasKey('code', $data['error']);
         $this->assertSame('AUTH_INVALID_CREDENTIALS', $data['error']['code']);
         $this->assertSame('Invalid credentials.', $data['error']['message']);
+    }
+
+    public function testAWrongPasswordIsReportedInTheAcceptLanguageWithTheSameCode(): void
+    {
+        $this->userRepository->method('findByEmail')->willReturn($this->createUser());
+        $this->passwordHasher->method('verify')->willReturn(false);
+        $request = Request::create('/api/auth/login', 'POST', server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_ACCEPT_LANGUAGE' => 'da-DK,da;q=0.9,en;q=0.5',
+        ], content: json_encode(['email' => 'alice@baander.app', 'password' => 'wrong'], JSON_THROW_ON_ERROR));
+
+        try {
+            $this->authenticator->authenticate($request);
+            self::fail('A wrong password must not authenticate.');
+        } catch (AuthenticationException $exception) {
+            $result = $this->authenticator->onAuthenticationFailure($request, $exception);
+        }
+
+        $this->assertSame(401, $result->getStatusCode());
+        $this->assertSame(
+            ['error' => ['message' => 'Ugyldige loginoplysninger.', 'code' => 'AUTH_INVALID_CREDENTIALS']],
+            json_decode((string) $result->getContent(), true),
+        );
     }
 
     public function testOnAuthenticationFailureReturnsTotpRequiredError(): void

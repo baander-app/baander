@@ -100,7 +100,7 @@ final class StreamController
         }
 
         if (!$scope->getLibraries()->allows($libraryId)) {
-            return $this->forbidden($this->trans('errors.forbidden', domain: 'messages'));
+            return $this->forbidden($this->trans('errors.forbidden.default', domain: 'messages'));
         }
 
         try {

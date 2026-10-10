@@ -9,7 +9,7 @@ import type { UserSettingResource } from '@/shared/api-client/gen/endpoints'
 import { EMAIL_LANGUAGE_KEY, SERVER_DEFAULT_SELECTION } from '../email-language'
 import { useResetUserSetting, useSetUserSetting, useUserSetting } from '../hooks/use-user-settings'
 
-const LABEL = 'Email language'
+const LABEL = 'Language'
 
 const CardStack = styled(CardContent)`
   display: flex;
@@ -51,7 +51,7 @@ const SkeletonLine = styled(Skeleton)<{ $width: string; $height: string }>`
   background: var(--color-muted);
 `
 
-/** The language Baander writes the user's emails in, or the server default. */
+/** The language of the user's emails and of Baander's messages to them, or no choice. */
 export function EmailLanguageSetting() {
   const labelId = useId()
   const setting = useUserSetting(EMAIL_LANGUAGE_KEY)
@@ -78,7 +78,7 @@ export function EmailLanguageSetting() {
         <CardStack>
           <FieldHeading>{LABEL}</FieldHeading>
           <ErrorBlock>
-            <ErrorText role="alert">Unable to load your email language.</ErrorText>
+            <ErrorText role="alert">Unable to load your language.</ErrorText>
             <Button variant="ghost" size="sm" onClick={retry}>
               Retry
             </Button>

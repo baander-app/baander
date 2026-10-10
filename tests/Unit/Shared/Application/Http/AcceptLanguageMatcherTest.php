@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Unit\Auth\Interface\Request;
+namespace App\Tests\Unit\Shared\Application\Http;
 
-use App\Auth\Interface\Request\AcceptLanguageMatcher;
+use App\Shared\Application\Http\AcceptLanguageMatcher;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 

@@ -19,6 +19,7 @@ use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
+use App\Tests\Fixtures\Auth\AuthenticationFailureMessages;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
 use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
@@ -60,7 +61,7 @@ final class PasskeyAuthenticatorResolutionTest extends TestCase
                 return new Envelope($message, [new HandledStamp(self::OWNER, 'handler')]);
             },
         );
-        $authenticator = new PasskeyAuthenticator($bus, $repository, new NullLogger(), new JsonEncoder(), $this->verifier());
+        $authenticator = new PasskeyAuthenticator($bus, $repository, new NullLogger(), new JsonEncoder(), $this->verifier(), AuthenticationFailureMessages::create());
         $request = $this->request();
         $resolved = $authenticator->authenticate($request)->getUser();
         $login = $request->attributes->get(VerifiedPasskeyLogin::class);
@@ -82,7 +83,7 @@ final class PasskeyAuthenticatorResolutionTest extends TestCase
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($this->once())->method('dispatch')->willReturnCallback(static fn (object $message): Envelope =>
             new Envelope($message, [new HandledStamp(self::OWNER, 'handler')]));
-        $authenticator = new PasskeyAuthenticator($bus, $repository, new NullLogger(), new JsonEncoder(), $this->verifier());
+        $authenticator = new PasskeyAuthenticator($bus, $repository, new NullLogger(), new JsonEncoder(), $this->verifier(), AuthenticationFailureMessages::create());
         $this->expectException(BadCredentialsException::class);
         $authenticator->authenticate($this->request())->getUser();
     }
@@ -95,7 +96,7 @@ final class PasskeyAuthenticatorResolutionTest extends TestCase
             $bus = $this->createMock(MessageBusInterface::class);
             $bus->expects($this->once())->method('dispatch')->willReturnCallback(static fn (object $message): Envelope =>
                 new Envelope($message, [new HandledStamp($result, 'handler')]));
-            $authenticator = new PasskeyAuthenticator($bus, $repository, new NullLogger(), new JsonEncoder(), $this->verifier());
+            $authenticator = new PasskeyAuthenticator($bus, $repository, new NullLogger(), new JsonEncoder(), $this->verifier(), AuthenticationFailureMessages::create());
             $this->assertGenericFailure($authenticator, $this->request());
         }
     }
@@ -106,7 +107,7 @@ final class PasskeyAuthenticatorResolutionTest extends TestCase
         $repository->expects($this->never())->method('findByUuid');
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($this->never())->method('dispatch');
-        $authenticator = new PasskeyAuthenticator($bus, $repository, new NullLogger(), new JsonEncoder(), $this->verifier());
+        $authenticator = new PasskeyAuthenticator($bus, $repository, new NullLogger(), new JsonEncoder(), $this->verifier(), AuthenticationFailureMessages::create());
         foreach (['{', 'null', '17', '{"challengeKey":[],"response":[]}',
             '{"challengeKey":"challenge","response":"invalid"}',
             '{"challengeKey":"challenge","response":[],"userId":17}'] as $json) {
@@ -120,7 +121,7 @@ final class PasskeyAuthenticatorResolutionTest extends TestCase
         $repository->expects($this->never())->method('findByUuid');
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($this->once())->method('dispatch')->willThrowException(new \RuntimeException('private-verifier-details'));
-        $authenticator = new PasskeyAuthenticator($bus, $repository, new NullLogger(), new JsonEncoder(), $this->verifier());
+        $authenticator = new PasskeyAuthenticator($bus, $repository, new NullLogger(), new JsonEncoder(), $this->verifier(), AuthenticationFailureMessages::create());
         $this->assertGenericFailure($authenticator, $this->request());
     }
 
@@ -137,7 +138,7 @@ final class PasskeyAuthenticatorResolutionTest extends TestCase
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($this->once())->method('dispatch')->willReturnCallback(static fn (object $message): Envelope =>
             new Envelope($message, [new HandledStamp(self::OWNER, 'handler')]));
-        $authenticator = new PasskeyAuthenticator($bus, $repository, new NullLogger(), new JsonEncoder(), $this->verifier());
+        $authenticator = new PasskeyAuthenticator($bus, $repository, new NullLogger(), new JsonEncoder(), $this->verifier(), AuthenticationFailureMessages::create());
 
         $this->expectException(CustomUserMessageAuthenticationException::class);
         $this->expectExceptionMessage('This account has been disabled.');
@@ -150,7 +151,7 @@ final class PasskeyAuthenticatorResolutionTest extends TestCase
         $repository->expects($this->never())->method('findByUuid');
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($this->never())->method('dispatch');
-        $authenticator = new PasskeyAuthenticator($bus, $repository, new NullLogger(), new JsonEncoder(), $this->verifier());
+        $authenticator = new PasskeyAuthenticator($bus, $repository, new NullLogger(), new JsonEncoder(), $this->verifier(), AuthenticationFailureMessages::create());
 
         $missing = $this->request(proof: false);
         $nonceLess = $this->request(proof: false);
