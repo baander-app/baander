@@ -189,15 +189,42 @@ final class MediaFileGuardTest extends TestCase
         $goneDirectory = $this->root . '/Gone/Album/gone.flac';
         $dangling = $this->root . '/Artist/Album/dangling.flac';
         self::assertTrue(symlink($this->outside . '/deleted.flac', $dangling));
+        $song = $this->file($this->root . '/Artist/Album/01.flac');
 
-        $inspection = $this->inspect($this->root, [$gone, $goneDirectory, $dangling]);
+        $inspection = $this->inspect($this->root, [$gone, $goneDirectory, $dangling, $song]);
 
-        self::assertSame(array_fill(0, 3, LibraryMediaFileVerdict::Missing), $this->verdicts($inspection));
+        self::assertSame([...array_fill(0, 3, LibraryMediaFileVerdict::Missing), LibraryMediaFileVerdict::Deletable], $this->verdicts($inspection));
+        self::assertFalse($inspection->allFilesMissing());
         self::assertTrue($inspection->allowsDeletion());
         $result = $this->guard->delete($inspection, static fn (): bool => true);
         self::assertSame([$gone, $goneDirectory, $dangling], $result->missing);
-        self::assertSame([], $result->removed);
+        self::assertSame([$song], $result->removed);
         self::assertTrue(is_link($dangling), 'A missing file is not unlinked.');
+    }
+
+    /** A partly unmounted library can read as every file missing; deleting their index rows would bring the songs back. */
+    public function testEveryFileMissingRefusesTheDeletion(): void
+    {
+        $gone = $this->root . '/Artist/Album/gone.flac';
+        $dangling = $this->root . '/Artist/Album/dangling.flac';
+        self::assertTrue(symlink($this->outside . '/deleted.flac', $dangling));
+
+        $inspection = $this->inspect($this->root, [$gone, $dangling]);
+
+        self::assertTrue($inspection->rootAvailable);
+        self::assertTrue($inspection->allFilesMissing());
+        self::assertFalse($inspection->allowsDeletion());
+    }
+
+    /** An album without songs deletes with its files and has no file to find missing. */
+    public function testARequestWithoutFilesIsAllowed(): void
+    {
+        $inspection = $this->inspect($this->root, []);
+
+        self::assertFalse($inspection->allFilesMissing());
+        self::assertTrue($inspection->allowsDeletion());
+        $result = $this->guard->delete($inspection, static fn (): bool => true);
+        self::assertSame([[], [], []], [$result->removed, $result->missing, $result->left]);
     }
 
     public function testAFileThatResolvesOutsideTheRootAfterTheCheckIsLeft(): void

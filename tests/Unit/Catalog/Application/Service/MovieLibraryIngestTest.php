@@ -16,6 +16,7 @@ use App\Catalog\Domain\Model\Video;
 use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Library\Application\Message\DiscoveredFile;
 use App\Library\Application\Message\FilesDiscovered;
+use App\Library\Application\Port\LibraryMediaFilesInterface;
 use App\Library\Application\Port\LibraryProvisioningInterface;
 use App\Library\Application\Port\ProvisionedLibraryScan;
 use App\Lyrics\Application\Port\LyricsFetchRequestInterface;
@@ -74,6 +75,7 @@ final class MovieLibraryIngestTest extends TestCase
             $this->createStub(SongPortInterface::class), $movies,
             $videos, $this->createStub(MetadataContentReaderPortInterface::class), new FFprobeAdapter(new JsonEncoder()),
             $this->createStub(MessageBusInterface::class), $this->createStub(LyricsFetchRequestInterface::class), $this->createStub(AlbumMetadataSyncRequestInterface::class), new NullLogger(),
+            $this->createStub(LibraryMediaFilesInterface::class),
         );
 
         return new MovieLibraryIngest($provisioning, $handler, $videos);

@@ -35,7 +35,7 @@ final readonly class DeleteSongHandler
     /**
      * @throws InvalidInputException when the public ID is malformed, or the file lies outside the library root
      * @throws NotFoundException     when no song has the public ID
-     * @throws ConflictException     with the file, when a scan or another delete holds the library or the server cannot write the song's directory
+     * @throws ConflictException     with the file, when a scan or another delete holds the library, the library folder is unavailable, the file is already missing, or the server cannot write the song's directory
      */
     #[AsMessageHandler]
     public function __invoke(DeleteSongCommand $command): CatalogDeletionResult

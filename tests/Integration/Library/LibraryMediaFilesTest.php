@@ -6,6 +6,7 @@ namespace App\Tests\Integration\Library;
 
 use App\Library\Application\Exception\LibraryMediaDirectoryNotWritableException;
 use App\Library\Application\Exception\LibraryMediaFileOutsideRootException;
+use App\Library\Application\Exception\LibraryMediaFilesAllMissingException;
 use App\Library\Application\Exception\LibraryRootUnavailableException;
 use App\Library\Application\Exception\LibraryBusyException;
 use App\Library\Application\Message\DiscoveredFile;
@@ -156,6 +157,70 @@ final class LibraryMediaFilesTest extends TestCase
         }
 
         self::assertSame([$first, $second], $this->indexedPaths($library));
+    }
+
+    /** Part of the library's storage unmounted reads as every file missing; dropping their index rows would bring the songs back. */
+    public function testEveryRequestedFileMissingRefusesTheRequestAsAConflict(): void
+    {
+        [$library, $first, $second] = $this->scannedAlbum();
+        self::assertTrue(unlink($first));
+        self::assertTrue(unlink($second));
+
+        self::assertFalse($this->files->inspect($library->getId(), [$first, $second])->allowsDeletion());
+        $claim = $this->files->claim($library->getId());
+        try {
+            $this->files->prepareDeletion($claim, [$first, $second]);
+            self::fail('A request whose files are all missing must refuse the deletion.');
+        } catch (LibraryMediaFilesAllMissingException $refusal) {
+            self::assertInstanceOf(ConflictException::class, $refusal);
+            self::assertSame(['reason' => 'all_files_missing', 'root' => $this->base . '/library'], $refusal->details);
+        } finally {
+            $this->files->release($claim);
+        }
+
+        self::assertSame([$first, $second], $this->indexedPaths($library));
+    }
+
+    public function testARequestWithoutFilesIsNotRefused(): void
+    {
+        [$library] = $this->scannedAlbum();
+
+        self::assertTrue($this->files->inspect($library->getId(), [])->allowsDeletion());
+        $result = $this->deleteWithFiles($library, []);
+
+        self::assertSame([[], [], []], [$result->removed, $result->missing, $result->left]);
+    }
+
+    public function testOnlyALiveDeleteClaimHoldsTheLibraryAgainstImports(): void
+    {
+        [$library] = $this->scannedAlbum();
+        self::assertFalse($this->files->isHeldByDelete($library->getId()));
+
+        $scan = new Uuid();
+        self::assertTrue($this->libraries->claimScan($library->getId(), $scan, 900)->claimed);
+        self::assertFalse($this->files->isHeldByDelete($library->getId()), 'A scan does not hold imports back.');
+        self::assertTrue($this->libraries->endScanClaim($scan, true));
+
+        $claim = $this->files->claim($library->getId());
+        self::assertTrue($this->files->isHeldByDelete($library->getId()));
+        $this->manager->getConnection()->executeStatement(
+            "UPDATE libraries SET claim_expires_at = clock_timestamp() - interval '1 second' WHERE id = ?",
+            [$library->getId()->toString()],
+        );
+        self::assertFalse($this->files->isHeldByDelete($library->getId()), 'A lapsed delete claim holds nothing.');
+        $this->files->release($claim);
+
+        self::assertFalse($this->files->isHeldByDelete(new Uuid()));
+    }
+
+    public function testMissingPathsNamesTheFilesThatAreGoneInRequestOrder(): void
+    {
+        [, $first, $second] = $this->scannedAlbum();
+        $dangling = $this->album . '/03.flac';
+        self::assertTrue(symlink($this->base . '/elsewhere/deleted.flac', $dangling));
+        self::assertTrue(unlink($first));
+
+        self::assertSame([$dangling, $first], $this->files->missingPaths([$dangling, $second, $first]));
     }
 
     public function testADirectoryTheServerCannotWriteRefusesTheRequestAsAConflict(): void

@@ -325,6 +325,16 @@ final class CatalogDeleteHandlersTest extends TestCase
                 throw new \LogicException('A delete does not inspect.');
             }
 
+            public function isHeldByDelete(Uuid $libraryId): bool
+            {
+                throw new \LogicException('A delete does not ask whether a delete holds the library.');
+            }
+
+            public function missingPaths(array $paths): array
+            {
+                throw new \LogicException('A delete does not look for missing paths.');
+            }
+
             public function claim(Uuid $libraryId): LibraryMediaFileClaim
             {
                 return $this->test->recordClaim($libraryId);
