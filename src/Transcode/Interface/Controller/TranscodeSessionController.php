@@ -261,7 +261,7 @@ final class TranscodeSessionController
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/list', name: 'list', methods: ['GET'])]
+    #[Route('/list', name: 'list', methods: ['GET'], priority: 1)]
     public function listSessions(TranscodeSessionQueryPort $queryPort): JsonResponse
     {
         $user = $this->security->getUser();

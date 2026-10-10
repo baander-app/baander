@@ -50,7 +50,7 @@ final class RecommendationCommandsTest extends TestCase
         $insights = $this->createStub(RecommendationInsightsPortInterface::class);
         $insights->method('getCoverage')->willReturn(['total_tracks' => 4, 'tracks_with_recommendations' => 3, 'tracks_without_recommendations' => 1, 'coverage_percentage' => 75.5]);
         $insights->method('getSourceQuality')->willReturn(['by_source_type' => ['song' => 12], 'avg_confidence_score' => 0.42]);
-        $insights->method('getFreshness')->willReturn(['avg_age_seconds' => 3600.5, 'last_generated_at' => '2026-10-08 04:00:00+00']);
+        $insights->method('getFreshness')->willReturn(['avg_age_seconds' => 3600.5, 'last_generated_at' => '2026-10-08T04:00:00+00:00']);
         $command = new RecommendationStatsCommand($insights);
 
         $json = new CommandTester($command);
@@ -68,7 +68,7 @@ final class RecommendationCommandsTest extends TestCase
         self::assertSame(Command::SUCCESS, $table->execute([]));
         self::assertStringContainsString('75.5%', $table->getDisplay());
         self::assertMatchesRegularExpression('/song\s+12/', $table->getDisplay());
-        self::assertStringContainsString('2026-10-08 04:00:00+00', $table->getDisplay());
+        self::assertStringContainsString('2026-10-08T04:00:00+00:00', $table->getDisplay());
     }
 
     public function testListAndShowPrintTheApiResource(): void

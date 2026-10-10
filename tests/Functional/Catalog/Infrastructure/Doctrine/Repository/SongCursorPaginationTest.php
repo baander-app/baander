@@ -24,6 +24,11 @@ use PHPUnit\Framework\Attributes\DataProvider;
  * Ascending order is (key present, key, id): a missing key (no album year, no
  * primary artist) sorts before every value, and equal keys fall back to the
  * song id. Descending order is the exact reverse.
+ *
+ * Three songs were added within one second, apart only in their microseconds:
+ * an "added" cursor must keep the microseconds or a page repeats or skips them.
+ * Added keys are written with six fraction digits and an offset, so comparing
+ * them as strings orders them as instants.
  */
 final class SongCursorPaginationTest extends TestCase
 {
@@ -38,13 +43,13 @@ final class SongCursorPaginationTest extends TestCase
 
     /** @var list<array{title: string, album: string, artist: string|null, added: string}> */
     private const SONGS = [
-        ['title' => 'Track Delta', 'album' => 'alpha', 'artist' => 'Mia', 'added' => '2026-01-01 10:00:00'],
-        ['title' => 'Track Alpha', 'album' => 'beta', 'artist' => 'Bea', 'added' => '2026-01-02 10:00:00'],
-        ['title' => 'Track Same', 'album' => 'gamma', 'artist' => null, 'added' => '2026-01-01 10:00:00'],
-        ['title' => 'Track Same', 'album' => 'delta', 'artist' => 'Mia', 'added' => '2026-01-03 10:00:00'],
-        ['title' => 'Track Charlie', 'album' => 'epsilon', 'artist' => 'Zed', 'added' => '2026-01-02 10:00:00'],
-        ['title' => 'Track Bravo', 'album' => 'alpha', 'artist' => null, 'added' => '2026-01-03 10:00:00'],
-        ['title' => 'Track Echo', 'album' => 'gamma', 'artist' => 'Bea', 'added' => '2026-01-01 10:00:00'],
+        ['title' => 'Track Delta', 'album' => 'alpha', 'artist' => 'Mia', 'added' => '2026-01-01 10:00:00.250000+00:00'],
+        ['title' => 'Track Alpha', 'album' => 'beta', 'artist' => 'Bea', 'added' => '2026-01-02 10:00:00.000000+00:00'],
+        ['title' => 'Track Same', 'album' => 'gamma', 'artist' => null, 'added' => '2026-01-01 10:00:00.000001+00:00'],
+        ['title' => 'Track Same', 'album' => 'delta', 'artist' => 'Mia', 'added' => '2026-01-03 10:00:00.000000+00:00'],
+        ['title' => 'Track Charlie', 'album' => 'epsilon', 'artist' => 'Zed', 'added' => '2026-01-02 10:00:00.000000+00:00'],
+        ['title' => 'Track Bravo', 'album' => 'alpha', 'artist' => null, 'added' => '2026-01-03 10:00:00.000000+00:00'],
+        ['title' => 'Track Echo', 'album' => 'gamma', 'artist' => 'Bea', 'added' => '2026-01-01 10:00:00.999999+00:00'],
     ];
 
     private LibraryReadScope $scope;

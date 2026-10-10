@@ -74,12 +74,12 @@ final readonly class TranscodeJobDto
             uuid: (string) $row['id'],
             publicId: (string) $row['public_id'],
             videoId: (string) $row['video_id'],
-            qualityTier: (string) $row['quality_tier'],
+            qualityTier: (string) $row['quality_tier_name'],
             status: (string) $row['status'],
             referenceCount: (int) $row['reference_count'],
             totalSegments: (int) $row['total_segments'],
             completedSegments: (int) $row['completed_segments'],
-            progress: (float) $row['progress'],
+            progress: (int) $row['total_segments'] === 0 ? 0.0 : (int) $row['completed_segments'] / (int) $row['total_segments'] * 100.0,
             outputDirectory: (string) $row['output_directory'],
             initSegmentPath: $row['init_segment_path'] !== null ? (string) $row['init_segment_path'] : null,
             segmentMap: \is_string($row['segment_map']) ? json_decode($row['segment_map'], true, 512, JSON_THROW_ON_ERROR) : (array) $row['segment_map'],
@@ -91,8 +91,8 @@ final readonly class TranscodeJobDto
             height: (int) $row['height'],
             framerate: (float) $row['framerate'],
             failReason: $row['fail_reason'] !== null ? (string) $row['fail_reason'] : null,
-            createdAt: (string) $row['created_at'],
-            updatedAt: (string) $row['updated_at'],
+            createdAt: self::apiInstant($row['created_at']),
+            updatedAt: self::apiInstant($row['updated_at']),
         );
     }
 
@@ -125,5 +125,11 @@ final readonly class TranscodeJobDto
             'createdAt' => $this->createdAt,
             'updatedAt' => $this->updatedAt,
         ];
+    }
+
+    /** A `timestamptz` value as PostgreSQL prints it, in the API format: whole seconds at +00:00. */
+    private static function apiInstant(mixed $value): string
+    {
+        return (new \DateTimeImmutable((string) $value))->setTimezone(new \DateTimeZone('UTC'))->format(\DateTimeInterface::ATOM);
     }
 }

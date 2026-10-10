@@ -6887,6 +6887,208 @@ type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
 
 
 
+export const getGetTranscodeJobListUrl = () => {
+
+
+
+
+  return `/api/transcode/jobs/list`
+}
+
+/**
+ * @summary List transcode jobs for the authenticated user
+ */
+export const getTranscodeJobList = async ( options?: RequestInit): Promise<void> => {
+
+  return customInstance<void>(getGetTranscodeJobListUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTranscodeJobListQueryKey = () => {
+    return [
+    `/api/transcode/jobs/list`
+    ] as const;
+    }
+
+
+export const getGetTranscodeJobListQueryOptions = <TData = Awaited<ReturnType<typeof getTranscodeJobList>>, TError = ErrorType<ApiError>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTranscodeJobListQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTranscodeJobList>>> = ({ signal }) => getTranscodeJobList({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobList>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetTranscodeJobListQueryResult = NonNullable<Awaited<ReturnType<typeof getTranscodeJobList>>>
+export type GetTranscodeJobListQueryError = ErrorType<ApiError>
+
+
+export function useGetTranscodeJobList<TData = Awaited<ReturnType<typeof getTranscodeJobList>>, TError = ErrorType<ApiError>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobList>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTranscodeJobList>>,
+          TError,
+          Awaited<ReturnType<typeof getTranscodeJobList>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTranscodeJobList<TData = Awaited<ReturnType<typeof getTranscodeJobList>>, TError = ErrorType<ApiError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobList>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTranscodeJobList>>,
+          TError,
+          Awaited<ReturnType<typeof getTranscodeJobList>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTranscodeJobList<TData = Awaited<ReturnType<typeof getTranscodeJobList>>, TError = ErrorType<ApiError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List transcode jobs for the authenticated user
+ */
+
+export function useGetTranscodeJobList<TData = Awaited<ReturnType<typeof getTranscodeJobList>>, TError = ErrorType<ApiError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetTranscodeJobListQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetTranscodeSessionListUrl = () => {
+
+
+
+
+  return `/api/transcode/sessions/list`
+}
+
+/**
+ * @summary List all transcode sessions for the authenticated user
+ */
+export const getTranscodeSessionList = async ( options?: RequestInit): Promise<void> => {
+
+  return customInstance<void>(getGetTranscodeSessionListUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTranscodeSessionListQueryKey = () => {
+    return [
+    `/api/transcode/sessions/list`
+    ] as const;
+    }
+
+
+export const getGetTranscodeSessionListQueryOptions = <TData = Awaited<ReturnType<typeof getTranscodeSessionList>>, TError = ErrorType<ApiError>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTranscodeSessionListQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTranscodeSessionList>>> = ({ signal }) => getTranscodeSessionList({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionList>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type GetTranscodeSessionListQueryResult = NonNullable<Awaited<ReturnType<typeof getTranscodeSessionList>>>
+export type GetTranscodeSessionListQueryError = ErrorType<ApiError>
+
+
+export function useGetTranscodeSessionList<TData = Awaited<ReturnType<typeof getTranscodeSessionList>>, TError = ErrorType<ApiError>>(
+  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionList>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTranscodeSessionList>>,
+          TError,
+          Awaited<ReturnType<typeof getTranscodeSessionList>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTranscodeSessionList<TData = Awaited<ReturnType<typeof getTranscodeSessionList>>, TError = ErrorType<ApiError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionList>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof getTranscodeSessionList>>,
+          TError,
+          Awaited<ReturnType<typeof getTranscodeSessionList>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useGetTranscodeSessionList<TData = Awaited<ReturnType<typeof getTranscodeSessionList>>, TError = ErrorType<ApiError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary List all transcode sessions for the authenticated user
+ */
+
+export function useGetTranscodeSessionList<TData = Awaited<ReturnType<typeof getTranscodeSessionList>>, TError = ErrorType<ApiError>>(
+  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getGetTranscodeSessionListQueryOptions(options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getGetAdminActivitySummaryUrl = (params?: GetAdminActivitySummaryParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -30049,107 +30251,6 @@ export function useGetTranscodeJobMetrics<TData = Awaited<ReturnType<typeof getT
 
 
 
-export const getGetTranscodeJobListUrl = () => {
-
-
-
-
-  return `/api/transcode/jobs/list`
-}
-
-/**
- * @summary List transcode jobs for the authenticated user
- */
-export const getTranscodeJobList = async ( options?: RequestInit): Promise<void> => {
-
-  return customInstance<void>(getGetTranscodeJobListUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetTranscodeJobListQueryKey = () => {
-    return [
-    `/api/transcode/jobs/list`
-    ] as const;
-    }
-
-
-export const getGetTranscodeJobListQueryOptions = <TData = Awaited<ReturnType<typeof getTranscodeJobList>>, TError = ErrorType<ApiError>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetTranscodeJobListQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTranscodeJobList>>> = ({ signal }) => getTranscodeJobList({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobList>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetTranscodeJobListQueryResult = NonNullable<Awaited<ReturnType<typeof getTranscodeJobList>>>
-export type GetTranscodeJobListQueryError = ErrorType<ApiError>
-
-
-export function useGetTranscodeJobList<TData = Awaited<ReturnType<typeof getTranscodeJobList>>, TError = ErrorType<ApiError>>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobList>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getTranscodeJobList>>,
-          TError,
-          Awaited<ReturnType<typeof getTranscodeJobList>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetTranscodeJobList<TData = Awaited<ReturnType<typeof getTranscodeJobList>>, TError = ErrorType<ApiError>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobList>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getTranscodeJobList>>,
-          TError,
-          Awaited<ReturnType<typeof getTranscodeJobList>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetTranscodeJobList<TData = Awaited<ReturnType<typeof getTranscodeJobList>>, TError = ErrorType<ApiError>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List transcode jobs for the authenticated user
- */
-
-export function useGetTranscodeJobList<TData = Awaited<ReturnType<typeof getTranscodeJobList>>, TError = ErrorType<ApiError>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeJobList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetTranscodeJobListQueryOptions(options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-
 export const getGetTranscodeSessionIndexUrl = () => {
 
 
@@ -30702,107 +30803,6 @@ export const usePatchTranscodeSessionResume = <TError = ErrorType<ApiError>,
       > => {
       return useMutation(getPatchTranscodeSessionResumeMutationOptions(options), queryClient);
     }
-
-export const getGetTranscodeSessionListUrl = () => {
-
-
-
-
-  return `/api/transcode/sessions/list`
-}
-
-/**
- * @summary List all transcode sessions for the authenticated user
- */
-export const getTranscodeSessionList = async ( options?: RequestInit): Promise<void> => {
-
-  return customInstance<void>(getGetTranscodeSessionListUrl(),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetTranscodeSessionListQueryKey = () => {
-    return [
-    `/api/transcode/sessions/list`
-    ] as const;
-    }
-
-
-export const getGetTranscodeSessionListQueryOptions = <TData = Awaited<ReturnType<typeof getTranscodeSessionList>>, TError = ErrorType<ApiError>>( options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetTranscodeSessionListQueryKey();
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTranscodeSessionList>>> = ({ signal }) => getTranscodeSessionList({ signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionList>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
-}
-
-export type GetTranscodeSessionListQueryResult = NonNullable<Awaited<ReturnType<typeof getTranscodeSessionList>>>
-export type GetTranscodeSessionListQueryError = ErrorType<ApiError>
-
-
-export function useGetTranscodeSessionList<TData = Awaited<ReturnType<typeof getTranscodeSessionList>>, TError = ErrorType<ApiError>>(
-  options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionList>>, TError, TData>> & Pick<
-        DefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getTranscodeSessionList>>,
-          TError,
-          Awaited<ReturnType<typeof getTranscodeSessionList>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetTranscodeSessionList<TData = Awaited<ReturnType<typeof getTranscodeSessionList>>, TError = ErrorType<ApiError>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionList>>, TError, TData>> & Pick<
-        UndefinedInitialDataOptions<
-          Awaited<ReturnType<typeof getTranscodeSessionList>>,
-          TError,
-          Awaited<ReturnType<typeof getTranscodeSessionList>>
-        > , 'initialData'
-      >, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-export function useGetTranscodeSessionList<TData = Awaited<ReturnType<typeof getTranscodeSessionList>>, TError = ErrorType<ApiError>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
-  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
-/**
- * @summary List all transcode sessions for the authenticated user
- */
-
-export function useGetTranscodeSessionList<TData = Awaited<ReturnType<typeof getTranscodeSessionList>>, TError = ErrorType<ApiError>>(
-  options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionList>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
- , queryClient?: QueryClient
- ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-
-  const queryOptions = getGetTranscodeSessionListQueryOptions(options)
-
-  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
 
 export const getPostTranscodeSessionPositionUrl = (uuid: string,) => {
 

@@ -120,7 +120,7 @@ final class TranscodeJobController
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/list', name: 'list', methods: ['GET'])]
+    #[Route('/list', name: 'list', methods: ['GET'], priority: 1)]
     public function listJobs(TranscodeJobQueryPort $queryPort, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
         $jobs = $queryPort->findByUser(Uuid::fromString($user->getId()));

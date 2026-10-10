@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Controller;
 
+use App\Recommendation\Infrastructure\Doctrine\Entity\RecommendationEntity;
 use App\Tests\Functional\TestCase;
 
 final class RecommendationAdminControllerTest extends TestCase
@@ -72,6 +73,28 @@ final class RecommendationAdminControllerTest extends TestCase
         $this->assertArrayHasKey('avg_age_seconds', $data['data']);
         $this->assertArrayHasKey('last_generated_at', $data['data']);
         $this->assertIsNumeric($data['data']['avg_age_seconds']);
+    }
+
+    public function testFreshnessReturnsLastGeneratedAtInTheApiFormat(): void
+    {
+        $admin = $this->createAdminUser();
+        $older = new RecommendationEntity('song', 'source-older', 'song', 'target-older');
+        $latest = new RecommendationEntity('song', 'source-latest', 'song', 'target-latest');
+        $this->entityManager->persist($older);
+        $this->entityManager->persist($latest);
+        $this->entityManager->flush();
+        $connection = $this->entityManager->getConnection();
+        foreach ([[$older, '2026-10-07 23:59:59.999999+00:00'], [$latest, '2026-10-08 04:00:00.123456+00:00']] as [$recommendation, $updatedAt]) {
+            $connection->executeStatement(
+                'UPDATE recommendations SET updated_at = :updated WHERE id = :id',
+                ['updated' => $updatedAt, 'id' => $recommendation->getId()->toString()],
+            );
+        }
+
+        $response = $this->authenticatedRequest('GET', '/api/admin/recommendations/freshness', $admin);
+        $data = $this->assertJsonResponse($response, 200, 'data');
+
+        $this->assertSame('2026-10-08T04:00:00+00:00', $data['data']['last_generated_at']);
     }
 
     public function testRegularUserCannotGetFreshness(): void

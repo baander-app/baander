@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Recommendation\Infrastructure\Doctrine\Repository;
 
 use App\Recommendation\Application\Port\RecommendationInsightsPortInterface;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class RecommendationInsightsRepository implements RecommendationInsightsPortInterface
@@ -70,13 +71,15 @@ final class RecommendationInsightsRepository implements RecommendationInsightsPo
             "SELECT COALESCE(AVG(EXTRACT(EPOCH FROM (NOW() - updated_at))), 0) FROM recommendations",
         )->fetchOne();
 
-        $lastGenerated = $conn->executeQuery(
-            'SELECT MAX(updated_at) FROM recommendations',
-        )->fetchOne();
+        $lastGenerated = $conn->convertToPHPValue(
+            $conn->executeQuery('SELECT MAX(updated_at) FROM recommendations')->fetchOne(),
+            Types::DATETIME_IMMUTABLE,
+        );
+        \assert($lastGenerated === null || $lastGenerated instanceof \DateTimeImmutable);
 
         return [
             'avg_age_seconds' => round($avgAge, 2),
-            'last_generated_at' => $lastGenerated !== null ? (string) $lastGenerated : null,
+            'last_generated_at' => $lastGenerated?->format(\DateTimeInterface::ATOM),
         ];
     }
 }

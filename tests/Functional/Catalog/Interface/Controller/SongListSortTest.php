@@ -101,6 +101,46 @@ final class SongListSortTest extends TestCase
         self::assertSame(['Track B'], array_column($second['data'], 'title'));
     }
 
+    /** @return iterable<string, array{string, list<string>}> */
+    public static function addedOrders(): iterable
+    {
+        yield 'asc' => ['asc', ['Track B', 'Track C', 'Track A']];
+        yield 'desc' => ['desc', ['Track A', 'Track C', 'Track B']];
+    }
+
+    /**
+     * Songs added within one second differ only in their microseconds, so the
+     * "added" cursor must carry them to page without repeats or gaps.
+     *
+     * @param list<string> $expected
+     */
+    #[DataProvider('addedOrders')]
+    public function testAddedCursorPagesSongsAddedWithinOneSecond(string $order, array $expected): void
+    {
+        $connection = $this->entityManager->getConnection();
+        foreach (['Track A' => '.900000', 'Track B' => '.100000', 'Track C' => '.500000'] as $title => $fraction) {
+            $connection->executeStatement(
+                'UPDATE songs SET created_at = :added WHERE title = :title',
+                ['added' => '2026-10-10 12:00:00' . $fraction . '+00:00', 'title' => $title],
+            );
+        }
+
+        $titles = [];
+        $cursor = null;
+        for ($guard = 0; $guard <= count($expected); ++$guard) {
+            $query = sprintf('sort=added&order=%s&limit=1', $order) . ($cursor !== null ? '&cursor=' . $cursor : '');
+            $body = $this->assertJsonResponse($this->list($query), 200, 'meta');
+            $titles = [...$titles, ...array_column($body['data'], 'title')];
+            $cursor = $body['meta']['next_cursor'];
+            if ($cursor === null) {
+                break;
+            }
+            self::assertIsString($cursor);
+        }
+
+        self::assertSame($expected, $titles);
+    }
+
     public function testDefaultOrderingCursorContinuesExplicitTitleAscending(): void
     {
         $first = $this->assertJsonResponse($this->list('limit=1'), 200, 'meta');

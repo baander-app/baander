@@ -702,7 +702,8 @@ final class SongRepository implements SongRepositoryInterface
             },
             SongSortField::Album => fn (SongEntity $e): array => ['sort' => $e->getAlbum()->getTitle(), 'id' => $e->getId()->toString()],
             SongSortField::Year => fn (SongEntity $e): array => ['sort' => $e->getAlbum()->getYear(), 'id' => $e->getId()->toString()],
-            SongSortField::Added => fn (SongEntity $e): array => ['sort' => $e->getCreatedAt()->format('c'), 'id' => $e->getId()->toString()],
+            // Keep the microseconds: a whole-second cursor sorts before its own row and repeats or skips songs added within that second.
+            SongSortField::Added => fn (SongEntity $e): array => ['sort' => $e->getCreatedAt()->format('Y-m-d H:i:s.uP'), 'id' => $e->getId()->toString()],
             SongSortField::Title => fn (SongEntity $e): array => ['sort' => $e->getTitle(), 'id' => $e->getId()->toString()],
         };
     }
