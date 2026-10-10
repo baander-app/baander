@@ -87,6 +87,18 @@ final class SongMetadataEnricher
             return EnrichmentResult::noMatch($data['source'], $quality);
         }
 
+        // The lookup takes seconds: decide and write against the stored state, so an edit or lock
+        // made meanwhile survives.
+        $current = $this->songService->findFreshByUuid($song->getId());
+
+        if ($current === null) {
+            $this->logger->info('Song deleted during enrichment', ['song_id' => $song->getId()]);
+
+            return EnrichmentResult::failure($data['source'], $quality);
+        }
+
+        $song = $current;
+
         $updatedFields = [];
 
         // Apply external identifiers

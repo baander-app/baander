@@ -23,6 +23,7 @@ use App\Shared\Infrastructure\Doctrine\Repository\PgroongaSearchTrait;
 use App\Shared\Infrastructure\Pagination\CursorCodec;
 use App\Shared\Infrastructure\Pagination\CursorPaginator;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Query;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\NonUniqueResultException;
 
@@ -138,6 +139,22 @@ final class SongRepository implements SongRepositoryInterface
             ->find($uuid);
 
         return $entity !== null ? $this->toDomain($entity) : null;
+    }
+
+    public function findFreshByUuid(Uuid $uuid): ?Song
+    {
+        // find() answers from the identity map; the refresh hint overwrites a managed entity
+        // with the stored row instead.
+        $entity = $this->entityManager
+            ->getRepository(SongEntity::class)
+            ->createQueryBuilder('fresh')
+            ->where('fresh.id = :id')
+            ->setParameter('id', $uuid)
+            ->getQuery()
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getOneOrNullResult();
+
+        return $entity instanceof SongEntity ? $this->toDomain($entity) : null;
     }
 
     public function findByPublicId(PublicId $publicId): ?Song

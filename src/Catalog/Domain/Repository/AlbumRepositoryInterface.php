@@ -38,6 +38,12 @@ interface AlbumRepositoryInterface extends Searchable
 
     public function findByUuid(Uuid $uuid): ?Album;
 
+    /**
+     * Re-reads the album from the database, replacing any state this process holds for it, so a
+     * decision taken after slow work sees edits other processes committed meanwhile.
+     */
+    public function findFreshByUuid(Uuid $uuid): ?Album;
+
     public function findByPublicId(PublicId $publicId): ?Album;
 
     public function findByMbid(?MusicbrainzId $mbid): ?Album;

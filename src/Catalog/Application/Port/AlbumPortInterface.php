@@ -32,6 +32,12 @@ interface AlbumPortInterface
 
     public function findByUuid(Uuid $uuid): ?Album;
 
+    /**
+     * Re-reads the album from the database, replacing any state this process holds for it, so a
+     * decision taken after slow work sees edits other processes committed meanwhile.
+     */
+    public function findFreshByUuid(Uuid $uuid): ?Album;
+
     public function findByMbid(?MusicbrainzId $mbid): ?Album;
 
     public function findByMbidAndLibrary(?MusicbrainzId $mbid, Uuid $libraryId): ?Album;

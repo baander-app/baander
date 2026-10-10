@@ -51,6 +51,12 @@ interface SongPortInterface
 
     public function findByUuid(Uuid $uuid): ?Song;
 
+    /**
+     * Re-reads the song from the database, replacing any state this process holds for it, so a
+     * decision taken after slow work sees edits other processes committed meanwhile.
+     */
+    public function findFreshByUuid(Uuid $uuid): ?Song;
+
     public function findByPath(string $path): ?Song;
 
     public function findByHash(string $hash): ?Song;

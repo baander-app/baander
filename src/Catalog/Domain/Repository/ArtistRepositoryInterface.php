@@ -31,6 +31,12 @@ interface ArtistRepositoryInterface extends Searchable
 
     public function findByUuid(Uuid $uuid): ?Artist;
 
+    /**
+     * Re-reads the artist from the database, replacing any state this process holds for it, so a
+     * decision taken after slow work sees edits other processes committed meanwhile.
+     */
+    public function findFreshByUuid(Uuid $uuid): ?Artist;
+
     public function findByPublicId(PublicId $publicId): ?Artist;
 
     public function findByMbid(?MusicbrainzId $mbid): ?Artist;

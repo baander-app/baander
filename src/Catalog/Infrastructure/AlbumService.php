@@ -65,6 +65,11 @@ final class AlbumService implements AlbumPortInterface
         return $this->albumRepository->findByUuid($uuid);
     }
 
+    public function findFreshByUuid(Uuid $uuid): ?Album
+    {
+        return $this->albumRepository->findFreshByUuid($uuid);
+    }
+
     public function findByMbid(?MusicbrainzId $mbid): ?Album
     {
         return $this->albumRepository->findByMbid($mbid);

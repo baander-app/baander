@@ -51,6 +51,11 @@ final class ArtistService implements ArtistPortInterface
         return $this->artistRepository->findByUuid($uuid);
     }
 
+    public function findFreshByUuid(Uuid $uuid): ?Artist
+    {
+        return $this->artistRepository->findFreshByUuid($uuid);
+    }
+
     public function findByMbid(?MusicbrainzId $mbid): ?Artist
     {
         return $this->artistRepository->findByMbid($mbid);

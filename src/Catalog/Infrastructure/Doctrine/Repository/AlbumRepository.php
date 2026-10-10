@@ -22,6 +22,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Infrastructure\Doctrine\Repository\PgroongaSearchTrait;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Query;
 
 /**
  * Pure domain repository for albums.
@@ -119,6 +120,22 @@ final class AlbumRepository implements AlbumRepositoryInterface
             ->find($uuid);
 
         return $entity !== null ? $this->toDomain($entity) : null;
+    }
+
+    public function findFreshByUuid(Uuid $uuid): ?Album
+    {
+        // find() answers from the identity map; the refresh hint overwrites a managed entity
+        // with the stored row instead.
+        $entity = $this->entityManager
+            ->getRepository(AlbumEntity::class)
+            ->createQueryBuilder('fresh')
+            ->where('fresh.id = :id')
+            ->setParameter('id', $uuid)
+            ->getQuery()
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getOneOrNullResult();
+
+        return $entity instanceof AlbumEntity ? $this->toDomain($entity) : null;
     }
 
     public function findByPublicId(PublicId $publicId): ?Album
