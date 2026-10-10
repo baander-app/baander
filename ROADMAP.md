@@ -126,21 +126,23 @@ production image also runs PHP's default `memory_limit` of 128M from
 
 ## Current quality-gate checkpoint
 
-Last recorded on 2026-10-10, at the end of the ROADMAP item 1 open-items work
-(branch `plan/item1-open-items`), all in the CI image unless noted:
+Last recorded on 2026-10-10, at the end of the ROADMAP item 3 timestamp work
+(branch `plan/item3-timestamps`), all in the CI image unless noted:
 
-- Unit suite: 5,917 tests pass. Functional: 1,439 tests in 129 shards; Integration:
-  982 tests in 95 shards; no failures.
+- Unit suite: 5,950 tests pass. Functional: 1,449 tests in 131 shards; Integration:
+  1,000 tests in 101 shards; no failures.
 - PHPStan: no errors on a full scan. Deptrac: 0 violations. Container lint passes.
   The OpenAPI specification check passes in the CI image, and on the host with a
   fresh cache (a stale host test cache reports a false mismatch).
-- Runtime drills: the worker drill and the new web drill pass.
-- Web: unchanged since the item 2 checkpoint (1,842 tests in 173 files; typecheck
-  and lint at zero errors, four existing lint warnings).
+- Runtime drills: the worker drill and the web drill pass.
+- Web: the regenerated API client changed only in order; the typecheck passes. The
+  test suite and lint were not rerun since the item 2 checkpoint (1,842 tests in 173
+  files; lint at zero errors, four existing lint warnings).
 - `ui/rn` is deferred indefinitely (84 `tsc` errors and 25 Jest failures); no CI
   job runs it.
 
-The item 2 checkpoint, earlier on 2026-10-10: unit 5,846; functional 1,438;
+The item 1 checkpoint, earlier on 2026-10-10: unit 5,917; functional 1,439;
+integration 982. The item 2 checkpoint: unit 5,846; functional 1,438;
 integration 981; web 1,842; PHPStan clean; Deptrac 0.
 
 The previous checkpoint, on 2026-10-09 at `master` `f40085e9`: unit 5,799;
