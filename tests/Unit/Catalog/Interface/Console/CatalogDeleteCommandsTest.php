@@ -14,6 +14,7 @@ use App\Catalog\Application\Query\Album\GetAlbumDeletePreviewQuery;
 use App\Catalog\Application\Query\FileDeletionPreview;
 use App\Catalog\Interface\Console\AlbumDeleteCommand;
 use App\Catalog\Interface\Console\ArtistDeleteCommand;
+use App\Catalog\Interface\Console\CatalogDeleteInterrupted;
 use App\Catalog\Interface\Console\MovieDeleteCommand;
 use App\Catalog\Interface\Console\SongDeleteCommand;
 use App\Catalog\Interface\Resource\AlbumDeletePreviewResource;
@@ -156,6 +157,61 @@ final class CatalogDeleteCommandsTest extends TestCase
 
         // The handler's finally block, which releases the library claim, ran in both.
         self::assertSame(['finally', 'finally'], $this->unwound);
+    }
+
+    /** A second signal while the delete unwinds must not cut short the release in its finally block. */
+    public function testOnlyTheFirstSignalOfADeleteThrows(): void
+    {
+        $command = new AlbumDeleteCommand($this->support());
+        $second = null;
+        $this->duringDelete = static function () use ($command, &$second): void {
+            try {
+                $command->handleSignal(\SIGTERM);
+            } finally {
+                $second = $command->handleSignal(\SIGINT);
+            }
+        };
+        $tester = new CommandTester($command);
+
+        self::assertSame(128 + \SIGTERM, $tester->execute(
+            ['public-id' => self::ALBUM, '--delete-files' => true, '--force' => true],
+            ['interactive' => false, 'capture_stderr_separately' => true],
+        ));
+        self::assertFalse($second, 'The second signal lets the delete go on unwinding.');
+        self::assertSame(['finally'], $this->unwound);
+
+        // The next delete can be interrupted again.
+        $this->duringDelete = static fn (): int|false => $command->handleSignal(\SIGINT);
+        self::assertSame(128 + \SIGINT, $tester->execute(
+            ['public-id' => self::ALBUM, '--delete-files' => true, '--force' => true],
+            ['interactive' => false, 'capture_stderr_separately' => true],
+        ));
+    }
+
+    /**
+     * A catch inside the delete, such as the one that keeps a failed claim release from hiding the
+     * delete's outcome, can swallow the interruption; the delete then finishes, and the command
+     * reports its result with the signal.
+     */
+    public function testASignalTheDeleteSwallowedIsReportedWithTheResult(): void
+    {
+        foreach ([AlbumDeleteCommand::class, SongDeleteCommand::class] as $class) {
+            $command = new $class($this->support());
+            $this->duringDelete = static function () use ($command): void {
+                try {
+                    $command->handleSignal(\SIGTERM);
+                } catch (CatalogDeleteInterrupted) {
+                }
+            };
+            $tester = new CommandTester($command);
+
+            self::assertSame(Command::SUCCESS, $tester->execute(
+                ['public-id' => self::ALBUM, '--delete-files' => true, '--force' => true],
+                ['interactive' => false, 'capture_stderr_separately' => true],
+            ), $class);
+            self::assertStringContainsString('Signal ' . \SIGTERM . ' arrived as the delete was ending', $tester->getErrorOutput());
+            self::assertStringContainsString('deleted', $tester->getDisplay());
+        }
     }
 
     public function testASignalWhileNoDeleteRunsEndsTheCommandWithTheSignal(): void

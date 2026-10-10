@@ -21,6 +21,7 @@ use App\Metadata\Application\Port\AlbumMetadataSyncRequestInterface;
 use App\Metadata\Domain\Model\ExtractedMetadata;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Infrastructure\FFmpeg\FFprobeAdapter;
+use App\Tests\Fixtures\Catalog\PassThroughTransaction;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -248,6 +249,7 @@ final class FilesDiscoveredLyricsRequestTest extends TestCase
             $this->createStub(AlbumMetadataSyncRequestInterface::class),
             $logger ?? new NullLogger(),
             $this->createStub(LibraryMediaFilesInterface::class),
+            new PassThroughTransaction(),
         );
     }
 

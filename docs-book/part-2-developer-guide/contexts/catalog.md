@@ -49,7 +49,7 @@ The API controllers and the console commands dispatch the same commands and quer
 | `UpdateGenreCommand` | `UpdateGenreHandler` | Change a genre's name, slug, parent or MusicBrainz ID (`app:genre:update`) |
 | `DeleteGenreCommand` | `DeleteGenreHandler` | Delete a genre; its children become root genres (`app:genre:delete`) |
 
-`FilesDiscoveredHandler` handles Library's `FilesDiscovered` message and imports the files a scan found.
+`FilesDiscoveredHandler` handles Library's `FilesDiscovered` message and imports the files a scan found. It reads the metadata of up to 50 audio files, then writes their songs, artist links and genres in one transaction; a delete with files cannot claim the library while that transaction runs (see [Library](library.md#media-file-deletion)). When a delete holds the library, the handler puts the files it has not imported back on the queue.
 
 ### Queries
 

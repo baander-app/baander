@@ -6,3 +6,4 @@ errors:
   library_busy:
     scan: 'En scanning er allerede i gang for biblioteket "{library}".'
     delete: 'En sletning med filer er i gang for biblioteket "{library}".'
+  all_files_missing: 'Ingen af filerne findes i biblioteksmappen {root}; dens lager er måske ikke monteret. Intet blev slettet.'

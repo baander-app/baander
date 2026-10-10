@@ -114,6 +114,20 @@ final class MetadataEnricherLockedFieldsTest extends TestCase
         self::assertSame(['type', 'sortName', 'lifeSpanBegin'], $result->getUpdatedFields());
     }
 
+    public function testAnArtistDeletedDuringTheLookupsIsNotWritten(): void
+    {
+        $loaded = Artist::create('The Beatles');
+        $artists = $this->createMock(ArtistPortInterface::class);
+        $artists->expects(self::once())->method('findFreshByUuid')->with($loaded->getId())->willReturn(null);
+        $artists->expects(self::never())->method('save');
+
+        $result = (new \ReflectionMethod(ArtistMetadataEnricher::class, 'applyData'))
+            ->invoke($this->artistEnricher($artists), $loaded, $this->artistData(), 'musicbrainz', true);
+
+        self::assertInstanceOf(EnrichmentResult::class, $result);
+        self::assertFalse($result->isSuccess());
+    }
+
     public function testAnArtistEnrichmentKeepsACountryLockedDuringTheLookups(): void
     {
         $loaded = Artist::create('The Beatles');
@@ -160,6 +174,31 @@ final class MetadataEnricherLockedFieldsTest extends TestCase
         self::assertTrue($result->isSuccess());
         self::assertSame('Come Together (2019 Mix)', $stored->getTitle());
         self::assertSame($mbid, $stored->getMbid());
+    }
+
+    public function testASongDeletedDuringTheLookupsIsNotWritten(): void
+    {
+        $loaded = Song::create(new Uuid(), 'Come Together', '/music/come-together.flac', 1024, 'audio/flac');
+        $songs = $this->createMock(SongPortInterface::class);
+        $songs->expects(self::once())->method('findFreshByUuid')->with($loaded->getId())->willReturn(null);
+        $songs->expects(self::never())->method('save');
+        $enricher = new SongMetadataEnricher(
+            $this->adapter(MusicBrainzAdapter::class),
+            $songs,
+            $this->createStub(GenrePortInterface::class),
+            new NullLogger(),
+        );
+
+        $result = (new \ReflectionMethod($enricher, 'applyData'))->invoke($enricher, $loaded, [
+            'source' => 'musicbrainz',
+            'quality' => 1.0,
+            'mbid' => '0b4f1a46-4a2e-4f3a-9d6c-6a3e2b7f1c11',
+            'title' => 'Come Together',
+            'tags' => [],
+        ], false);
+
+        self::assertInstanceOf(EnrichmentResult::class, $result);
+        self::assertFalse($result->isSuccess());
     }
 
     private function albumEnricher(AlbumPortInterface $albums): AlbumMetadataEnricher

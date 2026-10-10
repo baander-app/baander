@@ -127,6 +127,56 @@ final class LibraryScanClaimTest extends TestCase
         self::assertSame(['scanning', 'scan'], [$this->row()['scan_status'], $this->row()['claim_kind']]);
     }
 
+    /**
+     * An import writes its songs in a transaction that read the claim for an import first. A
+     * delete claim waits on that transaction's advisory lock, so the songs commit before the
+     * claim does and the delete reads them after it.
+     */
+    public function testADeleteClaimWaitsForAnImportTransactionInFlight(): void
+    {
+        $this->writer->beginTransaction();
+        self::assertNull($this->libraries->liveClaimKindForImport($this->library->getId()));
+        $child = $this->startChild('delete');
+        $this->awaitLockWait($child);
+        $this->observer->executeQuery('SELECT pg_stat_clear_snapshot()')->free();
+        self::assertSame('advisory', $this->observer->fetchOne(
+            'SELECT wait_event FROM pg_stat_activity WHERE application_name = ?',
+            [$child['application']],
+        ), 'The delete claim waits on the import lock, not on the library row.');
+        self::assertNull($this->row()['claim_id'], 'The waiting claim has taken nothing yet.');
+        $this->writer->commit();
+
+        self::assertSame(['claimed' => true, 'holder' => null], $this->finish($child));
+        self::assertSame('delete', $this->row()['claim_kind']);
+    }
+
+    /** An import transaction that begins after a delete claim committed sees the claim, and a scan claim takes no import lock. */
+    public function testAnImportTransactionAfterADeleteClaimSeesItAndAScanClaimDoesNotWaitForImports(): void
+    {
+        self::assertSame(['claimed' => true, 'holder' => null], $this->finish($this->startChild('delete')));
+
+        $this->writer->beginTransaction();
+        self::assertSame(LibraryClaimKind::Delete, $this->libraries->liveClaimKindForImport($this->library->getId()));
+        $this->writer->rollBack();
+
+        $claim = $this->row()['claim_id'];
+        self::assertNotNull($claim);
+        self::assertTrue($this->libraries->endDeleteClaim(Uuid::fromString($claim)));
+        $this->writer->beginTransaction();
+        self::assertNull($this->libraries->liveClaimKindForImport($this->library->getId()));
+        // A scan imports nothing itself, so it claims the library while an import transaction runs.
+        self::assertSame(['claimed' => true, 'holder' => null], $this->finish($this->startChild('scan')));
+        self::assertSame(LibraryClaimKind::Scan, $this->libraries->liveClaimKindForImport($this->library->getId()));
+        $this->writer->commit();
+    }
+
+    public function testReadingTheClaimForAnImportOutsideATransactionIsRefused(): void
+    {
+        $this->expectException(\LogicException::class);
+
+        $this->libraries->liveClaimKindForImport($this->library->getId());
+    }
+
     public function testOfTwoConcurrentTakeoversOfALapsedClaimExactlyOneSucceeds(): void
     {
         $lost = new Uuid();
@@ -488,13 +538,13 @@ final class LibraryScanClaimTest extends TestCase
     }
 
     /** @return array{process: resource, output: resource, application: string} */
-    private function startChild(): array
+    private function startChild(string $kind = 'scan'): array
     {
         $application = 'library_claim_' . bin2hex(random_bytes(6));
         $output = tmpfile();
         self::assertIsResource($output);
         $process = proc_open(
-            [PHP_BINARY, dirname(__DIR__) . '/Fixtures/Library/library-scan-claim.php', $this->schema, $application, $this->library->getId()->toString()],
+            [PHP_BINARY, dirname(__DIR__) . '/Fixtures/Library/library-scan-claim.php', $this->schema, $application, $this->library->getId()->toString(), $kind],
             [0 => ['file', '/dev/null', 'r'], 1 => $output, 2 => $output],
             $pipes,
         );

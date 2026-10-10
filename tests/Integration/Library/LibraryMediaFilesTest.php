@@ -213,14 +213,43 @@ final class LibraryMediaFilesTest extends TestCase
         self::assertFalse($this->files->isHeldByDelete(new Uuid()));
     }
 
-    public function testMissingPathsNamesTheFilesThatAreGoneInRequestOrder(): void
+    public function testForgetMissingNamesTheFilesThatAreGoneInRequestOrderAndDeletesOnlyTheirIndexRows(): void
     {
-        [, $first, $second] = $this->scannedAlbum();
+        [$library, $first, $second] = $this->scannedAlbum();
         $dangling = $this->album . '/03.flac';
         self::assertTrue(symlink($this->base . '/elsewhere/deleted.flac', $dangling));
         self::assertTrue(unlink($first));
 
-        self::assertSame([$dangling, $first], $this->files->missingPaths([$dangling, $second, $first]));
+        self::assertSame([$dangling, $first], $this->files->forgetMissing($library->getId(), [$dangling, $second, $first]));
+        self::assertSame([$second], $this->indexedPaths($library));
+    }
+
+    /**
+     * The scan indexes a file as it queues its import. When the import finds the file gone, as on
+     * storage unmounted in between, it has the index forget the file; once the file is back
+     * unchanged, the next incremental scan reads it as new and queues it again instead of
+     * skipping it as known.
+     */
+    public function testAFileAnImportFoundMissingIsQueuedAgainByTheNextScanWhenItComesBack(): void
+    {
+        [$library, $first, $second] = $this->scannedAlbum();
+        self::assertTrue(rename($first, $this->base . '/elsewhere/01.flac'));
+
+        self::assertSame([$first], $this->files->forgetMissing($library->getId(), [$first, $second]));
+        self::assertTrue(rename($this->base . '/elsewhere/01.flac', $first));
+
+        $published = [];
+        /** @param array<DiscoveredFile> $files */
+        $publish = static function (string $directory, array $files) use (&$published): void {
+            foreach ($files as $file) {
+                $published[] = $file->absolutePath;
+            }
+        };
+        $scan = $this->scanner->scan($library, publishDirectory: $publish);
+
+        self::assertSame([$first], $published, 'Only the returning file is new; its unchanged neighbour is still known.');
+        self::assertSame(1, $scan->filesProcessed);
+        self::assertSame([$first, $second], $this->indexedPaths($library));
     }
 
     public function testADirectoryTheServerCannotWriteRefusesTheRequestAsAConflict(): void

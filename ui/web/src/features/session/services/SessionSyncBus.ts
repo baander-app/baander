@@ -21,7 +21,6 @@ export interface SessionSyncEvents {
     playbackState: 'playing' | 'paused' | 'stopped'
     activeDeviceId: string | null
   }) => void
-  onReconnect: () => void
   onError: (error: Error) => void
 }
 
@@ -63,8 +62,6 @@ export class SessionSyncBus {
         const msg = JSON.parse(event.data as string)
         if (msg.type === 'session.state' || msg.type === 'session.joined') {
           this.events.onStateUpdate(msg.data ?? msg)
-        } else if (msg.type === 'connected' && msg.reconnected) {
-          this.events.onReconnect()
         }
       } catch { /* ignore malformed */ }
     }

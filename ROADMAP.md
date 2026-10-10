@@ -88,8 +88,8 @@ pairing endpoint that does not exist and needs a decision when that work resumes
 Last recorded on 2026-10-10, at the end of the ROADMAP item 2 open-items work
 (branch `plan/item2-open-items`), all in the CI image unless noted:
 
-- Unit suite: 5,832 tests pass. Functional: 1,438 tests in 129 shards; Integration:
-  977 tests in 95 shards; no failures.
+- Unit suite: 5,846 tests pass. Functional: 1,438 tests in 129 shards; Integration:
+  981 tests in 95 shards; no failures.
 - PHPStan: no errors on a full scan. Deptrac: 0 violations. Container lint passes.
   The OpenAPI specification check passes in the CI image, and on the host with a
   fresh cache (a stale host test cache reports a false mismatch).

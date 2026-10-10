@@ -21,11 +21,11 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 /**
  * Deletes an album with every song on it.
  *
- * With the files, the delete claims the album's library first, so no scan runs until it ends,
- * and releases the claim however it ends; every song path is checked before anything changes;
- * the album, its songs and their file index rows go in one transaction, and the files are
- * unlinked after the commit. The cover image is deleted after the commit too, so a rollback
- * leaves the album with its cover.
+ * With the files, the delete claims the album's library first, so no scan runs and no import
+ * writes songs until it ends, and releases the claim however it ends; the songs are read after
+ * the claim, and every song path is checked before anything changes; the album, its songs and
+ * their file index rows go in one transaction, and the files are unlinked after the commit. The
+ * cover image is deleted after the commit too, so a rollback leaves the album with its cover.
  */
 final readonly class DeleteAlbumHandler
 {
@@ -48,11 +48,13 @@ final readonly class DeleteAlbumHandler
     {
         $album = $this->albums->findByPublicId(CatalogInput::publicId($command->publicId))
             ?? throw new NotFoundException(sprintf('Album "%s" not found.', $command->publicId));
-        $songs = $this->songs->findByAlbumSortedByTrack($album->getId());
         $coverImageId = $command->deleteCover ? $album->getCoverImageId() : null;
 
         $claim = $command->deleteFiles ? $this->mediaFiles->claim($album->getLibraryId()) : null;
         try {
+            // Read after the claim: an import's songs commit before the claim does, and no import
+            // adds one after it, so every song the album delete removes has its path checked here.
+            $songs = $this->songs->findByAlbumSortedByTrack($album->getId());
             $deletion = $claim !== null
                 ? $this->mediaFiles->prepareDeletion($claim, array_map(static fn (Song $song): string => $song->getPath(), $songs))
                 : null;
