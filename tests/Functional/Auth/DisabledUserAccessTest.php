@@ -20,6 +20,7 @@ use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Infrastructure\Security\OAuth\OAuth2Authenticator;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Security\WsQueryTokenAuthenticator;
+use App\Tests\Fixtures\Auth\AuthenticationFailureMessages;
 use App\Tests\Functional\TestCase;
 use League\OAuth2\Server\ResourceServer;
 use Psr\Log\NullLogger;
@@ -133,6 +134,7 @@ final class DisabledUserAccessTest extends TestCase
             $this->service(HttpMessageFactoryInterface::class),
             new NullLogger(),
             $this->service(TokenMetadataRepositoryInterface::class),
+            AuthenticationFailureMessages::create(),
         );
 
         $request = Request::create('https://baander.app/api/auth/me');

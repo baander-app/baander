@@ -16,6 +16,10 @@ errors:
   internal: "Internal server error."
   password_reset_failed: "This password reset link is invalid or has expired."
   current_password_incorrect: "Current password is incorrect."
+  invalid_credentials: "Invalid credentials."
+  account_disabled: "This account has been disabled."
+  totp_required: "TOTP code is required."
+  invalid_token: "Invalid or expired token."
 
 success:
   token_revoked: "Token revoked successfully."

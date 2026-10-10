@@ -9,6 +9,7 @@ use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\Exception\ServiceUnavailableException;
+use App\Shared\Application\Http\RequestLocale;
 use App\Shared\Interface\DTO\ApiError;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
@@ -39,7 +40,7 @@ final class ExceptionSubscriber
             $event->setThrowable($exception);
         }
 
-        if ($this->respondWithOutcome($event, $exception)) {
+        if ($this->respondWithOutcome($event, $exception) || $this->respondToRefusal($event, $exception)) {
             return;
         }
 
@@ -75,8 +76,8 @@ final class ExceptionSubscriber
     /**
      * The shared use case outcomes: 404, 409 or 422 for client errors, and 503 when an external
      * service did not answer, each with the message and details.
-     * An outcome that is also TranslatableInterface is reported in the translator's locale, which
-     * LocaleListener sets from the API request; getMessage() stays English for the console and logs.
+     * An outcome that is also TranslatableInterface is reported in the request's language
+     * (RequestLocale); getMessage() stays English for the console and logs.
      */
     private function respondWithOutcome(ExceptionEvent $event, Throwable $exception): bool
     {
@@ -91,11 +92,44 @@ final class ExceptionSubscriber
             return false;
         }
 
-        $message = $exception instanceof TranslatableInterface ? $exception->trans($this->translator) : $exception->getMessage();
+        $message = $exception instanceof TranslatableInterface
+            ? $exception->trans($this->translator, $this->locale($event))
+            : $exception->getMessage();
         $error = new ApiError($message, $status, $details);
         $event->setResponse(new JsonResponse($error->toArray(), $status));
 
         return true;
+    }
+
+    /**
+     * A 401 or 403, including the firewall's refusals, as the shared error envelope with a
+     * generic message in the request's language. The exception's own message is not shown.
+     */
+    private function respondToRefusal(ExceptionEvent $event, Throwable $exception): bool
+    {
+        if (!$exception instanceof HttpExceptionInterface) {
+            return false;
+        }
+
+        $key = match ($exception->getStatusCode()) {
+            Response::HTTP_UNAUTHORIZED => 'errors.unauthorized.default',
+            Response::HTTP_FORBIDDEN => 'errors.forbidden.default',
+            default => null,
+        };
+        if ($key === null) {
+            return false;
+        }
+
+        $status = $exception->getStatusCode();
+        $error = new ApiError($this->translator->trans($key, [], 'messages', $this->locale($event)), $status);
+        $event->setResponse(new JsonResponse($error->toArray(), $status, $exception->getHeaders()));
+
+        return true;
+    }
+
+    private function locale(ExceptionEvent $event): string
+    {
+        return RequestLocale::of($event->getRequest()->attributes->get(RequestLocale::ATTRIBUTE));
     }
 
     private function getSafeMessage(Throwable $exception, int $status): string

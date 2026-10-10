@@ -13,7 +13,7 @@ use OpenApi\Attributes as OA;
     required: ['key', 'label', 'type', 'options', 'userEditable', 'storedValue', 'storedValueValid', 'value', 'resetValue', 'source'],
     properties: [
         new OA\Property(property: 'key', type: 'string', example: 'language'),
-        new OA\Property(property: 'label', type: 'string', example: 'Email language'),
+        new OA\Property(property: 'label', type: 'string', example: 'Language'),
         new OA\Property(property: 'type', type: 'string', enum: ['boolean', 'integer', 'enum', 'string']),
         new OA\Property(property: 'options', description: 'Allowed values of an enum setting, with their labels', type: 'array', items: new OA\Items(
             required: ['value', 'label'],

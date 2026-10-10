@@ -72,7 +72,7 @@ final class AdminUserSettingsControllerTest extends TestCase
 
         $language = $this->adminSettings($admin, $alice)['language'];
 
-        $this->assertSame('Email language', $language['label']);
+        $this->assertSame('Language', $language['label']);
         $this->assertSame('enum', $language['type']);
         $this->assertSame([
             ['value' => 'en', 'label' => 'English'],

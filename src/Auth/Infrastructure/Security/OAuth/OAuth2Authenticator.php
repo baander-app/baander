@@ -7,6 +7,7 @@ namespace App\Auth\Infrastructure\Security\OAuth;
 use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
+use App\Auth\Infrastructure\Security\AuthenticationFailureMessage;
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\Uuid;
@@ -40,6 +41,7 @@ final class OAuth2Authenticator extends AbstractAuthenticator
         private readonly HttpMessageFactoryInterface $psrHttpFactory,
         private readonly LoggerInterface $logger,
         private readonly TokenMetadataRepositoryInterface $tokenMetadataRepository,
+        private readonly AuthenticationFailureMessage $failureMessage,
     ) {
     }
 
@@ -191,7 +193,7 @@ final class OAuth2Authenticator extends AbstractAuthenticator
 
         return new JsonResponse([
             'error' => [
-                'message' => $exception->getMessageKey(),
+                'message' => $this->failureMessage->of($exception, $request),
                 'code' => $errorCode,
             ],
         ], Response::HTTP_UNAUTHORIZED);

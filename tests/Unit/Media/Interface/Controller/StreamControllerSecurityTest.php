@@ -84,6 +84,8 @@ final class StreamControllerSecurityTest extends TestCase
 
         self::assertNotInstanceOf(BinaryFileResponse::class, $response);
         self::assertSame(Response::HTTP_FORBIDDEN, $response->getStatusCode());
+        // The stub translator echoes the key: a key without a translation reached the client raw.
+        self::assertStringContainsString('errors.forbidden.default', (string) $response->getContent());
     }
 
     /** @return iterable<string, array{LibraryReadScope}> */

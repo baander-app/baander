@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\EventListener;
 
+use App\Shared\Application\Http\RequestLocale;
 use App\Shared\Interface\DTO\ApiError;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -40,7 +41,10 @@ final class ValidationExceptionSubscriber
         }
 
         $error = new ApiError(
-            message: $this->translator->trans('errors.validation.failed'),
+            message: $this->translator->trans(
+                'errors.validation.failed',
+                locale: RequestLocale::of($event->getRequest()->attributes->get(RequestLocale::ATTRIBUTE)),
+            ),
             code: $exception->getStatusCode(),
             details: $details,
         );

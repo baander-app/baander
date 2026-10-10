@@ -8,6 +8,7 @@ use App\Media\Application\Port\MediaReadScopeProviderInterface;
 use App\Media\Application\Port\StreamPortInterface;
 use App\Media\Domain\Model\TrackStreamMetadata;
 use App\Media\Interface\Controller\StreamController;
+use App\Shared\Application\Http\RequestLocale;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
@@ -19,6 +20,7 @@ use App\Transcode\Application\Port\AudioRenditionPortInterface;
 use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Translation\Loader\YamlFileLoader;
 use Symfony\Component\Translation\Translator;
 
@@ -54,9 +56,10 @@ final class StreamControllerTranscodeBusyTest extends TestCase
             ->with(self::anything(), $this->file, AudioRenditionFormat::Opus, 192_000)
             ->willThrowException(new AudioRenditionBusyException('The server already runs 4 audio rendition encodes.'));
 
-        $response = $this->controller($renditions, 'da')->streamById(Request::create(
-            'https://api.baander.app/api/stream/track?id=' . (new PublicId())->toString() . '&format=opus&bitrate=200000',
-        ));
+        $request = Request::create('https://api.baander.app/api/stream/track?id=' . (new PublicId())->toString() . '&format=opus&bitrate=200000');
+        $request->attributes->set(RequestLocale::ATTRIBUTE, 'da');
+
+        $response = $this->controller($renditions, $request)->streamById($request);
 
         self::assertSame(503, $response->getStatusCode());
         self::assertSame('5', $response->headers->get('Retry-After'));
@@ -65,7 +68,7 @@ final class StreamControllerTranscodeBusyTest extends TestCase
         self::assertSame('Serveren er optaget af at omkode anden lyd. Prøv igen om lidt.', $error['error']['message'] ?? null);
     }
 
-    private function controller(AudioRenditionPortInterface $renditions, string $locale): StreamController
+    private function controller(AudioRenditionPortInterface $renditions, Request $request): StreamController
     {
         $stream = $this->createStub(StreamPortInterface::class);
         $stream->method('getLibraryIdForTrack')->willReturn(new Uuid());
@@ -82,11 +85,14 @@ final class StreamControllerTranscodeBusyTest extends TestCase
             [TranscodeSettingDefinitions::MAX_BITRATE, 192],
         ]);
 
-        $translator = new Translator($locale);
+        $translator = new Translator('en');
         $translator->addLoader('yaml', new YamlFileLoader());
-        $translator->addResource('yaml', dirname(__DIR__, 5) . '/translations/media+intl-icu.' . $locale . '.yaml', $locale, 'media+intl-icu');
+        $translator->addResource('yaml', dirname(__DIR__, 5) . '/translations/media+intl-icu.da.yaml', 'da', 'media+intl-icu');
+        $requests = new RequestStack();
+        $requests->push($request);
         $controller = new StreamController($stream, $scopes, $renditions, $settings);
         $controller->setTranslator($translator);
+        $controller->setTranslationRequests($requests);
 
         return $controller;
     }

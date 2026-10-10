@@ -9,6 +9,7 @@ use App\Auth\Domain\Model\OAuth\TokenMetadata;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Infrastructure\Security\OAuth\OAuth2Authenticator;
 use App\Shared\Domain\Model\Uuid;
+use App\Tests\Fixtures\Auth\AuthenticationFailureMessages;
 use League\OAuth2\Server\Exception\OAuthServerException;
 use League\OAuth2\Server\ResourceServer;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -40,6 +41,7 @@ final class OAuth2AuthenticatorTest extends TestCase
             $this->psrFactory,
             $logger,
             $tokenMetadataRepository,
+            AuthenticationFailureMessages::create(),
         );
     }
 
@@ -96,6 +98,21 @@ final class OAuth2AuthenticatorTest extends TestCase
         $this->assertArrayHasKey('code', $data['error']);
         $this->assertSame('AUTH_INVALID_TOKEN', $data['error']['code']);
         $this->assertSame('Invalid or expired token.', $data['error']['message']);
+    }
+
+    public function testARefusedTokenIsReportedInTheAcceptLanguage(): void
+    {
+        $request = Request::create('/api/libraries', server: ['HTTP_ACCEPT_LANGUAGE' => 'th']);
+
+        $result = $this->authenticator->onAuthenticationFailure($request, new \Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException(
+            'Invalid or expired token.',
+            ['error_code' => 'AUTH_INVALID_TOKEN'],
+        ));
+
+        $this->assertSame(
+            ['error' => ['message' => 'โทเค็นไม่ถูกต้องหรือหมดอายุแล้ว', 'code' => 'AUTH_INVALID_TOKEN']],
+            json_decode((string) $result->getContent(), true),
+        );
     }
 
     public function testOnAuthenticationFailureDefaultsToInvalidTokenCode(): void
@@ -216,6 +233,7 @@ final class OAuth2AuthenticatorTest extends TestCase
             $this->psrFactory,
             $this->createStub(LoggerInterface::class),
             $tokenMetadataRepository,
+            AuthenticationFailureMessages::create(),
         );
     }
 }

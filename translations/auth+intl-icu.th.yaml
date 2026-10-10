@@ -1,33 +1,38 @@
 errors:
-  invalid_email: Invalid email address.
-  invalid_request: Invalid request.
-  invalid_challenge: Invalid or expired challenge.
-  passkey_registration_failed: "Passkey registration verification failed: {details}"
-  passkey_auth_failed: "Passkey authentication failed: {details}"
-  no_passkey_found: No passkey found for the given credential ID.
-  cannot_resolve_user: Unable to resolve user for the given credential ID.
-  failed_delete_passkey: Failed to delete passkey.
-  user_not_found: User not found.
-  client_auth_failed: Client authentication failed.
-  user_code_required: The "user_code" parameter is required.
-  invalid_user_code: Invalid or expired user code.
-  device_already_processed: Device code already processed.
-  email_verification_failed: This verification link is invalid or has expired.
-  internal: Internal server error.
-  password_reset_failed: This password reset link is invalid or has expired.
-  current_password_incorrect: Current password is incorrect.
+  invalid_email: "ที่อยู่อีเมลไม่ถูกต้อง"
+  invalid_request: "คำขอไม่ถูกต้อง"
+  invalid_challenge: "challenge ไม่ถูกต้องหรือหมดอายุแล้ว"
+  passkey_registration_failed: "การยืนยันการลงทะเบียนพาสคีย์ล้มเหลว: {details}"
+  passkey_auth_failed: "การยืนยันตัวตนด้วยพาสคีย์ล้มเหลว: {details}"
+  no_passkey_found: "ไม่พบพาสคีย์สำหรับ credential ID ที่ระบุ"
+  cannot_resolve_user: "ไม่พบผู้ใช้สำหรับ credential ID ที่ระบุ"
+  failed_delete_passkey: "ลบพาสคีย์ไม่สำเร็จ"
+  user_not_found: "ไม่พบผู้ใช้"
+  client_auth_failed: "การยืนยันตัวตนของไคลเอนต์ล้มเหลว"
+  user_code_required: 'ต้องระบุพารามิเตอร์ "user_code"'
+  invalid_user_code: "รหัสผู้ใช้ไม่ถูกต้องหรือหมดอายุแล้ว"
+  device_already_processed: "รหัสอุปกรณ์นี้ได้รับการดำเนินการแล้ว"
+  email_verification_failed: "ลิงก์ยืนยันนี้ไม่ถูกต้องหรือหมดอายุแล้ว"
+  internal: "เกิดข้อผิดพลาดภายในเซิร์ฟเวอร์"
+  password_reset_failed: "ลิงก์รีเซ็ตรหัสผ่านนี้ไม่ถูกต้องหรือหมดอายุแล้ว"
+  current_password_incorrect: "รหัสผ่านปัจจุบันไม่ถูกต้อง"
+  invalid_credentials: "ข้อมูลเข้าสู่ระบบไม่ถูกต้อง"
+  account_disabled: "บัญชีนี้ถูกปิดใช้งานแล้ว"
+  totp_required: "ต้องระบุรหัส TOTP"
+  invalid_token: "โทเค็นไม่ถูกต้องหรือหมดอายุแล้ว"
+
 success:
-  token_revoked: Token revoked successfully.
-  password_reset_sent: If the email exists, a password reset link has been sent.
-  email_verified: Email verified.
-  totp_enabled: TOTP enabled successfully.
-  totp_disable_not_implemented: TOTP disable is not yet fully implemented.
-  client_revoked: Client revoked successfully.
-  device_approved: Device approved successfully.
-  device_denied: Device access denied.
-  passkey_deleted: Passkey deleted successfully.
-  password_reset: Your password has been reset.
-  password_changed: Password changed.
+  token_revoked: "เพิกถอนโทเค็นเรียบร้อยแล้ว"
+  password_reset_sent: "หากมีอีเมลนี้ในระบบ เราได้ส่งลิงก์รีเซ็ตรหัสผ่านให้แล้ว"
+  email_verified: "ยืนยันอีเมลแล้ว"
+  totp_enabled: "เปิดใช้งาน TOTP เรียบร้อยแล้ว"
+  totp_disable_not_implemented: "การปิดใช้งาน TOTP ยังไม่พร้อมใช้งานเต็มรูปแบบ"
+  client_revoked: "เพิกถอนไคลเอนต์เรียบร้อยแล้ว"
+  device_approved: "อนุมัติอุปกรณ์เรียบร้อยแล้ว"
+  device_denied: "ปฏิเสธการเข้าถึงของอุปกรณ์แล้ว"
+  passkey_deleted: "ลบพาสคีย์เรียบร้อยแล้ว"
+  password_reset: "รีเซ็ตรหัสผ่านของคุณแล้ว"
+  password_changed: "เปลี่ยนรหัสผ่านแล้ว"
 
 password_reset_email:
   subject: "รีเซ็ตรหัสผ่าน {app} ของคุณ"

@@ -19,6 +19,7 @@ use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
+use App\Tests\Fixtures\Auth\AuthenticationFailureMessages;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -38,7 +39,7 @@ final class PasskeyAuthenticatorTest extends TestCase
         $redis = $this->createStub(RedisClientFactory::class);
         $redis->method('borrow')->willReturn(true);
         $verifier = new DpopTokenRequestVerifier(new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class)), new DpopNonceManager($redis));
-        $this->authenticator = new PasskeyAuthenticator($bus, $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class), $logger, new JsonEncoder(), $verifier);
+        $this->authenticator = new PasskeyAuthenticator($bus, $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class), $logger, new JsonEncoder(), $verifier, AuthenticationFailureMessages::create());
     }
 
     public function testSupportsCorrectRoute(): void

@@ -32,7 +32,7 @@ const SETTINGS_URL = `/api/admin/users/${ALICE.id}/settings`
 function language(overrides: Partial<AdminUserSetting> = {}): AdminUserSetting {
   return {
     key: 'language',
-    label: 'Email language',
+    label: 'Language',
     type: 'enum',
     options: [
       { value: 'en', label: 'English' },
@@ -126,7 +126,7 @@ function renderDialog(onOpenChange = vi.fn()) {
 }
 
 function languageSelect() {
-  return screen.findByRole('combobox', { name: 'Email language' })
+  return screen.findByRole('combobox', { name: 'Language' })
 }
 
 async function chooseLanguage(option: string) {

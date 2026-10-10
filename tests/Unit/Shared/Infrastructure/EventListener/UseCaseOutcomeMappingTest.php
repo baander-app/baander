@@ -8,6 +8,7 @@ use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\Exception\ServiceUnavailableException;
+use App\Shared\Application\Http\RequestLocale;
 use App\Shared\Infrastructure\EventListener\ExceptionSubscriber;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -93,9 +94,8 @@ final class UseCaseOutcomeMappingTest extends TestCase
         $this->assertSame(['error' => ['message' => 'No library has the ID "music".', 'code' => 404]], $this->body($response));
     }
 
-    public function testATranslatableOutcomeFromAHandlerIsReportedInTheTranslatorsLocale(): void
+    public function testATranslatableOutcomeFromAHandlerIsReportedInTheRequestsLanguage(): void
     {
-        $this->translator->setLocale('da');
         $bus = $this->bus(static function (): never {
             throw new class ('A library with the slug "jazz" already exists.', ['reason' => 'slug_exists']) extends ConflictException implements TranslatableInterface {
                 public function trans(TranslatorInterface $translator, ?string $locale = null): string
@@ -105,8 +105,9 @@ final class UseCaseOutcomeMappingTest extends TestCase
             };
         });
 
-        $response = $this->handle($this->dispatching($bus));
+        $response = $this->handle($this->dispatching($bus), 'da');
 
+        $this->assertSame('en', $this->translator->getLocale());
         $this->assertSame(Response::HTTP_CONFLICT, $response->getStatusCode());
         $this->assertSame(
             ['error' => ['message' => 'Et bibliotek med slug "jazz" findes allerede.', 'code' => 409, 'details' => ['reason' => 'slug_exists']]],
@@ -125,8 +126,13 @@ final class UseCaseOutcomeMappingTest extends TestCase
         $this->handle($this->dispatching($bus));
     }
 
-    private function handle(callable $controller): Response
+    private function handle(callable $controller, ?string $language = null): Response
     {
+        $request = Request::create('/api/admin/libraries/music/scan', 'POST');
+        if ($language !== null) {
+            $request->attributes->set(RequestLocale::ATTRIBUTE, $language);
+        }
+
         $events = new EventDispatcher();
         $events->addListener(KernelEvents::EXCEPTION, new ExceptionSubscriber(new NullLogger(), $this->translator));
         $controllers = new class ($controller) implements ControllerResolverInterface {
@@ -149,7 +155,7 @@ final class UseCaseOutcomeMappingTest extends TestCase
         };
 
         return (new HttpKernel($events, $controllers, new RequestStack(), $arguments))
-            ->handle(Request::create('/api/admin/libraries/music/scan', 'POST'), HttpKernelInterface::MAIN_REQUEST, true);
+            ->handle($request, HttpKernelInterface::MAIN_REQUEST, true);
     }
 
     /** A controller that dispatches a message through the bus, as the admin controllers do. */

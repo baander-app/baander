@@ -55,7 +55,7 @@ interface UserLanguageFieldProps {
   disabled: boolean
 }
 
-/** The user's email language: their choice, the server default, or a stored value that is no longer offered. */
+/** The user's language for emails and messages: their choice, the server default, or a stored value that is no longer offered. */
 export function UserLanguageField({
   setting,
   loading,
@@ -74,7 +74,7 @@ export function UserLanguageField({
   if (loading) {
     return (
       <FieldGroup aria-busy="true">
-        <Label id={labelId}>Email language</Label>
+        <Label id={labelId}>Language</Label>
         <SkeletonLine />
       </FieldGroup>
     )
@@ -83,7 +83,7 @@ export function UserLanguageField({
   if (loadFailed || !setting) {
     return (
       <FieldGroup>
-        <Label id={labelId}>Email language</Label>
+        <Label id={labelId}>Language</Label>
         <ErrorRow>
           <ErrorText role="alert">Unable to load the language.</ErrorText>
           <Button type="button" variant="ghost" size="sm" onClick={onRetry}>
@@ -100,7 +100,7 @@ export function UserLanguageField({
 
   return (
     <FieldGroup>
-      <Label id={labelId}>Email language</Label>
+      <Label id={labelId}>Language</Label>
       <Select
         value={selection ?? initialLanguageSelection(setting)}
         onValueChange={onSelect}

@@ -63,8 +63,8 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
           <DialogTitle>{isSuperAdmin ? 'Edit User' : 'User Details'}</DialogTitle>
           <DialogDescription>
             {isSuperAdmin
-              ? `Update name, email and email language for ${user.email}.`
-              : `Name, email and email language of ${user.email}. Only super admins can change them.`}
+              ? `Update name, email and language for ${user.email}.`
+              : `Name, email and language of ${user.email}. Only super admins can change them.`}
           </DialogDescription>
         </DialogHeader>
         {/* The form mounts with the dialog content, so each opening starts from the user's current values. */}

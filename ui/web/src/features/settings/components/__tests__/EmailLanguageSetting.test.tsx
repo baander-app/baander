@@ -19,8 +19,8 @@ const LANGUAGE_DEFINITION: SettingDefinitionResource = {
   key: 'language',
   type: 'enum',
   scope: 'user',
-  label: 'Email language',
-  description: 'The language of the emails Baander sends you.',
+  label: 'Language',
+  description: 'The language of the emails and messages Baander sends you. With no choice, emails use the server default and messages follow your browser.',
   group: 'Account',
   default: null,
   options: [
@@ -108,7 +108,7 @@ function renderSetting() {
 
 async function choose(option: string) {
   const user = userEvent.setup()
-  await user.click(screen.getByRole('combobox', { name: 'Email language' }))
+  await user.click(screen.getByRole('combobox', { name: 'Language' }))
   await user.click(await screen.findByRole('option', { name: option }))
 }
 
@@ -142,16 +142,16 @@ describe('EmailLanguageSetting', () => {
   it('selects the server default, named by its language, when the user has no choice', async () => {
     renderSetting()
 
-    const control = await screen.findByRole('combobox', { name: 'Email language' })
+    const control = await screen.findByRole('combobox', { name: 'Language' })
     expect(control).toHaveTextContent('Server default (Dansk)')
-    expect(screen.getByText('The language of the emails Baander sends you.')).toBeInTheDocument()
+    expect(screen.getByText('The language of the emails and messages Baander sends you. With no choice, emails use the server default and messages follow your browser.')).toBeInTheDocument()
   })
 
   it('lists the server default first, then each language by its native name', async () => {
     const user = userEvent.setup()
     renderSetting()
 
-    await user.click(await screen.findByRole('combobox', { name: 'Email language' }))
+    await user.click(await screen.findByRole('combobox', { name: 'Language' }))
 
     const options = await screen.findAllByRole('option')
     expect(options.map((option) => option.textContent)).toEqual([
@@ -164,7 +164,7 @@ describe('EmailLanguageSetting', () => {
 
   it('saves a chosen language and shows it as selected', async () => {
     renderSetting()
-    await screen.findByRole('combobox', { name: 'Email language' })
+    await screen.findByRole('combobox', { name: 'Language' })
 
     await choose('ไทย')
 
@@ -174,7 +174,7 @@ describe('EmailLanguageSetting', () => {
       url: '/api/user/settings/language',
       body: { value: 'th' },
     })
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Email language' })).toHaveTextContent('ไทย'))
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Language' })).toHaveTextContent('ไทย'))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
@@ -182,7 +182,7 @@ describe('EmailLanguageSetting', () => {
     choice = 'th'
     renderSetting()
 
-    const control = await screen.findByRole('combobox', { name: 'Email language' })
+    const control = await screen.findByRole('combobox', { name: 'Language' })
     expect(control).toHaveTextContent('ไทย')
 
     const user = userEvent.setup()
@@ -193,7 +193,7 @@ describe('EmailLanguageSetting', () => {
   it('resets the choice when the server default is chosen', async () => {
     choice = 'th'
     renderSetting()
-    await screen.findByRole('combobox', { name: 'Email language' })
+    await screen.findByRole('combobox', { name: 'Language' })
 
     await choose('Server default (Dansk)')
 
@@ -203,7 +203,7 @@ describe('EmailLanguageSetting', () => {
       url: '/api/user/settings/language',
       body: undefined,
     })
-    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Email language' })).toHaveTextContent(
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Language' })).toHaveTextContent(
       'Server default (Dansk)',
     ))
   })
@@ -211,12 +211,12 @@ describe('EmailLanguageSetting', () => {
   it('shows a failed save and restores the previous selection', async () => {
     saveFailure = httpError(500, 'The setting could not be saved.')
     renderSetting()
-    await screen.findByRole('combobox', { name: 'Email language' })
+    await screen.findByRole('combobox', { name: 'Language' })
 
     await choose('ไทย')
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not save: The setting could not be saved.')
-    expect(screen.getByRole('combobox', { name: 'Email language' })).toHaveTextContent('Server default (Dansk)')
+    expect(screen.getByRole('combobox', { name: 'Language' })).toHaveTextContent('Server default (Dansk)')
   })
 
   it('shows the violation the server returns for a rejected language', async () => {
@@ -224,12 +224,12 @@ describe('EmailLanguageSetting', () => {
       language: ['The language "th" is not offered.'],
     })
     renderSetting()
-    await screen.findByRole('combobox', { name: 'Email language' })
+    await screen.findByRole('combobox', { name: 'Language' })
 
     await choose('ไทย')
 
     expect(await screen.findByRole('alert')).toHaveTextContent('The language "th" is not offered.')
-    expect(screen.getByRole('combobox', { name: 'Email language' })).toHaveTextContent('Server default (Dansk)')
+    expect(screen.getByRole('combobox', { name: 'Language' })).toHaveTextContent('Server default (Dansk)')
   })
 
   it('shows a load failure with a retry instead of an empty control', async () => {
@@ -237,12 +237,12 @@ describe('EmailLanguageSetting', () => {
     const user = userEvent.setup()
     renderSetting()
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load your email language.')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Unable to load your language.')
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
 
     loadFailure = null
     await user.click(screen.getByRole('button', { name: 'Retry' }))
 
-    expect(await screen.findByRole('combobox', { name: 'Email language' })).toHaveTextContent('Server default (Dansk)')
+    expect(await screen.findByRole('combobox', { name: 'Language' })).toHaveTextContent('Server default (Dansk)')
   })
 })

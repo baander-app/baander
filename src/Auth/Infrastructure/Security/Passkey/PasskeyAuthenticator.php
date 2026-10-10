@@ -8,6 +8,7 @@ use App\Auth\Application\Command\Passkey\AuthenticatePasskeyCommand;
 use App\Auth\Application\DTO\VerifiedPasskeyLogin;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Security\OAuth\DpopTokenRequestVerifier;
+use App\Auth\Infrastructure\Security\AuthenticationFailureMessage;
 use App\Auth\Infrastructure\Security\SecurityUser;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -42,6 +43,7 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
         private readonly DpopTokenRequestVerifier $dpopVerifier,
+        private readonly AuthenticationFailureMessage $failureMessage,
     ) {
     }
 
@@ -134,7 +136,7 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
 
         return new JsonResponse([
             'error' => [
-                'message' => $exception->getMessageKey(),
+                'message' => $this->failureMessage->of($exception, $request),
                 'code' => 'AUTH_INVALID_CREDENTIALS',
             ],
         ], Response::HTTP_UNAUTHORIZED);

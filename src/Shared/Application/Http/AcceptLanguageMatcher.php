@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Auth\Interface\Request;
+namespace App\Shared\Application\Http;
 
 use App\Shared\Domain\Model\Setting\SupportedLanguages;
 
 /**
- * Picks the language a browser ranks highest among those emails can be sent in.
+ * Picks the language a browser ranks highest among those Baander speaks.
  *
  * Request::getPreferredLanguage() is not used because it answers with the first
  * supported language when the browser asks for none of them.
