@@ -23,14 +23,25 @@ plans come next, in this order:
 
 1. [General settings and email language](docs/plans/2026-10-07-1736-feat-general-settings-email-language-plan.md):
    one definition-driven settings mechanism, the per-user email language, and the
-   features behind the existing admin toggles. Delivered on 2026-10-08. Still open:
-   - health alerts run in the worker's scheduler consumer, so they cannot see outages
-     that stop the worker; the recommended fix raises them from the web server's
-     health endpoint
-     ([learning](docs/solutions/architecture-patterns/health-checks-run-in-a-messenger-consumer-cannot-see-outages-that-stop-it.md));
-   - the Swoole runtime checks for credential email at `kernel.terminate` and
-     progressive audio streaming were run by hand; no script under `scripts/` repeats them;
-   - Safari playback of a transcoded rendition that is still encoding is unverified.
+   features behind the existing admin toggles. Delivered on 2026-10-08. The
+   [open-items follow-up](docs/plans/2026-10-10-1312-fix-item1-open-items-plan.md)
+   closed the rest on 2026-10-10.
+
+   Closed on 2026-10-10: the web server raises health alerts, from HTTP worker 0 every
+   60 seconds, so a stopped worker or a sustained Redis or PostgreSQL outage alerts
+   once; a server that starts during an outage alerts once and worker reloads do not
+   repeat an alert; an alert that cannot be delivered while PostgreSQL is down is
+   delivered once it can be, naming the outage window
+   ([learning](docs/solutions/architecture-patterns/health-checks-run-in-a-messenger-consumer-cannot-see-outages-that-stop-it.md)).
+   The worker heartbeat lives in Redis, so the web container reads it, and a worker
+   outage no longer makes the web container unready; the memory check measures each
+   web worker against its memory limit; the worker's five-minute health job is gone.
+   `scripts/test-web-runtime-container.sh` runs the real Swoole server in CI and fails
+   when a credential email misses the user's language or a rendition does not stream
+   while it encodes and answer byte ranges once complete; it also keeps a baseline of
+   the server's answers to Safari's opening requests. Safari playback of a still-encoding
+   rendition is a documented manual check in the
+   [testing guide](docs-book/part-2-developer-guide/testing.md#safari-playback-of-an-encoding-rendition-manual).
 2. [Admin/CLI parity](docs/plans/2026-10-08-1627-feat-admin-cli-parity-plan.md):
    every action on the admin pages has a console command that reaches the same
    Application use case as its controller. `AdminCliParityTest` fails on an admin route
@@ -82,21 +93,30 @@ resource, and soak gates. Regional hosts and the S3 destination remain external
 blockers. Do not mark deployment or restore acceptance complete from local cluster
 tests. React Native and Android remain deferred; Android's device login posts to a
 pairing endpoint that does not exist and needs a decision when that work resumes.
+Not yet fixed: `app:serve` runs its shutdown only on SIGINT, and even then force-stops
+its workers after 5 seconds; SIGTERM does not stop it, so `docker stop` likely kills
+the web container at the end of its grace period instead of draining it. The
+production image also runs PHP's default `memory_limit` of 128M from
+`php.ini-production`, which the new memory check now measures each web worker against.
 
 ## Current quality-gate checkpoint
 
-Last recorded on 2026-10-10, at the end of the ROADMAP item 2 open-items work
-(branch `plan/item2-open-items`), all in the CI image unless noted:
+Last recorded on 2026-10-10, at the end of the ROADMAP item 1 open-items work
+(branch `plan/item1-open-items`), all in the CI image unless noted:
 
-- Unit suite: 5,846 tests pass. Functional: 1,438 tests in 129 shards; Integration:
-  981 tests in 95 shards; no failures.
+- Unit suite: 5,917 tests pass. Functional: 1,439 tests in 129 shards; Integration:
+  982 tests in 95 shards; no failures.
 - PHPStan: no errors on a full scan. Deptrac: 0 violations. Container lint passes.
   The OpenAPI specification check passes in the CI image, and on the host with a
   fresh cache (a stale host test cache reports a false mismatch).
-- Web: 1,842 tests in 173 files pass; typecheck and lint at zero errors (four
-  existing lint warnings).
-- `ui/rn`: the test setup loads; 84 `tsc` errors and 25 Jest failures remain as
-  deferred React Native drift (item 2); no CI job runs `ui/rn` yet.
+- Runtime drills: the worker drill and the new web drill pass.
+- Web: unchanged since the item 2 checkpoint (1,842 tests in 173 files; typecheck
+  and lint at zero errors, four existing lint warnings).
+- `ui/rn` is deferred indefinitely (84 `tsc` errors and 25 Jest failures); no CI
+  job runs it.
+
+The item 2 checkpoint, earlier on 2026-10-10: unit 5,846; functional 1,438;
+integration 981; web 1,842; PHPStan clean; Deptrac 0.
 
 The previous checkpoint, on 2026-10-09 at `master` `f40085e9`: unit 5,799;
 functional 1,422; integration 959; web 1,836 with typecheck and lint at zero

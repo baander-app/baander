@@ -945,8 +945,6 @@ deptrac:
     'Shared Domain': ~
     'Shared Application':
       - 'Shared Domain'
-      # CheckHealthCommand is schedulable; the contract layer itself depends on nothing.
-      - 'Scheduler Schedulable Contract'
     'Shared Infrastructure':
       - 'Shared Domain'
       - 'Shared Application'

@@ -157,15 +157,21 @@ Two [server settings](configuration.md#server-settings) switch parts of notifica
 | Setting | Default | While it is off |
 |---------|---------|-----------------|
 | `notifications.push_enabled` | `true` | No browser push is sent. The notification is still created and delivered in the app and by any other channel, and each skipped push is logged. |
-| `notifications.admin_alerts` | `true` | A health check that stops reporting healthy no longer alerts administrators; the degradation is still logged. Other admin alerts, such as new user registrations, are always sent. |
+| `notifications.admin_alerts` | `true` | A component that turns unhealthy no longer alerts administrators; the degradation is still logged. Other admin alerts, such as new user registrations, are always sent. |
 
 ### Health alerts
 
-A scheduled job, **Check system health**, runs the health checks every five minutes. A fresh install creates it, and you can reschedule or pause it in the scheduler admin. While it is paused, no health alert is sent, whatever `notifications.admin_alerts` says.
+The web server raises health alerts. One of its HTTP workers (worker 0) runs the [health checks](monitoring.md#what-is-checked) every 60 seconds: PostgreSQL, Redis, the background worker, the Swoole server and the memory of the server's workers. `HEALTH_MONITOR_INTERVAL_SECONDS` sets the interval. The first check runs one interval after the server starts, so services that start alongside it do not alert.
 
-The job runs in the worker, which keeps each component's status from the previous check in memory. A component alerts once when it stops reporting healthy and alerts again only after it has reported healthy in between. The first check after the worker starts records the statuses without alerting.
+Each outage alerts once. A component alerts when its check reads unhealthy, and alerts again only after it has read healthy in between. A check that reads not available neither alerts nor ends an outage. Recovery is logged; no notification is sent for it.
 
-The job sees the components from the worker; it does not check the web server. An outage that keeps the worker from running the job, such as a stopped worker or an unreachable PostgreSQL or Redis, also prevents the alert. Use the [health endpoints](monitoring.md#health-checks) to detect those.
+The server keeps each component's alert state for as long as it runs. A component that is already unhealthy when the server starts alerts once, at the first check. A reload of the server's workers keeps the state, so it does not repeat an alert.
+
+An alert is a notification row in PostgreSQL, so it cannot be delivered while PostgreSQL is down. The server logs the alerts it owes and delivers them at the first check that can deliver them, including the alert for the PostgreSQL outage itself. An alert for an outage that ended before it could be delivered names the outage window: when the component turned unhealthy and when it recovered. A delivery that fails for another reason is logged and retried at the next check. With `notifications.admin_alerts` off, an outage is logged and no alert is sent, also when the setting is turned off during the outage.
+
+The background worker writes a heartbeat to Redis, and the web server judges it by age. An idle worker renews it about every 10 seconds and reads unhealthy after 45 seconds without a renewal. A worker that is handling a message renews it every 30 seconds and reads unhealthy after 90 seconds. A handler blocked in a single call for longer than that cannot renew it, so the worker reads unhealthy until the call returns. A heartbeat that disappears also reads unhealthy. A heartbeat that says the worker stopped reads not available for 45 seconds and unhealthy after that, so a worker that restarts itself at its memory limit has time to report in again before it would alert. Until the server has seen a heartbeat, the worker check reads not available, so a development stack without a worker does not alert. While Redis is unreachable the worker check reads not available too, and the Redis check carries the alert.
+
+Baander assumes one web server and one background worker per deployment. Two web servers would each send every alert, and two workers share one heartbeat, so a live worker hides a dead one. The web server cannot report its own outage; watch it from outside with the [health endpoints](monitoring.md#health-checks).
 
 ## Scope
 

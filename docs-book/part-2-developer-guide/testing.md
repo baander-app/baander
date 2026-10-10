@@ -530,10 +530,11 @@ DAMA-wrapped functional tests.
 
 ```bash
 bash scripts/test-container-startup.sh
-timeout 180 bash scripts/test-worker-runtime-container.sh
+timeout 300 bash scripts/test-worker-runtime-container.sh
 bash scripts/test-worker-command-container.sh
 bash scripts/test-outbox-runtime-container.sh
 bash scripts/test-producer-runtime-container.sh
+bash scripts/test-web-runtime-container.sh
 ```
 
 These run the production kernel and actual repositories against disposable
@@ -550,11 +551,72 @@ user creation, registration tokens/preferences, email verification token retenti
 and recovery after an ORM flush closes the entity manager. This is coverage of
 three auth producers, not every event producer or a whole-schema audit.
 
+The web drill starts the real Swoole server (`app:serve`) in the production
+environment, with Mailpit receiving its mail. It fails unless a password-reset
+email for a user whose saved language is Danish arrives in Danish, an in-progress
+rendition streams with `Accept-Ranges: none` and grows as it is written, and the
+server's own encode of a generated track answers `Range: bytes=100-199` with 206
+once complete. It also replays Safari's opening requests (`bytes=0-1`, then
+`bytes=0-65535`) against an in-progress rendition and compares the answers with
+`tests/Fixtures/WebRuntime/safari-in-progress.txt`. For the in-progress cases the
+fixture holds the rendition's encoder lock and writes its partial file itself, so
+encode speed cannot change the answers. A different answer fails the drill with a
+diff; when the change is intended, update the baseline in the same commit. The
+baseline records what the server answers, not whether Safari plays it.
+
+The drill then checks health alerts, with the monitor checking every 2 seconds
+(`HEALTH_MONITOR_INTERVAL_SECONDS=2`). It stops PostgreSQL, reloads the server's
+workers during the outage through the swoole bundle's API server
+(`PATCH http://127.0.0.1:9200/api/server`), and starts PostgreSQL again. It fails
+unless the admin and the super-admin each receive exactly one PostgreSQL alert,
+delivered after PostgreSQL returns and naming an outage that began before the
+reload, and no second alert arrives in the next three checks.
+
 Fixtures under `tests/Fixtures/` prepare and observe only those disposable
 databases. Do not invoke them against an application database. The runtime runners
 accept `BAANDER_TEST_IMAGE` and `BAANDER_TEST_POSTGRES_IMAGE`; CI sets
 `BAANDER_TEST_CHECKOUT_IN_IMAGE=1` to test the checkout already built into its image.
-Outbox and producer runners also enforce their own 180-second timeout.
+Outbox, producer and web runners also enforce their own 180-second timeout.
+
+### Safari Playback of an Encoding Rendition (Manual)
+
+The web drill records the server's answers to Safari's opening requests as a
+baseline; it does not show whether Safari plays them. While a rendition is still
+encoding, the server answers Safari's byte-range probe with `200`,
+`Accept-Ranges: none` and the whole body as it grows. Whether Safari plays that
+stream is checked by hand, on macOS and on iOS.
+
+Prepare:
+
+1. Record the macOS version and its Safari version, and the iOS version and its
+   Safari version.
+2. Turn `transcode.enabled` on and pick a track whose original file Safari cannot
+   play. The player then falls back to a transcoded stream; in Web Inspector's
+   network tab the stream request carries `format=`.
+3. The web client asks for the first of `opus`, `aac` and `mp3` that Safari's
+   `canPlayType()` accepts. Record which format it chose. To check a format it did
+   not choose, start the stream from Web Inspector's console on the Baander tab,
+   for example `a = new Audio('/api/stream/track?id=<publicId>&format=aac'); a.play()`;
+   the page's service worker signs that request as it does the player's.
+4. Make sure the rendition is not cached: use a track that has not been streamed
+   in that format, or remove the track's directory under
+   `CONVERT_STORAGE_PATH/audio-renditions/`. The first request then starts the
+   encode and streams it while FFmpeg writes it.
+
+For each format:
+
+1. Start playback. Seeking is not expected to work while the rendition encodes.
+2. Keep it playing until the encode has finished. A new request for the same URL
+   answers with `Accept-Ranges: bytes` once it has.
+3. Seek forward and back: with the player's position bar, or with
+   `a.currentTime = <seconds>` for a stream started from the console.
+4. Record whether playback started, whether it kept playing past the end of the
+   encode, and whether the seek landed.
+
+If, for any recorded Safari version and format, playback does not start, stops
+early, or cannot seek after the encode has finished, open the deferred follow-up
+from the [item 1 open-items plan](../../docs/plans/2026-10-10-1312-fix-item1-open-items-plan.md):
+change the in-progress rendition's answer to Safari's byte-range probe.
 
 ### Example: Functional Test (Full Pattern)
 

@@ -81,7 +81,7 @@ Every `monolog.logger.*` channel is pooled (the bundle's `MonologProcessor` prox
 them), and so are the EntityManager and services tagged `kernel.reset`. The app's own
 Redis pool (`RedisClientFactory::borrow()`) gives its connection back by itself.
 
-Timer callbacks in `src/` as of 2026-10-09:
+Timer callbacks in `src/` as of 2026-10-10:
 
 | Callback | Pooled services | Release |
 |---|---|---|
@@ -90,9 +90,12 @@ Timer callbacks in `src/` as of 2026-10-09:
 | `src/Transcode/Infrastructure/Swoole/SwooleLoopLockRenewalTimer.php` (loop lock renewal for `TranscodeSessionSubscriber`) | Renews the Redis lock through `RedisClientFactory::borrow()`. On lost ownership it stops the encoder, and both the subscriber and `TranscodeStreamManager` log through pooled loggers. | Each tick calls `CoWrapper::defer()` (optional `?CoWrapper`, autowired). |
 | `src/Shared/Infrastructure/Swoole/SwooleWorkerEventSubscriber.php:70` | Shutdown force-kill; uses `printf` and `posix_kill` only. | None needed. |
 | `src/Shared/Infrastructure/Swoole/ProcessPool/CpuProcessPool.php` (pool health check, master process) | Reaps exited pool workers and logs through the pooled `monolog.logger` when one exited. | Each tick calls `CoWrapper::defer()` (optional `?CoWrapper`, autowired). |
+| `src/Shared/Infrastructure/Health/HealthMonitorSubscriber.php` (health monitor, HTTP worker 0) | Runs the health checks and delivers admin alerts: the database connection, the entity manager and the pooled logger. | Each tick calls `CoWrapper::defer()` (optional `?CoWrapper`, autowired). |
+| `src/Shared/Infrastructure/Swoole/WorkerMemoryReporter.php` (memory report, every HTTP worker) | None by design. It writes `memory_get_usage(true)` into `WorkerMemoryTable` and reports problems with `error_log()` only. | None needed; its docblock says so. |
 
-Probe tests that fail without the release: `SwooleLoopLockRenewalTimerTest` and
-`CpuProcessPoolHealthTest::testEachHealthCheckTickReleasesThePooledServicesItsCoroutineTook`.
+Probe tests that fail without the release: `SwooleLoopLockRenewalTimerTest`,
+`CpuProcessPoolHealthTest::testEachHealthCheckTickReleasesThePooledServicesItsCoroutineTook`
+and `HealthMonitorTimerProbeTest::testEachTickReleasesThePooledServicesItsCoroutineTook`.
 
 ## Related Issues
 

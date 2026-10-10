@@ -78,11 +78,15 @@ Retry metadata retains completed handler names so a retry skips handlers that
 already succeeded. External delivery still requires consumer idempotency.
 
 Each app container runs one Supervisor-managed `async` consumer. Its Redis
-consumer name includes the container hostname. `/health`, `/ready`, and
-`app:health:check` require a live local consumer: an idle heartbeat expires after
-45 seconds, while an active job has the transport's 3,600-second lease window.
-Readiness also checks the Linux process start identity, so a killed process or
-reused PID cannot keep an old heartbeat healthy. `/live` remains process liveness.
+consumer name includes the container hostname. The consumer writes its heartbeat
+to a Redis key, which the web container reads. An idle consumer renews it about
+every 10 seconds and a consumer handling a job every 30 seconds; the worker reads
+unhealthy when its heartbeat is older than 45 seconds while idle or 90 seconds
+while busy. `/health` and `app:health:check` list the worker and the memory
+check, but `/ready`, the `/health` status code and the command's exit status leave
+both out, so a worker outage or a web server worker near its memory limit does not
+make the web container unready or unhealthy. The web server alerts administrators
+instead. `/live` remains process liveness.
 
 The Messenger health details report `lastDeliveryQueueAgeSeconds` and
 `lastDeliveryAt`. These describe the last dequeued message, not the oldest waiting
@@ -128,11 +132,15 @@ Redis delivery, retry, failure-stream, and PostgreSQL lease tests with
 dependencies and Docker. The messaging script creates disposable services on its
 own network; it does not use the application's database or Redis instance.
 
-The production consumer startup and recovery drill is
-`bash scripts/test-worker-runtime-container.sh`. It runs the application's actual
-consumer command against disposable PostgreSQL and Redis services, verifies job
-completion, kills the worker, verifies Supervisor recovery, and checks shutdown
-readiness. CI runs the drill against the image it just built.
+The consumer recovery drill is `bash scripts/test-worker-runtime-container.sh`.
+It runs the application's actual consumer command under a historical Supervisor
+fixture against disposable PostgreSQL and Redis services and verifies job
+completion. It then kills the consumer in the middle of a job and checks that its
+heartbeat reads unhealthy once the 90-second busy window has passed. The fixture
+turns automatic restart off, because a replacement would renew the heartbeat
+first, so the drill restarts the consumer with `supervisorctl`. It checks that the
+replacement completes the unacknowledged job and that a stopped worker no longer
+reads healthy. CI runs the drill against the image it just built.
 
 Run `bash scripts/test-outbox-runtime-container.sh` for the production outbox
 drill. It uses real ORM repositories, PostgreSQL, and Redis to check live capture,

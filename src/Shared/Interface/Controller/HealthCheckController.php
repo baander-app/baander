@@ -22,7 +22,7 @@ final class HealthCheckController
 
     #[OA\Get(
         path: '/health',
-        description: 'Returns the health status of all system components (PostgreSQL, Redis, Swoole, memory). Used for Docker HEALTHCHECK and orchestration.',
+        description: 'Returns the health status of all system components (PostgreSQL, Redis, the background worker, Swoole, memory). A missing worker heartbeat reports the worker as not available until a worker has reported in. The background worker and memory are listed but do not decide the status code: either can read unhealthy while the endpoint answers 200.',
         summary: 'Health check endpoint',
         responses: [
             new OA\Response(
@@ -59,7 +59,7 @@ final class HealthCheckController
 
     #[OA\Get(
         path: '/ready',
-        description: 'Kubernetes readiness probe. Checks dependency availability (PostgreSQL, Redis, memory). Returns 503 if any dependency is unreachable.',
+        description: 'Kubernetes readiness probe. Checks dependency availability (PostgreSQL, Redis). Returns 503 if any dependency is unreachable. The background worker and memory are not dependencies: a worker outage or a web server worker near its memory limit does not make the web container unready.',
         summary: 'Readiness probe',
         responses: [
             new OA\Response(
@@ -131,9 +131,10 @@ final class HealthCheckController
      */
     private function buildResponse(array $results, string $okStatus = 'healthy', string $failStatus = 'unhealthy'): JsonResponse
     {
+        // The worker and memory are listed, but neither makes this container unhealthy.
         $healthy = true;
         foreach ($results as $result) {
-            if ($result->status === HealthStatus::Unhealthy) {
+            if ($result->status === HealthStatus::Unhealthy && HealthCheckService::affectsContainerHealth($result)) {
                 $healthy = false;
                 break;
             }

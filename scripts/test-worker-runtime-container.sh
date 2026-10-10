@@ -61,6 +61,15 @@ for section in config.sections():
     for option in ("command", "directory"):
         if config.has_option(section, option):
             config.set(section, option, config.get(section, option).replace("/var/www/html", sys.argv[1]))
+# The drill restarts the killed consumer itself, after the heartbeat it left behind goes stale;
+# an automatic replacement would renew the heartbeat first.
+config.set("program:messenger-worker", "autorestart", "false")
+config.add_section("unix_http_server")
+config.set("unix_http_server", "file", "/tmp/worker-supervisord.sock")
+config.add_section("supervisorctl")
+config.set("supervisorctl", "serverurl", "unix:///tmp/worker-supervisord.sock")
+config.add_section("rpcinterface:supervisor")
+config.set("rpcinterface:supervisor", "supervisor.rpcinterface_factory", "supervisor.rpcinterface:make_main_rpcinterface")
 with open("/tmp/worker-supervisord.conf", "w") as output:
     config.write(output)
 PY
@@ -68,16 +77,18 @@ PY
             supervisor_pid=$!
             trap "kill -TERM $supervisor_pid 2>/dev/null || true; wait $supervisor_pid || true" EXIT
             await_check() {
-                for attempt in $(seq 1 30); do
+                seconds=$1
+                shift
+                for attempt in $(seq 1 "$seconds"); do
                     if php tests/Fixtures/messaging-runtime.php "$@"; then return 0; fi
                     sleep 1
                 done
                 cat /tmp/worker-supervisord.log >&2
                 return 1
             }
-            await_check ready
+            await_check 30 ready
             php tests/Fixtures/messaging-runtime.php send
-            await_check handled 1
+            await_check 30 handled 1
             # Hold the real handler in a database operation, then kill it before ack.
             php tests/Fixtures/messaging-runtime.php hold-lock &
             lock_pid=$!
@@ -87,18 +98,24 @@ PY
             done
             test -f /tmp/baander-worker-test-lock-held
             php tests/Fixtures/messaging-runtime.php send
-            await_check busy
-            original_pid=$(php -r '\''echo json_decode(file_get_contents("/tmp/baander-messenger-async.json"), true)["pid"];'\'')
+            await_check 30 busy
+            original_pid=$(php tests/Fixtures/messaging-runtime.php consumer-pid)
             kill -KILL "$original_pid"
-            if php tests/Fixtures/messaging-runtime.php ready; then
-                echo "Killed worker incorrectly reported ready" >&2; exit 1
+            killed_at=$(date +%s)
+            # A killed consumer leaves a busy heartbeat; it reads unhealthy once the 90-second
+            # busy window has passed. The heartbeat carries no PID that could reveal the death sooner.
+            await_check 100 unhealthy
+            stale_after=$(( $(date +%s) - killed_at ))
+            if [ "$stale_after" -gt 95 ]; then
+                echo "Killed worker read healthy for $stale_after s, beyond the busy window" >&2; exit 1
             fi
+            supervisorctl -c /tmp/worker-supervisord.conf start "messenger-worker:*"
+            await_check 30 ready
             touch /tmp/baander-worker-test-release-lock
             wait "$lock_pid"
-            await_check ready
-            replacement_pid=$(php -r '\''echo json_decode(file_get_contents("/tmp/baander-messenger-async.json"), true)["pid"];'\'')
+            replacement_pid=$(php tests/Fixtures/messaging-runtime.php consumer-pid)
             test "$original_pid" != "$replacement_pid"
-            await_check handled 2
+            await_check 30 handled 2
             php tests/Fixtures/messaging-runtime.php one-row-per-job 2
             kill -TERM "$supervisor_pid"
             wait "$supervisor_pid"
@@ -106,5 +123,10 @@ PY
             if php tests/Fixtures/messaging-runtime.php ready; then
                 echo "Stopped worker incorrectly reported ready" >&2; exit 1
             fi
-            echo "Supervisor consumed jobs, recovered unacknowledged work after SIGKILL, and stopped cleanly."
+            # A clean stop writes a stopped heartbeat, which reads not available until the
+            # idle window passes, so a routine recycle does not alert.
+            if ! php tests/Fixtures/messaging-runtime.php stopped; then
+                echo "Stopped worker did not read not available with a stopped heartbeat" >&2; exit 1
+            fi
+            echo "Supervisor consumed jobs, the killed consumer read unhealthy after $stale_after s, its replacement recovered the unacknowledged work, and it stopped cleanly."
         '

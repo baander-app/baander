@@ -10,6 +10,9 @@ parameters:
     swoole_bundle.cache_dir: '%kernel.cache_dir%/swoole_bundle'
     app.swoole.dbal.ping_interval: 10
     app.swoole.dbal.check_active_transactions: true
+    # Seconds between health monitor checks; the web runtime script shortens it.
+    env(HEALTH_MONITOR_INTERVAL_SECONDS): '60'
+    app.health_monitor.interval_seconds: '%env(int:HEALTH_MONITOR_INTERVAL_SECONDS)%'
     app.websocket.allowed_origins: [ ]
     notification.push.allowed_domains:
         - fcm.googleapis.com
@@ -260,6 +263,17 @@ services:
                 Discogs: '%env(DISCOGS_TOKEN)%'
                 Last.fm: '%env(LASTFM_API_KEY)%'
                 Spotify: '%env(SPOTIFY_CLIENT_ID)%'
+
+    # Health monitor: a timer in HTTP worker 0 alerts admins once per outage. The
+    # alert state and the worker heartbeat sighting live in a boot-time table.
+    App\Shared\Infrastructure\Health\HealthMonitorSubscriber:
+        arguments:
+            $intervalSeconds: '%app.health_monitor.interval_seconds%'
+
+    # The table is the sighting; outside the server (worker, console) it is not
+    # booted and keeps the sighting in process memory.
+    App\Shared\Infrastructure\Health\WorkerHeartbeatSightingInterface:
+        alias: App\Shared\Infrastructure\Health\HealthAlertTable
 
     App\Shared\Interface\Controller\ConfigCheckController:
         arguments:
@@ -1174,8 +1188,6 @@ services:
         alias: App\UserPreference\Infrastructure\UserSettingsContract
     App\Shared\Application\Port\AdminAlertPortInterface:
         alias: App\Shared\Infrastructure\Event\AdminAlertService
-    App\Shared\Application\Port\HealthAlertPortInterface:
-        alias: App\Shared\Infrastructure\Health\HealthAlertService
 
     App\Shared\Application\Port\TransactionPortInterface:
         alias: App\Shared\Infrastructure\Doctrine\DoctrineTransaction
