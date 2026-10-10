@@ -22,7 +22,9 @@ use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInt
  * ranks highest, else English. The server default language is for emails only.
  *
  * It runs once the firewall (priority 8) has authenticated the request, and again on
- * kernel.exception for a request the firewall refused before this listener ran.
+ * kernel.exception for a request the firewall refused before this listener ran. It stores
+ * a resolver that RequestLocale::of() calls, so only a request that translates a message
+ * reads the saved choice; streaming and other successful requests skip that query.
  */
 final readonly class ApiLanguageListener
 {
@@ -40,7 +42,7 @@ final readonly class ApiLanguageListener
     public function onRequest(RequestEvent $event): void
     {
         if ($event->isMainRequest()) {
-            $this->resolve($event->getRequest(), $this->savedChoice());
+            $this->storeResolver($event->getRequest());
         }
     }
 
@@ -49,37 +51,45 @@ final readonly class ApiLanguageListener
     public function onException(ExceptionEvent $event): void
     {
         $request = $event->getRequest();
-        if ($request->attributes->has(RequestLocale::ATTRIBUTE)) {
-            return;
+        if (!$request->attributes->has(RequestLocale::ATTRIBUTE)) {
+            $this->storeResolver($request);
         }
-
-        try {
-            $savedChoice = $this->savedChoice();
-        } catch (\Throwable) {
-            // The exception being handled may be this same read failing; an error listener must not throw.
-            $savedChoice = null;
-        }
-
-        $this->resolve($request, $savedChoice);
     }
 
-    private function resolve(Request $request, ?string $savedChoice): void
+    /**
+     * Captures the signed-in user and Accept-Language now, and reads the saved choice on
+     * the first call only. The closure holds neither the request nor the token.
+     */
+    private function storeResolver(Request $request): void
     {
+        $user = $this->tokens->getToken()?->getUser();
+        $userId = $user instanceof AuthenticatedUserIdentityInterface ? $user->getId() : null;
+        $acceptLanguage = $request->headers->get('Accept-Language');
+        $language = null;
+
         $request->attributes->set(
             RequestLocale::ATTRIBUTE,
-            $savedChoice ?? $this->acceptLanguage->match($request->headers->get('Accept-Language')) ?? SupportedLanguages::FALLBACK,
+            function () use ($userId, $acceptLanguage, &$language): string {
+                return $language ??= $this->savedChoice($userId)
+                    ?? $this->acceptLanguage->match($acceptLanguage)
+                    ?? SupportedLanguages::FALLBACK;
+            },
         );
     }
 
-    /** The language the signed-in user chose, while it is still offered. */
-    private function savedChoice(): ?string
+    /** The language the user chose, while it is still offered. */
+    private function savedChoice(?string $userId): ?string
     {
-        $user = $this->tokens->getToken()?->getUser();
-        if (!$user instanceof AuthenticatedUserIdentityInterface) {
+        if ($userId === null) {
             return null;
         }
 
-        $language = $this->settings->setting($user->getId(), self::LANGUAGE_SETTING);
+        try {
+            $language = $this->settings->setting($userId, self::LANGUAGE_SETTING);
+        } catch (\Throwable) {
+            // An error listener may be translating the failure of this same read; it must not throw.
+            return null;
+        }
 
         return $language->source === 'user' && $language->storedValueValid && is_string($language->storedValue)
             ? $language->storedValue

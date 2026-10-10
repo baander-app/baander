@@ -13,7 +13,7 @@ use OpenApi\Attributes as OA;
     schema: 'FileDeletionPreviewResource',
     properties: [
         new OA\Property(property: 'allowed', description: 'The delete with files would go ahead', type: 'boolean'),
-        new OA\Property(property: 'scanInProgress', description: 'A scan or another delete with files holds the library, which refuses the delete', type: 'boolean'),
+        new OA\Property(property: 'libraryBusy', description: 'A scan or another delete with files holds the library, which refuses the delete', type: 'boolean'),
         new OA\Property(property: 'files', type: 'array', items: new OA\Items(properties: [
             new OA\Property(property: 'path', type: 'string'),
             new OA\Property(property: 'verdict', type: 'string', enum: ['deletable', 'missing', 'outside_root', 'directory_not_writable']),
@@ -24,7 +24,7 @@ use OpenApi\Attributes as OA;
 final class FileDeletionPreviewResource extends AbstractResource
 {
     /**
-     * @return array{allowed: bool, scanInProgress: bool, files: list<array{path: string, verdict: string, directory: string|null}>}
+     * @return array{allowed: bool, libraryBusy: bool, files: list<array{path: string, verdict: string, directory: string|null}>}
      */
     public static function from(mixed $source): array
     {
@@ -32,7 +32,7 @@ final class FileDeletionPreviewResource extends AbstractResource
 
         return [
             'allowed' => $source->allowed,
-            'scanInProgress' => $source->scanInProgress,
+            'libraryBusy' => $source->libraryBusy,
             'files' => $source->files,
         ];
     }

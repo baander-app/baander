@@ -18,12 +18,12 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\SearchOptions;
 use App\Shared\Domain\Model\SearchResult;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Doctrine\Repository\RefreshedEntityTrait;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Infrastructure\Doctrine\Repository\PgroongaSearchTrait;
 use App\Shared\Infrastructure\Pagination\CursorCodec;
 use App\Shared\Infrastructure\Pagination\CursorPaginator;
 use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\Query;
 use Doctrine\ORM\NoResultException;
 use Doctrine\ORM\NonUniqueResultException;
 
@@ -33,6 +33,7 @@ use Doctrine\ORM\NonUniqueResultException;
 final class SongRepository implements SongRepositoryInterface
 {
     use PgroongaSearchTrait;
+    use RefreshedEntityTrait;
 
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
@@ -143,18 +144,9 @@ final class SongRepository implements SongRepositoryInterface
 
     public function findFreshByUuid(Uuid $uuid): ?Song
     {
-        // find() answers from the identity map; the refresh hint overwrites a managed entity
-        // with the stored row instead.
-        $entity = $this->entityManager
-            ->getRepository(SongEntity::class)
-            ->createQueryBuilder('fresh')
-            ->where('fresh.id = :id')
-            ->setParameter('id', $uuid)
-            ->getQuery()
-            ->setHint(Query::HINT_REFRESH, true)
-            ->getOneOrNullResult();
+        $entity = $this->findRefreshedEntity($this->entityManager, SongEntity::class, $uuid);
 
-        return $entity instanceof SongEntity ? $this->toDomain($entity) : null;
+        return $entity === null ? null : $this->toDomain($entity);
     }
 
     public function findByPublicId(PublicId $publicId): ?Song

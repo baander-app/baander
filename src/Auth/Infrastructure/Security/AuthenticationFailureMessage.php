@@ -16,12 +16,18 @@ use Symfony\Contracts\Translation\TranslatorInterface;
  */
 final readonly class AuthenticationFailureMessage
 {
-    /** The messages Baander's authenticators fail with, and their keys in the auth domain. */
+    /** The messages Baander's authenticators fail with; of() looks them up in KEYS. */
+    public const string INVALID_CREDENTIALS = 'Invalid credentials.';
+    public const string ACCOUNT_DISABLED = 'This account has been disabled.';
+    public const string TOTP_REQUIRED = 'TOTP code is required.';
+    public const string INVALID_TOKEN = 'Invalid or expired token.';
+
+    /** Each authenticator message's key in the auth domain. */
     private const array KEYS = [
-        'Invalid credentials.' => 'errors.invalid_credentials',
-        'This account has been disabled.' => 'errors.account_disabled',
-        'TOTP code is required.' => 'errors.totp_required',
-        'Invalid or expired token.' => 'errors.invalid_token',
+        self::INVALID_CREDENTIALS => 'errors.invalid_credentials',
+        self::ACCOUNT_DISABLED => 'errors.account_disabled',
+        self::TOTP_REQUIRED => 'errors.totp_required',
+        self::INVALID_TOKEN => 'errors.invalid_token',
     ];
 
     public function __construct(

@@ -68,7 +68,7 @@ final class OAuth2Authenticator extends AbstractAuthenticator
         } catch (OAuthServerException $exception) {
             $this->logger->debug('OAuth2 authentication failed.', ['exception' => $exception]);
             throw new CustomUserMessageAuthenticationException(
-                'Invalid or expired token.',
+                AuthenticationFailureMessage::INVALID_TOKEN,
                 ['error_code' => 'AUTH_INVALID_TOKEN'],
             );
         }
@@ -80,7 +80,7 @@ final class OAuth2Authenticator extends AbstractAuthenticator
 
         if ($userIdentifier === null || $userIdentifier === '') {
             throw new CustomUserMessageAuthenticationException(
-                'Invalid or expired token.',
+                AuthenticationFailureMessage::INVALID_TOKEN,
                 ['error_code' => 'AUTH_INVALID_TOKEN'],
             );
         }
@@ -102,7 +102,7 @@ final class OAuth2Authenticator extends AbstractAuthenticator
                 if ($user === null) {
                     $this->logger->warning('OAuth2 authenticated user not found in database.', ['uuid' => $uuid]);
                     throw new CustomUserMessageAuthenticationException(
-                        'Invalid or expired token.',
+                        AuthenticationFailureMessage::INVALID_TOKEN,
                         ['error_code' => 'AUTH_INVALID_TOKEN'],
                     );
                 }
@@ -112,7 +112,7 @@ final class OAuth2Authenticator extends AbstractAuthenticator
                 if ($user->isDisabled()) {
                     $this->logger->info('OAuth2 token of a disabled account refused.', ['uuid' => $uuid]);
                     throw new CustomUserMessageAuthenticationException(
-                        'Invalid or expired token.',
+                        AuthenticationFailureMessage::INVALID_TOKEN,
                         ['error_code' => 'AUTH_INVALID_TOKEN'],
                     );
                 }
@@ -160,7 +160,7 @@ final class OAuth2Authenticator extends AbstractAuthenticator
             ]);
 
             throw new CustomUserMessageAuthenticationException(
-                'Invalid or expired token.',
+                AuthenticationFailureMessage::INVALID_TOKEN,
                 ['error_code' => 'AUTH_INVALID_TOKEN'],
             );
         }
@@ -177,7 +177,7 @@ final class OAuth2Authenticator extends AbstractAuthenticator
             ]);
 
             throw new CustomUserMessageAuthenticationException(
-                'Invalid or expired token.',
+                AuthenticationFailureMessage::INVALID_TOKEN,
                 ['error_code' => 'AUTH_INVALID_TOKEN'],
             );
         }

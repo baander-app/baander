@@ -21,7 +21,7 @@ final readonly class FileDeletionPreview
      */
     public function __construct(
         public bool $allowed,
-        public bool $scanInProgress,
+        public bool $libraryBusy,
         public array $files,
     ) {
     }

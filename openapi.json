@@ -23407,7 +23407,7 @@
             "FileDeletionPreviewResource": {
                 "required": [
                     "allowed",
-                    "scanInProgress",
+                    "libraryBusy",
                     "files"
                 ],
                 "properties": {
@@ -23415,7 +23415,7 @@
                         "description": "The delete with files would go ahead",
                         "type": "boolean"
                     },
-                    "scanInProgress": {
+                    "libraryBusy": {
                         "description": "A scan or another delete with files holds the library, which refuses the delete",
                         "type": "boolean"
                     },

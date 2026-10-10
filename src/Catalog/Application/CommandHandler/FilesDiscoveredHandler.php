@@ -373,7 +373,9 @@ final class FilesDiscoveredHandler
             'paths' => $missing,
         ]);
 
-        return array_values(array_filter($files, static fn (DiscoveredFile $file): bool => !in_array($file->absolutePath, $missing, true)));
+        $missingByPath = array_flip($missing);
+
+        return array_values(array_filter($files, static fn (DiscoveredFile $file): bool => !isset($missingByPath[$file->absolutePath])));
     }
 
     private function detectMimeType(string $extension): string

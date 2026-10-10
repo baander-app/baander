@@ -61,28 +61,28 @@ final class PasswordAuthenticator extends AbstractAuthenticator
                 fieldValue: (string) $data['username'],
                 userAgent: $request->headers->get('User-Agent', 'unknown'),
             ));
-            throw new BadCredentialsException('Invalid credentials.');
+            throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
         }
 
         if ($email === '' || $password === '') {
-            throw new BadCredentialsException('Invalid credentials.');
+            throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
         }
 
         $user = $this->userRepository->findByEmail(new Email($email));
 
         if ($user === null) {
             $this->logger->debug('Password authentication failed: user not found.', ['email' => $email]);
-            throw new BadCredentialsException('Invalid credentials.');
+            throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
         }
 
         if ($user->isDisabled()) {
             $this->logger->debug('Password authentication failed: user is disabled.', ['email' => $email]);
-            throw new CustomUserMessageAuthenticationException('This account has been disabled.');
+            throw new CustomUserMessageAuthenticationException(AuthenticationFailureMessage::ACCOUNT_DISABLED);
         }
 
         if (!$this->passwordHasher->verify($password, $user->getPassword())) {
             $this->logger->debug('Password authentication failed: invalid password.', ['email' => $email]);
-            throw new BadCredentialsException('Invalid credentials.');
+            throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
         }
 
         $totpSecret = $user->getTotpSecret();
@@ -90,14 +90,14 @@ final class PasswordAuthenticator extends AbstractAuthenticator
         if ($totpSecret !== null && $totpSecret !== '') {
             if ($totpCode === null) {
                 throw new CustomUserMessageAuthenticationException(
-                    'TOTP code is required.',
+                    AuthenticationFailureMessage::TOTP_REQUIRED,
                     ['totp_required' => true, 'error_code' => 'AUTH_TOTP_REQUIRED'],
                 );
             }
 
             if (!$this->totpService->verifyCode($totpSecret, $totpCode)) {
                 $this->logger->debug('Password authentication failed: invalid TOTP code.', ['email' => $email]);
-                throw new BadCredentialsException('Invalid credentials.');
+                throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
             }
         }
 

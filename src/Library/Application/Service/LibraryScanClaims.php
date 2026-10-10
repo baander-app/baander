@@ -59,7 +59,7 @@ final readonly class LibraryScanClaims
     {
         $library = $this->lookup->byIdentifier($identifier);
         $claimId = new Uuid();
-        self::claimed($library, $this->libraries->claimScan($library->getId(), $claimId, $this->leaseSeconds));
+        self::ensureClaimed($library, $this->libraries->claimScan($library->getId(), $claimId, $this->leaseSeconds));
 
         return $this->claimOf($library, $claimId);
     }
@@ -90,7 +90,7 @@ final readonly class LibraryScanClaims
      */
     public function acquire(Library $library, Uuid $claimId): LibraryScanLease
     {
-        self::claimed($library, $this->libraries->claimScan($library->getId(), $claimId, $this->leaseSeconds));
+        self::ensureClaimed($library, $this->libraries->claimScan($library->getId(), $claimId, $this->leaseSeconds));
 
         return new LibraryScanLease($this->libraries, $this->clock, $library, $claimId, $this->leaseSeconds, self::RENEWAL_INTERVAL_SECONDS);
     }
@@ -127,10 +127,12 @@ final readonly class LibraryScanClaims
     }
 
     /**
+     * Turns a refused claim of $library, by a scan or a delete with files, into its exception.
+     *
      * @throws LibraryBusyException     when a live claim holds the library
      * @throws LibraryNotFoundException when the library is gone
      */
-    private static function claimed(Library $library, LibraryClaimAttempt $attempt): void
+    public static function ensureClaimed(Library $library, LibraryClaimAttempt $attempt): void
     {
         if ($attempt->claimed) {
             return;

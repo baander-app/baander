@@ -8,7 +8,6 @@ use App\Library\Application\Exception\LibraryScanClaimLostException;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
-use DateTimeImmutable;
 use Psr\Clock\ClockInterface;
 
 /**
@@ -16,19 +15,19 @@ use Psr\Clock\ClockInterface;
  * at every file and directory; it extends the lease in the database at most once per renewal
  * interval, so frequent calls cost nothing. A renewal that finds the claim gone stops the scan.
  */
-final class LibraryScanLease
+final readonly class LibraryScanLease
 {
-    private DateTimeImmutable $renewedAt;
+    private LibraryClaimRenewal $renewal;
 
     public function __construct(
-        private readonly LibraryRepositoryInterface $libraries,
-        private readonly ClockInterface $clock,
-        private readonly Library $library,
-        private readonly Uuid $claimId,
-        private readonly int $leaseSeconds,
-        private readonly int $renewalIntervalSeconds,
+        private LibraryRepositoryInterface $libraries,
+        ClockInterface $clock,
+        private Library $library,
+        private Uuid $claimId,
+        int $leaseSeconds,
+        int $renewalIntervalSeconds,
     ) {
-        $this->renewedAt = $clock->now();
+        $this->renewal = new LibraryClaimRenewal($libraries, $clock, $claimId, $leaseSeconds, $renewalIntervalSeconds, $clock->now());
     }
 
     public function claimId(): Uuid
@@ -39,17 +38,9 @@ final class LibraryScanLease
     /** @throws LibraryScanClaimLostException when the claim was released or another scan or delete took it over */
     public function renew(): void
     {
-        $now = $this->clock->now();
-        $elapsed = $now->getTimestamp() - $this->renewedAt->getTimestamp();
-        // A wall clock set back counts as due, so a clock change cannot starve the lease.
-        if ($elapsed >= 0 && $elapsed < $this->renewalIntervalSeconds) {
-            return;
-        }
-
-        if (!$this->libraries->renewClaim($this->claimId, $this->leaseSeconds)) {
+        if (!$this->renewal->renew()) {
             throw LibraryScanClaimLostException::forLibrary($this->library->getName());
         }
-        $this->renewedAt = $now;
     }
 
     /**
