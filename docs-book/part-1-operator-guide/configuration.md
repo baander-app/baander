@@ -374,9 +374,11 @@ Baander writes emails in English, Danish or Thai. It picks the language of each 
 2. otherwise the server default, `i18n.default_language`, while Baander still offers it;
 3. otherwise English.
 
-Users choose under **Email language** in the Account section of **Settings**. The first option, for example **Server default (Dansk)**, names the current server default; choosing it removes the user's choice, so the user follows the default when an administrator changes it later. Administrators set a user's language in the admin user dialog, and operators with [`app:user:setting`](commands/app-user-setting.md); see [User settings](user-management.md#user-settings).
+Users choose under **Language** in the Account section of **Settings**. The first option, for example **Server default (Dansk)**, names the current server default; choosing it removes the user's choice, so the user follows the default when an administrator changes it later. Administrators set a user's language in the admin user dialog, and operators with [`app:user:setting`](commands/app-user-setting.md); see [User settings](user-management.md#user-settings).
 
-At registration Baander reads the browser's `Accept-Language` header and takes the supported language the browser ranks highest. It ignores `*` and entries with `q=0`, and maps a regional tag such as `da-DK` to `da`. It stores that language as the user's choice only when it differs from the server default: most browsers ask for English, and storing it would tie those users to English after an administrator changes the default. Accounts created by an operator or administrator store no language and follow the server default until one is set for them. `Accept-Language` is read only at registration; it does not change the language of API responses.
+At registration Baander reads the browser's `Accept-Language` header and takes the supported language the browser ranks highest. It ignores `*` and entries with `q=0`, and maps a regional tag such as `da-DK` to `da`. It stores that language as the user's choice only when it differs from the server default: most browsers ask for English, and storing it would tie those users to English after an administrator changes the default. Accounts created by an operator or administrator store no language and follow the server default until one is set for them.
+
+The same choice sets the language of the messages the API returns, such as errors. A signed-in user with a saved choice gets messages in that language. Without a choice, and for requests that are not signed in, the API follows the request's `Accept-Language` header, then falls back to English; the server default applies to emails only.
 
 The language applies to these emails:
 
@@ -399,7 +401,7 @@ Signed-in users read and change their own settings through these endpoints:
 | `PUT` | `/api/user/settings/{key}` | Store a choice; the body is `{"value": <value>}` |
 | `DELETE` | `/api/user/settings/{key}` | Remove the choice, so the setting follows its default |
 
-An unknown key gets `404`, a setting the user may not change gets `403`, and an invalid value gets `422` and stores nothing. Users never read server settings directly; the value after a reset is how the **Email language** control learns the current server default. A stored choice that is no longer allowed is presented to the user as no choice.
+An unknown key gets `404`, a setting the user may not change gets `403`, and an invalid value gets `422` and stores nothing. Users never read server settings directly; the value after a reset is how the **Language** control learns the current server default. A stored choice that is no longer allowed is presented to the user as no choice.
 
 Administrators read and change a user's settings through the admin API and the CLI; see [User settings](user-management.md#user-settings).
 
