@@ -39,7 +39,7 @@ try {
     $manifest = \App\Shared\Infrastructure\Worker\DeploymentOperatorManifest::fromJson($json);
     $credentials = \App\Shared\Infrastructure\Worker\DeploymentOperatorCredentials::fromFile($arguments[3]);
     $recipe = $manifest->recipe($credentials->runtimeEnvironment);
-    $connection = \Doctrine\DBAL\DriverManager::getConnection($credentials->connectionParameters());
+    $connection = \App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory::fromParams($credentials->connectionParameters());
     $inventory = new \App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory($connection);
     $retirements = new \App\Shared\Infrastructure\Worker\DoctrineDeploymentRetirement($connection);
     $docker = new \App\Shared\Infrastructure\Worker\DockerWorkerCommand($manifest->dockerBinary, $manifest->dockerEndpoint);

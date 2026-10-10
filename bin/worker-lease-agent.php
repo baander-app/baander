@@ -35,7 +35,7 @@ try {
     if (($params['driver'] ?? null) !== 'pdo_pgsql') {
         throw new RuntimeException('Unsupported database.');
     }
-    $repository = new \App\Shared\Infrastructure\Worker\DoctrineDeploymentLease(\Doctrine\DBAL\DriverManager::getConnection($params));
+    $repository = new \App\Shared\Infrastructure\Worker\DoctrineDeploymentLease(\App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory::fromParams($params));
     $lease = $request['action'] === 'acquire'
         ? $repository->acquire($request['namespace'], $request['bootId'], $request['ttlSeconds'])
         : new \App\Shared\Infrastructure\Worker\DeploymentLease($request['namespace'], $request['bootId'], $request['epoch']);

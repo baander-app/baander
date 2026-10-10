@@ -18,7 +18,9 @@ use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceExecutionSt
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceMaterializer;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerRecoveryScheduleStore;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerWorkerAuthority;
+use App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Tools\DsnParser;
 use Doctrine\DBAL\Types\Type;
 use Doctrine\DBAL\Types\Types;
 use Symfony\Component\Dotenv\Dotenv;
@@ -67,6 +69,10 @@ if ($statement === false) {
     throw new LogicException('SHOW TimeZone failed on the recommendation pool worker connection.');
 }
 $zones[RecommendationPoolWorker::class] = $statement->fetchColumn();
+// bin/worker-lease-agent.php and bin/worker-deployment.php connect through fromParams.
+$dedicated = DedicatedConnectionFactory::fromParams((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($databaseUrl));
+$zones[DedicatedConnectionFactory::class] = $dedicated->fetchOne('SHOW TimeZone');
+$dedicated->close();
 
 echo json_encode([
     'before' => $before,

@@ -11,6 +11,7 @@ use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceExecutionSt
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceMaterializer;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerRecoveryScheduleStore;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerWorkerAuthority;
+use App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory;
 use App\Shared\Infrastructure\Doctrine\Type\InstantType;
 use Doctrine\DBAL\Types\DateTimeImmutableType;
 use Doctrine\DBAL\Types\DateTimeTzImmutableType;
@@ -73,6 +74,7 @@ final class InstantRuntimeConfigurationTest extends TestCase
             DoctrineSchedulerRecoveryScheduleStore::class => 'UTC',
             DoctrineSchedulerWorkerAuthority::class => 'UTC',
             RecommendationPoolWorker::class => 'UTC',
+            DedicatedConnectionFactory::class => 'UTC',
         ], self::$probe['zones']);
     }
 }

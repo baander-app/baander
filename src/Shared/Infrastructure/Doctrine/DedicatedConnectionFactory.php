@@ -20,8 +20,16 @@ final class DedicatedConnectionFactory
 {
     public static function fromUrl(#[\SensitiveParameter] string $databaseUrl): Connection
     {
+        return self::fromParams((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($databaseUrl));
+    }
+
+    /**
+     * @param array<string, mixed> $params DBAL connection parameters, as DsnParser returns them
+     */
+    public static function fromParams(#[\SensitiveParameter] array $params): Connection
+    {
         $configuration = (new Configuration())->setMiddlewares([new BaanderDriverMiddleware()]);
 
-        return DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($databaseUrl), $configuration);
+        return DriverManager::getConnection($params, $configuration);
     }
 }
