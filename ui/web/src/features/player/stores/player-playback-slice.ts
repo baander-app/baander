@@ -22,6 +22,13 @@ import {
   type PlaybackRecoveryHost,
 } from './player-playback-recovery'
 
+/** Where a recovering seek ends: the reported duration, else the track's length, else nowhere. */
+function recoverySeekEnd(duration: number, trackLength: number | undefined): number {
+  if (duration > 0) return duration
+  if (trackLength !== undefined && Number.isFinite(trackLength) && trackLength > 0) return trackLength
+  return Infinity
+}
+
 export function createPlayerPlaybackSlice({ get, commit }: PlayerSliceContext): PlayerPlaybackState & PlayerPlaybackActions {
   const recoveryHost: PlaybackRecoveryHost = {
     get,
@@ -81,9 +88,7 @@ export function createPlayerPlaybackSlice({ get, commit }: PlayerSliceContext): 
       const { audioElement, duration, currentTrack } = get()
       if (isRecoveringPlayback(audioElement)) {
         // A progressive transcode never reported a duration; the catalogue's length still bounds the seek.
-        const trackLength = currentTrack?.duration
-        const end = duration > 0 ? duration
-          : trackLength !== undefined && Number.isFinite(trackLength) && trackLength > 0 ? trackLength : Infinity
+        const end = recoverySeekEnd(duration, currentTrack?.duration)
         if (seekPlaybackRecovery(Math.max(0, Math.min(end, time)))) return
       }
       const clamped = Math.max(0, Math.min(duration || 0, time))
