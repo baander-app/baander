@@ -24,7 +24,9 @@ services:
         image: martinjuul/baander-app:latest
         privileged: true
         container_name: baander-app
-        stop_grace_period: 3605s
+        # The web server drains within WEB_DRAIN_SECONDS (default 30); Docker must wait a
+        # little longer before it sends SIGKILL.
+        stop_grace_period: 35s
         build:
             context: .
             target: dev

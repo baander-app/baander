@@ -26,6 +26,11 @@ if (!in_array(ini_get("display_errors"), ["", "0"], true)
     fwrite(STDERR, "Production PHP must not display runtime or startup errors.\n");
     exit(1);
 }
+// The web server and its HEALTHCHECK read this from the production stage that this image extends.
+if (ini_get("memory_limit") !== "512M") {
+    fwrite(STDERR, "Production PHP memory_limit must be 512M, got " . ini_get("memory_limit") . ".\n");
+    exit(1);
+}
 if (!is_file("vendor/autoload_runtime.php")
     || Composer\InstalledVersions::isInstalled("phpunit/phpunit")
     || Composer\InstalledVersions::isInstalled("symfony/web-profiler-bundle")

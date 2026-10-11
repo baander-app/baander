@@ -481,7 +481,12 @@ COPY --chown=www-data:www-data . ${APP_HOME}/
 
 # Standalone production must not inherit development error-display settings.
 # Never ship a cache generated in the build context's environment.
+# Every PHP process in the image reads the same memory_limit from conf.d: the web server's
+# memory check measures each worker against it, and the HEALTHCHECK CLI reports against it
+# too. php.ini-production's default of 128M is too small for a web worker. The worker
+# supervisor passes its own limits to its children with -d.
 RUN cp /usr/local/etc/php/php.ini-production /usr/local/etc/php/php.ini && \
+    printf 'memory_limit=512M\n' > /usr/local/etc/php/conf.d/zz-baander-production-memory.ini && \
     rm -rf var/cache && \
     mkdir -p var/cache var/log && \
     chown www-data:www-data var var/cache var/log
