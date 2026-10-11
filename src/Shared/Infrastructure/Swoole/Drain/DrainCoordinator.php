@@ -73,7 +73,7 @@ final class DrainCoordinator implements ServerBeforeShutdownHandler, Configurato
         $this->started = true;
         $startedAtNs = hrtime(true);
 
-        $pool = $this->cpuProcessPool();
+        $pool = CpuProcessPool::fromLocator($this->cpuProcessPoolLocator);
         $pool?->stopHealthCheck();
         Process::signal(SIGINT, null);
         $this->state->begin($startedAtNs);
@@ -262,15 +262,6 @@ final class DrainCoordinator implements ServerBeforeShutdownHandler, Configurato
         }
 
         return array_values($groups);
-    }
-
-    private function cpuProcessPool(): ?CpuProcessPool
-    {
-        if ($this->cpuProcessPoolLocator === null || !$this->cpuProcessPoolLocator->has(CpuProcessPool::class)) {
-            return null;
-        }
-
-        return $this->cpuProcessPoolLocator->get(CpuProcessPool::class);
     }
 
     /**

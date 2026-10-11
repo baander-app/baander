@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Swoole\ProcessPool;
 
 use App\Shared\Infrastructure\Swoole\Async;
+use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
 use Swoole\Process;
@@ -81,6 +82,16 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
     )
     {
         $this->resultDir = $resultDir ?? sys_get_temp_dir() . '/baander_cpu_pool_results';
+    }
+
+    /** The pool that $locator holds; null without a locator or when it does not hold the pool. */
+    public static function fromLocator(?ContainerInterface $locator): ?self
+    {
+        if ($locator === null || !$locator->has(self::class)) {
+            return null;
+        }
+
+        return $locator->get(self::class);
     }
 
     public static function resultKey(string $type, string $jobId, ?int $segmentIndex = null): string

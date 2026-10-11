@@ -43,20 +43,11 @@ final class SwooleWorkerEventSubscriber implements EventSubscriberInterface
     public function onServerStarted(ServerStartedEvent $event): void
     {
         $server = $event->getServer();
-        $this->cpuProcessPool()?->startHealthCheck();
+        CpuProcessPool::fromLocator($this->cpuProcessPoolLocator)?->startHealthCheck();
 
         \Swoole\Process::signal(SIGINT, static function () use ($server): void {
             $server->shutdown();
         });
-    }
-
-    private function cpuProcessPool(): ?CpuProcessPool
-    {
-        if ($this->cpuProcessPoolLocator === null || !$this->cpuProcessPoolLocator->has(CpuProcessPool::class)) {
-            return null;
-        }
-
-        return $this->cpuProcessPoolLocator->get(CpuProcessPool::class);
     }
 
     public function onWorkerStarted(WorkerStartedEvent $event): void
