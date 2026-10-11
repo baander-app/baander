@@ -39,9 +39,9 @@ final class QoLProfileCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
-        $profile = $input->getArgument('profile');
+        $profile = (string) $input->getArgument('profile');
         try {
-            $report = $this->qol->setProfile(is_string($profile) ? $profile : '');
+            $report = $this->qol->setProfile($profile);
         } catch (Throwable $e) {
             return AdminCommandSupport::fail($io, $e);
         }

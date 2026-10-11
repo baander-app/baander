@@ -49,8 +49,8 @@ final class ServerSpansCommand extends Command
             return $this->clear($input, $io);
         }
 
-        $limit = $input->getOption('limit');
-        if (!is_string($limit) || preg_match('/^\d+$/', $limit) !== 1) {
+        $limit = (string) $input->getOption('limit');
+        if (preg_match('/^\d+$/', $limit) !== 1) {
             $io->getErrorStyle()->error('--limit must be a whole number.');
 
             return Command::INVALID;
