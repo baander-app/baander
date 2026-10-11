@@ -347,7 +347,7 @@ jobs:
                     node scripts/verify-build.mjs
             -   name: Install browser test runtime
                 working-directory: ui/web
-                run: yarn exec playwright install --with-deps chromium
+                run: yarn exec playwright install --with-deps chromium firefox webkit
             -   name: Native browser authentication transport
                 working-directory: ui/web
                 run: yarn test:browser-auth

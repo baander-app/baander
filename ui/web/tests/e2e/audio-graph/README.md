@@ -92,3 +92,30 @@ state; handlers must ignore notifications that disagree with it. The existing
 native-ended, gapless, crossfade, and repeat tests retain coverage for genuine
 events. Unit fixtures explicitly model paused/ended state for genuine events and
 leave stale notifications inconsistent to exercise the guards.
+
+`media-interruption.spec.ts` checks how Chromium, Firefox and WebKit report a
+stream that the server cuts midway. Each browser reaches `audio.baander.app`
+through a loopback HTTP proxy that the test serves itself and never forwards.
+A plain muted `<audio>` element plays `fixtures/tone-4s.mp3` joined three times,
+an MP3 without a Xing header as a progressive encode writes it. The server stops
+the body at 6.5 s and, once the element has played one second, resets the TCP
+connection without a terminating chunk. It does this for a chunked response
+without ranges and for a Content-Length response with ranges, and answers later
+requests with a 502 (nginx in front) or a reset (no proxy). The test asserts an
+error or a stall, and that any `ended` event comes after an error: Firefox reports
+the error, plays what it buffered and then fires `ended`, and the player lets the
+error win. A clean chunked end, which fires `ended` with no error in every
+engine, is recorded for contrast.
+
+The second test stops the server so connections are refused, reloads the same
+URL, starts the server again and seeks to the saved position. It records whether
+the position was seekable while paused or only during playback, for an original
+file and for a progressive rendition that arrives complete after the restart.
+Every outcome is printed and attached as JSON. The test does not run the player
+hook or store.
+
+The suite needs Playwright's Firefox and WebKit as well as Chromium. WebKit needs
+the host libraries Playwright's Ubuntu images provide; on other hosts run the
+spec in `mcr.microsoft.com/playwright` at the installed Playwright version, with
+`--network none`. Playwright's Linux WebKit uses GStreamer, not Safari's media
+stack.
