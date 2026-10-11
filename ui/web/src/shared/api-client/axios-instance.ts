@@ -114,6 +114,15 @@ AXIOS_INSTANCE.interceptors.response.use((response) => {
 });
 
 // --- Token refresh: queue concurrent 401s, retry after refresh ---
+/**
+ * Only the refresh endpoint refusing the refresh token ends the session. A network error,
+ * timeout or 5xx (a restarting server) keeps the user signed in and fails just the request.
+ */
+function isRefreshRejected(error: unknown): boolean {
+  const status = Axios.isAxiosError(error) ? error.response?.status : undefined;
+  return status === 400 || status === 401;
+}
+
 let refreshInFlight: { session: number; promise: Promise<void> } | null = null;
 
 async function refreshSession(session: number): Promise<void> {
@@ -156,7 +165,7 @@ async function refreshSession(session: number): Promise<void> {
       }
     }
   } catch (error) {
-    if (isCurrentSession()) {
+    if (isCurrentSession() && isRefreshRejected(error)) {
       getAuthStore().clearAuth();
       window.location.href = '/login';
     }

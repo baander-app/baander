@@ -1,6 +1,6 @@
 import Axios from 'axios';
 import MockAdapter from 'axios-mock-adapter';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const auth = vi.hoisted(() => ({
   accessToken: 'old-access' as string | null,
@@ -230,4 +230,72 @@ it('returns the current token to a late native failure without rotating again', 
   auth.accessToken = 'new-access'; auth.refreshToken = 'new-refresh';
   await expect(ensureFreshAccessToken(session, 'old-access')).resolves.toBe('new-access');
   expect(refresh.history.post).toHaveLength(0);
+});
+
+describe('a refresh that fails', () => {
+  let location: { href: string; origin: string };
+
+  beforeEach(() => {
+    location = { href: 'https://baander.app/library', origin: 'https://baander.app' };
+    vi.stubGlobal('location', location);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const transientFailures: Array<[string, (handler: ReturnType<MockAdapter['onPost']>) => void]> = [
+    ['a network error', handler => { handler.networkError(); }],
+    ['a timeout', handler => { handler.timeout(); }],
+    ['502', handler => { handler.reply(502); }],
+    ['503', handler => { handler.reply(503); }],
+  ];
+
+  for (const [failure, respond] of transientFailures) {
+    it(`with ${failure} keeps the user signed in and fails only the request`, async () => {
+      api.onGet('/private').reply(401);
+      respond(refresh.onPost());
+
+      await expect(AXIOS_INSTANCE.get('/private')).rejects.toThrow();
+
+      expect(auth.clearAuth).not.toHaveBeenCalled();
+      expect(auth.accessToken).toBe('old-access');
+      expect(auth.refreshToken).toBe('old-refresh');
+      expect(location.href).toBe('https://baander.app/library');
+    });
+  }
+
+  it('with a network error lets the next request refresh and succeed', async () => {
+    api.onGet('/private').replyOnce(401).onGet('/private').replyOnce(401).onGet('/private').reply(200);
+    refresh.onPost().networkErrorOnce()
+      .onPost().reply(200, { accessToken: 'new-access', refreshToken: 'new-refresh' });
+
+    await expect(AXIOS_INSTANCE.get('/private')).rejects.toThrow();
+    await expect(AXIOS_INSTANCE.get('/private')).resolves.toHaveProperty('status', 200);
+
+    expect(refresh.history.post).toHaveLength(2);
+    expect(auth.accessToken).toBe('new-access');
+    expect(location.href).toBe('https://baander.app/library');
+  });
+
+  it('through a native media caller with 502 keeps the user signed in', async () => {
+    refresh.onPost().reply(502);
+
+    await expect(ensureFreshAccessToken(getAuthSession(), 'old-access')).rejects.toThrow();
+
+    expect(auth.clearAuth).not.toHaveBeenCalled();
+    expect(location.href).toBe('https://baander.app/library');
+  });
+
+  for (const status of [400, 401]) {
+    it(`with ${status} signs the user out and sends them to the login page`, async () => {
+      api.onGet('/private').reply(401);
+      refresh.onPost().reply(status, { error: 'invalid_grant' });
+
+      await expect(AXIOS_INSTANCE.get('/private')).rejects.toThrow();
+
+      expect(auth.clearAuth).toHaveBeenCalledOnce();
+      expect(location.href).toBe('/login');
+    });
+  }
 });

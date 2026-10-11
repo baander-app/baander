@@ -5,7 +5,8 @@
 
 export interface SessionSyncConfig {
   wsEndpoint: string
-  authToken?: string
+  /** Read on every connect, so a reconnect uses the token current at that moment. */
+  getAuthToken: () => string | null | undefined
   deviceId: string
   getPosition: () => number
   getQueue: () => string[]
@@ -27,7 +28,7 @@ export interface SessionSyncEvents {
 export class SessionSyncBus {
   private static readonly RECONNECT_INITIAL_MS = 1_000
   private static readonly RECONNECT_MAX_MS = 30_000
-  private static readonly RECONNECT_MULTIPLIER = 2
+  private static readonly RECONNECT_GROWTH = 3
 
   private readonly config: SessionSyncConfig
   private readonly events: SessionSyncEvents
@@ -115,17 +116,14 @@ export class SessionSyncBus {
   private buildWsUrl(): string {
     const base = this.config.wsEndpoint
     const sep = base.includes('?') ? '&' : '?'
-    const auth = this.config.authToken ? `${sep}token=${encodeURIComponent(this.config.authToken)}` : ''
+    const token = this.config.getAuthToken()
+    const auth = token ? `${sep}token=${encodeURIComponent(token)}` : ''
     return `${base}${auth}`
   }
 
   private scheduleReconnect(): void {
     if (!this.sessionArgs) return
-    const delay = this.reconnectDelayMs
-    this.reconnectDelayMs = Math.min(
-      this.reconnectDelayMs * SessionSyncBus.RECONNECT_MULTIPLIER,
-      SessionSyncBus.RECONNECT_MAX_MS,
-    )
+    const delay = this.nextReconnectDelay()
     this.events.onError(new Error(`Session WS disconnected. Reconnecting in ${Math.round(delay / 1000)}s…`))
     this.reconnectTimer = setTimeout(async () => {
       this.reconnectTimer = null
@@ -134,6 +132,21 @@ export class SessionSyncBus {
         await this.connect(this.sessionArgs.sessionId)
       } catch { /* scheduleReconnect called by onclose */ }
     }, delay)
+  }
+
+  /**
+   * Decorrelated jitter: a random delay between the minimum and three times the previous
+   * delay, capped. Clients that lost the same server spread their reconnects out.
+   */
+  private nextReconnectDelay(): number {
+    const min = SessionSyncBus.RECONNECT_INITIAL_MS
+    const ceiling = this.reconnectDelayMs * SessionSyncBus.RECONNECT_GROWTH
+    const delay = Math.min(
+      SessionSyncBus.RECONNECT_MAX_MS,
+      Math.round(min + Math.random() * (ceiling - min)),
+    )
+    this.reconnectDelayMs = delay
+    return delay
   }
 
   private cancelReconnect(): void {

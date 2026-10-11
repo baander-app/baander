@@ -143,10 +143,9 @@ export function useSession() {
   useEffect(() => {
     if (!sessionId) return
 
-    const accessToken = useAuthStore.getState().accessToken
     const bus = new SessionSyncBus({
       wsEndpoint: '/api/ws',
-      authToken: accessToken ?? undefined,
+      getAuthToken: () => useAuthStore.getState().accessToken,
       deviceId,
       getPosition: getCurrentTime,
       getQueue: () => usePlayerStore.getState().queue.map(t => t.publicId),
@@ -156,6 +155,15 @@ export function useSession() {
       onStateUpdate: (state) => {
         const local = usePlayerStore.getState()
         const localQueueIds = local.queue.map(t => t.publicId)
+
+        // Only the device that plays the session writes it, so the server copy is at best this
+        // device's last sync. After an outage, adopting it would jump playback back or undo a
+        // queue change made meanwhile. A session no device holds belongs to the one playing it.
+        // An empty local queue (a reloaded tab) still takes the server state.
+        const activeDeviceId = state.activeDeviceId ?? null
+        const ownsPlayback = activeDeviceId === deviceId || (activeDeviceId === null && local.isPlaying)
+        if (ownsPlayback && localQueueIds.length > 0) return
+
         const queueMatch = state.queue.length === localQueueIds.length &&
           state.queue.every((id: string, i: number) => id === localQueueIds[i])
 
