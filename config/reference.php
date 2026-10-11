@@ -1387,6 +1387,7 @@ use Symfony\Component\Config\Loader\ParamConfigurator as Param;
  *             enabled?: "off"|"auto"|"inotify"|"external"|Param, // Default: "auto"
  *             file_path?: scalar|Param|null, // Default: "%swoole_bundle.cache_dir%"
  *         },
+ *         shutdown_timeout?: scalar|Param|null, // Seconds the server takes at most to stop; swoole:server:stop waits this long, plus a margin. // Default: 10
  *         api?: array{
  *             enabled?: bool|Param, // Default: false
  *             host?: scalar|Param|null, // Default: "127.0.0.1"
