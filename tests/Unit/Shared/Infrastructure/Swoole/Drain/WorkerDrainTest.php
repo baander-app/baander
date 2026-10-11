@@ -129,7 +129,7 @@ final class WorkerDrainTest extends TestCase
         self::assertTrue($this->state->allWorkersDrained(1));
     }
 
-    public function testStreamsStillOpenAreCutOnceWhenTheWindowEnds(): void
+    public function testStreamsStillOpenAreCutHalfASecondBeforeTheWindowEndsOnEachTickUntilTheWorkerIsIdle(): void
     {
         // A stream never ends on its own here; the aborter is the only way out.
         $this->concurrency = [1];
@@ -143,19 +143,25 @@ final class WorkerDrainTest extends TestCase
             }
         };
         $drain = $this->drain(streams: $streams);
+        $cutAtNs = self::WINDOW_NS - WorkerDrain::STREAM_CUT_LEAD_MILLISECONDS * 1_000_000;
+        self::assertSame(500, WorkerDrain::STREAM_CUT_LEAD_MILLISECONDS);
 
-        $this->nowNs += self::WINDOW_NS - 1;
+        $this->nowNs += $cutAtNs - 1;
         $drain->poll($this->server);
         self::assertSame(0, $streams->aborts);
 
+        // A cut stream's coroutine may be busy in work that cannot be cancelled, so each tick
+        // cuts again until the worker is idle.
         $this->nowNs += 1;
         $drain->poll($this->server);
         $drain->poll($this->server);
-        self::assertSame(1, $streams->aborts);
+        self::assertSame(2, $streams->aborts);
         self::assertFalse($this->state->allWorkersDrained(1), 'A worker reports only once its streams have ended.');
 
         $this->concurrency = [0];
         $drain->poll($this->server);
+        $drain->poll($this->server);
+        self::assertSame(2, $streams->aborts);
         self::assertTrue($this->state->allWorkersDrained(1));
     }
 

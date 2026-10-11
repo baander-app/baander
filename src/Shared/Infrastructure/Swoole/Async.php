@@ -12,10 +12,16 @@ namespace App\Shared\Infrastructure\Swoole;
  */
 final class Async
 {
+    /**
+     * @throws CoroutineCanceledException when another coroutine cancels this one while it sleeps
+     *         (Swoole\Coroutine::cancel()), so the cancelled work stops here
+     */
     public static function sleep(float $seconds): void
     {
         if (self::inCoroutine()) {
-            \Swoole\Coroutine::sleep($seconds);
+            if (\Swoole\Coroutine::sleep($seconds) === false && \Swoole\Coroutine::isCanceled()) {
+                throw new CoroutineCanceledException('The coroutine was cancelled while it slept.');
+            }
         } else {
             usleep((int) ($seconds * 1_000_000));
         }

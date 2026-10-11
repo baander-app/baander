@@ -18,6 +18,8 @@ final class HttpExchange
     public array $headerLines = [];
     public string $body = '';
     public bool $done = false;
+    /** curl's result code once the exchange has ended, such as CURLE_PARTIAL_FILE for a cut body */
+    public int $result = CURLE_OK;
     private bool $stopped = false;
     private readonly CurlMultiHandle $multi;
     private readonly CurlHandle $handle;
@@ -25,6 +27,7 @@ final class HttpExchange
     /**
      * @param list<string> $headers
      * @param int|null $stopAfterBytes drop the connection once this many body bytes arrived
+     * @param int|null $maxBytesPerSecond read the body no faster than this, as a slow client does
      */
     public function __construct(
         string $url,
@@ -32,6 +35,7 @@ final class HttpExchange
         string $method = 'GET',
         ?string $payload = null,
         private readonly ?int $stopAfterBytes = null,
+        ?int $maxBytesPerSecond = null,
     ) {
         $this->handle = curl_init($url);
         curl_setopt_array($this->handle, [
@@ -60,6 +64,9 @@ final class HttpExchange
         ]);
         if ($payload !== null) {
             curl_setopt($this->handle, CURLOPT_POSTFIELDS, $payload);
+        }
+        if ($maxBytesPerSecond !== null) {
+            curl_setopt($this->handle, CURLOPT_MAX_RECV_SPEED_LARGE, $maxBytesPerSecond);
         }
         $this->multi = curl_multi_init();
         curl_multi_add_handle($this->multi, $this->handle);
@@ -117,6 +124,7 @@ final class HttpExchange
     {
         $info = curl_multi_info_read($this->multi);
         $result = is_array($info) ? $info['result'] : CURLE_OK;
+        $this->result = $result;
         if ($result !== CURLE_OK && !($this->stopped && $result === CURLE_WRITE_ERROR)) {
             throw new RuntimeException('Request failed: ' . curl_strerror($result));
         }

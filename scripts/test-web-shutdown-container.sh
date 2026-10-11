@@ -26,6 +26,10 @@
 #    - a request for /ready on a connection kept alive from before the stop gets 503 with
 #      Connection: close while a stalled stream holds the window open;
 #    - a client that stopped reading a progressive stream does not hold the server past D;
+#    - streams still open half a second before the window ends are cut without their chunked
+#      terminator (curl 18), and a stream that ends within the window gets its whole body;
+#    - started with docker exec (not PID 1), the server leaves no FFmpeg or CPU pool process,
+#      and a byte-range file response read slowly at the stop is cut short of its Content-Length;
 #    - a stopped event worker is killed by Swoole after 2W and the server still exits 0;
 #    - a stopped manager is killed by the drain watchdog at D, and the server exits 1;
 #    - with PostgreSQL down, the start-up cleanup logs its failure once and the server exits 0.
@@ -374,9 +378,12 @@ docker kill --signal INT "$run_id-web" >/dev/null 2>&1 || true
 await_exit
 assert_stopped 'SIGTERM, then SIGINT a second later' "$started_at" 0 "$drain_seconds"
 
-# The master resets the stalled connection when the window ends, so joining its reactor threads
-# does not wait for output the client will never read. The stalled stream also holds the window
-# open while a connection kept alive from before the stop asks for /ready.
+# The worker resets the stalled connection when it cuts the stream, half a second before the
+# window ends, so joining the reactor threads does not wait for output the client will never read.
+# (A connection closed without a reset leaves the master's list but stays open in its reactor
+# thread until that output is sent, and the master would wait for it until the watchdog's
+# deadline.) The stalled stream also holds the window open while a connection kept alive from
+# before the stop asks for /ready.
 start_web
 start_client stalled-stream "$listener" "$track"
 await_client stalled-stream stalled
@@ -386,8 +393,8 @@ started_at=$(date +%s.%N)
 docker kill --signal TERM "$run_id-web" >/dev/null
 await_exit
 assert_stopped 'a client that stopped reading a progressive stream' "$started_at" 0 "$drain_seconds"
-grep -qE '^Drain window closed after [0-9.]+ s, the window passed; reset [1-9][0-9]* client connection\(s\)\.$' <<<"$(run_log)" ||
-    fail 'the window did not reset the stalled connection'
+grep -qE '^Drain window closed after [0-9.]+ s, every worker drained; ' <<<"$(run_log)" ||
+    fail "the worker did not drain once it cut the stalled stream: $(grep '^Drain window closed' <<<"$(run_log)" || true)"
 ready_log=$(docker cp "$run_id-web:/tmp/drain-keepalive-ready.log" - | tar -xOf -)
 [ "$(awk '$3 == "ready" { print $4, $5; exit }' <<<"$ready_log")" = 'status=200 connection=keep-alive' ] ||
     fail "the kept-alive connection was not ready before the stop: $ready_log"
@@ -419,6 +426,104 @@ grep -qE "^The web server did not stop by its drain deadline: killed processes \
     fail 'the watchdog did not report killing the manager'
 grep -q '^The web server reached its drain deadline; exiting with status 1.$' <<<"$(run_log)" || fail 'the master did not report the deadline'
 echo "PASS: the watchdog killed the stopped manager at the deadline."
+
+# Streams open at the stop. A progressive stream that ends within the window gets its whole body.
+# One that does not is cut half a second before the window ends: its connection closes without the
+# chunked terminator, so the client sees a transfer error (curl 18) and never a clean end of the
+# body, and its worker reports drained before the window ends.
+start_web
+web rm -f /tmp/drain-stop-requested
+for mode in held-stream completing-stream; do
+    start_client "$mode" "$listener" "$track"
+done
+for mode in held-stream completing-stream; do
+    await_client "$mode" streaming
+done
+web touch /tmp/drain-stop-requested
+started_at=$(date +%s.%N)
+docker kill --signal TERM "$run_id-web" >/dev/null
+await_exit
+assert_stopped 'streams open at the stop' "$started_at" 0 "$drain_seconds"
+log=$(run_log)
+grep -qE '^Drain window closed after [0-9.]+ s, every worker drained; ' <<<"$log" ||
+    fail "the workers did not report drained once their streams were cut: $(grep '^Drain window closed' <<<"$log" || true)"
+grep -q 'deadlock' <<<"$log" && fail 'a worker stopped with a coroutine still asleep'
+stream_log() {
+    docker cp "$run_id-web:/tmp/drain-$1.log" - | tar -xOf -
+}
+held_log=$(stream_log held-stream)
+[ "$(awk '$3 == "ended" { print $4; exit }' <<<"$held_log")" = 'result=18' ] ||
+    fail "the held stream did not end with curl's transfer error 18: $held_log"
+cut_after=$(awk -v t="$started_at" '$3 == "ended" { printf "%.1f", $2 - t; exit }' <<<"$held_log")
+awk -v e="$cut_after" -v s="$window_seconds" 'BEGIN { exit !(e >= s - 0.7 && e < s) }' ||
+    fail "the held stream was cut $cut_after seconds after the stop, not just before the window of $window_seconds s ended"
+echo "PASS: a progressive stream held open at the stop was cut after $cut_after seconds with curl's transfer error 18."
+completing_log=$(stream_log completing-stream)
+[ "$(awk '$3 == "ended" { print $4, $6; exit }' <<<"$completing_log")" = 'result=0 complete=yes' ] ||
+    fail "the stream that completed during the drain did not end with its whole body: $completing_log"
+echo "PASS: a stream that completed during the drain ended cleanly with its whole body."
+
+# The server not as PID 1, started with docker exec in the client container: the stop leaves no
+# FFmpeg or CPU pool process behind. The drain client there makes the track's source a FIFO that a
+# real-time FFmpeg writes, so the server's encoder keeps running until the server stops it. A
+# byte-range file response read slowly at the stop is cut short of its Content-Length; its client
+# runs in the same container, which outlives the server, so it can record how the response ended.
+docker exec -d -w "$app_dir" "$run_id-client" sh -c 'exec php bin/console app:serve --no-interaction > /tmp/not-pid1-serve.log 2>&1'
+for attempt in $(seq 1 90); do
+    if client curl -fsS -o /dev/null http://127.0.0.1:9501/live 2>/dev/null; then break; fi
+    sleep 1
+done
+client curl -fsS -o /dev/null http://127.0.0.1:9501/live || fail 'app:serve in the client container did not answer /live'
+client_in_client() {
+    docker exec -d -w "$app_dir" "$run_id-client" sh -c \
+        "exec php -d memory_limit=512M tests/Fixtures/WebShutdown/drain-client.php $* > /tmp/drain-$1.log 2>&1"
+}
+await_in_client() {
+    for attempt in $(seq 1 600); do
+        if client grep -q " $2 " "/tmp/drain-$1.log" 2>/dev/null; then return 0; fi
+        sleep 0.1
+    done
+    client cat "/tmp/drain-$1.log" >&2 || true
+    fail "the $1 client in the client container did not record $2"
+}
+client_in_client fifo-encode "$listener" "$track"
+await_in_client fifo-encode encoding
+# Named after the source, which is the FIFO from here on.
+client_in_client ranged-file "$listener" "$track"
+await_in_client ranged-file streaming
+fifo_log=$(client cat /tmp/drain-fifo-encode.log)
+writer=$(awk '$3 == "encoding" { sub(/^writer=/, "", $4); print $4; exit }' <<<"$fifo_log")
+[ -n "$writer" ] || fail "the server's encoder did not start: $fifo_log"
+# Every process in the container but zombies, which have exited, and the FIFO writer.
+processes() {
+    client ps -eo pid=,stat=,args= | awk -v writer="$writer" '$1 != writer && $2 !~ /^Z/'
+}
+grep -q -- '-map 0:a:0' <<<"$(processes)" || fail "no encoder of the server runs: $(processes)"
+master=$(client pgrep -o -f '^php bin/console app:serve')
+[ "$master" != 1 ] || fail 'app:serve is PID 1 in the client container'
+started_at=$(date +%s.%N)
+client kill -TERM "$master"
+for attempt in $(seq 1 $((stop_timeout * 10))); do
+    if ! client kill -0 "$master" 2>/dev/null; then break; fi
+    sleep 0.1
+done
+elapsed=$(awk -v a="$started_at" -v b="$(date +%s.%N)" 'BEGIN { printf "%.1f", b - a }')
+client kill -0 "$master" 2>/dev/null && fail "app:serve (not PID 1) was still running $elapsed seconds after SIGTERM"
+left=$(processes | grep -E 'ffmpeg|cpu-pool-worker|app:serve' || true)
+await_in_client ranged-file ended
+ranged_log=$(client cat /tmp/drain-ranged-file.log)
+client sh -c "pkill -f 'drain-client[.]php fifo-encode'; kill $writer; true"
+client sh -c 'f=storage/media/web-runtime/track.flac; rm -f "$f" && mv "$f.real" "$f"'
+[ -z "$left" ] || fail "processes outlived app:serve (not PID 1): $left"
+echo "PASS: app:serve (not PID 1) exited $elapsed seconds after SIGTERM and left no FFmpeg or CPU pool process."
+length=$(awk '$3 == "streaming" { sub(/^length=/, "", $5); print $5; exit }' <<<"$ranged_log")
+ranged_end=$(awk '$3 == "ended" { sub(/^result=/, "", $4); sub(/^bytes=/, "", $5); print $4, $5; exit }' <<<"$ranged_log")
+ranged_result=${ranged_end% *}
+ranged_bytes=${ranged_end#* }
+[ "$length" = 16777216 ] || fail "the ranged file response did not announce its Content-Length: $ranged_log"
+{ [ "$ranged_result" = 18 ] || [ "$ranged_result" = 56 ]; } && [ "$ranged_bytes" -lt "$length" ] ||
+    fail "the ranged file response was not cut short of its Content-Length: $ranged_log"
+echo "PASS: a ranged file response read slowly at the stop was cut after $ranged_bytes of $length bytes (curl $ranged_result)."
 
 # The start-up listeners survive an unreachable PostgreSQL, and the stop still drains. This start
 # also follows the watchdog's unclean exit in the same container.

@@ -25,6 +25,7 @@ use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePoolCo
 use SwooleBundle\SwooleBundle\Bridge\Symfony\HttpFoundation\DefaultRequestFactory;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\HttpFoundation\DefaultResponseProcessorInjector;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\HttpFoundation\EndResponseProcessor;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\HttpFoundation\InFlightStreams;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\HttpFoundation\NoOpStreamedResponseProcessor;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\HttpFoundation\RequestFactory;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\HttpFoundation\ResponseHeadersAndStatusProcessor;
@@ -182,8 +183,14 @@ return static function (ContainerConfigurator $containerConfigurator): void {
             service('response_processor.headers_and_cookies.default.inner'),
         ]);
 
+    // One per worker: the streamed responses it is sending, so a stopping server can cut them.
+    $services->set(InFlightStreams::class)
+        ->factory([InFlightStreams::class, 'forServer'])
+        ->args([service(HttpServer::class)]);
+
     $services->set(StreamedResponseProcessor::class)
-        ->arg('$coWrapper', service(CoWrapper::class));
+        ->arg('$coWrapper', service(CoWrapper::class))
+        ->arg('$streams', service(InFlightStreams::class));
 
     $services->set('response_processor.headers_and_cookies.streamed', ResponseHeadersAndStatusProcessor::class)
         ->decorate(StreamedResponseProcessor::class)

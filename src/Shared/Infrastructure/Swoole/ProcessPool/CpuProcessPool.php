@@ -25,6 +25,10 @@ use Throwable;
  * Handlers are identified by FQCN — workers instantiate fresh copies via
  * new $class(...$args). This avoids fragile serialize()/unserialize() of
  * service objects across process boundaries.
+ *
+ * Each worker leads a process group of its own, which the processes its jobs
+ * start, such as FFmpeg, join. Stopping a worker's group stops what it started
+ * with it, and the server's own process group is never signalled.
  */
 final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
 {
@@ -170,6 +174,8 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
                 $limits = $this->limitTable;
 
                 $process = new Process(function (Process $worker) use ($registry, $table, $limits): void {
+                    // The parent sets the group too; whichever runs first wins the race with shutdown.
+                    posix_setpgid(0, 0);
                     $worker->name(sprintf('cpu-pool-worker-%d', $worker->id));
 
                     $handlers = json_decode($registry, true, 512, JSON_THROW_ON_ERROR);
@@ -228,6 +234,7 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
                     $process->close();
                     throw new RuntimeException('Unable to start CPU pool worker.');
                 }
+                @posix_setpgid($pid, $pid);
                 $this->workers[$i] = $process;
                 $this->publishHealth((string) $i, true, $pid);
             }
@@ -515,20 +522,41 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
         }
     }
 
-    /** Drain, then kill and reap only this pool's children within shared deadlines. */
+    /**
+     * Drain, then stop and reap only this pool's children within shared deadlines.
+     *
+     * A worker still running after the drain is busy with a job, and may wait for
+     * a process it started, such as FFmpeg. Its process group gets SIGTERM, so
+     * FFmpeg can stop on its own, then SIGKILL: the worker and every process it
+     * started stop, even one that outlived the worker.
+     */
     private function killAllWorkers(): void
     {
         $this->waitForWorkers(2.0);
-        foreach ($this->workers as $worker) {
-            // reapExitedWorkers has just confirmed these are still our children.
-            // Unreaped child PIDs cannot be reused between this check and kill.
-            if (!posix_kill($worker->pid, SIGKILL)) {
-                $this->logger->warning('Could not kill CPU pool worker', ['pid' => $worker->pid]);
-            }
-        }
-        $this->waitForWorkers(1.0);
+        // reapExitedWorkers has just confirmed these are still our children.
+        // Unreaped child PIDs cannot be reused between this check and the signal.
+        $groups = $this->workerPids();
+        $this->signalGroups($groups, SIGTERM);
+        $this->waitForWorkers(0.5);
+        // A group outlives its leader while a member runs, and its id is not reused until then.
+        $this->signalGroups($groups, SIGKILL);
+        $this->waitForWorkers(0.5);
         if ($this->workers !== []) {
             throw new RuntimeException('CPU pool shutdown could not confirm every child exit.');
+        }
+    }
+
+    /** @param list<int> $groups worker PIDs, each its worker's process group */
+    private function signalGroups(array $groups, int $signal): void
+    {
+        foreach ($groups as $group) {
+            if (posix_kill(-$group, $signal) || !in_array($group, $this->workerPids(), true)) {
+                continue;
+            }
+            // The worker is ours but leads no group: signal the worker alone.
+            if (!posix_kill($group, $signal)) {
+                $this->logger->warning('Could not stop CPU pool worker', ['pid' => $group, 'signal' => $signal]);
+            }
         }
     }
 

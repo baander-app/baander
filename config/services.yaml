@@ -1085,6 +1085,10 @@ services:
     App\Shared\Application\Port\ServerDrainStateInterface:
         alias: App\Shared\Infrastructure\Swoole\Drain\DrainStateTable
 
+    # Before the window ends, WorkerDrain cuts the streamed responses its worker is still sending.
+    App\Shared\Infrastructure\Swoole\Drain\WorkerStreamAborterInterface:
+        alias: App\Shared\Infrastructure\Swoole\Drain\InFlightStreamAborter
+
     SwooleBundle\SwooleBundle\Server\LifecycleHandler\ServerShutdownHandler:
         alias: App\Shared\Infrastructure\Swoole\Drain\DrainShutdownHandler
 

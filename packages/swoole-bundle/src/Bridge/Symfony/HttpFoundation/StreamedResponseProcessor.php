@@ -9,7 +9,18 @@ use Swoole\Http\Response as SwooleResponse;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\CoWrapper;
 use Symfony\Component\HttpFoundation\Response as HttpFoundationResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
+/**
+ * Sends a streamed response from a coroutine of its own.
+ *
+ * A response that ends normally is ended with end(), which writes the terminating chunk. A
+ * response that is cut has its connection reset instead (InFlightStreams::reset()): the client
+ * never receives the terminating chunk (or the rest of a Content-Length body) and sees a transfer
+ * error, never a clean end of the body.
+ * A response is cut when its content fails (the callback or generator throws) and when the server
+ * stops (InFlightStreams::abortAll()).
+ */
 final readonly class StreamedResponseProcessor implements ResponseProcessor
 {
     /**
@@ -25,6 +36,7 @@ final readonly class StreamedResponseProcessor implements ResponseProcessor
 
     public function __construct(
         private CoWrapper $coWrapper,
+        private InFlightStreams $streams,
         private int $bufferOutputSize = self::DEFAULT_BUFFER_SIZE,
     ) {}
 
@@ -52,21 +64,26 @@ final readonly class StreamedResponseProcessor implements ResponseProcessor
         // from the pool when it accesses proxied services, and releases them
         // via CoWrapper's defer() when it finishes.
         $this->coWrapper->go(function () use ($httpFoundationResponse, $swooleResponse): void {
+            $this->streams->add($swooleResponse);
             $clientGone = false;
+            $streams = $this->streams;
 
-            ob_start(static function (string $payload) use ($swooleResponse, &$clientGone): string {
-                if ($payload !== '' && !$clientGone) {
+            ob_start(static function (string $payload) use ($swooleResponse, $streams, &$clientGone): string {
+                if ($payload !== '' && !$clientGone && !$streams->isAborted()) {
                     $clientGone = !$swooleResponse->write($payload);
                 }
 
                 return '';
             }, $this->bufferOutputSize);
 
+            $failure = null;
             try {
                 $httpFoundationResponse->sendContent();
+            } catch (Throwable $error) {
+                $failure = $error;
             } finally {
                 ob_end_clean();
-                $swooleResponse->end();
+                $this->finish($swooleResponse, $failure);
             }
         });
     }
@@ -81,26 +98,26 @@ final readonly class StreamedResponseProcessor implements ResponseProcessor
     private function processRangeFile(SwooleRangeFileResponse $response, SwooleResponse $swooleResponse): void
     {
         $this->coWrapper->go(function () use ($response, $swooleResponse): void {
-            $stream = fopen($response->path, 'rb');
-
-            if ($stream === false) {
-                $swooleResponse->end();
-
-                return;
-            }
+            $this->streams->add($swooleResponse);
+            $failure = null;
+            $stream = null;
 
             try {
+                $stream = fopen($response->path, 'rb');
+                if ($stream === false) {
+                    throw new \RuntimeException('Cannot open ' . $response->path);
+                }
                 fseek($stream, $response->getOffset());
 
                 $remaining = $response->getLength();
                 $bufferSize = self::RANGE_BUFFER_SIZE;
 
-                while ($remaining > 0 && !feof($stream)) {
+                while ($remaining > 0 && !$this->streams->isAborted()) {
                     $read = min($bufferSize, $remaining);
                     $data = fread($stream, $read);
 
                     if ($data === false || $data === '') {
-                        break;
+                        throw new \RuntimeException(sprintf('%s ended %d bytes before the range did', $response->path, $remaining));
                     }
 
                     // write() returns false when the client has disconnected.
@@ -112,10 +129,37 @@ final readonly class StreamedResponseProcessor implements ResponseProcessor
 
                     $remaining -= strlen($data);
                 }
+            } catch (Throwable $error) {
+                $failure = $error;
             } finally {
-                fclose($stream);
-                $swooleResponse->end();
+                if (is_resource($stream)) {
+                    fclose($stream);
+                }
+                $this->finish($swooleResponse, $failure);
             }
         });
+    }
+
+    /**
+     * Ends the response, or, when it was cut or its content failed, resets the connection
+     * without ending it.
+     */
+    private function finish(SwooleResponse $swooleResponse, ?Throwable $failure): void
+    {
+        $aborted = $this->streams->remove();
+        if ($failure !== null && !$aborted) {
+            // A cut connection is expected to fail the content; any other failure is reported.
+            error_log(sprintf(
+                '[StreamedResponse] %s: %s in %s:%d; the connection was reset without ending the response.',
+                $failure::class,
+                $failure->getMessage(),
+                $failure->getFile(),
+                $failure->getLine(),
+            ));
+            $this->streams->reset($swooleResponse);
+        }
+        // After a reset, end() writes nothing; it only releases the request in Swoole, which
+        // counts it in worker_concurrency until then.
+        $swooleResponse->end();
     }
 }

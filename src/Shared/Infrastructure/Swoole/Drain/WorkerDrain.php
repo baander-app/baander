@@ -25,7 +25,10 @@ use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
  * Requests that still arrive on kept-alive connections are served, with Connection: close
  * (DrainingResponseListener), and /ready answers 503. Once the worker handles no request and the
  * clients of its WebSockets have answered the close, it reports itself drained in the DrainStateTable and clears its tick.
- * When the window ends, it cuts the streams it is still sending (WorkerStreamAborterInterface).
+ * Half a second before the window ends (STREAM_CUT_LEAD_MILLISECONDS), it cuts the streams it is
+ * still sending (WorkerStreamAborterInterface), and repeats that on every tick until it is idle.
+ * The lead leaves the cut streams time to stop, so the worker reports drained before the master
+ * resets the connections at the end of the window.
  *
  * A reload never sets the flag, so a reloading worker runs none of this. The tick is the only
  * timer here; DrainWorkerExitSubscriber clears it if the worker stops before it reported.
@@ -38,11 +41,12 @@ final class WorkerDrain implements EventSubscriberInterface
 {
     public const int WEBSOCKET_CLOSE_CODE = 1012;
     public const string WEBSOCKET_CLOSE_REASON = 'service restart';
+    /** How long before the window ends a worker cuts its streams. */
+    public const int STREAM_CUT_LEAD_MILLISECONDS = 500;
     private const int TICK_MILLISECONDS = 100;
 
     private ?int $timerId = null;
     private bool $stepsRun = false;
-    private bool $streamsAborted = false;
     private bool $reported = false;
     /** @var list<int> WebSockets this worker closed whose connection Swoole has not yet closed */
     private array $closingWebSockets = [];
@@ -107,9 +111,9 @@ final class WorkerDrain implements EventSubscriberInterface
         }
 
         if (!$this->isIdle($server)) {
-            if (!$this->streamsAborted && ($this->monotonicNs)() >= $this->windowEndsAtNs()) {
-                $this->streamsAborted = true;
-                $this->attempt('cut its streams', $workerId, fn () => $this->streams?->abortAll());
+            $streams = $this->streams;
+            if ($streams !== null && ($this->monotonicNs)() >= $this->streamCutAtNs()) {
+                $this->attempt('cut its streams', $workerId, static fn () => $streams->abortAll());
             }
 
             return;
@@ -162,11 +166,11 @@ final class WorkerDrain implements EventSubscriberInterface
         return (int) ($stats['worker_concurrency'] ?? 0) === 0;
     }
 
-    private function windowEndsAtNs(): int
+    private function streamCutAtNs(): int
     {
         $startedAtNs = $this->state->startedAtNs() ?? ($this->monotonicNs)();
 
-        return $startedAtNs + $this->budget->windowSeconds * 1_000_000_000;
+        return $startedAtNs + $this->budget->windowSeconds * 1_000_000_000 - self::STREAM_CUT_LEAD_MILLISECONDS * 1_000_000;
     }
 
     /** A failed step is logged and the drain goes on: the master's window ends on its own. */

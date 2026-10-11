@@ -129,6 +129,30 @@ check(!$pool->isRunning(), 'Busy pool still reports running');
 PHP);
     }
 
+    public function testShutdownStopsABusyWorkerAndTheProcessItStartedTermFirst(): void
+    {
+        $this->runProbe(<<<'PHP'
+$pool->boot();
+$pids = trackWorkers($pool);
+$marker = $argv[2] . '/child-term';
+$pool->dispatch(json_encode(['type' => 'probe', 'block' => true, 'child' => $marker, 'started' => $argv[2] . '/started'], JSON_THROW_ON_ERROR), 'encoding');
+$deadline = hrtime(true) + 2_000_000_000;
+while (!is_file($argv[2] . '/started') && hrtime(true) < $deadline) { usleep(10_000); }
+check(is_file($argv[2] . '/started'), 'Worker never started its child');
+$child = (int) file_get_contents($argv[2] . '/started');
+trackPid($child);
+check($child > 0 && in_array(posix_getpgid($child), $pids, true), 'The child is not in its worker\'s process group');
+check(posix_getpgid($child) !== posix_getpgid(0), 'The worker shares the pool owner\'s process group');
+$started = hrtime(true);
+$pool->shutdown();
+check((hrtime(true) - $started) / 1e9 < 3.0, 'Busy shutdown exceeded its deadline');
+assertReaped($pids);
+check(is_file($marker), 'The child did not receive SIGTERM before the pool escalated');
+$stat = @file_get_contents('/proc/' . $child . '/stat');
+check($stat === false || substr($stat, strrpos($stat, ')') + 2, 1) === 'Z', 'The worker\'s child outlived the pool');
+PHP);
+    }
+
     public function testShutdownLetsAnInFlightJobFinishWithinTheDrainDeadline(): void
     {
         $this->runProbe(<<<'PHP'
@@ -196,9 +220,17 @@ final class ShutdownProbeWorker implements ProcessPoolWorkerInterface {
     public function handle(string $payload): string {
         $job = json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
         if ($job['block'] ?? false) {
+            $ready = 'ready';
+            if (isset($job['child'])) {
+                // Stands in for FFmpeg: it stops on SIGTERM and records that it got one. It
+                // starts before the worker ignores SIGTERM, so it does not inherit that.
+                $child = proc_open(['sh', '-c', 'trap "echo term > \"$0\"; exit 0" TERM; while :; do sleep 0.05; done', $job['child']], [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/dev/null', 'w']], $pipes);
+                $ready = (string) proc_get_status($child)['pid'];
+            }
             pcntl_async_signals(true);
             pcntl_signal(SIGTERM, SIG_IGN);
-            file_put_contents($job['started'], 'ready');
+            file_put_contents($job['started'] . '.tmp', $ready);
+            rename($job['started'] . '.tmp', $job['started']);
             while (true) { usleep(100_000); }
         }
         if ($job['delay'] ?? false) {

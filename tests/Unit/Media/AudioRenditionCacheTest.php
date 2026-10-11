@@ -152,6 +152,36 @@ final class AudioRenditionCacheTest extends TestCase
         self::assertStringContainsString('Invalid data found', (string) $this->logs[0]['context']['reason']);
     }
 
+    public function testAStreamWhoseEncodeStopsBeforeTheRenditionIsCompleteFailsInsteadOfEnding(): void
+    {
+        $lock = null;
+        $this->onDispatch = function (string $payload) use (&$lock): void {
+            $job = json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
+            $lock = fopen($job['lock_path'], 'c');
+            self::assertTrue(flock($lock, LOCK_EX));
+            file_put_contents($job['output_path'] . '.part', 'first-');
+        };
+        $rendition = $this->cache()->open(self::TRACK, $this->source, AudioRenditionFormat::Opus, 96_000);
+        $chunks = $this->generator($rendition->chunks());
+        self::assertSame('first-', $chunks->current());
+
+        // The encoder is killed: its lock is released, and no rendition was published.
+        flock($lock, LOCK_UN);
+        fclose($lock);
+        $this->results[$this->dispatched[0]['key']] = ['status' => 'error', 'data' => 'Audio encoder exited with code 255: killed'];
+
+        try {
+            $this->rest($chunks);
+            self::fail('A stream whose encode stopped must not end as if the rendition were complete.');
+        } catch (AudioRenditionFailedException $error) {
+            self::assertStringContainsString('Audio encoder exited with code 255', $error->getMessage());
+        }
+        self::assertCount(1, $this->logs);
+        self::assertSame('error', $this->logs[0]['level']);
+        self::assertStringContainsString('Audio encoder exited with code 255', (string) $this->logs[0]['context']['reason']);
+        self::assertSame([], $this->results, 'the request collected its pool result');
+    }
+
     public function testANewEncodeIsRefusedWithoutDispatchWhenTheEncodeLimitIsReached(): void
     {
         $this->poolAtLimit = true;

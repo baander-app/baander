@@ -236,9 +236,14 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
     /**
      * Stream the rendition from its first byte while the encoder writes it.
      *
+     * An encode that stops before the rendition is complete raises
+     * AudioRenditionFailedException, so the response is cut as a transfer
+     * error instead of ending as if the track were over.
+     *
      * @param array{output: string, partial: string, lock: string} $files
      * @param array<string, string|int> $context
      * @return Generator<int, string>
+     * @throws AudioRenditionFailedException
      */
     private function follow(array $files, ?string $jobKey, array $context): Generator
     {
@@ -282,7 +287,7 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
                     }
                     $failure = 'the encode stopped before the rendition was complete';
 
-                    return;
+                    break;
                 }
 
                 Async::sleep($this->pollIntervalSeconds);
@@ -299,6 +304,9 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
                 $this->logFailure($context, $failure);
             }
         }
+
+        // Only a stopped encode leaves the loop; a complete rendition returns from it.
+        throw new AudioRenditionFailedException('Audio transcoding failed: ' . $failure);
     }
 
     /**

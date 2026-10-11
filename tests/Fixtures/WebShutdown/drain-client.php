@@ -15,6 +15,19 @@ declare(strict_types=1);
  *   keepalive-ready <user>          one kept-alive connection that asks for /ready every 200 ms
  *                                   and records each status and Connection header, until an
  *                                   answer says Connection: close or the connection ends
+ *   held-stream <user> <track>      a progressive stream of a rendition this process holds in
+ *                                   progress and never completes, read as it arrives; records how
+ *                                   the response ended (curl's result code and the bytes received)
+ *   completing-stream <user> <track>
+ *                                   a progressive stream of a rendition this process holds in
+ *                                   progress; one second after /tmp/drain-stop-requested appears it
+ *                                   completes the rendition, and records how the response ended
+ *   ranged-file <user> <track>      a byte-range request for a complete 16 MB rendition, read at
+ *                                   1 MB/s; records the Content-Length and how the response ended
+ *   fifo-encode <user> <track>      replaces the track's source with a FIFO that a real-time
+ *                                   FFmpeg writes, so the server's encoder runs as long as this
+ *                                   process lets it, and streams the encode; records the writer's
+ *                                   process id. Run where app:serve is not PID 1
  */
 
 use App\Tests\Fixtures\WebRuntime\HeldRendition;
@@ -166,6 +179,79 @@ if ($mode === 'ws') {
         }
         usleep(200_000);
     }
+} elseif (in_array($mode, ['held-stream', 'completing-stream', 'ranged-file'], true)) {
+    $track = $arguments[3] ?? '';
+    $sourceFile = $projectDir . '/storage/media/web-runtime/track.flac';
+    // Each mode holds a rendition of its own; the server names renditions by format and bitrate.
+    [$format, $kbps] = ['held-stream' => ['aac', 96], 'completing-stream' => ['aac', 128], 'ranged-file' => ['opus', 64]][$mode];
+    $held = new HeldRendition((string) getenv('CONVERT_STORAGE_PATH'), $track, $sourceFile, $format, $kbps);
+    $query = sprintf('id=%s&format=%s&bitrate=%d', $track, $format, $kbps * 1000);
+    if ($mode === 'ranged-file') {
+        $held->append(HeldRendition::bytes(16 * 1_048_576, 'ranged'));
+        $held->complete();
+        $exchange = $client->open($query, ['Range: bytes=0-'], maxBytesPerSecond: 1_048_576);
+    } else {
+        $held->append(HeldRendition::bytes(65_536, $mode . '-first'));
+        $exchange = $client->open($query);
+    }
+    if (!$exchange->until(static fn ($exchange): bool => strlen($exchange->body) > 0)) {
+        throw new RuntimeException(sprintf('The response did not start (status %d).', $exchange->status()));
+    }
+    record('streaming', sprintf('status=%d length=%s', $exchange->status(), $exchange->header('Content-Length') ?? '-'));
+    $completeAt = null;
+    try {
+        $exchange->until(static function () use ($mode, $held, &$completeAt): bool {
+            if ($mode === 'completing-stream' && $completeAt === null && is_file('/tmp/drain-stop-requested')) {
+                $completeAt = microtime(true) + 1.0;
+            }
+            if ($completeAt !== null && microtime(true) >= $completeAt) {
+                $completeAt = INF;
+                $held->append(HeldRendition::bytes(65_536, 'completing-rest'));
+                $held->complete();
+                record('completed', 'written=' . strlen($held->written));
+            }
+
+            return false;
+        }, 3600.0);
+    } catch (RuntimeException) {
+        // A cut response: curl's result code says how.
+    }
+    record('ended', sprintf(
+        'result=%d bytes=%d complete=%s',
+        $exchange->result,
+        strlen($exchange->body),
+        $exchange->body === $held->written ? 'yes' : 'no',
+    ));
+} elseif ($mode === 'fifo-encode') {
+    $track = $arguments[3] ?? '';
+    $sourceFile = $projectDir . '/storage/media/web-runtime/track.flac';
+    if (!is_file($sourceFile . '.real') && !rename($sourceFile, $sourceFile . '.real')) {
+        throw new RuntimeException('Cannot move the track source aside.');
+    }
+    if (!file_exists($sourceFile) && !posix_mkfifo($sourceFile, 0644)) {
+        throw new RuntimeException('Cannot create the FIFO.');
+    }
+    // FFmpeg opens the FIFO for writing once the server's encoder opens it for reading, then
+    // writes ten minutes of audio in real time.
+    $writer = proc_open([
+        'ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-re',
+        '-f', 'lavfi', '-i', 'sine=frequency=440:duration=600', '-ac', '2', '-ar', '44100',
+        '-c:a', 'flac', '-f', 'flac', '-y', $sourceFile,
+    ], [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/tmp/drain-fifo-writer.log', 'a']], $pipes);
+    if ($writer === false) {
+        throw new RuntimeException('Cannot start the FIFO writer.');
+    }
+    $exchange = $client->open('id=' . $track . '&format=mp3&bitrate=128000');
+    if (!$exchange->until(static fn ($exchange): bool => strlen($exchange->body) > 0, 60.0)) {
+        throw new RuntimeException(sprintf('The encode did not stream (status %d).', $exchange->status()));
+    }
+    record('encoding', 'writer=' . proc_get_status($writer)['pid']);
+    try {
+        $exchange->until(static fn (): bool => false, 3600.0);
+    } catch (RuntimeException) {
+    }
+    record('ended', sprintf('result=%d bytes=%d', $exchange->result, strlen($exchange->body)));
+    sleep(3600);
 } else {
     throw new RuntimeException('Unknown mode ' . $mode);
 }
