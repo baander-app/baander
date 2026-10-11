@@ -9,10 +9,12 @@ Baander exposes three HTTP endpoints for health probing. None of these require a
 | Endpoint | Purpose | Healthy status | Unhealthy status |
 |----------|---------|---------------|-----------------|
 | `GET /health` | Full system health (PostgreSQL, Redis, background worker, Swoole, memory) | `200` with `"status": "healthy"` | `503` with `"status": "unhealthy"` |
-| `GET /ready` | Dependency readiness (PostgreSQL, Redis) | `200` with `"status": "ready"` | `503` with `"status": "not_ready"` |
+| `GET /ready` | Dependency readiness (PostgreSQL, Redis); not ready while the web server drains | `200` with `"status": "ready"` | `503` with `"status": "not_ready"` |
 | `GET /live` | Process liveness (Swoole worker alive) | `200` with `"status": "alive"` | N/A (always 200 if responding) |
 
 `/health` lists the background worker and memory, but neither decides the response code: a worker outage or a web server worker near its memory limit does not turn `/health` into `503`, and `/ready` checks neither. The web server [alerts administrators](notifications.md#health-alerts) about both instead.
+
+While the web server [drains before it stops](upgrading.md#stopping-and-restarting-the-web-server), `/ready` answers `503` without checking any dependency. Its `checks` list holds a single `server` entry whose `details` are `{"draining": true}`. The server accepts no new connections once the drain starts, so only a client that holds a kept-alive connection from before the stop sees this answer, and the answer carries `Connection: close`.
 
 These are designed for orchestration use. The Docker healthcheck does not call an endpoint; it runs the `app:health:check` command. The web image defines it in `Dockerfile`, and the development stack in `docker-compose.yml`:
 
@@ -45,9 +47,9 @@ The health check verifies five components:
 | Redis | `PING` command and database size |
 | Messenger (background worker) | The age of the heartbeat the worker writes to Redis. Unhealthy after 45 seconds without a renewal while idle or 90 seconds while handling a message, and when the heartbeat disappears. A heartbeat that says the worker stopped reads not available for 45 seconds and unhealthy after that; the 45 seconds give a restarted worker time to report in. Not available until a heartbeat has been seen, and while Redis is unreachable. |
 | Swoole | Whether the Swoole extension is loaded and the worker process is running |
-| Memory | The real memory use of each HTTP worker of the web server against PHP's `memory_limit`. Each worker reports every 5 seconds, and the check reads the worker using the most. Unhealthy at 90 percent of the limit; not available when the limit is `-1`. |
+| Memory | The real memory use of each HTTP worker of the web server against PHP's `memory_limit`, which the production image sets to [512M](configuration.md#php-memory-limit). Each worker reports every 5 seconds, and the check reads the worker using the most. Unhealthy at 90 percent of the limit, about 461 MiB at 512M; not available when the limit is `-1`. |
 
-The web server runs these checks every 60 seconds and alerts administrators once per outage; see [Health alerts](notifications.md#health-alerts).
+The web server runs these checks every 60 seconds and alerts administrators once per outage; see [Health alerts](notifications.md#health-alerts). A planned stop or restart of the web server sends no alert: once the server drains, its checks stop. An outage of a checked component while the server is not draining still alerts.
 
 ## Job Monitoring
 

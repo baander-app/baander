@@ -250,6 +250,7 @@ Constrains how many distinct IPs a single token can bind to, to detect token the
 |----------|---------|-------------|
 | `DEFAULT_URI` | `https://localhost` | Base URL used by the router for generating absolute URLs. Should match `APP_URL` in production. |
 | `HEALTH_MONITOR_INTERVAL_SECONDS` | `60` | Seconds between the web server's health checks, which raise [health alerts](notifications.md#health-alerts). |
+| `WEB_DRAIN_SECONDS` | `30` | The web server's drain deadline: how many seconds a stop or restart of the web server may take at most. At least `8`; a smaller value stops the server from starting. Give the container a stop timeout of this value plus 5 seconds; see [Stopping and restarting the web server](upgrading.md#stopping-and-restarting-the-web-server). |
 
 ### Swoole
 
@@ -259,6 +260,22 @@ Configured in `config/packages/swoole.yaml`:
 |---------|---------|-------------|
 | `swoole.http_server.host` | `0.0.0.0` | Address to bind the HTTP server. |
 | `swoole.http_server.port` | `9501` | HTTP server port. |
+| `swoole.http_server.shutdown_timeout` | `WEB_DRAIN_SECONDS` | Seconds `swoole:server:stop` expects a stop to take; it waits 5 seconds longer for the server to exit. |
+| `swoole.http_server.settings.heartbeat_check_interval` | `1` | Seconds between Swoole's checks for idle connections. A stop waits for the current interval to end before any worker stops, so keep it short. |
+
+Swoole's `max_wait_time` is not set in this file. When the server starts, it derives the whole drain budget from the deadline D, `WEB_DRAIN_SECONDS`:
+
+- the drain window, during which requests finish and clients are told to reconnect, is `floor((D - 4) / 2)`: 13 seconds at the default of 30;
+- `max_wait_time` is `floor((D - 4 - window) / 2)`: 6 seconds at the default. After the window, Swoole stops the HTTP workers and then the task workers, waiting up to `max_wait_time` for each group;
+- 4 seconds are kept for stopping the CPU process pool, which takes up to 3 seconds, and a 1-second margin.
+
+The window, twice `max_wait_time` and those 4 seconds never add up to more than D.
+
+The startup table of `app:serve` shows the derived `max_wait_time`, and the line the server logs when a drain starts names the deadline, the window and `max_wait_time`.
+
+### PHP memory limit
+
+The production image sets `memory_limit` to `512M` in `/usr/local/etc/php/conf.d/zz-baander-production-memory.ini`. Every PHP process in the image reads it: the web server, the `app:health:check` HEALTHCHECK and console commands. The web server's [memory check](monitoring.md#what-is-checked) measures each HTTP worker against this limit. The worker supervisor (`app:worker`) sets its children's limits itself with `-d`. To change the limit, override the file or add a later one in `conf.d`.
 
 ## Library Scanner Security
 

@@ -98,11 +98,11 @@ The encoding loop listens for playback position changes (seeks and pauses) via t
 
 On pause, dispatching stops and the loop waits. In-flight segments are allowed to finish before the loop goes idle.
 
-### Graceful Restarts
+### Restarts
 
-When the server receives a shutdown signal, the `GracefulRestartHandler` persists all active job state to disk (`var/transcode_state/<job-public-id>.json`). The state file includes the list of completed segments, the current segment index, and the quality tier.
+When the web server stops, it [drains](upgrading.md#stopping-and-restarting-the-web-server). As each HTTP worker stops, its encoding loops stop and release their loop leases, and the FFmpeg processes the worker started stop with them. The CPU process pool stops after the workers. Each FFmpeg process runs in its own process group, and the pool stops the whole group, first with `SIGTERM` and then with `SIGKILL`, so no encoder outlives the server.
 
-On restart, the handler scans for persisted state files, verifies that previously completed segments still exist on disk, and resumes encoding from the next unencoded segment. This means a server restart does not lose transcoding progress.
+The server does not resume transcode sessions after a restart. The sessions whose encoding loops the drain stopped end as failed, so a player that asks for the same video again gets a new session, and its encode starts again. The encoding loop writes each job's state to `var/transcode_state/<job-public-id>.json` as it saves the job, but nothing reads those files when the server starts. `GracefulRestartHandler`, which would resume persisted jobs, is groundwork for the movie feature; nothing calls it today.
 
 See [Monitoring](monitoring.md) for checking job status and pool health.
 
@@ -154,11 +154,13 @@ The transcode cache sweep (`app:transcode:cache-sweep`) treats each track's rend
 
 The web player always asks for the original file first. When the browser rejects it as an unsupported source, the player asks for the same track as Opus, then AAC, then MP3, without a bitrate, so the server applies `transcode.max_bitrate`. While a transcoded stream is still encoding, the player refuses to seek and says so. If the transcoded stream fails as well, playback stops with an error message. With `transcode.enabled` off, a track the browser cannot play therefore does not play in the web player.
 
+When the web server restarts during a transcoded stream, the server cuts the stream as an error and the rendition's encode stops. After the restart, the next request for the rendition starts its encode again from the beginning. The player keeps the listener's position, requests the track again until the rendition is complete, and then continues at that position; see [Listeners during a restart](upgrading.md#listeners-during-a-restart).
+
 ## Configuration
 
 Transcoding does not have dedicated environment variables. Audio transcoding is switched on and capped with the [server settings](#settings) above. The rest of the relevant configuration is:
 
 - **CPU process pool worker count** -- set `$workerCount` in `config/services.yaml` (default: 2). See [Configuration](configuration.md) for general server settings.
-- **State directory** -- persisted job state is written to `var/transcode_state/` inside the container. Ensure this directory is on a persistent volume if you deploy with ephemeral containers.
+- **State directory** -- the encoding loop writes job state to `var/transcode_state/` inside the container. Nothing reads it after a restart yet; see [Restarts](#restarts).
 - **FFmpeg path** -- hardcoded to `/usr/local/bin/ffmpeg` in `TranscodePoolWorker`.
 - **Source media path** -- mounted read-only into the container (see `docker-compose.yml` volumes).
