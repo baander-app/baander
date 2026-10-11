@@ -135,12 +135,21 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
      * lock renewal timer is cleared, its encoder killed and its loop lock released, so a
      * restarted server can take the job over at once. The job keeps its in-progress state.
      * A loop still suspended sees that it lost ownership and ends without writing.
+     *
+     * @return list<Uuid> The jobs whose loop this worker still owned when it stopped them. A job
+     *                    whose loop lock was lost may have a loop in another worker by now.
      */
-    public function stopAllLoops(): void
+    public function stopAllLoops(): array
     {
+        $stopped = [];
         foreach ($this->loopOwnership as $jobKey => $ownership) {
-            $this->cleanupLoop(Uuid::fromString($jobKey), $ownership);
+            $jobId = Uuid::fromString($jobKey);
+            if ($this->cleanupLoop($jobId, $ownership)) {
+                $stopped[] = $jobId;
+            }
         }
+
+        return $stopped;
     }
 
     private function runEncodingLoop(Uuid $sessionId, TranscodeLoopLeaseInterface $lease): void
@@ -472,19 +481,22 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
         }
     }
 
-    private function cleanupLoop(Uuid $jobId, TranscodeLoopOwnership $ownership): void
+    /** @return bool Whether the loop still owned its lock, which this cleanup then releases */
+    private function cleanupLoop(Uuid $jobId, TranscodeLoopOwnership $ownership): bool
     {
         $jobKey = $jobId->toString();
         if (($this->loopOwnership[$jobKey] ?? null) !== $ownership) {
-            return;
+            return false;
         }
         $ownership->close();
+        $owned = false;
         // Cleanup must continue if a timer, process or transport cleanup fails.
         $actions = [
             fn() => $this->stopLockRenewal($jobId),
             fn() => $this->streamManager?->stopStream($jobId),
-            function () use ($ownership): void {
+            function () use ($ownership, &$owned): void {
                 if (!$ownership->isLost()) {
+                    $owned = true;
                     $ownership->lease->release();
                 }
             },
@@ -492,7 +504,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
         ];
         foreach ($actions as $action) {
             if (($this->loopOwnership[$jobKey] ?? null) !== $ownership) {
-                return;
+                return $owned;
             }
             try {
                 $action();
@@ -505,6 +517,8 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
         if (($this->loopOwnership[$jobKey] ?? null) === $ownership) {
             unset($this->loopOwnership[$jobKey]);
         }
+
+        return $owned;
     }
 
     private function failJob(TranscodeJob $job, string $reason, TranscodeLoopOwnership $ownership): void

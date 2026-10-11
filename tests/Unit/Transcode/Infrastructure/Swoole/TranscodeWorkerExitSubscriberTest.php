@@ -9,6 +9,8 @@ use App\Catalog\Domain\Repository\VideoRepositoryInterface;
 use App\Shared\Application\Port\ServerDrainStateInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool;
+use App\Transcode\Application\Command\FailInterruptedTranscodeSessionsCommand;
+use App\Transcode\Application\CommandHandler\FailInterruptedTranscodeSessionsHandler;
 use App\Transcode\Application\Port\FFmpegPortInterface;
 use App\Transcode\Application\Port\SegmentAvailabilityInterface;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
@@ -20,6 +22,7 @@ use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
+use App\Transcode\Domain\ValueObject\SessionState;
 use App\Transcode\Domain\ValueObject\TranscodeStatus;
 use App\Transcode\Domain\ValueObject\VideoProbeResult;
 use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
@@ -31,20 +34,32 @@ use App\Transcode\Infrastructure\Swoole\TranscodeProcessPool;
 use App\Transcode\Infrastructure\Swoole\TranscodeSessionSubscriber;
 use App\Transcode\Infrastructure\Swoole\TranscodeStreamManager;
 use App\Transcode\Infrastructure\Swoole\TranscodeWorkerExitSubscriber;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
+use Psr\Log\AbstractLogger;
 use ReflectionMethod;
 use ReflectionProperty;
 use Swoole\Coroutine;
 use Swoole\Server;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerExitedEvent;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\Messenger\Handler\HandlersLocator;
+use Symfony\Component\Messenger\MessageBus;
+use Symfony\Component\Messenger\Middleware\HandleMessageMiddleware;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 /**
  * Runs a real encoding loop, suspended while its video encoder runs, and then exits the worker:
- * a reload leaves it running, a drain stops it, kills the encoder and releases the loop lock.
+ * a reload leaves it running, a drain stops it, kills the encoder, releases the loop lock and then
+ * ends the loop's session as failed, so a client asking again gets a new session.
+ *
+ * Each test runs in a separate process: Xdebug's develop mode crashes Swoole's coroutine runtime
+ * (exit 139, Swoole 6.2), and PHPUnit starts an isolated test with Xdebug off unless coverage or a
+ * debugger needs it.
  */
+#[RunTestsInSeparateProcesses]
+#[PreserveGlobalState(false)]
 final class TranscodeWorkerExitSubscriberTest extends TestCase
 {
     private string $directory;
@@ -71,12 +86,47 @@ final class TranscodeWorkerExitSubscriberTest extends TestCase
         rmdir($this->directory);
     }
 
-    public function testADrainingWorkerStopsItsLoopsKillsTheEncoderAndReleasesTheLoopLock(): void
+    public function testADrainingWorkerStopsItsLoopsKillsTheEncoderReleasesTheLoopLockAndFailsTheSession(): void
+    {
+        $this->inCoroutine(function (): void {
+            $result = $this->drainScenario();
+
+            self::assertSame([SessionState::Failed], $result['savedAfterDrain'], 'The drain fails the session once.');
+            self::assertSame([[9]], $result['signalsAtSessionWrite'], 'The session ends after the encoder was killed.');
+            self::assertSame([], $result['errors']);
+        });
+    }
+
+    public function testADrainLeavesTheSessionOfALoopThatLostItsLockToItsNewOwner(): void
+    {
+        $this->inCoroutine(function (): void {
+            $result = $this->drainScenario(ownershipLost: true);
+
+            self::assertSame([], $result['savedAfterDrain']);
+            self::assertSame(SessionState::Active, $result['session']->getSessionState());
+            self::assertSame(0, $result['releases'], 'A lost lock is not released.');
+            self::assertSame([], $result['errors']);
+        });
+    }
+
+    public function testADatabaseFailureWhileFailingTheSessionIsLoggedAfterTheEncoderStopped(): void
+    {
+        $this->inCoroutine(function (): void {
+            $result = $this->drainScenario(storeFails: true);
+
+            self::assertSame([], $result['savedAfterDrain']);
+            self::assertSame([[9]], $result['signalsAtSessionWrite']);
+            self::assertSame(1, $result['releases']);
+            self::assertSame(['Interrupted transcode sessions were not ended as the worker exits'], $result['errors']);
+        });
+    }
+
+    private function inCoroutine(\Closure $test): void
     {
         $failure = null;
-        Coroutine\run(function () use (&$failure): void {
+        Coroutine\run(static function () use ($test, &$failure): void {
             try {
-                $this->drainScenario();
+                $test();
             } catch (\Throwable $error) {
                 $failure = $error;
             }
@@ -86,7 +136,10 @@ final class TranscodeWorkerExitSubscriberTest extends TestCase
         }
     }
 
-    private function drainScenario(): void
+    /**
+     * @return array{session: TranscodeSession, savedAfterDrain: list<SessionState>, signalsAtSessionWrite: list<list<int>>, releases: int, errors: list<string>}
+     */
+    private function drainScenario(bool $ownershipLost = false, bool $storeFails = false): array
     {
         $drain = new class implements ServerDrainStateInterface {
             public bool $draining = false;
@@ -98,7 +151,7 @@ final class TranscodeWorkerExitSubscriberTest extends TestCase
         };
         $timer = new ExitRenewalTimer();
         $spawner = new ExitProcessSpawner();
-        $logger = new NullLogger();
+        $logger = new ExitRecordingLogger();
         $json = new JsonEncoder();
         $video = Video::create($this->directory . '/source', 'exit-fixture');
         $tier = QualityTier::p720();
@@ -116,6 +169,8 @@ final class TranscodeWorkerExitSubscriberTest extends TestCase
         $session->markActive();
 
         $writes = 0;
+        $savedAfterDrain = [];
+        $signalsAtSessionWrite = [];
         $jobs = $this->createStub(TranscodeJobPortInterface::class);
         $jobs->method('findByUuid')->willReturn($job);
         $jobs->method('save')->willReturnCallback(static function () use (&$writes): void {
@@ -123,9 +178,23 @@ final class TranscodeWorkerExitSubscriberTest extends TestCase
         });
         $sessions = $this->createStub(TranscodeSessionPortInterface::class);
         $sessions->method('findByUuid')->willReturn($session);
-        $sessions->method('save')->willReturnCallback(static function () use (&$writes): void {
-            ++$writes;
-        });
+        $sessions->method('findByJob')->willReturnCallback(
+            static fn (Uuid $jobId): array => $jobId->equals($job->getId()) ? [$session] : [],
+        );
+        $sessions->method('save')->willReturnCallback(
+            static function (TranscodeSession $saved) use (&$writes, $drain, &$savedAfterDrain, &$signalsAtSessionWrite, $spawner, $storeFails): void {
+                if (!$drain->draining) {
+                    ++$writes;
+
+                    return;
+                }
+                $signalsAtSessionWrite[] = $spawner->signals;
+                if ($storeFails) {
+                    throw new \RuntimeException('SQLSTATE[08006] could not connect to server');
+                }
+                $savedAfterDrain[] = $saved->getSessionState();
+            },
+        );
         $videos = $this->createStub(VideoRepositoryInterface::class);
         $videos->method('findByUuid')->willReturn($video);
         $storage = $this->createStub(TranscodeStoragePortInterface::class);
@@ -157,7 +226,10 @@ final class TranscodeWorkerExitSubscriberTest extends TestCase
         $lease->method('release')->willReturnCallback(static function () use (&$releases): void {
             ++$releases;
         });
-        $subscriber = new TranscodeWorkerExitSubscriber($drain, $loops, $manager, $logger);
+        $bus = new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
+            FailInterruptedTranscodeSessionsCommand::class => [new FailInterruptedTranscodeSessionsHandler($sessions)],
+        ]))]);
+        $subscriber = new TranscodeWorkerExitSubscriber($drain, $loops, $manager, $bus, $logger);
         $exit = new WorkerExitedEvent((new \ReflectionClass(Server::class))->newInstanceWithoutConstructor(), 0);
 
         $loopEnded = false;
@@ -177,6 +249,10 @@ final class TranscodeWorkerExitSubscriberTest extends TestCase
         self::assertSame(0, $releases);
         self::assertSame([], $timer->cleared);
 
+        if ($ownershipLost) {
+            $ownership = (new ReflectionProperty($loops, 'loopOwnership'))->getValue($loops)[$job->getId()->toString()];
+            $ownership->markLost();
+        }
         $drain->draining = true;
         $subscriber->onWorkerExited($exit);
         $subscriber->onWorkerExited($exit);
@@ -186,12 +262,33 @@ final class TranscodeWorkerExitSubscriberTest extends TestCase
         self::assertFalse($manager->isStreaming($job->getId()));
         self::assertSame([9], $spawner->signals, 'The encoder is killed once.');
         self::assertSame(1, $spawner->closeCount);
-        self::assertSame(1, $releases, 'The loop lock is released once.');
+        self::assertSame($ownershipLost ? 0 : 1, $releases, 'The loop lock is released once.');
         self::assertSame([1], $timer->cleared, 'The lock renewal timer is cleared.');
         self::assertSame([], (new ReflectionProperty($loops, 'loopOwnership'))->getValue($loops));
         self::assertSame(TranscodeStatus::InProgress, $job->getStatus(), 'The job is resumed after the restart.');
         self::assertSame($writesWhileRunning, $writes, 'The stopped loop writes nothing.');
         self::assertSame([], $events);
+
+        return [
+            'session' => $session,
+            'savedAfterDrain' => $savedAfterDrain,
+            'signalsAtSessionWrite' => $signalsAtSessionWrite,
+            'releases' => $releases,
+            'errors' => $logger->errors,
+        ];
+    }
+}
+
+final class ExitRecordingLogger extends AbstractLogger
+{
+    /** @var list<string> */
+    public array $errors = [];
+
+    public function log($level, \Stringable|string $message, array $context = []): void
+    {
+        if ($level === 'error') {
+            $this->errors[] = (string) $message;
+        }
     }
 }
 
