@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-10-10. This is the working delivery record for the remediation,
+Updated: 2026-10-11. This is the working delivery record for the remediation,
 registry, and web-state plans. Update it when scope changes or a stage is verified.
 Completed code is not proof of production or performance qualification.
 
@@ -18,8 +18,8 @@ roadmap records scope and acceptance; the linked design documents, current sourc
 and CI workflow are the executable detail. Measurements in later historical
 batches describe their own checkpoints; the current gate below takes precedence.
 
-The backend release-gate package is complete (see the next two sections). Three
-plans followed it, in this order, and all three are delivered:
+The backend release-gate package is complete (see the next two sections). Four
+plans followed it, in this order, and all four are delivered:
 
 1. [General settings and email language](docs/plans/2026-10-07-1736-feat-general-settings-email-language-plan.md):
    one definition-driven settings mechanism, the per-user email language, and the
@@ -105,6 +105,47 @@ plans followed it, in this order, and all three are delivered:
    directory lacks, where Doctrine would have rerun them. Accepted limits: a `since`
    filter at whole-second API precision can return a row from its own second again,
    and a cursor issued before the change may repeat one row.
+4. [Web server drain on container stop](docs/plans/2026-10-11-1121-fix-web-server-drain-plan.md):
+   stopping or restarting the web container no longer interrupts listeners. Delivered on
+   2026-10-11 (branch `plan/item4-web-shutdown`). `docker stop` used to end in SIGKILL:
+   the CPU pool's health timer kept Swoole's master running after SIGTERM, and shutdown
+   then waited on a heartbeat thread with a 60-second interval. Now SIGTERM, SIGINT,
+   `DELETE /api/server` and `swoole:server:stop` enter one drain from `onBeforeShutdown`,
+   bounded by `WEB_DRAIN_SECONDS` (30 by default; the stop timeout must be at least 5
+   seconds longer).
+
+   Swoole closes client connections before it signals the workers, so the master holds
+   a drain window open while the workers drain. In that window WebSockets close with
+   1012 and `/ready` answers 503. Requests and file downloads in progress finish. Streams
+   still open near the end of the window are cut as errors, never ended cleanly, and
+   every FFmpeg stops with its process group. A watchdog process kills a manager or pool
+   that does not stop, and the server then exits 1. An idle stop takes under a second.
+
+   When its stream fails or stalls, the web player probes `/live` and, once the server
+   answers, resumes the same track at its position; a transcoded track waits for its
+   complete rendition. Firefox reports a cut stream as an error and then fires `ended`;
+   the error wins (user decision, 2026-10-11). Session-sync sockets reconnect with a
+   current token, a refresh that fails during a restart no longer signs users out, and
+   the playing device keeps its position on rejoin. Production PHP runs at 512M.
+
+   `scripts/test-web-shutdown-container.sh` runs the server as PID 1 and covers every
+   stop route, stalled clients, a stopped worker and manager, PostgreSQL down, and worker
+   memory against the limit; CI runs it. `media-interruption.spec.ts` and
+   `stream-recovery.spec.ts` cover the browsers.
+
+   Found and fixed on the way: a throwing streamed-response generator ended the stream
+   cleanly and killed its worker; a stopped encode ended a progressive stream as if it
+   were complete; a drain left video sessions live for 60 s with no loop behind them;
+   a start-up cleanup query in the master left the server half-started when PostgreSQL
+   was down; two unit tests hung or crashed the unit run in the CI image. Still open:
+   - Safari's resume after a restart is a manual check that has not been run;
+     Playwright's Linux WebKit uses GStreamer and could not seek after an outage.
+   - The manual restart of the dev stack with a song playing has not been run; the dev
+     database must be reconciled first (below).
+   - No drill drains an HLS video session; that path has unit coverage only.
+   - In development, Xdebug's `develop` mode crashes a coroutine woken by
+     `Coroutine::cancel()`, so a dev server stopped with a stream in flight may log a
+     worker crash. Production and the drills run without Xdebug.
 
 The local dev database (`baander` in `baander-postgres`) records the migration class
 names from before the rename and is about 40 migrations behind (last migrated on
@@ -118,28 +159,27 @@ resource, and soak gates. Regional hosts and the S3 destination remain external
 blockers. Do not mark deployment or restore acceptance complete from local cluster
 tests. React Native and Android remain deferred; Android's device login posts to a
 pairing endpoint that does not exist and needs a decision when that work resumes.
-Not yet fixed: `app:serve` runs its shutdown only on SIGINT, and even then force-stops
-its workers after 5 seconds; SIGTERM does not stop it, so `docker stop` likely kills
-the web container at the end of its grace period instead of draining it. The
-production image also runs PHP's default `memory_limit` of 128M from
-`php.ini-production`, which the new memory check now measures each web worker against.
 
 ## Current quality-gate checkpoint
 
-Last recorded on 2026-10-10, at the end of the ROADMAP item 3 timestamp work
-(branch `plan/item3-timestamps`), all in the CI image unless noted:
+Last recorded on 2026-10-11, at the end of the ROADMAP item 4 drain work (branch
+`plan/item4-web-shutdown`), all in a CI image built from the branch unless noted:
 
-- Unit suite: 5,950 tests pass. Functional: 1,449 tests in 131 shards; Integration:
-  1,000 tests in 101 shards; no failures.
+- Unit suite: 6,008 tests in 24 shards pass. Functional: 1,449 tests in 131 shards;
+  Integration: 1,004 tests in 101 shards; no failures.
 - PHPStan: no errors on a full scan. Deptrac: 0 violations. Container lint passes.
-  The OpenAPI specification check passes in the CI image, and on the host with a
-  fresh cache (a stale host test cache reports a false mismatch).
-- Runtime drills: the worker drill and the web drill pass.
-- Web: the regenerated API client changed only in order; the typecheck passes. The
-  test suite and lint were not rerun since the item 2 checkpoint (1,842 tests in 173
-  files; lint at zero errors, four existing lint warnings).
+  The OpenAPI specification check passes.
+- Runtime drills: the web drain drill (also in CI mode), the web runtime drill, the
+  worker runtime, command, operator and production drills, the outbox and producer
+  drills and the container start-up check pass.
+- Web: 1,888 tests in 176 files pass; the typecheck passes; lint has zero errors and
+  the four existing warnings. The audio-graph suite passes in Chromium and Firefox on
+  the host and in WebKit in the Playwright container.
 - `ui/rn` is deferred indefinitely (84 `tsc` errors and 25 Jest failures); no CI
   job runs it.
+
+The item 3 checkpoint, on 2026-10-10: unit 5,950; functional 1,449; integration 1,000;
+web 1,842 (from item 2); PHPStan clean; Deptrac 0.
 
 The item 1 checkpoint, earlier on 2026-10-10: unit 5,917; functional 1,439;
 integration 982. The item 2 checkpoint: unit 5,846; functional 1,438;
