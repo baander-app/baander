@@ -28,7 +28,7 @@ use SwooleBundle\SwooleBundle\Server\LifecycleHandler\ServerBeforeShutdownHandle
  * 4. holds the drain window open with a timer of its own. While that timer runs, the master keeps
  *    its reactor threads and so every client connection, and the workers drain. The timer ends
  *    once every event worker has reported drained and no client connection has output left to
- *    send (see connectionsStillSending()), or after the window S. It first resets every client
+ *    send (see anyConnectionStillSending()), or after the window S. It first resets every client
  *    connection still open (see abortSocket()), so that joining the reactor threads cannot wait
  *    on a client that stopped reading.
  *
@@ -123,7 +123,7 @@ final class DrainCoordinator implements ServerBeforeShutdownHandler, Configurato
         Timer::tick(self::WINDOW_TICK_MILLISECONDS, function (int $timerId) use ($server, $startedAtNs, $windowEndsAtNs, $eventWorkers): void {
             $passed = hrtime(true) >= $windowEndsAtNs;
             $drained = $this->state->allWorkersDrained($eventWorkers);
-            if (!$passed && (!$drained || self::connectionsStillSending($server) > 0)) {
+            if (!$passed && (!$drained || self::anyConnectionStillSending($server))) {
                 return;
             }
             Timer::clear($timerId);
@@ -138,35 +138,38 @@ final class DrainCoordinator implements ServerBeforeShutdownHandler, Configurato
     }
 
     /**
-     * The client connections with output their clients have not yet received. A file response
+     * Whether any client connection has output its client has not yet received. A file response
      * (the bundle's sendfile) leaves its worker idle as soon as the worker hands the file to the
      * reactor thread, so worker_concurrency does not count it, and Swoole's send_queued_bytes
      * stays 0 while the reactor thread sends the file. The kernel's send queue of the socket
      * does show it: the reactor thread keeps that queue filled until it has sent the whole file,
      * and the queue empties once the client has acknowledged every byte. Swoole's own output
-     * buffer (send_queued_bytes) counts too.
+     * buffer (send_queued_bytes) counts too. The kernel's send queues are read only when a
+     * connection needs them.
      */
-    private static function connectionsStillSending(Server $server): int
+    private static function anyConnectionStillSending(Server $server): bool
     {
-        $queued = self::kernelSendQueues();
-        $sending = 0;
+        $queued = null;
         foreach ($server->connections as $fd) {
             $info = $server->getClientInfo((int) $fd);
             if (!is_array($info)) {
                 continue;
             }
             if ((int) ($info['send_queued_bytes'] ?? 0) > 0) {
-                ++$sending;
-                continue;
+                return true;
             }
             $socketFd = $info['socket_fd'] ?? null;
             $link = is_int($socketFd) ? @readlink('/proc/self/fd/' . $socketFd) : false;
-            if (is_string($link) && preg_match('/^socket:\[(\d+)]$/', $link, $inode) === 1 && isset($queued[$inode[1]])) {
-                ++$sending;
+            if (!is_string($link) || preg_match('/^socket:\[(\d+)]$/', $link, $inode) !== 1) {
+                continue;
+            }
+            $queued ??= self::kernelSendQueues();
+            if (isset($queued[$inode[1]])) {
+                return true;
             }
         }
 
-        return $sending;
+        return false;
     }
 
     /**
