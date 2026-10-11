@@ -60,9 +60,11 @@ swoole:
             worker_max_request: 0
             # Grace period unused when recycling is disabled.
             worker_max_request_grace: 0
-            # Heartbeat — detect and close stuck connections every 60s,
-            # close idle connections after 300s (5 min).
-            heartbeat_check_interval: 60
+            # Heartbeat — close connections idle for 300s (5 min), checked every second.
+            # Swoole's heartbeat thread sleeps this interval with signals blocked, and
+            # shutdown joins that thread before it stops any worker: an interval of 60
+            # added up to a minute to every stop.
+            heartbeat_check_interval: 1
             heartbeat_idle_time: 300
             # Max time (seconds) master waits for workers to exit on shutdown.
             max_wait_time: 5

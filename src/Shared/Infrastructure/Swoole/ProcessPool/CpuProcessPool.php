@@ -464,7 +464,8 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
         });
     }
 
-    private function stopHealthCheck(): void
+    /** Ends the owner's health check, which would otherwise keep the server master's event loop running. */
+    public function stopHealthCheck(): void
     {
         if ($this->healthTimerId !== null && $this->healthTimerOwnerPid === getmypid()) {
             \Swoole\Timer::clear($this->healthTimerId);

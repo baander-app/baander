@@ -13,9 +13,10 @@ use Swoole\Server;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerErrorEvent;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerStartedEvent;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerStoppedEvent;
+use SwooleBundle\SwooleBundle\Server\Configurator\Configurator;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
-final class SwooleWorkerEventSubscriber implements EventSubscriberInterface
+final class SwooleWorkerEventSubscriber implements EventSubscriberInterface, Configurator
 {
     private bool $shuttingDown = false;
 
@@ -39,15 +40,24 @@ final class SwooleWorkerEventSubscriber implements EventSubscriberInterface
         ];
     }
 
+    /**
+     * After SIGTERM, Swoole keeps the master's event loop running until no timer is left in it,
+     * and it checks for timers before it checks its own max_wait_time deadline. The CPU pool's
+     * health check is a timer in the master, so it ends when shutdown begins; otherwise the master
+     * never stops and the container waits for SIGKILL.
+     */
+    public function configure(Server $server): void
+    {
+        $server->on('BeforeShutdown', function (): void {
+            $this->cpuProcessPool()?->stopHealthCheck();
+        });
+    }
+
     public function onServerStarted(ServerStartedEvent $event): void
     {
         $server = $event->getServer();
-        $pool = null;
-
-        if ($this->cpuProcessPoolLocator !== null && $this->cpuProcessPoolLocator->has(CpuProcessPool::class)) {
-            $pool = $this->cpuProcessPoolLocator->get(CpuProcessPool::class);
-            $pool->startHealthCheck();
-        }
+        $pool = $this->cpuProcessPool();
+        $pool?->startHealthCheck();
 
         \Swoole\Process::signal(SIGINT, function () use ($server, $pool): void {
             $this->shuttingDown = true;
@@ -72,6 +82,15 @@ final class SwooleWorkerEventSubscriber implements EventSubscriberInterface
                 posix_kill(posix_getpid(), SIGKILL);
             });
         });
+    }
+
+    private function cpuProcessPool(): ?CpuProcessPool
+    {
+        if ($this->cpuProcessPoolLocator === null || !$this->cpuProcessPoolLocator->has(CpuProcessPool::class)) {
+            return null;
+        }
+
+        return $this->cpuProcessPoolLocator->get(CpuProcessPool::class);
     }
 
     public function onWorkerStarted(WorkerStartedEvent $event): void
