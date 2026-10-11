@@ -432,13 +432,6 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
         }
     }
 
-    public function registerShutdownSignals(): void
-    {
-        // Signal registration moved to SwooleWorkerEventSubscriber::onServerStarted()
-        // so that the shutdown message and server->shutdown() are always wired up,
-        // even when the pool has no handlers.
-    }
-
     public function startHealthCheck(): void
     {
         if ($this->ownerPid !== null && $this->ownerPid !== getmypid()) {
@@ -611,6 +604,16 @@ final class CpuProcessPool implements Bootable, CpuProcessPoolInterface
         return $worker !== null && is_array($state)
             && $state['generation'] === $this->bootGeneration && $state['alive'] === 1
             && $state['pid'] === $worker->pid;
+    }
+
+    /**
+     * The process ids of the pool's workers that have not been reaped.
+     *
+     * @return list<int>
+     */
+    public function workerPids(): array
+    {
+        return array_values(array_map(static fn (Process $worker): int => (int) $worker->pid, $this->workers));
     }
 
     public function getWorkerCount(): int

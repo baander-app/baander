@@ -19,6 +19,7 @@ use SwooleBundle\SwooleBundle\Server\HttpServerFactory;
 use SwooleBundle\SwooleBundle\Server\Runtime\Bootable;
 use Symfony\Component\DependencyInjection\Loader\Configurator\ContainerConfigurator;
 
+use function Symfony\Component\DependencyInjection\Loader\Configurator\param;
 use function Symfony\Component\DependencyInjection\Loader\Configurator\service;
 
 return static function (ContainerConfigurator $containerConfigurator): void {
@@ -36,9 +37,8 @@ return static function (ContainerConfigurator $containerConfigurator): void {
         ]);
 
     $services->set(ServerStopCommand::class)
-        ->arg('$server', service(HttpServer::class))
-        ->arg('$serverConfiguration', service(HttpServerConfiguration::class))
-        ->arg('$parameterBag', service('parameter_bag'))
+        ->arg('$apiServerClientFactory', service(ApiServerClientFactory::class))
+        ->arg('$shutdownTimeout', param('swoole.http_server.shutdown_timeout'))
         ->tag('console.command', [
             'command' => 'swoole:server:stop',
         ]);

@@ -38,6 +38,13 @@ abstract class ServerExecutionCommand extends Command
 
     private bool $testing = false;
 
+    /**
+     * The settings of the configured Swoole server, for the startup table.
+     *
+     * @var array<string, mixed>
+     */
+    private array $swooleSettings = [];
+
     public function __construct(
         private readonly HttpServerFactory $httpServerFactory,
         private readonly HttpServer $server,
@@ -90,6 +97,8 @@ abstract class ServerExecutionCommand extends Command
         $swooleServer = $this->makeSwooleHttpServer();
         $this->serverConfigurator->configure($swooleServer);
         $this->server->attach($swooleServer);
+        // Configurators may change settings after the bundle's own, such as max_wait_time.
+        $this->swooleSettings = $swooleServer->setting;
 
         // TODO: Lock server configuration here
         //        $this->serverConfiguration->lock();
@@ -337,7 +346,7 @@ abstract class ServerExecutionCommand extends Command
             ['reactor_count', (string)$serverConfiguration->getReactorCount()],
             ['worker_max_request', (string)$serverConfiguration->getMaxRequest()],
             ['worker_max_request_grace', (string)$serverConfiguration->getMaxRequestGrace()],
-            ['max_wait_time', (string)($settings['max_wait_time'] ?? 'default')],
+            ['max_wait_time', $this->settingToPrint('max_wait_time')],
             ['dispatch_mode', (string)($serverConfiguration->getDispatchMode() ?? 'default')],
             ['reload_async', $serverConfiguration->isReloadAsync() ? 'true' : 'false'],
             ['task_max_request', (string)($serverConfiguration->getTaskMaxRequest() ?? 'default')],
@@ -365,6 +374,13 @@ abstract class ServerExecutionCommand extends Command
         }
 
         return $rows;
+    }
+
+    private function settingToPrint(string $name): string
+    {
+        $value = $this->swooleSettings[$name] ?? null;
+
+        return is_scalar($value) ? (string)$value : 'default';
     }
 
     protected function startServer(

@@ -9,17 +9,13 @@ use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool;
 use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\ServerStartedEvent;
-use Swoole\Server;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerErrorEvent;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerStartedEvent;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerStoppedEvent;
-use SwooleBundle\SwooleBundle\Server\Configurator\Configurator;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
-final class SwooleWorkerEventSubscriber implements EventSubscriberInterface, Configurator
+final class SwooleWorkerEventSubscriber implements EventSubscriberInterface
 {
-    private bool $shuttingDown = false;
-
     public function __construct(
         private readonly SwooleWorkerEventBuffer $buffer,
         private readonly ?ContainerInterface $cpuProcessPoolLocator = null,
@@ -41,46 +37,16 @@ final class SwooleWorkerEventSubscriber implements EventSubscriberInterface, Con
     }
 
     /**
-     * After SIGTERM, Swoole keeps the master's event loop running until no timer is left in it,
-     * and it checks for timers before it checks its own max_wait_time deadline. The CPU pool's
-     * health check is a timer in the master, so it ends when shutdown begins; otherwise the master
-     * never stops and the container waits for SIGKILL.
+     * The CPU pool's health check runs in the master until the drain ends it (DrainCoordinator).
+     * SIGINT starts the same drain as SIGTERM: Server::shutdown() sends SIGTERM to the master.
      */
-    public function configure(Server $server): void
-    {
-        $server->on('BeforeShutdown', function (): void {
-            $this->cpuProcessPool()?->stopHealthCheck();
-        });
-    }
-
     public function onServerStarted(ServerStartedEvent $event): void
     {
         $server = $event->getServer();
-        $pool = $this->cpuProcessPool();
-        $pool?->startHealthCheck();
+        $this->cpuProcessPool()?->startHealthCheck();
 
-        \Swoole\Process::signal(SIGINT, function () use ($server, $pool): void {
-            $this->shuttingDown = true;
-            $t = microtime(true);
-            echo "\n // Shutting down server...\n";
-
-            if ($pool !== null) {
-                echo " // Stopping CPU process pool...\n";
-                $pool->shutdown();
-                printf(" // CPU process pool stopped (%dms)\n", (int) ((microtime(true) - $t) * 1000));
-            }
-
-            $maxWait = (int) ($server->setting['max_wait_time'] ?? 5);
-            printf(" // Draining workers (timeout: %ds)...\n", $maxWait);
+        \Swoole\Process::signal(SIGINT, static function () use ($server): void {
             $server->shutdown();
-
-            // $server->shutdown() from a custom signal handler bypasses
-            // Swoole's default max_wait_time enforcement. Force-exit after
-            // the configured timeout to prevent indefinite hangs.
-            \Swoole\Timer::after($maxWait * 1000, function () use ($maxWait): void {
-                printf(" // Workers did not exit within %ds, force-stopping\n", $maxWait);
-                posix_kill(posix_getpid(), SIGKILL);
-            });
         });
     }
 
@@ -110,10 +76,6 @@ final class SwooleWorkerEventSubscriber implements EventSubscriberInterface, Con
         $this->logger?->info('Swoole worker stopped', ['workerId' => $event->getWorkerId()]);
 
         $this->redisClientFactory?->dispose();
-
-        if ($this->shuttingDown) {
-            printf(" // Worker %d stopped\n", $event->getWorkerId());
-        }
     }
 
     public function onWorkerError(WorkerErrorEvent $event): void

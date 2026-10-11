@@ -49,6 +49,12 @@ final readonly class StreamClient
         $this->jwt = OAuthAccessTokenJwt::sign($privateKey, $token);
     }
 
+    /** The signed access token, for a WebSocket handshake's token query parameter. */
+    public function accessToken(): string
+    {
+        return $this->jwt;
+    }
+
     /** @param list<string> $headers */
     public function open(string $query, array $headers = [], ?int $stopAfterBytes = null): HttpExchange
     {

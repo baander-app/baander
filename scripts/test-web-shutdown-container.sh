@@ -13,8 +13,17 @@
 #      and before any worker stops;
 #    - the workers stop while the master waits for the manager in waitpid.
 #
-# 2. app:serve as PID 1, started by docker/general/start-web.sh with PostgreSQL and Redis: an
-#    idle server exits 0 within the stop timeout after `docker stop` (SIGTERM) and after SIGINT.
+# 2. app:serve as PID 1, started by docker/general/start-web.sh with PostgreSQL and Redis, and a
+#    drain deadline WEB_DRAIN_SECONDS (D) of 10 seconds: window S = 3 s, worker stop wait W = 1 s.
+#    Every stop route runs one drain (DrainCoordinator) and the server exits within D:
+#    - `docker stop` (SIGTERM), SIGINT, DELETE /api/server and swoole:server:stop each log one
+#      drain-start line and exit 0; SIGTERM followed by SIGINT still drains once;
+#    - a PATCH /api/server reload keeps the server, the CPU pool's processes and an open
+#      WebSocket, and starts no drain;
+#    - a client that stopped reading a progressive stream does not hold the server past D;
+#    - a stopped event worker is killed by Swoole after 2W and the server still exits 0;
+#    - a stopped manager is killed by the drain watchdog at D, and the server exits 1;
+#    - with PostgreSQL down, the start-up cleanup logs its failure once and the server exits 0.
 #
 # Why app:serve used to ignore SIGTERM (found by removing the master's registrations one at a
 # time, ROADMAP item 4):
@@ -31,13 +40,14 @@ set -euo pipefail
 # Timestamps are compared and sorted as decimal numbers with a decimal point.
 export LC_ALL=C
 if [ "${BAANDER_WEB_SHUTDOWN_TIMEOUT_ACTIVE:-0}" != 1 ]; then
-    exec env BAANDER_WEB_SHUTDOWN_TIMEOUT_ACTIVE=1 timeout 300s bash "$0" "$@"
+    exec env BAANDER_WEB_SHUTDOWN_TIMEOUT_ACTIVE=1 timeout 900s bash "$0" "$@"
 fi
 cd "$(dirname "$0")/.."
 image="${BAANDER_TEST_IMAGE:-martinjuul/baander-app:latest}"
 run_id="baander-web-shutdown-$(date +%s)-$$"
-# Seconds `docker stop` waits before SIGKILL; the server must exit well inside it.
-stop_timeout=20
+# The drain deadline D of part 2, and the stop timeout D + 5 that operators must allow.
+drain_seconds=10
+stop_timeout=$((drain_seconds + 5))
 cleanup() {
     local status=$?
     if [ "$status" != 0 ]; then
@@ -79,6 +89,7 @@ app_env=(
     -e REDIS_PASSWORD=test-only -e REDIS_URL=redis://default:test-only@redis:6379
     -e MESSENGER_TRANSPORT_DSN=redis://default:test-only@redis:6379/messages
     -e DATABASE_URL="postgresql://baander:test-only@postgres:5432/web_shutdown_test?serverVersion=18&charset=utf8"
+    -e WEB_DRAIN_SECONDS="$drain_seconds"
 )
 # The client idles; it prepares the database and checkout and makes the probe's requests.
 docker run -d --name "$run_id-client" --privileged --network "$run_id" --entrypoint sleep \
@@ -88,7 +99,7 @@ client() {
 }
 if [ "${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" != 1 ]; then
     docker exec "$run_id-client" mkdir -p "$app_dir"
-    tar -cf - vendor src tests/Fixtures/WebShutdown config packages migrations bin docker/general templates public \
+    tar -cf - vendor src tests/Fixtures/WebShutdown tests/Fixtures/WebRuntime tests/Fixtures/Auth tests/Fixtures/web-runtime.php config packages migrations bin docker/general templates public \
         .env composer.json composer.lock translations | client tar -xf -
 fi
 client mkdir -p storage/media storage/conversions
@@ -172,6 +183,7 @@ fi
 grep -q ' shutdown $' <<<"$timeline" || fail 'onShutdown did not run'
 echo "PASS: Swoole kept the server open during the master timer, then closed connections before stopping workers."
 
+
 # Part 2: app:serve as PID 1, started by start-web.sh.
 for attempt in $(seq 1 30); do
     if docker exec "$run_id-postgres" pg_isready -h 127.0.0.1 -U baander -d web_shutdown_test >/dev/null 2>&1 &&
@@ -182,47 +194,195 @@ for attempt in $(seq 1 30); do
 done
 docker exec "$run_id-postgres" pg_isready -h 127.0.0.1 -U baander -d web_shutdown_test >/dev/null
 client php bin/console doctrine:migrations:migrate --no-interaction >/dev/null
+# A listener, and a track whose progressive stream the stalled client opens.
+listener=drain-listener@baander.app
+printf '%s\n' 'Web-shutdown-test-only-1' | client php bin/console app:user:create --no-interaction \
+    --password --role admin --force "$listener" 'Drain Listener' >/dev/null
+client php bin/console app:settings:set transcode.enabled true --no-interaction >/dev/null
+client php tests/Fixtures/web-runtime.php prepare >/dev/null
+track=$(client php -r 'echo json_decode(file_get_contents("/tmp/baander-web-runtime.json"), true)["track"];')
 docker create --name "$run_id-web" --privileged --network "$run_id" -w "$app_dir" "${app_env[@]}" \
     "$image" "$app_dir/docker/general/start-web.sh" >/dev/null
 if [ "${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" != 1 ]; then
     client tar -cf - . | docker cp -a - "$run_id-web:$app_dir"
 fi
+web() {
+    docker exec -w "$app_dir" "$run_id-web" "$@"
+}
+# The log lines of the current run start after this many lines.
+log_offset=0
+run_log() {
+    docker logs "$run_id-web" 2>&1 | tail -n +$((log_offset + 1))
+}
 start_web() {
+    log_offset=$(docker logs "$run_id-web" 2>&1 | wc -l)
     docker start "$run_id-web" >/dev/null
     for attempt in $(seq 1 90); do
-        if docker exec "$run_id-web" curl -fsS -o /dev/null http://127.0.0.1:9501/live 2>/dev/null; then break; fi
+        if web curl -fsS -o /dev/null http://127.0.0.1:9501/live 2>/dev/null; then break; fi
         sleep 1
     done
-    docker exec "$run_id-web" curl -fsS -o /dev/null http://127.0.0.1:9501/live || fail 'app:serve did not answer /live'
-    docker exec "$run_id-web" sh -c 'tr "\0" " " < /proc/1/cmdline' | grep -q 'bin/console app:serve' ||
-        fail 'app:serve is not PID 1'
+    web curl -fsS -o /dev/null http://127.0.0.1:9501/live || fail 'app:serve did not answer /live'
+    web sh -c 'tr "\0" " " < /proc/1/cmdline' | grep -q 'bin/console app:serve' || fail 'app:serve is not PID 1'
 }
-# assert_stopped SCENARIO STARTED_AT SHUTDOWN_LINES: exit 0, before the stop timeout, through Swoole's shutdown.
+# The manager is the master's child that is not a CPU pool worker; the workers are its children.
+manager_pid() {
+    web sh -c 'for pid in $(pgrep -P 1); do tr "\0" " " < /proc/$pid/cmdline | grep -q "^cpu-pool-worker" || echo $pid; done' |
+        grep -v '^$'
+}
+pool_pids() {
+    web sh -c 'for pid in $(pgrep -P 1); do tr "\0" " " < /proc/$pid/cmdline | grep -q "^cpu-pool-worker" && echo $pid; done; true' | sort
+}
+worker_pids() {
+    web pgrep -P "$(manager_pid)" | sort
+}
+# The event worker that answered an API server request: a worker, never a task worker.
+event_worker_pid() {
+    web sh -c 'curl -fsS http://127.0.0.1:9200/api/server |
+        php -r "echo json_decode(stream_get_contents(STDIN), true)[\"server\"][\"processes\"][\"worker\"][\"pid\"];"'
+}
+# Starts a drain-client.php mode in the web container, writing its lines to /tmp/drain-<mode>.log.
+start_client() {
+    docker exec -d -w "$app_dir" "$run_id-web" sh -c \
+        "exec php -d memory_limit=512M tests/Fixtures/WebShutdown/drain-client.php $* > /tmp/drain-$1.log 2>&1"
+}
+await_client() {
+    for attempt in $(seq 1 600); do
+        if web grep -q " $2 " "/tmp/drain-$1.log" 2>/dev/null; then return 0; fi
+        sleep 0.1
+    done
+    web cat "/tmp/drain-$1.log" >&2 || true
+    fail "the $1 client did not record $2"
+}
+await_exit() {
+    for attempt in $(seq 1 $((stop_timeout * 10 + 50))); do
+        if [ "$(docker inspect --format '{{.State.Running}}' "$run_id-web")" = false ]; then return 0; fi
+        sleep 0.1
+    done
+}
+# assert_stopped SCENARIO STARTED_AT EXIT_CODE LIMIT: app:serve exited with EXIT_CODE less than
+# LIMIT seconds after STARTED_AT, through one drain.
 assert_stopped() {
-    local elapsed exit_code
+    local elapsed exit_code log
     elapsed=$(awk -v a="$2" -v b="$(date +%s.%N)" 'BEGIN { printf "%.1f", b - a }')
     [ "$(docker inspect --format '{{.State.Running}}' "$run_id-web")" = false ] ||
         fail "$1: app:serve was still running $elapsed seconds after the signal"
     exit_code=$(docker inspect --format '{{.State.ExitCode}}' "$run_id-web")
-    [ "$exit_code" = 0 ] || fail "$1: app:serve exited $exit_code after $elapsed seconds"
     [ "$(docker inspect --format '{{.State.OOMKilled}}' "$run_id-web")" = false ] || fail "$1: app:serve was OOM-killed"
-    awk -v e="$elapsed" -v limit="$stop_timeout" 'BEGIN { exit !(e < limit) }' ||
-        fail "$1: app:serve took $elapsed seconds, not less than the $stop_timeout-second stop timeout"
-    [ "$(docker logs "$run_id-web" 2>&1 | grep -c 'Swoole HTTP Server has been successfully shutdown')" = "$3" ] ||
-        fail "$1: the log does not show Swoole's shutdown"
-    echo "PASS: $1: app:serve exited 0 after $elapsed seconds."
+    [ "$exit_code" = "$3" ] || fail "$1: app:serve exited $exit_code after $elapsed seconds, not $3"
+    awk -v e="$elapsed" -v limit="$4" 'BEGIN { exit !(e < limit) }' ||
+        fail "$1: app:serve took $elapsed seconds, not less than $4"
+    log=$(run_log)
+    [ "$(grep -c "Web server drain started: deadline $drain_seconds s, window 3 s, worker stop wait 1 s." <<<"$log")" = 1 ] ||
+        fail "$1: the log does not show exactly one drain start"
+    if [ "$3" = 0 ]; then
+        [ "$(grep -c 'Swoole HTTP Server has been successfully shutdown' <<<"$log")" = 1 ] ||
+            fail "$1: the log does not show Swoole's shutdown"
+    fi
+    echo "PASS: $1: app:serve exited $exit_code after $elapsed seconds."
 }
 
+# A reload keeps the server, the CPU pool and an open WebSocket, and starts no drain.
 start_web
+start_client ws "$listener"
+await_client ws ws_pong
+pool_before=$(pool_pids)
+workers_before=$(worker_pids)
+started_before=$(docker inspect --format '{{.State.StartedAt}}' "$run_id-web")
+[ -n "$pool_before" ] || fail 'the CPU pool has no processes'
+web curl -fsS -X PATCH -o /dev/null http://127.0.0.1:9200/api/server || fail 'PATCH /api/server failed'
+for attempt in $(seq 1 100); do
+    workers_after=$(worker_pids)
+    if [ -z "$(comm -12 <(printf '%s\n' "$workers_before") <(printf '%s\n' "$workers_after"))" ]; then break; fi
+    sleep 0.1
+done
+[ -z "$(comm -12 <(printf '%s\n' "$workers_before") <(printf '%s\n' "$workers_after"))" ] ||
+    fail 'the reload did not replace every worker'
+reloaded_at=$(date +%s.%N)
+sleep 1
+[ "$(docker inspect --format '{{.State.StartedAt}}' "$run_id-web")" = "$started_before" ] &&
+    [ "$(docker inspect --format '{{.State.Running}}' "$run_id-web")" = true ] || fail 'the reload restarted the server'
+[ "$(pool_pids)" = "$pool_before" ] || fail 'the reload replaced the CPU pool processes'
+ws_log=$(web cat /tmp/drain-ws.log)
+grep -qE ' ws_(closed|close_frame) ' <<<"$ws_log" && fail "the reload closed the WebSocket: $ws_log"
+awk -v t="$reloaded_at" '$3 == "ws_pong" && $2 > t { found = 1 } END { exit !found }' <<<"$ws_log" ||
+    fail 'the WebSocket answered no ping after the reload'
+run_log | grep -q 'Web server drain started' && fail 'the reload started a drain'
+echo "PASS: PATCH /api/server reloaded every worker and kept the server, the CPU pool and the WebSocket, with no drain."
 started_at=$(date +%s.%N)
 docker stop -t "$stop_timeout" "$run_id-web" >/dev/null
-assert_stopped 'docker stop (SIGTERM)' "$started_at" 1
+assert_stopped 'docker stop (SIGTERM)' "$started_at" 0 "$drain_seconds"
 
 start_web
 started_at=$(date +%s.%N)
 docker kill --signal INT "$run_id-web" >/dev/null
-for attempt in $(seq 1 $((stop_timeout * 10))); do
-    if [ "$(docker inspect --format '{{.State.Running}}' "$run_id-web")" = false ]; then break; fi
-    sleep 0.1
-done
-assert_stopped 'SIGINT' "$started_at" 2
+await_exit
+assert_stopped 'SIGINT' "$started_at" 0 "$drain_seconds"
+
+start_web
+started_at=$(date +%s.%N)
+web curl -fsS -X DELETE -o /dev/null http://127.0.0.1:9200/api/server || fail 'DELETE /api/server failed'
+await_exit
+assert_stopped 'DELETE /api/server' "$started_at" 0 "$drain_seconds"
+
+# The command waits for the server to exit, so it ends with the container.
+start_web
+started_at=$(date +%s.%N)
+docker exec -d -w "$app_dir" "$run_id-web" php bin/console swoole:server:stop --no-interaction
+await_exit
+assert_stopped 'swoole:server:stop' "$started_at" 0 "$drain_seconds"
+
+start_web
+started_at=$(date +%s.%N)
+docker kill --signal TERM "$run_id-web" >/dev/null
+sleep 1
+docker kill --signal INT "$run_id-web" >/dev/null 2>&1 || true
+await_exit
+assert_stopped 'SIGTERM, then SIGINT a second later' "$started_at" 0 "$drain_seconds"
+
+# The master resets the stalled connection when the window ends, so joining its reactor threads
+# does not wait for output the client will never read.
+start_web
+start_client stalled-stream "$listener" "$track"
+await_client stalled-stream stalled
+started_at=$(date +%s.%N)
+docker kill --signal TERM "$run_id-web" >/dev/null
+await_exit
+assert_stopped 'a client that stopped reading a progressive stream' "$started_at" 0 "$drain_seconds"
+run_log | grep -qE '^Drain window closed after [0-9.]+ s, the window passed; reset [1-9][0-9]* client connection\(s\)\.$' ||
+    fail 'the window did not reset the stalled connection'
+
+# Swoole's manager kills a worker that does not stop within 2W.
+start_web
+stopped_worker=$(event_worker_pid)
+web kill -STOP "$stopped_worker"
+started_at=$(date +%s.%N)
+docker kill --signal TERM "$run_id-web" >/dev/null
+await_exit
+assert_stopped "an event worker stopped with SIGSTOP (pid $stopped_worker)" "$started_at" 0 "$drain_seconds"
+
+# The watchdog kills a manager that never stops, and the master exits 1.
+start_web
+stopped_manager=$(manager_pid)
+web kill -STOP "$stopped_manager"
+started_at=$(date +%s.%N)
+docker kill --signal TERM "$run_id-web" >/dev/null
+await_exit
+assert_stopped "the manager stopped with SIGSTOP (pid $stopped_manager)" "$started_at" 1 "$stop_timeout"
+elapsed=$(awk -v a="$started_at" -v b="$(date +%s.%N)" 'BEGIN { printf "%.1f", b - a }')
+awk -v e="$elapsed" -v d="$drain_seconds" 'BEGIN { exit !(e >= d - 0.5) }' || fail "the watchdog fired after $elapsed seconds, before D"
+run_log | grep -qE "^The web server did not stop by its drain deadline: killed processes \[([0-9]+, )*$stopped_manager(, [0-9]+)*\]" ||
+    fail 'the watchdog did not report killing the manager'
+run_log | grep -q '^The web server reached its drain deadline; exiting with status 1.$' || fail 'the master did not report the deadline'
+echo "PASS: the watchdog killed the stopped manager at the deadline."
+
+# The start-up listeners survive an unreachable PostgreSQL, and the stop still drains. This start
+# also follows the watchdog's unclean exit in the same container.
+docker stop "$run_id-postgres" >/dev/null
+start_web
+started_at=$(date +%s.%N)
+docker kill --signal TERM "$run_id-web" >/dev/null
+await_exit
+assert_stopped 'SIGTERM with PostgreSQL stopped' "$started_at" 0 "$drain_seconds"
+[ "$(run_log | grep -c 'Could not clean up orphaned recommendation jobs at server start')" = 1 ] ||
+    fail 'the start-up cleanup did not log its database failure once'
+echo "PASS: the start-up cleanup logged the unreachable database once."

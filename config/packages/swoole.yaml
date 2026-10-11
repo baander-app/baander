@@ -16,6 +16,9 @@ swoole:
         hmr:
             enabled: 'inotify' # One of "off"; "auto"; "inotify"; "external"
             file_path: '%swoole_bundle.cache_dir%'
+        # Seconds the server takes at most to stop (the drain deadline); swoole:server:stop
+        # waits this long, plus a margin, for it to exit.
+        shutdown_timeout: '%env(int:WEB_DRAIN_SECONDS)%'
         api:
             enabled: true
             host: 127.0.0.1
@@ -42,6 +45,9 @@ swoole:
         settings:
             log_file: '%kernel.logs_dir%/swoole_%kernel.environment%.log'
             log_level: warning
+            # No pid file: one left by an unclean exit (the drain watchdog, SIGKILL) names PID 1, and
+            # the next app:serve in the same container, PID 1 again, then thinks a server is already
+            # running and exits. swoole:server:stop finds the master through the API server.
             pid_file: null
             # 2MB output buffer — balance between memory and streaming throughput
             buffer_output_size: 8388608
@@ -66,8 +72,7 @@ swoole:
             # added up to a minute to every stop.
             heartbeat_check_interval: 1
             heartbeat_idle_time: 300
-            # Max time (seconds) master waits for workers to exit on shutdown.
-            max_wait_time: 5
+            # max_wait_time is not set here: DrainCoordinator derives it from WEB_DRAIN_SECONDS.
             # Fixed dispatch — all requests from the same client FD go to the
             # same worker. Best for stateful SSE/WebSocket connections.
             dispatch_mode: 2

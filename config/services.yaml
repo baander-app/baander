@@ -13,6 +13,10 @@ parameters:
     # Seconds between health monitor checks; the web runtime script shortens it.
     env(HEALTH_MONITOR_INTERVAL_SECONDS): '60'
     app.health_monitor.interval_seconds: '%env(int:HEALTH_MONITOR_INTERVAL_SECONDS)%'
+    # The web server's whole drain budget D in seconds, at least 8 (DrainBudget derives the
+    # drain window and Swoole's max_wait_time from it). Orchestrators must allow D + 5 seconds
+    # before they kill the container.
+    env(WEB_DRAIN_SECONDS): '30'
     app.websocket.allowed_origins: [ ]
     notification.push.allowed_domains:
         - fcm.googleapis.com
@@ -1057,11 +1061,27 @@ services:
             $cpuProcessPoolLocator: !service_locator
                 App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool: '@App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool'
 
-    SwooleBundle\SwooleBundle\Server\LifecycleHandler\ServerShutdownHandler:
-        class: App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPoolShutdownHandler
+    # --- Web server drain (stop and restart) ---
+    # One drain path from onBeforeShutdown; see DrainCoordinator.
+    App\Shared\Infrastructure\Swoole\Drain\DrainBudget:
         arguments:
+            $deadlineSeconds: '%env(int:WEB_DRAIN_SECONDS)%'
+
+    App\Shared\Infrastructure\Swoole\Drain\DrainCoordinator:
+        arguments:
+            $watchdogCommand:
+                - !php/const PHP_BINARY
+                - '%kernel.project_dir%/bin/console'
+                - 'app:server:drain:watch'
+                - '--no-interaction'
             $cpuProcessPoolLocator: !service_locator
                 App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool: '@App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool'
+
+    SwooleBundle\SwooleBundle\Server\LifecycleHandler\ServerBeforeShutdownHandler:
+        alias: App\Shared\Infrastructure\Swoole\Drain\DrainCoordinator
+
+    SwooleBundle\SwooleBundle\Server\LifecycleHandler\ServerShutdownHandler:
+        alias: App\Shared\Infrastructure\Swoole\Drain\DrainShutdownHandler
 
     App\Transcode\Infrastructure\Swoole\TranscodeProcessPool:
         arguments:

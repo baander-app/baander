@@ -59,6 +59,7 @@ use SwooleBundle\SwooleBundle\Server\Config\Sockets;
 use SwooleBundle\SwooleBundle\Server\Configurator\CallableChainConfiguratorFactory;
 use SwooleBundle\SwooleBundle\Server\Configurator\WithHttpServerConfiguration;
 use SwooleBundle\SwooleBundle\Server\Configurator\WithRequestHandler;
+use SwooleBundle\SwooleBundle\Server\Configurator\WithServerBeforeShutdownHandler;
 use SwooleBundle\SwooleBundle\Server\Configurator\WithServerManagerStartHandler;
 use SwooleBundle\SwooleBundle\Server\Configurator\WithServerManagerStopHandler;
 use SwooleBundle\SwooleBundle\Server\Configurator\WithServerShutdownHandler;
@@ -77,6 +78,7 @@ use SwooleBundle\SwooleBundle\Server\HttpServerFactory;
 use SwooleBundle\SwooleBundle\Server\LifecycleHandler\NoOpServerManagerStartHandler;
 use SwooleBundle\SwooleBundle\Server\LifecycleHandler\NoOpServerManagerStopHandler;
 use SwooleBundle\SwooleBundle\Server\LifecycleHandler\NoOpServerShutdownHandler;
+use SwooleBundle\SwooleBundle\Server\LifecycleHandler\ServerBeforeShutdownHandler;
 use SwooleBundle\SwooleBundle\Server\LifecycleHandler\ServerManagerStartHandler;
 use SwooleBundle\SwooleBundle\Server\LifecycleHandler\ServerManagerStopHandler;
 use SwooleBundle\SwooleBundle\Server\LifecycleHandler\ServerShutdownHandler;
@@ -311,6 +313,11 @@ return static function (ContainerConfigurator $containerConfigurator): void {
 
     $services->set(WithServerShutdownHandler::class)
         ->arg('$handler', service(ServerShutdownHandler::class))
+        ->tag('swoole_bundle.server_configurator');
+
+    // The application registers a ServerBeforeShutdownHandler service to take part in a stop.
+    $services->set(WithServerBeforeShutdownHandler::class)
+        ->arg('$handler', service(ServerBeforeShutdownHandler::class)->nullOnInvalid())
         ->tag('swoole_bundle.server_configurator');
 
     $services->set(WithServerManagerStartHandler::class)

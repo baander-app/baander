@@ -117,6 +117,7 @@ use ZEngine\Core;
  * }
  * @phpstan-type HttpServerConfig = array{
  *   running_mode: string,
+ *   shutdown_timeout: int|string,
  *   api: array{
  *     enabled: bool,
  *     host: string,
@@ -270,6 +271,7 @@ final class SwooleExtension extends Extension
         $container->setParameter('swoole.http_server.trusted_hosts', $config['trusted_hosts']);
         $container->setParameter('swoole.http_server.api.host', $config['api']['host']);
         $container->setParameter('swoole.http_server.api.port', $config['api']['port']);
+        $container->setParameter('swoole.http_server.shutdown_timeout', $config['shutdown_timeout']);
 
         return $this->prepareHttpServerConfiguration($config, $container);
     }

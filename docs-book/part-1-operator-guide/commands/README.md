@@ -281,6 +281,7 @@ own exit code without JSON. Error output contains no credentials or raw diagnost
 |---------|-------------|
 | [app:outbox:consume](app-outbox-consume.md) | Relay durable notification events and delivery intents |
 | [app:server:coroutines](app-server-coroutines.md) | Show coroutine and channel statistics of every web server worker |
+| [app:server:drain:watch](app-server-drain-watch.md) | Kill the web server processes still running at the drain deadline (started by app:serve) |
 | [app:server:spans](app-server-spans.md) | List the web server's recent request spans, or empty the span buffer |
 | [app:server:stats](app-server-stats.md) | Show memory, process and coroutine figures of every web server worker |
 | [app:server:workers](app-server-workers.md) | Show the HTTP worker, task worker and transcoding pool statistics |
