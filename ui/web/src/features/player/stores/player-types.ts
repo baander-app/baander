@@ -11,6 +11,12 @@ export interface Track {
 
 export type RepeatMode = 'off' | 'all' | 'one'
 
+/** What the listener sees while an interrupted track recovers. */
+export type PlaybackRecovery = 'none' | 'reconnecting' | 'tap-to-resume'
+
+/** How the active stream stopped: a media error, or no progress without one. */
+export type PlaybackInterruption = 'error' | 'stall'
+
 export interface PlayerPreferences {
   shuffle: boolean
   repeat: RepeatMode
@@ -31,6 +37,7 @@ export interface PlayerPlaybackState {
   isPlaying: boolean
   duration: number
   audioElement: HTMLAudioElement | null
+  playbackRecovery: PlaybackRecovery
 }
 
 export interface PlayerQueueActions {
@@ -51,6 +58,11 @@ export interface PlayerPlaybackActions {
   replayCurrentTrack: () => void
   /** Replace the current track's original stream after the browser rejected its format. */
   switchToTranscodedStream: () => void
+  /**
+   * The active element's stream failed or stalled. An outage starts a retry that resumes the
+   * same track at its position; otherwise `onServerUp` sends the error down the existing paths.
+   */
+  interruptPlayback: (element: HTMLAudioElement, cause: PlaybackInterruption, onServerUp: () => void) => void
   setIsPlaying: (playing: boolean) => void
   setDuration: (duration: number) => void
   seekTo: (time: number) => void

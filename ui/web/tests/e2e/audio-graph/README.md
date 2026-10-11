@@ -114,6 +114,16 @@ file and for a progressive rendition that arrives complete after the restart.
 Every outcome is printed and attached as JSON. The test does not run the player
 hook or store.
 
+`stream-recovery.spec.ts` runs the real player hook and store in Chromium through a
+server outage. The fixture serves a 20-second WAV in a burst and then at 1.25 times
+real time. While the test holds the fixture down, it cuts that stream without
+finishing it, and answers `/live` and the stream with 502, as nginx does while the
+web container restarts. The test checks that the player shows it is reconnecting,
+keeps its clock at the saved position, resumes the same track at that position
+once `/live` answers, and records one play. The app probes `/live` through its
+shared API client; the fixture substitutes a `fetch` of the same endpoint with the
+same rule, because the bundle leaves out the authenticated client.
+
 The suite needs Playwright's Firefox and WebKit as well as Chromium. WebKit needs
 the host libraries Playwright's Ubuntu images provide; on other hosts run the
 spec in `mcr.microsoft.com/playwright` at the installed Playwright version, with

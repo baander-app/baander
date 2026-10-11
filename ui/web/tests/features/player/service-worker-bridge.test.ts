@@ -150,3 +150,21 @@ it('rejects proof requests from another session even if the token matches', asyn
   expect(port.postMessage).toHaveBeenCalledExactlyOnceWith({ type: 'SW_DPOP_PROOF', proof: null });
   expect(port.close).toHaveBeenCalledOnce();
 });
+
+it('records the Retry-After of a busy stream that the active worker reports', async () => {
+  const retryAfter = await import('@/features/player/services/stream-retry-after');
+  const url = 'https://api.baander.app/api/stream/track?id=t0&format=opus';
+  await listener({ source: active, data: { type: 'SW_STREAM_RETRY_AFTER', url, seconds: 5 }, ports: [] });
+  expect(retryAfter.takeStreamRetryAfter(url)).toBeGreaterThan(4000);
+});
+
+it('ignores a stream Retry-After from another worker, for a foreign URL, or with an invalid delay', async () => {
+  const retryAfter = await import('@/features/player/services/stream-retry-after');
+  const url = 'https://api.baander.app/api/stream/track?id=t0&format=opus';
+  const foreign = 'https://foreign.baander.app/api/stream/track?id=t0&format=opus';
+  await listener({ source: new ServiceWorker(), data: { type: 'SW_STREAM_RETRY_AFTER', url, seconds: 5 }, ports: [] });
+  await listener({ source: active, data: { type: 'SW_STREAM_RETRY_AFTER', url: foreign, seconds: 5 }, ports: [] });
+  await listener({ source: active, data: { type: 'SW_STREAM_RETRY_AFTER', url, seconds: -1 }, ports: [] });
+  expect(retryAfter.takeStreamRetryAfter(url)).toBeNull();
+  expect(retryAfter.takeStreamRetryAfter(foreign)).toBeNull();
+});

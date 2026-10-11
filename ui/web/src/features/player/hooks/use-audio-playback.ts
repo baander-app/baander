@@ -4,13 +4,21 @@ import { usePlayerStore, resolveNextIndex, buildStreamUrl, syncPlaybackVolume, g
 import { updateTime } from '@/features/player/stores/player-time-tracker'
 import {
   chooseTranscodeFormat,
+  isTrackStream,
   isTranscodedStream,
   isUnsupportedOriginalStream,
   notifyPlaybackFailure,
 } from '@/features/player/stores/player-playback-runtime'
+import { isRecoveringPlayback } from '@/features/player/stores/player-playback-recovery'
 import { createLogger } from '@/shared/lib/logger'
 
 const logger = createLogger('AudioPlayback')
+
+/**
+ * Chromium retries a cut stream internally and can then wait without ever reporting an error.
+ * Playback that makes no progress for this long after `waiting` or `stalled` counts as interrupted.
+ */
+const STALL_TIMEOUT_MS = 10_000
 
 /** Owns persistent dual audio elements, including transition and teardown work. */
 export function useAudioPlayback() {
@@ -218,23 +226,23 @@ export function useAudioPlayback() {
     }
     const removers = [audioA, audioB].map((audio) => {
       const owned = () => lifetime.active && active() === audio
-      const onPlay = () => {
-        if (!owned() || audio.paused || audio.ended) return
-        usePlayerStore.getState().setIsPlaying(true)
-        audioService.setPlayingState(true)
-        if (audio.src) connect().catch((err) => {
-          if (owned()) logger.warn('Dual audio connection failed:', err)
-        })
+      const recovering = () => isRecoveringPlayback(audio)
+      // Error wins: Firefox reports a cut stream as an error, then plays its buffer and fires ended.
+      let loadFailed = false
+      let stallTimer: ReturnType<typeof setTimeout> | undefined
+      let stallPosition = 0
+      const clearStall = () => {
+        if (stallTimer !== undefined) clearTimeout(stallTimer)
+        stallTimer = undefined
       }
-      const onPause = () => {
-        if (!owned() || audio.ended || !audio.paused) return
-        usePlayerStore.getState().setIsPlaying(false)
-        audioService.setPlayingState(false)
+      /** The current track's own stream can be retried; any other source fails as before. */
+      const playsCurrentTrack = () => {
+        const track = usePlayerStore.getState().currentTrack
+        return track !== null && isTrackStream(audio.src, track.publicId)
       }
-      const onError = () => {
-        if (!owned() || !audio.error) return
+      const failPlayback = () => {
+        if (!owned()) return
         const state = usePlayerStore.getState()
-        invalidate()
         if (state.currentTrack && isUnsupportedOriginalStream(audio, state.currentTrack.publicId)) {
           logger.info('Original format is not playable; requesting a transcoded stream')
           state.switchToTranscodedStream()
@@ -246,8 +254,52 @@ export function useAudioPlayback() {
         audioService.setPlayingState(false)
         notifyPlaybackFailure(isTranscodedStream(audio.src))
       }
+      const onPlay = () => {
+        if (!owned() || audio.paused || audio.ended) return
+        usePlayerStore.getState().setIsPlaying(true)
+        audioService.setPlayingState(true)
+        if (audio.src) connect().catch((err) => {
+          if (owned()) logger.warn('Dual audio connection failed:', err)
+        })
+      }
+      const onPause = () => {
+        if (!owned() || audio.ended || !audio.paused) return
+        clearStall()
+        if (recovering()) return
+        usePlayerStore.getState().setIsPlaying(false)
+        audioService.setPlayingState(false)
+      }
+      const onError = () => {
+        if (audio.error) loadFailed = true
+        if (!owned() || !audio.error) return
+        clearStall()
+        invalidate()
+        const { code, MEDIA_ERR_NETWORK, MEDIA_ERR_SRC_NOT_SUPPORTED } = audio.error
+        // A server outage surfaces as a network error, or as an unsupported source when the
+        // request itself fails. The probe in the recovery tells it from a broken track.
+        if (recovering() || ((code === MEDIA_ERR_NETWORK || code === MEDIA_ERR_SRC_NOT_SUPPORTED) && playsCurrentTrack())) {
+          usePlayerStore.getState().interruptPlayback(audio, 'error', failPlayback)
+          return
+        }
+        failPlayback()
+      }
+      const onStall = () => {
+        if (!owned() || audio.paused || stallTimer !== undefined || recovering()) return
+        if (!usePlayerStore.getState().isPlaying || !playsCurrentTrack()) return
+        stallPosition = audio.currentTime
+        stallTimer = setTimeout(() => {
+          stallTimer = undefined
+          if (!owned() || audio.paused || recovering() || audio.currentTime !== stallPosition) return
+          if (!usePlayerStore.getState().isPlaying || !playsCurrentTrack()) return
+          invalidate()
+          usePlayerStore.getState().interruptPlayback(audio, 'stall', failPlayback)
+        }, STALL_TIMEOUT_MS)
+      }
       const onTimeUpdate = () => {
         if (!owned()) return
+        if (audio.currentTime !== stallPosition) clearStall()
+        // The recovery holds the saved position; a failed element may report 0.
+        if (recovering()) return
         updateTime(audio.currentTime)
         if (candidate && !valid(candidate)) invalidate()
         schedulePreload(audio)
@@ -257,7 +309,7 @@ export function useAudioPlayback() {
         if (owned() && Number.isFinite(audio.duration) && audio.duration > 0) usePlayerStore.getState().setDuration(audio.duration)
       }
       const onEnded = () => {
-        if (!owned() || !audio.ended || transitionPending) return
+        if (!owned() || !audio.ended || transitionPending || loadFailed || recovering()) return
         const state = usePlayerStore.getState()
         if (state.repeat === 'one' && state.currentTrack) {
           audioService.getProcessor()?.resetProgramme()
@@ -271,13 +323,23 @@ export function useAudioPlayback() {
       }
       const onSeeking = () => { if (owned()) invalidate() }
       const onSourceChange = () => {
+        loadFailed = false
+        clearStall()
         if (!owned()) return
         invalidate()
-        if (audio.src) audioService.getProcessor()?.resetProgramme()
+        // Resuming the same track at its position continues the same programme.
+        if (audio.src && !recovering()) audioService.getProcessor()?.resetProgramme()
       }
-      const listeners = { seeking: onSeeking, loadstart: onSourceChange, play: onPlay, pause: onPause, timeupdate: onTimeUpdate, durationchange: onDurationChange, ended: onEnded, error: onError }
+      const listeners = {
+        seeking: onSeeking, loadstart: onSourceChange, play: onPlay, pause: onPause, playing: clearStall,
+        waiting: onStall, stalled: onStall, timeupdate: onTimeUpdate, durationchange: onDurationChange,
+        ended: onEnded, error: onError,
+      }
       for (const [name, listener] of Object.entries(listeners)) audio.addEventListener(name, listener)
-      return () => { for (const [name, listener] of Object.entries(listeners)) audio.removeEventListener(name, listener) }
+      return () => {
+        clearStall()
+        for (const [name, listener] of Object.entries(listeners)) audio.removeEventListener(name, listener)
+      }
     })
     const unsubscribe = usePlayerStore.subscribe((state, previous) => {
       if (state.volume !== previous.volume || state.muted !== previous.muted) syncVolume()
@@ -315,7 +377,7 @@ export function useAudioPlayback() {
       && getPlaybackSelectionGeneration() === generation
       && usePlayerStore.getState().audioElement === audio && audio.src === src
       && usePlayerStore.getState().currentTrack === track
-    if (isPlaying && audio.paused) {
+    if (isPlaying && audio.paused && !isRecoveringPlayback(audio)) {
       audioService.resumeContextIfNeeded().then(async () => {
         if (isActive() && usePlayerStore.getState().isPlaying) await audio.play()
       }).catch((err) => {

@@ -4,17 +4,35 @@ import {
   buildStreamUrl,
   canSeekStream,
   chooseTranscodeFormat,
+  hasPendingPlayRecord,
   invalidatePlaybackSelection,
+  isTranscodedStream,
+  notifyPlaybackFailure,
   notifySeekUnavailable,
   requestSelectedTrackPlayback,
   syncPlaybackVolume,
 } from './player-playback-runtime'
+import {
+  beginPlaybackRecovery,
+  continuePlaybackRecovery,
+  isRecoveringPlayback,
+  pausePlaybackRecovery,
+  resumePlaybackRecovery,
+  seekPlaybackRecovery,
+  type PlaybackRecoveryHost,
+} from './player-playback-recovery'
 
 export function createPlayerPlaybackSlice({ get, commit }: PlayerSliceContext): PlayerPlaybackState & PlayerPlaybackActions {
+  const recoveryHost: PlaybackRecoveryHost = {
+    get,
+    commit,
+    notifyFailure: (src) => notifyPlaybackFailure(isTranscodedStream(src)),
+  }
   return {
     isPlaying: false,
     duration: 0,
     audioElement: null,
+    playbackRecovery: 'none',
     replayCurrentTrack: () => {
       const { currentTrack, audioElement } = get()
       if (!currentTrack || !audioElement?.src) return
@@ -31,8 +49,21 @@ export function createPlayerPlaybackSlice({ get, commit }: PlayerSliceContext): 
       invalidatePlaybackSelection()
       audioElement.src = buildStreamUrl(currentTrack.publicId, format)
     },
+    interruptPlayback: (element, cause, onServerUp) => {
+      const { audioElement, currentTrack } = get()
+      if (!currentTrack || audioElement !== element) return
+      if (isRecoveringPlayback(element)) {
+        continuePlaybackRecovery(element, cause)
+        return
+      }
+      const recordPlay = hasPendingPlayRecord()
+      // The recovery now owns this selection's playback, so a pending native play must not settle it.
+      invalidatePlaybackSelection()
+      beginPlaybackRecovery(recoveryHost, element, currentTrack, cause, onServerUp, recordPlay)
+    },
     setIsPlaying: (playing) => {
       if (playing === get().isPlaying) return
+      if (playing ? resumePlaybackRecovery() : pausePlaybackRecovery()) return
       if (!playing) invalidatePlaybackSelection()
       const { audioElement, currentTrack } = get()
       if (playing && audioElement && !audioElement.src && currentTrack) {
@@ -47,7 +78,14 @@ export function createPlayerPlaybackSlice({ get, commit }: PlayerSliceContext): 
     },
     seekTo: (time) => {
       if (!Number.isFinite(time)) return
-      const { audioElement, duration } = get()
+      const { audioElement, duration, currentTrack } = get()
+      if (isRecoveringPlayback(audioElement)) {
+        // A progressive transcode never reported a duration; the catalogue's length still bounds the seek.
+        const trackLength = currentTrack?.duration
+        const end = duration > 0 ? duration
+          : trackLength !== undefined && Number.isFinite(trackLength) && trackLength > 0 ? trackLength : Infinity
+        if (seekPlaybackRecovery(Math.max(0, Math.min(end, time)))) return
+      }
       const clamped = Math.max(0, Math.min(duration || 0, time))
       if (audioElement && audioElement.currentTime !== clamped) {
         if (!canSeekStream(audioElement)) {

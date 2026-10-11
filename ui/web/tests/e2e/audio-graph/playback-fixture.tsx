@@ -2,13 +2,14 @@ import React, { useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { useAudioPlayback } from '@/features/player/hooks/use-audio-playback'
 import { usePlayerStore } from '@/features/player/stores/player-store'
-import { getCurrentTime } from '@/features/player/stores/player-time-tracker'
+import { getCurrentTime, subscribe as subscribeToTime } from '@/features/player/stores/player-time-tracker'
 import { audioService } from '@/features/player/services/audio-service'
 
 export interface MediaSnapshot {
   track: string | undefined
   index: number
   playing: boolean
+  recovery: string
   processorPlaying: boolean | undefined
   duration: number
   time: number
@@ -37,6 +38,9 @@ window.Audio = function (...args: ConstructorParameters<typeof Audio>) {
 } as unknown as typeof Audio
 
 const tracks = ['first', 'second', 'third'].map(publicId => ({ publicId, title: publicId }))
+// Every value the playback clock publishes, as the time display and session sync read it.
+const clock: number[] = []
+subscribeToTime(() => { clock.push(getCurrentTime()) })
 let pendingResume: ((reason: Error) => void) | null = null
 export function Fixture() {
   useAudioPlayback()
@@ -74,7 +78,7 @@ const fixture = {
     const state = usePlayerStore.getState()
     const graph = audioService.getProcessor() as unknown as { gainNode: GainNode } | null
     return {
-      track: state.currentTrack?.publicId, index: state.currentIndex, playing: state.isPlaying,
+      track: state.currentTrack?.publicId, index: state.currentIndex, playing: state.isPlaying, recovery: state.playbackRecovery,
       processorPlaying: audioService.getProcessor()?.getSystemInfo().playing,
       duration: state.duration, time: getCurrentTime(), active: elements.indexOf(state.audioElement!),
       source: audioService.getProcessor()?.getActiveSource(), outputGain: graph?.gainNode.gain.value, events: [...events],
@@ -117,6 +121,11 @@ const fixture = {
     pendingResume = null
     pending(new Error('Obsolete context resume rejected'))
   },
+  playLong() {
+    const long = { publicId: 'long', title: 'long' }
+    usePlayerStore.getState().playTrack(long, [long])
+  },
+  clock(): number[] { return [...clock] },
   domPause(index: number) { elements[index].pause() },
   domPlay(index: number) { return elements[index].play() },
 }

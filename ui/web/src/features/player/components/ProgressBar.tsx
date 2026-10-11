@@ -1,6 +1,7 @@
 import styled from 'styled-components'
 import { usePlayerStore } from '@/features/player/stores/player-store'
 import { useCurrentTime } from '@/features/player/stores/player-time-tracker'
+import { PlaybackClock } from './PlaybackRecoveryStatus'
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds) || !isFinite(seconds) || seconds < 0) return '0:00'
@@ -29,7 +30,8 @@ const ProgressRow = styled.div`
 `
 
 const TimeLabel = styled.span`
-  width: 2.5rem;
+  min-width: 2.5rem;
+  white-space: nowrap;
   font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
   color: var(--color-muted-foreground);
@@ -104,7 +106,7 @@ export function ProgressBar() {
   return (
     <ProgressRow>
       <TimeLabelRight>
-        {formatTime(currentTime)}
+        <PlaybackClock format={formatTime} />
       </TimeLabelRight>
       <ProgressTrack
         onClick={handleClick}

@@ -4,6 +4,7 @@ import { usePlayerStore } from '@/features/player/stores/player-store'
 import { useRadioStore } from '@/features/radio/stores/radio-store'
 import { RadioPlayerBar } from '@/features/radio/components/RadioPlayerBar'
 import { ProgressBar } from './ProgressBar'
+import { PlaybackRecoveryAnnouncer } from './PlaybackRecoveryStatus'
 import { CoverArt } from '@/shared/components/cover-art'
 
 function formatTime(seconds: number): string {
@@ -141,6 +142,8 @@ function MusicPlayerBar() {
     <PlayerContainer>
       {/* Progress bar at top of player */}
       <ProgressBar />
+      {/* Mounted with the track, before any recovery state can change */}
+      <PlaybackRecoveryAnnouncer />
 
       <PlayerContent>
         {/* Cover art */}

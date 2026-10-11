@@ -1,4 +1,5 @@
-import { updateTime } from '../../stores/player-time-tracker'
+import { getCurrentTime, subscribe as subscribeToTime, updateTime } from '../../stores/player-time-tracker'
+import { noteStreamRetryAfter } from '../../services/stream-retry-after'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act, cleanup } from '@testing-library/react'
 import { reapplyAllEqState } from '@/features/equalizer/stores/eq-reapply'
@@ -54,6 +55,12 @@ vi.mock('@/features/player/services/activity-service', () => ({
 
 vi.mock('sonner', () => ({
   toast: { error: vi.fn(), info: vi.fn() },
+}))
+
+// The player asks the server's liveness endpoint whether a failed stream means an outage.
+const liveness = vi.hoisted(() => ({ get: vi.fn() }))
+vi.mock('@/shared/api-client/axios-instance', () => ({
+  AXIOS_INSTANCE: { get: liveness.get },
 }))
 
 // EQ reapply is dynamically imported inside the hook; stub it to a no-op.
@@ -191,6 +198,8 @@ describe('useAudioPlayback', () => {
       processorMock.instance.isActive = true
     })
     vi.mocked(audioService.resumeContextIfNeeded).mockResolvedValue(undefined)
+    liveness.get.mockReset()
+    liveness.get.mockResolvedValue({ status: 200 })
     // vi.clearAllMocks wipes mock implementations; restore the swap state machine.
     // getActiveSource returns the current `active`, instantSwap/crossfade flip it
     // (mirrors the real AudioProcessor behavior).
@@ -1206,6 +1215,387 @@ describe('useAudioPlayback', () => {
       expect(usePlayerStore.getState().audioElement).toBe(b)
       expect(usePlayerStore.getState().currentTrack?.publicId).toBe('t1')
       expect(processorMock.instance.instantSwap).toHaveBeenCalledOnce()
+    })
+  })
+
+  describe('interrupted streams', () => {
+    const POSITION = 42
+    const ORIGINAL = '/api/stream/track?id=t0'
+    const TRANSCODED = '/api/stream/track?id=t0&format=opus'
+
+    /** Each probe of the liveness endpoint gets the next answer: an HTTP status or no answer. */
+    function answerLiveness(...answers: Array<number | 'unreachable'>) {
+      for (const answer of answers) {
+        if (answer === 'unreachable') liveness.get.mockRejectedValueOnce(new Error('Network Error'))
+        else liveness.get.mockResolvedValueOnce({ status: answer })
+      }
+    }
+
+    async function elapse(ms: number) {
+      await act(async () => { await vi.advanceTimersByTimeAsync(ms) })
+    }
+
+    /** The reloaded source reports its duration: finite for a complete file, infinite while progressive. */
+    async function loadMetadata(audio: MockAudioElement, duration: number) {
+      await act(async () => {
+        audio.duration = duration
+        audio.dispatchEvent(new Event('loadedmetadata'))
+      })
+    }
+
+    /** The first queued track plays from `src` and has reached POSITION. */
+    async function playAtPosition(src = ORIGINAL, duration = 200) {
+      vi.useFakeTimers()
+      const queue = seedQueue(0, 2)
+      renderHook(() => useAudioPlayback())
+      const [a, b] = capturedAudioElements
+      vi.mocked(a.play).mockImplementation(() => {
+        a.paused = false
+        a.ended = false
+        return Promise.resolve()
+      })
+      // A native load clears the error, rewinds, and announces the new load.
+      vi.mocked(a.load).mockImplementation(() => {
+        a.error = null
+        a.paused = true
+        a.currentTime = 0
+        a.duration = NaN
+        a.dispatchEvent(new Event('loadstart'))
+      })
+      await act(async () => { usePlayerStore.getState().playTrack(queue[0]) })
+      a.src = src
+      act(() => {
+        playMedia(a)
+        a.duration = duration
+        a.dispatchEvent(new Event('durationchange'))
+        timeUpdate(a, POSITION, duration)
+      })
+      processorMock.instance.resetProgramme.mockClear()
+      return { a, b, queue }
+    }
+
+    it('keeps retrying without a failure notice or a transcode while nginx answers 502', async () => {
+      const { a } = await playAtPosition()
+      answerLiveness(502)
+      await act(async () => { errorMedia(a, 4) })
+
+      expect(liveness.get).toHaveBeenCalledWith('/live', expect.anything())
+      expect(a.src).toBe(ORIGINAL)
+      expect(toast.error).not.toHaveBeenCalled()
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+      expect(usePlayerStore.getState().playbackRecovery).toBe('reconnecting')
+      expect(getCurrentTime()).toBe(POSITION)
+    })
+
+    it('resumes an original stream at its position once the server answers, without a second play record', async () => {
+      const { a } = await playAtPosition()
+      answerLiveness('unreachable', 503, 200)
+      await act(async () => { errorMedia(a, 2) })
+      expect(a.load).not.toHaveBeenCalled()
+
+      await elapse(1000)
+      expect(liveness.get).toHaveBeenCalledTimes(2)
+      expect(a.load).not.toHaveBeenCalled()
+      await elapse(2000)
+      expect(liveness.get).toHaveBeenCalledTimes(3)
+      expect(a.load).toHaveBeenCalledOnce()
+      expect(a.src).toBe(ORIGINAL)
+
+      const plays = vi.mocked(a.play).mock.calls.length
+      await loadMetadata(a, 200)
+      expect(a.currentTime).toBe(POSITION)
+      expect(a.play).toHaveBeenCalledTimes(plays + 1)
+      expect(usePlayerStore.getState().playbackRecovery).toBe('none')
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+      expect(activityService.recordPlay).toHaveBeenCalledOnce()
+      expect(processorMock.instance.resetProgramme).not.toHaveBeenCalled()
+      expect(toast.error).not.toHaveBeenCalled()
+    })
+
+    it('stays paused while a transcode is progressive and seeks once the complete rendition arrives', async () => {
+      const { a } = await playAtPosition(TRANSCODED, Infinity)
+      answerLiveness('unreachable', 200)
+      await act(async () => { errorMedia(a, 2) })
+      await elapse(1000)
+      expect(a.load).toHaveBeenCalledOnce()
+      expect(a.src).toBe(TRANSCODED)
+
+      const plays = vi.mocked(a.play).mock.calls.length
+      await loadMetadata(a, Infinity)
+      expect(a.play).toHaveBeenCalledTimes(plays)
+      expect(a.currentTime).toBe(0)
+      expect(usePlayerStore.getState().playbackRecovery).toBe('reconnecting')
+
+      await elapse(1000)
+      expect(a.load).toHaveBeenCalledTimes(2)
+      await loadMetadata(a, 200)
+      expect(a.currentTime).toBe(POSITION)
+      expect(a.play).toHaveBeenCalledTimes(plays + 1)
+      expect(usePlayerStore.getState().playbackRecovery).toBe('none')
+      expect(toast.error).not.toHaveBeenCalled()
+    })
+
+    it('switches to a transcoded stream when the server answers an unsupported original', async () => {
+      const { a } = await playAtPosition()
+      vi.mocked(a.canPlayType).mockImplementation((type: string) => type === 'audio/ogg; codecs=opus' ? 'probably' : '')
+      await act(async () => { errorMedia(a, 4) })
+
+      expect(liveness.get).toHaveBeenCalledOnce()
+      expect(a.src).toBe(TRANSCODED)
+      expect(usePlayerStore.getState().playbackRecovery).toBe('none')
+      expect(toast.error).not.toHaveBeenCalled()
+    })
+
+    it('enters the retry when playback stalls without an error for longer than the stall timeout', async () => {
+      const { a } = await playAtPosition()
+      act(() => { a.dispatchEvent(new Event('stalled')) })
+      act(() => { timeUpdate(a, POSITION + 1, 200) })
+      await elapse(20_000)
+      expect(liveness.get).not.toHaveBeenCalled()
+
+      act(() => { a.dispatchEvent(new Event('waiting')) })
+      await elapse(9_000)
+      expect(liveness.get).not.toHaveBeenCalled()
+      await elapse(1_000)
+      expect(liveness.get).toHaveBeenCalledOnce()
+      expect(a.pause).toHaveBeenCalled()
+      // The server answers, so the stalled stream is requested again at its position.
+      expect(a.load).toHaveBeenCalledOnce()
+      await loadMetadata(a, 200)
+      expect(a.currentTime).toBe(POSITION + 1)
+    })
+
+    it('requests the source again when the resumed playback silently never starts', async () => {
+      const { a } = await playAtPosition()
+      answerLiveness('unreachable', 200, 200)
+      await act(async () => { errorMedia(a, 2) })
+      await elapse(1000)
+      expect(a.load).toHaveBeenCalledOnce()
+      vi.mocked(a.play).mockReturnValueOnce(new Promise<void>(() => {}))
+      await loadMetadata(a, 200)
+      await elapse(9_000)
+      expect(a.load).toHaveBeenCalledOnce()
+
+      await elapse(1_000)
+      expect(liveness.get).toHaveBeenCalledTimes(3)
+      expect(a.load).toHaveBeenCalledTimes(2)
+      await loadMetadata(a, 200)
+      expect(a.currentTime).toBe(POSITION)
+      expect(usePlayerStore.getState().playbackRecovery).toBe('none')
+    })
+
+    it('waits at least the Retry-After of a busy encoder before the next attempt', async () => {
+      const { a } = await playAtPosition(TRANSCODED, Infinity)
+      answerLiveness('unreachable', 200, 200)
+      await act(async () => { errorMedia(a, 2) })
+      await elapse(1000)
+      expect(a.load).toHaveBeenCalledOnce()
+
+      // The service worker passes on the 503 transcode_busy answer the media element cannot read.
+      noteStreamRetryAfter(TRANSCODED, 5)
+      await act(async () => { errorMedia(a, 4) })
+      await elapse(4_900)
+      expect(a.load).toHaveBeenCalledOnce()
+      await elapse(100)
+      expect(a.load).toHaveBeenCalledTimes(2)
+      expect(toast.error).not.toHaveBeenCalled()
+    })
+
+    it('moves the saved position when the listener seeks during the retry', async () => {
+      const { a } = await playAtPosition()
+      answerLiveness('unreachable', 200)
+      await act(async () => { errorMedia(a, 2) })
+      act(() => { usePlayerStore.getState().seekTo(90) })
+      expect(getCurrentTime()).toBe(90)
+      expect(toast.info).not.toHaveBeenCalled()
+
+      await elapse(1000)
+      await loadMetadata(a, 200)
+      expect(a.currentTime).toBe(90)
+    })
+
+    it('cancels the retry when the listener picks the next track', async () => {
+      const { a, queue } = await playAtPosition()
+      answerLiveness('unreachable')
+      await act(async () => { errorMedia(a, 2) })
+      await act(async () => { usePlayerStore.getState().playNext() })
+      expect(usePlayerStore.getState().currentTrack).toBe(queue[1])
+      expect(usePlayerStore.getState().playbackRecovery).toBe('none')
+
+      const probes = liveness.get.mock.calls.length
+      const loads = vi.mocked(a.load).mock.calls.length
+      await elapse(130_000)
+      expect(liveness.get).toHaveBeenCalledTimes(probes)
+      expect(a.load).toHaveBeenCalledTimes(loads)
+      expect(a.src).toBe('/api/stream/track?id=t1')
+      expect(toast.error).not.toHaveBeenCalled()
+    })
+
+    it('does not resume on its own after a pause, and pressing play tries at once from the saved position', async () => {
+      const { a } = await playAtPosition()
+      answerLiveness('unreachable')
+      await act(async () => { errorMedia(a, 2) })
+      act(() => { usePlayerStore.getState().setIsPlaying(false) })
+      expect(usePlayerStore.getState().playbackRecovery).toBe('none')
+
+      await elapse(60_000)
+      expect(liveness.get).toHaveBeenCalledOnce()
+      expect(a.load).not.toHaveBeenCalled()
+      expect(toast.error).not.toHaveBeenCalled()
+
+      const plays = vi.mocked(a.play).mock.calls.length
+      act(() => { usePlayerStore.getState().setIsPlaying(true) })
+      expect(a.load).toHaveBeenCalledOnce()
+      expect(usePlayerStore.getState().playbackRecovery).toBe('reconnecting')
+      await loadMetadata(a, 200)
+      expect(a.currentTime).toBe(POSITION)
+      expect(a.play).toHaveBeenCalledTimes(plays + 1)
+      expect(activityService.recordPlay).toHaveBeenCalledOnce()
+    })
+
+    it('gives up after about two minutes, keeping the position so play tries again', async () => {
+      const { a } = await playAtPosition()
+      liveness.get.mockRejectedValue(new Error('Network Error'))
+      await act(async () => { errorMedia(a, 2) })
+      await elapse(119_000)
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+      expect(toast.error).not.toHaveBeenCalled()
+
+      await elapse(1_000)
+      expect(usePlayerStore.getState().isPlaying).toBe(false)
+      expect(usePlayerStore.getState().playbackRecovery).toBe('none')
+      expect(toast.error).toHaveBeenCalledExactlyOnceWith('This track could not be played.', expect.anything())
+      expect(getCurrentTime()).toBe(POSITION)
+
+      act(() => { usePlayerStore.getState().setIsPlaying(true) })
+      expect(a.load).toHaveBeenCalledOnce()
+      await loadMetadata(a, 200)
+      expect(a.currentTime).toBe(POSITION)
+    })
+
+    it('gives up the same way when the transcode is still progressive two minutes after the interruption', async () => {
+      const { a } = await playAtPosition(TRANSCODED, Infinity)
+      answerLiveness('unreachable')
+      vi.mocked(a.load).mockImplementation(() => {
+        a.error = null
+        a.duration = Infinity
+        a.dispatchEvent(new Event('loadedmetadata'))
+      })
+      await act(async () => { errorMedia(a, 2) })
+      await elapse(119_000)
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+      expect(vi.mocked(a.load).mock.calls.length).toBeGreaterThan(1)
+
+      await elapse(1_000)
+      expect(usePlayerStore.getState().isPlaying).toBe(false)
+      expect(toast.error).toHaveBeenCalledOnce()
+      expect(getCurrentTime()).toBe(POSITION)
+    })
+
+    it('never shows or syncs position 0 while the stream recovers', async () => {
+      const { a } = await playAtPosition()
+      const seen: number[] = []
+      const stop = subscribeToTime(() => seen.push(getCurrentTime()))
+      answerLiveness('unreachable', 200)
+      await act(async () => { errorMedia(a, 2) })
+      // WebKit rewinds a failed element.
+      act(() => { timeUpdate(a, 0, NaN) })
+      await elapse(1000)
+      act(() => { timeUpdate(a, 0, 200) })
+      expect(getCurrentTime()).toBe(POSITION)
+
+      await loadMetadata(a, 200)
+      act(() => { timeUpdate(a, POSITION + 1, 200) })
+      stop()
+      expect(getCurrentTime()).toBe(POSITION + 1)
+      expect(seen).not.toContain(0)
+    })
+
+    it('resumes repeat-one at its position when Firefox reports the cut and then the end of its buffer', async () => {
+      const { a } = await playAtPosition()
+      act(() => { usePlayerStore.getState().setRepeat('one') })
+      answerLiveness('unreachable', 200)
+      await act(async () => { errorMedia(a, 2) })
+      await act(async () => { endMedia(a) })
+      expect(a.currentTime).not.toBe(0)
+
+      await elapse(1000)
+      await loadMetadata(a, 200)
+      expect(a.currentTime).toBe(POSITION)
+      expect(activityService.recordPlay).toHaveBeenCalledOnce()
+      expect(processorMock.instance.resetProgramme).not.toHaveBeenCalled()
+    })
+
+    it('ignores an ended notification from a load that already reported an error', async () => {
+      const { a, queue } = await playAtPosition()
+      await act(async () => { errorMedia(a, 3) })
+      expect(toast.error).toHaveBeenCalledOnce()
+      const plays = vi.mocked(a.play).mock.calls.length
+      await act(async () => { endMedia(a) })
+
+      expect(usePlayerStore.getState().currentTrack).toBe(queue[0])
+      expect(a.src).toBe(ORIGINAL)
+      expect(a.play).toHaveBeenCalledTimes(plays)
+    })
+
+    it('keeps the active track when the next-track preload fails during the outage', async () => {
+      const { a, b, queue } = await playAtPosition()
+      act(() => { timeUpdate(a, 195, 200) })
+      expect(b.src).toBe('/api/stream/track?id=t1')
+      await act(async () => { errorMedia(b, 4) })
+      await act(async () => { errorMedia(b, 4) })
+
+      expect(usePlayerStore.getState().audioElement).toBe(a)
+      expect(usePlayerStore.getState().currentTrack).toBe(queue[0])
+      expect(liveness.get).not.toHaveBeenCalled()
+      expect(toast.error).not.toHaveBeenCalled()
+    })
+
+    it('asks for a tap when the browser refuses to resume without a gesture', async () => {
+      const { a } = await playAtPosition()
+      answerLiveness('unreachable', 200)
+      await act(async () => { errorMedia(a, 2) })
+      await elapse(1000)
+      vi.mocked(a.play).mockRejectedValueOnce(new DOMException('play() needs a user gesture', 'NotAllowedError'))
+      await loadMetadata(a, 200)
+      expect(usePlayerStore.getState().isPlaying).toBe(false)
+      expect(usePlayerStore.getState().playbackRecovery).toBe('tap-to-resume')
+      expect(toast.error).not.toHaveBeenCalled()
+
+      const plays = vi.mocked(a.play).mock.calls.length
+      act(() => { usePlayerStore.getState().setIsPlaying(true) })
+      // Called synchronously, so the browser still sees the listener's gesture.
+      expect(a.play).toHaveBeenCalledTimes(plays + 1)
+      await elapse(0)
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+      expect(usePlayerStore.getState().playbackRecovery).toBe('none')
+      expect(a.currentTime).toBe(POSITION)
+    })
+
+    it('records a play that the outage interrupted before it started', async () => {
+      vi.useFakeTimers()
+      const queue = seedQueue(0, 2)
+      renderHook(() => useAudioPlayback())
+      const [a] = capturedAudioElements
+      let rejectPlay!: (error: Error) => void
+      vi.mocked(a.play).mockReturnValueOnce(new Promise<void>((_, reject) => { rejectPlay = reject }))
+      await act(async () => { usePlayerStore.getState().playTrack(queue[1]) })
+      answerLiveness('unreachable', 200)
+      await act(async () => {
+        errorMedia(a, 4)
+        rejectPlay(new DOMException('Failed to load', 'NotSupportedError'))
+      })
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+      expect(usePlayerStore.getState().playbackRecovery).toBe('reconnecting')
+
+      vi.mocked(a.play).mockImplementation(() => {
+        a.paused = false
+        return Promise.resolve()
+      })
+      await elapse(1000)
+      expect(a.load).toHaveBeenCalledOnce()
+      await loadMetadata(a, 200)
+      expect(activityService.recordPlay).toHaveBeenCalledExactlyOnceWith({ songId: 't1', albumId: undefined })
     })
   })
 

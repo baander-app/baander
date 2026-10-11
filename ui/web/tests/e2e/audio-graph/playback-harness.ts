@@ -1,6 +1,7 @@
 import { test as base, expect } from '@playwright/test'
 import { build } from 'esbuild'
 import { createServer } from 'node:https'
+import type { ServerResponse } from 'node:http'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { execFileSync } from 'node:child_process'
@@ -39,17 +40,61 @@ export const test = base.extend<Record<never, never>, { origin: string }>({
         alias: { '@': sourceRoot }, nodePaths: [resolve(webRoot, 'node_modules')],
         plugins: [{ name: 'external-services', setup(plugin) {
           plugin.onResolve({ filter: /^(?:react(?:-dom)?|zustand|scheduler|sonner)(?:\/.*)?$/ }, args => ({ path: require.resolve(args.path) }))
-          plugin.onResolve({ filter: /(?:activity-service|eq-reapply|wasm-loader)$/ }, args => ({ path: args.path, namespace: 'fixture' }))
+          plugin.onResolve({ filter: /(?:activity-service|eq-reapply|wasm-loader|server-liveness)$/ }, args => ({ path: args.path, namespace: 'fixture' }))
           plugin.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path.endsWith('activity-service')
             ? 'export const activityService={recordPlay(payload){(globalThis.playbackActivity??=[]).push(payload.songId)}}'
             : args.path.endsWith('eq-reapply') ? 'export function reapplyAllEqState(){}'
+            // The app probes through its shared API client; the fixture asks the same endpoint with the same rule.
+            : args.path.endsWith('server-liveness') ? "export async function probeServerLiveness(){try{return (await fetch('/live',{cache:'no-store'})).ok?'up':'down'}catch{return 'down'}}"
             : `const api=new Proxy({}, {get:()=>()=>{}}); export const getLoudness=async()=>api,getDynamics=async()=>api,getSpectralFeatures=async()=>api; export const getWasmUrl=()=>'/analysis.wasm',getAudioWorkletUrl=file=>'/'+file;` }))
         } }],
       })
       const waves = [wave(4, 440), wave(5, 660), wave(6, 880)]
+      // A longer track: its first three seconds at once, so playback starts promptly, then the rest
+      // at 1.25x real time, so a cut finds much of it unbuffered.
+      const long = wave(20, 330)
+      const slowStreams = new Set<ServerResponse>()
+      // While down, the fixture answers liveness and streams as nginx does for a stopped web container.
+      let down = false
+      const sendSlowly = (response: ServerResponse, start: number, end: number) => {
+        let offset = Math.min(end + 1, start + 96_000)
+        response.write(long.subarray(start, offset))
+        slowStreams.add(response)
+        const timer = setInterval(() => {
+          const next = Math.min(end + 1, offset + 5000)
+          response.write(long.subarray(offset, next))
+          offset = next
+          if (offset > end) {
+            clearInterval(timer)
+            slowStreams.delete(response)
+            response.end()
+          }
+        }, 250)
+        response.on('close', () => {
+          clearInterval(timer)
+          slowStreams.delete(response)
+        })
+      }
       server = createServer({ key: readFileSync(key), cert: readFileSync(cert) }, (request, response) => {
         const url = new URL(request.url!, 'https://audio.baander.app')
-        if (url.pathname === '/fixture.js') {
+        if (url.pathname === '/fixture/server') {
+          down = url.searchParams.get('state') === 'down'
+          // A stopping server cuts its streams without a terminating chunk.
+          if (down) for (const stream of slowStreams) stream.socket?.destroy()
+          response.end()
+        } else if (url.pathname === '/live') {
+          if (down) { response.writeHead(502); response.end(); return }
+          response.setHeader('Content-Type', 'application/json')
+          response.end('{"status":"alive"}')
+        } else if (url.pathname === '/api/stream/track' && url.searchParams.get('id') === 'long') {
+          if (down) { response.writeHead(502); response.end(); return }
+          response.setHeader('Content-Type', 'audio/wav'); response.setHeader('Accept-Ranges', 'bytes')
+          const range = request.headers.range?.match(/bytes=(\d+)-(\d*)/)
+          const start = range ? Number(range[1]) : 0, end = range?.[2] ? Number(range[2]) : long.length - 1
+          if (range) response.writeHead(206, { 'Content-Range': `bytes ${start}-${end}/${long.length}`, 'Content-Length': end - start + 1 })
+          else response.setHeader('Content-Length', long.length)
+          sendSlowly(response, start, end)
+        } else if (url.pathname === '/fixture.js') {
           response.setHeader('Content-Type', 'application/javascript')
           response.end('window.Worker=class {postMessage(){} terminate(){}};\n' + bundle.outputFiles[0].text)
         } else if (url.pathname === '/api/stream/track') {

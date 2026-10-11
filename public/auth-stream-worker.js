@@ -142,6 +142,17 @@
     headers.set("DPoP", proof);
     return fetch(request, { headers, mode: "cors", credentials: "omit", redirect: "error" });
   }
+  function relayRetryAfter(clientId, url, response) {
+    if (response.status !== 503 || url.pathname !== "/api/stream/track") return;
+    const header = response.headers.get("retry-after")?.trim() ?? "";
+    if (!/^\d{1,4}$/.test(header)) return;
+    self.clients.get(clientId).then((client) => {
+      if (client && client.id === clientId && isSameOriginClient(client)) {
+        client.postMessage({ type: "SW_STREAM_RETRY_AFTER", url: url.href, seconds: Number(header) });
+      }
+    }).catch(() => {
+    });
+  }
   function updateNonce(clientId, auth, response) {
     if (clientAuth.get(clientId) !== auth) return;
     const nonce = response.headers.get("dpop-nonce");
@@ -166,7 +177,10 @@
       if (!proof || clientAuth.get(event.clientId) !== requestAuth) return fetch(event.request);
       const response = await authorizedFetch(event.request, requestAuth, proof);
       updateNonce(event.clientId, requestAuth, response);
-      if (response.status !== 401) return response;
+      if (response.status !== 401) {
+        relayRetryAfter(event.clientId, url, response);
+        return response;
+      }
       if (!await requestAuthRefresh(event.clientId, event.request.method, htu, requestAuth)) return response;
       const refreshed = clientAuth.get(event.clientId);
       if (!refreshed?.accessToken || refreshed.session !== auth.session || refreshed.apiOrigin !== auth.apiOrigin) return response;
@@ -176,6 +190,7 @@
       });
       const retry = await authorizedFetch(event.request, refreshed, retryProof);
       updateNonce(event.clientId, refreshed, retry);
+      relayRetryAfter(event.clientId, url, retry);
       return retry;
     })());
   });

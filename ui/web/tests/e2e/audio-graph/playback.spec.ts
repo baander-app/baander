@@ -196,11 +196,16 @@ test('native playback requests a transcoded stream when Chromium cannot decode t
     } else await route.continue()
   })
   await start(page, origin)
+  // The player first asks /live whether the server answers, then requests the transcode.
+  // The fixture server returns its WAV for any format; the request shape is what matters.
+  await expect.poll(() => requested).toContain('?id=first&format=opus')
+  await expect.poll(async () => {
+    const state = await snapshot(page)
+    return state.elements[state.active]?.paused
+  }).toBe(false)
   const playing = await snapshot(page)
   expect(playing.track).toBe('first')
   expect(playing.playing).toBe(true)
-  // The fixture server returns its WAV for any format; the request shape is what matters.
-  expect(requested).toContain('?id=first&format=opus')
   await expect.poll(() => page.evaluate(() => window.playbackFixture.activity())).toEqual(['first'])
 })
 

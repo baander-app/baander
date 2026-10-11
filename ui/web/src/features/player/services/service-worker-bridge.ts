@@ -2,6 +2,7 @@ import { getAuthSnapshot } from '@/features/auth/stores/auth-store';
 import { getDpopKeyPair, getDpopNonce, setDpopNonce } from '@/shared/crypto/dpop-store';
 import { createDpopProof } from '@/shared/crypto/dpop-proof';
 import { ensureFreshAccessToken, getAuthSession } from '@/shared/api-client/axios-instance';
+import { noteStreamRetryAfter } from './stream-retry-after';
 
 /** Push credentials only while they still belong to this window's current session. */
 export async function postTokenToWorker(token: string | null): Promise<void> {
@@ -61,6 +62,13 @@ export function initServiceWorkerListener(): void {
       if (!registration?.active || event.source !== registration.active) return;
       if (event.data?.type === 'SW_REQUEST_TOKEN') {
         sendAuthState(registration.active);
+        return;
+      }
+      if (event.data?.type === 'SW_STREAM_RETRY_AFTER') {
+        const { url, seconds } = event.data;
+        if (typeof url === 'string' && isAllowedSignUrl(url) && Number.isInteger(seconds) && seconds >= 0 && seconds <= 3600) {
+          noteStreamRetryAfter(url, seconds);
+        }
         return;
       }
       if ((!refreshing && event.data?.type !== 'SW_SIGN_DPOP') || !replyPort) return;

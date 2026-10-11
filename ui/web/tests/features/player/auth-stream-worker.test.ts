@@ -403,3 +403,27 @@ it('bounds initial re-signing even if another rotation invalidates the second pr
   expect(fetchMock).toHaveBeenCalledOnce();
   expect(fetchMock.mock.calls[0][1]).toBeUndefined();
 });
+
+it('tells the requesting tab how long a busy encoder asks it to wait', async () => {
+  const client = configure('a', 'token-a');
+  fetchMock.mockResolvedValueOnce(new Response('busy', { status: 503, headers: { 'Retry-After': '5' } }));
+  const url = `${api}/api/stream/track?id=t0&format=opus`;
+  const response = await request('a', url);
+  expect(response!.status).toBe(503);
+  await vi.waitFor(() => {
+    expect(client.postMessage).toHaveBeenCalledWith({ type: 'SW_STREAM_RETRY_AFTER', url, seconds: 5 });
+  });
+});
+
+it.each([
+  ['a 503 without Retry-After', `${api}/api/stream/track?id=t0&format=opus`, 503, {}],
+  ['a Retry-After date', `${api}/api/stream/track?id=t0&format=opus`, 503, { 'Retry-After': 'Wed, 21 Oct 2026 07:28:00 GMT' }],
+  ['another status', `${api}/api/stream/track?id=t0&format=opus`, 429, { 'Retry-After': '5' }],
+  ['another path', `${api}/api/images/cover`, 503, { 'Retry-After': '5' }],
+])('reports nothing to the tab for %s', async (_case, url, status, headers) => {
+  const client = configure('a', 'token-a');
+  fetchMock.mockResolvedValueOnce(new Response('busy', { status, headers }));
+  await request('a', url);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(client.postMessage.mock.calls.map(([message]) => message.type)).toEqual(['SW_SIGN_DPOP']);
+});

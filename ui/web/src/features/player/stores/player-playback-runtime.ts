@@ -3,10 +3,13 @@ import { audioService } from '../services/audio-service'
 import { activityService } from '../services/activity-service'
 import { createLogger } from '@/shared/lib/logger'
 import { updateTime } from './player-time-tracker'
+import { cancelPlaybackRecovery } from './player-playback-recovery'
 import type { PlayerState, Track } from './player-types'
 
 const logger = createLogger('PlayerStore')
 let playbackSelectionGeneration = 0
+/** The selection whose native play is still pending, and with it the play record. */
+let pendingPlayRecord: number | null = null
 
 /** Read the current attempt token without subscribing to playback state. */
 export function getPlaybackSelectionGeneration(): number {
@@ -28,6 +31,12 @@ export function syncPlaybackVolume(elements: HTMLAudioElement[], volume: number,
 
 export function invalidatePlaybackSelection(): void {
   playbackSelectionGeneration++
+  cancelPlaybackRecovery()
+}
+
+/** Whether the current selection has not yet recorded its play because native play is pending. */
+export function hasPendingPlayRecord(): boolean {
+  return pendingPlayRecord === playbackSelectionGeneration
 }
 
 export type TranscodeFormat = 'opus' | 'aac' | 'mp3'
@@ -54,6 +63,13 @@ export function chooseTranscodeFormat(element: HTMLAudioElement): TranscodeForma
 
 function resolveSource(src: string): URL {
   return new URL(src, document.baseURI)
+}
+
+/** Whether `src` streams this track, as the original file or a transcoded rendition. */
+export function isTrackStream(src: string, publicId: string): boolean {
+  if (!src) return false
+  const url = resolveSource(src)
+  return url.pathname === STREAM_PATH && url.searchParams.get('id') === publicId
 }
 
 export function isTranscodedStream(src: string): boolean {
@@ -101,9 +117,14 @@ export function requestSelectedTrackPlayback(
   format?: TranscodeFormat,
 ) {
   const generation = ++playbackSelectionGeneration
+  cancelPlaybackRecovery()
   const el = get().audioElement
   set({ isPlaying: true })
   if (!el) return
+  pendingPlayRecord = generation
+  const settle = () => {
+    if (pendingPlayRecord === generation) pendingPlayRecord = null
+  }
   if (sourceMode === 'replace') {
     el.src = buildStreamUrl(track.publicId, format)
   } else {
@@ -116,10 +137,12 @@ export function requestSelectedTrackPlayback(
   const ownsSelection = () => generation === playbackSelectionGeneration
     && get().audioElement === el && el.src === src && get().currentTrack === track
   el.play().then(() => {
+    settle()
     if (!ownsSelection() || !get().isPlaying || el.paused || el.ended) return
     // ActivityService handles its own request errors; those are not playback errors.
     activityService.recordPlay({ songId: track.publicId, albumId: track.albumPublicId })
   }, (err) => {
+    settle()
     if (!ownsSelection()) return
     logger.warn('Autoplay blocked or failed:', err)
     set({ isPlaying: false })
