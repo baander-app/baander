@@ -11,6 +11,8 @@ use App\Shared\Infrastructure\Swoole\Drain\WorkerDrainStartedEvent;
 use App\Shared\Infrastructure\Swoole\Drain\WorkerStreamAborterInterface;
 use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
 use App\Shared\Infrastructure\Swoole\WebSocketPusher;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -216,7 +218,13 @@ final class WorkerDrainTest extends TestCase
         self::assertTrue($this->state->allWorkersDrained(1));
     }
 
-    /** A constructed server keeps the timers' event loop from running when the test process ends. */
+    /**
+     * A constructed server keeps the timers' event loop from running when the test process ends.
+     * It also leaves Swoole state behind that stops a later blocking socket read in the same
+     * process from timing out (SocketServerControlClientTest hung), so the test runs alone.
+     */
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
     public function testOnlyEventWorkersStartTheTickAndStopClearsIt(): void
     {
         $taskWorker = new Server('127.0.0.1', 0);
@@ -236,7 +244,13 @@ final class WorkerDrainTest extends TestCase
         self::assertSame([], iterator_to_array(Timer::list()));
     }
 
-    /** A constructed server keeps the timers' event loop from running when the test process ends. */
+    /**
+     * A constructed server keeps the timers' event loop from running when the test process ends.
+     * It also leaves Swoole state behind that stops a later blocking socket read in the same
+     * process from timing out (SocketServerControlClientTest hung), so the test runs alone.
+     */
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
     public function testTheTickClearsItselfOnceTheWorkerHasReported(): void
     {
         $this->state->begin($this->nowNs);
