@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Infrastructure\Health;
 
 use App\Shared\Application\Port\AdminAlertPortInterface;
+use App\Shared\Application\Port\ServerDrainStateInterface;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Infrastructure\Health\HealthAlertService;
 use App\Shared\Infrastructure\Health\HealthAlertTable;
@@ -133,7 +134,38 @@ final class HealthMonitorSubscriberTest extends TestCase
         self::assertCount(1, $this->logger->records);
     }
 
-    private function monitor(ClockInterface $alertClock = new MockClock()): HealthMonitorSubscriber
+    public function testWhileTheServerDrainsATickChecksNothingAndSendsNoAlert(): void
+    {
+        $drain = $this->createStub(ServerDrainStateInterface::class);
+        $drain->method('isDraining')->willReturn(true);
+        $alerts = $this->createMock(AdminAlertPortInterface::class);
+        $alerts->expects(self::never())->method('alertAdmins');
+        $monitor = $this->monitor(drain: $drain, alerts: $alerts);
+
+        $monitor->tick();
+
+        self::assertSame(0, $this->checks);
+        self::assertSame([], $this->logger->records);
+    }
+
+    public function testStopClearsTheTimerOnceAndOnWorkerStoppedAfterItDoesNothing(): void
+    {
+        $monitor = $this->monitor();
+        $server = new Server('127.0.0.1', 0);
+        $monitor->onWorkerStarted(new WorkerStartedEvent($server, 0));
+
+        $monitor->stop();
+        $monitor->stop();
+        $monitor->onWorkerStopped(new WorkerStoppedEvent($server, 0));
+
+        self::assertSame(0, Timer::stats()['num']);
+    }
+
+    private function monitor(
+        ClockInterface $alertClock = new MockClock(),
+        ?ServerDrainStateInterface $drain = null,
+        ?AdminAlertPortInterface $alerts = null,
+    ): HealthMonitorSubscriber
     {
         $result = $this->createStub(Result::class);
         $result->method('fetchOne')->willReturn(1);
@@ -161,16 +193,16 @@ final class HealthMonitorSubscriberTest extends TestCase
             vapidPrivateKey: '',
             messengerWorkerHealth: new MessengerWorkerHealth($redis, new MockClock(), new HealthAlertTable()),
         );
-        $alerts = new HealthAlertService(
+        $alertService = new HealthAlertService(
             $checks,
-            $this->createStub(AdminAlertPortInterface::class),
+            $alerts ?? $this->createStub(AdminAlertPortInterface::class),
             $this->createStub(SystemSettingsPortInterface::class),
             new HealthAlertTable(),
             $alertClock,
             new NullLogger(),
         );
 
-        return new HealthMonitorSubscriber($alerts, $this->logger, 60);
+        return new HealthMonitorSubscriber($alertService, $this->logger, 60, drain: $drain);
     }
 }
 

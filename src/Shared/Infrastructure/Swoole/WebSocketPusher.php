@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Swoole;
 
 use Psr\Log\LoggerInterface;
+use Swoole\WebSocket\CloseFrame;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 final class WebSocketPusher
@@ -98,6 +99,36 @@ final class WebSocketPusher
         }
 
         return $closed;
+    }
+
+    /**
+     * Starts the closing handshake on every connection registered by this worker, as the drain
+     * does: each gets a close frame, the client answers with its own, and Swoole then closes the
+     * connection. Closing at once, as disconnect() does, races with frames the client is still
+     * sending: the kernel answers those with a reset, which can discard the close frame before
+     * the client has read it. A connection that cannot take a frame has its socket closed.
+     * A worker that has no server yet (before its start event) has no connection to close.
+     *
+     * @return list<int> the connections whose close has started
+     */
+    public function closeWorkerConnections(int $workerId, int $code, string $reason): array
+    {
+        $server = $this->server;
+        if ($server === null) {
+            return [];
+        }
+
+        $closing = [];
+        foreach ($this->registry->getWorkerConnectionFds($workerId) as $fd) {
+            $frame = new CloseFrame();
+            $frame->code = $code;
+            $frame->reason = $reason;
+            if (($server->isEstablished($fd) && $server->push($fd, $frame)) || $server->close($fd)) {
+                $closing[] = $fd;
+            }
+        }
+
+        return $closing;
     }
 
     /**

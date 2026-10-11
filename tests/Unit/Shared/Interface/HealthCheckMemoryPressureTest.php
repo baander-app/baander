@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Interface;
 
 use App\Shared\Application\Port\AdminAlertPortInterface;
+use App\Shared\Application\Port\ServerDrainStateInterface;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Infrastructure\Health\HealthAlertService;
 use App\Shared\Infrastructure\Health\HealthAlertTable;
@@ -46,6 +47,14 @@ final class HealthCheckMemoryPressureTest extends TestCase
         $this->service = $this->service($workerMemory);
     }
 
+    private function notDraining(): ServerDrainStateInterface
+    {
+        $drain = $this->createStub(ServerDrainStateInterface::class);
+        $drain->method('isDraining')->willReturn(false);
+
+        return $drain;
+    }
+
     protected function tearDown(): void
     {
         if ($this->memoryLimit !== false) {
@@ -55,7 +64,7 @@ final class HealthCheckMemoryPressureTest extends TestCase
 
     public function testReadyAnswers200WhenOnlyMemoryIsUnhealthy(): void
     {
-        $ready = (new HealthCheckController($this->service))->ready();
+        $ready = (new HealthCheckController($this->service, $this->notDraining()))->ready();
 
         self::assertSame(200, $ready->getStatusCode());
         $body = json_decode((string) $ready->getContent(), true, flags: JSON_THROW_ON_ERROR);
@@ -65,7 +74,7 @@ final class HealthCheckMemoryPressureTest extends TestCase
 
     public function testHealthAnswers200AndStillListsMemoryAsUnhealthy(): void
     {
-        $response = (new HealthCheckController($this->service))->health();
+        $response = (new HealthCheckController($this->service, $this->notDraining()))->health();
 
         self::assertSame(200, $response->getStatusCode());
         $body = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);

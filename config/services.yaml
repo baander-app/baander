@@ -1080,6 +1080,11 @@ services:
     SwooleBundle\SwooleBundle\Server\LifecycleHandler\ServerBeforeShutdownHandler:
         alias: App\Shared\Infrastructure\Swoole\Drain\DrainCoordinator
 
+    # Each event worker drains on its own tick (WorkerDrain); listeners and senders ask the
+    # drain state through this port.
+    App\Shared\Application\Port\ServerDrainStateInterface:
+        alias: App\Shared\Infrastructure\Swoole\Drain\DrainStateTable
+
     SwooleBundle\SwooleBundle\Server\LifecycleHandler\ServerShutdownHandler:
         alias: App\Shared\Infrastructure\Swoole\Drain\DrainShutdownHandler
 

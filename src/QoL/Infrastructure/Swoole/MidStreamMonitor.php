@@ -25,6 +25,7 @@ final class MidStreamMonitor
     private const int CHECK_INTERVAL_MS = 5000;
     private const int OVERBUDGET_THRESHOLD = 2;
     private int $consecutiveOverBudget = 0;
+    private ?int $timerId = null;
 
     public function __construct(
         private readonly StreamGovernor  $governor,
@@ -39,11 +40,35 @@ final class MidStreamMonitor
      */
     public function startMonitoring(): void
     {
+        if ($this->timerId !== null) {
+            return;
+        }
         $this->logger->info('MidStreamMonitor starting on worker 0');
 
-        Timer::tick(self::CHECK_INTERVAL_MS, function (): void {
+        $timerId = Timer::tick(self::CHECK_INTERVAL_MS, function (): void {
             $this->check();
         });
+        // Native Swoole may return false; usable timer ids are positive.
+        if ($timerId < 1) {
+            error_log('[MidStreamMonitor] Worker 0 could not start the monitoring timer');
+
+            return;
+        }
+        $this->timerId = $timerId;
+    }
+
+    /**
+     * Stops the monitoring timer, which would otherwise keep a stopping worker's event loop
+     * running. Safe to call more than once.
+     */
+    public function stopMonitoring(): void
+    {
+        if ($this->timerId === null) {
+            return;
+        }
+
+        Timer::clear($this->timerId);
+        $this->timerId = null;
     }
 
     private function check(): void

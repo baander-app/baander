@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Swoole\Drain;
 
+use App\Shared\Application\Port\ServerDrainStateInterface;
 use Swoole\Table;
 use SwooleBundle\SwooleBundle\Server\HttpServerConfiguration;
 use SwooleBundle\SwooleBundle\Server\Runtime\Bootable;
@@ -21,7 +22,7 @@ use SwooleBundle\SwooleBundle\Server\Runtime\Bootable;
  * Outside the server (console, tests that do not boot it) the table does not exist: nothing is
  * draining, and a write throws.
  */
-final class DrainStateTable implements Bootable
+final class DrainStateTable implements Bootable, ServerDrainStateInterface
 {
     private const string DRAIN_KEY = 'drain';
     private const string WORKER_KEY_PREFIX = 'worker:';

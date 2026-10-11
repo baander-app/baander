@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Health;
 
+use App\Shared\Application\Port\ServerDrainStateInterface;
 use Psr\Log\LoggerInterface;
 use Swoole\Timer;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\CoWrapper;
@@ -22,18 +23,22 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
  * database connection, the entity manager and the logger, so it releases its pooled
  * services first (CoWrapper::defer()). A tick that finds this worker's previous tick
  * still running logs a warning and returns, so a hung check leaves a trace.
+ *
+ * A planned stop sends no alert: once the server drains, ticks check nothing, and the drain
+ * clears the timer when the worker exits (DrainWorkerExitSubscriber calls stop()).
  */
 final class HealthMonitorSubscriber implements EventSubscriberInterface
 {
     private ?int $timerId = null;
     private bool $ticking = false;
 
-    /** The container passes the CoWrapper; it is optional only for tests. */
+    /** The container passes the CoWrapper and the drain state; they are optional only for tests. */
     public function __construct(
         private readonly HealthAlertService $alerts,
         private readonly LoggerInterface $logger,
         private readonly int $intervalSeconds,
         private readonly ?CoWrapper $coWrapper = null,
+        private readonly ?ServerDrainStateInterface $drain = null,
     ) {
     }
 
@@ -65,6 +70,12 @@ final class HealthMonitorSubscriber implements EventSubscriberInterface
 
     public function onWorkerStopped(WorkerStoppedEvent $event): void
     {
+        $this->stop();
+    }
+
+    /** Clears the timer. Safe to call more than once. */
+    public function stop(): void
+    {
         if ($this->timerId === null) {
             return;
         }
@@ -77,6 +88,9 @@ final class HealthMonitorSubscriber implements EventSubscriberInterface
     public function tick(): void
     {
         $this->coWrapper?->defer();
+        if ($this->drain?->isDraining() === true) {
+            return;
+        }
         if ($this->ticking) {
             $this->logger->warning('Health monitor tick skipped: the previous tick is still running.');
 

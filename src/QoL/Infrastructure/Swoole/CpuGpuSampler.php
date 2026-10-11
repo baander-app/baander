@@ -28,6 +28,7 @@ final class CpuGpuSampler implements Bootable
 
     private bool $booted = false;
     private ?Table $table = null;
+    private ?int $timerId = null;
     private int $previousCpuTotal = 0;
     private int $previousCpuIdle = 0;
 
@@ -59,7 +60,7 @@ final class CpuGpuSampler implements Bootable
      */
     public function startSampling(): void
     {
-        if (!$this->booted || $this->table === null) {
+        if (!$this->booted || $this->table === null || $this->timerId !== null) {
             return;
         }
 
@@ -68,9 +69,30 @@ final class CpuGpuSampler implements Bootable
         // Seed initial CPU reading
         $this->readCpuUsage();
 
-        Timer::tick(self::SAMPLE_INTERVAL_MS, function (): void {
+        $timerId = Timer::tick(self::SAMPLE_INTERVAL_MS, function (): void {
             $this->sample();
         });
+        // Native Swoole may return false; usable timer ids are positive.
+        if ($timerId < 1) {
+            error_log('[CpuGpuSampler] Worker 0 could not start the sampling timer');
+
+            return;
+        }
+        $this->timerId = $timerId;
+    }
+
+    /**
+     * Stops the sampling timer, which would otherwise keep a stopping worker's event loop
+     * running. Safe to call more than once.
+     */
+    public function stopSampling(): void
+    {
+        if ($this->timerId === null) {
+            return;
+        }
+
+        Timer::clear($this->timerId);
+        $this->timerId = null;
     }
 
     /**

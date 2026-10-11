@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Interface\Controller;
 
+use App\Shared\Application\Port\ServerDrainStateInterface;
 use App\Shared\Infrastructure\Health\HealthCheckService;
 use App\Shared\Infrastructure\Health\HealthCheckResult;
 use App\Shared\Infrastructure\Health\HealthStatus;
@@ -16,6 +17,7 @@ final class HealthCheckController
 {
     public function __construct(
         private readonly HealthCheckService $healthCheckService,
+        private readonly ServerDrainStateInterface $drain,
     )
     {
     }
@@ -59,7 +61,7 @@ final class HealthCheckController
 
     #[OA\Get(
         path: '/ready',
-        description: 'Kubernetes readiness probe. Checks dependency availability (PostgreSQL, Redis). Returns 503 if any dependency is unreachable. The background worker and memory are not dependencies: a worker outage or a web server worker near its memory limit does not make the web container unready.',
+        description: 'Kubernetes readiness probe. Checks dependency availability (PostgreSQL, Redis). Returns 503 if any dependency is unreachable, and while the web server drains before it stops; the drain answer lists a single `server` check and checks no dependency. The background worker and memory are not dependencies: a worker outage or a web server worker near its memory limit does not make the web container unready.',
         summary: 'Readiness probe',
         responses: [
             new OA\Response(
@@ -75,7 +77,7 @@ final class HealthCheckController
             ),
             new OA\Response(
                 response: '503',
-                description: 'Dependencies not ready',
+                description: 'Dependencies not ready, or the web server is draining',
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'status', type: 'string', example: 'not_ready'),
@@ -89,6 +91,14 @@ final class HealthCheckController
     #[Route('/ready', name: 'health_ready', methods: ['GET'])]
     public function ready(): JsonResponse
     {
+        if ($this->drain->isDraining()) {
+            return $this->buildResponse(
+                [new HealthCheckResult('server', HealthStatus::Unhealthy, 0.0, ['draining' => true])],
+                'ready',
+                'not_ready',
+            );
+        }
+
         $results = $this->healthCheckService->checkReadiness();
 
         return $this->buildResponse($results, 'ready', 'not_ready');

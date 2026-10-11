@@ -24,6 +24,7 @@ use App\Radio\Application\CommandHandler\SyncCountryStationsHandler;
 use App\Radio\Application\Port\RadioStationPortInterface;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Scheduler\Application\Command\ExecuteScheduledJobCommand;
+use App\Shared\Application\Port\ServerDrainStateInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
 use App\Shared\Infrastructure\Messenger\HttpServerTaskDispatcher;
@@ -216,18 +217,25 @@ final class MessengerJsonDeliveryTest extends TestCase
         self::assertSame(0, $failed->getMessageCount());
     }
 
-    /** @return iterable<string, array{class-string}> */
+    /** @return iterable<string, array{class-string, bool}> */
     public static function syncFallbackMessages(): iterable
     {
-        yield 'song' => [SyncSongMessage::class];
-        yield 'album' => [SyncAlbumMessage::class];
-        yield 'library' => [SyncLibraryMessage::class];
-        yield 'country stations' => [SyncCountryStationsCommand::class];
+        $messages = [
+            'song' => SyncSongMessage::class,
+            'album' => SyncAlbumMessage::class,
+            'library' => SyncLibraryMessage::class,
+            'country stations' => SyncCountryStationsCommand::class,
+        ];
+        foreach ($messages as $name => $messageType) {
+            yield $name . ' when the task queue is full' => [$messageType, false];
+            // A draining server sends to Redis without trying the task queue.
+            yield $name . ' while the server drains' => [$messageType, true];
+        }
     }
 
     /** @param class-string $messageType */
     #[DataProvider('syncFallbackMessages')]
-    public function testRedisFallbackSelectsActualTransportRestrictedSyncHandler(string $messageType): void
+    public function testRedisFallbackSelectsActualTransportRestrictedSyncHandler(string $messageType, bool $draining): void
     {
         $async = $this->transport([$messageType]);
         $id = Uuid::v4();
@@ -280,8 +288,10 @@ final class MessengerJsonDeliveryTest extends TestCase
             $descriptors[] = new HandlerDescriptor($handler, ['from_transport' => $registration->fromTransport]);
         }
         $dispatcher = $this->createMock(SwooleTaskDispatcherInterface::class);
-        $dispatcher->expects($this->once())->method('dispatchTask')->willReturn(false);
-        $sender = new SwooleTaskWithRedisFallbackSender($dispatcher, $async, $logger);
+        $dispatcher->expects($draining ? $this->never() : $this->once())->method('dispatchTask')->willReturn(false);
+        $drain = $this->createStub(ServerDrainStateInterface::class);
+        $drain->method('isDraining')->willReturn($draining);
+        $sender = new SwooleTaskWithRedisFallbackSender($dispatcher, $async, $logger, $drain);
         $bus = new MessageBus([
             new SendMessageMiddleware(new SendersLocator([$messageType => ['swoole_task']], new ServiceLocator(['swoole_task' => static fn () => $sender]))),
             new HandleMessageMiddleware(new HandlersLocator([$messageType => $descriptors])),

@@ -39,6 +39,20 @@ final class WebSocketConnectionRegistryTest extends TestCase
         $this->assertGreaterThan(0, $conn['connected_at']);
     }
 
+    public function testWorkerConnectionsAreTheOnesItsWorkerRegistered(): void
+    {
+        $this->registry->addConnection(1, 'user-uuid-1', 0);
+        $this->registry->addConnection(2, 'user-uuid-2', 1);
+        $this->registry->addConnection(3, 'user-uuid-1', 0);
+
+        $fds = $this->registry->getWorkerConnectionFds(0);
+        sort($fds);
+
+        $this->assertSame([1, 3], $fds);
+        $this->assertSame([2], $this->registry->getWorkerConnectionFds(1));
+        $this->assertSame([], $this->registry->getWorkerConnectionFds(2));
+    }
+
     public function testAddConnectionStoresCurrentTimestamp(): void
     {
         $before = time();

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Swoole;
 
+use App\Shared\Application\Port\ServerDrainStateInterface;
 use Psr\Log\LoggerInterface;
 use Swoole\Server;
 use Throwable;
@@ -18,6 +19,8 @@ use Throwable;
  *
  * This monitors consecutive 5xx responses per worker and forces a reload
  * via Server::reload() when the threshold is hit, breaking the error spiral.
+ *
+ * A server that drains is stopping, and its workers with it: it never reloads.
  */
 final class ErrorRateWorkerReloader
 {
@@ -33,6 +36,7 @@ final class ErrorRateWorkerReloader
         private readonly int $threshold = 5,
         private readonly int $cooldownSeconds = 30,
         private readonly ?LoggerInterface $logger = null,
+        private readonly ?ServerDrainStateInterface $drain = null,
     ) {}
 
     public function setServer(Server $server): void
@@ -70,6 +74,14 @@ final class ErrorRateWorkerReloader
                 'workerId' => $workerId,
                 'consecutiveErrors' => $count,
                 'cooldownRemaining' => round($this->cooldownSeconds - ($now - $lastReload), 1),
+            ]);
+            return;
+        }
+
+        if ($this->drain?->isDraining() === true) {
+            $this->logger?->debug('Worker error threshold exceeded while the server drains; no reload', [
+                'workerId' => $workerId,
+                'consecutiveErrors' => $count,
             ]);
             return;
         }

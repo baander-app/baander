@@ -8,6 +8,7 @@ use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
 use App\Shared\Infrastructure\Swoole\WebSocketPusher;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Swoole\WebSocket\CloseFrame;
 use Swoole\WebSocket\Server;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
@@ -216,6 +217,63 @@ final class WebSocketPusherTest extends TestCase
         $this->server->expects($this->once())->method('close')->with(10)->willReturn(true);
 
         self::assertTrue($this->pusher->close(10, 1013, 'Server connection limit reached'));
+    }
+
+    // --- close this worker's connections (drain) ---
+
+    public function testCloseWorkerConnectionsSendsACloseFrameOnlyToTheConnectionsThisWorkerRegistered(): void
+    {
+        $this->registry->addConnection(10, 'user-1', 0);
+        $this->registry->addConnection(20, 'user-2', 1);
+        $this->registry->addConnection(30, 'user-1', 0);
+        $this->server->method('isEstablished')->willReturn(true);
+        $frames = [];
+        $this->server->expects($this->exactly(2))->method('push')
+            ->willReturnCallback(static function (int $fd, mixed $frame) use (&$frames): bool {
+                self::assertInstanceOf(CloseFrame::class, $frame);
+                $frames[] = [$fd, $frame->code, $frame->reason];
+
+                return true;
+            });
+        // The client answers the close frame, and Swoole then closes the connection.
+        $this->server->expects($this->never())->method('disconnect');
+        $this->server->expects($this->never())->method('close');
+
+        $closing = $this->pusher->closeWorkerConnections(0, 1012, 'service restart');
+
+        sort($closing);
+        self::assertSame([10, 30], $closing);
+        usort($frames, static fn (array $a, array $b): int => $a[0] <=> $b[0]);
+        self::assertSame([[10, 1012, 'service restart'], [30, 1012, 'service restart']], $frames);
+    }
+
+    public function testCloseWorkerConnectionsClosesTheSocketWhenNoCloseFrameCanBeSent(): void
+    {
+        $this->registry->addConnection(10, 'user-1', 0);
+        $this->server->method('isEstablished')->willReturn(true);
+        $this->server->method('push')->willReturn(false);
+        $this->server->expects($this->once())->method('close')->with(10)->willReturn(true);
+
+        self::assertSame([10], $this->pusher->closeWorkerConnections(0, 1012, 'service restart'));
+    }
+
+    public function testCloseWorkerConnectionsLeavesOutAConnectionAlreadyGone(): void
+    {
+        $this->registry->addConnection(10, 'user-1', 0);
+        $this->server->method('isEstablished')->willReturn(false);
+        $this->server->expects($this->once())->method('close')->with(10)->willReturn(false);
+
+        self::assertSame([], $this->pusher->closeWorkerConnections(0, 1012, 'service restart'));
+    }
+
+    public function testCloseWorkerConnectionsWithoutAServerClosesNothing(): void
+    {
+        $this->registry->addConnection(10, 'user-1', 0);
+        $this->server->expects($this->never())->method('disconnect');
+
+        $pusher = new WebSocketPusher($this->registry, new JsonEncoder());
+
+        self::assertSame([], $pusher->closeWorkerConnections(0, 1012, 'service restart'));
     }
 
     public function testPlainServerIsRejectedBeforeAnyPushAttempt(): void

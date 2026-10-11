@@ -7,10 +7,14 @@ declare(strict_types=1);
  * container, next to app:serve on 127.0.0.1:9501, and prints one timestamped line per outcome.
  *
  *   ws <user>                       a WebSocket that sends a ping frame every 200 ms and records
- *                                   each pong, any other frame and the close
+ *                                   each pong, any other frame and the close; it answers a close
+ *                                   frame with its own, as a browser does
  *   stalled-stream <user> <track>   a progressive stream of an in-progress rendition that stops
  *                                   reading once the response has started, while this process
  *                                   keeps writing the rendition so the server's buffers fill up
+ *   keepalive-ready <user>          one kept-alive connection that asks for /ready every 200 ms
+ *                                   and records each status and Connection header, until an
+ *                                   answer says Connection: close or the connection ends
  */
 
 use App\Tests\Fixtures\WebRuntime\HeldRendition;
@@ -29,6 +33,40 @@ require $projectDir . '/vendor/autoload.php';
 function record(string $event, string $detail = ''): void
 {
     fwrite(STDOUT, sprintf("client %.6f %s %s\n", microtime(true), $event, $detail));
+}
+
+/**
+ * Reads one HTTP/1.1 response with a Content-Length body.
+ *
+ * @param resource $socket
+ * @return array{int, array<string, string>}|null the status and the lower-cased headers, or null at EOF
+ */
+function readResponse($socket): ?array
+{
+    $head = '';
+    while (!str_ends_with($head, "\r\n\r\n")) {
+        $line = fgets($socket);
+        if ($line === false) {
+            return null;
+        }
+        $head .= $line;
+    }
+    $lines = explode("\r\n", trim($head));
+    if (preg_match('#^HTTP/1\.1 (\d{3}) #', $lines[0], $status) !== 1) {
+        throw new RuntimeException('Unexpected status line ' . $lines[0]);
+    }
+    $headers = [];
+    foreach (array_slice($lines, 1) as $header) {
+        [$name, $value] = explode(':', $header, 2) + [1 => ''];
+        $headers[strtolower(trim($name))] = trim($value);
+    }
+    $length = (int) ($headers['content-length'] ?? 0);
+    $body = $length > 0 ? stream_get_contents($socket, $length) : '';
+    if (strlen((string) $body) !== $length) {
+        return null;
+    }
+
+    return [(int) $status[1], $headers];
 }
 
 /** @var list<string> $arguments */
@@ -67,6 +105,8 @@ if ($mode === 'ws') {
             $frame = $ws->recv(0.2);
             if ($frame instanceof CloseFrame) {
                 record('ws_close_frame', sprintf('code=%d reason=%s', $frame->code, $frame->reason));
+                // A browser answers a close frame with its own; the server then closes the connection.
+                $ws->push(pack('n', 1000), WEBSOCKET_OPCODE_CLOSE);
                 continue;
             }
             if ($frame === false && $ws->errCode === SOCKET_ETIMEDOUT) {
@@ -102,6 +142,30 @@ if ($mode === 'ws') {
     }
     record('stalled', 'written=' . strlen($held->written));
     sleep(3600);
+} elseif ($mode === 'keepalive-ready') {
+    $socket = stream_socket_client('tcp://127.0.0.1:9501', $errno, $error, 5);
+    if ($socket === false) {
+        throw new RuntimeException(sprintf('Cannot connect: %s (%d)', $error, $errno));
+    }
+    stream_set_timeout($socket, 10);
+    while (true) {
+        $request = "GET /ready HTTP/1.1\r\nHost: 127.0.0.1:9501\r\nConnection: keep-alive\r\n\r\n";
+        if (@fwrite($socket, $request) !== strlen($request)) {
+            record('ready_eof', 'when=send');
+            break;
+        }
+        $response = readResponse($socket);
+        if ($response === null) {
+            record('ready_eof', 'when=read');
+            break;
+        }
+        [$status, $headers] = $response;
+        record('ready', sprintf('status=%d connection=%s', $status, strtolower($headers['connection'] ?? '-')));
+        if (strtolower($headers['connection'] ?? '') === 'close') {
+            break;
+        }
+        usleep(200_000);
+    }
 } else {
     throw new RuntimeException('Unknown mode ' . $mode);
 }

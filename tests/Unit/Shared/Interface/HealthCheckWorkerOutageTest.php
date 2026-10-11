@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Interface;
 
+use App\Shared\Application\Port\ServerDrainStateInterface;
 use App\Shared\Infrastructure\Health\HealthCheckService;
 use App\Shared\Infrastructure\Health\HealthAlertTable;
 use App\Shared\Infrastructure\Health\MessengerWorkerHealth;
@@ -25,6 +26,7 @@ final class HealthCheckWorkerOutageTest extends TestCase
     private ArrayRedis $redis;
     private MockClock $clock;
     private bool $databaseUp = true;
+    private int $databaseQueries = 0;
 
     protected function setUp(): void
     {
@@ -34,7 +36,7 @@ final class HealthCheckWorkerOutageTest extends TestCase
 
     public function testReadyAnswers200WhenOnlyTheWorkerIsUnhealthy(): void
     {
-        $controller = new HealthCheckController($this->service($this->staleWorker()));
+        $controller = new HealthCheckController($this->service($this->staleWorker()), $this->drain(false));
 
         $ready = $controller->ready();
         $readyBody = json_decode((string) $ready->getContent(), true, flags: JSON_THROW_ON_ERROR);
@@ -54,9 +56,25 @@ final class HealthCheckWorkerOutageTest extends TestCase
     public function testReadyStillFailsWhenADependencyIsDown(): void
     {
         $this->databaseUp = false;
-        $controller = new HealthCheckController($this->service($this->staleWorker()));
+        $controller = new HealthCheckController($this->service($this->staleWorker()), $this->drain(false));
 
         self::assertSame(503, $controller->ready()->getStatusCode());
+    }
+
+    public function testReadyAnswers503WithoutCheckingDependenciesWhileTheServerDrains(): void
+    {
+        $controller = new HealthCheckController($this->service($this->staleWorker()), $this->drain(true));
+
+        $ready = $controller->ready();
+
+        self::assertSame(503, $ready->getStatusCode());
+        $body = json_decode((string) $ready->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('not_ready', $body['status']);
+        self::assertSame([['component' => 'server', 'status' => 'unhealthy', 'responseTimeMs' => 0, 'details' => ['draining' => true]]], $body['checks']);
+        self::assertSame(0, $this->databaseQueries, 'A draining server checks no dependency.');
+        // /health and /live keep answering as before.
+        self::assertSame(200, $controller->health()->getStatusCode());
+        self::assertSame(200, $controller->live()->getStatusCode());
     }
 
     public function testTheContainerHealthcheckPassesWhenOnlyTheWorkerIsUnhealthy(): void
@@ -91,16 +109,27 @@ final class HealthCheckWorkerOutageTest extends TestCase
         return new RedisClientFactory('redis://127.0.0.1:6379', connectionFactory: static fn (): Redis => $redis);
     }
 
+    private function drain(bool $draining): ServerDrainStateInterface
+    {
+        $drain = $this->createStub(ServerDrainStateInterface::class);
+        $drain->method('isDraining')->willReturn($draining);
+
+        return $drain;
+    }
+
     private function service(MessengerWorkerHealth $messenger): HealthCheckService
     {
         $connection = $this->createStub(Connection::class);
-        if ($this->databaseUp) {
-            $result = $this->createStub(Result::class);
-            $result->method('fetchOne')->willReturn(1);
-            $connection->method('executeQuery')->willReturn($result);
-        } else {
-            $connection->method('executeQuery')->willThrowException(new \RuntimeException('Connection refused'));
-        }
+        $result = $this->createStub(Result::class);
+        $result->method('fetchOne')->willReturn(1);
+        $connection->method('executeQuery')->willReturnCallback(function () use ($result): Result {
+            ++$this->databaseQueries;
+            if (!$this->databaseUp) {
+                throw new \RuntimeException('Connection refused');
+            }
+
+            return $result;
+        });
 
         return new HealthCheckService(
             connection: $connection,

@@ -20,6 +20,11 @@
 #      drain-start line and exit 0; SIGTERM followed by SIGINT still drains once;
 #    - a PATCH /api/server reload keeps the server, the CPU pool's processes and an open
 #      WebSocket, and starts no drain;
+#    - each event worker drains on its own (WorkerDrain): an open WebSocket receives a close frame
+#      with code 1012 before its connection ends, and a server with nothing streaming closes the
+#      drain window as soon as every worker has reported drained, then stops within S + W;
+#    - a request for /ready on a connection kept alive from before the stop gets 503 with
+#      Connection: close while a stalled stream holds the window open;
 #    - a client that stopped reading a progressive stream does not hold the server past D;
 #    - a stopped event worker is killed by Swoole after 2W and the server still exits 0;
 #    - a stopped manager is killed by the drain watchdog at D, and the server exits 1;
@@ -114,16 +119,16 @@ docker create --name "$run_id-probe" --network "$run_id" --network-alias probe -
 tar -cf - tests/Fixtures/WebShutdown | docker cp - "$run_id-probe:/tmp/"
 docker start "$run_id-probe" >/dev/null
 for attempt in $(seq 1 50); do
-    if docker logs "$run_id-probe" 2>&1 | grep -q ' master_start '; then break; fi
+    if grep -q ' master_start ' <<<"$(docker logs "$run_id-probe" 2>&1)"; then break; fi
     sleep 0.1
 done
-docker logs "$run_id-probe" 2>&1 | grep -q ' master_start ' || fail 'the probe server did not start'
+grep -q ' master_start ' <<<"$(docker logs "$run_id-probe" 2>&1)" || fail 'the probe server did not start'
 docker exec -d -w "$app_dir" "$run_id-client" \
     sh -c 'exec php tests/Fixtures/WebShutdown/shutdown-order-client.php probe > /tmp/shutdown-order-client.log 2>&1'
 for attempt in $(seq 1 50); do
     if client grep -q ' ready ' /tmp/shutdown-order-client.log 2>/dev/null &&
-        docker logs "$run_id-probe" 2>&1 | grep -q ' hold_received ' &&
-        docker logs "$run_id-probe" 2>&1 | grep -q ' ws_open '; then
+        grep -q ' hold_received ' <<<"$(docker logs "$run_id-probe" 2>&1)" &&
+        grep -q ' ws_open ' <<<"$(docker logs "$run_id-probe" 2>&1)"; then
         break
     fi
     sleep 0.1
@@ -280,6 +285,18 @@ assert_stopped() {
     fi
     echo "PASS: $1: app:serve exited $exit_code after $elapsed seconds."
 }
+# assert_workers_drained SCENARIO: every event worker reported drained, so the master closed the
+# drain window well before the window S of 3 seconds.
+assert_workers_drained() {
+    local window
+    window=$(run_log | sed -nE 's/^Drain window closed after ([0-9.]+) s, every worker drained; reset [0-9]+ client connection\(s\)\.$/\1/p')
+    [ -n "$window" ] || fail "$1: the drain window did not close with every worker drained: $(run_log | grep '^Drain window closed' || true)"
+    awk -v w="$window" 'BEGIN { exit !(w < 1.0) }' || fail "$1: the workers took $window seconds to report drained"
+    echo "PASS: $1: every worker reported drained; the window closed after $window seconds."
+}
+# The drain window S and Swoole's worker stop wait W for a drain deadline of 10 seconds.
+window_seconds=3
+worker_stop_wait_seconds=1
 
 # A reload keeps the server, the CPU pool and an open WebSocket, and starts no drain.
 start_web
@@ -306,23 +323,40 @@ ws_log=$(web cat /tmp/drain-ws.log)
 grep -qE ' ws_(closed|close_frame) ' <<<"$ws_log" && fail "the reload closed the WebSocket: $ws_log"
 awk -v t="$reloaded_at" '$3 == "ws_pong" && $2 > t { found = 1 } END { exit !found }' <<<"$ws_log" ||
     fail 'the WebSocket answered no ping after the reload'
-run_log | grep -q 'Web server drain started' && fail 'the reload started a drain'
+grep -q 'Web server drain started' <<<"$(run_log)" && fail 'the reload started a drain'
 echo "PASS: PATCH /api/server reloaded every worker and kept the server, the CPU pool and the WebSocket, with no drain."
+# The WebSocket is still open: its worker closes it with 1012 ("service restart") during the
+# drain, before the connection ends.
 started_at=$(date +%s.%N)
 docker stop -t "$stop_timeout" "$run_id-web" >/dev/null
 assert_stopped 'docker stop (SIGTERM)' "$started_at" 0 "$drain_seconds"
+assert_workers_drained 'docker stop (SIGTERM) with a WebSocket open'
+# The container has stopped, so the client's log is copied out of it.
+ws_log=$(docker cp "$run_id-web:/tmp/drain-ws.log" - | tar -xOf -)
+close_frame=$(awk '$3 == "ws_close_frame" { print NR, $4, $5, $6; exit }' <<<"$ws_log")
+closed=$(awk '$3 == "ws_closed" { print NR; exit }' <<<"$ws_log")
+[ "${close_frame#* }" = 'code=1012 reason=service restart' ] || fail "the WebSocket got no 1012 close frame: $ws_log"
+# A close frame can only arrive while the connection is open. The client runs inside the web
+# container, which may end it before it logs the connection's end, so a missing ws_closed line
+# is not a failure; a ws_closed line before the close frame is.
+[ -z "$closed" ] || [ "${close_frame%% *}" -lt "$closed" ] || fail "the WebSocket ended before its close frame: $ws_log"
+echo "PASS: the open WebSocket received close code 1012 before its connection ended."
 
+# Nothing is streaming: the window closes once every worker has reported, and the workers, with
+# no timer left, exit at once.
 start_web
 started_at=$(date +%s.%N)
 docker kill --signal INT "$run_id-web" >/dev/null
 await_exit
-assert_stopped 'SIGINT' "$started_at" 0 "$drain_seconds"
+assert_stopped 'SIGINT' "$started_at" 0 $((window_seconds + worker_stop_wait_seconds))
+assert_workers_drained 'SIGINT'
 
 start_web
 started_at=$(date +%s.%N)
 web curl -fsS -X DELETE -o /dev/null http://127.0.0.1:9200/api/server || fail 'DELETE /api/server failed'
 await_exit
 assert_stopped 'DELETE /api/server' "$started_at" 0 "$drain_seconds"
+assert_workers_drained 'DELETE /api/server'
 
 # The command waits for the server to exit, so it ends with the container.
 start_web
@@ -330,6 +364,7 @@ started_at=$(date +%s.%N)
 docker exec -d -w "$app_dir" "$run_id-web" php bin/console swoole:server:stop --no-interaction
 await_exit
 assert_stopped 'swoole:server:stop' "$started_at" 0 "$drain_seconds"
+assert_workers_drained 'swoole:server:stop'
 
 start_web
 started_at=$(date +%s.%N)
@@ -340,16 +375,26 @@ await_exit
 assert_stopped 'SIGTERM, then SIGINT a second later' "$started_at" 0 "$drain_seconds"
 
 # The master resets the stalled connection when the window ends, so joining its reactor threads
-# does not wait for output the client will never read.
+# does not wait for output the client will never read. The stalled stream also holds the window
+# open while a connection kept alive from before the stop asks for /ready.
 start_web
 start_client stalled-stream "$listener" "$track"
 await_client stalled-stream stalled
+start_client keepalive-ready "$listener"
+await_client keepalive-ready ready
 started_at=$(date +%s.%N)
 docker kill --signal TERM "$run_id-web" >/dev/null
 await_exit
 assert_stopped 'a client that stopped reading a progressive stream' "$started_at" 0 "$drain_seconds"
-run_log | grep -qE '^Drain window closed after [0-9.]+ s, the window passed; reset [1-9][0-9]* client connection\(s\)\.$' ||
+grep -qE '^Drain window closed after [0-9.]+ s, the window passed; reset [1-9][0-9]* client connection\(s\)\.$' <<<"$(run_log)" ||
     fail 'the window did not reset the stalled connection'
+ready_log=$(docker cp "$run_id-web:/tmp/drain-keepalive-ready.log" - | tar -xOf -)
+[ "$(awk '$3 == "ready" { print $4, $5; exit }' <<<"$ready_log")" = 'status=200 connection=keep-alive' ] ||
+    fail "the kept-alive connection was not ready before the stop: $ready_log"
+[ "$(awk '$3 == "ready" { last = $4 " " $5 } END { print last }' <<<"$ready_log")" = 'status=503 connection=close' ] ||
+    fail "/ready on the kept-alive connection did not answer 503 with Connection: close during the drain: $ready_log"
+grep -q ' ready_eof ' <<<"$ready_log" && fail "the kept-alive connection ended before its 503: $ready_log"
+echo "PASS: /ready on a connection kept alive from before the stop answered 503 with Connection: close."
 
 # Swoole's manager kills a worker that does not stop within 2W.
 start_web
@@ -370,9 +415,9 @@ await_exit
 assert_stopped "the manager stopped with SIGSTOP (pid $stopped_manager)" "$started_at" 1 "$stop_timeout"
 elapsed=$(awk -v a="$started_at" -v b="$(date +%s.%N)" 'BEGIN { printf "%.1f", b - a }')
 awk -v e="$elapsed" -v d="$drain_seconds" 'BEGIN { exit !(e >= d - 0.5) }' || fail "the watchdog fired after $elapsed seconds, before D"
-run_log | grep -qE "^The web server did not stop by its drain deadline: killed processes \[([0-9]+, )*$stopped_manager(, [0-9]+)*\]" ||
+grep -qE "^The web server did not stop by its drain deadline: killed processes \[([0-9]+, )*$stopped_manager(, [0-9]+)*\]" <<<"$(run_log)" ||
     fail 'the watchdog did not report killing the manager'
-run_log | grep -q '^The web server reached its drain deadline; exiting with status 1.$' || fail 'the master did not report the deadline'
+grep -q '^The web server reached its drain deadline; exiting with status 1.$' <<<"$(run_log)" || fail 'the master did not report the deadline'
 echo "PASS: the watchdog killed the stopped manager at the deadline."
 
 # The start-up listeners survive an unreachable PostgreSQL, and the stop still drains. This start

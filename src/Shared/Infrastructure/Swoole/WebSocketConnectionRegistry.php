@@ -115,6 +115,24 @@ final class WebSocketConnectionRegistry
     }
 
     /**
+     * The connections whose handshake this worker handled. With dispatch_mode 2 the same worker
+     * receives every later frame of the connection.
+     *
+     * @return list<int>
+     */
+    public function getWorkerConnectionFds(int $workerId): array
+    {
+        $fds = [];
+        foreach ($this->connections as $fd => $row) {
+            if ($row['worker_id'] === $workerId) {
+                $fds[] = (int) $fd;
+            }
+        }
+
+        return $fds;
+    }
+
+    /**
      * @throws \InvalidArgumentException when the room name is longer than MAX_ROOM_NAME_BYTES
      * @throws WebSocketRegistrationRefused when the tables have no free row; the
      *         connection is then not a member

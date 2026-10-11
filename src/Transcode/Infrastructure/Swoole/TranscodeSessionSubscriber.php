@@ -130,6 +130,19 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
         }
     }
 
+    /**
+     * Stops every encoding loop this worker runs, as the worker stops for a drain: each loop's
+     * lock renewal timer is cleared, its encoder killed and its loop lock released, so a
+     * restarted server can take the job over at once. The job keeps its in-progress state.
+     * A loop still suspended sees that it lost ownership and ends without writing.
+     */
+    public function stopAllLoops(): void
+    {
+        foreach ($this->loopOwnership as $jobKey => $ownership) {
+            $this->cleanupLoop(Uuid::fromString($jobKey), $ownership);
+        }
+    }
+
     private function runEncodingLoop(Uuid $sessionId, TranscodeLoopLeaseInterface $lease): void
     {
         $jobId = $lease->getJobId();

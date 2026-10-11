@@ -14,6 +14,8 @@ use App\QoL\Infrastructure\Swoole\CpuGpuSampler;
 use App\QoL\Infrastructure\Swoole\LearningDataPersister;
 use App\QoL\Infrastructure\Swoole\MidStreamMonitor;
 use App\QoL\Infrastructure\Swoole\QoLWorkerStartupSubscriber;
+use App\Shared\Application\Port\ServerDrainStateInterface;
+use App\Shared\Infrastructure\Swoole\Drain\WorkerDrainStartedEvent;
 use App\Shared\Infrastructure\Swoole\SwooleWorkerEventBuffer;
 use App\Shared\Infrastructure\Swoole\SwooleWorkerEventSubscriber;
 use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
@@ -27,6 +29,7 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Swoole\Server;
 use Swoole\Timer;
+use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerExitedEvent;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerStartedEvent;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\EventDispatcher\EventDispatcher;
@@ -201,8 +204,54 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
         self::assertSame(2, Timer::stats()['num']);
     }
 
+    public function testWorkerZeroSavesItsLearningStateWhenTheDrainStarts(): void
+    {
+        [$subscriber, $governor] = $this->fixture();
+        $governor->importState(['state' => 'active']);
+        $server = new Server('127.0.0.1', 0);
+
+        $subscriber->onWorkerDrainStarted(new WorkerDrainStartedEvent($server, 1));
+        self::assertFileDoesNotExist($this->directory . '/governor_state.json');
+
+        $subscriber->onWorkerDrainStarted(new WorkerDrainStartedEvent($server, 0));
+        $saved = json_decode((string) file_get_contents($this->directory . '/governor_state.json'), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('active', $saved['governor']['state']);
+    }
+
+    public function testAFailedSaveDuringTheDrainIsLoggedAndTheDrainGoesOn(): void
+    {
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('error')->with(
+            'QoL learning state was not saved during the drain',
+            self::callback(static fn (array $context): bool => $context['exception'] instanceof \RuntimeException),
+        );
+        [$subscriber] = $this->fixture($logger, failFingerprint: true);
+
+        $subscriber->onWorkerDrainStarted(new WorkerDrainStartedEvent(new Server('127.0.0.1', 0), 0));
+
+        self::assertFileDoesNotExist($this->directory . '/governor_state.json');
+    }
+
+    public function testADrainingWorkerZeroStopsTheSamplerAndMonitorAsItExits(): void
+    {
+        $drain = new SwitchableDrainState();
+        [$subscriber] = $this->fixture(drain: $drain);
+        $server = new Server('127.0.0.1', 0);
+        $subscriber->onWorkerStarted(new WorkerStartedEvent($server, 0));
+        self::assertSame(2, Timer::stats()['num']);
+
+        // A reload: WorkerExit without the drain stops nothing.
+        $subscriber->onWorkerExited(new WorkerExitedEvent($server, 0));
+        self::assertSame(2, Timer::stats()['num']);
+
+        $drain->draining = true;
+        $subscriber->onWorkerExited(new WorkerExitedEvent($server, 0));
+        $subscriber->onWorkerExited(new WorkerExitedEvent($server, 0));
+        self::assertSame(0, Timer::stats()['num']);
+    }
+
     /** @return array{QoLWorkerStartupSubscriber, StreamGovernor, LearningDataPersister} */
-    private function fixture(?LoggerInterface $logger = null, bool $failFingerprint = false): array
+    private function fixture(?LoggerInterface $logger = null, bool $failFingerprint = false, ?ServerDrainStateInterface $drain = null): array
     {
         $fingerprint = $this->createStub(EncoderProfileFingerprintPortInterface::class);
         if ($failFingerprint) {
@@ -223,6 +272,16 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
             EncoderProfileFingerprintPortInterface::class => static fn (): EncoderProfileFingerprintPortInterface => $fingerprint,
         ]);
 
-        return [new QoLWorkerStartupSubscriber($locator, $logger ?? new NullLogger()), $governor, $persister];
+        return [new QoLWorkerStartupSubscriber($locator, $logger ?? new NullLogger(), $drain), $governor, $persister];
+    }
+}
+
+final class SwitchableDrainState implements ServerDrainStateInterface
+{
+    public bool $draining = false;
+
+    public function isDraining(): bool
+    {
+        return $this->draining;
     }
 }

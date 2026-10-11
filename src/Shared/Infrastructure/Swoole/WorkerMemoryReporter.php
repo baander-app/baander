@@ -13,7 +13,7 @@ use Symfony\Component\EventDispatcher\EventSubscriberInterface;
  * Each HTTP worker writes its real memory use into WorkerMemoryTable when it starts
  * and then every WorkerMemoryTable::UPDATE_INTERVAL_SECONDS. Task workers report
  * nothing. The timer is cleared when the worker stops, so a reload leaves no stray
- * timer behind.
+ * timer behind; a drain clears it earlier, on WorkerExit (DrainWorkerExitSubscriber).
  *
  * CRITICAL: the timer callback uses no pooled service (no logger, entity manager or
  * connection), so it needs no CoWrapper::defer(). It reports problems with
@@ -58,6 +58,12 @@ final class WorkerMemoryReporter implements EventSubscriberInterface
     }
 
     public function onWorkerStopped(WorkerStoppedEvent $event): void
+    {
+        $this->stop();
+    }
+
+    /** Clears the timer; the drain calls it when the worker exits. Safe to call more than once. */
+    public function stop(): void
     {
         if ($this->timerId === null) {
             return;
