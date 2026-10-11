@@ -7,7 +7,6 @@ namespace App\Shared\Infrastructure\Swoole\Drain;
 use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool;
 use Psr\Container\ContainerInterface;
 use Swoole\Process;
-use Swoole\Runtime;
 use Swoole\Server;
 use Swoole\Timer;
 use SwooleBundle\SwooleBundle\Server\Configurator\Configurator;
@@ -180,8 +179,10 @@ final class DrainCoordinator implements ServerBeforeShutdownHandler, Configurato
      */
     private static function kernelSendQueues(): array
     {
-        $queued = [];
-        self::unhooked(SWOOLE_HOOK_FILE, static function () use (&$queued): void {
+        // Hooked, the read would yield the master coroutine, and the next window tick could then
+        // run beside it.
+        return SwooleHooks::without(SWOOLE_HOOK_FILE, static function (): array {
+            $queued = [];
             foreach (['/proc/net/tcp', '/proc/net/tcp6'] as $table) {
                 $lines = @file($table, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
                 foreach (array_slice($lines === false ? [] : $lines, 1) as $line) {
@@ -195,9 +196,9 @@ final class DrainCoordinator implements ServerBeforeShutdownHandler, Configurato
                     }
                 }
             }
-        });
 
-        return $queued;
+            return $queued;
+        });
     }
 
     private static function resetConnections(Server $server): int
@@ -279,26 +280,6 @@ final class DrainCoordinator implements ServerBeforeShutdownHandler, Configurato
      */
     private function say(string $line): void
     {
-        self::unhooked(SWOOLE_HOOK_STDIO, fn () => fwrite($this->log ?? STDERR, $line . "\n"));
-    }
-
-    /**
-     * Runs $action with these Swoole coroutine hooks off. A hooked read or write in a master
-     * coroutine yields: in the window tick, the next tick could then run beside it.
-     */
-    private static function unhooked(int $hooks, \Closure $action): void
-    {
-        $flags = Runtime::getHookFlags();
-        $hooked = ($flags & $hooks) !== 0;
-        if ($hooked) {
-            Runtime::setHookFlags($flags & ~$hooks);
-        }
-        try {
-            $action();
-        } finally {
-            if ($hooked) {
-                Runtime::setHookFlags($flags);
-            }
-        }
+        SwooleHooks::without(SWOOLE_HOOK_STDIO, fn () => fwrite($this->log ?? STDERR, $line . "\n"));
     }
 }

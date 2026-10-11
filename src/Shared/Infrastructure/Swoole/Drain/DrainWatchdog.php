@@ -56,8 +56,10 @@ final class DrainWatchdog
             $arguments[] = '--pgid=' . $processGroup;
         }
 
-        $hooks = self::suspendProcessHook();
-        try {
+        // Without the Swoole extension its constants are undefined, and there is no hook to suspend.
+        $processHook = \defined('SWOOLE_HOOK_PROC') ? \SWOOLE_HOOK_PROC : 0;
+
+        return SwooleHooks::without($processHook, static function () use ($arguments, $deadlineNs): self {
             $process = proc_open(
                 ['/bin/bash', '-c', self::CLOSE_INHERITED_DESCRIPTORS, 'drain-watchdog', ...$arguments],
                 [0 => ['file', '/dev/null', 'r'], 1 => STDOUT, 2 => STDERR],
@@ -66,12 +68,9 @@ final class DrainWatchdog
             if (!is_resource($process)) {
                 throw new \RuntimeException('Cannot start the drain watchdog.');
             }
-            $pid = proc_get_status($process)['pid'];
-        } finally {
-            self::restoreProcessHook($hooks);
-        }
 
-        return new self($process, $pid, $deadlineNs);
+            return new self($process, proc_get_status($process)['pid'], $deadlineNs);
+        });
     }
 
     /**
@@ -117,26 +116,5 @@ final class DrainWatchdog
 
         // A signal, or a child already reaped by someone else (ECHILD).
         return -1;
-    }
-
-    private static function suspendProcessHook(): ?int
-    {
-        if (!class_exists(\Swoole\Runtime::class)) {
-            return null;
-        }
-        $flags = \Swoole\Runtime::getHookFlags();
-        if (($flags & SWOOLE_HOOK_PROC) === 0) {
-            return null;
-        }
-        \Swoole\Runtime::setHookFlags($flags & ~SWOOLE_HOOK_PROC);
-
-        return $flags;
-    }
-
-    private static function restoreProcessHook(?int $flags): void
-    {
-        if ($flags !== null) {
-            \Swoole\Runtime::setHookFlags($flags);
-        }
     }
 }
