@@ -219,6 +219,9 @@ docker create --name "$run_id-web" --privileged --network "$run_id" -w "$app_dir
     "$image" "$app_dir/docker/general/start-web.sh" >/dev/null
 if [ "${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" != 1 ]; then
     client tar -cf - . | docker cp -a - "$run_id-web:$app_dir"
+else
+    # Both containers run the image's own checkout; only the media the client prepared differs.
+    client tar -cf - storage | docker cp -a - "$run_id-web:$app_dir"
 fi
 web() {
     docker exec -w "$app_dir" "$run_id-web" "$@"
