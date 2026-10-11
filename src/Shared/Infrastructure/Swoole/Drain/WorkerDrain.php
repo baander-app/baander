@@ -24,11 +24,12 @@ use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
  *
  * Requests that still arrive on kept-alive connections are served, with Connection: close
  * (DrainingResponseListener), and /ready answers 503. Once the worker handles no request and the
- * clients of its WebSockets have answered the close, it reports itself drained in the DrainStateTable and clears its tick.
- * Half a second before the window ends (STREAM_CUT_LEAD_MILLISECONDS), it cuts the streams it is
- * still sending (WorkerStreamAborterInterface), and repeats that on every tick until it is idle.
- * The lead leaves the cut streams time to stop, so the worker reports drained before the master
- * resets the connections at the end of the window.
+ * clients of its WebSockets have answered the close, it reports itself drained in the
+ * DrainStateTable and clears its tick. Half a second before the window ends
+ * (STREAM_CUT_LEAD_MILLISECONDS), it cuts the streams it is still sending
+ * (WorkerStreamAborterInterface), and repeats that on every tick until it is idle. The lead
+ * leaves the cut streams time to stop, so the worker reports drained before the master resets the
+ * connections at the end of the window.
  *
  * A reload never sets the flag, so a reloading worker runs none of this. The tick is the only
  * timer here; DrainWorkerExitSubscriber clears it if the worker stops before it reported.
