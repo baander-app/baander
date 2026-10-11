@@ -39,17 +39,15 @@
 #    - a stopped manager is killed by the drain watchdog at D, and the server exits 1;
 #    - with PostgreSQL down, the start-up cleanup logs its failure once and the server exits 0.
 #
-# Why app:serve used to ignore SIGTERM (found by removing the master's registrations one at a
-# time, ROADMAP item 4):
+# Two Swoole behaviours decide whether app:serve stops on SIGTERM:
 # - After SIGTERM, Swoole stops the master's event loop only once no timer is left in it, and
-#   it checks for timers before it checks its own max_wait_time deadline. The CPU pool's health
-#   check (CpuProcessPool::startHealthCheck, a Timer::tick in the master) never ended, so the
-#   loop ran forever: no worker was ever stopped, and `docker stop` ended in SIGKILL. The
-#   SIGINT listener does not hold the loop. SwooleWorkerEventSubscriber now ends the health
-#   check in onBeforeShutdown.
-# - Once the loop ends, the master joins Swoole's heartbeat thread, which sleeps
-#   heartbeat_check_interval seconds with signals blocked. At 60 that added up to a minute to
-#   every stop; config/packages/swoole.yaml now checks every second.
+#   it checks for timers before its own max_wait_time deadline: a master timer that never ends
+#   keeps the server running until `docker stop` sends SIGKILL. DrainCoordinator::handle() ends
+#   the CPU pool's health check (CpuProcessPool::startHealthCheck, a Timer::tick in the master)
+#   and drops the SIGINT listener.
+# - Once the loop ends, the master joins Swoole's heartbeat thread before any worker stops. That
+#   thread sleeps heartbeat_check_interval seconds with signals blocked, so every stop can wait
+#   that long; config/packages/swoole.yaml sets it to 1.
 set -euo pipefail
 # Timestamps are compared and sorted as decimal numbers with a decimal point.
 export LC_ALL=C
@@ -62,6 +60,9 @@ run_id="baander-web-shutdown-$(date +%s)-$$"
 # The drain deadline D of part 2, and the stop timeout D + 5 that operators must allow.
 drain_seconds=10
 stop_timeout=$((drain_seconds + 5))
+# The drain window S and Swoole's worker stop wait W for a drain deadline of 10 seconds.
+window_seconds=3
+worker_stop_wait_seconds=1
 cleanup() {
     local status=$?
     if [ "$status" != 0 ]; then
@@ -289,7 +290,7 @@ assert_stopped() {
     awk -v e="$elapsed" -v limit="$4" 'BEGIN { exit !(e < limit) }' ||
         fail "$1: app:serve took $elapsed seconds, not less than $4"
     log=$(run_log)
-    [ "$(grep -c "Web server drain started: deadline $drain_seconds s, window 3 s, worker stop wait 1 s." <<<"$log")" = 1 ] ||
+    [ "$(grep -c "Web server drain started: deadline $drain_seconds s, window $window_seconds s, worker stop wait $worker_stop_wait_seconds s." <<<"$log")" = 1 ] ||
         fail "$1: the log does not show exactly one drain start"
     if [ "$3" = 0 ]; then
         [ "$(grep -c 'Swoole HTTP Server has been successfully shutdown' <<<"$log")" = 1 ] ||
@@ -306,9 +307,6 @@ assert_workers_drained() {
     awk -v w="$window" 'BEGIN { exit !(w < 1.0) }' || fail "$1: the workers took $window seconds to report drained"
     echo "PASS: $1: every worker reported drained; the window closed after $window seconds."
 }
-# The drain window S and Swoole's worker stop wait W for a drain deadline of 10 seconds.
-window_seconds=3
-worker_stop_wait_seconds=1
 # The largest memory a web worker reported while streams ran, and the server's memory_limit, in
 # MiB. Each worker writes its memory to WorkerMemoryTable every 5 seconds; /health's memory row
 # gives the largest. A stop accepts no new connection, so sample_memory EXEC reads it for one
