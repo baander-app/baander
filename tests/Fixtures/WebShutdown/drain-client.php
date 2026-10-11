@@ -24,6 +24,9 @@ declare(strict_types=1);
  *                                   completes the rendition, and records how the response ended
  *   ranged-file <user> <track>      a byte-range request for a complete 16 MB rendition, read at
  *                                   1 MB/s; records the Content-Length and how the response ended
+ *   completing-file <user> <track>  a request for a complete 4 MB rendition, read at 2 MB/s, so it
+ *                                   takes about 1.6 seconds; records the Content-Length and how
+ *                                   the response ended
  *   fifo-encode <user> <track>      replaces the track's source with a FIFO that a real-time
  *                                   FFmpeg writes, so the server's encoder runs as long as this
  *                                   process lets it, and streams the encode; records the writer's
@@ -179,17 +182,26 @@ if ($mode === 'ws') {
         }
         usleep(200_000);
     }
-} elseif (in_array($mode, ['held-stream', 'completing-stream', 'ranged-file'], true)) {
+} elseif (in_array($mode, ['held-stream', 'completing-stream', 'ranged-file', 'completing-file'], true)) {
     $track = $arguments[3] ?? '';
     $sourceFile = $projectDir . '/storage/media/web-runtime/track.flac';
     // Each mode holds a rendition of its own; the server names renditions by format and bitrate.
-    [$format, $kbps] = ['held-stream' => ['aac', 96], 'completing-stream' => ['aac', 128], 'ranged-file' => ['opus', 64]][$mode];
+    [$format, $kbps] = [
+        'held-stream' => ['aac', 96],
+        'completing-stream' => ['aac', 128],
+        'ranged-file' => ['opus', 64],
+        'completing-file' => ['opus', 96],
+    ][$mode];
     $held = new HeldRendition((string) getenv('CONVERT_STORAGE_PATH'), $track, $sourceFile, $format, $kbps);
     $query = sprintf('id=%s&format=%s&bitrate=%d', $track, $format, $kbps * 1000);
     if ($mode === 'ranged-file') {
         $held->append(HeldRendition::bytes(16 * 1_048_576, 'ranged'));
         $held->complete();
         $exchange = $client->open($query, ['Range: bytes=0-'], maxBytesPerSecond: 1_048_576);
+    } elseif ($mode === 'completing-file') {
+        $held->append(HeldRendition::bytes(4 * 1_048_576, 'completing-file'));
+        $held->complete();
+        $exchange = $client->open($query, maxBytesPerSecond: 2 * 1_048_576);
     } else {
         $held->append(HeldRendition::bytes(65_536, $mode . '-first'));
         $exchange = $client->open($query);

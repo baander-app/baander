@@ -66,11 +66,21 @@ final class DrainCoordinatorTest extends TestCase
         // A stream that never ends: the worker writes until the connection's buffers are full,
         // then keeps trying, as a progressive stream follows a growing file.
         $held = new Swoole\Atomic(0);
+        // A song file, sent the way the bundle sends a file response: with sendfile, which leaves
+        // the worker idle while the reactor thread sends the file.
+        $song = $argv[3] . '/song.bin';
+        file_put_contents($song, str_repeat('s', 3 * 1048576));
         $server = new Swoole\Http\Server('127.0.0.1', 0, SWOOLE_PROCESS);
         $server->set(['worker_num' => 2, 'reactor_num' => 2, 'buffer_output_size' => 8 * 1024 * 1024, 'log_file' => $argv[3] . '/server.log', 'heartbeat_check_interval' => 1]);
         $coordinator->configure($server);
         record('configured', ['max_wait_time' => $server->setting['max_wait_time']]);
-        $server->on('request', static function ($request, $response) use ($held): void {
+        $server->on('request', static function ($request, $response) use ($held, $mode, $song): void {
+            if ($mode === 'sendfile') {
+                $response->header('Content-Type', 'audio/flac');
+                $response->sendfile($song);
+                $held->add();
+                return;
+            }
             $chunk = str_repeat('x', 65536);
             $response->header('Content-Type', 'audio/mpeg');
             $response->write($chunk);
@@ -82,7 +92,7 @@ final class DrainCoordinatorTest extends TestCase
             }
         });
         $server->on('workerStart', static function (Swoole\Server $server, int $workerId) use ($mode, $state): void {
-            if ($mode !== 'drained') { return; }
+            if ($mode !== 'drained' && $mode !== 'sendfile') { return; }
             // What each event worker's drain steps end with (U3): report drained once the flag is set.
             Swoole\Timer::tick(50, static function (int $timer) use ($state, $workerId): void {
                 if ($state->isDraining()) { Swoole\Timer::clear($timer); $state->markWorkerDrained($workerId); }
@@ -116,12 +126,12 @@ final class DrainCoordinatorTest extends TestCase
             $serverStarted->handle($server);
             $healthTimer = (new ReflectionProperty($pool, 'healthTimerId'))->getValue($pool);
             record('health_timer', ['id' => $healthTimer]);
-            if ($mode === 'held') {
-                Swoole\Timer::tick(20, static function (int $timer) use ($held): void {
+            if ($mode === 'held' || $mode === 'sendfile') {
+                Swoole\Timer::tick(20, static function (int $timer) use ($held, $mode): void {
                     // Give the worker a moment to fill the connection's buffers.
                     if ($held->get() > 0) {
                         Swoole\Timer::clear($timer);
-                        Swoole\Timer::after(500, static function (): void { record('sigterm'); posix_kill(getmypid(), SIGTERM); });
+                        Swoole\Timer::after($mode === 'held' ? 500 : 100, static function (): void { record('sigterm'); posix_kill(getmypid(), SIGTERM); });
                     }
                 });
             } else {
@@ -140,6 +150,39 @@ final class DrainCoordinatorTest extends TestCase
                 while (is_string($data = @fread($socket, 1 << 20)) && $data !== '') {}
                 $meta = stream_get_meta_data($socket);
                 file_put_contents($argv[2], json_encode(['at' => hrtime(true) / 1e9, 'ended' => $meta['eof'] || $data === false, 'timedOut' => $meta['timed_out']]));
+                CLIENT;
+            $clientProcess = proc_open([PHP_BINARY, '-r', $client, (string) $server->port, $argv[3] . '/client.json'], [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', $argv[3] . '/client.err', 'w']], $pipes);
+            $clientPid = proc_get_status($clientProcess)['pid'];
+        } elseif ($mode === 'sendfile') {
+            // A client that reads the file at about 2.5 MB/s with a small receive buffer, so the
+            // server's side holds what the client has not yet read, and records what it received.
+            $client = <<<'CLIENT'
+                $socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+                socket_set_option($socket, SOL_SOCKET, SO_RCVBUF, 65536);
+                for ($i = 0; $i < 250 && !@socket_connect($socket, '127.0.0.1', (int) $argv[1]); $i++) { usleep(20000); }
+                socket_write($socket, "GET /song HTTP/1.1\r\nHost: drain.baander.app\r\n\r\n");
+                $data = '';
+                $length = null;
+                $body = 0;
+                $started = hrtime(true);
+                while (true) {
+                    $chunk = @socket_read($socket, 65536);
+                    if (!is_string($chunk) || $chunk === '') { break; }
+                    $data .= $chunk;
+                    if ($length === null && ($end = strpos($data, "\r\n\r\n")) !== false) {
+                        preg_match('/^Content-Length: (\d+)/mi', substr($data, 0, $end), $match);
+                        $length = (int) $match[1];
+                        $data = substr($data, $end + 4);
+                    }
+                    if ($length !== null) {
+                        $body += strlen($data);
+                        $data = '';
+                        if ($body >= $length) { break; }
+                    }
+                    usleep(max(0, (int) (($body / 2_621_440) * 1e6 - (hrtime(true) - $started) / 1e3)));
+                }
+                file_put_contents($argv[2], json_encode(['at' => hrtime(true) / 1e9, 'length' => $length, 'received' => $body, 'error' => socket_last_error($socket)]));
+                socket_close($socket);
                 CLIENT;
             $clientProcess = proc_open([PHP_BINARY, '-r', $client, (string) $server->port, $argv[3] . '/client.json'], [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', $argv[3] . '/client.err', 'w']], $pipes);
             $clientPid = proc_get_status($clientProcess)['pid'];
@@ -200,6 +243,24 @@ final class DrainCoordinatorTest extends TestCase
         self::assertIsArray($client);
         self::assertTrue($client['ended'], 'the server did not close the stalled connection');
         self::assertFalse($client['timedOut']);
+    }
+
+    /**
+     * A file response leaves its worker idle while the reactor thread sends the file, so the
+     * worker reports drained at once; the window stays open until the client has the whole file.
+     */
+    public function testTheWindowStaysOpenUntilAFileResponseIsSent(): void
+    {
+        [$events, $errors, $client] = $this->scenario('sendfile');
+
+        self::assertIsArray($client, $errors);
+        self::assertSame(3 * 1048576, $client['length']);
+        self::assertSame($client['length'], $client['received'], 'the file response was cut: ' . json_encode($client));
+        self::assertSame(1, preg_match('/^Drain window closed after (\d+\.\d) s, every worker drained; /m', $errors, $match), $errors);
+        // The window closes once the client has the file (the tick and the log round to 0.1 s).
+        $clientDoneAfter = $client['at'] - $events['sigterm']['at'];
+        self::assertGreaterThan(0.5, $clientDoneAfter, 'the client read the file faster than the test needs');
+        self::assertGreaterThanOrEqual($clientDoneAfter - 0.3, (float) $match[1]);
     }
 
     /** @return array{0: array<string, array<string, mixed>>, 1: string, 2: mixed} */

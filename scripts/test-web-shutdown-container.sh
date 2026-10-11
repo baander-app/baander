@@ -28,8 +28,13 @@
 #    - a client that stopped reading a progressive stream does not hold the server past D;
 #    - streams still open half a second before the window ends are cut without their chunked
 #      terminator (curl 18), and a stream that ends within the window gets its whole body;
+#    - a file response (sendfile, which leaves its worker idle) that a client can finish reading
+#      within the window gets its whole body, and the window closes only once it is sent;
 #    - started with docker exec (not PID 1), the server leaves no FFmpeg or CPU pool process,
-#      and a byte-range file response read slowly at the stop is cut short of its Content-Length;
+#      and a byte-range file response read slowly at the stop is cut short of its Content-Length
+#      when the window ends;
+#    - while the stream scenarios run, no web worker uses more than 60 % of memory_limit, as its
+#      own reports (WorkerMemoryTable, read through /health) show; the PASS line gives the peak;
 #    - a stopped event worker is killed by Swoole after 2W and the server still exits 0;
 #    - a stopped manager is killed by the drain watchdog at D, and the server exits 1;
 #    - with PostgreSQL down, the start-up cleanup logs its failure once and the server exits 0.
@@ -301,6 +306,26 @@ assert_workers_drained() {
 # The drain window S and Swoole's worker stop wait W for a drain deadline of 10 seconds.
 window_seconds=3
 worker_stop_wait_seconds=1
+# The largest memory a web worker reported while streams ran, and the server's memory_limit, in
+# MiB. Each worker writes its memory to WorkerMemoryTable every 5 seconds; /health's memory row
+# gives the largest. A stop accepts no new connection, so sample_memory EXEC reads it for one
+# report interval while the streams run, before the stop. EXEC runs a command where the server is.
+memory_peak_mb=0
+memory_limit_mb=
+sample_memory() {
+    local until health row
+    until=$(awk -v t="$(date +%s.%N)" 'BEGIN { printf "%.3f", t + 5.5 }')
+    while awk -v u="$until" -v t="$(date +%s.%N)" 'BEGIN { exit !(t < u) }'; do
+        health=$("$1" curl -sS --max-time 2 http://127.0.0.1:9501/health 2>/dev/null || true)
+        row=$(sed -nE 's/.*"component":"memory","status":"[a-z_]+","responseTimeMs":[0-9.]+,"details":\{"workerId":[0-9]+,"usageMb":([0-9.]+),"limitMb":([0-9.]+),.*/\1 \2/p' <<<"$health")
+        if [ -n "$row" ]; then
+            memory_limit_mb=${row#* }
+            memory_peak_mb=$(awk -v a="$memory_peak_mb" -v b="${row% *}" 'BEGIN { print (b + 0 > a + 0) ? b : a }')
+        fi
+        sleep 0.5
+    done
+    [ -n "$memory_limit_mb" ] || fail "/health reported no worker's memory against a memory_limit: $health"
+}
 
 # A reload keeps the server, the CPU pool and an open WebSocket, and starts no drain.
 start_web
@@ -389,6 +414,7 @@ start_client stalled-stream "$listener" "$track"
 await_client stalled-stream stalled
 start_client keepalive-ready "$listener"
 await_client keepalive-ready ready
+sample_memory web
 started_at=$(date +%s.%N)
 docker kill --signal TERM "$run_id-web" >/dev/null
 await_exit
@@ -439,6 +465,7 @@ done
 for mode in held-stream completing-stream; do
     await_client "$mode" streaming
 done
+sample_memory web
 web touch /tmp/drain-stop-requested
 started_at=$(date +%s.%N)
 docker kill --signal TERM "$run_id-web" >/dev/null
@@ -462,6 +489,30 @@ completing_log=$(stream_log completing-stream)
 [ "$(awk '$3 == "ended" { print $4, $6; exit }' <<<"$completing_log")" = 'result=0 complete=yes' ] ||
     fail "the stream that completed during the drain did not end with its whole body: $completing_log"
 echo "PASS: a stream that completed during the drain ended cleanly with its whole body."
+
+# A file response in flight at the stop. The bundle sends a complete rendition with sendfile, which
+# leaves the worker idle while the reactor thread sends the file, so every worker reports drained at
+# once. The master holds the window open until the client has the whole file (about 1.6 seconds at
+# 2 MB/s), then closes it well before S.
+start_web
+start_client completing-file "$listener" "$track"
+await_client completing-file streaming
+started_at=$(date +%s.%N)
+docker kill --signal TERM "$run_id-web" >/dev/null
+await_exit
+assert_stopped 'a file response in flight at the stop' "$started_at" 0 "$drain_seconds"
+file_log=$(stream_log completing-file)
+[ "$(awk '$3 == "streaming" { print $4, $5; exit }' <<<"$file_log")" = 'status=200 length=4194304' ] ||
+    fail "the file response did not announce its Content-Length: $file_log"
+[ "$(awk '$3 == "ended" { print $4, $6; exit }' <<<"$file_log")" = 'result=0 complete=yes' ] ||
+    fail "the file response in flight at the stop did not end with its whole body: $file_log"
+file_done=$(awk -v t="$started_at" '$3 == "ended" { printf "%.2f", $2 - t; exit }' <<<"$file_log")
+window=$(run_log | sed -nE 's/^Drain window closed after ([0-9.]+) s, every worker drained; reset [0-9]+ client connection\(s\)\.$/\1/p')
+[ -n "$window" ] || fail "the drain window did not close with every worker drained: $(run_log | grep '^Drain window closed' || true)"
+# The window tick and its log line round to a tenth of a second.
+awk -v w="$window" -v f="$file_done" 'BEGIN { exit !(f >= 0.5 && w >= f - 0.3) }' ||
+    fail "the drain window closed after $window seconds, before the file response finished after $file_done seconds"
+echo "PASS: a file response in flight at the stop finished after $file_done seconds with its whole body; the window closed after $window seconds."
 
 # The server not as PID 1, started with docker exec in the client container: the stop leaves no
 # FFmpeg or CPU pool process behind. The drain client there makes the track's source a FIFO that a
@@ -491,6 +542,7 @@ await_in_client fifo-encode encoding
 # Named after the source, which is the FIFO from here on.
 client_in_client ranged-file "$listener" "$track"
 await_in_client ranged-file streaming
+sample_memory client
 fifo_log=$(client cat /tmp/drain-fifo-encode.log)
 writer=$(awk '$3 == "encoding" { sub(/^writer=/, "", $4); print $4; exit }' <<<"$fifo_log")
 [ -n "$writer" ] || fail "the server's encoder did not start: $fifo_log"
@@ -523,7 +575,18 @@ ranged_bytes=${ranged_end#* }
 [ "$length" = 16777216 ] || fail "the ranged file response did not announce its Content-Length: $ranged_log"
 { [ "$ranged_result" = 18 ] || [ "$ranged_result" = 56 ]; } && [ "$ranged_bytes" -lt "$length" ] ||
     fail "the ranged file response was not cut short of its Content-Length: $ranged_log"
-echo "PASS: a ranged file response read slowly at the stop was cut after $ranged_bytes of $length bytes (curl $ranged_result)."
+# The file response still had output to send, so the master held the window open until S and then
+# reset the connection. The client reads what its kernel had already received before it sees the
+# reset, so the cut is timed from the server's log.
+serve_log=$(client cat /tmp/not-pid1-serve.log)
+ranged_window=$(sed -nE 's/^Drain window closed after ([0-9.]+) s, the window passed; reset [1-9][0-9]* client connection\(s\)\.$/\1/p' <<<"$serve_log")
+[ -n "$ranged_window" ] ||
+    fail "the window did not stay open until S for the ranged file response: $(grep '^Drain window closed' <<<"$serve_log" || true)"
+echo "PASS: a ranged file response read slowly at the stop was reset when the window closed after $ranged_window seconds, after $ranged_bytes of $length bytes (curl $ranged_result)."
+memory_percent=$(awk -v p="$memory_peak_mb" -v l="$memory_limit_mb" 'BEGIN { printf "%.1f", 100 * p / l }')
+awk -v p="$memory_percent" 'BEGIN { exit !(p <= 60) }' ||
+    fail "a web worker used $memory_peak_mb MiB of its $memory_limit_mb MiB memory_limit ($memory_percent %) during the stream scenarios, above 60 %"
+echo "PASS: the largest web worker used $memory_peak_mb MiB of its $memory_limit_mb MiB memory_limit ($memory_percent %) during the stream scenarios."
 
 # The start-up listeners survive an unreachable PostgreSQL, and the stop still drains. This start
 # also follows the watchdog's unclean exit in the same container.

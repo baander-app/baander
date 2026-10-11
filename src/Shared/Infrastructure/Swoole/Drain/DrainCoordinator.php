@@ -27,9 +27,10 @@ use SwooleBundle\SwooleBundle\Server\LifecycleHandler\ServerBeforeShutdownHandle
  * 3. starts the watchdog (DrainWatchdog), which kills the manager and the pool at the deadline D;
  * 4. holds the drain window open with a timer of its own. While that timer runs, the master keeps
  *    its reactor threads and so every client connection, and the workers drain. The timer ends
- *    once every event worker has reported drained, or after the window S. It first resets every
- *    client connection still open (see abortSocket()), so that joining the reactor threads cannot
- *    wait on a client that stopped reading.
+ *    once every event worker has reported drained and no client connection has output left to
+ *    send (see connectionsStillSending()), or after the window S. It first resets every client
+ *    connection still open (see abortSocket()), so that joining the reactor threads cannot wait
+ *    on a client that stopped reading.
  *
  * Swoole then closes the connections, stops the workers (each for up to max_wait_time W, which
  * configure() sets) and the manager, and runs onShutdown, where finish() ends the watchdog. If
@@ -120,8 +121,9 @@ final class DrainCoordinator implements ServerBeforeShutdownHandler, Configurato
         $windowEndsAtNs = $startedAtNs + $this->budget->windowSeconds * 1_000_000_000;
         $eventWorkers = max(1, (int) ($server->setting['worker_num'] ?? 1));
         Timer::tick(self::WINDOW_TICK_MILLISECONDS, function (int $timerId) use ($server, $startedAtNs, $windowEndsAtNs, $eventWorkers): void {
+            $passed = hrtime(true) >= $windowEndsAtNs;
             $drained = $this->state->allWorkersDrained($eventWorkers);
-            if (!$drained && hrtime(true) < $windowEndsAtNs) {
+            if (!$passed && (!$drained || self::connectionsStillSending($server) > 0)) {
                 return;
             }
             Timer::clear($timerId);
@@ -129,10 +131,70 @@ final class DrainCoordinator implements ServerBeforeShutdownHandler, Configurato
             $this->say(sprintf(
                 'Drain window closed after %.1f s, %s; reset %d client connection(s).',
                 (hrtime(true) - $startedAtNs) / 1e9,
-                $drained ? 'every worker drained' : 'the window passed',
+                $passed ? 'the window passed' : 'every worker drained',
                 $reset,
             ));
         });
+    }
+
+    /**
+     * The client connections with output their clients have not yet received. A file response
+     * (the bundle's sendfile) leaves its worker idle as soon as the worker hands the file to the
+     * reactor thread, so worker_concurrency does not count it, and Swoole's send_queued_bytes
+     * stays 0 while the reactor thread sends the file. The kernel's send queue of the socket
+     * does show it: the reactor thread keeps that queue filled until it has sent the whole file,
+     * and the queue empties once the client has acknowledged every byte. Swoole's own output
+     * buffer (send_queued_bytes) counts too.
+     */
+    private static function connectionsStillSending(Server $server): int
+    {
+        $queued = self::kernelSendQueues();
+        $sending = 0;
+        foreach ($server->connections as $fd) {
+            $info = $server->getClientInfo((int) $fd);
+            if (!is_array($info)) {
+                continue;
+            }
+            if ((int) ($info['send_queued_bytes'] ?? 0) > 0) {
+                ++$sending;
+                continue;
+            }
+            $socketFd = $info['socket_fd'] ?? null;
+            $link = is_int($socketFd) ? @readlink('/proc/self/fd/' . $socketFd) : false;
+            if (is_string($link) && preg_match('/^socket:\[(\d+)]$/', $link, $inode) === 1 && isset($queued[$inode[1]])) {
+                ++$sending;
+            }
+        }
+
+        return $sending;
+    }
+
+    /**
+     * The inodes of this network namespace's TCP sockets whose send queue (tx_queue: bytes
+     * written but not yet acknowledged) is not empty. Empty where /proc/net is not readable.
+     *
+     * @return array<string, true>
+     */
+    private static function kernelSendQueues(): array
+    {
+        $queued = [];
+        self::unhooked(SWOOLE_HOOK_FILE, static function () use (&$queued): void {
+            foreach (['/proc/net/tcp', '/proc/net/tcp6'] as $table) {
+                $lines = @file($table, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                foreach (array_slice($lines === false ? [] : $lines, 1) as $line) {
+                    // sl local_address rem_address st tx_queue:rx_queue tr:tm->when retrnsmt uid timeout inode ...
+                    $fields = preg_split('/\s+/', trim($line));
+                    if (!is_array($fields) || !isset($fields[9]) || !str_contains($fields[4], ':')) {
+                        continue;
+                    }
+                    if (hexdec(strstr($fields[4], ':', true)) > 0) {
+                        $queued[$fields[9]] = true;
+                    }
+                }
+            }
+        });
+
+        return $queued;
     }
 
     private static function resetConnections(Server $server): int
@@ -214,13 +276,22 @@ final class DrainCoordinator implements ServerBeforeShutdownHandler, Configurato
      */
     private function say(string $line): void
     {
+        self::unhooked(SWOOLE_HOOK_STDIO, fn () => fwrite($this->log ?? STDERR, $line . "\n"));
+    }
+
+    /**
+     * Runs $action with these Swoole coroutine hooks off. A hooked read or write in a master
+     * coroutine yields: in the window tick, the next tick could then run beside it.
+     */
+    private static function unhooked(int $hooks, \Closure $action): void
+    {
         $flags = Runtime::getHookFlags();
-        $hooked = ($flags & SWOOLE_HOOK_STDIO) !== 0;
+        $hooked = ($flags & $hooks) !== 0;
         if ($hooked) {
-            Runtime::setHookFlags($flags & ~SWOOLE_HOOK_STDIO);
+            Runtime::setHookFlags($flags & ~$hooks);
         }
         try {
-            fwrite($this->log ?? STDERR, $line . "\n");
+            $action();
         } finally {
             if ($hooked) {
                 Runtime::setHookFlags($flags);
