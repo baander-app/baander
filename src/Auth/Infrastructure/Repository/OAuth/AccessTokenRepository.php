@@ -18,6 +18,7 @@ use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Uuid;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
@@ -55,11 +56,32 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
     public function revokeByChainId(ChainId $chainId): void
     {
         $conn = $this->entityManager->getConnection();
+        // Lock the chain's rows in id order first, as the refresh token repository does.
+        $conn->fetchFirstColumn(
+            'SELECT id FROM oauth_access_tokens WHERE chain_id = :chainId ORDER BY id FOR UPDATE',
+            ['chainId' => $chainId->toString()],
+        );
         $conn->executeStatement(
             'UPDATE oauth_access_tokens SET revoked = TRUE, updated_at = NOW() WHERE chain_id = :chainId AND revoked = FALSE',
             ['chainId' => $chainId->toString()],
         );
         $this->entityManager->clear();
+    }
+
+    /**
+     * @param list<Uuid> $ids
+     */
+    public function revokeByIds(array $ids): int
+    {
+        if ($ids === []) {
+            return 0;
+        }
+
+        return (int) $this->entityManager->getConnection()->executeStatement(
+            'UPDATE oauth_access_tokens SET revoked = TRUE, updated_at = NOW() WHERE id IN (:ids) AND revoked = FALSE',
+            ['ids' => array_map(static fn (Uuid $id): string => $id->toString(), $ids)],
+            ['ids' => ArrayParameterType::STRING],
+        );
     }
 
     public function revokeForUser(Uuid $userId, ?AccessToken $keep = null): void

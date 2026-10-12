@@ -60,7 +60,8 @@ final class TokenChainValidatorTest extends TestCase
         $this->assertFalse($token->isRevoked());
     }
 
-    public function testValidateReplayRevokesChain(): void
+    /** A used token is refused; the refresh handler decides under the row lock whether the chain ends. */
+    public function testValidateRejectsAUsedTokenWithoutRevoking(): void
     {
         $this->accessTokenRepo = $this->createMock(AccessTokenRepositoryInterface::class);
         $this->refreshTokenRepo = $this->createMock(RefreshTokenRepositoryInterface::class);
@@ -68,8 +69,8 @@ final class TokenChainValidatorTest extends TestCase
 
         $token = $this->createRefreshToken(used: true);
 
-        $this->accessTokenRepo->expects($this->once())->method('revokeByChainId');
-        $this->refreshTokenRepo->expects($this->once())->method('revokeByChainId');
+        $this->accessTokenRepo->expects($this->never())->method('revokeByChainId');
+        $this->refreshTokenRepo->expects($this->never())->method('revokeByChainId');
 
         $this->expectException(TokenChainViolationException::class);
         $this->expectExceptionMessage('reuse detected');

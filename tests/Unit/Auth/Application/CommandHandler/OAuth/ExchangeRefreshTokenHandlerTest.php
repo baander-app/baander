@@ -17,11 +17,13 @@ use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Domain\Service\TokenChainValidator;
+use App\Shared\Application\Port\TransactionPortInterface;
 use Doctrine\DBAL\Driver\AbstractException;
 use Doctrine\DBAL\Exception\ConnectionException;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use RuntimeException;
 
 /**
@@ -101,8 +103,11 @@ final class ExchangeRefreshTokenHandlerTest extends TestCase
                 $this->createStub(TokenMetadataRepositoryInterface::class),
                 $clients,
                 $this->createStub(UserRepositoryInterface::class),
+                $this->createStub(TransactionPortInterface::class),
+                new NullLogger(),
                 accessTokenTtl: 3600,
                 refreshTokenTtl: 2592000,
+                reuseGraceSeconds: 60,
             ),
         );
     }

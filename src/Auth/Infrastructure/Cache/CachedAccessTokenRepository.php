@@ -60,6 +60,22 @@ final readonly class CachedAccessTokenRepository implements AccessTokenRepositor
         );
     }
 
+    /**
+     * @param list<Uuid> $ids
+     */
+    public function revokeByIds(array $ids): int
+    {
+        $revoked = $this->inner->revokeByIds($ids);
+
+        $this->invalidateCache(
+            fn (): bool => $this->cache->invalidateTags([CacheTags::OAUTH_TOKEN]),
+            'Failed to invalidate token cache on revocation by id',
+            ['ids' => array_map(static fn (Uuid $id): string => $id->toString(), $ids)],
+        );
+
+        return $revoked;
+    }
+
     public function revokeForUser(Uuid $userId, ?AccessToken $keep = null): void
     {
         $this->inner->revokeForUser($userId, $keep);

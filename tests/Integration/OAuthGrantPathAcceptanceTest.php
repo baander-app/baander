@@ -151,7 +151,8 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertSame(200, $owner->getStatusCode(), (string) $owner->getContent());
     }
 
-    public function testRefreshRotatesWithinTheBindingAndRevokesTheChainOnReplay(): void
+    /** Reuse of a rotated token, graced or replayed, is the matrix of RefreshTokenGraceTest. */
+    public function testRefreshRotatesWithinTheBinding(): void
     {
         $key = new SignedDpopProof();
         $login = $this->login($key);
@@ -163,11 +164,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         $claims = self::claims($data['accessToken']);
         self::assertSame(['jkt' => $key->thumbprint()], $claims['cnf'] ?? null);
         self::assertSame($key->thumbprint(), $this->storedBinding($claims['jti']));
-
-        $replay = $this->refresh($login['refreshToken'], $key, $this->nonce());
-        self::assertSame(401, $replay->getStatusCode(), (string) $replay->getContent());
-        $successor = $this->refresh($data['refreshToken'], $key, $this->nonce());
-        self::assertSame(401, $successor->getStatusCode(), (string) $successor->getContent());
+        self::assertSame(200, $this->me($data['accessToken'], $key)->getStatusCode());
     }
 
     public function testRefreshRejectsARevokedRefreshToken(): void

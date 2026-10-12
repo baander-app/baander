@@ -25,10 +25,47 @@ interface RefreshTokenRepositoryInterface
     public function consumeByTokenId(TokenId $tokenId): ?RefreshToken;
 
     /**
+     * Locks the token's row FOR UPDATE and returns its state as of the lock, so a decision
+     * taken on it holds until the transaction ends. Requires an open transaction.
+     */
+    public function lockByTokenId(TokenId $tokenId): ?RefreshToken;
+
+    /**
+     * Locks the tokens issued with the given one as their predecessor FOR UPDATE, in issuance
+     * order (by id), and returns their state as of the lock. Requires an open transaction.
+     *
+     * @return list<RefreshToken>
+     */
+    public function lockSuccessors(Uuid $refreshTokenId): array;
+
+    /**
+     * Whether the token was consumed within the last $seconds seconds, measured on the
+     * database clock; false for a token that was never consumed.
+     */
+    public function consumedWithin(Uuid $refreshTokenId, int $seconds): bool;
+
+    /** Whether the chain still holds a refresh token that is not revoked. */
+    public function chainHoldsLiveToken(ChainId $chainId): bool;
+
+    /**
+     * Revokes the tokens with these ids that are not revoked yet and returns how many rows
+     * changed. Leaves the entity manager's managed objects in place, so it can run inside
+     * a transaction that still persists new tokens.
+     *
+     * @param list<Uuid> $ids
+     */
+    public function revokeByIds(array $ids): int;
+
+    /**
      * @return RefreshToken[]
      */
     public function findByChainId(ChainId $chainId): array;
 
+    /**
+     * Revokes every refresh token of the chain after locking the chain's rows in id order,
+     * so chain revocations and a grace that locks a token before its successors never
+     * wait on each other in opposite orders.
+     */
     public function revokeByChainId(ChainId $chainId): void;
 
     /**

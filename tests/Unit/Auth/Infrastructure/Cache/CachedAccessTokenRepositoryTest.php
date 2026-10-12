@@ -274,6 +274,30 @@ final class CachedAccessTokenRepositoryTest extends TestCase
         $this->decorator($inner, $cache, $logger)->revokeByClientId($clientId);
     }
 
+    public function testRevocationByIdInvalidatesLegacyTaggedStatusAndReportsTheCount(): void
+    {
+        $this->seed(true);
+        $ids = [$this->token->getId()];
+        $inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $inner->expects($this->once())->method('revokeByIds')->with($ids)->willReturn(1);
+
+        self::assertSame(1, $this->decorator($inner)->revokeByIds($ids));
+
+        self::assertFalse($this->cache->getItem($this->key())->isHit());
+    }
+
+    public function testRevocationByIdDatabaseFailureDoesNotInvalidateCache(): void
+    {
+        $failure = new \RuntimeException('Database unavailable');
+        $inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $inner->expects($this->once())->method('revokeByIds')->willThrowException($failure);
+        $cache = $this->createMock(TagAwareCacheInterface::class);
+        $cache->expects($this->never())->method('invalidateTags');
+        $this->expectExceptionObject($failure);
+
+        $this->decorator($inner, $cache)->revokeByIds([$this->token->getId()]);
+    }
+
     private function seed(?bool $status): void
     {
         $this->cache->get($this->key(), static function (ItemInterface $item) use ($status): ?bool {

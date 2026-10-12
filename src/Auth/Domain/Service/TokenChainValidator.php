@@ -14,8 +14,9 @@ use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
  * Domain service for validating refresh token chain integrity.
  *
  * Enforces refresh token rotation security: each refresh token may be used
- * exactly once. If a previously-used token is presented again, this signals
- * a replay attack and the entire chain is revoked.
+ * exactly once. A previously-used token presented again is refused here; whether
+ * that presentation is a lost-response retry or a replay that ends the chain is
+ * decided by the refresh handler on rows read under the row lock.
  */
 final class TokenChainValidator
 {
@@ -43,17 +44,15 @@ final class TokenChainValidator
      *    (meaning it was already rotated) but not revoked.
      * 3. If the predecessor has NOT been used, this means the current token was
      *    never properly issued -- reject it.
-     * 4. If the predecessor was used and the incoming token has also been used,
-     *    this is a replay -- revoke the chain.
+     *
+     * Nothing is revoked here: the refresh handler decides under the row lock.
      *
      * @throws TokenChainViolationException on chain integrity violation
      */
     public function validate(RefreshToken $incoming, ?RefreshToken $previous): void
     {
-        // Rule 1: If the incoming token was already used, this is a replay.
+        // Rule 1: If the incoming token was already used, it is refused.
         if ($incoming->hasBeenUsed()) {
-            $this->revokeChain($incoming->getChainId());
-
             throw TokenChainViolationException::replayed($incoming->getChainId());
         }
 

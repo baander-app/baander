@@ -25,6 +25,13 @@ parameters:
     # Refresh token time-to-live. Default: 30 days.
     auth.refresh_token.ttl: 2592000
 
+    # Lost-response grace: for this many seconds after a refresh token was consumed,
+    # presenting it again with a proof from the same DPoP key, while its replacement
+    # is still unused, issues a fresh pair and revokes that replacement. Any other
+    # reuse revokes the chain. Measured on the database clock; 0 disables the grace.
+    # The web client's refresh budget stays below it. Default and maximum: 60.
+    auth.refresh.reuse_grace_seconds: 60
+
     # Authorization code time-to-live (authorization code grant with PKCE). Default: 10 minutes.
     auth.auth_code.ttl: 600
 

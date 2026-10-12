@@ -15,7 +15,16 @@ interface AccessTokenRepositoryInterface
 
     public function findByTokenId(TokenId $tokenId): ?AccessToken;
 
+    /** Revokes every access token of the chain after locking the chain's rows in id order. */
     public function revokeByChainId(ChainId $chainId): void;
+
+    /**
+     * Revokes the tokens with these ids that are not revoked yet and returns how many rows
+     * changed. Leaves the entity manager's managed objects in place.
+     *
+     * @param list<Uuid> $ids
+     */
+    public function revokeByIds(array $ids): int;
 
     /**
      * Revokes every access token issued to the user. When $keep is given, that token and

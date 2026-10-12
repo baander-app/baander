@@ -10,11 +10,11 @@ use RuntimeException;
 /** A refresh token broke its rotation chain: it was replayed, or its predecessor is not a rotated, live link. */
 final class TokenChainViolationException extends RuntimeException
 {
-    /** A used token was presented again; its chain has been revoked. */
+    /** A used token was presented again; the handler decides whether the chain is revoked. */
     public static function replayed(ChainId $chainId): self
     {
         return new self(sprintf(
-            'Refresh token reuse detected. The entire token chain (chain: %s) has been revoked.',
+            'Refresh token reuse detected on chain %s.',
             $chainId->toString(),
         ));
     }

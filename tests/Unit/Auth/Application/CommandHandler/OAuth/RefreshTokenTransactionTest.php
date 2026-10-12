@@ -17,11 +17,15 @@ use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Domain\Service\TokenChainValidator;
+use App\Shared\Infrastructure\Doctrine\DoctrineTransaction;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use RuntimeException;
+use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
 
 final class RefreshTokenTransactionTest extends TestCase
 {
@@ -44,6 +48,7 @@ final class RefreshTokenTransactionTest extends TestCase
         $access = $this->createStub(AccessTokenRepositoryInterface::class);
         $manager = $this->createMock(EntityManagerInterface::class);
         $manager->method('getConnection')->willReturn($connection);
+        $manager->method('isOpen')->willReturn(true);
         $manager->expects($this->once())->method('clear');
         $manager->method('flush')->willReturnCallback(static function () use ($connection, $stage): void {
             $connection->insert('replacement_tokens', ['id' => 1]);
@@ -55,7 +60,9 @@ final class RefreshTokenTransactionTest extends TestCase
         $jwt->method('generate')->willThrowException(new RuntimeException('sign failed'));
         $clients = $this->createStub(ClientRepositoryInterface::class);
         $clients->method('lockActiveClientForIssuance')->willReturn(true);
-        $handler = new RefreshTokenHandler($access, $refresh, new TokenChainValidator($access, $refresh), $manager, $jwt, $this->createStub(TokenMetadataRepositoryInterface::class), $clients, $this->createStub(UserRepositoryInterface::class), 3600, 86400);
+        $registry = $this->createStub(ManagerRegistry::class);
+        $registry->method('getManager')->willReturn($manager);
+        $handler = new RefreshTokenHandler($access, $refresh, new TokenChainValidator($access, $refresh), $manager, $jwt, $this->createStub(TokenMetadataRepositoryInterface::class), $clients, $this->createStub(UserRepositoryInterface::class), new DoctrineTransaction($registry, new Swoole()), new NullLogger(), 3600, 86400, 60);
         $command = new RefreshTokenCommand($token->getTokenId()->toString(), dpopJkt: 'bound-proof-key-thumbprint');
         try {
             $handler($command);

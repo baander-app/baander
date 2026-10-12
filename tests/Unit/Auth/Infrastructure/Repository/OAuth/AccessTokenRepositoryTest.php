@@ -9,6 +9,7 @@ use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Infrastructure\Repository\OAuth\AccessTokenRepository;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -50,6 +51,62 @@ final class AccessTokenRepositoryTest extends TestCase
             ->method('clear');
 
         $this->repository->revokeByChainId(self::$chainId);
+    }
+
+    public function testRevokeByChainIdLocksTheChainRowsInIdOrderBeforeTheUpdate(): void
+    {
+        $callOrder = [];
+
+        $this->connection->expects($this->once())
+            ->method('fetchFirstColumn')
+            ->with(
+                'SELECT id FROM oauth_access_tokens WHERE chain_id = :chainId ORDER BY id FOR UPDATE',
+                ['chainId' => self::$chainId->toString()],
+            )
+            ->willReturnCallback(function () use (&$callOrder): array {
+                $callOrder[] = 'lock';
+                return [];
+            });
+        $this->connection->expects($this->once())
+            ->method('executeStatement')
+            ->willReturnCallback(function () use (&$callOrder): int {
+                $callOrder[] = 'update';
+                return 0;
+            });
+        $this->entityManager->expects($this->once())
+            ->method('clear')
+            ->willReturnCallback(function () use (&$callOrder): void {
+                $callOrder[] = 'clear';
+            });
+
+        $this->repository->revokeByChainId(self::$chainId);
+
+        $this->assertSame(['lock', 'update', 'clear'], $callOrder);
+    }
+
+    public function testRevokeByIdsUpdatesTheRowsWithoutClearingTheEntityManager(): void
+    {
+        $first = Uuid::v7();
+        $second = Uuid::v7();
+        $this->connection->expects($this->once())
+            ->method('executeStatement')
+            ->with(
+                'UPDATE oauth_access_tokens SET revoked = TRUE, updated_at = NOW() WHERE id IN (:ids) AND revoked = FALSE',
+                ['ids' => [$first->toString(), $second->toString()]],
+                ['ids' => ArrayParameterType::STRING],
+            )
+            ->willReturn(2);
+        $this->entityManager->expects($this->never())->method('clear');
+
+        $this->assertSame(2, $this->repository->revokeByIds([$first, $second]));
+    }
+
+    public function testRevokeByIdsWithNoIdsTouchesNothing(): void
+    {
+        $this->connection->expects($this->never())->method('executeStatement');
+        $this->entityManager->expects($this->never())->method('clear');
+
+        $this->assertSame(0, $this->repository->revokeByIds([]));
     }
 
     public function testRevokeByChainIdClearsEntityManager(): void

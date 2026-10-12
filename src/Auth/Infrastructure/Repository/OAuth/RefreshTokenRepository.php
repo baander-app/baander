@@ -21,6 +21,8 @@ use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\RefreshTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Uuid;
+use Doctrine\DBAL\ArrayParameterType;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
@@ -87,6 +89,73 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
         return $this->toDomain($entity);
     }
 
+    public function lockByTokenId(TokenId $tokenId): ?RefreshToken
+    {
+        $id = $this->entityManager->getConnection()->fetchOne(
+            'SELECT id FROM oauth_refresh_tokens WHERE token_id = :tokenId FOR UPDATE',
+            ['tokenId' => $tokenId->toString()],
+        );
+        if (!is_string($id)) {
+            return null;
+        }
+
+        return $this->toDomain($this->lockedEntity(Uuid::fromString($id)));
+    }
+
+    /**
+     * @return list<RefreshToken>
+     */
+    public function lockSuccessors(Uuid $refreshTokenId): array
+    {
+        $ids = $this->entityManager->getConnection()->fetchFirstColumn(
+            'SELECT id FROM oauth_refresh_tokens WHERE previous_refresh_token_id = :id ORDER BY id FOR UPDATE',
+            ['id' => $refreshTokenId->toString()],
+        );
+
+        return array_map(
+            fn (string $id): RefreshToken => $this->toDomain($this->lockedEntity(Uuid::fromString($id))),
+            $ids,
+        );
+    }
+
+    public function consumedWithin(Uuid $refreshTokenId, int $seconds): bool
+    {
+        // The lost-response grace window: one predicate on the database clock, with >=.
+        $answer = $this->entityManager->getConnection()->fetchOne(
+            'SELECT (used_at >= NOW() - make_interval(secs => :seconds))::int FROM oauth_refresh_tokens WHERE id = :id',
+            ['id' => $refreshTokenId->toString(), 'seconds' => $seconds],
+            ['seconds' => ParameterType::INTEGER],
+        );
+
+        return (int) $answer === 1;
+    }
+
+    public function chainHoldsLiveToken(ChainId $chainId): bool
+    {
+        $answer = $this->entityManager->getConnection()->fetchOne(
+            'SELECT (EXISTS (SELECT 1 FROM oauth_refresh_tokens WHERE chain_id = :chainId AND revoked = FALSE))::int',
+            ['chainId' => $chainId->toString()],
+        );
+
+        return (int) $answer === 1;
+    }
+
+    /**
+     * @param list<Uuid> $ids
+     */
+    public function revokeByIds(array $ids): int
+    {
+        if ($ids === []) {
+            return 0;
+        }
+
+        return (int) $this->entityManager->getConnection()->executeStatement(
+            'UPDATE oauth_refresh_tokens SET revoked = TRUE, updated_at = NOW() WHERE id IN (:ids) AND revoked = FALSE',
+            ['ids' => array_map(static fn (Uuid $id): string => $id->toString(), $ids)],
+            ['ids' => ArrayParameterType::STRING],
+        );
+    }
+
     /**
      * @return RefreshToken[]
      */
@@ -101,6 +170,12 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
     public function revokeByChainId(ChainId $chainId): void
     {
         $conn = $this->entityManager->getConnection();
+        // Lock the chain's rows in id order first: a grace locks a token before its
+        // later-issued successors, so both sides take the rows in the same order.
+        $conn->fetchFirstColumn(
+            'SELECT id FROM oauth_refresh_tokens WHERE chain_id = :chainId ORDER BY id FOR UPDATE',
+            ['chainId' => $chainId->toString()],
+        );
         $conn->executeStatement(
             'UPDATE oauth_refresh_tokens SET revoked = TRUE, updated_at = NOW() WHERE chain_id = :chainId AND revoked = FALSE',
             ['chainId' => $chainId->toString()],
@@ -156,6 +231,23 @@ final class RefreshTokenRepository implements RefreshTokenRepositoryInterface
         return $this->entityManager
             ->getRepository(RefreshTokenEntity::class)
             ->findBy(['chainId' => $chainId->getUuid()]);
+    }
+
+    /**
+     * The row as it is under the lock just taken. The identity map may hold the row as it
+     * was read before the transaction, and the lock may have waited for another session's
+     * commit, so the entity and its access token are re-read.
+     */
+    private function lockedEntity(Uuid $id): RefreshTokenEntity
+    {
+        $entity = $this->entityManager->getRepository(RefreshTokenEntity::class)->find($id);
+        if ($entity === null) {
+            throw new \LogicException(sprintf('Refresh token row %s vanished under its lock.', $id->toString()));
+        }
+        $this->entityManager->refresh($entity);
+        $this->entityManager->refresh($entity->getAccessToken());
+
+        return $entity;
     }
 
     private function findEntityOrCreate(RefreshToken $refreshToken): RefreshTokenEntity
