@@ -97,7 +97,7 @@ final class ExchangeRefreshTokenHandlerTest extends TestCase
             new RefreshTokenHandler(
                 $accessTokens,
                 $refreshTokens,
-                new TokenChainValidator($accessTokens, $refreshTokens),
+                new TokenChainValidator(),
                 $this->createStub(EntityManagerInterface::class),
                 $this->createStub(JwtGeneratorInterface::class),
                 $this->createStub(TokenMetadataRepositoryInterface::class),

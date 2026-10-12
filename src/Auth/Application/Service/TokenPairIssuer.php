@@ -19,6 +19,7 @@ use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
+use App\Shared\Application\Port\TransactionPortInterface;
 use DateInterval;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -35,6 +36,13 @@ use Doctrine\ORM\EntityManagerInterface;
  * The client's row stays locked against revocation while the tokens are
  * written, so a client revoked concurrently either rejects the issuance or has
  * the new tokens revoked with the rest (ClientRepositoryInterface::lockActiveClientForIssuance).
+ *
+ * The pair, its metadata and the signature are one transaction, in the order
+ * flush, metadata, sign, commit, as the refresh rotation is: a signing failure
+ * leaves no committed pair without its binding. The transaction runs through the
+ * transaction port, whose failure cleanup discards the rolled-back entities and
+ * releases a manager a flush failure closed, and its lock waits are bounded
+ * (IssuanceLockTimeout).
  */
 final class TokenPairIssuer
 {
@@ -49,6 +57,7 @@ final class TokenPairIssuer
         private readonly JwtGeneratorInterface $jwtGenerator,
         private readonly TokenMetadataRepositoryInterface $tokenMetadataRepository,
         private readonly ClientRepositoryInterface $clientRepository,
+        private readonly TransactionPortInterface $transaction,
         int $accessTokenTtl,
         int $refreshTokenTtl,
     ) {
@@ -92,7 +101,8 @@ final class TokenPairIssuer
             $this->refreshTokenTtl,
         );
 
-        $this->entityManager->getConnection()->transactional(function () use ($client, $accessToken, $refreshToken, $persistWithTokens): void {
+        return $this->transaction->run(function () use ($client, $accessToken, $refreshToken, $persistWithTokens, $dpopJkt, $clientFingerprint, $userAgent, $ipAddress): TokenResponseDTO {
+            IssuanceLockTimeout::apply($this->entityManager);
             if (!$this->clientRepository->lockActiveClientForIssuance($client->getId())) {
                 throw OAuthProtocolException::invalidClient('The client has been revoked.');
             }
@@ -102,21 +112,21 @@ final class TokenPairIssuer
             $this->accessTokenRepository->save($accessToken, false);
             $this->refreshTokenRepository->save($refreshToken, false);
             $this->entityManager->flush();
+
+            $this->tokenMetadataRepository->save(TokenMetadata::create(
+                tokenId: $accessToken->getId(),
+                userAgent: $userAgent,
+                clientFingerprint: $clientFingerprint === '' ? null : $clientFingerprint,
+                ipAddress: $ipAddress,
+            ));
+
+            return new TokenResponseDTO(
+                accessToken: $this->jwtGenerator->generate($accessToken, $dpopJkt),
+                expiresIn: $this->accessTokenTtl->s,
+                refreshToken: $refreshToken->getTokenId()->toString(),
+                scopes: $accessToken->getScopeIdentifiers(),
+            );
         });
-
-        $this->tokenMetadataRepository->save(TokenMetadata::create(
-            tokenId: $accessToken->getId(),
-            userAgent: $userAgent,
-            clientFingerprint: $clientFingerprint === '' ? null : $clientFingerprint,
-            ipAddress: $ipAddress,
-        ));
-
-        return new TokenResponseDTO(
-            accessToken: $this->jwtGenerator->generate($accessToken, $dpopJkt),
-            expiresIn: $this->accessTokenTtl->s,
-            refreshToken: $refreshToken->getTokenId()->toString(),
-            scopes: $accessToken->getScopeIdentifiers(),
-        );
     }
 
     /**

@@ -95,6 +95,7 @@ final class OAuthRevocationRace
             },
             new TokenMetadataRepository($manager),
             $clients,
+            self::transaction($manager),
             3600,
             86400,
         );
@@ -113,28 +114,37 @@ final class OAuthRevocationRace
             $clients,
             new AccessTokenRepository($manager, $encoder),
             new RefreshTokenRepository($manager, $encoder),
-            new class ($manager, $beforeCommit) implements TransactionPortInterface {
-                /** @param (callable(): void)|null $beforeCommit */
-                public function __construct(private EntityManager $manager, private $beforeCommit)
-                {
-                }
-
-                public function run(callable $operation): mixed
-                {
-                    // DoctrineTransaction's boundary without its Swoole service pool handling.
-                    return $this->manager->getConnection()->transactional(function () use ($operation): mixed {
-                        $result = $operation();
-                        $this->manager->flush();
-                        if ($this->beforeCommit !== null) {
-                            ($this->beforeCommit)();
-                        }
-
-                        return $result;
-                    });
-                }
-            },
+            self::transaction($manager, $beforeCommit),
         ));
 
         $handler(new RevokeClientCommand($userId, $clientPublicId));
+    }
+
+    /**
+     * DoctrineTransaction's boundary without its Swoole service pool handling.
+     *
+     * @param (callable(): void)|null $beforeCommit Runs inside the transaction, after all of its writes
+     */
+    private static function transaction(EntityManager $manager, ?callable $beforeCommit = null): TransactionPortInterface
+    {
+        return new class ($manager, $beforeCommit) implements TransactionPortInterface {
+            /** @param (callable(): void)|null $beforeCommit */
+            public function __construct(private EntityManager $manager, private $beforeCommit)
+            {
+            }
+
+            public function run(callable $operation): mixed
+            {
+                return $this->manager->getConnection()->transactional(function () use ($operation): mixed {
+                    $result = $operation();
+                    $this->manager->flush();
+                    if ($this->beforeCommit !== null) {
+                        ($this->beforeCommit)();
+                    }
+
+                    return $result;
+                });
+            }
+        };
     }
 }

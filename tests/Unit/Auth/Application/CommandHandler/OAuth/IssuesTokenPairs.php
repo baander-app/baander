@@ -16,6 +16,7 @@ use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Connection;
@@ -49,10 +50,9 @@ trait IssuesTokenPairs
         $refreshTokens->method('save')->willReturnCallback(function (RefreshToken $token): void {
             $this->issuedRefreshTokens[] = $token;
         });
-        $connection = $this->createStub(Connection::class);
-        $connection->method('transactional')->willReturnCallback(static fn (callable $callback) => $callback());
+        // The issuing transaction bounds its lock waits on the manager's connection.
         $entityManager = $this->createStub(EntityManagerInterface::class);
-        $entityManager->method('getConnection')->willReturn($connection);
+        $entityManager->method('getConnection')->willReturn($this->createStub(Connection::class));
         $jwt = $this->createStub(JwtGeneratorInterface::class);
         $jwt->method('generate')->willReturnCallback(function (AccessToken $token, ?string $jkt): string {
             $this->jwtBindings[] = $jkt;
@@ -76,7 +76,10 @@ trait IssuesTokenPairs
             return false;
         });
 
-        return new TokenPairIssuer($accessTokens, $refreshTokens, new ScopeAllowlist(['profile', 'email', 'library', 'playlist']), $entityManager, $jwt, $metadata, $clients, 3600, 2592000);
+        $transaction = $this->createStub(TransactionPortInterface::class);
+        $transaction->method('run')->willReturnCallback(static fn (callable $operation): mixed => $operation());
+
+        return new TokenPairIssuer($accessTokens, $refreshTokens, new ScopeAllowlist(['profile', 'email', 'library', 'playlist']), $entityManager, $jwt, $metadata, $clients, $transaction, 3600, 2592000);
     }
 
     private function clientAuthenticator(): OAuthClientAuthenticator

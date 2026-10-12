@@ -111,10 +111,7 @@ final class RefreshTokenHandlerConcurrencyTest extends TestCase
             ->willReturnCallback(fn (): array => $this->successorsUnderLock);
         $this->refreshTokenRepository->method('consumedWithin')->willReturn(true);
 
-        $chainValidator = new TokenChainValidator(
-            $this->createStub(AccessTokenRepositoryInterface::class),
-            $this->createStub(RefreshTokenRepositoryInterface::class),
-        );
+        $chainValidator = new TokenChainValidator();
 
         $transaction = $this->createStub(TransactionPortInterface::class);
         $transaction->method('run')->willReturnCallback(static fn (callable $operation) => $operation());

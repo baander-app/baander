@@ -20,6 +20,7 @@ use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Connection;
@@ -60,10 +61,11 @@ final class IssueTokenHandlerTest extends TestCase
         $this->clientRepository->method('lockActiveClientForIssuance')->willReturnCallback(fn (): bool => $this->clientActiveAtIssuance);
         $this->userRepository = $this->createStub(UserRepositoryInterface::class);
 
-        $connection = $this->createStub(Connection::class);
-        $connection->method('transactional')->willReturnCallback(static fn (callable $callback) => $callback());
+        // The issuing transaction bounds its lock waits on the manager's connection.
         $entityManager = $this->createStub(EntityManagerInterface::class);
-        $entityManager->method('getConnection')->willReturn($connection);
+        $entityManager->method('getConnection')->willReturn($this->createStub(Connection::class));
+        $transaction = $this->createStub(TransactionPortInterface::class);
+        $transaction->method('run')->willReturnCallback(static fn (callable $operation): mixed => $operation());
 
         $jwtGenerator = $this->createStub(JwtGeneratorInterface::class);
         $jwtGenerator->method('generate')->willReturnCallback(function (AccessToken $token, ?string $jkt): string {
@@ -88,6 +90,7 @@ final class IssueTokenHandlerTest extends TestCase
                 $jwtGenerator,
                 $tokenMetadataRepository,
                 $this->clientRepository,
+                $transaction,
                 accessTokenTtl: 3600,
                 refreshTokenTtl: 2592000,
             ),

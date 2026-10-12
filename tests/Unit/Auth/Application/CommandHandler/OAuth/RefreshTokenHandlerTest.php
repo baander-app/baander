@@ -148,12 +148,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
         // TokenChainValidator is final and cannot be mocked. Use a real instance
         // with dedicated repository mocks for its dependency chain.
-        $chainValidatorAccessTokenRepo = $this->createStub(AccessTokenRepositoryInterface::class);
-        $chainValidatorRefreshTokenRepo = $this->createStub(RefreshTokenRepositoryInterface::class);
-        $this->chainValidator = new TokenChainValidator(
-            $chainValidatorAccessTokenRepo,
-            $chainValidatorRefreshTokenRepo,
-        );
+        $this->chainValidator = new TokenChainValidator();
 
         $this->transaction = $this->createStub(TransactionPortInterface::class);
         $this->transaction->method('run')->willReturnCallback(function (callable $operation): mixed {

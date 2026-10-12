@@ -6,9 +6,6 @@ namespace App\Auth\Domain\Service;
 
 use App\Auth\Domain\Exception\TokenChainViolationException;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
-use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
-use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
-use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 
 /**
  * Domain service for validating refresh token chain integrity.
@@ -16,25 +13,11 @@ use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
  * Enforces refresh token rotation security: each refresh token may be used
  * exactly once. A previously-used token presented again is refused here; whether
  * that presentation is a lost-response retry or a replay that ends the chain is
- * decided by the refresh handler on rows read under the row lock.
+ * decided by the refresh handler on rows read under the row lock, and every chain
+ * revocation is the handler's, in the one lock order (refresh rows before access rows).
  */
 final class TokenChainValidator
 {
-    public function __construct(
-        private readonly AccessTokenRepositoryInterface $accessTokenRepository,
-        private readonly RefreshTokenRepositoryInterface $refreshTokenRepository,
-    ) {
-    }
-
-    /**
-     * Revoke all tokens in a chain (replay attack response).
-     */
-    public function revokeChain(ChainId $chainId): void
-    {
-        $this->accessTokenRepository->revokeByChainId($chainId);
-        $this->refreshTokenRepository->revokeByChainId($chainId);
-    }
-
     /**
      * Validate a refresh token against its predecessor for rotation security.
      *

@@ -9,6 +9,7 @@ use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Exception\RefreshTokenRejectedException;
 use App\Auth\Application\Port\JwtGeneratorInterface;
+use App\Auth\Application\Service\IssuanceLockTimeout;
 use App\Auth\Domain\Exception\TokenChainViolationException;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
@@ -41,9 +42,11 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * reports as invalid_grant; a token of a disabled account is one of them. Any other
  * exception, such as a lost database connection, is a server fault and says nothing
  * about the token. The rotation holds the client's row lock against a concurrent
- * revocation, as TokenPairIssuer does. Both transactions run through the transaction
- * port, whose failure cleanup discards rolled-back entities and releases a manager a
- * flush failure closed, so the failure does not poison the coroutine's manager.
+ * revocation, as TokenPairIssuer does, and bounds its lock waits (IssuanceLockTimeout),
+ * so a stuck lock is answered as a server fault inside the client's attempt timeout.
+ * Both transactions run through the transaction port, whose failure cleanup discards
+ * rolled-back entities and releases a manager a flush failure closed, so the failure
+ * does not poison the coroutine's manager.
  *
  * Lost-response grace: a token that was already consumed, presented again with a
  * proof from its own DPoP key, is judged on rows read under the row lock inside the
@@ -177,6 +180,7 @@ final class RefreshTokenHandler
 
         try {
             return $this->transaction->run(function () use ($refreshTokenId, $command, $tokenClient, $lockedEvaluation): TokenResponseDTO {
+                IssuanceLockTimeout::apply($this->entityManager);
                 if (!$this->clientRepository->lockActiveClientForIssuance($tokenClient->getId())) {
                     throw self::clientRevoked();
                 }
