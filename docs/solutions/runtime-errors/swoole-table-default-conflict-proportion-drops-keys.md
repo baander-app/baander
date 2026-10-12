@@ -13,6 +13,7 @@ root_cause: wrong_api
 resolution_type: code_fix
 severity: medium
 framework_version: swoole 6.2.1
+last_updated: 2026-10-12
 tags: [swoole, swoole-table, shared-memory, conflict-proportion, span-buffer, diagnostics]
 ---
 
@@ -90,16 +91,19 @@ The registry tables showed that sequential keys can fare worse than random ones.
 the default proportion, a 1,024-row connection table keyed by fd (`"1"`, `"2"`, ...)
 refused connection 455; random keys got to about 70%.
 
-Other `Swoole\Table` uses in `src/`, as of 2026-10-10 (`grep -rn "new Table(" src/`). The reconnection token table was removed with `auth.reconnect` on 2026-10-10:
+Other `Swoole\Table` uses in `src/`, as of 2026-10-12 (`grep -rn "new Table(" src/`). The reconnection token table was removed with `auth.reconnect` on 2026-10-10:
 
 | Table | Size | Keys | Headroom / failure handling |
 |---|---|---|---|
-| `src/QoL/Infrastructure/Swoole/CpuGpuSampler.php:47` | 2 | 1 | Plenty. |
+| `src/QoL/Infrastructure/Swoole/CpuGpuSampler.php:48` | 2 | 1 | Plenty. |
 | `src/QoL/Infrastructure/Swoole/AlgorithmProfileTable.php:50` | 2 | 1 | Plenty. |
 | `CpuProcessPool` health table | `workerCount + 1` | `pool` plus one per worker | Proportion 1.0. `publishHealth()` throws when `set()` fails. |
 | `CpuProcessPool` result table | 8192 | one per job not yet read | Default proportion. Rows used to stay after `readResult()`, so the table filled up after a few thousand jobs and kept up to 64 KB of shared memory per finished job; a refused `set()` under a throwing error handler stopped the pool worker. `readResult()` now deletes the row, and `writeResult()` writes the row best effort with `@`, because the result file is the source of truth. |
 | `CpuProcessPool` limit table | 64 | one per limit key | Proportion 1.0. A failed `incr()` refuses the dispatch as if at the limit and logs a warning. |
 | `src/Shared/Infrastructure/Swoole/WebSocketConnectionRegistry.php` | 1024 connections, 8192 room memberships | one per connection / membership | Proportion 1.0 (about 2.5 MB for the three tables). A refused write throws `WebSocketRegistrationRefused` after removing anything it wrote. `WebSocketController` closes a refused connection (1013, or 1008 over the per-user limit) and answers a refused room join with an error. Room names are limited to 52 bytes so membership keys stay within 63 bytes. |
+| `src/Shared/Infrastructure/Swoole/Drain/DrainStateTable.php:49` | `max(8, 2 * (workers + 1))` | the drain row plus one per event worker | Proportion 1.0 and twice the key count. A refused `set()` throws, so a failed write is never read as "not draining". |
+| `src/Shared/Infrastructure/Swoole/WorkerMemoryTable.php:49` | `max(8, 2 * workers)` | one per HTTP worker | Proportion 1.0. `set()` runs with `@` and its result is returned, so a refused report is a `false`, not an exception. |
+| `src/Shared/Infrastructure/Health/HealthAlertTable.php:42` and `:48` | 32 alert rows; 2 for the sighting flag | one per health component (five today); one flag | Proportion 1.0. `set()` runs with `@` and its result is checked. |
 | `src/Transcode/Infrastructure/Swoole/SegmentAvailabilityTable.php:61` | 16384 by default | one per ready segment | Sized with headroom (see its docblock). It checks `set()`, warns, and falls back to polling the file system. |
 
 ## Related Issues

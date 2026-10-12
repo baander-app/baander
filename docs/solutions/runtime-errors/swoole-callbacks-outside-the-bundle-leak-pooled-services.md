@@ -11,6 +11,7 @@ symptoms:
 root_cause: memory_leak
 resolution_type: code_fix
 severity: high
+last_updated: 2026-10-12
 tags: [swoole, coroutine, service-pool, cowrapper, entity-manager, control-channel, resource-leak]
 ---
 
@@ -24,11 +25,11 @@ With coroutines enabled, the swoole bundle gives each coroutine its own instance
 
 - No error at the time. Each control request that touched a pooled service, for example the EntityManager, left one pool slot taken for good.
 - The failure comes later. `BaseServicePool::get()` waits on a mutex once the pool is at its limit (`packages/swoole-bundle/src/Bridge/Symfony/Container/ServicePool/BaseServicePool.php:59-73`). After enough leaked slots, every request in that worker that needs the service hangs.
-- The EntityManager pool is small. `doctrine_processor_config.global_limit: 10` (`config/packages/swoole.yaml:121`) sets the pool limit of each Doctrine connection, and each EntityManager takes its connection's limit (`packages/swoole-bundle/src/Bridge/Doctrine/DoctrineProcessor.php:57-61, 113-123`). Other pooled services use `max_service_instances: 2500` (`swoole.yaml:116`).
+- The EntityManager pool is small. `doctrine_processor_config.global_limit: 10` (`config/packages/swoole.yaml:128`) sets the pool limit of each Doctrine connection, and each EntityManager takes its connection's limit (`packages/swoole-bundle/src/Bridge/Doctrine/DoctrineProcessor.php:57-61, 113-123`). Other pooled services use `max_service_instances: 2500` (`swoole.yaml:123`).
 
 ## What Didn't Work
 
-- Expecting a later request to clean up. A slot is released by coroutine ID (`releaseFromCoroutine($cId)`), and Swoole hands out coroutine IDs from an increasing per-process counter, so no later coroutine releases a leaked one. The slot stays taken until the worker restarts, and `worker_max_request: 0` (`swoole.yaml:60`) turns off worker recycling.
+- Expecting a later request to clean up. A slot is released by coroutine ID (`releaseFromCoroutine($cId)`), and Swoole hands out coroutine IDs from an increasing per-process counter, so no later coroutine releases a leaked one. The slot stays taken until the worker restarts, and `worker_max_request: 0` (`swoole.yaml:66`) turns off worker recycling.
 
 ## Solution
 
@@ -81,15 +82,16 @@ Every `monolog.logger.*` channel is pooled (the bundle's `MonologProcessor` prox
 them), and so are the EntityManager and services tagged `kernel.reset`. The app's own
 Redis pool (`RedisClientFactory::borrow()`) gives its connection back by itself.
 
-Timer callbacks in `src/` as of 2026-10-10:
+Timer callbacks in `src/` as of 2026-10-12:
 
 | Callback | Pooled services | Release |
 |---|---|---|
-| `src/QoL/Infrastructure/Swoole/CpuGpuSampler.php:71` | None by design; its docblock says it uses `error_log()` only. | None needed. |
+| `src/QoL/Infrastructure/Swoole/CpuGpuSampler.php:72` | None by design; its docblock says it uses `error_log()` only. | None needed. |
 | `src/QoL/Infrastructure/Swoole/MidStreamMonitor.php` | None. It reads the governor, the sampler and the algorithm profile table, none of them pooled, and logs with `error_log()`. | None needed; its docblock says to add `defer()` before the tick uses a logger or repository. |
 | `src/Transcode/Infrastructure/Swoole/SwooleLoopLockRenewalTimer.php` (loop lock renewal for `TranscodeSessionSubscriber`) | Renews the Redis lock through `RedisClientFactory::borrow()`. On lost ownership it stops the encoder, and both the subscriber and `TranscodeStreamManager` log through pooled loggers. | Each tick calls `CoWrapper::defer()` (optional `?CoWrapper`, autowired). |
-| `src/Shared/Infrastructure/Swoole/SwooleWorkerEventSubscriber.php:70` | Shutdown force-kill; uses `printf` and `posix_kill` only. | None needed. |
-| `src/Shared/Infrastructure/Swoole/ProcessPool/CpuProcessPool.php` (pool health check, master process) | Reaps exited pool workers and logs through the pooled `monolog.logger` when one exited. | Each tick calls `CoWrapper::defer()` (optional `?CoWrapper`, autowired). |
+| `src/Shared/Infrastructure/Swoole/ProcessPool/CpuProcessPool.php` (pool health check, master process) | Reaps exited pool workers and logs through the pooled `monolog.logger` when one exited. | Each tick calls `CoWrapper::defer()` (optional `?CoWrapper`, autowired). The drain ends this timer at shutdown, because a master timer also keeps the server running after SIGTERM. |
+| `src/Shared/Infrastructure/Swoole/Drain/DrainCoordinator.php:122` (drain window, master process, only during a stop) | None by design; it reads the drain state table and the server's connections and writes its lines to stderr. | None needed; its docblock says the master steps touch no pooled service. |
+| `src/Shared/Infrastructure/Swoole/Drain/WorkerDrain.php:90` (drain poll, every HTTP worker) | Once the drain starts: closes WebSockets through `WebSocketPusher`, dispatches `WorkerDrainStartedEvent` to listeners that may use pooled services, and logs failures through a pooled logger. | Calls `CoWrapper::defer()` once the drain flag is set (`WorkerDrain.php:109`); before that each tick only reads the drain state table. |
 | `src/Shared/Infrastructure/Health/HealthMonitorSubscriber.php` (health monitor, HTTP worker 0) | Runs the health checks and delivers admin alerts: the database connection, the entity manager and the pooled logger. | Each tick calls `CoWrapper::defer()` (optional `?CoWrapper`, autowired). |
 | `src/Shared/Infrastructure/Swoole/WorkerMemoryReporter.php` (memory report, every HTTP worker) | None by design. It writes `memory_get_usage(true)` into `WorkerMemoryTable` and reports problems with `error_log()` only. | None needed; its docblock says so. |
 
@@ -99,4 +101,4 @@ and `HealthMonitorTimerProbeTest::testEachTickReleasesThePooledServicesItsCorout
 
 ## Related Issues
 
-- None in `docs/solutions/` yet.
+- `docs/solutions/runtime-errors/swoole-sigterm-waits-for-master-timers-and-closes-connections-before-workers-stop.md`: a timer left in the master also keeps the server running after SIGTERM, so master timers must end when shutdown starts.
