@@ -260,7 +260,7 @@ Configured in `config/packages/swoole.yaml`:
 |---------|---------|-------------|
 | `swoole.http_server.host` | `0.0.0.0` | Address to bind the HTTP server. |
 | `swoole.http_server.port` | `9501` | HTTP server port. |
-| `swoole.http_server.shutdown_timeout` | `WEB_DRAIN_SECONDS` | Seconds `swoole:server:stop` expects a stop to take; it waits 5 seconds longer for the server to exit. |
+| `swoole.http_server.shutdown_timeout` | `WEB_DRAIN_SECONDS` | Seconds `swoole:server:stop` expects a stop to take; it waits 5 seconds longer for the server to exit. When the server is its container's PID 1, as in the shipped images, the command does not wait: it exits once the stop is requested. |
 | `swoole.http_server.settings.heartbeat_check_interval` | `1` | Seconds between Swoole's checks for idle connections. A stop waits for the current interval to end before any worker stops, so keep it short. |
 
 Swoole's `max_wait_time` is not set in this file. When the server starts, it derives the whole drain budget from the deadline D, `WEB_DRAIN_SECONDS`:

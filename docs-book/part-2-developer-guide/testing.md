@@ -606,14 +606,14 @@ has two parts:
    3 seconds and a `max_wait_time` of 1 second). The drill fails unless:
    - `docker stop`, `SIGINT`, `DELETE /api/server` and `swoole:server:stop` each
      run one drain and exit `0` within the deadline, and `SIGTERM` followed by
-     `SIGINT` still drains once;
+     `SIGINT` still drains once; `swoole:server:stop` itself exits `0`;
    - a worker reload through `PATCH /api/server` keeps the server, the CPU
      pool's processes and an open WebSocket, and starts no drain;
    - an open WebSocket receives close code `1012` before its connection ends,
      and an idle server closes the drain window as soon as every worker has
      reported drained;
    - `/ready` on a connection kept alive from before the stop answers `503` with
-     `Connection: close`;
+     `Connection: close`, and `/live` answers `200` with `"draining": true`;
    - a short request in flight at the stop completes with its full body, and a
      held progressive stream is cut so that curl exits with `18`;
    - a client that stopped reading a stream does not hold the server past the

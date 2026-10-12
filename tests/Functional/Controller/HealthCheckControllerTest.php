@@ -66,6 +66,7 @@ final class HealthCheckControllerTest extends TestCase
 
         $data = json_decode($response->getContent(), true, 512, JSON_THROW_ON_ERROR);
         $this->assertSame('alive', $data['status']);
+        $this->assertFalse($data['draining'], 'Outside the web server nothing is draining.');
         $this->assertIsArray($data['checks']);
         $this->assertNotEmpty($data['checks']);
     }

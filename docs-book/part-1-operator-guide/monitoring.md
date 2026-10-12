@@ -10,11 +10,11 @@ Baander exposes three HTTP endpoints for health probing. None of these require a
 |----------|---------|---------------|-----------------|
 | `GET /health` | Full system health (PostgreSQL, Redis, background worker, Swoole, memory) | `200` with `"status": "healthy"` | `503` with `"status": "unhealthy"` |
 | `GET /ready` | Dependency readiness (PostgreSQL, Redis); not ready while the web server drains | `200` with `"status": "ready"` | `503` with `"status": "not_ready"` |
-| `GET /live` | Process liveness (Swoole worker alive) | `200` with `"status": "alive"` | N/A (always 200 if responding) |
+| `GET /live` | Process liveness (Swoole worker alive) | `200` with `"status": "alive"` and `"draining": false` | N/A (always 200 if responding; `"draining": true` while the web server drains) |
 
 `/health` lists the background worker and memory, but neither decides the response code: a worker outage or a web server worker near its memory limit does not turn `/health` into `503`, and `/ready` checks neither. The web server [alerts administrators](notifications.md#health-alerts) about both instead.
 
-While the web server [drains before it stops](upgrading.md#stopping-and-restarting-the-web-server), `/ready` answers `503` without checking any dependency. Its `checks` list holds a single `server` entry whose `details` are `{"draining": true}`. The server accepts no new connections once the drain starts, so only a client that holds a kept-alive connection from before the stop sees this answer, and the answer carries `Connection: close`.
+While the web server [drains before it stops](upgrading.md#stopping-and-restarting-the-web-server), `/ready` answers `503` without checking any dependency. Its `checks` list holds a single `server` entry whose `details` are `{"draining": true}`. The server accepts no new connections once the drain starts, so only a client that holds a kept-alive connection from before the stop sees this answer, and the answer carries `Connection: close`. `/live` still answers `200` during the drain, so liveness probes do not restart the container, and its body says `"draining": true`. The web player reads that answer as "server not back yet".
 
 These are designed for orchestration use. The Docker healthcheck does not call an endpoint; it runs the `app:health:check` command. The web image defines it in `Dockerfile`, and the development stack in `docker-compose.yml`:
 

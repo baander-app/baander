@@ -36,6 +36,19 @@ final class DrainStateTableTest extends TestCase
         self::assertFalse($table->allWorkersDrained(4));
     }
 
+    public function testAWorkerCanWithdrawItsReportAndReportAgain(): void
+    {
+        $table = $this->bootedTable(workers: 2);
+        $table->markWorkerDrained(0);
+        $table->markWorkerDrained(1);
+
+        $table->withdrawWorkerDrained(1);
+        self::assertFalse($table->allWorkersDrained(2));
+
+        $table->markWorkerDrained(1);
+        self::assertTrue($table->allWorkersDrained(2));
+    }
+
     public function testAWriteThatFindsNoFreeRowThrows(): void
     {
         $table = $this->bootedTable(workers: 1);

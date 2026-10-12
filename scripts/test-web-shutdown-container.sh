@@ -17,14 +17,16 @@
 #    drain deadline WEB_DRAIN_SECONDS (D) of 10 seconds: window S = 3 s, worker stop wait W = 1 s.
 #    Every stop route runs one drain (DrainCoordinator) and the server exits within D:
 #    - `docker stop` (SIGTERM), SIGINT, DELETE /api/server and swoole:server:stop each log one
-#      drain-start line and exit 0; SIGTERM followed by SIGINT still drains once;
+#      drain-start line and exit 0; SIGTERM followed by SIGINT still drains once; with the server
+#      as PID 1, swoole:server:stop returns 0 once the stop is requested;
 #    - a PATCH /api/server reload keeps the server, the CPU pool's processes and an open
 #      WebSocket, and starts no drain;
 #    - each event worker drains on its own (WorkerDrain): an open WebSocket receives a close frame
 #      with code 1012 before its connection ends, and a server with nothing streaming closes the
 #      drain window as soon as every worker has reported drained, then stops within S + W;
 #    - a request for /ready on a connection kept alive from before the stop gets 503 with
-#      Connection: close while a stalled stream holds the window open;
+#      Connection: close while a stalled stream holds the window open, and one for /live gets 200
+#      with "draining": true;
 #    - a client that stopped reading a progressive stream does not hold the server past D;
 #    - streams still open half a second before the window ends are cut without their chunked
 #      terminator (curl 18), and a stream that ends within the window gets its whole body;
@@ -388,10 +390,16 @@ await_exit
 assert_stopped 'DELETE /api/server' "$started_at" 0 "$drain_seconds"
 assert_workers_drained 'DELETE /api/server'
 
-# The command waits for the server to exit, so it ends with the container.
+# The server is PID 1, whose exit takes down every process in the container, so the command does
+# not wait for it: it returns 0 once the stop is requested, and the container ends with the drain.
 start_web
 started_at=$(date +%s.%N)
-docker exec -d -w "$app_dir" "$run_id-web" php bin/console swoole:server:stop --no-interaction
+stop_status=0
+stop_output=$(timeout "$stop_timeout" docker exec -w "$app_dir" "$run_id-web" php bin/console swoole:server:stop --no-interaction 2>&1) ||
+    stop_status=$?
+[ "$stop_status" = 0 ] || fail "swoole:server:stop exited $stop_status: $stop_output"
+grep -q 'stop requested' <<<"$stop_output" || fail "swoole:server:stop did not report the stop request: $stop_output"
+echo "PASS: swoole:server:stop exited 0 once the stop was requested."
 await_exit
 assert_stopped 'swoole:server:stop' "$started_at" 0 "$drain_seconds"
 assert_workers_drained 'swoole:server:stop'
@@ -408,13 +416,15 @@ assert_stopped 'SIGTERM, then SIGINT a second later' "$started_at" 0 "$drain_sec
 # window ends, so joining the reactor threads does not wait for output the client will never read.
 # (A connection closed without a reset leaves the master's list but stays open in its reactor
 # thread until that output is sent, and the master would wait for it until the watchdog's
-# deadline.) The stalled stream also holds the window open while a connection kept alive from
-# before the stop asks for /ready.
+# deadline.) The stalled stream also holds the window open while connections kept alive from
+# before the stop ask for /ready and /live.
 start_web
 start_client stalled-stream "$listener" "$track"
 await_client stalled-stream stalled
 start_client keepalive-ready "$listener"
 await_client keepalive-ready ready
+start_client keepalive-live "$listener"
+await_client keepalive-live live
 sample_memory web
 started_at=$(date +%s.%N)
 docker kill --signal TERM "$run_id-web" >/dev/null
@@ -429,6 +439,13 @@ ready_log=$(docker cp "$run_id-web:/tmp/drain-keepalive-ready.log" - | tar -xOf 
     fail "/ready on the kept-alive connection did not answer 503 with Connection: close during the drain: $ready_log"
 grep -q ' ready_eof ' <<<"$ready_log" && fail "the kept-alive connection ended before its 503: $ready_log"
 echo "PASS: /ready on a connection kept alive from before the stop answered 503 with Connection: close."
+live_log=$(docker cp "$run_id-web:/tmp/drain-keepalive-live.log" - | tar -xOf -)
+[ "$(awk '$3 == "live" { print $4, $5, $6; exit }' <<<"$live_log")" = 'status=200 connection=keep-alive draining=false' ] ||
+    fail "/live on the kept-alive connection did not answer draining=false before the stop: $live_log"
+[ "$(awk '$3 == "live" { last = $4 " " $5 " " $6 } END { print last }' <<<"$live_log")" = 'status=200 connection=close draining=true' ] ||
+    fail "/live on the kept-alive connection did not answer 200 with draining=true during the drain: $live_log"
+grep -q ' live_eof ' <<<"$live_log" && fail "the kept-alive connection ended before /live reported the drain: $live_log"
+echo "PASS: /live on a connection kept alive from before the stop answered 200 with draining=true."
 
 # Swoole's manager kills a worker that does not stop within 2W.
 start_web

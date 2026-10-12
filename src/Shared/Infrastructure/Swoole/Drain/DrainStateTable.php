@@ -15,7 +15,8 @@ use SwooleBundle\SwooleBundle\Server\Runtime\Bootable;
  *
  * Implements Bootable: boot() creates the Swoole\Table before the server forks, so the master,
  * the workers and reloaded workers share it. The master sets the drain row once, from
- * onBeforeShutdown. A worker reload never touches it.
+ * onBeforeShutdown. A worker reload never touches it. Each event worker writes only its own row,
+ * and rewrites it whenever it turns busy or idle again during the drain.
  *
  * Instants are hrtime(true) nanoseconds: CLOCK_MONOTONIC, the same clock in every process.
  *
@@ -87,6 +88,16 @@ final class DrainStateTable implements Bootable, ServerDrainStateInterface
     {
         $this->created();
         $this->set(self::WORKER_KEY_PREFIX . $workerId, ['started_at_ns' => 0, 'drained' => 1]);
+    }
+
+    /**
+     * Withdraws the drained report of the event worker with this id: a request reached it on a
+     * kept-alive connection after it had reported.
+     */
+    public function withdrawWorkerDrained(int $workerId): void
+    {
+        $this->created();
+        $this->set(self::WORKER_KEY_PREFIX . $workerId, ['started_at_ns' => 0, 'drained' => 0]);
     }
 
     /** Whether every event worker with an id below $eventWorkerCount has reported drained. */

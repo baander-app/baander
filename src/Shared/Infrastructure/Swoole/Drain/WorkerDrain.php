@@ -23,16 +23,19 @@ use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
  * - it dispatches WorkerDrainStartedEvent, where other contexts save their state.
  *
  * Requests that still arrive on kept-alive connections are served, with Connection: close
- * (DrainingResponseListener), and /ready answers 503. Once the worker handles no request and the
- * clients of its WebSockets have answered the close, it reports itself drained in the
- * DrainStateTable and clears its tick. Half a second before the window ends
- * (STREAM_CUT_LEAD_MILLISECONDS), it cuts the streams it is still sending
+ * (DrainingResponseListener), /ready answers 503 and /live reports draining. Once the worker
+ * handles no request and the clients of its WebSockets have answered the close, it reports itself
+ * drained in the DrainStateTable. The tick keeps running: a request that reaches the worker after
+ * its report withdraws it on the next tick, and the worker reports again once it is idle, so the
+ * master does not reset a connection whose request is still running. A request that arrives
+ * within one tick of the master closing the window can still be reset. Half a second before the
+ * window ends (STREAM_CUT_LEAD_MILLISECONDS), it cuts the streams it is still sending
  * (WorkerStreamAborterInterface), and repeats that on every tick until it is idle. The lead
  * leaves the cut streams time to stop, so the worker reports drained before the master resets the
  * connections at the end of the window.
  *
  * A reload never sets the flag, so a reloading worker runs none of this. The tick is the only
- * timer here; DrainWorkerExitSubscriber clears it if the worker stops before it reported.
+ * timer here; DrainWorkerExitSubscriber clears it when the worker stops.
  *
  * "Handling no request" is Swoole's worker_concurrency: the requests this worker is running,
  * including streamed responses. Timer ticks, WebSocket messages already handled and idle
@@ -99,7 +102,7 @@ final class WorkerDrain implements EventSubscriberInterface
     /** One look at the drain flag; public for the timer callback and tests. */
     public function poll(Server $server): void
     {
-        if ($this->reported || !$this->state->isDraining()) {
+        if (!$this->state->isDraining()) {
             return;
         }
         // The steps log and their listeners may use pooled services.
@@ -112,6 +115,9 @@ final class WorkerDrain implements EventSubscriberInterface
         }
 
         if (!$this->isIdle($server)) {
+            if ($this->reported && $this->attempt('withdraw its drained report', $workerId, fn () => $this->state->withdrawWorkerDrained($workerId))) {
+                $this->reported = false;
+            }
             $streams = $this->streams;
             if ($streams !== null && ($this->monotonicNs)() >= $this->streamCutAtNs()) {
                 $this->attempt('cut its streams', $workerId, static fn () => $streams->abortAll());
@@ -120,9 +126,9 @@ final class WorkerDrain implements EventSubscriberInterface
             return;
         }
 
-        $this->reported = true;
-        $this->stop();
-        $this->attempt('report itself drained', $workerId, fn () => $this->state->markWorkerDrained($workerId));
+        if (!$this->reported && $this->attempt('report itself drained', $workerId, fn () => $this->state->markWorkerDrained($workerId))) {
+            $this->reported = true;
+        }
     }
 
     /** Ends the tick. Safe to call more than once. */
@@ -174,13 +180,20 @@ final class WorkerDrain implements EventSubscriberInterface
         return $startedAtNs + $this->budget->windowSeconds * 1_000_000_000 - self::STREAM_CUT_LEAD_MILLISECONDS * 1_000_000;
     }
 
-    /** A failed step is logged and the drain goes on: the master's window ends on its own. */
-    private function attempt(string $step, int $workerId, \Closure $action): void
+    /**
+     * A failed step is logged and the drain goes on: the master's window ends on its own. Returns
+     * whether the step succeeded.
+     */
+    private function attempt(string $step, int $workerId, \Closure $action): bool
     {
         try {
             $action();
+
+            return true;
         } catch (\Throwable $error) {
             $this->logger->error(sprintf('Web server worker %d could not %s during the drain.', $workerId, $step), ['exception' => $error]);
+
+            return false;
         }
     }
 }

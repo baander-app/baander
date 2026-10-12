@@ -15,6 +15,7 @@ declare(strict_types=1);
  *   keepalive-ready <user>          one kept-alive connection that asks for /ready every 200 ms
  *                                   and records each status and Connection header, until an
  *                                   answer says Connection: close or the connection ends
+ *   keepalive-live <user>           the same for /live, recording also the answer's draining field
  *   held-stream <user> <track>      a progressive stream of a rendition this process holds in
  *                                   progress and never completes, read as it arrives; records how
  *                                   the response ended (curl's result code and the bytes received)
@@ -55,7 +56,8 @@ function record(string $event, string $detail = ''): void
  * Reads one HTTP/1.1 response with a Content-Length body.
  *
  * @param resource $socket
- * @return array{int, array<string, string>}|null the status and the lower-cased headers, or null at EOF
+ * @return array{int, array<string, string>, string}|null the status, the lower-cased headers and
+ *     the body, or null at EOF
  */
 function readResponse($socket): ?array
 {
@@ -82,7 +84,7 @@ function readResponse($socket): ?array
         return null;
     }
 
-    return [(int) $status[1], $headers];
+    return [(int) $status[1], $headers, (string) $body];
 }
 
 /** @var list<string> $arguments */
@@ -158,25 +160,31 @@ if ($mode === 'ws') {
     }
     record('stalled', 'written=' . strlen($held->written));
     sleep(3600);
-} elseif ($mode === 'keepalive-ready') {
+} elseif ($mode === 'keepalive-ready' || $mode === 'keepalive-live') {
+    $probe = substr($mode, strlen('keepalive-'));
     $socket = stream_socket_client('tcp://127.0.0.1:9501', $errno, $error, 5);
     if ($socket === false) {
         throw new RuntimeException(sprintf('Cannot connect: %s (%d)', $error, $errno));
     }
     stream_set_timeout($socket, 10);
     while (true) {
-        $request = "GET /ready HTTP/1.1\r\nHost: 127.0.0.1:9501\r\nConnection: keep-alive\r\n\r\n";
+        $request = "GET /{$probe} HTTP/1.1\r\nHost: 127.0.0.1:9501\r\nConnection: keep-alive\r\n\r\n";
         if (@fwrite($socket, $request) !== strlen($request)) {
-            record('ready_eof', 'when=send');
+            record($probe . '_eof', 'when=send');
             break;
         }
         $response = readResponse($socket);
         if ($response === null) {
-            record('ready_eof', 'when=read');
+            record($probe . '_eof', 'when=read');
             break;
         }
-        [$status, $headers] = $response;
-        record('ready', sprintf('status=%d connection=%s', $status, strtolower($headers['connection'] ?? '-')));
+        [$status, $headers, $body] = $response;
+        $detail = sprintf('status=%d connection=%s', $status, strtolower($headers['connection'] ?? '-'));
+        if ($probe === 'live') {
+            $draining = json_decode($body, true)['draining'] ?? null;
+            $detail .= ' draining=' . (is_bool($draining) ? var_export($draining, true) : '-');
+        }
+        record($probe, $detail);
         if (strtolower($headers['connection'] ?? '') === 'close') {
             break;
         }

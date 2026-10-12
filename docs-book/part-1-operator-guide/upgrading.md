@@ -63,7 +63,7 @@ An update that replaces the app container stops the web server in it, and so do 
 
 The drain ends within the drain deadline `WEB_DRAIN_SECONDS` (D, 30 seconds by default; see [Configuration](configuration.md#server)):
 
-1. The server accepts no new connections. Connections already open keep working. Requests that still arrive on them are answered with `Connection: close`, and `/ready` answers `503`.
+1. The server accepts no new connections. Connections already open keep working. Requests that still arrive on them are answered with `Connection: close`, `/ready` answers `503`, and `/live` answers `200` with `"draining": true`.
 2. Every WebSocket receives a close frame with code `1012` ("service restart"). Session-sync clients reconnect once the server is back, with a current access token.
 3. Requests in progress finish with complete responses. Background tasks dispatched to the web server's task workers during the drain go to the Redis `async` transport, which the background worker handles. Tasks already waiting in the task workers' in-memory queue are lost; their claims expire.
 4. When the drain window ends (13 seconds at the default), the server closes every response it is still sending, such as an audio stream, without finishing it. The client sees a transfer error, not the end of the track. The server then resets every connection still open.
@@ -86,7 +86,7 @@ Docker's default stop timeout is 10 seconds, shorter than even the smallest drai
 
 ### Listeners during a restart
 
-When its stream fails, or stalls for 10 seconds, the web player asks the server's `/live` endpoint whether the server answers. No answer, a timeout or an answer other than `2xx` means the server is unreachable; nginx answers `502` while the app container restarts. The player then:
+When its stream fails, or stalls for 10 seconds, the web player asks the server's `/live` endpoint whether the server answers. No answer, a timeout, an answer other than `2xx` or an answer with `"draining": true` means the server is unreachable; nginx answers `502` while the app container restarts, and a draining server can still answer on a connection nginx kept alive. The player then:
 
 - shows "Reconnecting…" in place of the time and keeps the position it had reached;
 - retries with a growing, randomised delay, from 1 second up to 15 seconds, and honours a `Retry-After` header on a `503`;

@@ -77,6 +77,18 @@ final class HealthCheckWorkerOutageTest extends TestCase
         self::assertSame(200, $controller->live()->getStatusCode());
     }
 
+    public function testLiveAnswers200AndReportsWhetherTheServerDrains(): void
+    {
+        foreach ([false, true] as $draining) {
+            $live = (new HealthCheckController($this->service($this->staleWorker()), $this->drain($draining)))->live();
+
+            self::assertSame(200, $live->getStatusCode(), 'Orchestrators read liveness from the status code alone.');
+            $body = json_decode((string) $live->getContent(), true, flags: JSON_THROW_ON_ERROR);
+            self::assertSame('alive', $body['status']);
+            self::assertSame($draining, $body['draining']);
+        }
+    }
+
     public function testTheContainerHealthcheckPassesWhenOnlyTheWorkerIsUnhealthy(): void
     {
         $tester = new CommandTester(new HealthCheckCommand($this->service($this->staleWorker())));

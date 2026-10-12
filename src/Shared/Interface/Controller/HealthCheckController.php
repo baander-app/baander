@@ -106,15 +106,17 @@ final class HealthCheckController
 
     #[OA\Get(
         path: '/live',
-        description: 'Kubernetes liveness probe. Checks if the Swoole worker process is alive. Always returns 200 if the process can respond.',
+        description: 'Kubernetes liveness probe. Checks if the Swoole worker process is alive. Always returns 200 if the process can respond, also while the web server drains before it stops; `draining` is then true. A client that asks whether the server is back treats a draining answer as down.',
         summary: 'Liveness probe',
         responses: [
             new OA\Response(
                 response: '200',
                 description: 'Process is alive',
                 content: new OA\JsonContent(
+                    required: ['status', 'draining', 'checks'],
                     properties: [
                         new OA\Property(property: 'status', type: 'string', example: 'alive'),
+                        new OA\Property(property: 'draining', description: 'Whether the web server is draining before it stops', type: 'boolean', example: false),
                         new OA\Property(property: 'checks', type: 'array', items: new OA\Items(type: 'object')),
                     ],
                     type: 'object',
@@ -130,6 +132,8 @@ final class HealthCheckController
         return new JsonResponse(
             data: [
                 'status' => 'alive',
+                // Liveness for orchestrators stays 200; clients read the drain from the body.
+                'draining' => $this->drain->isDraining(),
                 'checks' => [$result->toArray()],
             ],
             status: 200,

@@ -114,6 +114,27 @@ final class WorkerDrainTest extends TestCase
         self::assertTrue($this->state->allWorkersDrained(1));
     }
 
+    public function testARequestOnAKeptAliveConnectionWithdrawsTheReportUntilTheWorkerIsIdleAgain(): void
+    {
+        $this->concurrency = [0, 1, 1, 0];
+        $this->state->begin($this->nowNs);
+        $this->state->markWorkerDrained(1);
+        $drain = $this->drain();
+
+        $drain->poll($this->server);
+        self::assertTrue($this->state->allWorkersDrained(2));
+
+        // A request reached the reported worker: the master must not close the window under it.
+        $drain->poll($this->server);
+        self::assertFalse($this->state->allWorkersDrained(2));
+        $drain->poll($this->server);
+        self::assertFalse($this->state->allWorkersDrained(2));
+
+        $drain->poll($this->server);
+        self::assertTrue($this->state->allWorkersDrained(2));
+        self::assertCount(1, $this->drainEvents, 'The drain steps run once.');
+    }
+
     public function testAClosedWebSocketHoldsTheReportUntilSwooleHasClosedItsConnection(): void
     {
         $this->registry->addConnection(10, 'user-1', 0);
@@ -251,7 +272,7 @@ final class WorkerDrainTest extends TestCase
      */
     #[RunInSeparateProcess]
     #[PreserveGlobalState(false)]
-    public function testTheTickClearsItselfOnceTheWorkerHasReported(): void
+    public function testTheTickKeepsRunningOnceTheWorkerHasReported(): void
     {
         $this->state->begin($this->nowNs);
         $drain = $this->drain();
@@ -261,6 +282,8 @@ final class WorkerDrainTest extends TestCase
         $drain->poll($this->server);
 
         self::assertTrue($this->state->allWorkersDrained(1));
+        self::assertCount(1, iterator_to_array(Timer::list()), 'A request can still reach the worker after its report.');
+        $drain->stop();
         self::assertSame([], iterator_to_array(Timer::list()));
     }
 

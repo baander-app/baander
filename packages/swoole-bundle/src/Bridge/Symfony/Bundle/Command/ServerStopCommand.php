@@ -15,6 +15,11 @@ use Throwable;
 /**
  * Stops the running server through its API server (DELETE /api/server), the same stop as SIGTERM,
  * and waits for the master to exit: the configured shutdown timeout plus a margin.
+ *
+ * The API server reports the master's PID as the master's own PID namespace sees it. A master
+ * that is PID 1 is its container's init: inside that container, the kernel kills this command with
+ * every other process when the master exits; outside it, /proc/1 is some other process. Either way
+ * this command cannot watch the master exit, so it reports the stop request and exits 0.
  */
 final class ServerStopCommand extends Command
 {
@@ -48,6 +53,12 @@ final class ServerStopCommand extends Command
             $io->error(sprintf('Cannot stop the server through its API server: %s', $exception->getMessage()));
 
             return 1;
+        }
+
+        if ($masterPid === 1) {
+            $io->success('Swoole server stop requested. The server drains and exits, and its container ends with it.');
+
+            return 0;
         }
 
         $wait = $this->shutdownTimeout + self::MARGIN_SECONDS;
