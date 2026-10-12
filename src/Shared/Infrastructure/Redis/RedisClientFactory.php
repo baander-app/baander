@@ -18,9 +18,18 @@ use Throwable;
  * Pool health is maintained via ping validation on idle connections,
  * idle timeout eviction, and orphan reclamation for checked-out connections
  * whose coroutine has exited.
+ *
+ * Every connection carries a connect timeout and a read timeout of
+ * TIMEOUT_SECONDS, so a Redis that accepts connections but does not answer
+ * fails the borrowing request within a bound instead of blocking its
+ * coroutine until TCP gives up. The Symfony cache pools in
+ * config/packages/cache.yaml use the same value.
  */
 class RedisClientFactory
 {
+    /** Connect timeout and read timeout, in seconds, of every connection this factory opens. */
+    public const float TIMEOUT_SECONDS = 2.0;
+
     /** @var array{host: string, port: int, password: string|null} */
     private readonly array $parsed;
 
@@ -49,7 +58,7 @@ class RedisClientFactory
      * @param string $dsn Redis DSN (redis://[user:pass@]host:port)
      * @param int $maxSize Maximum connections in the pool
      * @param int $idleTimeoutSeconds Seconds before idle connections are evicted
-     * @param (callable(): Redis)|null $connectionFactory Override connection creation (for testing)
+     * @param (callable(): Redis)|null $connectionFactory Supplies a ready, connected client (for testing); the default connects a fresh client with the timeouts
      * @param (callable(): int)|null $getCidFn Override coroutine ID resolution (for testing)
      * @param (callable(int): bool)|null $cidExistsFn Override coroutine existence check (for testing)
      */
@@ -73,7 +82,7 @@ class RedisClientFactory
 
         $this->maxSize = $maxSize;
         $this->idleTimeoutSeconds = $idleTimeoutSeconds;
-        $this->connectionFactory = $connectionFactory ?? fn(): Redis => $this->createConnection();
+        $this->connectionFactory = $connectionFactory ?? fn(): Redis => $this->connect(new Redis());
         $this->getCidFn = $getCidFn ?? static fn(): int => \extension_loaded('swoole') && \Swoole\Coroutine::getCid() > 0
             ? \Swoole\Coroutine::getCid()
             : -1;
@@ -252,16 +261,18 @@ class RedisClientFactory
      */
     public function createStandaloneConnection(): Redis
     {
-        return $this->createConnection();
+        return ($this->connectionFactory)();
     }
 
     /**
-     * Creates a fresh Redis connection using the parsed DSN.
+     * Connects a Redis client to the parsed DSN with the connect and read timeouts and authenticates it.
+     *
+     * The read timeout goes through connect(): phpredis builds the socket there, so an
+     * OPT_READ_TIMEOUT set before connecting would not survive it.
      */
-    private function createConnection(): Redis
+    public function connect(Redis $redis): Redis
     {
-        $redis = new Redis();
-        $redis->connect($this->parsed['host'], $this->parsed['port'], 2.0);
+        $redis->connect($this->parsed['host'], $this->parsed['port'], self::TIMEOUT_SECONDS, null, 0, self::TIMEOUT_SECONDS);
 
         if ($this->parsed['password'] !== null) {
             $redis->auth($this->parsed['password']);

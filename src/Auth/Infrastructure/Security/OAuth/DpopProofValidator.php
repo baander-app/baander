@@ -44,10 +44,14 @@ final class DpopProofValidator
     /** @var array<string, Signer> */
     private array $signers;
 
+    /**
+     * @param int $jtiTtlSeconds The proof acceptance window a jti is refused for: the larger
+     *     of the nonce TTL and twice the clock skew (wired in config/services.yaml).
+     */
     public function __construct(
         private readonly DpopJtiCacheInterface $jtiCache,
         private readonly int $clockSkewSeconds = 60,
-        private readonly int $jtiTtlSeconds = 3600,
+        private readonly int $jtiTtlSeconds = 300,
         private readonly LoggerInterface $logger = new NullLogger(),
     )
     {
@@ -204,8 +208,10 @@ final class DpopProofValidator
         }
 
         // 11. jti replay prevention (RFC 9449 §11.1) — checked after signature verification
-        // to prevent poisoning the cache with JTIs from unsigned/forged proofs.
-        if ($this->jtiCache->isReplay($jti)) {
+        // to prevent poisoning the cache with JTIs from unsigned/forged proofs. The first
+        // sight records the jti for the acceptance window. A store outage propagates as
+        // DpopStoreUnavailableException: a proof is never accepted without this check.
+        if ($this->jtiCache->isReplay($jti, $this->jtiTtlSeconds)) {
             return DpopValidationResult::invalid('invalid_dpop_proof', 'DPoP proof "jti" has been reused.');
         }
 
@@ -235,9 +241,6 @@ final class DpopProofValidator
         } catch (Throwable $e) {
             return DpopValidationResult::invalid('invalid_dpop_proof', 'Failed to compute JWK thumbprint.');
         }
-
-        // Store jti to prevent replay
-        $this->jtiCache->store($jti, $this->jtiTtlSeconds);
 
         return DpopValidationResult::valid($jkt);
     }

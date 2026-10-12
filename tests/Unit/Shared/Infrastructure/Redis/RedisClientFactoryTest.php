@@ -287,6 +287,56 @@ final class RedisClientFactoryTest extends TestCase
         $this->assertSame(1, $metrics['total']);
     }
 
+    // --- connection setup ---
+
+    public function test_connect_applies_the_connect_and_read_timeouts_and_authenticates(): void
+    {
+        $redis = $this->createMock(Redis::class);
+        $redis->expects($this->once())
+            ->method('connect')
+            ->with('redis.baander.app', 6380, RedisClientFactory::TIMEOUT_SECONDS, null, 0, RedisClientFactory::TIMEOUT_SECONDS)
+            ->willReturn(true);
+        $redis->expects($this->once())->method('auth')->with('secret')->willReturn(true);
+
+        $factory = new RedisClientFactory(
+            dsn: 'redis://default:secret@redis.baander.app:6380',
+            getCidFn: static fn (): int => -1,
+            cidExistsFn: static fn (int $cid): bool => true,
+        );
+
+        $this->assertSame($redis, $factory->connect($redis));
+        $this->assertSame(2.0, RedisClientFactory::TIMEOUT_SECONDS);
+    }
+
+    public function test_an_injected_connection_factory_supplies_a_ready_client_that_is_not_reconnected(): void
+    {
+        $redis = $this->createMock(Redis::class);
+        $redis->expects($this->never())->method('connect');
+        $redis->expects($this->never())->method('auth');
+
+        $factory = new RedisClientFactory(
+            dsn: 'redis://default:secret@redis.baander.app:6380',
+            connectionFactory: static fn (): Redis => $redis,
+            getCidFn: static fn (): int => -1,
+            cidExistsFn: static fn (int $cid): bool => true,
+        );
+
+        $this->assertSame($redis, $factory->borrow(static fn (Redis $r): Redis => $r));
+    }
+
+    public function test_cache_pool_dsns_carry_the_same_timeouts_as_the_factory(): void
+    {
+        $yaml = file_get_contents(__DIR__ . '/../../../../../config/packages/cache.yaml');
+        $this->assertIsString($yaml);
+        preg_match_all('#redis://\S+#', $yaml, $matches);
+        $this->assertNotSame([], $matches[0]);
+
+        $expected = sprintf('timeout=%d&read_timeout=%d', RedisClientFactory::TIMEOUT_SECONDS, RedisClientFactory::TIMEOUT_SECONDS);
+        foreach ($matches[0] as $dsn) {
+            $this->assertStringEndsWith('?' . $expected . "'", $dsn, sprintf('Cache pool DSN %s lacks the Redis timeouts.', $dsn));
+        }
+    }
+
     public function test_borrow_callback_receives_redis_instance(): void
     {
         $factory = $this->createFactory();

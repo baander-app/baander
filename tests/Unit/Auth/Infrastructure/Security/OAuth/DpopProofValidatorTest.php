@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Infrastructure\Security\OAuth;
 
+use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use App\Auth\Application\Port\DpopJtiCacheInterface;
 use App\Auth\Infrastructure\Security\OAuth\DpopProofValidator;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
@@ -25,6 +26,48 @@ final class DpopProofValidatorTest extends TestCase
         $result = $validator->validate($proof->create('GET', $uri, $token), Request::create($uri), $token, $proof->thumbprint());
 
         self::assertTrue($result->isValid(), $result->getErrorDescription() ?? '');
+    }
+
+    public function testTheJtiIsRecordedForTheConfiguredAcceptanceWindow(): void
+    {
+        $proof = new SignedDpopProof();
+        $cache = $this->createMock(DpopJtiCacheInterface::class);
+        $cache->expects($this->once())->method('isReplay')->with(self::isString(), 420)->willReturn(false);
+        $validator = new DpopProofValidator($cache, jtiTtlSeconds: 420);
+        $token = 'disposable-access-token';
+        $uri = 'https://baander.app/api/auth/me';
+        $result = $validator->validate($proof->create('GET', $uri, $token), Request::create($uri), $token, $proof->thumbprint());
+
+        self::assertTrue($result->isValid(), $result->getErrorDescription() ?? '');
+    }
+
+    public function testAStoreOutageLeavesValidateUnchanged(): void
+    {
+        $proof = new SignedDpopProof();
+        $outage = DpopStoreUnavailableException::jtiStore(new \RedisException('Connection refused'));
+        $cache = $this->createStub(DpopJtiCacheInterface::class);
+        $cache->method('isReplay')->willThrowException($outage);
+        $validator = new DpopProofValidator($cache);
+        $token = 'disposable-access-token';
+        $uri = 'https://baander.app/api/auth/me';
+
+        $this->expectExceptionObject($outage);
+        $validator->validate($proof->create('GET', $uri, $token), Request::create($uri), $token, $proof->thumbprint());
+    }
+
+    public function testAJwkCarryingPrivateMembersIsRejectedBeforeTheReplayCheck(): void
+    {
+        $proof = new SignedDpopProof();
+        $cache = $this->createMock(DpopJtiCacheInterface::class);
+        $cache->expects($this->never())->method('isReplay');
+        $validator = new DpopProofValidator($cache);
+        $token = 'disposable-access-token';
+        $uri = 'https://baander.app/api/auth/me';
+        $jwk = ['kty' => 'EC', 'crv' => 'P-256', 'x' => SignedDpopProof::encode(str_repeat("\x01", 32)), 'y' => SignedDpopProof::encode(str_repeat("\x02", 32)), 'd' => SignedDpopProof::encode(str_repeat("\x03", 32))];
+        $result = $validator->validate($proof->create('GET', $uri, $token, $jwk), Request::create($uri), $token, $proof->thumbprint());
+
+        self::assertFalse($result->isValid());
+        self::assertSame('DPoP proof jwk must not contain private key material.', $result->getErrorDescription());
     }
 
     public function testMalformedEcPointReturnsInvalidProofWithoutPoisoningReplayCache(): void

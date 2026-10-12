@@ -339,10 +339,12 @@ services:
         arguments:
             $redisClientFactory: '@App\Shared\Infrastructure\Redis\RedisClientFactory'
 
+    # A jti is refused for the proof acceptance window: a proof is accepted while its
+    # iat is within the clock skew (either side) or while the nonce it carries lives.
     App\Auth\Infrastructure\Security\OAuth\DpopProofValidator:
         arguments:
             $clockSkewSeconds: '%auth.dpop.clock_skew%'
-            $jtiTtlSeconds: '%auth.access_token.ttl%'
+            $jtiTtlSeconds: '@=max(parameter("auth.dpop.nonce_ttl"), 2 * parameter("auth.dpop.clock_skew"))'
 
     App\Auth\Infrastructure\Security\OAuth\DpopNonceManager:
         arguments:
@@ -350,8 +352,6 @@ services:
             $redisClientFactory: '@App\Shared\Infrastructure\Redis\RedisClientFactory'
 
     App\Auth\Infrastructure\Security\OAuth\DpopBindingListener: ~
-
-    App\Shared\Infrastructure\EventListener\DpopNonceResponseListener: ~
 
     App\Auth\Application\CommandHandler\Totp\EnableTotpHandler:
         arguments:
