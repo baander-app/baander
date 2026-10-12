@@ -92,15 +92,17 @@ final class RefreshTokenGraceTest extends TestCase
 
     protected function tearDown(): void
     {
-        if (isset($this->connection, $this->user)) {
-            // Access tokens, with their refresh tokens and token metadata, cascade from the user.
-            $this->connection->executeStatement('DELETE FROM users WHERE id = ?', [$this->user->getId()->toString()]);
-        }
+        // The observer may still hold a row lock a failed test never released; let it go
+        // before the cleanup below, which would otherwise wait on it.
         if ($this->observer !== null) {
             while ($this->observer->isTransactionActive()) {
                 $this->observer->rollBack();
             }
             $this->observer->close();
+        }
+        if (isset($this->connection, $this->user)) {
+            // Access tokens, with their refresh tokens and token metadata, cascade from the user.
+            $this->connection->executeStatement('DELETE FROM users WHERE id = ?', [$this->user->getId()->toString()]);
         }
         if (isset($this->manager) && $this->manager->isOpen()) {
             $this->manager->close();
@@ -640,6 +642,11 @@ final class RefreshTokenGraceTest extends TestCase
         }
         $response = $this->kernel->handle($request);
         $this->kernel->terminate($request, $response);
+        // The web server clears a pooled EntityManager when a request releases it; this
+        // kernel reuses one manager, so clear it the same way between requests.
+        if ($this->manager->isOpen()) {
+            $this->manager->clear();
+        }
 
         return $response;
     }
