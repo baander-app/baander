@@ -277,18 +277,15 @@ AXIOS_INSTANCE.interceptors.response.use(undefined, async (error) => {
 
   if (error.response?.status !== 401 || originalRequest._skipAuth || originalRequest._didRetry) {
     // Handle use_dpop_nonce error from token endpoint: retry with nonce
+    const nonce = challengedNonce(error);
     if (
-      error.response?.status === 400 &&
-      error.response?.data?.error === 'use_dpop_nonce' &&
+      nonce !== null &&
       !originalRequest._didRetry &&
       (originalRequest._dpopRetryCount ?? 0) < MAX_DPOP_NONCE_RETRIES
     ) {
-      const nonce = error.response?.headers?.['dpop-nonce'] ?? error.response?.headers?.['DPoP-Nonce'];
-      if (typeof nonce === 'string' && nonce !== '') {
-        setDpopNonce(nonce);
-        originalRequest._dpopRetryCount = (originalRequest._dpopRetryCount ?? 0) + 1;
-        return AXIOS_INSTANCE(originalRequest);
-      }
+      setDpopNonce(nonce);
+      originalRequest._dpopRetryCount = (originalRequest._dpopRetryCount ?? 0) + 1;
+      return AXIOS_INSTANCE(originalRequest);
     }
 
     return Promise.reject(error);

@@ -10,7 +10,9 @@ import type { StoredAuth, StoredAuthData, StoredAuthTombstone, StoredAuthUser } 
 import { IndexedDbAuthStorage } from '../../../../shared/crypto/auth-db';
 
 export type { StoredAuth, AuthStorageBackend, StoredAuthTombstone } from '../../../../shared/crypto/auth-storage';
-export { isClearedRecord } from '../../../../shared/crypto/auth-storage';
+import { isClearedRecord } from '../../../../shared/crypto/auth-storage';
+
+export { isClearedRecord };
 
 /** The flat record shape the web auth-store reads and writes. */
 export interface LegacyStoredAuth {
@@ -70,7 +72,7 @@ function authToLegacy(auth: StoredAuth): LegacyStoredAuth {
 
 function recordToLegacy(record: StoredAuth | StoredAuthTombstone | null): LegacyStoredRecord | null {
   if (record === null) return null;
-  if ('cleared' in record) return { epoch: record.epoch, cleared: true };
+  if (isClearedRecord(record)) return record;
   return authToLegacy(record);
 }
 

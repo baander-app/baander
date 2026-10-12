@@ -53,6 +53,17 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
         return $entity !== null ? $this->toDomain($entity) : null;
     }
 
+    public function findTokenIdsByChainId(ChainId $chainId): array
+    {
+        /** @var list<string> $tokenIds */
+        $tokenIds = $this->entityManager->getConnection()->fetchFirstColumn(
+            'SELECT token_id FROM oauth_access_tokens WHERE chain_id = :chainId ORDER BY id',
+            ['chainId' => $chainId->toString()],
+        );
+
+        return $tokenIds;
+    }
+
     public function revokeByChainId(ChainId $chainId): void
     {
         $conn = $this->entityManager->getConnection();

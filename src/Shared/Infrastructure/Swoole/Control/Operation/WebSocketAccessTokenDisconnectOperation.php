@@ -45,15 +45,16 @@ final readonly class WebSocketAccessTokenDisconnectOperation implements ServerCo
             throw new InvalidArgumentException('"access_token_ids" must be a non-empty list of access token ids.');
         }
 
-        $closed = 0;
         foreach ($accessTokenIds as $accessTokenId) {
             if (!is_string($accessTokenId) || $accessTokenId === '') {
                 throw new InvalidArgumentException('"access_token_ids" must be a non-empty list of access token ids.');
             }
-            foreach ($this->registry->getAccessTokenConnectionFds($accessTokenId) as $fd) {
-                if ($this->pusher->close($fd, WebSocketUserDisconnectOperation::CLOSE_CODE, WebSocketUserDisconnectOperation::CLOSE_REASON)) {
-                    ++$closed;
-                }
+        }
+
+        $closed = 0;
+        foreach ($this->registry->getConnectionFdsForAccessTokens(array_values($accessTokenIds)) as $fd) {
+            if ($this->pusher->close($fd, WebSocketUserDisconnectOperation::CLOSE_CODE, WebSocketUserDisconnectOperation::CLOSE_REASON)) {
+                ++$closed;
             }
         }
 

@@ -87,8 +87,8 @@ final class WebSocketConnectionRegistry
      */
     public function addConnection(int $fd, string $userId, int $workerId, string $accessTokenId): void
     {
-        // Swoole cuts a longer value short, and getAccessTokenConnectionFds() would then
-        // miss the connection when its token is revoked.
+        // Swoole cuts a longer value short, and getConnectionFdsForAccessTokens() would
+        // then miss the connection when its token is revoked.
         if (strlen($accessTokenId) > self::ACCESS_TOKEN_ID_BYTES) {
             throw new \InvalidArgumentException(sprintf('An access token id may be at most %d bytes long.', self::ACCESS_TOKEN_ID_BYTES));
         }
@@ -141,6 +141,26 @@ final class WebSocketConnectionRegistry
         $fds = [];
         foreach ($this->connections as $fd => $row) {
             if ($row['access_token_id'] === $accessTokenId) {
+                $fds[] = (int) $fd;
+            }
+        }
+
+        return $fds;
+    }
+
+    /**
+     * The connections that authenticated with any of the access tokens, found in one scan.
+     *
+     * @param list<string> $accessTokenIds
+     *
+     * @return list<int>
+     */
+    public function getConnectionFdsForAccessTokens(array $accessTokenIds): array
+    {
+        $wanted = array_flip($accessTokenIds);
+        $fds = [];
+        foreach ($this->connections as $fd => $row) {
+            if (isset($wanted[$row['access_token_id']])) {
                 $fds[] = (int) $fd;
             }
         }

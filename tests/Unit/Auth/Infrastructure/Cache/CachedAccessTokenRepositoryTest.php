@@ -53,6 +53,17 @@ final class CachedAccessTokenRepositoryTest extends TestCase
         self::assertSame($this->token, $this->decorator($inner)->findByTokenId($this->token->getTokenId()));
     }
 
+    public function testChainTokenIdsComeFromTheDatabaseAndTouchNoCache(): void
+    {
+        $chainId = ChainId::generate();
+        $inner = $this->createMock(AccessTokenRepositoryInterface::class);
+        $inner->expects($this->once())->method('findTokenIdsByChainId')->with($chainId)->willReturn(['token-a', 'token-b']);
+        $cache = $this->createMock(TagAwareCacheInterface::class);
+        $cache->expects($this->never())->method($this->anything());
+
+        self::assertSame(['token-a', 'token-b'], $this->decorator($inner, $cache)->findTokenIdsByChainId($chainId));
+    }
+
     public function testAbsentTokenIsNotPublishedAsAuthenticationDecision(): void
     {
         $inner = $this->createMock(AccessTokenRepositoryInterface::class);

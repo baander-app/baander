@@ -16,7 +16,7 @@ use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
-use App\Shared\Application\Port\TransactionPortInterface;
+use App\Tests\Fixtures\Catalog\PassThroughTransaction;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Connection;
@@ -76,8 +76,7 @@ trait IssuesTokenPairs
             return false;
         });
 
-        $transaction = $this->createStub(TransactionPortInterface::class);
-        $transaction->method('run')->willReturnCallback(static fn (callable $operation): mixed => $operation());
+        $transaction = new PassThroughTransaction();
 
         return new TokenPairIssuer($accessTokens, $refreshTokens, new ScopeAllowlist(['profile', 'email', 'library', 'playlist']), $entityManager, $jwt, $metadata, $clients, $transaction, 3600, 2592000);
     }

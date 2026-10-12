@@ -16,10 +16,11 @@ final class WithWebSocketHandler implements Configurator
 {
 
     /**
-     * @param (callable(SwooleRequest): ?array{user_id: string, access_token_id: string})|null $authenticator
-     *   Authenticates the handshake request. Returns the authenticated user ID and the ID of the
-     *   access token the request presented, both as strings, on success, or null to reject.
-     *   When null, authentication is skipped (e.g., no WS controller configured).
+     * @param (callable(SwooleRequest): ?array{user_id: string, access_token_id: string})|object|null $authenticator
+     *   Authenticates the handshake request: a callable, or an object with an `authenticate(SwooleRequest)`
+     *   method. Returns the authenticated user ID and the ID of the access token the request presented,
+     *   both as strings, on success, or null to reject. When null, authentication is skipped (e.g., no WS
+     *   controller configured).
      * @param list<string>|null $allowedOrigins Origin header allowlist. Null means allow all (dev mode).
      */
     public function __construct(
@@ -126,12 +127,12 @@ final class WithWebSocketHandler implements Configurator
             return null;
         }
 
-        if ($this->authenticator instanceof \Closure) {
-            $identity = ($this->authenticator)($request);
-        } elseif (is_object($this->authenticator) && method_exists($this->authenticator, 'authenticate')) {
+        if (is_object($this->authenticator) && method_exists($this->authenticator, 'authenticate')) {
             $identity = $this->authenticator->authenticate($request);
-        } else {
+        } elseif (is_callable($this->authenticator)) {
             $identity = ($this->authenticator)($request);
+        } else {
+            return null;
         }
 
         if (!is_array($identity)) {

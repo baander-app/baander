@@ -9,7 +9,7 @@ use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 /** Production OAuth kernel with a WebAuthn relying party for passkey login behind the firewall. */
-final class GrantPathOAuthKernel extends ProductionOAuthKernel
+class GrantPathOAuthKernel extends ProductionOAuthKernel
 {
     public const string RELYING_PARTY = 'baander.app';
 

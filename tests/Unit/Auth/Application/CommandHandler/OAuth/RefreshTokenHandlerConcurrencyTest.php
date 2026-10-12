@@ -24,7 +24,7 @@ use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Domain\Service\TokenChainValidator;
 use App\Shared\Domain\Model\Email;
-use App\Shared\Application\Port\TransactionPortInterface;
+use App\Tests\Fixtures\Catalog\PassThroughTransaction;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\Stub;
@@ -113,8 +113,7 @@ final class RefreshTokenHandlerConcurrencyTest extends TestCase
 
         $chainValidator = new TokenChainValidator();
 
-        $transaction = $this->createStub(TransactionPortInterface::class);
-        $transaction->method('run')->willReturnCallback(static fn (callable $operation) => $operation());
+        $transaction = new PassThroughTransaction();
         $entityManager = $this->createStub(EntityManagerInterface::class);
 
         $jwtGenerator = $this->createStub(JwtGeneratorInterface::class);

@@ -34,6 +34,19 @@ final class DpopNonceManager
         return bin2hex(random_bytes(32));
     }
 
+    /**
+     * Generates a nonce and hands it out once Redis stored it.
+     *
+     * @throws DpopStoreUnavailableException when the nonce could not be stored; no nonce is issued then.
+     */
+    public function issueNonce(): string
+    {
+        $nonce = $this->generateNonce();
+        $this->storeNonce($nonce);
+
+        return $nonce;
+    }
+
     /** @throws DpopStoreUnavailableException */
     public function storeNonce(string $nonce): void
     {
@@ -53,8 +66,7 @@ final class DpopNonceManager
      */
     public function createChallengeResponse(string $errorDescription = 'Authorization server requires nonce in DPoP proof.'): JsonResponse
     {
-        $nonce = $this->generateNonce();
-        $this->storeNonce($nonce);
+        $nonce = $this->issueNonce();
 
         return new JsonResponse([
             'error' => 'use_dpop_nonce',

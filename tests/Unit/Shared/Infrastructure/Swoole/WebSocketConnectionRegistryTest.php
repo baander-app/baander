@@ -81,6 +81,21 @@ final class WebSocketConnectionRegistryTest extends TestCase
         self::assertSame([], $this->registry->getAccessTokenConnectionFds('token-c'));
     }
 
+    public function testConnectionsOfSeveralAccessTokensAreFoundInOneScan(): void
+    {
+        $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-a');
+        $this->registry->addConnection(2, 'user-uuid-1', 1, 'token-b');
+        $this->registry->addConnection(3, 'user-uuid-2', 0, 'token-a');
+        $this->registry->addConnection(4, 'user-uuid-3', 0, 'token-d');
+
+        $fds = $this->registry->getConnectionFdsForAccessTokens(['token-a', 'token-b', 'token-c']);
+        sort($fds);
+
+        self::assertSame([1, 2, 3], $fds);
+        self::assertSame([], $this->registry->getConnectionFdsForAccessTokens(['token-c']));
+        self::assertSame([], $this->registry->getConnectionFdsForAccessTokens([]));
+    }
+
     public function testARemovedConnectionIsNoLongerFoundByItsAccessToken(): void
     {
         $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-a');

@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Fixtures\Auth;
 
-use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 /**
- * Production OAuth kernel for the DPoP store outage tests, with passkey login behind the firewall.
+ * Grant-path OAuth kernel for the DPoP store outage tests.
  *
  * With a Redis DSN, every Redis client of the request path connects to it: the
  * RedisClientFactory behind the DPoP nonce and jti stores, and the Symfony cache
@@ -23,9 +22,8 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
  * Two kernels of this class compile into the directory they are given, so each
  * variant needs its own directory with the signing keys in it.
  */
-final class RedisOutageOAuthKernel extends ProductionOAuthKernel
+final class RedisOutageOAuthKernel extends GrantPathOAuthKernel
 {
-    public const string RELYING_PARTY = 'baander.app';
     public const string REDIS = 'oauth.outage.redis';
 
     /** @param string|null $redisDsn `redis://[user:pass@]host:port`, or null for the configured Redis with the counting pool */
@@ -37,7 +35,6 @@ final class RedisOutageOAuthKernel extends ProductionOAuthKernel
     protected function build(ContainerBuilder $container): void
     {
         parent::build($container);
-        $container->setAlias('oauth.acceptance.passkeys', PasskeyRepositoryInterface::class)->setPublic(true);
         $container->setAlias(self::REDIS, RedisClientFactory::class)->setPublic(true);
         // Default priority runs after the framework's CachePoolPass (32), which registers the cache connections.
         $container->addCompilerPass(new class($this->redisDsn) implements CompilerPassInterface {
@@ -47,7 +44,6 @@ final class RedisOutageOAuthKernel extends ProductionOAuthKernel
 
             public function process(ContainerBuilder $container): void
             {
-                $container->setParameter('app.domain', RedisOutageOAuthKernel::RELYING_PARTY);
                 $factory = $container->getDefinition(RedisClientFactory::class);
                 if ($this->redisDsn === null) {
                     $factory->setClass(BorrowLimitingRedisClientFactory::class);
@@ -62,7 +58,8 @@ final class RedisOutageOAuthKernel extends ProductionOAuthKernel
                         continue;
                     }
                     // The same connect and read timeouts as config/packages/cache.yaml.
-                    $definition->replaceArgument(0, $this->redisDsn . '?timeout=2&read_timeout=2');
+                    $timeout = (int) RedisClientFactory::TIMEOUT_SECONDS;
+                    $definition->replaceArgument(0, $this->redisDsn . sprintf('?timeout=%d&read_timeout=%d', $timeout, $timeout));
                     $rewritten++;
                 }
                 if ($rewritten === 0) {

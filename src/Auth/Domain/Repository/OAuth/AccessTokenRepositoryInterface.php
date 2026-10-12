@@ -15,6 +15,13 @@ interface AccessTokenRepositoryInterface
 
     public function findByTokenId(TokenId $tokenId): ?AccessToken;
 
+    /**
+     * The token ids of every access token of the chain, in id order, without locking the rows.
+     *
+     * @return list<string>
+     */
+    public function findTokenIdsByChainId(ChainId $chainId): array;
+
     /** Revokes every access token of the chain after locking the chain's rows in id order. */
     public function revokeByChainId(ChainId $chainId): void;
 

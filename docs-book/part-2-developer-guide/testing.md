@@ -131,7 +131,7 @@ runner's disposable PostgreSQL and Redis and do not run on the host:
   its own DPoP key inside the window, while its replacement is unused, gets a
   fresh pair; every other reuse revokes the chain before the `401`, and a
   different key revokes nothing. The two-session cases run a child process
-  (`tests/Fixtures/Auth/refresh-token-race.php`) that waits on a row lock.
+  (`tests/Fixtures/Auth/refresh-race.php`) that waits on a row lock.
 - `tests/Integration/RefreshTokenConcurrencyTest.php`: two database sessions
   presenting one token leave exactly one usable pair; a logout concurrent with a
   refresh ends the chain without a deadlock; a signing or flush failure after the

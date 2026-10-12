@@ -150,7 +150,8 @@ function requestAuthRefresh(clientId: string, method: string, url: string, auth:
       const current = clientAuth.get(clientId);
       if (!next || !current || next.session !== auth.session || next.apiOrigin !== auth.apiOrigin ||
           current.session !== auth.session || current.apiOrigin !== auth.apiOrigin || !current.accessToken) {
-        finish('failed'); return;
+        finish('failed');
+        return;
       }
       applyAuth(clientId, next);
       finish('refreshed');
@@ -160,7 +161,8 @@ function requestAuthRefresh(clientId: string, method: string, url: string, auth:
       const current = clientAuth.get(clientId);
       if (!client || client.id !== clientId || !isSameOriginClient(client) || !current?.accessToken ||
           current.session !== auth.session || current.apiOrigin !== auth.apiOrigin) {
-        finish('failed'); return;
+        finish('failed');
+        return;
       }
       client.postMessage({ type: 'SW_REFRESH_AUTH', method, url, token: auth.accessToken, session: auth.session }, [channel.port2]);
     }).catch(() => finish('failed'));
@@ -200,7 +202,8 @@ function requestAuthPull(clientId: string): Promise<void> {
     self.clients.get(clientId).then(client => {
       if (finished) return;
       if (!client || client.id !== clientId || !isSameOriginClient(client)) {
-        finish(); return;
+        finish();
+        return;
       }
       client.postMessage({ type: 'SW_PULL_AUTH' }, [channel.port2]);
     }).catch(finish);

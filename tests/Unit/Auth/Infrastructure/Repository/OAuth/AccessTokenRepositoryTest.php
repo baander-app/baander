@@ -35,6 +35,25 @@ final class AccessTokenRepositoryTest extends TestCase
     }
 
     // =========================================================================
+    // findTokenIdsByChainId: an unlocked read in id order
+    // =========================================================================
+
+    public function testFindTokenIdsByChainIdReadsTheChainInIdOrderWithoutLocking(): void
+    {
+        $this->connection->expects($this->once())
+            ->method('fetchFirstColumn')
+            ->with(
+                'SELECT token_id FROM oauth_access_tokens WHERE chain_id = :chainId ORDER BY id',
+                ['chainId' => self::$chainId->toString()],
+            )
+            ->willReturn(['token-first', 'token-second']);
+        $this->connection->expects($this->never())->method('executeStatement');
+        $this->entityManager->expects($this->never())->method('clear');
+
+        $this->assertSame(['token-first', 'token-second'], $this->repository->findTokenIdsByChainId(self::$chainId));
+    }
+
+    // =========================================================================
     // revokeByChainId: bulk UPDATE
     // =========================================================================
 

@@ -13,6 +13,7 @@ use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Shared\Application\Port\LiveConnectionsPortInterface;
+use App\Shared\Application\Port\ServerControlException;
 use App\Shared\Application\Port\ServerNotRunningException;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -45,7 +46,7 @@ final class RevokeTokenHandler
     }
 
     /**
-     * @throws \App\Shared\Application\Port\ServerControlException when the chain is revoked but the web server did not close its connections
+     * @throws ServerControlException when the chain is revoked but the web server did not close its connections
      */
     #[AsMessageHandler]
     public function __invoke(RevokeTokenCommand $command): void
@@ -117,12 +118,8 @@ final class RevokeTokenHandler
     {
         $accessTokenIds = $this->entityManager->getConnection()->transactional(function () use ($chainId): array {
             // The ids are listed before the revoking UPDATEs so the sockets to close are
-            // known. Every chained access token was issued with a refresh token of the
-            // same chain, which is how the chain's access tokens are found.
-            $accessTokenIds = [];
-            foreach ($this->refreshTokenRepository->findByChainId($chainId) as $refreshToken) {
-                $accessTokenIds[$refreshToken->getAccessToken()->getTokenId()->toString()] = true;
-            }
+            // known.
+            $accessTokenIds = $this->accessTokenRepository->findTokenIdsByChainId($chainId);
 
             // Lock order of every chain revocation: refresh rows before access rows. A
             // refresh of the same chain locks its refresh row first, so the two never
@@ -130,7 +127,7 @@ final class RevokeTokenHandler
             $this->refreshTokenRepository->revokeByChainId($chainId);
             $this->accessTokenRepository->revokeByChainId($chainId);
 
-            return array_keys($accessTokenIds);
+            return $accessTokenIds;
         });
 
         $this->closeLiveConnections($accessTokenIds, $chainId);

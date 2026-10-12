@@ -80,9 +80,6 @@ final readonly class DpopTokenRequestVerifier
     /** Issues the nonce the client must put in its next proof, such as the one it refreshes with. */
     public function issueNonce(): string
     {
-        $nonce = $this->nonceManager->generateNonce();
-        $this->nonceManager->storeNonce($nonce);
-
-        return $nonce;
+        return $this->nonceManager->issueNonce();
     }
 }

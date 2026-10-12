@@ -29,8 +29,8 @@ use Symfony\Component\HttpFoundation\Response;
  * A token that was already consumed, presented again with its own DPoP key within the
  * window while its replacement is unused, gets a fresh pair and the replacement is
  * revoked. Every other reuse revokes the chain before the 401; a different key revokes
- * nothing. The two-session cases run a child process (refresh-token-race.php) that waits
- * on a row lock this process holds.
+ * nothing. The two-session cases run a child process (refresh-race.php) that waits on a
+ * row lock this process holds.
  */
 final class RefreshTokenGraceTest extends TestCase
 {
@@ -469,7 +469,7 @@ final class RefreshTokenGraceTest extends TestCase
         $output = tmpfile();
         self::assertIsResource($output);
         $process = proc_open(
-            [PHP_BINARY, dirname(__DIR__) . '/Fixtures/Auth/refresh-token-race.php', self::$sharedDirectory, $application, $this->ip, $this->keyPath, $refreshToken],
+            [PHP_BINARY, dirname(__DIR__) . '/Fixtures/Auth/refresh-race.php', self::$sharedDirectory, $application, $this->ip, $this->keyPath, 'refresh', $refreshToken],
             [0 => ['file', '/dev/null', 'r'], 1 => $output, 2 => $output],
             $pipes,
         );

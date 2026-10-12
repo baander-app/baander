@@ -82,12 +82,21 @@ export const useAuthStore = create<AuthState>()(withStoreDebug('auth.auth', with
     generation++
     const held = getDpopKeyPair()
     if (!held || held.jkt !== record.jkt) {
-      setDpopKeyPair({ publicKey: record.cryptoKeyPair.publicKey, privateKey: record.cryptoKeyPair.privateKey,
-        jwk: record.publicJwk, jkt: record.jkt })
+      setDpopKeyPair({
+        publicKey: record.cryptoKeyPair.publicKey,
+        privateKey: record.cryptoKeyPair.privateKey,
+        jwk: record.publicJwk,
+        jkt: record.jkt,
+      })
     }
     if (record.nonce) setDpopNonce(record.nonce)
     heldEpoch = record.epoch
-    set({ accessToken: record.accessToken, refreshToken: record.refreshToken, user: record.user as User, isAuthenticated: true })
+    set({
+      accessToken: record.accessToken,
+      refreshToken: record.refreshToken,
+      user: record.user as User,
+      isAuthenticated: true,
+    })
     pushToken(record.accessToken)
   }
 
@@ -149,7 +158,9 @@ export const useAuthStore = create<AuthState>()(withStoreDebug('auth.auth', with
     adoptRecord(record, event.type === 'cleared' ? event.epoch : undefined)
   }
   subscribeAuthEvents((event) => {
-    onAuthEvent(event).catch((error) => { logger.warn('Failed to re-read stored auth after a tab event:', error) })
+    onAuthEvent(event).catch((error) => {
+      logger.warn('Failed to re-read stored auth after a tab event:', error)
+    })
   })
 
   return {
@@ -236,7 +247,9 @@ export const useAuthStore = create<AuthState>()(withStoreDebug('auth.auth', with
       set({ user: { ...user, ...updates } })
       const owner = generation
       withAuthLock(REFRESH_BUDGET_MS, () => persistCurrent(owner))
-        .catch((error) => { logger.warn('Failed to persist updated user:', error) })
+        .catch((error) => {
+          logger.warn('Failed to persist updated user:', error)
+        })
     },
 
     clearAuth: () => {
@@ -247,8 +260,12 @@ export const useAuthStore = create<AuthState>()(withStoreDebug('auth.auth', with
         ? state : CLEARED_STATE)
       // The tombstone does not wait for the lock: a refresh holding it fails its write against the tombstone.
       clearStoredAuth()
-        .then((epoch) => { publishAuthEvent({ type: 'cleared', epoch }) })
-        .catch((error) => { logger.warn('Failed to clear stored auth:', error) })
+        .then((epoch) => {
+          publishAuthEvent({ type: 'cleared', epoch })
+        })
+        .catch((error) => {
+          logger.warn('Failed to clear stored auth:', error)
+        })
       pushToken(null)
     },
 

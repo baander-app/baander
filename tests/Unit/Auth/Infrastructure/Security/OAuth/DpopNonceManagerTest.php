@@ -30,6 +30,33 @@ final class DpopNonceManagerTest extends TestCase
         self::assertFalse($manager->isValid('never-stored'));
     }
 
+    public function testAnIssuedNonceIsStoredBeforeItIsHandedOut(): void
+    {
+        $manager = new DpopNonceManager($this->workingFactory(), nonceTtlSeconds: 300);
+
+        $nonce = $manager->issueNonce();
+
+        self::assertSame(64, strlen($nonce));
+        self::assertSame(['value' => '1', 'ttl' => 300], $this->store['dpop:nonce:' . $nonce]);
+        self::assertTrue($manager->isValid($nonce));
+        self::assertNotSame($nonce, $manager->issueNonce());
+    }
+
+    public function testAnUnreachableStoreIssuesNoNonce(): void
+    {
+        $cause = new RedisException('Connection refused');
+        $manager = new DpopNonceManager($this->failingFactory($cause), logger: $this->loggerWarningOnce());
+
+        try {
+            $manager->issueNonce();
+            self::fail('No nonce may be issued while the nonce store is unavailable.');
+        } catch (DpopStoreUnavailableException $exception) {
+            self::assertSame($cause, $exception->getPrevious());
+        }
+
+        self::assertSame([], $this->store);
+    }
+
     public function testTheChallengeCarriesTheNonceItStored(): void
     {
         $manager = new DpopNonceManager($this->workingFactory(), nonceTtlSeconds: 300);

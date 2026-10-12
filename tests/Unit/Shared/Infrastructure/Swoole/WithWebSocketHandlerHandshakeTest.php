@@ -64,11 +64,40 @@ final class WithWebSocketHandlerHandshakeTest extends TestCase
         self::assertSame([], $controller->opened);
     }
 
+    public function testAnObjectWithAnAuthenticateMethodIsAsked(): void
+    {
+        $controller = $this->controllerSpy();
+        $authenticator = new class(self::USER, self::ACCESS_TOKEN) {
+            public function __construct(private readonly string $userId, private readonly string $accessTokenId)
+            {
+            }
+
+            /** @return array{user_id: string, access_token_id: string} */
+            public function authenticate(SwooleRequest $request): array
+            {
+                return ['user_id' => $this->userId, 'access_token_id' => $this->accessTokenId];
+            }
+        };
+
+        $this->handshake($controller, $authenticator, 20);
+
+        self::assertSame([[20, self::USER, self::ACCESS_TOKEN]], $controller->opened);
+    }
+
+    public function testAnAuthenticatorThatCannotBeCalledRejectsTheHandshake(): void
+    {
+        $controller = $this->controllerSpy();
+
+        $this->handshake($controller, 'not an authenticator', 21);
+
+        self::assertSame([], $controller->opened);
+    }
+
     /**
      * Drives the handshake callback the configurator registers on the server, with a
      * request and a response detached from any connection.
      */
-    private function handshake(AbstractWebSocketController $controller, callable $authenticator, int $fd): void
+    private function handshake(AbstractWebSocketController $controller, mixed $authenticator, int $fd): void
     {
         $handshake = null;
         $server = $this->createStub(Server::class);

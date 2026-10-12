@@ -3,9 +3,10 @@
 declare(strict_types=1);
 
 /*
- * Child process of RefreshTokenConcurrencyTest: presents a refresh token at the production
- * refresh endpoint, or logs a session out, over its own PostgreSQL session, so it can hold
- * or wait on a row lock while the test process runs the other side.
+ * Child process of RefreshTokenConcurrencyTest and RefreshTokenGraceTest: presents a
+ * refresh token at the production refresh endpoint, or logs a session out, over its own
+ * PostgreSQL session, so it can hold or wait on a row lock while the test process runs
+ * the other side.
  *
  * Arguments: the shared directory (JWT keys and logs of the kernel), the application name
  * to report in pg_stat_activity, the client IP, the path of the DPoP private key (PEM) the

@@ -149,9 +149,8 @@ final class LoginController
      */
     private function attachNextNonce(JsonResponse $response): void
     {
-        $nonce = $this->dpopNonceManager->generateNonce();
         try {
-            $this->dpopNonceManager->storeNonce($nonce);
+            $nonce = $this->dpopNonceManager->issueNonce();
         } catch (DpopStoreUnavailableException) {
             return;
         }

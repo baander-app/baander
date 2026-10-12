@@ -90,11 +90,11 @@ final class RevokeTokenHandlerTest extends TestCase
             ->method('findByTokenId')
             ->with($this->callback(fn (TokenId $id): bool => $id->toString() === $tokenId))
             ->willReturn($secondRefresh);
-        $this->refreshTokenRepository
+        $this->accessTokenRepository
             ->expects($this->once())
-            ->method('findByChainId')
+            ->method('findTokenIdsByChainId')
             ->with($this->callback(fn (ChainId $c): bool => $c->equals($chainId)))
-            ->willReturn([$firstRefresh, $secondRefresh]);
+            ->willReturn([$first->getTokenId()->toString(), $second->getTokenId()->toString()]);
 
         $order = [];
         $this->refreshTokenRepository
@@ -145,15 +145,15 @@ final class RevokeTokenHandlerTest extends TestCase
         $this->refreshTokenRepository
             ->method('findByTokenId')
             ->willReturn(null);
-        $this->refreshTokenRepository
-            ->method('findByChainId')
-            ->willReturn([$refreshToken]);
 
         $this->accessTokenRepository
             ->expects($this->once())
             ->method('findByTokenId')
             ->with($this->callback(fn (TokenId $id): bool => $id->toString() === $tokenId))
             ->willReturn($accessToken);
+        $this->accessTokenRepository
+            ->method('findTokenIdsByChainId')
+            ->willReturn([$tokenId]);
 
         $this->accessTokenRepository
             ->expects($this->once())
@@ -272,7 +272,7 @@ final class RevokeTokenHandlerTest extends TestCase
         $refreshToken = RefreshToken::issue($accessToken, $chainId);
 
         $this->refreshTokenRepository->method('findByTokenId')->willReturn($refreshToken);
-        $this->refreshTokenRepository->method('findByChainId')->willReturn([$refreshToken]);
+        $this->accessTokenRepository->method('findTokenIdsByChainId')->willReturn([$accessToken->getTokenId()->toString()]);
         $this->refreshTokenRepository->expects($this->once())->method('revokeByChainId');
         $this->liveConnections->method('closeForAccessTokens')->willThrowException(new ServerNotRunningException());
 
@@ -290,7 +290,7 @@ final class RevokeTokenHandlerTest extends TestCase
         $refreshToken = RefreshToken::issue($accessToken, $chainId);
 
         $this->refreshTokenRepository->method('findByTokenId')->willReturn($refreshToken);
-        $this->refreshTokenRepository->method('findByChainId')->willReturn([$refreshToken]);
+        $this->accessTokenRepository->method('findTokenIdsByChainId')->willReturn([$accessToken->getTokenId()->toString()]);
         $this->refreshTokenRepository->expects($this->once())->method('revokeByChainId');
         $this->liveConnections->method('closeForAccessTokens')->willThrowException(new ServerControlException('a worker did not answer'));
 
@@ -364,7 +364,7 @@ final class RevokeTokenHandlerTest extends TestCase
         $refreshToken = RefreshToken::issue($accessToken, $chainId);
 
         $this->refreshTokenRepository->method('findByTokenId')->willReturn($refreshToken);
-        $this->refreshTokenRepository->method('findByChainId')->willReturn([$refreshToken]);
+        $this->accessTokenRepository->method('findTokenIdsByChainId')->willReturn([$accessToken->getTokenId()->toString()]);
         $this->refreshTokenRepository->expects($this->once())->method('revokeByChainId');
         $this->accessTokenRepository->expects($this->once())->method('revokeByChainId');
         $this->liveConnections
@@ -506,9 +506,9 @@ final class RevokeTokenHandlerTest extends TestCase
         $this->refreshTokenRepository
             ->method('findByTokenId')
             ->willReturn($refreshToken);
-        $this->refreshTokenRepository
-            ->method('findByChainId')
-            ->willReturn([$refreshToken]);
+        $this->accessTokenRepository
+            ->method('findTokenIdsByChainId')
+            ->willReturn([$accessToken->getTokenId()->toString()]);
 
         $transactionalCalled = false;
         $this->connection
