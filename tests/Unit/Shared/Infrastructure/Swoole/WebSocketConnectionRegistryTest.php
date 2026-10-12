@@ -29,21 +29,71 @@ final class WebSocketConnectionRegistryTest extends TestCase
 
     public function testAddConnectionStoresConnection(): void
     {
-        $this->registry->addConnection(1, 'user-uuid-1', 0);
+        $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-1');
 
         $conn = $this->registry->getConnection(1);
 
         $this->assertNotNull($conn);
         $this->assertSame('user-uuid-1', $conn['user_id']);
+        $this->assertSame('token-1', $conn['access_token_id']);
         $this->assertSame(0, $conn['worker_id']);
         $this->assertGreaterThan(0, $conn['connected_at']);
     }
 
+    // --- Access token of a connection ---
+
+    public function testAnAccessTokenIdOfTheFullLengthRoundTrips(): void
+    {
+        $tokenId = str_repeat('t', WebSocketConnectionRegistry::ACCESS_TOKEN_ID_BYTES);
+
+        $this->registry->addConnection(1, 'user-uuid-1', 0, $tokenId);
+
+        self::assertSame($tokenId, $this->registry->getConnection(1)['access_token_id'] ?? null);
+        self::assertSame([1], $this->registry->getAccessTokenConnectionFds($tokenId));
+    }
+
+    public function testALongerAccessTokenIdIsRefusedBeforeAnythingIsStored(): void
+    {
+        $tooLong = str_repeat('t', WebSocketConnectionRegistry::ACCESS_TOKEN_ID_BYTES + 1);
+
+        try {
+            $this->registry->addConnection(1, 'user-uuid-1', 0, $tooLong);
+            self::fail('A token id longer than the column must be refused.');
+        } catch (\InvalidArgumentException $exception) {
+            self::assertStringContainsString('80 bytes', $exception->getMessage());
+        }
+
+        self::assertNull($this->registry->getConnection(1));
+        self::assertSame([], $this->registry->getAccessTokenConnectionFds($tooLong));
+    }
+
+    public function testAccessTokenConnectionsAreTheOnesRegisteredWithThatToken(): void
+    {
+        $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-a');
+        $this->registry->addConnection(2, 'user-uuid-1', 1, 'token-b');
+        $this->registry->addConnection(3, 'user-uuid-2', 0, 'token-a');
+
+        $fds = $this->registry->getAccessTokenConnectionFds('token-a');
+        sort($fds);
+
+        self::assertSame([1, 3], $fds);
+        self::assertSame([2], $this->registry->getAccessTokenConnectionFds('token-b'));
+        self::assertSame([], $this->registry->getAccessTokenConnectionFds('token-c'));
+    }
+
+    public function testARemovedConnectionIsNoLongerFoundByItsAccessToken(): void
+    {
+        $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-a');
+        $this->registry->removeConnection(1);
+
+        self::assertSame([], $this->registry->getAccessTokenConnectionFds('token-a'));
+    }
+
     public function testWorkerConnectionsAreTheOnesItsWorkerRegistered(): void
     {
-        $this->registry->addConnection(1, 'user-uuid-1', 0);
-        $this->registry->addConnection(2, 'user-uuid-2', 1);
-        $this->registry->addConnection(3, 'user-uuid-1', 0);
+        $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-1');
+        $this->registry->addConnection(2, 'user-uuid-2', 1, 'token-2');
+        $this->registry->addConnection(3, 'user-uuid-1', 0, 'token-3');
 
         $fds = $this->registry->getWorkerConnectionFds(0);
         sort($fds);
@@ -56,7 +106,7 @@ final class WebSocketConnectionRegistryTest extends TestCase
     public function testAddConnectionStoresCurrentTimestamp(): void
     {
         $before = time();
-        $this->registry->addConnection(1, 'user-uuid-1', 0);
+        $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-1');
         $after = time();
 
         $conn = $this->registry->getConnection(1);
@@ -68,7 +118,7 @@ final class WebSocketConnectionRegistryTest extends TestCase
 
     public function testRemoveConnectionDeletesFromTable(): void
     {
-        $this->registry->addConnection(1, 'user-uuid-1', 0);
+        $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-1');
         $this->registry->removeConnection(1);
 
         $this->assertNull($this->registry->getConnection(1));
@@ -88,8 +138,8 @@ final class WebSocketConnectionRegistryTest extends TestCase
 
     public function testGetAllConnectionsReturnsAllEntries(): void
     {
-        $this->registry->addConnection(1, 'user-uuid-1', 0);
-        $this->registry->addConnection(2, 'user-uuid-2', 1);
+        $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-1');
+        $this->registry->addConnection(2, 'user-uuid-2', 1, 'token-2');
 
         $all = $this->registry->getAllConnections();
 
@@ -104,22 +154,22 @@ final class WebSocketConnectionRegistryTest extends TestCase
     public function testAddConnectionRejectsBeyondMaxPerUser(): void
     {
         for ($i = 1; $i <= 10; ++$i) {
-            $this->registry->addConnection($i, 'user-uuid-1', 0);
+            $this->registry->addConnection($i, 'user-uuid-1', 0, 'token-' . $i);
         }
 
         $this->expectException(WebSocketRegistrationRefused::class);
         $this->expectExceptionMessage('has reached the maximum of 10 WebSocket connections');
 
-        $this->registry->addConnection(11, 'user-uuid-1', 0);
+        $this->registry->addConnection(11, 'user-uuid-1', 0, 'token-11');
     }
 
     public function testDifferentUsersCanEachHaveMaxConnections(): void
     {
         for ($i = 1; $i <= 10; ++$i) {
-            $this->registry->addConnection($i, 'user-uuid-1', 0);
+            $this->registry->addConnection($i, 'user-uuid-1', 0, 'token-' . $i);
         }
         for ($i = 11; $i <= 20; ++$i) {
-            $this->registry->addConnection($i, 'user-uuid-2', 0);
+            $this->registry->addConnection($i, 'user-uuid-2', 0, 'token-' . $i);
         }
 
         $this->assertCount(10, $this->registry->getUserConnectionFds('user-uuid-1'));
@@ -129,12 +179,12 @@ final class WebSocketConnectionRegistryTest extends TestCase
     public function testRemovedConnectionSlotFreesUpForSameUser(): void
     {
         for ($i = 1; $i <= 10; ++$i) {
-            $this->registry->addConnection($i, 'user-uuid-1', 0);
+            $this->registry->addConnection($i, 'user-uuid-1', 0, 'token-' . $i);
         }
         $this->registry->removeConnection(1);
 
         // Should not throw since one slot freed up
-        $this->registry->addConnection(11, 'user-uuid-1', 0);
+        $this->registry->addConnection(11, 'user-uuid-1', 0, 'token-11');
 
         $fds = $this->registry->getUserConnectionFds('user-uuid-1');
         $this->assertCount(10, $fds);
@@ -150,9 +200,9 @@ final class WebSocketConnectionRegistryTest extends TestCase
 
     public function testGetUserConnectionFdsReturnsOnlyMatchingFds(): void
     {
-        $this->registry->addConnection(1, 'user-uuid-1', 0);
-        $this->registry->addConnection(2, 'user-uuid-2', 0);
-        $this->registry->addConnection(3, 'user-uuid-1', 1);
+        $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-1');
+        $this->registry->addConnection(2, 'user-uuid-2', 0, 'token-2');
+        $this->registry->addConnection(3, 'user-uuid-1', 1, 'token-3');
 
         $fds = $this->registry->getUserConnectionFds('user-uuid-1');
 
@@ -166,7 +216,7 @@ final class WebSocketConnectionRegistryTest extends TestCase
 
     public function testJoinRoomAddsToBothTables(): void
     {
-        $this->registry->addConnection(1, 'user-uuid-1', 0);
+        $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-1');
         $this->registry->joinRoom('room:123', 1);
 
         $members = $this->registry->getRoomMembers('room:123');
@@ -176,7 +226,7 @@ final class WebSocketConnectionRegistryTest extends TestCase
 
     public function testJoinRoomIsIdempotent(): void
     {
-        $this->registry->addConnection(1, 'user-uuid-1', 0);
+        $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-1');
         $this->registry->joinRoom('room:123', 1);
         $this->registry->joinRoom('room:123', 1);
 
@@ -189,7 +239,7 @@ final class WebSocketConnectionRegistryTest extends TestCase
 
     public function testLeaveRoomRemovesFromBothTables(): void
     {
-        $this->registry->addConnection(1, 'user-uuid-1', 0);
+        $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-1');
         $this->registry->joinRoom('room:123', 1);
         $this->registry->leaveRoom('room:123', 1);
 
@@ -204,9 +254,9 @@ final class WebSocketConnectionRegistryTest extends TestCase
 
     public function testGetRoomMembersReturnsAllFdsInRoom(): void
     {
-        $this->registry->addConnection(1, 'user-uuid-1', 0);
-        $this->registry->addConnection(2, 'user-uuid-2', 0);
-        $this->registry->addConnection(3, 'user-uuid-3', 1);
+        $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-1');
+        $this->registry->addConnection(2, 'user-uuid-2', 0, 'token-2');
+        $this->registry->addConnection(3, 'user-uuid-3', 1, 'token-3');
         $this->registry->joinRoom('room:123', 1);
         $this->registry->joinRoom('room:123', 2);
         $this->registry->joinRoom('room:123', 3);
@@ -221,8 +271,8 @@ final class WebSocketConnectionRegistryTest extends TestCase
 
     public function testGetRoomMembersDoesNotReturnFdsFromOtherRooms(): void
     {
-        $this->registry->addConnection(1, 'user-uuid-1', 0);
-        $this->registry->addConnection(2, 'user-uuid-2', 0);
+        $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-1');
+        $this->registry->addConnection(2, 'user-uuid-2', 0, 'token-2');
         $this->registry->joinRoom('room:aaa', 1);
         $this->registry->joinRoom('room:bbb', 2);
 
@@ -242,7 +292,7 @@ final class WebSocketConnectionRegistryTest extends TestCase
 
     public function testLeaveAllRoomsRemovesFdFromEveryRoom(): void
     {
-        $this->registry->addConnection(1, 'user-uuid-1', 0);
+        $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-1');
         $this->registry->joinRoom('room:aaa', 1);
         $this->registry->joinRoom('room:bbb', 1);
         $this->registry->joinRoom('room:ccc', 1);
@@ -256,8 +306,8 @@ final class WebSocketConnectionRegistryTest extends TestCase
 
     public function testLeaveAllRoomsDoesNotAffectOtherFds(): void
     {
-        $this->registry->addConnection(1, 'user-uuid-1', 0);
-        $this->registry->addConnection(2, 'user-uuid-2', 0);
+        $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-1');
+        $this->registry->addConnection(2, 'user-uuid-2', 0, 'token-2');
         $this->registry->joinRoom('room:123', 1);
         $this->registry->joinRoom('room:123', 2);
 
@@ -280,7 +330,7 @@ final class WebSocketConnectionRegistryTest extends TestCase
 
     public function testRemoveConnectionAlsoCleansUpRoomMemberships(): void
     {
-        $this->registry->addConnection(1, 'user-uuid-1', 0);
+        $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-1');
         $this->registry->joinRoom('room:123', 1);
 
         $this->registry->removeConnection(1);
@@ -293,8 +343,8 @@ final class WebSocketConnectionRegistryTest extends TestCase
 
     public function testCleanupOrphansRemovesDeadConnections(): void
     {
-        $this->registry->addConnection(1, 'user-uuid-1', 0);
-        $this->registry->addConnection(2, 'user-uuid-2', 0);
+        $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-1');
+        $this->registry->addConnection(2, 'user-uuid-2', 0, 'token-2');
         $this->registry->joinRoom('room:123', 1);
 
         $isEstablished = fn (int $fd): bool => $fd !== 1;
@@ -309,8 +359,8 @@ final class WebSocketConnectionRegistryTest extends TestCase
 
     public function testCleanupOrphansReturnsZeroWhenAllAlive(): void
     {
-        $this->registry->addConnection(1, 'user-uuid-1', 0);
-        $this->registry->addConnection(2, 'user-uuid-2', 0);
+        $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-1');
+        $this->registry->addConnection(2, 'user-uuid-2', 0, 'token-2');
 
         $isEstablished = fn (int $fd): bool => true;
 
@@ -334,9 +384,9 @@ final class WebSocketConnectionRegistryTest extends TestCase
 
     public function testFdCanBeReusedAfterRemoval(): void
     {
-        $this->registry->addConnection(1, 'user-uuid-1', 0);
+        $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-1');
         $this->registry->removeConnection(1);
-        $this->registry->addConnection(1, 'user-uuid-2', 0);
+        $this->registry->addConnection(1, 'user-uuid-2', 0, 'token-1');
 
         $conn = $this->registry->getConnection(1);
 
@@ -348,7 +398,7 @@ final class WebSocketConnectionRegistryTest extends TestCase
 
     public function testSameFdCanJoinMultipleRooms(): void
     {
-        $this->registry->addConnection(1, 'user-uuid-1', 0);
+        $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-1');
         $this->registry->joinRoom('room:aaa', 1);
         $this->registry->joinRoom('room:bbb', 1);
         $this->registry->joinRoom('room:ccc', 1);
@@ -375,7 +425,7 @@ final class WebSocketConnectionRegistryTest extends TestCase
         }
 
         for ($fd = 1; $fd <= 1024; ++$fd) {
-            $registry->addConnection($fd, sprintf('01900000-0000-7000-9000-%012d', $fd), 0);
+            $registry->addConnection($fd, sprintf('01900000-0000-7000-9000-%012d', $fd), 0, 'token-' . $fd);
             foreach ($rooms as $room) {
                 $registry->joinRoom($room, $fd);
             }
@@ -395,7 +445,7 @@ final class WebSocketConnectionRegistryTest extends TestCase
         $refused = null;
         for ($fd = 1; $fd <= 10_000 && $refused === null; ++$fd) {
             try {
-                $registry->addConnection($fd, sprintf('user-%d', $fd), 0);
+                $registry->addConnection($fd, sprintf('user-%d', $fd), 0, 'token-' . $fd);
             } catch (WebSocketRegistrationRefused $error) {
                 $refused = $fd;
                 self::assertSame(WebSocketRegistrationRefused::CLOSE_TRY_AGAIN_LATER, $error->closeCode);
@@ -410,7 +460,7 @@ final class WebSocketConnectionRegistryTest extends TestCase
     public function testAMembershipTheTablesCannotHoldIsRefusedWithoutAHalfMembership(): void
     {
         $registry = WebSocketConnectionRegistry::create(maxConnections: 1, maxRoomMembers: 1);
-        $registry->addConnection(1, 'user-1', 0);
+        $registry->addConnection(1, 'user-1', 0, 'token-1');
         // Fill only the per-connection index, so the first of the two writes succeeds
         // and the second is refused.
         $fdRooms = (new \ReflectionProperty($registry, 'fdRooms'))->getValue($registry);

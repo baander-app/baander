@@ -25,8 +25,8 @@ final class WebSocketUserDisconnectOperationTest extends TestCase
     public function testClosesEveryConnectionOfTheUser(): void
     {
         $registry = WebSocketConnectionRegistry::create(16, 64);
-        $registry->addConnection(7, self::USER, 0);
-        $registry->addConnection(8, self::USER, 1);
+        $registry->addConnection(7, self::USER, 0, 'token-7');
+        $registry->addConnection(8, self::USER, 1, 'token-8');
 
         $server = $this->createMock(Server::class);
         $server->method('isEstablished')->willReturn(true);

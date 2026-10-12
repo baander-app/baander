@@ -7,7 +7,9 @@ namespace App\Shared\Infrastructure\Swoole;
 use App\Shared\Application\Port\LiveConnectionsPortInterface;
 use App\Shared\Application\Port\ServerControlException;
 use App\Shared\Application\Port\ServerControlPortInterface;
+use App\Shared\Application\Port\ServerControlResult;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Infrastructure\Swoole\Control\Operation\WebSocketAccessTokenDisconnectOperation;
 use App\Shared\Infrastructure\Swoole\Control\Operation\WebSocketUserDisconnectOperation;
 
 /**
@@ -25,10 +27,26 @@ final readonly class SwooleLiveConnections implements LiveConnectionsPortInterfa
 
     public function closeForUser(Uuid $userId): int
     {
-        $result = $this->serverControl->execute(
+        return $this->closedCount($this->serverControl->execute(
             WebSocketUserDisconnectOperation::NAME,
             ['user_id' => $userId->toString()],
-        );
+        ));
+    }
+
+    public function closeForAccessTokens(array $accessTokenIds): int
+    {
+        if ($accessTokenIds === []) {
+            return 0;
+        }
+
+        return $this->closedCount($this->serverControl->execute(
+            WebSocketAccessTokenDisconnectOperation::NAME,
+            ['access_token_ids' => $accessTokenIds],
+        ));
+    }
+
+    private function closedCount(ServerControlResult $result): int
+    {
         if (!$result->isComplete()) {
             throw new ServerControlException(implode('; ', $result->errors) ?: 'a worker did not answer');
         }

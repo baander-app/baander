@@ -128,7 +128,8 @@ final class WsQueryTokenAuthenticatorTest extends TestCase
             ->withHeader('Authorization', 'Bearer valid-token');
 
         $validatedRequest = $this->psr17Factory->createServerRequest('GET', 'http://localhost/api/ws')
-            ->withAttribute('oauth_user_id', $uuid->toString());
+            ->withAttribute('oauth_user_id', $uuid->toString())
+            ->withAttribute('oauth_access_token_id', 'access-token-id-99');
 
         $this->psrHttpFactory
             ->method('createRequest')
@@ -157,7 +158,8 @@ final class WsQueryTokenAuthenticatorTest extends TestCase
         );
         $this->resourceServer->method('validateAuthenticatedRequest')->willReturn(
             $this->psr17Factory->createServerRequest('GET', 'http://localhost/api/ws')
-                ->withAttribute('oauth_user_id', $uuid->toString()),
+                ->withAttribute('oauth_user_id', $uuid->toString())
+                ->withAttribute('oauth_access_token_id', 'access-token-id-2'),
         );
 
         $user = User::reconstitute(new \App\Auth\Domain\Model\UserState(
@@ -176,6 +178,31 @@ final class WsQueryTokenAuthenticatorTest extends TestCase
         self::assertNull($this->authenticator->authenticate($this->createSwooleRequest(['token' => 'valid-token'])));
     }
 
+    public function testAuthenticateReturnsNullWhenTokenHasNoAccessTokenId(): void
+    {
+        $uuid = Uuid::fromString('00000000-0000-7000-8000-000000000003');
+        $this->psrHttpFactory->method('createRequest')->willReturn(
+            $this->psr17Factory->createServerRequest('GET', 'http://localhost/api/ws?token=valid-token'),
+        );
+        $this->resourceServer->method('validateAuthenticatedRequest')->willReturn(
+            $this->psr17Factory->createServerRequest('GET', 'http://localhost/api/ws')
+                ->withAttribute('oauth_user_id', $uuid->toString()),
+        );
+        $this->userRepository->method('findByUuid')->willReturn(User::reconstitute(new \App\Auth\Domain\Model\UserState(
+            id: $uuid,
+            publicId: new PublicId(),
+            name: 'Test User',
+            email: 'user@baander.app',
+            password: 'hashed-password',
+            totpSecret: null,
+            createdAt: new \DateTimeImmutable(),
+            updatedAt: new \DateTimeImmutable(),
+        )));
+
+        // Without the token id a revocation could not close the connection.
+        self::assertNull($this->authenticator->authenticate($this->createSwooleRequest(['token' => 'valid-token'])));
+    }
+
     public function testAuthenticateReturnsUserIdOnSuccess(): void
     {
         $this->userRepository = $this->createMock(UserRepositoryInterface::class);
@@ -190,6 +217,7 @@ final class WsQueryTokenAuthenticatorTest extends TestCase
         $validatedRequest = $this->psr17Factory->createServerRequest('GET', 'http://localhost/api/ws')
             ->withAttribute('oauth_user_id', $uuid->toString())
             ->withAttribute('oauth_client_id', 'test-client')
+            ->withAttribute('oauth_access_token_id', 'access-token-id-1')
             ->withAttribute('oauth_scopes', ['read']);
 
         $this->psrHttpFactory
@@ -219,6 +247,6 @@ final class WsQueryTokenAuthenticatorTest extends TestCase
 
         $result = $this->authenticator->authenticate($swooleRequest);
 
-        $this->assertSame($uuid->toString(), $result);
+        $this->assertSame(['user_id' => $uuid->toString(), 'access_token_id' => 'access-token-id-1'], $result);
     }
 }

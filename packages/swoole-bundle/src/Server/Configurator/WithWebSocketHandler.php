@@ -16,8 +16,9 @@ final class WithWebSocketHandler implements Configurator
 {
 
     /**
-     * @param (callable(SwooleRequest): ?string)|null $authenticator Authenticates the handshake request.
-     *   Returns the authenticated user ID string on success, or null to reject.
+     * @param (callable(SwooleRequest): ?array{user_id: string, access_token_id: string})|null $authenticator
+     *   Authenticates the handshake request. Returns the authenticated user ID and the ID of the
+     *   access token the request presented, both as strings, on success, or null to reject.
      *   When null, authentication is skipped (e.g., no WS controller configured).
      * @param list<string>|null $allowedOrigins Origin header allowlist. Null means allow all (dev mode).
      */
@@ -52,8 +53,8 @@ final class WithWebSocketHandler implements Configurator
                     return;
                 }
 
-                $userId = $this->authenticate($request);
-                if ($userId === null) {
+                $identity = $this->authenticate($request);
+                if ($identity === null) {
                     $response->status(401);
                     $response->end('Unauthorized');
 
@@ -75,7 +76,7 @@ final class WithWebSocketHandler implements Configurator
                 // When onHandshake is registered, Swoole does NOT call onOpen.
                 // Invoke the controller's onOpen directly after successful handshake.
                 $fd = (int) $request->fd;
-                $this->controller->onOpen($fd, $userId);
+                $this->controller->onOpen($fd, $identity['user_id'], $identity['access_token_id']);
             } catch (\Throwable $exception) {
                 error_log(sprintf('[WS Handshake] %s: %s in %s:%d', get_class($exception), $exception->getMessage(), $exception->getFile(), $exception->getLine()));
                 $response->status(500);
@@ -114,27 +115,34 @@ final class WithWebSocketHandler implements Configurator
     }
 
     /**
-     * Calls the authenticator closure to verify the request and extract the user ID.
-     * Returns null if authentication fails or no authenticator is configured.
+     * Calls the authenticator to verify the request and extract the user ID and the access token ID.
+     * Returns null if authentication fails, the answer lacks either ID, or no authenticator is configured.
+     *
+     * @return array{user_id: string, access_token_id: string}|null
      */
-    private function authenticate(SwooleRequest $request): ?string
+    private function authenticate(SwooleRequest $request): ?array
     {
         if ($this->authenticator === null) {
             return null;
         }
 
         if ($this->authenticator instanceof \Closure) {
-            return ($this->authenticator)($request);
+            $identity = ($this->authenticator)($request);
+        } elseif (is_object($this->authenticator) && method_exists($this->authenticator, 'authenticate')) {
+            $identity = $this->authenticator->authenticate($request);
+        } else {
+            $identity = ($this->authenticator)($request);
         }
 
-        if (is_object($this->authenticator) && method_exists($this->authenticator, 'authenticate')) {
-            return $this->authenticator->authenticate($request);
+        if (!is_array($identity)) {
+            return null;
+        }
+        $userId = $identity['user_id'] ?? null;
+        $accessTokenId = $identity['access_token_id'] ?? null;
+        if (!is_string($userId) || $userId === '' || !is_string($accessTokenId) || $accessTokenId === '') {
+            return null;
         }
 
-        if (is_callable($this->authenticator)) {
-            return ($this->authenticator)($request);
-        }
-
-        return null;
+        return ['user_id' => $userId, 'access_token_id' => $accessTokenId];
     }
 }

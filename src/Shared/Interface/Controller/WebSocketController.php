@@ -52,9 +52,9 @@ final class WebSocketController extends AbstractWebSocketController
     {
     }
 
-    public function onOpen(int $fd, string $userId): void
+    public function onOpen(int $fd, string $userId, string $accessTokenId): void
     {
-        if (!$this->register($fd, $userId)) {
+        if (!$this->register($fd, $userId, $accessTokenId)) {
             return;
         }
 
@@ -67,10 +67,10 @@ final class WebSocketController extends AbstractWebSocketController
      * Registers the connection, or closes it when the registry refuses it. A refused
      * connection must not stay open: it would get no pushes or broadcasts.
      */
-    private function register(int $fd, string $userId): bool
+    private function register(int $fd, string $userId, string $accessTokenId): bool
     {
         try {
-            $this->registry->addConnection($fd, $userId, $this->registry->getWorkerId());
+            $this->registry->addConnection($fd, $userId, $this->registry->getWorkerId(), $accessTokenId);
         } catch (WebSocketRegistrationRefused $refused) {
             unset($this->fdUsers[$fd]);
             $this->logger?->warning('WebSocket connection refused', [

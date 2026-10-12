@@ -32,6 +32,11 @@ final class WebSocketConnectionRegistry
      * the fd (at most 10 digits), which leaves 52 bytes for the name.
      */
     public const int MAX_ROOM_NAME_BYTES = 52;
+    /**
+     * An OAuth token id is 80 bytes long. The Auth context owns that length and this
+     * table must not import it, so a unit test on the Auth side pins the two together.
+     */
+    public const int ACCESS_TOKEN_ID_BYTES = 80;
 
     private function __construct(
         private readonly Table $connections,
@@ -56,6 +61,7 @@ final class WebSocketConnectionRegistry
     ): self {
         $connections = new Table($maxConnections, self::CONFLICT_PROPORTION);
         $connections->column('user_id', Table::TYPE_STRING, 36);
+        $connections->column('access_token_id', Table::TYPE_STRING, self::ACCESS_TOKEN_ID_BYTES);
         $connections->column('worker_id', Table::TYPE_INT);
         $connections->column('connected_at', Table::TYPE_INT);
         $connections->create();
@@ -72,11 +78,21 @@ final class WebSocketConnectionRegistry
     }
 
     /**
+     * @param string $accessTokenId the access token the connection authenticated with;
+     *        revoking it closes the connection
+     *
+     * @throws \InvalidArgumentException when the token id is longer than ACCESS_TOKEN_ID_BYTES
      * @throws WebSocketRegistrationRefused when the user has too many connections or the
      *         table has no free row; the connection is then not registered
      */
-    public function addConnection(int $fd, string $userId, int $workerId): void
+    public function addConnection(int $fd, string $userId, int $workerId, string $accessTokenId): void
     {
+        // Swoole cuts a longer value short, and getAccessTokenConnectionFds() would then
+        // miss the connection when its token is revoked.
+        if (strlen($accessTokenId) > self::ACCESS_TOKEN_ID_BYTES) {
+            throw new \InvalidArgumentException(sprintf('An access token id may be at most %d bytes long.', self::ACCESS_TOKEN_ID_BYTES));
+        }
+
         $existingCount = $this->countUserConnections($userId);
         if ($existingCount >= self::MAX_CONNECTIONS_PER_USER) {
             throw WebSocketRegistrationRefused::userConnectionLimit($userId, self::MAX_CONNECTIONS_PER_USER);
@@ -85,6 +101,7 @@ final class WebSocketConnectionRegistry
         // A full table makes set() warn and return false; the refusal is reported below.
         $stored = @$this->connections->set((string) $fd, [
             'user_id' => $userId,
+            'access_token_id' => $accessTokenId,
             'worker_id' => $workerId,
             'connected_at' => time(),
         ]);
@@ -107,6 +124,23 @@ final class WebSocketConnectionRegistry
         $fds = [];
         foreach ($this->connections as $fd => $row) {
             if ($row['user_id'] === $userId) {
+                $fds[] = (int) $fd;
+            }
+        }
+
+        return $fds;
+    }
+
+    /**
+     * The connections that authenticated with the access token.
+     *
+     * @return list<int>
+     */
+    public function getAccessTokenConnectionFds(string $accessTokenId): array
+    {
+        $fds = [];
+        foreach ($this->connections as $fd => $row) {
+            if ($row['access_token_id'] === $accessTokenId) {
                 $fds[] = (int) $fd;
             }
         }
@@ -196,7 +230,7 @@ final class WebSocketConnectionRegistry
         return $fds;
     }
 
-    /** @return array{user_id: string, worker_id: int, connected_at: int}|null */
+    /** @return array{user_id: string, access_token_id: string, worker_id: int, connected_at: int}|null */
     public function getConnection(int $fd): ?array
     {
         $row = $this->connections->get((string) $fd);
@@ -206,6 +240,7 @@ final class WebSocketConnectionRegistry
 
         return [
             'user_id' => $row['user_id'],
+            'access_token_id' => $row['access_token_id'],
             'worker_id' => $row['worker_id'],
             'connected_at' => $row['connected_at'],
         ];
@@ -239,7 +274,7 @@ final class WebSocketConnectionRegistry
     }
 
     /**
-     * @return list<array{user_id: string, worker_id: int, connected_at: int}>
+     * @return list<array{user_id: string, access_token_id: string, worker_id: int, connected_at: int}>
      */
     public function getAllConnections(): array
     {
@@ -247,6 +282,7 @@ final class WebSocketConnectionRegistry
         foreach ($this->connections as $fd => $row) {
             $result[] = [
                 'user_id' => $row['user_id'],
+                'access_token_id' => $row['access_token_id'],
                 'worker_id' => $row['worker_id'],
                 'connected_at' => $row['connected_at'],
             ];

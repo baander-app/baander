@@ -11,6 +11,7 @@ use App\Auth\Application\Command\OAuth\ExchangeAuthorizationCodeCommand;
 use App\Auth\Application\Command\OAuth\ExchangeDeviceCodeCommand;
 use App\Auth\Application\Command\OAuth\ExchangeRefreshTokenCommand;
 use App\Auth\Application\Command\OAuth\RequestDeviceAuthorizationCommand;
+use App\Auth\Application\Command\OAuth\RevokeTokenCommand;
 use App\Auth\Application\DTO\AuthorizationRequestDTO;
 use App\Auth\Application\DTO\AuthorizationResponseDTO;
 use App\Auth\Application\DTO\DeviceAuthorizationDTO;
@@ -37,8 +38,6 @@ use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\OAuthError;
-use League\OAuth2\Server\Repositories\AccessTokenRepositoryInterface;
-use League\OAuth2\Server\Repositories\RefreshTokenRepositoryInterface;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -80,8 +79,6 @@ final class OAuthController
     public function __construct(
         private readonly Security $security,
         private readonly MessageBusInterface $bus,
-        private readonly AccessTokenRepositoryInterface $accessTokenRepository,
-        private readonly RefreshTokenRepositoryInterface $refreshTokenRepository,
         private readonly string $issuer,
     ) {
     }
@@ -239,7 +236,7 @@ final class OAuthController
 
     #[OA\Post(
         path: '/api/oauth/revoke',
-        summary: 'Revoke an access or refresh token (RFC 7009)',
+        summary: 'Revoke an access or refresh token of the signed-in user and its chain (RFC 7009)',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(required: ['token'], properties: [
@@ -248,22 +245,30 @@ final class OAuthController
                 ]),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Token revoked (always 200, even for invalid tokens per RFC 7009)', content: new OA\JsonContent()),
+            new OA\Response(response: '200', description: 'Token revoked (always 200, even for an unknown token or one of another user, per RFC 7009 section 2.2)', content: new OA\JsonContent()),
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
     #[Route('/revoke', name: 'revoke', methods: ['POST'])]
     public function revoke(#[MapRequestPayload] RevokeTokenRequest $payload): JsonResponse
     {
+        $user = $this->security->getUser();
+        if (!$user instanceof AuthenticatedUserIdentityInterface) {
+            return $this->unauthorized();
+        }
+
         try {
-            if ($payload->tokenTypeHint === 'refresh_token') {
-                $this->refreshTokenRepository->revokeRefreshToken($payload->token);
-            } else {
-                $this->accessTokenRepository->revokeAccessToken($payload->token);
-            }
+            // Only a token of the authenticated user is revoked; the handler treats a
+            // foreign token as unknown, so the answer tells the two apart in no way.
+            // Revoking either token of a pair ends the session: the whole chain goes.
+            $this->dispatch(new RevokeTokenCommand(
+                tokenId: $payload->token,
+                revokeChain: true,
+                ownerUserId: $user->getId(),
+            ));
         } catch (\Throwable) {
-            // Per RFC 7009, the revocation endpoint MUST return 200
-            // even if the token is invalid — prevents token probing.
+            // Per RFC 7009 section 2.2, the revocation endpoint answers 200
+            // even if the token is invalid, which prevents token probing.
         }
 
         return new JsonResponse(null, Response::HTTP_OK);

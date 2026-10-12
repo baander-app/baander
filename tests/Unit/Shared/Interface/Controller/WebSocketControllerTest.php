@@ -157,7 +157,7 @@ final class WebSocketControllerTest extends TestCase
                 return ['sessionId' => 'session-1', 'active' => false];
             },
         );
-        $this->controller->onOpen(1, $userId->toString());
+        $this->controller->onOpen(1, $userId->toString(), 'token-1');
         $this->controller->onMessage(1, json_encode([
             'type' => $type,
             'deviceId' => $deviceId->toString(),
@@ -196,7 +196,7 @@ final class WebSocketControllerTest extends TestCase
         $this->listeningSessions->method($method)->willThrowException(new HandlerFailedException(
             new Envelope(new \stdClass()), [new \RuntimeException('Private handler detail')],
         ));
-        $this->controller->onOpen(1, Uuid::generate()->toString());
+        $this->controller->onOpen(1, Uuid::generate()->toString(), 'token-1');
         $this->controller->onMessage(1, json_encode([
             'type' => $type,
             'deviceId' => Uuid::generate()->toString(),
@@ -224,7 +224,7 @@ final class WebSocketControllerTest extends TestCase
                 return [];
             },
         );
-        $this->controller->onOpen(1, Uuid::generate()->toString());
+        $this->controller->onOpen(1, Uuid::generate()->toString(), 'token-1');
         $this->controller->onMessage(1, json_encode([
             'type' => 'session.playback', 'deviceId' => Uuid::generate()->toString(), 'action' => 'pause',
         ], JSON_THROW_ON_ERROR));
@@ -246,7 +246,7 @@ final class WebSocketControllerTest extends TestCase
                 return [];
             },
         );
-        $this->controller->onOpen(1, Uuid::generate()->toString());
+        $this->controller->onOpen(1, Uuid::generate()->toString(), 'token-1');
         $this->controller->onMessage(1, json_encode([
             'type' => 'session.sync', 'deviceId' => Uuid::generate()->toString(),
         ], JSON_THROW_ON_ERROR));
@@ -262,12 +262,14 @@ final class WebSocketControllerTest extends TestCase
 
     public function testOnOpenStoresConnectionInRegistry(): void
     {
-        $this->controller->onOpen(1, 'user-uuid-1');
+        $this->controller->onOpen(1, 'user-uuid-1', 'token-1');
 
         $conn = $this->registry->getConnection(1);
         $this->assertNotNull($conn);
         $this->assertSame('user-uuid-1', $conn['user_id']);
+        $this->assertSame('token-1', $conn['access_token_id']);
         $this->assertSame(0, $conn['worker_id']);
+        $this->assertSame([1], $this->registry->getAccessTokenConnectionFds('token-1'));
     }
 
     public function testOnOpenStoresConnectionWithCorrectWorkerId(): void
@@ -282,7 +284,7 @@ final class WebSocketControllerTest extends TestCase
             $this->listeningSessions,
         );
 
-        $controller->onOpen(5, 'user-uuid-2');
+        $controller->onOpen(5, 'user-uuid-2', 'token-5');
 
         $conn = $this->registry->getConnection(5);
         $this->assertNotNull($conn);
@@ -291,7 +293,7 @@ final class WebSocketControllerTest extends TestCase
 
     public function testOnOpenSendsAConnectedMessageWithoutAReconnectToken(): void
     {
-        $this->controller->onOpen(1, 'user-1');
+        $this->controller->onOpen(1, 'user-1', 'token-1');
 
         self::assertSame([['fd' => 1, 'payload' => ['type' => 'connected']]], $this->allPushedPayloads());
     }
@@ -300,7 +302,7 @@ final class WebSocketControllerTest extends TestCase
 
     public function testOnMessageWithPingSendsPong(): void
     {
-        $this->controller->onOpen(1, 'user-1');
+        $this->controller->onOpen(1, 'user-1', 'token-1');
 
         $this->controller->onMessage(1, json_encode(['type' => 'ping']));
 
@@ -313,7 +315,7 @@ final class WebSocketControllerTest extends TestCase
 
     public function testOnMessageWithInvalidJsonSendsError(): void
     {
-        $this->controller->onOpen(1, 'user-1');
+        $this->controller->onOpen(1, 'user-1', 'token-1');
 
         $this->controller->onMessage(1, 'not-json{{{');
 
@@ -325,7 +327,7 @@ final class WebSocketControllerTest extends TestCase
 
     public function testOnMessageWithMissingTypeSendsError(): void
     {
-        $this->controller->onOpen(1, 'user-1');
+        $this->controller->onOpen(1, 'user-1', 'token-1');
 
         $this->controller->onMessage(1, json_encode(['data' => 'hello']));
 
@@ -334,7 +336,7 @@ final class WebSocketControllerTest extends TestCase
 
     public function testOnMessageWithUnknownTypeSendsError(): void
     {
-        $this->controller->onOpen(1, 'user-1');
+        $this->controller->onOpen(1, 'user-1', 'token-1');
 
         $this->controller->onMessage(1, json_encode(['type' => 'bogus.type']));
 
@@ -343,7 +345,7 @@ final class WebSocketControllerTest extends TestCase
 
     public function testOnMessageWithEmptyStringSendsError(): void
     {
-        $this->controller->onOpen(1, 'user-1');
+        $this->controller->onOpen(1, 'user-1', 'token-1');
 
         $this->controller->onMessage(1, '');
 
@@ -369,7 +371,7 @@ final class WebSocketControllerTest extends TestCase
     {
         $logger = new RefusalRecordingLogger();
         $controller = new WebSocketController($this->registry, $this->pusher, $this->bus, new JsonEncoder(), $this->listeningSessions, $logger);
-        $controller->onOpen(1, 'user-1');
+        $controller->onOpen(1, 'user-1', 'token-1');
 
         $controller->onMessage(1, json_encode(['type' => 'room.join', 'room' => 'notifications:user-1'], JSON_THROW_ON_ERROR));
 
@@ -382,7 +384,7 @@ final class WebSocketControllerTest extends TestCase
     public function testRoomJoinOfAPartyRoomIsRefusedSoANonMemberGetsNoPartyBroadcasts(): void
     {
         $sessionId = '01900000-0000-7000-8000-000000000002';
-        $this->controller->onOpen(1, '01900000-0000-7000-8000-000000000009');
+        $this->controller->onOpen(1, '01900000-0000-7000-8000-000000000009', 'token-1');
 
         $this->controller->onMessage(1, json_encode(['type' => 'room.join', 'room' => 'party:' . $sessionId], JSON_THROW_ON_ERROR));
 
@@ -395,7 +397,7 @@ final class WebSocketControllerTest extends TestCase
 
     public function testRoomJoinWithoutRoomFieldSendsError(): void
     {
-        $this->controller->onOpen(1, 'user-1');
+        $this->controller->onOpen(1, 'user-1', 'token-1');
 
         $this->controller->onMessage(1, json_encode(['type' => 'room.join']));
 
@@ -404,7 +406,7 @@ final class WebSocketControllerTest extends TestCase
 
     public function testRoomLeaveRemovesMembership(): void
     {
-        $this->controller->onOpen(1, 'user-1');
+        $this->controller->onOpen(1, 'user-1', 'token-1');
         $this->registry->joinRoom('party:01900000-0000-7000-8000-000000000002', 1);
 
         $this->controller->onMessage(1, json_encode([
@@ -418,7 +420,7 @@ final class WebSocketControllerTest extends TestCase
 
     public function testRoomLeaveNotJoinedDoesNotCrash(): void
     {
-        $this->controller->onOpen(1, 'user-1');
+        $this->controller->onOpen(1, 'user-1', 'token-1');
 
         $this->controller->onMessage(1, json_encode([
             'type' => 'room.leave',
@@ -432,7 +434,7 @@ final class WebSocketControllerTest extends TestCase
 
     public function testPartyJoinWithoutSessionIdSendsError(): void
     {
-        $this->controller->onOpen(1, 'user-1');
+        $this->controller->onOpen(1, 'user-1', 'token-1');
 
         $this->controller->onMessage(1, json_encode(['type' => 'party.join']));
 
@@ -441,7 +443,7 @@ final class WebSocketControllerTest extends TestCase
 
     public function testPartyJoinWithInvalidUuidSendsError(): void
     {
-        $this->controller->onOpen(1, 'user-1');
+        $this->controller->onOpen(1, 'user-1', 'token-1');
 
         $this->controller->onMessage(1, json_encode([
             'type' => 'party.join',
@@ -460,7 +462,7 @@ final class WebSocketControllerTest extends TestCase
             $command->getSessionId(),
             MemberRole::Host,
         ), new ResultStampMiddleware([PartyMemberResultStamp::class]));
-        $controller->onOpen(1, $userId);
+        $controller->onOpen(1, $userId, 'token-1');
 
         $controller->onMessage(1, json_encode(['type' => 'party.join', 'sessionId' => $sessionId], JSON_THROW_ON_ERROR));
 
@@ -476,7 +478,7 @@ final class WebSocketControllerTest extends TestCase
             $command->getUserId(),
             $command->getSessionId(),
         ));
-        $controller->onOpen(1, '01900000-0000-7000-8000-000000000001');
+        $controller->onOpen(1, '01900000-0000-7000-8000-000000000001', 'token-1');
 
         $controller->onMessage(1, json_encode(['type' => 'party.join', 'sessionId' => $sessionId], JSON_THROW_ON_ERROR));
 
@@ -508,7 +510,7 @@ final class WebSocketControllerTest extends TestCase
                 ]);
             },
         );
-        $this->controller->onOpen(1, $userId);
+        $this->controller->onOpen(1, $userId, 'token-1');
         $messageCount = count($this->pushedMessages);
 
         $this->controller->onMessage(1, json_encode([
@@ -537,7 +539,7 @@ final class WebSocketControllerTest extends TestCase
             }],
         ]))]);
         $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions);
-        $controller->onOpen(1, $userId);
+        $controller->onOpen(1, $userId, 'token-1');
 
         $controller->onMessage(1, json_encode([
             'type' => 'party.sync',
@@ -575,7 +577,7 @@ final class WebSocketControllerTest extends TestCase
         $this->bus->method('dispatch')->willReturnCallback(static function (): never {
             self::fail('Invalid sync input must not reach the message bus.');
         });
-        $this->controller->onOpen(1, '01900000-0000-7000-8000-000000000001');
+        $this->controller->onOpen(1, '01900000-0000-7000-8000-000000000001', 'token-1');
 
         $this->controller->onMessage(1, json_encode([
             'type' => 'party.sync',
@@ -590,7 +592,7 @@ final class WebSocketControllerTest extends TestCase
     public function testPartySyncWithoutHandledResultFailsClosed(): void
     {
         $this->bus->method('dispatch')->willReturnCallback(static fn (object $command): Envelope => new Envelope($command));
-        $this->controller->onOpen(1, '01900000-0000-7000-8000-000000000001');
+        $this->controller->onOpen(1, '01900000-0000-7000-8000-000000000001', 'token-1');
 
         $this->controller->onMessage(1, json_encode([
             'type' => 'party.sync',
@@ -602,7 +604,7 @@ final class WebSocketControllerTest extends TestCase
 
     public function testPartySyncRejectsOverflowingJsonNumber(): void
     {
-        $this->controller->onOpen(1, '01900000-0000-7000-8000-000000000001');
+        $this->controller->onOpen(1, '01900000-0000-7000-8000-000000000001', 'token-1');
 
         $this->controller->onMessage(1, '{"type":"party.sync","sessionId":"01900000-0000-7000-8000-000000000002","position":1e999}');
 
@@ -617,7 +619,7 @@ final class WebSocketControllerTest extends TestCase
             }],
         ]))]);
         $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions);
-        $controller->onOpen(1, '01900000-0000-7000-8000-000000000001');
+        $controller->onOpen(1, '01900000-0000-7000-8000-000000000001', 'token-1');
         $messageCount = count($this->pushedMessages);
 
         $controller->onMessage(1, '{"type":"party.sync","sessionId":"01900000-0000-7000-8000-000000000002"}');
@@ -632,7 +634,7 @@ final class WebSocketControllerTest extends TestCase
 
     public function testRateLimitTriggersAfterMaxMessagesPerSecond(): void
     {
-        $this->controller->onOpen(1, 'user-1');
+        $this->controller->onOpen(1, 'user-1', 'token-1');
 
         for ($i = 0; $i < 30; ++$i) {
             $this->controller->onMessage(1, json_encode(['type' => 'ping']));
@@ -653,7 +655,7 @@ final class WebSocketControllerTest extends TestCase
 
     public function testOnCloseRemovesConnectionFromRegistry(): void
     {
-        $this->controller->onOpen(1, 'user-1');
+        $this->controller->onOpen(1, 'user-1', 'token-1');
         $this->assertNotNull($this->registry->getConnection(1));
 
         $this->controller->onClose(1);
@@ -669,7 +671,7 @@ final class WebSocketControllerTest extends TestCase
 
     public function testOnCloseCleansUpRoomMemberships(): void
     {
-        $this->controller->onOpen(1, 'user-1');
+        $this->controller->onOpen(1, 'user-1', 'token-1');
         $this->registry->joinRoom('room:123', 1);
 
         $this->assertSame([1], $this->registry->getRoomMembers('room:123'));
@@ -684,8 +686,8 @@ final class WebSocketControllerTest extends TestCase
 
     public function testAuthReconnectIsAnUnknownMessageAndTheConnectionKeepsItsIdentity(): void
     {
-        $this->controller->onOpen(1, 'user-1');
-        $this->registry->addConnection(2, 'user-2', 0);
+        $this->controller->onOpen(1, 'user-1', 'token-1');
+        $this->registry->addConnection(2, 'user-2', 0, 'token-2');
 
         $this->controller->onMessage(1, json_encode([
             'type' => 'auth.reconnect',
@@ -717,9 +719,9 @@ final class WebSocketControllerTest extends TestCase
             }],
         ]))]);
         $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions);
-        $controller->onOpen(1, $leaver);
-        $controller->onOpen(2, $leaver);
-        $controller->onOpen(3, $member);
+        $controller->onOpen(1, $leaver, 'token-1');
+        $controller->onOpen(2, $leaver, 'token-2');
+        $controller->onOpen(3, $member, 'token-3');
         foreach ([1, 2, 3] as $fd) {
             $this->registry->joinRoom($room, $fd);
         }
@@ -739,11 +741,11 @@ final class WebSocketControllerTest extends TestCase
     public function testOnOpenOverTheUserLimitClosesTheConnectionWithoutRegisteringIt(): void
     {
         for ($fd = 1; $fd <= 10; ++$fd) {
-            $this->controller->onOpen($fd, 'user-1');
+            $this->controller->onOpen($fd, 'user-1', 'token-' . $fd);
         }
         $this->pushedMessages = [];
 
-        $this->controller->onOpen(11, 'user-1');
+        $this->controller->onOpen(11, 'user-1', 'token-11');
 
         self::assertSame([['fd' => 11, 'code' => 1008, 'reason' => 'Too many connections for this user']], $this->closedConnections);
         self::assertSame([], $this->pushedMessages, 'A refused connection was told it is connected.');
@@ -756,7 +758,7 @@ final class WebSocketControllerTest extends TestCase
     {
         self::fillTable($this->registryTable('connections'), ['user_id' => 'filler', 'worker_id' => 0, 'connected_at' => 0]);
 
-        $this->controller->onOpen(1, 'user-1');
+        $this->controller->onOpen(1, 'user-1', 'token-1');
 
         self::assertSame([['fd' => 1, 'code' => 1013, 'reason' => 'Server connection limit reached']], $this->closedConnections);
         self::assertSame([], $this->pushedMessages);
@@ -770,7 +772,7 @@ final class WebSocketControllerTest extends TestCase
             $command->getUserId(),
             $command->getSessionId(),
         ), new ResultStampMiddleware([PartyMemberResultStamp::class]));
-        $controller->onOpen(1, '01900000-0000-7000-8000-000000000001');
+        $controller->onOpen(1, '01900000-0000-7000-8000-000000000001', 'token-1');
         self::fillTable($this->registryTable('roomMembers'), ['joined_at' => 0]);
 
         $controller->onMessage(1, json_encode(['type' => 'party.join', 'sessionId' => $sessionId], JSON_THROW_ON_ERROR));

@@ -6,19 +6,31 @@ namespace App\Auth\Application\CommandHandler\OAuth;
 
 use App\Auth\Application\Command\OAuth\RevokeTokenCommand;
 use App\Auth\Domain\Event\OAuth\TokenRevoked;
+use App\Auth\Domain\Model\OAuth\AccessToken;
+use App\Auth\Domain\Model\OAuth\RefreshToken;
 use App\Auth\Domain\Model\OAuth\TokenId;
+use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
+use App\Shared\Application\Port\LiveConnectionsPortInterface;
+use App\Shared\Application\Port\ServerNotRunningException;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
  * Handler for revoking OAuth 2.0 tokens.
  *
- * Supports single token revocation and full chain revocation.
- * Per RFC 7009, the server responds with 200 OK even if the token
- * does not exist or is already revoked.
+ * Supports single token revocation and full chain revocation. A chain revocation
+ * ends the session: after the revocation committed, the web server closes every
+ * WebSocket connection that authenticated with one of the chain's access tokens.
+ * Closing them earlier would let a reconnect pass on a token the commit has not yet
+ * revoked. A token without a chain is revoked on its own.
+ *
+ * Per RFC 7009, the server responds with 200 OK even if the token does not exist
+ * or is already revoked; a token the command's owner does not hold is treated the
+ * same way, so the revocation endpoint is no liveness oracle for foreign tokens.
  */
 final class RevokeTokenHandler
 {
@@ -27,55 +39,39 @@ final class RevokeTokenHandler
         private readonly RefreshTokenRepositoryInterface $refreshTokenRepository,
         private readonly EntityManagerInterface $entityManager,
         private readonly EventDispatcherInterface $eventDispatcher,
+        private readonly LiveConnectionsPortInterface $liveConnections,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
+    /**
+     * @throws \App\Shared\Application\Port\ServerControlException when the chain is revoked but the web server did not close its connections
+     */
     #[AsMessageHandler]
     public function __invoke(RevokeTokenCommand $command): void
     {
         $tokenId = TokenId::fromString($command->getTokenId());
 
         $refreshToken = $this->refreshTokenRepository->findByTokenId($tokenId);
+        $accessToken = $refreshToken === null ? $this->accessTokenRepository->findByTokenId($tokenId) : null;
+        $token = $refreshToken ?? $accessToken;
 
-        if ($command->shouldRevokeChain()) {
-            if ($refreshToken !== null) {
-                $chainId = $refreshToken->getChainId();
-                if ($chainId !== null) {
-                    $this->entityManager->getConnection()->transactional(function () use ($chainId): void {
-                        $this->accessTokenRepository->revokeByChainId($chainId);
-                        $this->refreshTokenRepository->revokeByChainId($chainId);
-                    });
-
-                    $this->eventDispatcher->dispatch(new TokenRevoked(
-                        tokenId: $tokenId->toString(),
-                        tokenType: 'access_token',
-                    ));
-                }
-
-                return;
-            }
-
-            $accessToken = $this->accessTokenRepository->findByTokenId($tokenId);
-
-            if ($accessToken !== null && $accessToken->getChainId() !== null) {
-                $chainId = $accessToken->getChainId();
-                $this->entityManager->getConnection()->transactional(function () use ($chainId): void {
-                    $this->accessTokenRepository->revokeByChainId($chainId);
-                    $this->refreshTokenRepository->revokeByChainId($chainId);
-                });
-
-                $this->eventDispatcher->dispatch(new TokenRevoked(
-                    tokenId: $tokenId->toString(),
-                    tokenType: 'access_token',
-                ));
-
-                return;
-            }
-
+        // RFC 7009: an unknown token, and a token of another user, are answered alike.
+        if ($token === null || !$this->isHeldBy($token, $command->getOwnerUserId())) {
             return;
         }
 
-        // Single token revocation
+        $chainId = $token->getChainId();
+        if ($command->shouldRevokeChain() && $chainId !== null) {
+            $this->revokeChain($chainId);
+
+            $this->eventDispatcher->dispatch(new TokenRevoked(
+                tokenId: $tokenId->toString(),
+                tokenType: 'access_token',
+            ));
+
+            return;
+        }
 
         if ($refreshToken !== null) {
             $refreshToken->revoke();
@@ -92,23 +88,66 @@ final class RevokeTokenHandler
             return;
         }
 
-        $accessToken = $this->accessTokenRepository->findByTokenId($tokenId);
+        assert($accessToken !== null);
+        $accessToken->revoke();
+        $this->entityManager->getConnection()->transactional(function () use ($accessToken): void {
+            $this->accessTokenRepository->save($accessToken, false);
+            $this->entityManager->flush();
+        });
 
-        if ($accessToken !== null) {
-            $accessToken->revoke();
-            $this->entityManager->getConnection()->transactional(function () use ($accessToken): void {
-                $this->accessTokenRepository->save($accessToken, false);
-                $this->entityManager->flush();
-            });
+        $this->eventDispatcher->dispatch(new TokenRevoked(
+            tokenId: $tokenId->toString(),
+            tokenType: 'access_token',
+        ));
+    }
 
-            $this->eventDispatcher->dispatch(new TokenRevoked(
-                tokenId: $tokenId->toString(),
-                tokenType: 'access_token',
-            ));
-
-            return;
+    private function isHeldBy(AccessToken|RefreshToken $token, ?string $ownerUserId): bool
+    {
+        if ($ownerUserId === null) {
+            return true;
         }
 
-        // RFC 7009: Return 200 OK even if token not found
+        $accessToken = $token instanceof RefreshToken ? $token->getAccessToken() : $token;
+        $holder = $accessToken->getUser()?->getId();
+
+        return $holder !== null && $holder->toString() === $ownerUserId;
+    }
+
+    private function revokeChain(ChainId $chainId): void
+    {
+        $accessTokenIds = $this->entityManager->getConnection()->transactional(function () use ($chainId): array {
+            // The ids are listed before the revoking UPDATEs so the sockets to close are
+            // known. Every chained access token was issued with a refresh token of the
+            // same chain, which is how the chain's access tokens are found.
+            $accessTokenIds = [];
+            foreach ($this->refreshTokenRepository->findByChainId($chainId) as $refreshToken) {
+                $accessTokenIds[$refreshToken->getAccessToken()->getTokenId()->toString()] = true;
+            }
+
+            // Lock order of every chain revocation: refresh rows before access rows. A
+            // refresh of the same chain locks its refresh row first, so the two never
+            // wait on each other in opposite order.
+            $this->refreshTokenRepository->revokeByChainId($chainId);
+            $this->accessTokenRepository->revokeByChainId($chainId);
+
+            return array_keys($accessTokenIds);
+        });
+
+        $this->closeLiveConnections($accessTokenIds, $chainId);
+    }
+
+    /** @param list<string> $accessTokenIds */
+    private function closeLiveConnections(array $accessTokenIds, ChainId $chainId): void
+    {
+        try {
+            $this->liveConnections->closeForAccessTokens($accessTokenIds);
+        } catch (ServerNotRunningException) {
+            // Only reached outside the web server: a console command in a container
+            // without one, so the server's connections are not reachable from here.
+            $this->logger->warning(
+                'No web server runs in this container, so the open WebSocket connections of token chain "{chain}" were not closed.',
+                ['chain' => $chainId->toString()],
+            );
+        }
     }
 }

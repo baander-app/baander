@@ -2289,7 +2289,7 @@
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Revoke an access or refresh token (RFC 7009)",
+                "summary": "Revoke an access or refresh token of the signed-in user and its chain (RFC 7009)",
                 "operationId": "post_oauth_revoke",
                 "requestBody": {
                     "required": true,
@@ -2316,7 +2316,7 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Token revoked (always 200, even for invalid tokens per RFC 7009)",
+                        "description": "Token revoked (always 200, even for an unknown token or one of another user, per RFC 7009 section 2.2)",
                         "content": {
                             "application/json": {
                                 "schema": {}
@@ -3316,11 +3316,11 @@
                 "tags": [
                     "Auth"
                 ],
-                "summary": "Revoke the current access token",
+                "summary": "End the session: revoke the chain of the presented access token",
                 "operationId": "post_auth_logout",
                 "responses": {
                     "200": {
-                        "description": "Token revoked",
+                        "description": "The access token, its refresh token and every token of their chain are revoked; WebSocket connections opened with them are closed",
                         "content": {
                             "application/json": {
                                 "schema": {

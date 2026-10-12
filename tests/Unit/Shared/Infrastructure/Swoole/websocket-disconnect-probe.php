@@ -281,7 +281,7 @@ $server->on('Handshake', static function (Request $request, Response $response) 
     $response->end();
     $fd = (int) $request->fd;
     $userId = (string) ($request->get['user'] ?? '');
-    $registry->addConnection($fd, $userId, $server->worker_id);
+    $registry->addConnection($fd, $userId, $server->worker_id, 'token-' . $fd);
     $pusher->pushToConnection($fd, [
         'type' => 'connected',
         'worker' => $server->worker_id,

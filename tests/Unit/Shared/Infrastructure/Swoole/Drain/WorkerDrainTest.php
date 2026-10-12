@@ -63,7 +63,7 @@ final class WorkerDrainTest extends TestCase
 
     public function testWithoutTheDrainFlagATickDoesNothing(): void
     {
-        $this->registry->addConnection(10, 'user-1', 0);
+        $this->registry->addConnection(10, 'user-1', 0, 'token-10');
         $this->server = $server = $this->serverDouble($this->createMock(Server::class));
         $server->expects(self::never())->method('stats');
         $server->expects(self::never())->method('push');
@@ -78,8 +78,8 @@ final class WorkerDrainTest extends TestCase
 
     public function testEachStepRunsOnceAndTheWorkerReportsOnceOverThreeTicks(): void
     {
-        $this->registry->addConnection(10, 'user-1', 0);
-        $this->registry->addConnection(20, 'user-2', 1);
+        $this->registry->addConnection(10, 'user-1', 0, 'token-10');
+        $this->registry->addConnection(20, 'user-2', 1, 'token-20');
         $this->server = $server = $this->serverDouble($this->createMock(Server::class));
         $server->method('isEstablished')->willReturn(true);
         $server->expects(self::once())->method('push')
@@ -137,7 +137,7 @@ final class WorkerDrainTest extends TestCase
 
     public function testAClosedWebSocketHoldsTheReportUntilSwooleHasClosedItsConnection(): void
     {
-        $this->registry->addConnection(10, 'user-1', 0);
+        $this->registry->addConnection(10, 'user-1', 0, 'token-10');
         $this->server->method('isEstablished')->willReturn(true);
         $this->server->method('push')->willReturn(true);
         // The client answers the close frame on the next tick.
@@ -203,7 +203,7 @@ final class WorkerDrainTest extends TestCase
 
     public function testAWorkerWhosePusherHasNoServerYetSkipsTheWebSockets(): void
     {
-        $this->registry->addConnection(10, 'user-1', 0);
+        $this->registry->addConnection(10, 'user-1', 0, 'token-10');
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects(self::never())->method('error');
         $this->state->begin($this->nowNs);

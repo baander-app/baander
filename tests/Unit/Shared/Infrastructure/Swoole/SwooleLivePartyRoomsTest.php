@@ -47,11 +47,11 @@ final class SwooleLivePartyRoomsTest extends TestCase
 
         // The leaver has two sockets in the party and one outside it; another member
         // has one; a socket in another party must not be touched.
-        $this->registry->addConnection(1, self::LEAVER, 0);
-        $this->registry->addConnection(2, self::LEAVER, 1);
-        $this->registry->addConnection(3, self::MEMBER, 0);
-        $this->registry->addConnection(4, self::LEAVER, 0);
-        $this->registry->addConnection(5, self::MEMBER, 1);
+        $this->registry->addConnection(1, self::LEAVER, 0, 'token-1');
+        $this->registry->addConnection(2, self::LEAVER, 1, 'token-2');
+        $this->registry->addConnection(3, self::MEMBER, 0, 'token-3');
+        $this->registry->addConnection(4, self::LEAVER, 0, 'token-4');
+        $this->registry->addConnection(5, self::MEMBER, 1, 'token-5');
         // party.join builds the room from the client's string, which may be upper case.
         $this->registry->joinRoom(WebSocketRooms::party(strtoupper(self::SESSION)), 1);
         $this->registry->joinRoom(WebSocketRooms::party(self::SESSION), 2);

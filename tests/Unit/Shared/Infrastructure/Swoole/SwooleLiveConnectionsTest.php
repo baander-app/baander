@@ -25,6 +25,33 @@ final class SwooleLiveConnectionsTest extends TestCase
         self::assertSame(3, (new SwooleLiveConnections($serverControl))->closeForUser($userId));
     }
 
+    public function testAsksTheServerToDisconnectTheAccessTokensAndReturnsTheCount(): void
+    {
+        $serverControl = $this->createMock(ServerControlPortInterface::class);
+        $serverControl->expects(self::once())->method('execute')
+            ->with('websocket.access_token.disconnect', ['access_token_ids' => ['token-a', 'token-b']])
+            ->willReturn(new ServerControlResult([1 => ['closed' => 2]]));
+
+        self::assertSame(2, (new SwooleLiveConnections($serverControl))->closeForAccessTokens(['token-a', 'token-b']));
+    }
+
+    public function testNoAccessTokensMeansNothingToCloseAndNoServerCall(): void
+    {
+        $serverControl = $this->createMock(ServerControlPortInterface::class);
+        $serverControl->expects(self::never())->method('execute');
+
+        self::assertSame(0, (new SwooleLiveConnections($serverControl))->closeForAccessTokens([]));
+    }
+
+    public function testAWorkerErrorFailsTheAccessTokenClose(): void
+    {
+        $serverControl = $this->createStub(ServerControlPortInterface::class);
+        $serverControl->method('execute')->willReturn(new ServerControlResult([], [0 => 'No WebSocket server is attached to this worker.']));
+
+        $this->expectException(ServerControlException::class);
+        (new SwooleLiveConnections($serverControl))->closeForAccessTokens(['token-a']);
+    }
+
     public function testAWorkerErrorFailsTheClose(): void
     {
         $this->expectException(ServerControlException::class);

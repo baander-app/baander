@@ -6,7 +6,11 @@ namespace SwooleBundle\SwooleBundle\Bridge\Symfony\HttpKernel;
 
 abstract class AbstractWebSocketController
 {
-    abstract public function onOpen(int $fd, string $userId): void;
+    /**
+     * @param string $userId the authenticated user
+     * @param string $accessTokenId the access token the handshake presented; revoking it closes the connection
+     */
+    abstract public function onOpen(int $fd, string $userId, string $accessTokenId): void;
 
     abstract public function onMessage(int $fd, string $data): void;
 

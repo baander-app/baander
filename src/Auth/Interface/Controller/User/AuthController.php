@@ -134,11 +134,11 @@ final class AuthController
 
     #[OA\Post(
         path: '/api/auth/logout',
-        summary: 'Revoke the current access token',
+        summary: 'End the session: revoke the chain of the presented access token',
         responses: [
             new OA\Response(
                 response: '200',
-                description: 'Token revoked',
+                description: 'The access token, its refresh token and every token of their chain are revoked; WebSocket connections opened with them are closed',
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'data', properties: [
@@ -154,26 +154,18 @@ final class AuthController
     #[Route('/logout', name: 'logout', methods: ['POST'])]
     public function logout(Request $request): JsonResponse
     {
-        $authHeader = $request->headers->get('Authorization', '');
-        $tokenId = null;
-
-        if (str_starts_with($authHeader, 'DPoP ')) {
-            $tokenId = substr($authHeader, 5);
-        } elseif (str_starts_with($authHeader, 'Bearer ')) {
-            $tokenId = substr($authHeader, 7);
-        }
-
-        if ($tokenId === null || $tokenId === '') {
+        // OAuth2Authenticator copies the presenting token's identifier here. Its chain is
+        // the session: logout revokes the whole chain and closes the sockets it opened.
+        $accessTokenId = $request->attributes->get('oauth_access_token_id');
+        if (!is_string($accessTokenId) || $accessTokenId === '') {
             return $this->unauthorized();
         }
 
-        $command = new RevokeTokenCommand(
-            tokenId: $tokenId,
-            revokeChain: false,
-        );
-
         try {
-            $this->commandBus->dispatch($command);
+            $this->commandBus->dispatch(new RevokeTokenCommand(
+                tokenId: $accessTokenId,
+                revokeChain: true,
+            ));
         } catch (\Throwable $e) {
             // RFC 7009: revocation endpoint must return 200 even on failure.
             $this->logger->warning('Token revocation failed during logout.', [

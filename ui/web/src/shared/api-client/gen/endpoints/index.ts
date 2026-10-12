@@ -9895,7 +9895,7 @@ export const getPostOauthRevokeUrl = () => {
 }
 
 /**
- * @summary Revoke an access or refresh token (RFC 7009)
+ * @summary Revoke an access or refresh token of the signed-in user and its chain (RFC 7009)
  */
 export const postOauthRevoke = async (postOauthRevokeBody: PostOauthRevokeBody, options?: RequestInit): Promise<unknown> => {
 
@@ -9943,7 +9943,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostOauthRevokeMutationError = ErrorType<ValidationError>
 
     /**
- * @summary Revoke an access or refresh token (RFC 7009)
+ * @summary Revoke an access or refresh token of the signed-in user and its chain (RFC 7009)
  */
 export const usePostOauthRevoke = <TError = ErrorType<ValidationError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postOauthRevoke>>, TError,{data: BodyType<PostOauthRevokeBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
@@ -11019,7 +11019,7 @@ export const getPostAuthLogoutUrl = () => {
 }
 
 /**
- * @summary Revoke the current access token
+ * @summary End the session: revoke the chain of the presented access token
  */
 export const postAuthLogout = async ( options?: RequestInit): Promise<PostAuthLogout200> => {
 
@@ -11067,7 +11067,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostAuthLogoutMutationError = ErrorType<ApiError>
 
     /**
- * @summary Revoke the current access token
+ * @summary End the session: revoke the chain of the presented access token
  */
 export const usePostAuthLogout = <TError = ErrorType<ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthLogout>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}

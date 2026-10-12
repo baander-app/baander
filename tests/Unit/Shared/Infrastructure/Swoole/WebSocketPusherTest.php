@@ -37,7 +37,7 @@ final class WebSocketPusherTest extends TestCase
 
     public function testPushToUserWithSingleConnection(): void
     {
-        $this->registry->addConnection(10, 'user-1', 0);
+        $this->registry->addConnection(10, 'user-1', 0, 'token-10');
 
         $this->server->expects($this->once())->method('isEstablished')->with(10)->willReturn(true);
         $this->server->expects($this->once())
@@ -51,9 +51,9 @@ final class WebSocketPusherTest extends TestCase
 
     public function testPushToUserWithMultipleConnections(): void
     {
-        $this->registry->addConnection(10, 'user-1', 0);
-        $this->registry->addConnection(20, 'user-1', 0);
-        $this->registry->addConnection(30, 'user-1', 0);
+        $this->registry->addConnection(10, 'user-1', 0, 'token-10');
+        $this->registry->addConnection(20, 'user-1', 0, 'token-20');
+        $this->registry->addConnection(30, 'user-1', 0, 'token-30');
 
         $this->server->method('isEstablished')->willReturn(true);
         $this->server->expects($this->exactly(3))
@@ -74,8 +74,8 @@ final class WebSocketPusherTest extends TestCase
 
     public function testPushToUserSkipsClosedConnections(): void
     {
-        $this->registry->addConnection(10, 'user-1', 0);
-        $this->registry->addConnection(20, 'user-1', 0);
+        $this->registry->addConnection(10, 'user-1', 0, 'token-10');
+        $this->registry->addConnection(20, 'user-1', 0, 'token-20');
 
         $this->server->method('isEstablished')
             ->willReturnMap([[10, true], [20, false]]);
@@ -127,8 +127,8 @@ final class WebSocketPusherTest extends TestCase
 
     public function testBroadcastToRoom(): void
     {
-        $this->registry->addConnection(10, 'user-a', 0);
-        $this->registry->addConnection(20, 'user-b', 0);
+        $this->registry->addConnection(10, 'user-a', 0, 'token-10');
+        $this->registry->addConnection(20, 'user-b', 0, 'token-20');
         $this->registry->joinRoom('party:abc', 10);
         $this->registry->joinRoom('party:abc', 20);
 
@@ -152,9 +152,9 @@ final class WebSocketPusherTest extends TestCase
 
     public function testBroadcastSkipsDisconnectedMembers(): void
     {
-        $this->registry->addConnection(10, 'user-a', 0);
-        $this->registry->addConnection(20, 'user-b', 0);
-        $this->registry->addConnection(30, 'user-c', 0);
+        $this->registry->addConnection(10, 'user-a', 0, 'token-10');
+        $this->registry->addConnection(20, 'user-b', 0, 'token-20');
+        $this->registry->addConnection(30, 'user-c', 0, 'token-30');
         $this->registry->joinRoom('party:abc', 10);
         $this->registry->joinRoom('party:abc', 20);
         $this->registry->joinRoom('party:abc', 30);
@@ -173,10 +173,10 @@ final class WebSocketPusherTest extends TestCase
 
     public function testDisconnectUserClosesEachEstablishedConnectionOfThatUserOnly(): void
     {
-        $this->registry->addConnection(10, 'user-1', 0);
-        $this->registry->addConnection(20, 'user-1', 1);
-        $this->registry->addConnection(30, 'user-1', 2);
-        $this->registry->addConnection(40, 'user-2', 0);
+        $this->registry->addConnection(10, 'user-1', 0, 'token-10');
+        $this->registry->addConnection(20, 'user-1', 1, 'token-20');
+        $this->registry->addConnection(30, 'user-1', 2, 'token-30');
+        $this->registry->addConnection(40, 'user-2', 0, 'token-40');
 
         $this->server->method('isEstablished')->willReturnMap([[10, true], [20, true], [30, false], [40, true]]);
         $closed = [];
@@ -223,9 +223,9 @@ final class WebSocketPusherTest extends TestCase
 
     public function testCloseWorkerConnectionsSendsACloseFrameOnlyToTheConnectionsThisWorkerRegistered(): void
     {
-        $this->registry->addConnection(10, 'user-1', 0);
-        $this->registry->addConnection(20, 'user-2', 1);
-        $this->registry->addConnection(30, 'user-1', 0);
+        $this->registry->addConnection(10, 'user-1', 0, 'token-10');
+        $this->registry->addConnection(20, 'user-2', 1, 'token-20');
+        $this->registry->addConnection(30, 'user-1', 0, 'token-30');
         $this->server->method('isEstablished')->willReturn(true);
         $frames = [];
         $this->server->expects($this->exactly(2))->method('push')
@@ -249,7 +249,7 @@ final class WebSocketPusherTest extends TestCase
 
     public function testCloseWorkerConnectionsClosesTheSocketWhenNoCloseFrameCanBeSent(): void
     {
-        $this->registry->addConnection(10, 'user-1', 0);
+        $this->registry->addConnection(10, 'user-1', 0, 'token-10');
         $this->server->method('isEstablished')->willReturn(true);
         $this->server->method('push')->willReturn(false);
         $this->server->expects($this->once())->method('close')->with(10)->willReturn(true);
@@ -259,7 +259,7 @@ final class WebSocketPusherTest extends TestCase
 
     public function testCloseWorkerConnectionsLeavesOutAConnectionAlreadyGone(): void
     {
-        $this->registry->addConnection(10, 'user-1', 0);
+        $this->registry->addConnection(10, 'user-1', 0, 'token-10');
         $this->server->method('isEstablished')->willReturn(false);
         $this->server->expects($this->once())->method('close')->with(10)->willReturn(false);
 
@@ -268,7 +268,7 @@ final class WebSocketPusherTest extends TestCase
 
     public function testCloseWorkerConnectionsWithoutAServerClosesNothing(): void
     {
-        $this->registry->addConnection(10, 'user-1', 0);
+        $this->registry->addConnection(10, 'user-1', 0, 'token-10');
         $this->server->expects($this->never())->method('disconnect');
 
         $pusher = new WebSocketPusher($this->registry, new JsonEncoder());

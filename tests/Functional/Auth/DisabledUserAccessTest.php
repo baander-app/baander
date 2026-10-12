@@ -162,7 +162,7 @@ final class DisabledUserAccessTest extends TestCase
         $request->get = ['token' => $accessToken];
         $request->server = ['request_uri' => '/api/ws'];
 
-        return $authenticator->authenticate($request);
+        return $authenticator->authenticate($request)['user_id'] ?? null;
     }
 
     private function refresh(string $clientPublicId, ?string $refreshToken): TokenResponseDTO

@@ -29,9 +29,14 @@ final class WsQueryTokenAuthenticator
 
     /**
      * Authenticates a WebSocket handshake request.
-     * Returns the authenticated user's UUID string, or null on failure or for a disabled account.
+     *
+     * Returns the authenticated user's UUID and the id of the access token the request
+     * presented, both as plain strings, or null on failure or for a disabled account.
+     * The token id lets a revocation of the token close the connection.
+     *
+     * @return array{user_id: string, access_token_id: string}|null
      */
-    public function authenticate(\Swoole\Http\Request $request): ?string
+    public function authenticate(\Swoole\Http\Request $request): ?array
     {
         $token = $request->get['token'] ?? null;
 
@@ -57,8 +62,9 @@ final class WsQueryTokenAuthenticator
         }
 
         $userIdentifier = $validatedRequest->getAttribute('oauth_user_id');
+        $accessTokenId = $validatedRequest->getAttribute('oauth_access_token_id');
 
-        if ($userIdentifier === null || $userIdentifier === '') {
+        if (!is_string($userIdentifier) || $userIdentifier === '' || !is_string($accessTokenId) || $accessTokenId === '') {
             return null;
         }
 
@@ -69,6 +75,6 @@ final class WsQueryTokenAuthenticator
             return null;
         }
 
-        return $user->getId()->toString();
+        return ['user_id' => $user->getId()->toString(), 'access_token_id' => $accessTokenId];
     }
 }
