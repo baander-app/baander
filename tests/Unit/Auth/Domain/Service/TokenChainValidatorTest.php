@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Auth\Domain\Service;
 
+use App\Auth\Domain\Exception\TokenChainViolationException;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
@@ -12,7 +13,6 @@ use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Service\TokenChainValidator;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 
 final class TokenChainValidatorTest extends TestCase
 {
@@ -71,7 +71,7 @@ final class TokenChainValidatorTest extends TestCase
         $this->accessTokenRepo->expects($this->once())->method('revokeByChainId');
         $this->refreshTokenRepo->expects($this->once())->method('revokeByChainId');
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(TokenChainViolationException::class);
         $this->expectExceptionMessage('reuse detected');
 
         $this->validator->validate($token, null);
@@ -82,7 +82,7 @@ final class TokenChainValidatorTest extends TestCase
         $token = $this->createRefreshToken();
         $previous = $this->createRefreshToken(used: false);
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(TokenChainViolationException::class);
         $this->expectExceptionMessage('not been rotated');
 
         $this->validator->validate($token, $previous);
@@ -93,7 +93,7 @@ final class TokenChainValidatorTest extends TestCase
         $previous = $this->createRefreshToken(used: true, revoked: true);
         $token = $this->createRefreshToken();
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(TokenChainViolationException::class);
         $this->expectExceptionMessage('previous refresh token has been revoked');
 
         $this->validator->validate($token, $previous);
@@ -104,7 +104,7 @@ final class TokenChainValidatorTest extends TestCase
         $previous = $this->createRefreshToken(used: true);
         $token = $this->createRefreshToken(chainId: ChainId::generate());
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(TokenChainViolationException::class);
         $this->expectExceptionMessage('chain ID mismatch');
 
         $this->validator->validate($token, $previous);

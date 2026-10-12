@@ -255,7 +255,7 @@ DPoP: <proof>
 {"refreshToken": "..."}
 ```
 
-The proof must be signed by the key the token pair was issued to. Each refresh token works once; the response contains a new pair with the same key binding. Reusing a consumed refresh token revokes its whole rotation chain.
+The proof must be signed by the key the token pair was issued to. Each refresh token works once; the response contains a new pair with the same key binding. Reusing a consumed refresh token revokes its whole rotation chain. A refused refresh token answers `401`; sign in again. `503` with `Retry-After` means the server could not check the token, for example while its database restarts; keep the token and retry after the given delay.
 
 ### Client Fingerprint Binding
 

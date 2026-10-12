@@ -15,6 +15,7 @@ use App\Tests\Fixtures\Auth\GrantPathOAuthKernel;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
 use App\Tests\Fixtures\Auth\WebAuthnTestCredential;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\DriverManager;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -180,6 +181,97 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
 
         $response = $this->refresh($login['refreshToken'], $key, $login['nonce']);
         self::assertSame(401, $response->getStatusCode(), (string) $response->getContent());
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function refusedRefreshes(): iterable
+    {
+        yield 'unknown token' => ['unknown'];
+        yield 'malformed token' => ['malformed'];
+        yield 'expired token' => ['expired'];
+        yield 'disabled account' => ['disabled'];
+        yield 'revoked client' => ['client revoked'];
+    }
+
+    /** A refused grant answers 401, and the web client signs out. */
+    #[DataProvider('refusedRefreshes')]
+    public function testRefreshRefusesAnInvalidGrantWith401(string $kind): void
+    {
+        $key = new SignedDpopProof();
+        $login = $this->login($key);
+        $spaClientId = $this->kernel->getContainer()->getParameter('auth.spa_client_id');
+        $refreshToken = $login['refreshToken'];
+        switch ($kind) {
+            case 'unknown':
+                $refreshToken = str_repeat('u', 80);
+                break;
+            case 'malformed':
+                $refreshToken = 'short-token';
+                break;
+            case 'expired':
+                $this->connection->executeStatement(
+                    "UPDATE oauth_refresh_tokens SET expires_at = now() - interval '1 hour' WHERE token_id = ?",
+                    [$refreshToken],
+                );
+                break;
+            case 'disabled':
+                // Disabling through the use case also revokes the tokens; this leaves the
+                // pair that a refresh racing the disable rotated past that revocation.
+                $users = $this->kernel->getContainer()->get('oauth.acceptance.users');
+                self::assertInstanceOf(UserRepositoryInterface::class, $users);
+                $this->user->disable();
+                $users->save($this->user);
+                break;
+            case 'client revoked':
+                $this->connection->executeStatement('UPDATE oauth_clients SET revoked = TRUE WHERE public_id = ?', [$spaClientId]);
+                break;
+        }
+
+        try {
+            $response = $this->refresh($refreshToken, $key, $login['nonce']);
+        } finally {
+            // The first-party client row is shared by every test.
+            $this->connection->executeStatement('UPDATE oauth_clients SET revoked = FALSE WHERE public_id = ?', [$spaClientId]);
+        }
+
+        self::assertSame(401, $response->getStatusCode(), (string) $response->getContent());
+        self::assertNull($response->headers->get('Retry-After'));
+    }
+
+    /**
+     * A server fault, here a database that is restarting, is not a verdict on the token:
+     * 503 with Retry-After keeps the client signed in, and the token still rotates once
+     * the database is back.
+     */
+    public function testRefreshAnswers503WhileTheDatabaseIsRestarting(): void
+    {
+        $key = new SignedDpopProof();
+        $login = $this->login($key);
+
+        // While PostgreSQL restarts it ends every session and refuses new ones.
+        $database = $this->connection->getDatabase();
+        self::assertIsString($database);
+        $admin = DriverManager::getConnection(['dbname' => 'postgres'] + $this->connection->getParams());
+        try {
+            $admin->executeStatement(sprintf('ALTER DATABASE %s WITH ALLOW_CONNECTIONS false', $admin->quoteSingleIdentifier($database)));
+            $admin->executeQuery('SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = ?', [$database]);
+
+            $response = $this->refresh($login['refreshToken'], $key, $login['nonce']);
+        } finally {
+            $admin->executeStatement(sprintf('ALTER DATABASE %s WITH ALLOW_CONNECTIONS true', $admin->quoteSingleIdentifier($database)));
+            $admin->close();
+            $this->connection->close();
+        }
+
+        self::assertSame(503, $response->getStatusCode(), (string) $response->getContent());
+        self::assertSame('5', $response->headers->get('Retry-After'));
+        $error = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR)['error'];
+        self::assertSame(['message' => 'Internal server error.', 'code' => 503], $error);
+        self::assertStringNotContainsStringIgnoringCase('SQLSTATE', (string) $response->getContent());
+        self::assertStringNotContainsStringIgnoringCase('terminat', (string) $response->getContent());
+
+        $retry = $this->refresh($login['refreshToken'], $key, $this->nonce());
+        self::assertSame(200, $retry->getStatusCode(), (string) $retry->getContent());
     }
 
     public function testPasskeyLoginIssuesProofBoundTokensUsableOnTheApiAndRefreshableWithTheSameKey(): void

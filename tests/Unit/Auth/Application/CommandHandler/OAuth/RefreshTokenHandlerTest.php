@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Auth\Application\CommandHandler;
 use App\Auth\Application\Command\OAuth\RefreshTokenCommand;
 use App\Auth\Application\CommandHandler\OAuth\RefreshTokenHandler;
 use App\Auth\Application\Exception\OAuthProtocolException;
+use App\Auth\Application\Exception\RefreshTokenRejectedException;
 use App\Auth\Application\Port\JwtGeneratorInterface;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
@@ -29,6 +30,8 @@ use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Driver\AbstractException;
+use Doctrine\DBAL\Exception\ConnectionException;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -274,10 +277,43 @@ final class RefreshTokenHandlerTest extends TestCase
             dpopJkt: self::JKT,
         );
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(RefreshTokenRejectedException::class);
         $this->expectExceptionMessage('Refresh token not found');
 
         ($this->handler)($command);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function malformedRefreshTokens(): iterable
+    {
+        yield 'too short' => ['short-token'];
+        yield 'whitespace' => ['   '];
+    }
+
+    #[DataProvider('malformedRefreshTokens')]
+    public function testAMalformedRefreshTokenIsRejected(string $refreshToken): void
+    {
+        $this->expectException(RefreshTokenRejectedException::class);
+        $this->expectExceptionMessage('Refresh token not found');
+
+        ($this->handler)(new RefreshTokenCommand(refreshTokenId: $refreshToken, dpopJkt: self::JKT));
+    }
+
+    public function testAnInfrastructureFailureIsNotAGrantRejection(): void
+    {
+        $failure = new ConnectionException(
+            new class ('connection to server was lost', '08006') extends AbstractException {
+            },
+            null,
+        );
+        $this->refreshTokenRepository->method('findByTokenId')->willThrowException($failure);
+
+        try {
+            ($this->handler)(new RefreshTokenCommand(refreshTokenId: str_repeat('a', 80), dpopJkt: self::JKT));
+            self::fail('The lookup failure must propagate.');
+        } catch (\Throwable $exception) {
+            self::assertSame($failure, $exception);
+        }
     }
 
     /** @return iterable<string, array{string|null, string|null}> */
@@ -310,7 +346,7 @@ final class RefreshTokenHandlerTest extends TestCase
                 dpopJkt: $proofJkt,
             ));
             self::fail('A refresh with an unmatched proof key must be rejected.');
-        } catch (RuntimeException $exception) {
+        } catch (RefreshTokenRejectedException $exception) {
             self::assertSame('Refresh token proof binding does not match.', $exception->getMessage());
         }
         self::assertFalse($refreshToken->hasBeenUsed());
@@ -364,13 +400,13 @@ final class RefreshTokenHandlerTest extends TestCase
         $rejection = null;
         try {
             ($this->handler)(new RefreshTokenCommand(refreshTokenId: $refreshToken->getTokenId()->toString(), dpopJkt: self::JKT));
-        } catch (RuntimeException $exception) {
+        } catch (RefreshTokenRejectedException $exception) {
             $rejection = $exception;
         }
 
-        // A plain RuntimeException, which the token endpoint reports as invalid_grant.
+        // A grant rejection, which the token endpoint reports as invalid_grant.
         self::assertNotNull($rejection, 'A disabled account must not refresh.');
-        self::assertSame(RuntimeException::class, $rejection::class);
+        self::assertInstanceOf(RefreshTokenRejectedException::class, $rejection);
         self::assertFalse($refreshToken->hasBeenUsed());
         self::assertSame([], $this->savedAccessTokens);
     }
@@ -384,13 +420,13 @@ final class RefreshTokenHandlerTest extends TestCase
         $rejection = null;
         try {
             ($this->handler)(new RefreshTokenCommand(refreshTokenId: $refreshToken->getTokenId()->toString(), dpopJkt: self::JKT));
-        } catch (RuntimeException $exception) {
+        } catch (RefreshTokenRejectedException $exception) {
             $rejection = $exception;
         }
 
-        // A plain RuntimeException, which the token endpoint reports as invalid_grant.
+        // A grant rejection, which the token endpoint reports as invalid_grant.
         self::assertNotNull($rejection, 'A deleted account must not refresh.');
-        self::assertSame(RuntimeException::class, $rejection::class);
+        self::assertInstanceOf(RefreshTokenRejectedException::class, $rejection);
         self::assertSame('Refresh token belongs to a disabled or deleted account.', $rejection->getMessage());
         self::assertFalse($refreshToken->hasBeenUsed());
         self::assertSame([], $this->savedAccessTokens);
@@ -418,7 +454,7 @@ final class RefreshTokenHandlerTest extends TestCase
         $refreshToken = $this->boundRefreshToken();
         $refreshToken->getAccessToken()->getClient()->revoke();
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(RefreshTokenRejectedException::class);
         $this->expectExceptionMessage('not issued to this client');
 
         ($this->handler)(new RefreshTokenCommand(
@@ -432,7 +468,7 @@ final class RefreshTokenHandlerTest extends TestCase
     {
         $refreshToken = $this->boundRefreshToken();
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(RefreshTokenRejectedException::class);
         $this->expectExceptionMessage('not issued to this client');
 
         try {
@@ -508,7 +544,7 @@ final class RefreshTokenHandlerTest extends TestCase
             dpopJkt: self::JKT,
         );
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(RefreshTokenRejectedException::class);
         $this->expectExceptionMessage('Refresh token has been revoked');
 
         ($this->handler)($command);
@@ -552,7 +588,7 @@ final class RefreshTokenHandlerTest extends TestCase
             dpopJkt: self::JKT,
         );
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(RefreshTokenRejectedException::class);
         $this->expectExceptionMessage('Refresh token has expired');
 
         ($this->handler)($command);
@@ -595,7 +631,7 @@ final class RefreshTokenHandlerTest extends TestCase
             dpopJkt: self::JKT,
         );
 
-        $this->expectException(RuntimeException::class);
+        $this->expectException(RefreshTokenRejectedException::class);
         $this->expectExceptionMessage('reuse detected');
 
         ($this->handler)($command);

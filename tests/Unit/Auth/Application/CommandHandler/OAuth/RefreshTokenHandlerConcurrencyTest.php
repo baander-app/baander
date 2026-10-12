@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Auth\Application\CommandHandler\OAuth;
 
 use App\Auth\Application\CommandHandler\OAuth\RefreshTokenHandler;
 use App\Auth\Application\Command\OAuth\RefreshTokenCommand;
+use App\Auth\Application\Exception\RefreshTokenRejectedException;
 use App\Auth\Application\Port\JwtGeneratorInterface;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
@@ -28,7 +29,6 @@ use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
-use RuntimeException;
 
 /**
  * Validation test: refresh-token one-time-use must be concurrency-safe.
@@ -163,7 +163,7 @@ final class RefreshTokenHandlerConcurrencyTest extends TestCase
         // Second concurrent request should be rejected because the token was
         // already consumed. With the current implementation it succeeds, so
         // this assertion fails and proves the race condition.
-        $this->expectException(RuntimeException::class);
+        $this->expectException(RefreshTokenRejectedException::class);
         $this->expectExceptionMessage('reuse detected');
 
         ($this->handler)($command);

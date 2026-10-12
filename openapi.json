@@ -3412,7 +3412,7 @@
                         }
                     },
                     "401": {
-                        "description": "Invalid refresh token",
+                        "description": "The refresh token is unknown, malformed, revoked, expired or replayed, is bound to another proof key, or belongs to a disabled account or a revoked client; sign in again",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3427,6 +3427,25 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The server could not decide on the token, for example while its database restarts; the token may still be valid, so retry after the Retry-After delay",
+                        "headers": {
+                            "Retry-After": {
+                                "description": "Seconds to wait before retrying",
+                                "schema": {
+                                    "type": "integer",
+                                    "example": 5
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }

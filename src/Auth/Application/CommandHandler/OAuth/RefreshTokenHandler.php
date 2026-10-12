@@ -7,7 +7,9 @@ namespace App\Auth\Application\CommandHandler\OAuth;
 use App\Auth\Application\Command\OAuth\RefreshTokenCommand;
 use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Application\Exception\OAuthProtocolException;
+use App\Auth\Application\Exception\RefreshTokenRejectedException;
 use App\Auth\Application\Port\JwtGeneratorInterface;
+use App\Auth\Domain\Exception\TokenChainViolationException;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
 use App\Auth\Domain\Model\OAuth\TokenId;
@@ -20,7 +22,7 @@ use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Domain\Service\TokenChainValidator;
 use DateInterval;
 use Doctrine\ORM\EntityManagerInterface;
-use RuntimeException;
+use InvalidArgumentException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
@@ -30,9 +32,11 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * marks the old token as used, and returns a new access/refresh token pair.
  *
  * A revoked client answers invalid_client (OAuthProtocolException); every other
- * rejection is a plain RuntimeException, which the token endpoint reports as
- * invalid_grant; a token of a disabled account is one of them. The rotation holds
- * the client's row lock against a concurrent revocation, as TokenPairIssuer does.
+ * verdict on the token is a RefreshTokenRejectedException, which the token endpoint
+ * reports as invalid_grant; a token of a disabled account is one of them. Any other
+ * exception, such as a lost database connection, is a server fault and says nothing
+ * about the token. The rotation holds the client's row lock against a concurrent
+ * revocation, as TokenPairIssuer does.
  */
 final class RefreshTokenHandler
 {
@@ -58,19 +62,24 @@ final class RefreshTokenHandler
     #[AsMessageHandler]
     public function __invoke(RefreshTokenCommand $command): TokenResponseDTO
     {
-        $refreshTokenId = TokenId::fromString($command->getRefreshTokenId());
+        try {
+            $refreshTokenId = TokenId::fromString($command->getRefreshTokenId());
+        } catch (InvalidArgumentException) {
+            // No token was ever issued in this form.
+            throw RefreshTokenRejectedException::notFound();
+        }
         $refreshToken = $this->refreshTokenRepository->findByTokenId($refreshTokenId);
 
         if ($refreshToken === null) {
-            throw new RuntimeException('Refresh token not found.');
+            throw RefreshTokenRejectedException::notFound();
         }
 
         if ($refreshToken->isRevoked()) {
-            throw new RuntimeException('Refresh token has been revoked.');
+            throw RefreshTokenRejectedException::revoked();
         }
 
         if ($refreshToken->isExpired()) {
-            throw new RuntimeException('Refresh token has expired.');
+            throw RefreshTokenRejectedException::expired();
         }
 
         // At the token endpoint the token must belong to the client that authenticated
@@ -79,7 +88,7 @@ final class RefreshTokenHandler
         $tokenClient = $refreshToken->getAccessToken()->getClient();
         $clientId = $command->getClientId();
         if ($clientId !== null && !$tokenClient->getId()->equals($clientId)) {
-            throw new RuntimeException('Refresh token was not issued to this client.');
+            throw RefreshTokenRejectedException::issuedToAnotherClient();
         }
         // A revoked client's tokens cannot be refreshed. This early check uses the
         // loaded state; the transaction below repeats it under the row lock.
@@ -94,7 +103,7 @@ final class RefreshTokenHandler
         if ($tokenUser !== null) {
             $user = $this->userRepository->findByUuid($tokenUser->getId());
             if ($user === null || $user->isDisabled()) {
-                throw new RuntimeException('Refresh token belongs to a disabled or deleted account.');
+                throw RefreshTokenRejectedException::accountDisabled();
             }
         }
 
@@ -104,14 +113,18 @@ final class RefreshTokenHandler
         $proofJkt = $command->getDpopJkt();
         if ($boundJkt === null || $boundJkt === '' || $proofJkt === null || $proofJkt === ''
             || !hash_equals($boundJkt, $proofJkt)) {
-            throw new RuntimeException('Refresh token proof binding does not match.');
+            throw RefreshTokenRejectedException::proofBindingMismatch();
         }
 
         // Validate chain integrity (replay detection).
         // If the token was already used, this will revoke the entire chain.
         // Tokens without a chainId are outside the rotation model and skip validation.
         if ($refreshToken->getChainId() !== null) {
-            $this->chainValidator->validateWithLoadedPrevious($refreshToken);
+            try {
+                $this->chainValidator->validateWithLoadedPrevious($refreshToken);
+            } catch (TokenChainViolationException $violation) {
+                throw RefreshTokenRejectedException::chainViolated($violation);
+            }
         }
 
         try {
@@ -124,7 +137,7 @@ final class RefreshTokenHandler
                 // this token, the conditional UPDATE will affect zero rows.
                 $consumedToken = $this->refreshTokenRepository->consumeByTokenId($refreshTokenId);
                 if ($consumedToken === null) {
-                    throw new RuntimeException('Refresh token reuse detected.');
+                    throw RefreshTokenRejectedException::alreadyConsumed();
                 }
 
                 $refreshToken = $consumedToken;

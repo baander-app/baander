@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Auth\Domain\Service;
 
+use App\Auth\Domain\Exception\TokenChainViolationException;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
-use RuntimeException;
 
 /**
  * Domain service for validating refresh token chain integrity.
@@ -46,7 +46,7 @@ final class TokenChainValidator
      * 4. If the predecessor was used and the incoming token has also been used,
      *    this is a replay -- revoke the chain.
      *
-     * @throws RuntimeException on chain integrity violation
+     * @throws TokenChainViolationException on chain integrity violation
      */
     public function validate(RefreshToken $incoming, ?RefreshToken $previous): void
     {
@@ -54,12 +54,7 @@ final class TokenChainValidator
         if ($incoming->hasBeenUsed()) {
             $this->revokeChain($incoming->getChainId());
 
-            throw new RuntimeException(
-                sprintf(
-                    'Refresh token reuse detected. The entire token chain (chain: %s) has been revoked.',
-                    $incoming->getChainId()->toString(),
-                ),
-            );
+            throw TokenChainViolationException::replayed($incoming->getChainId());
         }
 
         if ($previous === null) {
@@ -69,23 +64,17 @@ final class TokenChainValidator
 
         // Rule 2: The predecessor must have been used (i.e., previously rotated).
         if (!$previous->hasBeenUsed()) {
-            throw new RuntimeException(
-                'Refresh token chain integrity violation: the previous refresh token has not been rotated.',
-            );
+            throw TokenChainViolationException::brokenLink('the previous refresh token has not been rotated.');
         }
 
         // Rule 3: The predecessor must not be revoked.
         if ($previous->isRevoked()) {
-            throw new RuntimeException(
-                'Refresh token chain integrity violation: the previous refresh token has been revoked.',
-            );
+            throw TokenChainViolationException::brokenLink('the previous refresh token has been revoked.');
         }
 
         // Additional check: ensure both tokens belong to the same chain.
         if (!$incoming->getChainId()->equals($previous->getChainId())) {
-            throw new RuntimeException(
-                'Refresh token chain integrity violation: chain ID mismatch.',
-            );
+            throw TokenChainViolationException::brokenLink('chain ID mismatch.');
         }
     }
 
@@ -93,7 +82,7 @@ final class TokenChainValidator
      * Convenience method: validate an incoming refresh token by loading its
      * predecessor from the repository and performing chain validation.
      *
-     * @throws RuntimeException on chain integrity violation
+     * @throws TokenChainViolationException on chain integrity violation
      */
     public function validateWithLoadedPrevious(RefreshToken $incoming): void
     {

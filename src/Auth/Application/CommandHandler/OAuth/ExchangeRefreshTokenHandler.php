@@ -8,9 +8,8 @@ use App\Auth\Application\Command\OAuth\ExchangeRefreshTokenCommand;
 use App\Auth\Application\Command\OAuth\RefreshTokenCommand;
 use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Application\Exception\OAuthProtocolException;
+use App\Auth\Application\Exception\RefreshTokenRejectedException;
 use App\Auth\Application\Service\OAuthClientAuthenticator;
-use InvalidArgumentException;
-use RuntimeException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
@@ -19,7 +18,9 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  * After authenticating the client it rotates the pair through the same
  * RefreshTokenHandler as first-party refresh: the proof key must match, the
  * fingerprint binding carries forward, and a replayed token revokes its chain.
- * The token must have been issued to the authenticated client.
+ * The token must have been issued to the authenticated client. Only a rejection of
+ * the token is invalid_grant; a server fault propagates, so the client keeps a token
+ * that may still be good.
  */
 final readonly class ExchangeRefreshTokenHandler
 {
@@ -47,15 +48,7 @@ final readonly class ExchangeRefreshTokenHandler
                 dpopJkt: $command->dpopJkt,
                 clientId: $client->getId(),
             ));
-        } catch (InvalidArgumentException) {
-            throw self::invalidGrant();
-        } catch (RuntimeException $exception) {
-            // Refresh rejections are plain RuntimeExceptions. Anything more specific, such as a
-            // database failure, is not a verdict on the token and must not make the client drop it.
-            if ($exception::class !== RuntimeException::class) {
-                throw $exception;
-            }
-
+        } catch (RefreshTokenRejectedException) {
             throw self::invalidGrant();
         }
     }

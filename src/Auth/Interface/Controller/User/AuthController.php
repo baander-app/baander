@@ -16,8 +16,10 @@ use App\Auth\Application\Command\User\VerifyEmailCommand;
 use App\Auth\Application\Exception\CurrentPasswordMismatchException;
 use App\Auth\Application\Exception\EmailAddressInUseException;
 use App\Auth\Application\Exception\EmailVerificationException;
+use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Exception\PasswordPolicyException;
 use App\Auth\Application\Exception\PasswordResetException;
+use App\Auth\Application\Exception\RefreshTokenRejectedException;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Application\Port\UserPortInterface;
 use App\Auth\Domain\Model\User;
@@ -60,6 +62,9 @@ final class AuthController
 {
     use ApiResponsesTrait;
     use TranslatorTrait;
+
+    /** How long a client waits before retrying a refresh that failed on the server's side. */
+    private const int REFRESH_RETRY_AFTER_SECONDS = 5;
 
     public function __construct(
         private readonly Security $security,
@@ -207,8 +212,14 @@ final class AuthController
                     type: 'object',
                 ),
             ),
-            new OA\Response(response: '401', description: 'Invalid refresh token', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '401', description: 'The refresh token is unknown, malformed, revoked, expired or replayed, is bound to another proof key, or belongs to a disabled account or a revoked client; sign in again', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '503',
+                description: 'The server could not decide on the token, for example while its database restarts; the token may still be valid, so retry after the Retry-After delay',
+                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 5))],
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ),
         ],
     )]
     #[Route('/refresh', name: 'refresh', methods: ['POST'])]
@@ -251,11 +262,7 @@ final class AuthController
             $stamp = $envelope->last(HandledStamp::class);
             $tokenResponse = $stamp?->getResult();
         } catch (\Throwable $e) {
-            return $this->handleCommandException(
-                $e,
-                $this->trans('errors.internal', domain: 'auth'),
-                Response::HTTP_UNAUTHORIZED,
-            );
+            return $this->refreshFailure($e);
         }
 
         $nonce = $this->dpopNonceManager->generateNonce();
@@ -676,6 +683,32 @@ final class AuthController
         return $this->userService->findByUuid(
             Uuid::fromString($securityUser->getId()),
         );
+    }
+
+    /**
+     * A refused grant answers 401, after which the client signs in again. Any other
+     * failure, such as a database that is restarting, says nothing about the token: it
+     * answers 503 with Retry-After so the client keeps its session and retries.
+     */
+    private function refreshFailure(\Throwable $exception): JsonResponse
+    {
+        $cause = $exception instanceof HandlerFailedException
+            ? $exception->getPrevious() ?? $exception
+            : $exception;
+        $message = $this->trans('errors.internal', domain: 'auth');
+
+        // A revoked client is reported as invalid_client, the only protocol error of the grant.
+        if ($cause instanceof RefreshTokenRejectedException || $cause instanceof OAuthProtocolException) {
+            $this->logger->info('Token refresh rejected: {reason}', ['reason' => $cause->getMessage()]);
+
+            return $this->errorResponse($message, Response::HTTP_UNAUTHORIZED);
+        }
+
+        $this->logger->error('Token refresh failed.', ['exception' => $cause]);
+        $response = $this->errorResponse($message, Response::HTTP_SERVICE_UNAVAILABLE);
+        $response->headers->set('Retry-After', (string) self::REFRESH_RETRY_AFTER_SECONDS);
+
+        return $response;
     }
 
     /**
