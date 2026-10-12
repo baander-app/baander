@@ -21,6 +21,8 @@ const PROOF_DEADLINE_MS = 3000;
 const REFRESH_DEADLINE_MS = 35000;
 let pendingProofs = 0;
 let pendingRefreshes = 0;
+// One credential pull per window the browser restarted this worker under.
+const pendingPulls = new Map<string, Promise<void>>();
 
 self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting());
@@ -79,10 +81,11 @@ function buildHtu(url: string): string {
 interface DpopProofResult {
   proof: string | null;
   timedOut: boolean;
+  overflowed: boolean;
 }
 
 function requestDpopProof(clientId: string, method: string, url: string, auth: ClientAuth): Promise<DpopProofResult> {
-  if (pendingProofs >= MAX_PENDING_PROOFS) return Promise.resolve({ proof: null, timedOut: false });
+  if (pendingProofs >= MAX_PENDING_PROOFS) return Promise.resolve({ proof: null, timedOut: false, overflowed: true });
   pendingProofs++;
   return new Promise(resolve => {
     const channel = new MessageChannel();
@@ -96,7 +99,7 @@ function requestDpopProof(clientId: string, method: string, url: string, auth: C
       channel.port1.close();
       channel.port2.close();
       pendingProofs--;
-      resolve({ proof, timedOut });
+      resolve({ proof, timedOut, overflowed: false });
     };
     const timeout = setTimeout(() => finish(null, true), PROOF_DEADLINE_MS);
     channel.port1.onmessageerror = () => finish(null);
@@ -120,13 +123,15 @@ function requestDpopProof(clientId: string, method: string, url: string, auth: C
   });
 }
 
-function requestAuthRefresh(clientId: string, method: string, url: string, auth: ClientAuth): Promise<boolean> {
-  if (pendingRefreshes >= MAX_PENDING_REFRESHES) return Promise.resolve(false);
+type RefreshOutcome = 'refreshed' | 'failed' | 'overflowed';
+
+function requestAuthRefresh(clientId: string, method: string, url: string, auth: ClientAuth): Promise<RefreshOutcome> {
+  if (pendingRefreshes >= MAX_PENDING_REFRESHES) return Promise.resolve('overflowed');
   pendingRefreshes++;
   return new Promise(resolve => {
     const channel = new MessageChannel();
     let finished = false;
-    const finish = (refreshed: boolean) => {
+    const finish = (outcome: RefreshOutcome) => {
       if (finished) return;
       finished = true;
       clearTimeout(timeout);
@@ -135,31 +140,73 @@ function requestAuthRefresh(clientId: string, method: string, url: string, auth:
       channel.port1.close();
       channel.port2.close();
       pendingRefreshes--;
-      resolve(refreshed);
+      resolve(outcome);
     };
     // The window's whole refresh budget plus one message round trip.
-    const timeout = setTimeout(() => finish(false), REFRESH_DEADLINE_MS);
-    channel.port1.onmessageerror = () => finish(false);
+    const timeout = setTimeout(() => finish('failed'), REFRESH_DEADLINE_MS);
+    channel.port1.onmessageerror = () => finish('failed');
     channel.port1.onmessage = event => {
       const next = event.data?.type === 'SW_AUTH_REFRESHED' ? parseAuth(event.data.auth) : null;
       const current = clientAuth.get(clientId);
       if (!next || !current || next.session !== auth.session || next.apiOrigin !== auth.apiOrigin ||
           current.session !== auth.session || current.apiOrigin !== auth.apiOrigin || !current.accessToken) {
-        finish(false); return;
+        finish('failed'); return;
       }
       applyAuth(clientId, next);
-      finish(true);
+      finish('refreshed');
     };
     self.clients.get(clientId).then(client => {
       if (finished) return;
       const current = clientAuth.get(clientId);
       if (!client || client.id !== clientId || !isSameOriginClient(client) || !current?.accessToken ||
           current.session !== auth.session || current.apiOrigin !== auth.apiOrigin) {
-        finish(false); return;
+        finish('failed'); return;
       }
       client.postMessage({ type: 'SW_REFRESH_AUTH', method, url, token: auth.accessToken, session: auth.session }, [channel.port2]);
-    }).catch(() => finish(false));
+    }).catch(() => finish('failed'));
   });
+}
+
+/**
+ * The browser restarted this worker while the window kept playing. Ask that window, and only
+ * that window, for the credentials it published before; one pull serves every request it has
+ * pending. The reply is applied through the same revision order as a publication, so a newer
+ * SW_SET_AUTH that arrives meanwhile is never replaced.
+ */
+function requestAuthPull(clientId: string): Promise<void> {
+  const pending = pendingPulls.get(clientId);
+  if (pending) return pending;
+  const pull = new Promise<void>(resolve => {
+    const channel = new MessageChannel();
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timeout);
+      channel.port1.onmessage = null;
+      channel.port1.onmessageerror = null;
+      channel.port1.close();
+      channel.port2.close();
+      pendingPulls.delete(clientId);
+      resolve();
+    };
+    const timeout = setTimeout(finish, PROOF_DEADLINE_MS);
+    channel.port1.onmessageerror = finish;
+    channel.port1.onmessage = event => {
+      const next = event.data?.type === 'SW_AUTH_PULLED' ? parseAuth(event.data.auth) : null;
+      if (next) applyAuth(clientId, next);
+      finish();
+    };
+    self.clients.get(clientId).then(client => {
+      if (finished) return;
+      if (!client || client.id !== clientId || !isSameOriginClient(client)) {
+        finish(); return;
+      }
+      client.postMessage({ type: 'SW_PULL_AUTH' }, [channel.port2]);
+    }).catch(finish);
+  });
+  pendingPulls.set(clientId, pull);
+  return pull;
 }
 
 function authorizedFetch(request: Request, auth: ClientAuth, proof: string): Promise<Response> {
@@ -190,43 +237,86 @@ function updateNonce(clientId: string, auth: ClientAuth, response: Response): vo
   if (nonce) auth.nonce = nonce;
 }
 
+/**
+ * The answer for a request that must not leave unauthenticated and cannot be signed right now:
+ * the worker has no window to ask, or it holds too many pending answers. The tab waits a second
+ * and asks again; for a track stream the relay turns the wait into a player retry.
+ */
+function serviceUnavailable(clientId: string, url: URL): Response {
+  const response = new Response(null, { status: 503, headers: { 'Retry-After': '1' } });
+  relayRetryAfter(clientId, url, response);
+  return response;
+}
+
+function isCredentialedPath(pathname: string): boolean {
+  return pathname.startsWith('/api/stream/') || pathname.startsWith('/api/images/');
+}
+
+async function serveAuthorized(event: FetchEvent, url: URL, auth: ClientAuth): Promise<Response> {
+  const htu = buildHtu(url.href);
+  let requestAuth = auth;
+  const initialProof = await requestDpopProof(event.clientId, event.request.method, htu, requestAuth);
+  if (initialProof.overflowed) return serviceUnavailable(event.clientId, url);
+  let { proof } = initialProof;
+  const latest = clientAuth.get(event.clientId);
+  if (!initialProof.timedOut && latest?.accessToken && latest.accessToken !== auth.accessToken &&
+      latest.session === auth.session && latest.apiOrigin === auth.apiOrigin) {
+    // A shared refresh can rotate the token while the window signs this request.
+    // Spend at most one extra proof attempt, always within the original session.
+    requestAuth = latest;
+    const secondProof = await requestDpopProof(event.clientId, event.request.method, htu, requestAuth);
+    if (secondProof.overflowed) return serviceUnavailable(event.clientId, url);
+    ({ proof } = secondProof);
+  }
+  if (!proof || clientAuth.get(event.clientId) !== requestAuth) return fetch(event.request);
+  const response = await authorizedFetch(event.request, requestAuth, proof);
+  updateNonce(event.clientId, requestAuth, response);
+  if (response.status !== 401) {
+    relayRetryAfter(event.clientId, url, response);
+    return response;
+  }
+  const refresh = await requestAuthRefresh(event.clientId, event.request.method, htu, requestAuth);
+  if (refresh === 'overflowed') {
+    response.body?.cancel().catch(() => {});
+    return serviceUnavailable(event.clientId, url);
+  }
+  if (refresh === 'failed') return response;
+  const refreshed = clientAuth.get(event.clientId);
+  if (!refreshed?.accessToken || refreshed.session !== auth.session || refreshed.apiOrigin !== auth.apiOrigin) return response;
+  const retryProof = await requestDpopProof(event.clientId, event.request.method, htu, refreshed);
+  if (retryProof.overflowed) {
+    response.body?.cancel().catch(() => {});
+    return serviceUnavailable(event.clientId, url);
+  }
+  if (!retryProof.proof || clientAuth.get(event.clientId) !== refreshed) return response;
+  // Keep the first error readable until recovery has a valid, current proof.
+  response.body?.cancel().catch(() => {});
+  const retry = await authorizedFetch(event.request, refreshed, retryProof.proof);
+  updateNonce(event.clientId, refreshed, retry);
+  relayRetryAfter(event.clientId, url, retry);
+  return retry;
+}
+
+/** A credentialed path from a window this worker holds no entry for: pull before deciding. */
+async function serveAfterPull(event: FetchEvent, url: URL): Promise<Response> {
+  await requestAuthPull(event.clientId);
+  // The newest entry wins, whether the pull reply or a publication in flight armed it.
+  const auth = clientAuth.get(event.clientId);
+  if (!auth) return serviceUnavailable(event.clientId, url);
+  if (url.origin !== auth.apiOrigin || !auth.accessToken) return fetch(event.request);
+  return serveAuthorized(event, url, auth);
+}
+
 self.addEventListener('fetch', (event: FetchEvent) => {
   const url = new URL(event.request.url);
+  if (!isCredentialedPath(url.pathname) || !['GET', 'HEAD'].includes(event.request.method)) return;
   const auth = clientAuth.get(event.clientId);
-  if (!auth?.accessToken || url.origin !== auth.apiOrigin) return;
-  if (!url.pathname.startsWith('/api/stream/') && !url.pathname.startsWith('/api/images/')) return;
-  if (!['GET', 'HEAD'].includes(event.request.method)) return;
-
-  event.respondWith((async () => {
-    const htu = buildHtu(url.href);
-    let requestAuth = auth;
-    const initialProof = await requestDpopProof(event.clientId, event.request.method, htu, requestAuth);
-    let { proof } = initialProof;
-    const latest = clientAuth.get(event.clientId);
-    if (!initialProof.timedOut && latest?.accessToken && latest.accessToken !== auth.accessToken &&
-        latest.session === auth.session && latest.apiOrigin === auth.apiOrigin) {
-      // A shared refresh can rotate the token while the window signs this request.
-      // Spend at most one extra proof attempt, always within the original session.
-      requestAuth = latest;
-      ({ proof } = await requestDpopProof(event.clientId, event.request.method, htu, requestAuth));
-    }
-    if (!proof || clientAuth.get(event.clientId) !== requestAuth) return fetch(event.request);
-    const response = await authorizedFetch(event.request, requestAuth, proof);
-    updateNonce(event.clientId, requestAuth, response);
-    if (response.status !== 401) {
-      relayRetryAfter(event.clientId, url, response);
-      return response;
-    }
-    if (!await requestAuthRefresh(event.clientId, event.request.method, htu, requestAuth)) return response;
-    const refreshed = clientAuth.get(event.clientId);
-    if (!refreshed?.accessToken || refreshed.session !== auth.session || refreshed.apiOrigin !== auth.apiOrigin) return response;
-    const { proof: retryProof } = await requestDpopProof(event.clientId, event.request.method, htu, refreshed);
-    if (!retryProof || clientAuth.get(event.clientId) !== refreshed) return response;
-    // Keep the first error readable until recovery has a valid, current proof.
-    response.body?.cancel().catch(() => {});
-    const retry = await authorizedFetch(event.request, refreshed, retryProof);
-    updateNonce(event.clientId, refreshed, retry);
-    relayRetryAfter(event.clientId, url, retry);
-    return retry;
-  })());
+  if (auth) {
+    if (!auth.accessToken || url.origin !== auth.apiOrigin) return;
+    event.respondWith(serveAuthorized(event, url, auth));
+    return;
+  }
+  // Only a window the worker can name may supply credentials; a navigation has no window yet.
+  if (!event.clientId || event.request.mode === 'navigate') return;
+  event.respondWith(serveAfterPull(event, url));
 });

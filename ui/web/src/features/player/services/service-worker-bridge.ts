@@ -20,13 +20,17 @@ interface WorkerAuthState {
 
 let authRevision = 0;
 
-function sendAuthState(worker: ServiceWorker): WorkerAuthState {
-  const state = {
+function authState(revision: number): WorkerAuthState {
+  return {
     apiUrl: window.__BAANDER_API_URL__ || window.location.origin,
     token: getAuthSnapshot().accessToken,
     session: getAuthSession(),
-    revision: ++authRevision,
+    revision,
   };
+}
+
+function sendAuthState(worker: ServiceWorker): WorkerAuthState {
+  const state = authState(++authRevision);
   worker.postMessage({ type: 'SW_SET_AUTH', ...state });
   return state;
 }
@@ -56,12 +60,21 @@ export function initServiceWorkerListener(): void {
   navigator.serviceWorker.addEventListener('message', async event => {
     const replyPort = event.ports[0];
     const refreshing = event.data?.type === 'SW_REFRESH_AUTH';
-    const failure = refreshing ? { type: 'SW_AUTH_REFRESHED', auth: null } : { type: 'SW_DPOP_PROOF', proof: null };
+    const pulling = event.data?.type === 'SW_PULL_AUTH';
+    const failure = refreshing || pulling
+      ? { type: refreshing ? 'SW_AUTH_REFRESHED' : 'SW_AUTH_PULLED', auth: null }
+      : { type: 'SW_DPOP_PROOF', proof: null };
     try {
       const registration = await navigator.serviceWorker.getRegistration();
       if (!registration?.active || event.source !== registration.active) return;
       if (event.data?.type === 'SW_REQUEST_TOKEN') {
         sendAuthState(registration.active);
+        return;
+      }
+      if (pulling) {
+        // A restarted worker asks this window for what it published before. Answer at the last
+        // published revision, never a new one, so a publication still in flight wins in the worker.
+        replyPort?.postMessage({ type: 'SW_AUTH_PULLED', auth: authState(authRevision) });
         return;
       }
       if (event.data?.type === 'SW_STREAM_RETRY_AFTER') {

@@ -7,6 +7,7 @@
   const REFRESH_DEADLINE_MS = 35e3;
   let pendingProofs = 0;
   let pendingRefreshes = 0;
+  const pendingPulls = /* @__PURE__ */ new Map();
   self.addEventListener("install", (event) => {
     event.waitUntil(self.skipWaiting());
   });
@@ -57,7 +58,7 @@
     return `${parsed.origin}${parsed.pathname}`;
   }
   function requestDpopProof(clientId, method, url, auth) {
-    if (pendingProofs >= MAX_PENDING_PROOFS) return Promise.resolve({ proof: null, timedOut: false });
+    if (pendingProofs >= MAX_PENDING_PROOFS) return Promise.resolve({ proof: null, timedOut: false, overflowed: true });
     pendingProofs++;
     return new Promise((resolve) => {
       const channel = new MessageChannel();
@@ -71,7 +72,7 @@
         channel.port1.close();
         channel.port2.close();
         pendingProofs--;
-        resolve({ proof, timedOut });
+        resolve({ proof, timedOut, overflowed: false });
       };
       const timeout = setTimeout(() => finish(null, true), PROOF_DEADLINE_MS);
       channel.port1.onmessageerror = () => finish(null);
@@ -99,12 +100,12 @@
     });
   }
   function requestAuthRefresh(clientId, method, url, auth) {
-    if (pendingRefreshes >= MAX_PENDING_REFRESHES) return Promise.resolve(false);
+    if (pendingRefreshes >= MAX_PENDING_REFRESHES) return Promise.resolve("overflowed");
     pendingRefreshes++;
     return new Promise((resolve) => {
       const channel = new MessageChannel();
       let finished = false;
-      const finish = (refreshed) => {
+      const finish = (outcome) => {
         if (finished) return;
         finished = true;
         clearTimeout(timeout);
@@ -113,30 +114,66 @@
         channel.port1.close();
         channel.port2.close();
         pendingRefreshes--;
-        resolve(refreshed);
+        resolve(outcome);
       };
-      const timeout = setTimeout(() => finish(false), REFRESH_DEADLINE_MS);
-      channel.port1.onmessageerror = () => finish(false);
+      const timeout = setTimeout(() => finish("failed"), REFRESH_DEADLINE_MS);
+      channel.port1.onmessageerror = () => finish("failed");
       channel.port1.onmessage = (event) => {
         const next = event.data?.type === "SW_AUTH_REFRESHED" ? parseAuth(event.data.auth) : null;
         const current = clientAuth.get(clientId);
         if (!next || !current || next.session !== auth.session || next.apiOrigin !== auth.apiOrigin || current.session !== auth.session || current.apiOrigin !== auth.apiOrigin || !current.accessToken) {
-          finish(false);
+          finish("failed");
           return;
         }
         applyAuth(clientId, next);
-        finish(true);
+        finish("refreshed");
       };
       self.clients.get(clientId).then((client) => {
         if (finished) return;
         const current = clientAuth.get(clientId);
         if (!client || client.id !== clientId || !isSameOriginClient(client) || !current?.accessToken || current.session !== auth.session || current.apiOrigin !== auth.apiOrigin) {
-          finish(false);
+          finish("failed");
           return;
         }
         client.postMessage({ type: "SW_REFRESH_AUTH", method, url, token: auth.accessToken, session: auth.session }, [channel.port2]);
-      }).catch(() => finish(false));
+      }).catch(() => finish("failed"));
     });
+  }
+  function requestAuthPull(clientId) {
+    const pending = pendingPulls.get(clientId);
+    if (pending) return pending;
+    const pull = new Promise((resolve) => {
+      const channel = new MessageChannel();
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(timeout);
+        channel.port1.onmessage = null;
+        channel.port1.onmessageerror = null;
+        channel.port1.close();
+        channel.port2.close();
+        pendingPulls.delete(clientId);
+        resolve();
+      };
+      const timeout = setTimeout(finish, PROOF_DEADLINE_MS);
+      channel.port1.onmessageerror = finish;
+      channel.port1.onmessage = (event) => {
+        const next = event.data?.type === "SW_AUTH_PULLED" ? parseAuth(event.data.auth) : null;
+        if (next) applyAuth(clientId, next);
+        finish();
+      };
+      self.clients.get(clientId).then((client) => {
+        if (finished) return;
+        if (!client || client.id !== clientId || !isSameOriginClient(client)) {
+          finish();
+          return;
+        }
+        client.postMessage({ type: "SW_PULL_AUTH" }, [channel.port2]);
+      }).catch(finish);
+    });
+    pendingPulls.set(clientId, pull);
+    return pull;
   }
   function authorizedFetch(request, auth, proof) {
     const headers = new Headers(request.headers);
@@ -160,40 +197,74 @@
     const nonce = response.headers.get("dpop-nonce");
     if (nonce) auth.nonce = nonce;
   }
-  self.addEventListener("fetch", (event) => {
-    const url = new URL(event.request.url);
-    const auth = clientAuth.get(event.clientId);
-    if (!auth?.accessToken || url.origin !== auth.apiOrigin) return;
-    if (!url.pathname.startsWith("/api/stream/") && !url.pathname.startsWith("/api/images/")) return;
-    if (!["GET", "HEAD"].includes(event.request.method)) return;
-    event.respondWith((async () => {
-      const htu = buildHtu(url.href);
-      let requestAuth = auth;
-      const initialProof = await requestDpopProof(event.clientId, event.request.method, htu, requestAuth);
-      let { proof } = initialProof;
-      const latest = clientAuth.get(event.clientId);
-      if (!initialProof.timedOut && latest?.accessToken && latest.accessToken !== auth.accessToken && latest.session === auth.session && latest.apiOrigin === auth.apiOrigin) {
-        requestAuth = latest;
-        ({ proof } = await requestDpopProof(event.clientId, event.request.method, htu, requestAuth));
-      }
-      if (!proof || clientAuth.get(event.clientId) !== requestAuth) return fetch(event.request);
-      const response = await authorizedFetch(event.request, requestAuth, proof);
-      updateNonce(event.clientId, requestAuth, response);
-      if (response.status !== 401) {
-        relayRetryAfter(event.clientId, url, response);
-        return response;
-      }
-      if (!await requestAuthRefresh(event.clientId, event.request.method, htu, requestAuth)) return response;
-      const refreshed = clientAuth.get(event.clientId);
-      if (!refreshed?.accessToken || refreshed.session !== auth.session || refreshed.apiOrigin !== auth.apiOrigin) return response;
-      const { proof: retryProof } = await requestDpopProof(event.clientId, event.request.method, htu, refreshed);
-      if (!retryProof || clientAuth.get(event.clientId) !== refreshed) return response;
+  function serviceUnavailable(clientId, url) {
+    const response = new Response(null, { status: 503, headers: { "Retry-After": "1" } });
+    relayRetryAfter(clientId, url, response);
+    return response;
+  }
+  function isCredentialedPath(pathname) {
+    return pathname.startsWith("/api/stream/") || pathname.startsWith("/api/images/");
+  }
+  async function serveAuthorized(event, url, auth) {
+    const htu = buildHtu(url.href);
+    let requestAuth = auth;
+    const initialProof = await requestDpopProof(event.clientId, event.request.method, htu, requestAuth);
+    if (initialProof.overflowed) return serviceUnavailable(event.clientId, url);
+    let { proof } = initialProof;
+    const latest = clientAuth.get(event.clientId);
+    if (!initialProof.timedOut && latest?.accessToken && latest.accessToken !== auth.accessToken && latest.session === auth.session && latest.apiOrigin === auth.apiOrigin) {
+      requestAuth = latest;
+      const secondProof = await requestDpopProof(event.clientId, event.request.method, htu, requestAuth);
+      if (secondProof.overflowed) return serviceUnavailable(event.clientId, url);
+      ({ proof } = secondProof);
+    }
+    if (!proof || clientAuth.get(event.clientId) !== requestAuth) return fetch(event.request);
+    const response = await authorizedFetch(event.request, requestAuth, proof);
+    updateNonce(event.clientId, requestAuth, response);
+    if (response.status !== 401) {
+      relayRetryAfter(event.clientId, url, response);
+      return response;
+    }
+    const refresh = await requestAuthRefresh(event.clientId, event.request.method, htu, requestAuth);
+    if (refresh === "overflowed") {
       response.body?.cancel().catch(() => {
       });
-      const retry = await authorizedFetch(event.request, refreshed, retryProof);
-      updateNonce(event.clientId, refreshed, retry);
-      relayRetryAfter(event.clientId, url, retry);
-      return retry;
-    })());
+      return serviceUnavailable(event.clientId, url);
+    }
+    if (refresh === "failed") return response;
+    const refreshed = clientAuth.get(event.clientId);
+    if (!refreshed?.accessToken || refreshed.session !== auth.session || refreshed.apiOrigin !== auth.apiOrigin) return response;
+    const retryProof = await requestDpopProof(event.clientId, event.request.method, htu, refreshed);
+    if (retryProof.overflowed) {
+      response.body?.cancel().catch(() => {
+      });
+      return serviceUnavailable(event.clientId, url);
+    }
+    if (!retryProof.proof || clientAuth.get(event.clientId) !== refreshed) return response;
+    response.body?.cancel().catch(() => {
+    });
+    const retry = await authorizedFetch(event.request, refreshed, retryProof.proof);
+    updateNonce(event.clientId, refreshed, retry);
+    relayRetryAfter(event.clientId, url, retry);
+    return retry;
+  }
+  async function serveAfterPull(event, url) {
+    await requestAuthPull(event.clientId);
+    const auth = clientAuth.get(event.clientId);
+    if (!auth) return serviceUnavailable(event.clientId, url);
+    if (url.origin !== auth.apiOrigin || !auth.accessToken) return fetch(event.request);
+    return serveAuthorized(event, url, auth);
+  }
+  self.addEventListener("fetch", (event) => {
+    const url = new URL(event.request.url);
+    if (!isCredentialedPath(url.pathname) || !["GET", "HEAD"].includes(event.request.method)) return;
+    const auth = clientAuth.get(event.clientId);
+    if (auth) {
+      if (!auth.accessToken || url.origin !== auth.apiOrigin) return;
+      event.respondWith(serveAuthorized(event, url, auth));
+      return;
+    }
+    if (!event.clientId || event.request.mode === "navigate") return;
+    event.respondWith(serveAfterPull(event, url));
   });
 })();

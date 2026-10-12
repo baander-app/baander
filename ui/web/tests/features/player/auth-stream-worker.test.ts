@@ -70,9 +70,13 @@ it('uses only the requesting tab for both signing and its token', async () => {
   expect(ports.every(port => port.close.mock.calls.length === 1)).toBe(true);
 });
 
-it('never borrows credentials for a client missing after a worker restart', () => {
-  configure('a', 'token-a');
-  expect(request('unknown')).toBeUndefined();
+it('never borrows credentials for a client missing after a worker restart', async () => {
+  const known = configure('a', 'token-a');
+  const response = await request('unknown');
+  expect(response!.status).toBe(503);
+  expect(response!.headers.get('Retry-After')).toBe('1');
+  expect(fetchMock).not.toHaveBeenCalled();
+  expect(known.postMessage).not.toHaveBeenCalled();
 });
 
 it('does not attach credentials if logout happens while signing', async () => {
@@ -248,8 +252,11 @@ it('bounds concurrent refreshes and releases all ports and capacity on timeout',
     expect(client.postMessage.mock.calls.filter(([message]) => message.type === 'SW_REFRESH_AUTH')).toHaveLength(32);
     await vi.advanceTimersByTimeAsync(35001);
     const responses = await Promise.all(requests);
-    expect(responses.every(response => response?.status === 401)).toBe(true);
+    expect(responses.slice(0, 32).every(response => response?.status === 401)).toBe(true);
     expect(await responses[0]!.text()).toBe('expired');
+    // The overflowing request waits instead of surfacing an authentication failure.
+    expect(responses[32]!.status).toBe(503);
+    expect(responses[32]!.headers.get('Retry-After')).toBe('1');
     expect(ports.every(port => port.close.mock.calls.length === 1)).toBe(true);
     const next = request('a');
     await vi.advanceTimersByTimeAsync(0);
@@ -426,4 +433,171 @@ it.each([
   await request('a', url);
   await new Promise(resolve => setTimeout(resolve, 0));
   expect(client.postMessage.mock.calls.map(([message]) => message.type)).toEqual(['SW_SIGN_DPOP']);
+});
+
+/** A window the restarted worker can name but holds no credentials for. */
+function restarted(id: string, reply: Record<string, unknown> | 'silent' = { apiUrl: api, token: `token-${id}`, session: 1, revision: 1 }) {
+  const client = { id, url: `${origin}/player`, postMessage: vi.fn((message, channels) => {
+    if (message.type === 'SW_PULL_AUTH') {
+      if (reply !== 'silent') channels[0].postMessage({ type: 'SW_AUTH_PULLED', auth: reply });
+    } else channels?.[0].postMessage({ type: 'SW_DPOP_PROOF', proof: `proof-${id}` });
+  }) };
+  clients.set(id, client);
+  return client;
+}
+
+function messageTypes(client: { postMessage: ReturnType<typeof vi.fn> }): string[] {
+  return client.postMessage.mock.calls.map(([message]) => message.type);
+}
+
+it('pulls credentials from the requesting tab after a restart and signs the request', async () => {
+  vi.useFakeTimers();
+  try {
+    const client = restarted('a');
+    const response = await request('a');
+    expect(response!.status).toBe(200);
+    expect(client.postMessage.mock.calls[0][0]).toEqual({ type: 'SW_PULL_AUTH' });
+    expect(messageTypes(client)).toEqual(['SW_PULL_AUTH', 'SW_SIGN_DPOP']);
+    expect(fetchMock.mock.calls[0][1].headers.get('Authorization')).toBe('DPoP token-a');
+    expect(fetchMock.mock.calls[0][1].headers.get('DPoP')).toBe('proof-a');
+    expect(ports.every(port => port.close.mock.calls.length === 1)).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+    // The entry is armed: the next request signs without another pull.
+    await request('a');
+    expect(messageTypes(client)).toEqual(['SW_PULL_AUTH', 'SW_SIGN_DPOP', 'SW_SIGN_DPOP']);
+  } finally { vi.useRealTimers(); }
+});
+
+it('shares one pull between fetches from the same unknown client', async () => {
+  const client = restarted('a', 'silent');
+  let pullPort: { postMessage: (data: unknown) => void } | undefined;
+  client.postMessage.mockImplementation((message, channels) => {
+    if (message.type === 'SW_PULL_AUTH') pullPort = channels[0];
+    else channels[0].postMessage({ type: 'SW_DPOP_PROOF', proof: 'proof-a' });
+  });
+  const first = request('a');
+  const second = request('a', `${api}/api/stream/track?id=t0&format=opus`);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  expect(messageTypes(client)).toEqual(['SW_PULL_AUTH']);
+  pullPort!.postMessage({ type: 'SW_AUTH_PULLED', auth: { apiUrl: api, token: 'token-a', session: 1, revision: 1 } });
+  const responses = await Promise.all([first, second]);
+  expect(responses.map(response => response!.status)).toEqual([200, 200]);
+  expect(messageTypes(client)).toEqual(['SW_PULL_AUTH', 'SW_SIGN_DPOP', 'SW_SIGN_DPOP']);
+  expect(fetchMock.mock.calls.map(([, init]) => init.headers.get('Authorization'))).toEqual(['DPoP token-a', 'DPoP token-a']);
+  expect(ports.every(port => port.close.mock.calls.length === 1)).toBe(true);
+});
+
+it.each([
+  ['client id', (client: ReturnType<typeof restarted>) => clients.set('a', { ...client, id: 'b' })],
+  ['origin', (client: ReturnType<typeof restarted>) => clients.set('a', { ...client, url: 'https://foreign.baander.app/player' })],
+])('refuses a pull answered by another %s and answers 503', async (_case, swap) => {
+  const client = restarted('a');
+  swap(client);
+  const response = await request('a');
+  expect(response!.status).toBe(503);
+  expect(response!.headers.get('Retry-After')).toBe('1');
+  expect(client.postMessage).not.toHaveBeenCalled();
+  expect(fetchMock).not.toHaveBeenCalled();
+  expect(ports.every(port => port.close.mock.calls.length === 1)).toBe(true);
+});
+
+it('answers 503 with Retry-After 1 when the pull times out and closes its channel', async () => {
+  vi.useFakeTimers();
+  try {
+    const client = restarted('a', 'silent');
+    const pending = request('a');
+    await vi.advanceTimersByTimeAsync(2999);
+    expect(fetchMock).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(2);
+    const response = await pending;
+    expect(response!.status).toBe(503);
+    expect(response!.headers.get('Retry-After')).toBe('1');
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(messageTypes(client)).toEqual(['SW_PULL_AUTH']);
+    expect(ports.every(port => port.close.mock.calls.length === 1)).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  } finally { vi.useRealTimers(); }
+});
+
+it.each([
+  ['an empty client id', ''],
+  ['a navigation', 'a'],
+])('takes no pull for %s and forwards the request unchanged', (_case, clientId) => {
+  const client = restarted('a');
+  const navigation = new Request(`${api}/api/stream/track?id=t0&format=opus`);
+  if (clientId) Object.defineProperty(navigation, 'mode', { value: 'navigate' });
+  let response: Promise<Response> | undefined;
+  handlers.fetch({ clientId, request: navigation, respondWith: (value: Promise<Response>) => { response = value; } });
+  expect(response).toBeUndefined();
+  expect(client.postMessage).not.toHaveBeenCalled();
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
+it.each([
+  ['a foreign origin', 'https://foreign.baander.app/api/images/cover', { apiUrl: api, token: 'token-a', session: 1, revision: 1 }],
+  ['a signed-out tab', `${api}/api/images/cover`, { apiUrl: api, token: null, session: 0, revision: 1 }],
+])('forwards a request without credentials after the pull reports %s', async (_case, url, reply) => {
+  const client = restarted('a', reply);
+  const response = await request('a', url);
+  expect(response!.status).toBe(200);
+  expect(messageTypes(client)).toEqual(['SW_PULL_AUTH']);
+  expect(fetchMock).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ url }));
+  expect(fetchMock.mock.calls[0][1]).toBeUndefined();
+  expect(ports.every(port => port.close.mock.calls.length === 1)).toBe(true);
+});
+
+it('keeps a newer publication over an older pull reply', async () => {
+  const client = restarted('a', 'silent');
+  client.postMessage.mockImplementation((message, channels) => {
+    if (message.type === 'SW_PULL_AUTH') {
+      publish(client, 'newest', 3);
+      channels[0].postMessage({ type: 'SW_AUTH_PULLED', auth: { apiUrl: api, token: 'older', session: 1, revision: 2 } });
+    } else channels[0].postMessage({ type: 'SW_DPOP_PROOF', proof: `proof-${message.token}` });
+  });
+  await request('a');
+  expect(fetchMock.mock.calls[0][1].headers.get('Authorization')).toBe('DPoP newest');
+  expect(fetchMock.mock.calls[0][1].headers.get('DPoP')).toBe('proof-newest');
+});
+
+it('answers 503 on proof overflow instead of forwarding unauthenticated, and relays the wait for a track stream', async () => {
+  vi.useFakeTimers();
+  try {
+    const client = configure('a', 'token-a');
+    client.postMessage.mockImplementation(() => {});
+    const pending: Array<Promise<Response> | undefined> = [];
+    for (let i = 0; i < 32; i++) pending.push(request('a'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(messageTypes(client)).toHaveLength(32);
+    const url = `${api}/api/stream/track?id=t0&format=opus`;
+    const overflow = await request('a', url);
+    expect(overflow!.status).toBe(503);
+    expect(overflow!.headers.get('Retry-After')).toBe('1');
+    expect(fetchMock).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(client.postMessage).toHaveBeenCalledWith({ type: 'SW_STREAM_RETRY_AFTER', url, seconds: 1 });
+    await vi.advanceTimersByTimeAsync(3001);
+    await Promise.all(pending);
+    expect(ports.every(port => port.close.mock.calls.length === 1)).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  } finally { vi.useRealTimers(); }
+});
+
+it('refuses a proof answered after logout and closes the channel by the deadline', async () => {
+  vi.useFakeTimers();
+  try {
+    const client = configure('a', 'token-a');
+    let proofPort: { postMessage: (data: unknown) => void } | undefined;
+    client.postMessage.mockImplementation((_message, channels) => {
+      proofPort = channels[0];
+      publish(client, null, 2, 0);
+    });
+    const pending = request('a');
+    await vi.advanceTimersByTimeAsync(3001);
+    expect(ports.every(port => port.close.mock.calls.length === 1)).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+    proofPort!.postMessage({ type: 'SW_DPOP_PROOF', proof: 'late-proof' });
+    await pending;
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock.mock.calls[0][1]).toBeUndefined();
+  } finally { vi.useRealTimers(); }
 });

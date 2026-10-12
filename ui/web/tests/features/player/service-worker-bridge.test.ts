@@ -168,3 +168,28 @@ it('ignores a stream Retry-After from another worker, for a foreign URL, or with
   expect(retryAfter.takeStreamRetryAfter(url)).toBeNull();
   expect(retryAfter.takeStreamRetryAfter(foreign)).toBeNull();
 });
+
+function pull(source: unknown = active) {
+  const port = { postMessage: vi.fn(), close: vi.fn() };
+  return { port, done: listener({ source, data: { type: 'SW_PULL_AUTH' }, ports: [port] }) };
+}
+
+it('answers a credential pull with the current snapshot at the last published revision', async () => {
+  await bridge.initWorkerApiUrl();
+  auth.accessToken = 'rotated';
+  await bridge.postTokenToWorker('rotated');
+  expect(active.postMessage).toHaveBeenCalledTimes(2);
+  const { port, done } = pull(); await done;
+  expect(port.postMessage).toHaveBeenCalledExactlyOnceWith({
+    type: 'SW_AUTH_PULLED', auth: { apiUrl: 'https://api.baander.app', token: 'rotated', session: 1, revision: 2 },
+  });
+  // A pull never mints a revision, so a publication in flight still wins in the worker.
+  expect(active.postMessage).toHaveBeenCalledTimes(2);
+  expect(port.close).toHaveBeenCalledOnce();
+});
+
+it('does not answer a credential pull from an unrelated worker', async () => {
+  const { port, done } = pull(new ServiceWorker()); await done;
+  expect(port.postMessage).not.toHaveBeenCalled();
+  expect(port.close).toHaveBeenCalledOnce();
+});
