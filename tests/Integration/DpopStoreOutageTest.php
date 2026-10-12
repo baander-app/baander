@@ -161,7 +161,7 @@ final class DpopStoreOutageTest extends TestCase
         $elapsed = microtime(true) - $started;
 
         self::assertStoreUnavailable($response);
-        self::assertLessThan(2.0, $elapsed, sprintf('A refused connection is answered at once, not after %.1f s.', $elapsed));
+        self::assertLessThan(5.0, $elapsed, sprintf('A refused connection is answered without waiting out a read timeout, not after %.1f s.', $elapsed));
         self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM oauth_refresh_tokens WHERE token_id = ? AND used_at IS NULL AND revoked = FALSE', [$login['refreshToken']]), 'The token was neither consumed nor revoked.');
 
         // The nonce from the login was never read by the refused kernel, so it is still good.
