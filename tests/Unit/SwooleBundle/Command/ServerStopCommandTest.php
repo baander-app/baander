@@ -6,11 +6,7 @@ namespace App\Tests\Unit\SwooleBundle\Command;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Tester\CommandTester;
-use SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\Command\ServerStopCommand;
-use SwooleBundle\SwooleBundle\Server\Api\ApiServerClientFactory;
-use SwooleBundle\SwooleBundle\Server\Config\Socket;
-use SwooleBundle\SwooleBundle\Server\Config\Sockets;
+use Symfony\Component\Process\Process;
 
 /** swoole:server:stop against a stand-in API server (fake-api-server.php). */
 final class ServerStopCommandTest extends TestCase
@@ -57,13 +53,23 @@ final class ServerStopCommandTest extends TestCase
 
     public function testAMasterStillRunningAfterTheWaitFails(): void
     {
-        // This test process stands in for a master that does not exit.
-        $port = $this->startApiServer(getmypid());
+        // A sleeping child stands in for a master that does not exit. It is never PID 1, which the
+        // command does not wait for, even when this test runs as a container's first process.
+        $master = proc_open(['sleep', '30'], [], $pipes);
+        self::assertIsResource($master);
+        $masterPid = proc_get_status($master)['pid'];
 
-        [$exitCode, $display] = $this->stop($port, shutdownTimeout: self::NO_WAIT);
+        try {
+            $port = $this->startApiServer($masterPid);
+
+            [$exitCode, $display] = $this->stop($port, shutdownTimeout: self::NO_WAIT);
+        } finally {
+            proc_terminate($master);
+            proc_close($master);
+        }
 
         self::assertSame(Command::FAILURE, $exitCode);
-        self::assertStringContainsString(sprintf('master PID %d) is still running', getmypid()), $display);
+        self::assertStringContainsString(sprintf('master PID %d) is still running', $masterPid), $display);
     }
 
     public function testAnUnreachableApiServerFails(): void
@@ -80,14 +86,24 @@ final class ServerStopCommandTest extends TestCase
         self::assertStringContainsString('Cannot stop the server through its API server', $display);
     }
 
-    /** @return array{int, string} the exit code and the output, on one line */
+    /**
+     * Runs the command in a process of its own with Xdebug off (run-server-stop.php says why).
+     *
+     * @return array{int, string} the exit code and the output, on one line
+     */
     private function stop(int $apiPort, int $shutdownTimeout): array
     {
-        $sockets = new Sockets(new Socket('127.0.0.1', 9501), new Socket('127.0.0.1', $apiPort));
-        $tester = new CommandTester(new ServerStopCommand(new ApiServerClientFactory($sockets), $shutdownTimeout));
-        $exitCode = $tester->execute([]);
+        $process = new Process(
+            [PHP_BINARY, '-d', 'xdebug.mode=off', __DIR__ . '/run-server-stop.php', (string) $apiPort, (string) $shutdownTimeout],
+            env: ['XDEBUG_MODE' => 'off'],
+            timeout: 30,
+        );
+        $process->run();
+        self::assertTrue($process->isSuccessful(), $process->getOutput() . $process->getErrorOutput());
+        /** @var array{exitCode: int, display: string} $result */
+        $result = json_decode(trim($process->getOutput()), true, flags: JSON_THROW_ON_ERROR);
 
-        return [$exitCode, (string) preg_replace('/\s+/', ' ', $tester->getDisplay())];
+        return [$result['exitCode'], (string) preg_replace('/\s+/', ' ', $result['display'])];
     }
 
     private function startApiServer(int $masterPid): int
