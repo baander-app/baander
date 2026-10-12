@@ -17,7 +17,7 @@ work = pathlib.Path(sys.argv[1])
 excluded = [
     '.git/sentinel', '.github/sentinel', '.claude/sentinel',
     '.agents/sentinel', '.codex/sentinel', '.gitnexus/sentinel',
-    '.pi/sentinel', '.rpiv/sentinel', '.reli/sentinel',
+    '.rpiv/sentinel', '.reli/sentinel',
     '.idea/sentinel', 'ui/rn/android/.idea/sentinel',
     'ui/rn/android/.claude/sentinel', '.phpunit.cache/sentinel', '.deptrac.cache',
     'node_modules/sentinel', 'ui/rn/node_modules/sentinel',
