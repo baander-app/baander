@@ -74,7 +74,9 @@ Edit skills, rules, and agents only under `.agents/`.
 Documented solutions to past problems (bugs, best practices, workflow patterns)
 live in `docs/solutions/`, organized by category with YAML frontmatter (`module`,
 `tags`, `problem_type`); consult them when implementing or debugging in a
-documented area.
+documented area. `CONCEPTS.md` at the repository root is the shared domain
+vocabulary (entities, named processes, status concepts); relevant when orienting
+to the codebase or discussing domain concepts.
 
 After a solved, verified problem, offer once to invoke the `ce-compound` skill at
 the completion checkpoint only when the work produced durable project reasoning
