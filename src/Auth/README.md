@@ -7,7 +7,7 @@ Authentication and token issuance. Password login (with optional TOTP), passkey 
 The context is organized into four feature areas within each layer:
 
 - **User** — registration, login, profile management, password reset
-- **OAuth** — token lifecycle: issue at password or passkey login and through the authorization code and device code grants, rotate at refresh, revoke. Every token pair comes from `TokenPairIssuer`, and both refresh paths rotate through `RefreshTokenHandler`. Every request that issues tokens needs a DPoP proof with a server-issued nonce, and tokens are bound to the proof key. An optional `X-Baander-Client-Fingerprint` header on the token request also binds the access token to that fingerprint. The OAuth area also covers the RFC 8414 metadata document, personal access clients, and the registration, secret rotation and revocation of device, public and confidential clients through the admin API and the `app:oauth:client:*` commands.
+- **OAuth** — token lifecycle: issue at password or passkey login and through the authorization code and device code grants, rotate at refresh, revoke. Every token pair comes from `TokenPairIssuer`, and both refresh paths rotate through `RefreshTokenHandler`. Every request that issues tokens needs a DPoP proof with a server-issued nonce, and tokens are bound to the proof key. An optional `X-Baander-Client-Fingerprint` header on the token request also binds the access token to that fingerprint. A consumed refresh token presented again with its own key inside `auth.refresh.reuse_grace_seconds`, while its replacement is unused, gets a fresh pair (the lost-response grace); any other reuse revokes the chain. Logout revokes the chain of the presenting access token and closes its WebSocket connections. While the nonce or jti store in Redis is unavailable, every DPoP edge answers `503` with `Retry-After` (`DpopStoreUnavailableException`) instead of a verdict on the proof. The OAuth area also covers the RFC 8414 metadata document, personal access clients, and the registration, secret rotation and revocation of device, public and confidential clients through the admin API and the `app:oauth:client:*` commands.
 - **Passkey** — WebAuthn registration and authentication via `web-auth/webauthn-lib`
 - **Totp** — time-based one-time password setup and verification via `otphp`
 
@@ -22,7 +22,7 @@ The OAuth models AccessToken, AuthCode, Client, DeviceCode and RefreshToken each
 | `JwtGeneratorInterface` | JWT token generation |
 | `TotpVerifierInterface` | TOTP code verification |
 | `PasskeyVerifierInterface` | WebAuthn passkey verification |
-| `DpopJtiCacheInterface` | DPoP JTI replay protection (backed by Redis) |
+| `DpopJtiCacheInterface` | DPoP JTI replay protection (backed by Redis): `isReplay()` records a jti for the proof acceptance window and throws `DpopStoreUnavailableException` when the store cannot answer |
 | `PasswordResetTokenRepositoryInterface` | Each user's single outstanding password reset token (hashed, single use) |
 | `PasswordResetDeliveryInterface` | Emails the reset link after the response is sent; never persists or logs the token |
 | `EmailVerificationTokenRepositoryInterface` | Each user's single outstanding email verification token (hashed, bound to the address, single use) |

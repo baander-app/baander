@@ -3,8 +3,9 @@
 # checks what functional tests cannot see outside Swoole: the language of a credential
 # email resolved at kernel.terminate, progressive streaming of a rendition while it
 # encodes, byte ranges once it is complete, the answers to Safari's opening request
-# sequence against an in-progress rendition (a committed baseline), and the health alert
-# for a PostgreSQL outage that spans a reload of the server's workers.
+# sequence against an in-progress rendition (a committed baseline), the health alert
+# for a PostgreSQL outage that spans a reload of the server's workers, and a Redis outage
+# during which a signed-in session is told to wait (503) rather than signed out.
 set -euo pipefail
 if [ "${BAANDER_WEB_RUNTIME_TIMEOUT_ACTIVE:-0}" != 1 ]; then
     exec env BAANDER_WEB_RUNTIME_TIMEOUT_ACTIVE=1 timeout 180s bash "$0" "$@"
@@ -70,7 +71,7 @@ app() {
 if [ "${BAANDER_TEST_CHECKOUT_IN_IMAGE:-0}" != 1 ]; then
     docker exec "$run_id-app" mkdir -p "$app_dir"
     tar -cf - vendor src tests config packages migrations bin docker/general templates public \
-        phpunit.xml.dist .env .env.test composer.json composer.lock translations | app tar -xf -
+        scripts/web-runtime phpunit.xml.dist .env .env.test composer.json composer.lock translations | app tar -xf -
 fi
 app mkdir -p storage/media storage/conversions
 # Throwaway OAuth signing keys; the CI image already carries its own.
@@ -88,6 +89,8 @@ printf '%s\n' 'Web-runtime-test-only-2' | app php bin/console app:user:create --
 printf '%s\n' 'Web-runtime-test-only-3' | app php bin/console app:user:create --no-interaction \
     --password --role super-admin --force web-runtime-super-admin@baander.app 'Web Runtime Super Admin' >/dev/null
 app php bin/console app:settings:set transcode.enabled true --no-interaction >/dev/null
+# The first-party client that password login issues tokens to.
+app php bin/console app:auth:setup-clients --no-interaction >/dev/null
 app php tests/Fixtures/web-runtime.php prepare
 
 docker exec -d -w "$app_dir" "$run_id-app" \
@@ -166,3 +169,57 @@ app php tests/Fixtures/web-runtime.php alert "$stopped_at" "$reloaded_at" "$star
 sleep $((3 * monitor_interval))
 app php tests/Fixtures/web-runtime.php alert "$stopped_at" "$reloaded_at" "$started_at" >/dev/null
 echo "No second alert arrived in the next $((3 * monitor_interval)) seconds."
+
+# Redis goes down while a signed-in client holds a session. The DPoP nonce and replay
+# stores live in Redis, so every DPoP-bound request is answered 503 with Retry-After and
+# no nonce: the client keeps its tokens and waits. The monitor alerts once, and delivers
+# at once, since PostgreSQL is up. After Redis returns the same refresh token refreshes.
+redis_outage() {
+    app php scripts/web-runtime/redis-outage.php "$@"
+}
+# Lines of the server's log that carry the message and name Redis.
+redis_log_lines() {
+    app sh -c 'grep -F "$1" var/log/prod.log | grep -cF "\"component\":\"redis\""' sh "$1" || true
+}
+# The administrators holding a Redis alert, one line per alert.
+redis_alerts() {
+    docker exec -e PGPASSWORD=test-only "$run_id-postgres" psql -h 127.0.0.1 -U baander -d web_test -tA -c \
+        "SELECT u.email FROM notifications n JOIN users u ON u.id = n.user_id
+          WHERE n.event_type = 'admin.health_degraded' AND n.reference_data->>'component' = 'redis'
+          ORDER BY u.email"
+}
+admins=$(printf '%s\n' web-runtime-admin@baander.app web-runtime-super-admin@baander.app)
+redis_outage login
+docker stop "$run_id-redis" >/dev/null
+redis_outage outage
+for attempt in $(seq 1 $((5 * monitor_interval))); do
+    if [ "$(redis_log_lines 'Health degradation detected')" -ge 1 ]; then break; fi
+    sleep 1
+done
+if [ "$(redis_log_lines 'Health degradation detected')" != 1 ]; then
+    echo "The health monitor did not report Redis unhealthy while it was stopped." >&2
+    exit 1
+fi
+echo "Redis stopped; the monitor saw it."
+docker start "$run_id-redis" >/dev/null
+for attempt in $(seq 1 30); do
+    if docker exec -e REDISCLI_AUTH=test-only "$run_id-redis" redis-cli ping 2>/dev/null | grep -qx PONG; then break; fi
+    sleep 1
+done
+docker exec -e REDISCLI_AUTH=test-only "$run_id-redis" redis-cli ping | grep -qx PONG
+redis_outage recovered
+for attempt in $(seq 1 $((10 * monitor_interval))); do
+    if [ "$(redis_alerts)" = "$admins" ]; then break; fi
+    sleep 1
+done
+if [ "$(redis_alerts)" != "$admins" ]; then
+    printf 'Expected one Redis alert for each of %s, got: %s\n' "$(tr '\n' ' ' <<<"$admins")" "$(tr '\n' ' ' <<<"$(redis_alerts)")" >&2
+    exit 1
+fi
+# A few more ticks: the delivered alert is not repeated.
+sleep $((3 * monitor_interval))
+if [ "$(redis_alerts)" != "$admins" ]; then
+    printf 'A second Redis alert arrived: %s\n' "$(tr '\n' ' ' <<<"$(redis_alerts)")" >&2
+    exit 1
+fi
+echo "Each administrator has one Redis alert, and no second alert arrived in the next $((3 * monitor_interval)) seconds."

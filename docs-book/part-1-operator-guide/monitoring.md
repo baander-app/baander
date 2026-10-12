@@ -51,6 +51,8 @@ The health check verifies five components:
 
 The web server runs these checks every 60 seconds and alerts administrators once per outage; see [Health alerts](notifications.md#health-alerts). A planned stop or restart of the web server sends no alert: once the server drains, its checks stop. An outage of a checked component while the server is not draining still alerts.
 
+While Redis is unreachable, the web server cannot check DPoP nonces and proof replays, so every request that needs them answers `503` with `Retry-After: 5` instead of refusing the token: API requests made with an access token, token refresh, login, passkey login and `/api/oauth/token`. Clients keep their sessions and retry after the delay; nobody is signed out. Every Redis connection has a 1 second connect and read timeout, so a Redis that hangs gets the same answer within that time. The Redis check alerts once for the outage and the alert is delivered at once, because it is a row in PostgreSQL; the background worker check reads not available meanwhile. The server logs the store failure, not every `503` it answers. A logout during the outage ends the session on the client only; see [Sessions, logout and a Redis outage](security.md#sessions-logout-and-a-redis-outage).
+
 ## Job Monitoring
 
 Background jobs (library scans, transcoding, notifications) are tracked by a job monitoring system. All job endpoints require authentication with `ROLE_ADMIN`.

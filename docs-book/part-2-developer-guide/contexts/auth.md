@@ -80,7 +80,7 @@ Four queries serve the OAuth endpoints. `GetAuthorizationRequestQuery` (`GetAuth
 | `PasswordResetTokenRepositoryInterface` | Each user's single outstanding reset token, stored as a SHA-256 hash and redeemed once |
 | `PasswordResetRequestThrottleInterface` | Per-account limit on password reset requests, keyed by normalized email |
 | `PasswordResetDeliveryInterface` | Emails the reset link after the response is sent; never persists or logs the token |
-| `DpopJtiCacheInterface` | DPoP replay protection |
+| `DpopJtiCacheInterface` | DPoP replay protection: `isReplay()` records a proof's `jti` for the acceptance window and throws `DpopStoreUnavailableException` when the store cannot answer |
 | `AuthenticatedUserIdentityInterface` | Identity of the user a login authenticator verified |
 | `EmailVerificationTokenRepositoryInterface` | Each user's single outstanding verification token, stored as a SHA-256 hash with the address it verifies and redeemed once |
 | `EmailVerificationDeliveryInterface` | Emails the verification link after the response is sent; never persists or logs the token |
@@ -149,7 +149,7 @@ All endpoints except the two `/.well-known/` documents are under `/api`.
 | POST | `/api/auth/login` | Password login (issues tokens) |
 | POST | `/api/auth/login/passkey` | Passkey login (issues tokens) |
 | POST | `/api/auth/refresh` | Refresh token rotation (issues tokens) |
-| POST | `/api/auth/logout` | Revoke the current access token |
+| POST | `/api/auth/logout` | Revoke the chain of the access token that authenticated the request and close the WebSocket connections opened with any of its access tokens |
 | POST | `/api/auth/password/reset-request` | Issue a password reset token; always answers `200` |
 | POST | `/api/auth/password/reset` | Redeem a reset token and set a new password |
 | POST | `/api/auth/email/verify` | Redeem a verification token; one generic `400` for every unusable token |
@@ -169,7 +169,7 @@ All endpoints except the two `/.well-known/` documents are under `/api`.
 | GET | `/api/oauth/authorize` | Check an authorization request for the consent page (authorization code with S256 PKCE) |
 | POST | `/api/oauth/authorize` | Record the signed-in user's decision and answer the redirect URI |
 | POST | `/api/oauth/token` | Token endpoint for the authorization code, device code, and refresh token grants (public; DPoP proof required) |
-| POST | `/api/oauth/revoke` | Token revocation (RFC 7009) |
+| POST | `/api/oauth/revoke` | Token revocation (RFC 7009) of a token of the signed-in user and its chain; a foreign or unknown token answers `200` alike, nothing revoked |
 | POST | `/api/oauth/device/authorize` | Device authorization request (RFC 8628; public) |
 | GET | `/api/oauth/device/verify` | Show the signed-in user the pending request behind a user code (device page) |
 | POST | `/api/oauth/device/approve` | Approve or deny a device request |
@@ -234,17 +234,23 @@ Four endpoints issue tokens. Baander's own apps use `POST /api/auth/login`, `POS
 
 Every new token pair comes from `TokenPairIssuer`, whether password login, passkey login, the authorization code grant, or the device code grant asked for it. It stores a DPoP-bound access token and a refresh token that starts a new rotation chain, with both rows written in one transaction. A grant can pass a further write that commits or rolls back with the tokens; the code grants use it to redeem their code. The refresh token is a plain opaque identifier; neither League encryption nor an `OAUTH_ENCRYPTION_KEY` is involved. Requested scopes are filtered against `auth.scopes.user_grants`, and a request for no scopes gets the default scopes.
 
-Rotation happens in `RefreshTokenHandler` for both refresh paths. It consumes the old refresh token atomically, issues the new pair in the same chain, and carries the DPoP key and the client fingerprint forward. A replayed refresh token revokes its chain. Tokens of a revoked client cannot be refreshed.
+Rotation happens in `RefreshTokenHandler` for both refresh paths. It consumes the old refresh token atomically, issues the new pair in the same chain, and carries the DPoP key and the client fingerprint forward. A replayed refresh token revokes its chain, except within the lost-response grace: a consumed token presented again with its own key inside `auth.refresh.reuse_grace_seconds` (default and maximum 60, measured on the database clock, 0 disables), while its replacement is unused, gets a fresh pair and the replacement is revoked. The decision is made on rows read under the row lock inside the issuing transaction, so two simultaneous presentations leave exactly one usable pair. A presentation with another key revokes nothing. Tokens of a revoked client cannot be refreshed. A server fault, such as a database restart, is answered `503` with `Retry-After`; it says nothing about the token.
+
+Logout (`POST /api/auth/logout`) dispatches `RevokeTokenCommand` for the access token that authenticated the request, with its chain: the handler revokes the refresh rows before the access rows, commits, and asks the live-connections port to close every WebSocket opened with an access token of the chain. `/api/oauth/revoke` runs the same command with the caller as the owner, so a token of another user is treated as unknown and the answer is `200` either way.
 
 The first-party endpoints wrap `accessToken`, `tokenType` (`DPoP`), `expiresIn`, and `refreshToken` in `data`; login responses also include `user`. The token endpoint answers in the RFC 6749 format instead: a flat object with `access_token`, `token_type` (`DPoP`), `expires_in`, `refresh_token`, and `scope`, built by `OAuthTokenResource`.
 
 ### DPoP
 
-All four endpoints require a `DPoP` header carrying a proof (RFC 9449) with a server-issued nonce. A proof without a valid nonce gets `400` with `{"error": "use_dpop_nonce"}` and a `DPoP-Nonce` header; the client retries with a new proof that carries that nonce. Each nonce works once. A successful response returns a fresh `DPoP-Nonce` for the client's next proof. At the first-party endpoints a missing `DPoP` header returns a `400` `ApiError`, and an invalid proof gets the `use_dpop_nonce` answer.
+All four endpoints require a `DPoP` header carrying a proof (RFC 9449) with a server-issued nonce. A proof without a valid nonce gets `400` with `{"error": "use_dpop_nonce"}` and a `DPoP-Nonce` header; the client retries with a new proof that carries that nonce. Each nonce works once, and `DpopNonceManager` hands one out only after Redis stored it. A successful response returns a fresh `DPoP-Nonce` for the client's next proof; at the first-party endpoints the next nonce is stored after the tokens are committed, and when that store fails the header is left out and the client's next refresh gets one challenge. Ordinary API responses carry no nonce. At the first-party endpoints a missing `DPoP` header returns a `400` `ApiError`, and an invalid proof gets the `use_dpop_nonce` answer.
 
-At the token endpoint, `TokenEndpointDpopListener` checks the proof before any grant runs, through `DpopTokenRequestVerifier::inspect()`, and stores a valid one on the request as `VerifiedDpopProof`. A rejected proof comes back as a `DpopProofRejection`, which the listener answers in RFC 9449 terms: `400` `use_dpop_nonce` when the proof lacks a fresh nonce, and `400` `invalid_dpop_proof` when the proof is missing or invalid, each with `error_description`, a `DPoP-Nonce` header, `Cache-Control: no-store` and `Pragma: no-cache`. Because a polling device spends a nonce on every request, every answer the controller gives, OAuth errors included, carries the next `DPoP-Nonce`.
+At the token endpoint, `TokenEndpointDpopListener` checks the proof before any grant runs, through `DpopTokenRequestVerifier::inspect()`, and stores a valid one on the request as `VerifiedDpopProof`. A rejected proof comes back as a `DpopProofRejection`, which the listener answers in RFC 9449 terms: `400` `use_dpop_nonce` when the proof lacks a fresh nonce, and `400` `invalid_dpop_proof` when the proof is missing or invalid, each with `error_description`, a `DPoP-Nonce` header, `Cache-Control: no-store` and `Pragma: no-cache`. Because a polling device spends a nonce on every request, every answer the controller gives, OAuth errors included, carries the next `DPoP-Nonce`; only the `503` below carries none.
 
-Tokens are bound to the proof key: the access token JWT carries `cnf.jkt`, and the thumbprint is stored with the token (`dpop_jkt`). Refresh requires a proof signed by the same key, and the new pair keeps the binding. `DpopBindingListener` requires a matching proof on every API request made with the token, except signed stream delivery URLs.
+Tokens are bound to the proof key: the access token JWT carries `cnf.jkt`, and the thumbprint is stored with the token (`dpop_jkt`). Refresh requires a proof signed by the same key, and the new pair keeps the binding. `DpopBindingListener` requires a matching proof on every API request made with the token, except signed stream delivery URLs. Replay protection records each proof's `jti` through `DpopJtiCacheInterface::isReplay()`, one atomic set-if-absent command with an expiry equal to the proof acceptance window (the larger of `auth.dpop.nonce_ttl` and twice `auth.dpop.clock_skew`).
+
+#### DPoP store outage
+
+A nonce or jti that cannot be checked is not a verdict on the proof. `DpopNonceManager` and `RedisDpopJtiCache` translate `\RedisException` and pool exhaustion into `DpopStoreUnavailableException` (Application) and log the failure; `RedisClientFactory` in Shared keeps its own exceptions. Five edges catch it and answer `503` with `Retry-After: 5`, `Cache-Control: no-store`, no `DPoP-Nonce` and no `WWW-Authenticate`: `AuthController::refresh`, `LoginController`, `PasskeyAuthenticator`, `TokenEndpointDpopListener` and `DpopBindingListener` (the listeners through `DpopStoreUnavailableResponse`). `OAuthController::token` answers a server fault during the grant the same way by throwing Symfony's service-unavailable exception, whose headers `ExceptionSubscriber` keeps. A genuine nonce miss keeps its `400` `use_dpop_nonce` answer and a genuine replay its `400` or `403`. Every Redis connection has a 1 second connect and read timeout (`RedisClientFactory::TIMEOUT_SECONDS` and the DSNs in `config/packages/cache.yaml`), so a hung Redis is answered inside the web client's 10 second attempt. The health monitor alerts once per outage; the edges log nothing more.
 
 ### Token Endpoint
 
@@ -258,7 +264,7 @@ Tokens are bound to the proof key: the access token JWT carries `cnf.jkt`, and t
 
 `OAuthClientAuthenticator` authenticates the client by `client_id`. A public client sends only its ID (`none`); a confidential client also sends `client_secret` (`client_secret_post`). Unknown, malformed, and revoked clients all fail with `401` `invalid_client`, so the answer does not reveal which it was.
 
-Errors follow RFC 6749: `{"error": "...", "error_description": "..."}`, with `400` except for `invalid_client`, which is `401`. Every controller answer, success or error, carries `Cache-Control: no-store`, `Pragma: no-cache`, and the next `DPoP-Nonce`. At this endpoint a refresh token must belong to the authenticated client; `ExchangeRefreshTokenHandler` reports every refresh rejection as `invalid_grant` without saying why.
+Errors follow RFC 6749: `{"error": "...", "error_description": "..."}`, with `400` except for `invalid_client`, which is `401`. Every controller answer, success or error, carries `Cache-Control: no-store`, `Pragma: no-cache`, and the next `DPoP-Nonce`; a server fault during the grant is `503` with `Retry-After` and no nonce (see [DPoP store outage](#dpop-store-outage)). At this endpoint a refresh token must belong to the authenticated client; `ExchangeRefreshTokenHandler` reports every refresh rejection as `invalid_grant` without saying why.
 
 ### Authorization Code Grant
 
@@ -349,6 +355,9 @@ Password login, passkey login, and every grant at the token endpoint accept an o
 | `CachedAccessTokenRepository` | Cache decorator | Caches access token lookups |
 | `TokenEndpointDpopListener` | Security | Requires a nonce-bearing DPoP proof at `POST /api/oauth/token` before the grant runs; answers a rejected proof with `invalid_dpop_proof` or `use_dpop_nonce` |
 | `DpopProofRejection` | Security | Why `DpopTokenRequestVerifier::inspect()` rejected a proof (`missing`, `nonce_required`, `invalid`) and the RFC 9449 error code for it |
+| `DpopNonceManager` | Security | Issues and consumes the single-use nonces in Redis; a nonce is handed out only after it was stored, and an unreachable store raises `DpopStoreUnavailableException` |
+| `RedisDpopJtiCache` | Cache | `DpopJtiCacheInterface` on Redis: one set-if-absent-with-expiry command per proof |
+| `DpopBindingListener` | Security | Requires a proof from the token's key on every API request made with an access token; answers an unavailable store with `DpopStoreUnavailableResponse` (`503`) |
 | `RateLimitListener` | Security | Per-IP and per-client limits for the auth and OAuth endpoints (see [Rate limiting](../../part-1-operator-guide/configuration.md#rate-limiting)) |
 | Doctrine entities | ORM | Persistence for all models |
 | Doctrine repositories | ORM | Repository implementations for all aggregates |

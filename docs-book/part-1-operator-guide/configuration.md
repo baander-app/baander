@@ -33,6 +33,9 @@ Redis is used for:
 - **Cache** — tag-aware caching for API responses, OAuth tokens, and user sessions
 - **Messenger** — async job transport (scan jobs, notification delivery)
 - **Rate limiting** — limiter state for API requests, for login, passkey, registration, password reset and token refresh attempts, and for the OAuth authorization server endpoints
+- **DPoP stores** — the single-use nonces of the token endpoints and the proof identifiers seen on API requests (replay protection)
+
+Every Redis connection the web server opens, from its connection pool and from the cache pools behind the rate limiters and Doctrine's caches, has a connect timeout and a read timeout of 1 second, so a Redis that hangs is answered as unavailable within that time. While Redis is unreachable, requests that need the DPoP stores answer `503` with `Retry-After` and clients keep their sessions; see [Sessions and a Redis outage](security.md#sessions-logout-and-a-redis-outage).
 
 ## Messenger
 
@@ -62,6 +65,7 @@ These are configured as parameters in `config/packages/auth.yaml` and can be ove
 |-----------|---------|-------------|
 | `auth.access_token.ttl` | `3600` (1 hour) | Access token lifetime in seconds. |
 | `auth.refresh_token.ttl` | `2592000` (30 days) | Refresh token lifetime in seconds. |
+| `auth.refresh.reuse_grace_seconds` | `60` | Lost-response grace, in seconds, measured on the database clock. For this long after a refresh token was consumed, presenting it again with a proof from the same DPoP key, while the pair it was exchanged for is still unused, issues a fresh pair and revokes that unused pair; a client whose refresh answer never arrived keeps its session. Any other reuse of a consumed token revokes its whole chain. At most `60`; `0` disables the grace. |
 | `auth.auth_code.ttl` | `600` (10 minutes) | Authorization code lifetime in seconds (authorization code grant with PKCE). |
 | `auth.device_code.ttl` | `900` (15 minutes) | Device code lifetime in seconds (RFC 8628). |
 | `auth.device_code.interval` | `5` | Minimum seconds between a device's token polls. A faster poll is answered with `slow_down` and adds 5 seconds to that device code's interval. |

@@ -66,6 +66,25 @@ The gate rebuilds twice and checks reproducibility and shipped artifact parity.
 See [DSP qualification](../../packages/dsp/README.md) for covered contracts and
 the remaining loudness and codec qualification limits.
 
+## Browser authentication transport
+
+`yarn --cwd ui/web test:browser-auth` runs `ui/web/tests/e2e/browser-auth/` in
+Chromium, Firefox and WebKit against a scripted server at `api.baander.app`,
+mapped to loopback; it runs as a blocking step in the frontend workflow. The
+scripted server's refresh state machine (`refresh-state.ts`) answers refresh
+tokens the way `/api/auth/refresh` does on PostgreSQL and is pinned to
+`tests/Integration/RefreshTokenGraceTest.php`. The suite checks that the service
+worker signs native image and media requests with the page's DPoP credentials
+and sends none to a foreign origin, that an expired token refreshes once and
+retries, and that a refresh failure is bounded. Its modes cover a nonce challenge
+answered with one re-signed proof, a `503` with `Retry-After` that keeps the
+session and retries after the delay, a lost refresh response re-presented inside
+the grace window, two tabs sharing one real credential store so the second tab
+adopts the pair the first rotated instead of presenting a consumed token, and a
+service worker stopped through CDP that pulls its credentials back from the page
+before signing the next request. Mock proofs qualify the browser transport; they
+do not validate the server's DPoP cryptography.
+
 ## Web store isolation and debugging
 
 Run `yarn --cwd ui/web test:store-debug` for the disposable Chromium workflow at
@@ -100,6 +119,39 @@ playback. Performance assertions use counts rather than timing-sensitive thresho
 | **StaticAnalysisRules** | `packages/baander-phpstan-rules/tests/` | Custom PHPStan rules, including parsed-source request-payload fixtures |
 | **Functional** | `tests/Functional/` | With Symfony kernel container, database, and services |
 | **Integration** | `tests/Integration/` | Database, transport, and other integration contracts against configured test services |
+
+Four suites cover the session work of ROADMAP item 5 and run through the
+functional runner in the CI image (`BAANDER_TEST_IMAGE=baander-ci-prewarm:local
+bash scripts/test-functional-container.sh <file>`); the integration ones need the
+runner's disposable PostgreSQL and Redis and do not run on the host:
+
+- `tests/Integration/RefreshTokenGraceTest.php`: the lost-response grace of
+  `auth.refresh.reuse_grace_seconds` and every other reuse of a refresh token
+  through the production refresh endpoint. A consumed token presented again with
+  its own DPoP key inside the window, while its replacement is unused, gets a
+  fresh pair; every other reuse revokes the chain before the `401`, and a
+  different key revokes nothing. The two-session cases run a child process
+  (`tests/Fixtures/Auth/refresh-token-race.php`) that waits on a row lock.
+- `tests/Integration/RefreshTokenConcurrencyTest.php`: two database sessions
+  presenting one token leave exactly one usable pair; a logout concurrent with a
+  refresh ends the chain without a deadlock; a signing or flush failure after the
+  consume rolls back and the retry succeeds; a login whose signing fails commits
+  nothing; a commit whose acknowledgement is lost leaves a usable pair; a lock
+  held past the lock timeout answers `503` inside the web client's attempt
+  timeout; fifty refreshes leave the connection pools at their starting sizes.
+  The faults are inert injectors in the production kernel
+  (`tests/Fixtures/Auth/IssuanceFaults.php`).
+- `tests/Integration/DpopStoreOutageTest.php`: the five DPoP edges during a Redis
+  outage. A refused store (a kernel whose Redis clients point at a closed port)
+  and a hung store (`CLIENT PAUSE` on the disposable Redis) both get `503` with
+  `Retry-After`, no `DPoP-Nonce` and no `WWW-Authenticate`, inside the web
+  client's attempt timeout; a genuine replay is still `403`; a refresh whose
+  post-commit nonce store fails answers `200` without a nonce; and the same token
+  refreshes once the store answers.
+- `tests/Functional/Auth/LogoutTest.php`: logout revokes the chain of the access
+  token that authenticated the request, so neither token works afterwards, and
+  `/api/oauth/revoke` revokes only the caller's own tokens and answers a foreign
+  token exactly like an unknown one.
 
 ## Running Tests
 
@@ -591,6 +643,23 @@ workers during the outage through the swoole bundle's API server
 unless the admin and the super-admin each receive exactly one PostgreSQL alert,
 delivered after PostgreSQL returns and naming an outage that began before the
 reload, and no second alert arrives in the next three checks.
+
+The drill then stops Redis while a signed-in session exists. It signs in as the
+admin with a fresh DPoP key through the real login (`app:auth:setup-clients` has
+seeded the first-party client), stops the Redis container, and drives the session
+with `scripts/web-runtime/redis-outage.php` inside the app container. It fails
+unless:
+
+- the refresh of that session answers `503` with a `Retry-After` delay,
+  `Cache-Control: no-store`, no `DPoP-Nonce` and no `WWW-Authenticate`, and
+  `GET /api/auth/me` with the session's access token answers the same `503`, not
+  `403`, each within the web client's 10-second attempt;
+- the monitor logs Redis unhealthy during the outage;
+- after Redis starts again, the same refresh token refreshes, taking one nonce
+  challenge when the restart lost the stored nonce, and the new access token is
+  accepted;
+- the admin and the super-admin each hold exactly one Redis alert, and no second
+  alert arrives in the next three checks.
 
 The web shutdown drill, `scripts/test-web-shutdown-container.sh`, stops the web
 server the way a container runtime does and takes about five to six minutes. It
