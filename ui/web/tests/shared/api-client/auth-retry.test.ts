@@ -16,6 +16,7 @@ vi.mock('@/shared/crypto/dpop-store', () => ({
 vi.mock('@/shared/crypto/dpop-proof', () => ({ createDpopProof: crypto.proof }));
 import { AXIOS_INSTANCE, ensureFreshAccessToken, getAuthSession } from '@/shared/api-client/axios-instance';
 import { schedulerAdminApi } from '@/features/admin/api/scheduler-admin-api';
+import { REFRESH_ATTEMPT_TIMEOUT_MS } from '@/shared/auth/refresh-budget';
 
 let api: MockAdapter;
 let refresh: MockAdapter;
@@ -30,6 +31,13 @@ beforeEach(() => {
   refresh = new MockAdapter(Axios);
 });
 afterEach(() => { api.restore(); refresh.restore(); });
+
+/** A private resource that is answered 401 until the request carries the rotated token. */
+function privateApi() {
+  api.onGet('/private').reply(config => {
+    return config.headers?.Authorization === 'DPoP new-access' ? [200, {}] : [401];
+  });
+}
 
 it('bounds retries for both the initiator and queued requests', async () => {
   api.onGet('/private').reply(401);
@@ -244,20 +252,21 @@ describe('a refresh that fails', () => {
     vi.unstubAllGlobals();
   });
 
-  const transientFailures: Array<[string, (handler: ReturnType<MockAdapter['onPost']>) => void]> = [
-    ['a network error', handler => { handler.networkError(); }],
-    ['a timeout', handler => { handler.timeout(); }],
-    ['502', handler => { handler.reply(502); }],
-    ['503', handler => { handler.reply(503); }],
+  // A transport failure buys one more attempt; any other answer does not.
+  const transientFailures: Array<[string, (handler: ReturnType<MockAdapter['onPost']>) => void, number]> = [
+    ['a network error', handler => { handler.networkError(); }, 2],
+    ['a timeout', handler => { handler.timeout(); }, 2],
+    ['502', handler => { handler.reply(502); }, 1],
   ];
 
-  for (const [failure, respond] of transientFailures) {
+  for (const [failure, respond, attempts] of transientFailures) {
     it(`with ${failure} keeps the user signed in and fails only the request`, async () => {
       api.onGet('/private').reply(401);
       respond(refresh.onPost());
 
       await expect(AXIOS_INSTANCE.get('/private')).rejects.toThrow();
 
+      expect(refresh.history.post).toHaveLength(attempts);
       expect(auth.clearAuth).not.toHaveBeenCalled();
       expect(auth.accessToken).toBe('old-access');
       expect(auth.refreshToken).toBe('old-refresh');
@@ -265,16 +274,19 @@ describe('a refresh that fails', () => {
     });
   }
 
-  it('with a network error lets the next request refresh and succeed', async () => {
-    api.onGet('/private').replyOnce(401).onGet('/private').replyOnce(401).onGet('/private').reply(200);
-    refresh.onPost().networkErrorOnce()
+  it('with one timeout retries at once and replays the initiator and the queued request once', async () => {
+    privateApi();
+    refresh.onPost().timeoutOnce()
       .onPost().reply(200, { accessToken: 'new-access', refreshToken: 'new-refresh' });
 
-    await expect(AXIOS_INSTANCE.get('/private')).rejects.toThrow();
-    await expect(AXIOS_INSTANCE.get('/private')).resolves.toHaveProperty('status', 200);
+    const outcomes = await Promise.all([AXIOS_INSTANCE.get('/private'), AXIOS_INSTANCE.get('/private')]);
 
+    expect(outcomes.map(outcome => outcome.status)).toEqual([200, 200]);
     expect(refresh.history.post).toHaveLength(2);
+    expect(refresh.history.post.map(attempt => attempt.timeout)).toEqual([REFRESH_ATTEMPT_TIMEOUT_MS, REFRESH_ATTEMPT_TIMEOUT_MS]);
+    expect(api.history.get).toHaveLength(4);
     expect(auth.accessToken).toBe('new-access');
+    expect(auth.clearAuth).not.toHaveBeenCalled();
     expect(location.href).toBe('https://baander.app/library');
   });
 
@@ -326,5 +338,154 @@ describe('a refresh that fails', () => {
 
     expect(auth.clearAuth).not.toHaveBeenCalled();
     expect(location.href).toBe('https://baander.app/library');
+  });
+});
+
+describe('a refresh answered 503', () => {
+  const rotated = { accessToken: 'new-access', refreshToken: 'new-refresh' };
+  let location: { href: string; origin: string };
+  let random: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    location = { href: 'https://baander.app/library', origin: 'https://baander.app' };
+    vi.stubGlobal('location', location);
+    vi.useFakeTimers();
+    random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+  });
+
+  afterEach(() => {
+    random.mockRestore();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  function expectSessionKept() {
+    expect(auth.clearAuth).not.toHaveBeenCalled();
+    expect(auth.refreshToken).toBe('old-refresh');
+    expect(location.href).toBe('https://baander.app/library');
+  }
+
+  it('waits Retry-After plus jitter, retries once and keeps the session throughout', async () => {
+    privateApi();
+    refresh.onPost().replyOnce(503, { error: 'temporarily_unavailable' }, { 'retry-after': '5' })
+      .onPost().reply(200, rotated);
+
+    const request = AXIOS_INSTANCE.get('/private');
+    await vi.advanceTimersByTimeAsync(4_999);
+
+    expect(refresh.history.post).toHaveLength(1);
+    expectSessionKept();
+
+    await vi.advanceTimersByTimeAsync(5_001);
+
+    await expect(request).resolves.toHaveProperty('status', 200);
+    expect(refresh.history.post).toHaveLength(2);
+    expect(auth.refreshToken).toBe('new-refresh');
+    expect(auth.clearAuth).not.toHaveBeenCalled();
+    expect(location.href).toBe('https://baander.app/library');
+  });
+
+  it('twice keeps the session and fails the initiator and the queued request once', async () => {
+    api.onGet('/private').reply(401);
+    refresh.onPost().reply(503, { error: 'temporarily_unavailable' }, { 'retry-after': '5' });
+
+    const outcomes = Promise.allSettled([AXIOS_INSTANCE.get('/private'), AXIOS_INSTANCE.get('/private')]);
+    await vi.advanceTimersByTimeAsync(10_000);
+    const results = await outcomes;
+
+    expect(results.map(result => result.status)).toEqual(['rejected', 'rejected']);
+    for (const result of results) {
+      expect((result as PromiseRejectedResult).reason).toHaveProperty('response.status', 503);
+    }
+    expect(refresh.history.post).toHaveLength(2);
+    expect(api.history.get).toHaveLength(2);
+    expectSessionKept();
+  });
+
+  it('caps a long Retry-After at 10 s in total', async () => {
+    privateApi();
+    random.mockReturnValue(1);
+    refresh.onPost().replyOnce(503, { error: 'temporarily_unavailable' }, { 'retry-after': '120' })
+      .onPost().reply(200, rotated);
+
+    const request = AXIOS_INSTANCE.get('/private');
+    await vi.advanceTimersByTimeAsync(9_999);
+
+    expect(refresh.history.post).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    await expect(request).resolves.toHaveProperty('status', 200);
+    expect(refresh.history.post).toHaveLength(2);
+  });
+
+  it('counts a nonce challenge after the wait against the budget and bounds the next attempt by what is left', async () => {
+    privateApi();
+    random.mockReturnValue(0);
+    refresh.onPost()
+      // 0 s to 10 s: the first attempt runs to its timeout before the 503 arrives.
+      .replyOnce(() => {
+        vi.setSystemTime(Date.now() + 10_000);
+        return [503, { error: 'temporarily_unavailable' }, { 'retry-after': '5' }];
+      })
+      // 15 s to 25 s: the server takes its time and then challenges the nonce.
+      .onPost().replyOnce(() => {
+        vi.setSystemTime(Date.now() + 10_000);
+        return [400, { error: 'use_dpop_nonce' }, { 'dpop-nonce': 'late-nonce' }];
+      })
+      .onPost().reply(200, rotated);
+
+    const request = AXIOS_INSTANCE.get('/private');
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    await expect(request).resolves.toHaveProperty('status', 200);
+    expect(refresh.history.post).toHaveLength(3);
+    expect(refresh.history.post.map(attempt => attempt.timeout)).toEqual([10_000, 10_000, 5_000]);
+    expect(refresh.history.post[2].headers?.DPoP).toBeDefined();
+    expect(crypto.proof).toHaveBeenCalledWith(crypto.key, 'POST', 'https://api.baander.app/api/auth/refresh', { nonce: 'late-nonce' });
+  });
+
+  it('does not start an attempt past the budget', async () => {
+    api.onGet('/private').reply(401);
+    random.mockReturnValue(1);
+    refresh.onPost()
+      // 0 s to 10 s: timeout, then a 503 asking for 10 s plus jitter, capped at 10 s: 20 s.
+      .replyOnce(() => {
+        vi.setSystemTime(Date.now() + 10_000);
+        return [503, { error: 'temporarily_unavailable' }, { 'retry-after': '10' }];
+      })
+      // 20 s to 30 s: the nonce challenge arrives as the budget runs out.
+      .onPost().replyOnce(() => {
+        vi.setSystemTime(Date.now() + 10_000);
+        return [400, { error: 'use_dpop_nonce' }, { 'dpop-nonce': 'late-nonce' }];
+      })
+      .onPost().reply(200, rotated);
+
+    const request = AXIOS_INSTANCE.get('/private').catch(error => error);
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    await expect(request).resolves.toHaveProperty('response.status', 400);
+    expect(refresh.history.post).toHaveLength(2);
+    expectSessionKept();
+  });
+
+  it('signs every attempt with a fresh proof from the same key', async () => {
+    privateApi();
+    let signed = 0;
+    crypto.proof.mockImplementation(async () => `proof-${++signed}`);
+    refresh.onPost().replyOnce(503, { error: 'temporarily_unavailable' }, { 'retry-after': '1' })
+      .onPost().timeoutOnce()
+      .onPost().replyOnce(400, { error: 'use_dpop_nonce' }, { 'dpop-nonce': 'required-nonce' })
+      .onPost().reply(200, rotated);
+
+    const request = AXIOS_INSTANCE.get('/private');
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    await expect(request).resolves.toHaveProperty('status', 200);
+    expect(refresh.history.post).toHaveLength(4);
+    const proofs = refresh.history.post.map(attempt => attempt.headers?.DPoP);
+    expect(new Set(proofs).size).toBe(4);
+    expect(crypto.proof.mock.calls.every(call => call[0] === crypto.key)).toBe(true);
+    expect(crypto.proof).toHaveBeenCalledWith(crypto.key, 'POST', 'https://api.baander.app/api/auth/refresh', { nonce: 'required-nonce' });
   });
 });

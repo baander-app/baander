@@ -2,6 +2,8 @@ import Axios, { AxiosError, type AxiosRequestConfig, type InternalAxiosRequestCo
 import { useAuthStore } from '@/features/auth/stores/auth-store';
 import { getDpopKeyPair, getDpopNonce, setDpopNonce } from '@/shared/crypto/dpop-store';
 import { createDpopProof } from '@/shared/crypto/dpop-proof';
+import { REFRESH_ATTEMPT_TIMEOUT_MS, REFRESH_BUDGET_MS, outageWaitMs } from '@/shared/auth/refresh-budget';
+import { retryAfterSeconds } from '@/features/auth/lib/retry-after';
 
 const getAuthStore = () => useAuthStore.getState();
 
@@ -116,9 +118,9 @@ AXIOS_INSTANCE.interceptors.response.use((response) => {
 // --- Token refresh: queue concurrent 401s, retry after refresh ---
 /**
  * Only the refresh endpoint refusing the refresh token ends the session: a 401, or an OAuth
- * 400 invalid_grant. A network error, a timeout, a 5xx (a restarting server) and any other
- * 400, such as a nonce challenge still answered after the one nonce retry, keep the user
- * signed in and fail just the request.
+ * 400 invalid_grant. A network error, a timeout, a 5xx (a restarting server or a store outage)
+ * and any other 400, such as a nonce challenge still answered after the one nonce retry, keep
+ * the user signed in and fail just the request.
  */
 function isRefreshRejected(error: unknown): boolean {
   if (!Axios.isAxiosError(error)) return false;
@@ -126,8 +128,30 @@ function isRefreshRejected(error: unknown): boolean {
   return status === 401 || (status === 400 && error.response?.data?.error === 'invalid_grant');
 }
 
+/** The answer never arrived: a timeout or a network error, as opposed to a cancelled request. */
+function isTransportFailure(error: unknown): boolean {
+  return Axios.isAxiosError(error) && !error.response && !Axios.isCancel(error);
+}
+
+/** The nonce a `use_dpop_nonce` challenge asks the next proof to carry, or null for any other answer. */
+function challengedNonce(error: unknown): string | null {
+  if (!Axios.isAxiosError(error) || error.response?.status !== 400) return null;
+  if (error.response.data?.error !== 'use_dpop_nonce') return null;
+  const nonce = error.response.headers?.['dpop-nonce'];
+  return typeof nonce === 'string' && nonce !== '' ? nonce : null;
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 let refreshInFlight: { session: number; promise: Promise<void> } | null = null;
 
+/**
+ * One refresh has one wall-clock budget (see `@/shared/auth/refresh-budget`). A transport failure,
+ * a nonce challenge and a 503 each buy one more attempt; the remaining budget is checked before every
+ * attempt and bounds it; every attempt signs a fresh proof with the same key.
+ */
 async function refreshSession(session: number): Promise<void> {
   const {accessToken, refreshToken} = getAuthStore();
   const keyPair = getDpopKeyPair();
@@ -136,14 +160,21 @@ async function refreshSession(session: number): Promise<void> {
   try {
     if (!refreshToken || !keyPair) throw new Error('No refresh credentials');
     const refreshUrl = new URL('/api/auth/refresh', window.__BAANDER_API_URL__ || window.location.origin).href;
-    for (let attempt = 0; attempt <= MAX_DPOP_NONCE_RETRIES; attempt++) {
-      const proof = await createDpopProof(keyPair, 'POST', buildHtu(refreshUrl), {
+    const htu = buildHtu(refreshUrl);
+    const deadline = Date.now() + REFRESH_BUDGET_MS;
+    const retried = { transport: false, nonce: false, outage: false };
+    let lastError: unknown = new Error('Refresh budget exhausted');
+    for (;;) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) throw lastError;
+      const proof = await createDpopProof(keyPair, 'POST', htu, {
         nonce: getDpopNonce() ?? undefined,
       });
       if (!isCurrentSession()) throw new Axios.CanceledError('Authentication changed during refresh');
       try {
         const response = await Axios.post(refreshUrl, {refreshToken}, {
-          headers: {DPoP: proof}, timeout: 15000,
+          headers: {DPoP: proof},
+          timeout: Math.min(REFRESH_ATTEMPT_TIMEOUT_MS, remaining),
         });
         if (!isCurrentSession()) throw new Axios.CanceledError('Authentication changed during refresh');
         const data = response.data?.data ?? response.data;
@@ -157,11 +188,25 @@ async function refreshSession(session: number): Promise<void> {
         return;
       } catch (error) {
         if (!isCurrentSession()) throw error;
-        const nonce = Axios.isAxiosError(error) ? error.response?.headers?.['dpop-nonce'] : undefined;
-        if (attempt < MAX_DPOP_NONCE_RETRIES && Axios.isAxiosError(error) &&
-            error.response?.status === 400 && error.response.data?.error === 'use_dpop_nonce' &&
-            typeof nonce === 'string' && nonce) {
+        lastError = error;
+        const nonce = challengedNonce(error);
+        if (nonce !== null && !retried.nonce) {
+          retried.nonce = true;
           setDpopNonce(nonce);
+          continue;
+        }
+        if (isTransportFailure(error) && !retried.transport) {
+          retried.transport = true;
+          continue;
+        }
+        const retryAfter = retryAfterSeconds(error, { status: 503 });
+        if (retryAfter !== null && !retried.outage) {
+          retried.outage = true;
+          const outageWait = outageWaitMs(retryAfter);
+          // A wait that ends past the budget would start no attempt; fail now instead.
+          if (Date.now() + outageWait >= deadline) throw error;
+          await wait(outageWait);
+          if (!isCurrentSession()) throw new Axios.CanceledError('Authentication changed during refresh');
           continue;
         }
         throw error;

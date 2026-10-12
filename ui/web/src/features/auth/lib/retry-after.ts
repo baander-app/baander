@@ -1,14 +1,22 @@
-import { AxiosError } from 'axios'
+import { isAxiosError } from 'axios'
 
-/** Used when a 429 response carries no usable Retry-After header. */
+/** Used when a response carries no usable Retry-After header. */
 const DEFAULT_RETRY_SECONDS = 60
 
+export interface RetryAfterOptions {
+  /** The status the response must carry: 429 (rate limited) by default, 503 for an outage. */
+  status?: number
+  /** The current time, for a Retry-After given as an HTTP date. */
+  now?: number
+}
+
 /**
- * Seconds to wait before retrying a request the server rate limited, or null when the
- * error is not a 429 response. Retry-After may be a number of seconds or an HTTP date.
+ * Seconds a response asked the client to wait before retrying, or null when the error is not a
+ * response with the expected status. Retry-After may be a number of seconds or an HTTP date; a
+ * missing or unreadable header counts as a minute.
  */
-export function retryAfterSeconds(err: unknown, now: number = Date.now()): number | null {
-  if (!(err instanceof AxiosError) || err.response?.status !== 429) return null
+export function retryAfterSeconds(err: unknown, { status = 429, now = Date.now() }: RetryAfterOptions = {}): number | null {
+  if (!isAxiosError(err) || err.response?.status !== status) return null
 
   const header: unknown = err.response.headers?.['retry-after']
   if (typeof header !== 'string' || header.trim() === '') return DEFAULT_RETRY_SECONDS

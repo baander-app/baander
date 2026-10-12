@@ -17,15 +17,22 @@ describe('retryAfterSeconds', () => {
     expect(retryAfterSeconds(httpError(429, { 'retry-after': '42' }))).toBe(42)
   })
 
+  it('reads a delay from a 503 response when asked for that status', () => {
+    expect(retryAfterSeconds(httpError(503, { 'retry-after': '5' }), { status: 503 })).toBe(5)
+    expect(retryAfterSeconds(httpError(429, { 'retry-after': '5' }), { status: 503 })).toBeNull()
+  })
+
   it('converts an HTTP date into the remaining seconds', () => {
     const now = Date.parse('2026-10-07T12:00:00Z')
 
-    expect(retryAfterSeconds(httpError(429, { 'retry-after': 'Wed, 07 Oct 2026 12:01:30 GMT' }), now)).toBe(90)
+    expect(retryAfterSeconds(httpError(429, { 'retry-after': 'Wed, 07 Oct 2026 12:01:30 GMT' }), { now })).toBe(90)
   })
 
   it('waits at least one second', () => {
+    const now = Date.parse('2026-10-07T12:00:00Z')
+
     expect(retryAfterSeconds(httpError(429, { 'retry-after': '0' }))).toBe(1)
-    expect(retryAfterSeconds(httpError(429, { 'retry-after': 'Wed, 07 Oct 2026 11:00:00 GMT' }), Date.parse('2026-10-07T12:00:00Z'))).toBe(1)
+    expect(retryAfterSeconds(httpError(429, { 'retry-after': 'Wed, 07 Oct 2026 11:00:00 GMT' }), { now })).toBe(1)
   })
 
   it('falls back to a minute when the header is missing or unreadable', () => {
@@ -33,8 +40,9 @@ describe('retryAfterSeconds', () => {
     expect(retryAfterSeconds(httpError(429, { 'retry-after': 'soon' }))).toBe(60)
   })
 
-  it('ignores responses that were not rate limited', () => {
+  it('ignores responses with another status', () => {
     expect(retryAfterSeconds(httpError(400, { 'retry-after': '42' }))).toBeNull()
+    expect(retryAfterSeconds(httpError(503, { 'retry-after': '42' }))).toBeNull()
     expect(retryAfterSeconds(new Error('Network down'))).toBeNull()
   })
 })

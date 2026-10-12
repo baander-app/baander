@@ -15,6 +15,10 @@ const clientAuth = new Map<string, ClientAuth>();
 const MAX_CLIENTS = 128;
 const MAX_PENDING_PROOFS = 32;
 const MAX_PENDING_REFRESHES = 32;
+// Deadlines for the window's answers. This file is a single-file build with no imports, so the values
+// are declared here and pinned to src/shared/auth/refresh-budget.ts by tests/shared/auth/refresh-budget.test.ts.
+const PROOF_DEADLINE_MS = 3000;
+const REFRESH_DEADLINE_MS = 35000;
 let pendingProofs = 0;
 let pendingRefreshes = 0;
 
@@ -94,7 +98,7 @@ function requestDpopProof(clientId: string, method: string, url: string, auth: C
       pendingProofs--;
       resolve({ proof, timedOut });
     };
-    const timeout = setTimeout(() => finish(null, true), 3000);
+    const timeout = setTimeout(() => finish(null, true), PROOF_DEADLINE_MS);
     channel.port1.onmessageerror = () => finish(null);
     channel.port1.onmessage = event => {
       if (event.data?.type === 'SW_DPOP_PROOF' && typeof event.data.proof === 'string' && event.data.proof &&
@@ -133,8 +137,8 @@ function requestAuthRefresh(clientId: string, method: string, url: string, auth:
       pendingRefreshes--;
       resolve(refreshed);
     };
-    // The window can perform two bounded 15s refresh attempts.
-    const timeout = setTimeout(() => finish(false), 35000);
+    // The window's whole refresh budget plus one message round trip.
+    const timeout = setTimeout(() => finish(false), REFRESH_DEADLINE_MS);
     channel.port1.onmessageerror = () => finish(false);
     channel.port1.onmessage = event => {
       const next = event.data?.type === 'SW_AUTH_REFRESHED' ? parseAuth(event.data.auth) : null;

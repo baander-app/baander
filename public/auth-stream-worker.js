@@ -3,6 +3,8 @@
   const MAX_CLIENTS = 128;
   const MAX_PENDING_PROOFS = 32;
   const MAX_PENDING_REFRESHES = 32;
+  const PROOF_DEADLINE_MS = 3e3;
+  const REFRESH_DEADLINE_MS = 35e3;
   let pendingProofs = 0;
   let pendingRefreshes = 0;
   self.addEventListener("install", (event) => {
@@ -71,7 +73,7 @@
         pendingProofs--;
         resolve({ proof, timedOut });
       };
-      const timeout = setTimeout(() => finish(null, true), 3e3);
+      const timeout = setTimeout(() => finish(null, true), PROOF_DEADLINE_MS);
       channel.port1.onmessageerror = () => finish(null);
       channel.port1.onmessage = (event) => {
         if (event.data?.type === "SW_DPOP_PROOF" && typeof event.data.proof === "string" && event.data.proof && clientAuth.get(clientId) === auth) {
@@ -113,7 +115,7 @@
         pendingRefreshes--;
         resolve(refreshed);
       };
-      const timeout = setTimeout(() => finish(false), 35e3);
+      const timeout = setTimeout(() => finish(false), REFRESH_DEADLINE_MS);
       channel.port1.onmessageerror = () => finish(false);
       channel.port1.onmessage = (event) => {
         const next = event.data?.type === "SW_AUTH_REFRESHED" ? parseAuth(event.data.auth) : null;
