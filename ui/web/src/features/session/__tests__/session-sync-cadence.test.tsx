@@ -12,7 +12,10 @@ vi.mock('@/shared/api-client/axios-instance', () => ({ AXIOS_INSTANCE: {
 } }))
 vi.mock('@/features/player/services/audio-service', () => ({ audioService: { getProcessor: () => null } }))
 vi.mock('@/features/player/services/activity-service', () => ({ activityService: { recordPlay: () => Promise.resolve() } }))
-vi.mock('@/features/auth/stores/auth-store', () => ({ useAuthStore: { getState: () => ({ accessToken: 'token' }) } }))
+vi.mock('@/features/auth/stores/auth-store', () => {
+  const state = { accessToken: 'token', isAuthenticated: true }
+  return { useAuthStore: Object.assign((selector: (s: typeof state) => unknown) => selector(state), { getState: () => state }) }
+})
 vi.mock('../utils/device-id', () => ({ getDeviceId: () => 'local-device', getDeviceName: () => 'Test Browser' }))
 vi.mock('@/shared/lib/mediator/bus', () => ({ mediator: { dispatch: vi.fn() } }))
 

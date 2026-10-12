@@ -1,4 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { FakeBroadcastChannel, FakeLockManager, installLocks } from '../../../../../tests/shared/auth/auth-fakes'
+import type { LegacyStoredAuthData, LegacyStoredRecord } from '@/shared/crypto/auth-db'
+
+// The store subscribes to the auth channel when it is created, so the fake must exist before the import.
+vi.hoisted(async () => {
+  const fakes = await import('../../../../../tests/shared/auth/auth-fakes')
+  Object.assign(globalThis, { BroadcastChannel: fakes.FakeBroadcastChannel })
+})
 
 vi.mock('@/shared/api-client/axios-instance', () => ({
   AXIOS_INSTANCE: {
@@ -24,18 +32,40 @@ vi.mock('@/shared/crypto/dpop-key-pair', () => ({
   generateDpopKeyPair: vi.fn(),
 }))
 
+/** The in-memory DPoP cache, so adoption can compare the held key with the stored one. */
+const dpop = vi.hoisted(() => ({
+  keyPair: null as { publicKey: CryptoKey; privateKey: CryptoKey; jwk: JsonWebKey; jkt: string } | null,
+  nonce: null as string | null,
+}))
+
 vi.mock('@/shared/crypto/dpop-store', () => ({
-  getDpopKeyPair: vi.fn(() => null),
-  setDpopKeyPair: vi.fn(),
-  clearDpopKeyPair: vi.fn(),
-  getDpopNonce: vi.fn(() => null),
-  setDpopNonce: vi.fn(),
+  getDpopKeyPair: vi.fn(() => dpop.keyPair),
+  setDpopKeyPair: vi.fn((pair) => { dpop.keyPair = pair }),
+  clearDpopKeyPair: vi.fn(() => { dpop.keyPair = null }),
+  getDpopNonce: vi.fn(() => dpop.nonce),
+  setDpopNonce: vi.fn((nonce: string) => { dpop.nonce = nonce }),
+}))
+
+/** One origin's record, with the epoch rules of the IndexedDB adapter. */
+const storage = vi.hoisted(() => ({
+  record: null as LegacyStoredRecord | null,
 }))
 
 vi.mock('@/shared/crypto/auth-db', () => ({
-  loadStoredAuth: vi.fn().mockResolvedValue(null),
-  saveStoredAuth: vi.fn().mockResolvedValue(undefined),
-  clearStoredAuth: vi.fn().mockResolvedValue(undefined),
+  loadStoredAuth: vi.fn(async () => storage.record),
+  saveStoredAuth: vi.fn(async (data: LegacyStoredAuthData, expectedEpoch: number | null) => {
+    const currentEpoch = storage.record?.epoch ?? null
+    if (currentEpoch !== expectedEpoch) return { ok: false, current: storage.record }
+    const epoch = (expectedEpoch ?? 0) + 1
+    storage.record = { ...data, epoch }
+    return { ok: true, epoch }
+  }),
+  clearStoredAuth: vi.fn(async () => {
+    const epoch = (storage.record?.epoch ?? 0) + 1
+    storage.record = { epoch, cleared: true }
+    return epoch
+  }),
+  isClearedRecord: (record: LegacyStoredRecord) => 'cleared' in record && record.cleared === true,
 }))
 
 vi.mock('@/shared/lib/logger', () => ({
@@ -61,6 +91,7 @@ import {
   saveStoredAuth,
   clearStoredAuth,
 } from '@/shared/crypto/auth-db'
+import { AUTH_CHANNEL_NAME, AUTH_LOCK_NAME } from '@/features/auth/services/auth-coordination'
 import { useAuthStore } from '../auth-store'
 
 const mockAxios = vi.mocked(AXIOS_INSTANCE)
@@ -89,6 +120,8 @@ const VALID_USER = {
   roles: ['ROLE_USER'],
 }
 
+const LOGIN_PAGE = 'https://baander.app/library'
+
 function validLoginResponse() {
   return {
     data: {
@@ -101,26 +134,76 @@ function validLoginResponse() {
   }
 }
 
-describe('useAuthStore', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
+/** A live record as another tab would have written it. */
+function liveRecord(epoch: number, accessToken: string, overrides: Partial<LegacyStoredAuthData> = {}) {
+  return {
+    epoch,
+    cryptoKeyPair: { publicKey: FAKE_KEY_PAIR.publicKey, privateKey: FAKE_KEY_PAIR.privateKey },
+    publicJwk: FAKE_KEY_PAIR.jwk,
+    jkt: FAKE_KEY_PAIR.jkt,
+    accessToken,
+    refreshToken: `${accessToken}-refresh`,
+    user: VALID_USER,
+    nonce: null,
+    ...overrides,
+  }
+}
 
-    // Reset store state between tests — drives every action via getState().
-    useAuthStore.setState({
-      accessToken: null,
-      refreshToken: null,
-      user: null,
-      isAuthenticated: false,
-      isLoading: false,
-    })
+/** Signs the tab in from a stored record, as a page load does. */
+async function hydrateFrom(record: LegacyStoredRecord) {
+  storage.record = record
+  await useAuthStore.getState().initAuth()
+  expect(useAuthStore.getState().isAuthenticated).toBe(true)
+  vi.clearAllMocks()
+}
 
-    // Defaults
-    mockAxios.post.mockResolvedValue({ data: {} })
-    mockGenerateDpopKeyPair.mockResolvedValue(FAKE_KEY_PAIR)
-    mockPostAuthLogout.mockResolvedValue({ data: {} } as Awaited<ReturnType<typeof postAuthLogout>>)
-    mockLoadStoredAuth.mockResolvedValue(null)
+function postedEvents() {
+  return FakeBroadcastChannel.posted.filter((entry) => entry.name === AUTH_CHANNEL_NAME).map((entry) => entry.message)
+}
+
+function deliverFromOtherTab(message: object) {
+  FakeBroadcastChannel.deliver(AUTH_CHANNEL_NAME, message)
+}
+
+let locks: FakeLockManager
+let restoreLocks: () => void
+let location: { href: string; origin: string; pathname: string }
+
+function resetStore() {
+  useAuthStore.getState().clearAuth()
+  useAuthStore.setState({
+    accessToken: null,
+    refreshToken: null,
+    user: null,
+    isAuthenticated: false,
+    isLoading: false,
   })
+}
 
+beforeEach(async () => {
+  resetStore()
+  await vi.waitFor(() => expect(mockClearStoredAuth).toHaveBeenCalled())
+  vi.clearAllMocks()
+  storage.record = null
+  dpop.keyPair = null
+  dpop.nonce = null
+  FakeBroadcastChannel.posted = []
+  locks = new FakeLockManager()
+  restoreLocks = installLocks(locks)
+  location = { href: LOGIN_PAGE, origin: 'https://baander.app', pathname: '/library' }
+  vi.stubGlobal('location', location)
+
+  mockAxios.post.mockResolvedValue({ data: {} })
+  mockGenerateDpopKeyPair.mockResolvedValue(FAKE_KEY_PAIR)
+  mockPostAuthLogout.mockResolvedValue({ data: {} } as Awaited<ReturnType<typeof postAuthLogout>>)
+})
+
+afterEach(() => {
+  restoreLocks()
+  vi.unstubAllGlobals()
+})
+
+describe('useAuthStore', () => {
   describe('login', () => {
     it('sets tokens/user/isAuthenticated and persists auth + posts token to worker on valid response', async () => {
       mockAxios.post.mockResolvedValue(validLoginResponse())
@@ -138,7 +221,7 @@ describe('useAuthStore', () => {
       expect(mockGenerateDpopKeyPair).toHaveBeenCalledOnce()
       // Key pair was stashed in the DPoP store before persisting.
       expect(mockSetDpopKeyPair).toHaveBeenCalledWith(FAKE_KEY_PAIR)
-      // Auth persisted to IndexedDB with token + key material.
+      // Auth persisted to IndexedDB with token + key material, at the epoch of an empty store.
       expect(mockSaveStoredAuth).toHaveBeenCalledOnce()
       expect(mockSaveStoredAuth).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -147,9 +230,32 @@ describe('useAuthStore', () => {
           publicJwk: FAKE_KEY_PAIR.jwk,
           jkt: FAKE_KEY_PAIR.jkt,
         }),
+        null,
       )
+      expect(storage.record).toMatchObject({ epoch: 1, accessToken: 'access-token-123' })
       // Token pushed to the service worker.
       expect(mockPostTokenToWorker).toHaveBeenCalledWith('access-token-123')
+    })
+
+    it('writes through the auth lock and tells the other tabs', async () => {
+      mockAxios.post.mockResolvedValue(validLoginResponse())
+
+      await useAuthStore.getState().login('test@baander.app', 'secret')
+
+      expect(locks.requests).toEqual([{ name: AUTH_LOCK_NAME, outcome: 'granted' }])
+      expect(postedEvents()).toEqual([{ type: 'rotated', epoch: 1 }])
+    })
+
+    it('writes over the tombstone a logout left, at its epoch plus one', async () => {
+      storage.record = { epoch: 5, cleared: true }
+      mockAxios.post.mockResolvedValue(validLoginResponse())
+
+      await useAuthStore.getState().login('test@baander.app', 'secret')
+
+      expect(mockSaveStoredAuth).toHaveBeenCalledWith(expect.objectContaining({ accessToken: 'access-token-123' }), 5)
+      expect(storage.record).toMatchObject({ epoch: 6, accessToken: 'access-token-123' })
+      expect(postedEvents()).toEqual([{ type: 'rotated', epoch: 6 }])
+      expect(useAuthStore.getState().isAuthenticated).toBe(true)
     })
 
     it('hits the re-entrancy guard and refuses a second concurrent login', async () => {
@@ -272,6 +378,7 @@ describe('useAuthStore', () => {
       useAuthStore.getState().clearAuth()
       expect(mockPostTokenToWorker).toHaveBeenCalledWith(null)
     })
+
     it('clears DPoP key pair, state, and IndexedDB', async () => {
       useAuthStore.setState({
         accessToken: 'tok',
@@ -291,11 +398,23 @@ describe('useAuthStore', () => {
       expect(mockClearDpopKeyPair).toHaveBeenCalledOnce()
       await vi.waitFor(() => expect(mockClearStoredAuth).toHaveBeenCalledOnce())
     })
+
+    it('writes the tombstone without waiting for the lock and broadcasts the epoch, never a token', async () => {
+      await hydrateFrom(liveRecord(3, 'held-access'))
+      locks.hold()
+
+      useAuthStore.getState().clearAuth()
+
+      await vi.waitFor(() => expect(postedEvents()).toEqual([{ type: 'cleared', epoch: 4 }]))
+      expect(storage.record).toEqual({ epoch: 4, cleared: true })
+      expect(locks.requests).toEqual([{ name: AUTH_LOCK_NAME, outcome: 'granted' }])
+      expect(JSON.stringify(FakeBroadcastChannel.posted)).not.toContain('held-access')
+    })
   })
 
   describe('initAuth', () => {
     it('is a no-op when no auth is stored (leaves state unauthenticated, does not throw)', async () => {
-      mockLoadStoredAuth.mockResolvedValue(null)
+      storage.record = null
 
       await useAuthStore.getState().initAuth()
 
@@ -310,8 +429,18 @@ describe('useAuthStore', () => {
       expect(mockSetDpopNonce).not.toHaveBeenCalled()
     })
 
+    it('stays signed out when a logout left a tombstone', async () => {
+      storage.record = { epoch: 2, cleared: true }
+
+      await useAuthStore.getState().initAuth()
+
+      expect(useAuthStore.getState().isAuthenticated).toBe(false)
+      expect(mockSetDpopKeyPair).not.toHaveBeenCalled()
+    })
+
     it('reconstructs DPoP key pair, restores nonce, and authenticates when stored auth exists', async () => {
       const stored = {
+        epoch: 1,
         cryptoKeyPair: {
           publicKey: {} as CryptoKey,
           privateKey: {} as CryptoKey,
@@ -323,7 +452,7 @@ describe('useAuthStore', () => {
         user: VALID_USER,
         nonce: 'restored-nonce',
       }
-      mockLoadStoredAuth.mockResolvedValue(stored)
+      storage.record = stored
 
       await useAuthStore.getState().initAuth()
 
@@ -344,7 +473,7 @@ describe('useAuthStore', () => {
     })
 
     it('does not throw when loadStoredAuth rejects (logs and stays unauthenticated)', async () => {
-      mockLoadStoredAuth.mockRejectedValue(new Error('IndexedDB unavailable'))
+      mockLoadStoredAuth.mockRejectedValueOnce(new Error('IndexedDB unavailable'))
 
       await expect(useAuthStore.getState().initAuth()).resolves.toBeUndefined()
 
@@ -355,24 +484,226 @@ describe('useAuthStore', () => {
   })
 })
 
-describe('auth request ownership', () => {
-  beforeEach(async () => {
-    useAuthStore.getState().clearAuth()
-    await vi.waitFor(() => expect(mockClearStoredAuth).toHaveBeenCalled())
-    vi.clearAllMocks()
-    mockLoadStoredAuth.mockResolvedValue(null)
-    mockGenerateDpopKeyPair.mockResolvedValue(FAKE_KEY_PAIR)
-    mockSaveStoredAuth.mockResolvedValue(undefined)
+describe('adoptStoredAuth under the refresh lock', () => {
+  it('adopts the tokens and nonce another tab rotated and keeps the shared key (AE5)', async () => {
+    await hydrateFrom(liveRecord(1, 'r1-access'))
+    storage.record = liveRecord(2, 'r2-access', { nonce: 'nonce-after-rotation' })
+
+    await expect(useAuthStore.getState().adoptStoredAuth()).resolves.toBe(true)
+
+    const state = useAuthStore.getState()
+    expect(state.accessToken).toBe('r2-access')
+    expect(state.refreshToken).toBe('r2-access-refresh')
+    expect(state.isAuthenticated).toBe(true)
+    expect(mockSetDpopNonce).toHaveBeenCalledWith('nonce-after-rotation')
+    expect(mockSetDpopKeyPair).not.toHaveBeenCalled()
+    expect(mockPostTokenToWorker).toHaveBeenCalledWith('r2-access')
+    expect(mockAxios.post).not.toHaveBeenCalled()
+    expect(mockSaveStoredAuth).not.toHaveBeenCalled()
   })
 
+  it('adopts nothing when the stored epoch is the one it holds', async () => {
+    await hydrateFrom(liveRecord(1, 'r1-access'))
+
+    await expect(useAuthStore.getState().adoptStoredAuth()).resolves.toBe(false)
+
+    expect(useAuthStore.getState().accessToken).toBe('r1-access')
+    expect(mockPostTokenToWorker).not.toHaveBeenCalled()
+  })
+
+  it('takes over another account signed in elsewhere, key pair included', async () => {
+    await hydrateFrom(liveRecord(1, 'r1-access'))
+    const otherKey = { publicKey: {} as CryptoKey, privateKey: {} as CryptoKey }
+    storage.record = liveRecord(2, 'other-access', {
+      cryptoKeyPair: otherKey,
+      jkt: 'other-jkt',
+      user: { ...VALID_USER, uuid: 'user-2', email: 'other@baander.app' },
+    })
+
+    await expect(useAuthStore.getState().adoptStoredAuth()).resolves.toBe(true)
+
+    expect(mockSetDpopKeyPair).toHaveBeenCalledWith({
+      publicKey: otherKey.publicKey,
+      privateKey: otherKey.privateKey,
+      jwk: FAKE_KEY_PAIR.jwk,
+      jkt: 'other-jkt',
+    })
+    expect(useAuthStore.getState().user?.email).toBe('other@baander.app')
+  })
+
+  it('syncs its epoch but reports no rotation when the stored tokens are its own', async () => {
+    await hydrateFrom(liveRecord(1, 'r1-access'))
+    storage.record = liveRecord(2, 'r1-access', { user: { ...VALID_USER, name: 'Renamed' } })
+
+    await expect(useAuthStore.getState().adoptStoredAuth()).resolves.toBe(false)
+
+    expect(useAuthStore.getState().user?.name).toBe('Renamed')
+    await useAuthStore.getState().setTokens('r2-access', 'r2-refresh')
+    expect(mockSaveStoredAuth).toHaveBeenCalledWith(expect.objectContaining({ accessToken: 'r2-access' }), 2)
+  })
+
+  it('adopts the tombstone another tab left: signs out without calling logout and lands on the login page', async () => {
+    await hydrateFrom(liveRecord(1, 'r1-access'))
+    storage.record = { epoch: 2, cleared: true }
+
+    await expect(useAuthStore.getState().adoptStoredAuth()).resolves.toBe(true)
+
+    const state = useAuthStore.getState()
+    expect(state.isAuthenticated).toBe(false)
+    expect(state.accessToken).toBeNull()
+    expect(mockClearDpopKeyPair).toHaveBeenCalledOnce()
+    expect(mockPostAuthLogout).not.toHaveBeenCalled()
+    expect(mockClearStoredAuth).not.toHaveBeenCalled()
+    expect(mockPostTokenToWorker).toHaveBeenCalledWith(null)
+    expect(location.href).toBe('/login')
+  })
+
+  it('treats a missing record as newer than the epoch it holds', async () => {
+    await hydrateFrom(liveRecord(1, 'r1-access'))
+    storage.record = null
+
+    await expect(useAuthStore.getState().adoptStoredAuth()).resolves.toBe(true)
+
+    expect(useAuthStore.getState().isAuthenticated).toBe(false)
+    expect(location.href).toBe('/login')
+  })
+
+  it('adopts the login tab A made after a logout this tab never heard of, calling neither refresh nor logout', async () => {
+    await hydrateFrom(liveRecord(1, 'r1-access'))
+    storage.record = liveRecord(3, 'after-relogin-access')
+
+    await expect(useAuthStore.getState().adoptStoredAuth()).resolves.toBe(true)
+
+    expect(useAuthStore.getState().accessToken).toBe('after-relogin-access')
+    expect(mockAxios.post).not.toHaveBeenCalled()
+    expect(mockPostAuthLogout).not.toHaveBeenCalled()
+    await useAuthStore.getState().setTokens('next-access', 'next-refresh')
+    expect(mockSaveStoredAuth).toHaveBeenCalledWith(expect.objectContaining({ accessToken: 'next-access' }), 3)
+  })
+})
+
+describe('setTokens', () => {
+  it('writes at the held epoch, moves to the new one and tells the other tabs', async () => {
+    await hydrateFrom(liveRecord(1, 'r1-access'))
+
+    await useAuthStore.getState().setTokens('r2-access', 'r2-refresh')
+
+    expect(mockSaveStoredAuth).toHaveBeenCalledWith(
+      expect.objectContaining({ accessToken: 'r2-access', refreshToken: 'r2-refresh', jkt: FAKE_KEY_PAIR.jkt }),
+      1,
+    )
+    expect(storage.record).toMatchObject({ epoch: 2, accessToken: 'r2-access' })
+    expect(postedEvents()).toEqual([{ type: 'rotated', epoch: 2 }])
+    expect(mockPostTokenToWorker).toHaveBeenCalledWith('r2-access')
+
+    await useAuthStore.getState().setTokens('r3-access', 'r3-refresh')
+    expect(mockSaveStoredAuth).toHaveBeenLastCalledWith(expect.objectContaining({ accessToken: 'r3-access' }), 2)
+  })
+
+  it('cannot resurrect a session another tab cleared: the write fails against the tombstone and the tab clears', async () => {
+    await hydrateFrom(liveRecord(1, 'r1-access'))
+    storage.record = { epoch: 2, cleared: true }
+
+    await useAuthStore.getState().setTokens('r2-access', 'r2-refresh')
+
+    expect(storage.record).toEqual({ epoch: 2, cleared: true })
+    expect(useAuthStore.getState().isAuthenticated).toBe(false)
+    expect(useAuthStore.getState().accessToken).toBeNull()
+    expect(postedEvents()).toEqual([])
+    expect(mockPostTokenToWorker).toHaveBeenLastCalledWith(null)
+  })
+
+  it('cannot overwrite a newer record with an older epoch: it adopts the stored one instead', async () => {
+    await hydrateFrom(liveRecord(1, 'r1-access'))
+    storage.record = liveRecord(4, 'newer-access')
+
+    await useAuthStore.getState().setTokens('stale-access', 'stale-refresh')
+
+    expect(storage.record).toMatchObject({ epoch: 4, accessToken: 'newer-access' })
+    expect(useAuthStore.getState().accessToken).toBe('newer-access')
+    expect(postedEvents()).toEqual([])
+  })
+})
+
+describe('events from other tabs', () => {
+  it('clears on `cleared` when the record is tombstoned at that epoch, without calling the server (AE6)', async () => {
+    await hydrateFrom(liveRecord(1, 'r1-access'))
+    storage.record = { epoch: 2, cleared: true }
+
+    deliverFromOtherTab({ type: 'cleared', epoch: 2 })
+
+    await vi.waitFor(() => expect(useAuthStore.getState().isAuthenticated).toBe(false))
+    expect(useAuthStore.getState().accessToken).toBeNull()
+    expect(mockPostAuthLogout).not.toHaveBeenCalled()
+    expect(mockAxios.post).not.toHaveBeenCalled()
+    expect(mockClearStoredAuth).not.toHaveBeenCalled()
+    expect(mockPostTokenToWorker).toHaveBeenCalledWith(null)
+    expect(location.href).toBe('/login')
+  })
+
+  it('clears on `cleared` when the record is gone', async () => {
+    await hydrateFrom(liveRecord(1, 'r1-access'))
+    storage.record = null
+
+    deliverFromOtherTab({ type: 'cleared', epoch: 2 })
+
+    await vi.waitFor(() => expect(useAuthStore.getState().isAuthenticated).toBe(false))
+    expect(location.href).toBe('/login')
+  })
+
+  it('ignores a `cleared` whose epoch is older than the stored record and adopts the newer login', async () => {
+    await hydrateFrom(liveRecord(1, 'r1-access'))
+    storage.record = liveRecord(3, 'relogin-access')
+
+    deliverFromOtherTab({ type: 'cleared', epoch: 2 })
+
+    await vi.waitFor(() => expect(useAuthStore.getState().accessToken).toBe('relogin-access'))
+    expect(useAuthStore.getState().isAuthenticated).toBe(true)
+    expect(location.href).toBe(LOGIN_PAGE)
+  })
+
+  it('keeps a tombstone older than the `cleared` epoch from clearing the tab', async () => {
+    await hydrateFrom(liveRecord(5, 'r1-access'))
+    storage.record = { epoch: 3, cleared: true }
+
+    deliverFromOtherTab({ type: 'cleared', epoch: 6 })
+
+    await vi.waitFor(() => expect(mockLoadStoredAuth).toHaveBeenCalled())
+    await Promise.resolve()
+    expect(useAuthStore.getState().isAuthenticated).toBe(true)
+    expect(location.href).toBe(LOGIN_PAGE)
+  })
+
+  it('ignores `cleared` when it holds no session', async () => {
+    storage.record = { epoch: 2, cleared: true }
+
+    deliverFromOtherTab({ type: 'cleared', epoch: 2 })
+    await Promise.resolve()
+
+    expect(mockPostTokenToWorker).not.toHaveBeenCalled()
+    expect(location.href).toBe(LOGIN_PAGE)
+  })
+
+  it('adopts the rotation a `rotated` event announces', async () => {
+    await hydrateFrom(liveRecord(1, 'r1-access'))
+    storage.record = liveRecord(2, 'r2-access')
+
+    deliverFromOtherTab({ type: 'rotated', epoch: 2 })
+
+    await vi.waitFor(() => expect(useAuthStore.getState().accessToken).toBe('r2-access'))
+    expect(mockSaveStoredAuth).not.toHaveBeenCalled()
+    expect(mockPostTokenToWorker).toHaveBeenCalledWith('r2-access')
+  })
+})
+
+describe('auth request ownership', () => {
   it('does not restore keys or tokens from hydration after clearAuth', async () => {
     let resolve!: (value: Awaited<ReturnType<typeof loadStoredAuth>>) => void
     mockLoadStoredAuth.mockReturnValueOnce(new Promise((yes) => { resolve = yes }))
     const hydrate = useAuthStore.getState().initAuth()
     await vi.waitFor(() => expect(mockLoadStoredAuth).toHaveBeenCalled())
     useAuthStore.getState().clearAuth()
-    resolve({ cryptoKeyPair: { publicKey: FAKE_KEY_PAIR.publicKey, privateKey: FAKE_KEY_PAIR.privateKey },
-      publicJwk: FAKE_KEY_PAIR.jwk, jkt: FAKE_KEY_PAIR.jkt, accessToken: 'old', refreshToken: 'old-refresh', user: VALID_USER, nonce: null })
+    resolve(liveRecord(1, 'old'))
     await hydrate
     expect(useAuthStore.getState().isAuthenticated).toBe(false)
     expect(mockSetDpopKeyPair).not.toHaveBeenCalled()
@@ -393,31 +724,35 @@ describe('auth request ownership', () => {
     expect(mockPostTokenToWorker).not.toHaveBeenCalledWith('access-token-123')
   })
 
-  it('finishes an in-flight credential write before deleting the cleared session', async () => {
+  it('lets a clear win over an in-flight credential write: the write fails against the tombstone', async () => {
     let release!: () => void
-    mockSaveStoredAuth.mockReturnValueOnce(new Promise((yes) => { release = yes }))
+    const original = mockSaveStoredAuth.getMockImplementation()!
+    mockSaveStoredAuth.mockImplementationOnce(async (data, expected) => {
+      await new Promise<void>((yes) => { release = yes })
+      return original(data, expected)
+    })
     mockAxios.post.mockResolvedValue(validLoginResponse())
     const login = useAuthStore.getState().login('user@baander.app', 'secret')
     await vi.waitFor(() => expect(mockSaveStoredAuth).toHaveBeenCalledOnce())
     useAuthStore.getState().clearAuth()
-    expect(mockClearStoredAuth).not.toHaveBeenCalled()
-    release()
-    await login
     await vi.waitFor(() => expect(mockClearStoredAuth).toHaveBeenCalledOnce())
-    expect(mockClearStoredAuth.mock.invocationCallOrder[0]).toBeGreaterThan(mockSaveStoredAuth.mock.invocationCallOrder[0])
+    release()
+    await login.catch(() => {})
+    expect(storage.record).toEqual({ epoch: 1, cleared: true })
     expect(useAuthStore.getState().accessToken).toBeNull()
     expect(mockPostTokenToWorker).not.toHaveBeenCalledWith('access-token-123')
   })
 
-  it('keeps repeated token and user updates notification-free', () => {
+  it('keeps repeated token and user updates notification-free', async () => {
     useAuthStore.setState({ accessToken: 'access', refreshToken: 'refresh', user: VALID_USER, isAuthenticated: true })
     const notify = vi.fn(), unsubscribe = useAuthStore.subscribe(notify)
-    useAuthStore.getState().setTokens('access', 'refresh')
+    await useAuthStore.getState().setTokens('access', 'refresh')
     useAuthStore.getState().updateUser({ email: VALID_USER.email })
     expect(notify).not.toHaveBeenCalled()
     expect(mockPostTokenToWorker).not.toHaveBeenCalled()
     unsubscribe()
   })
+
   it('cannot clear a newer login when an older logout finally returns', async () => {
     let release!: (value: Awaited<ReturnType<typeof postAuthLogout>>) => void
     mockPostAuthLogout.mockReturnValueOnce(new Promise((yes) => { release = yes }))
@@ -433,25 +768,13 @@ describe('auth request ownership', () => {
     expect(mockPostTokenToWorker.mock.calls.at(-1)).toEqual(['access-token-123'])
   })
 
-  it('waits for queued credential deletion before hydration can read IndexedDB', async () => {
-    let releaseWrite!: () => void, releaseClear!: () => void
-    mockSaveStoredAuth.mockReturnValueOnce(new Promise((yes) => { releaseWrite = yes }))
-    mockClearStoredAuth.mockReturnValueOnce(new Promise((yes) => { releaseClear = yes }))
-    mockAxios.post.mockResolvedValue(validLoginResponse())
-    const login = useAuthStore.getState().login('user@baander.app', 'secret')
-    await vi.waitFor(() => expect(mockSaveStoredAuth).toHaveBeenCalledOnce())
-    useAuthStore.getState().clearAuth()
-    const hydrate = useAuthStore.getState().initAuth()
-    expect(mockLoadStoredAuth).not.toHaveBeenCalled()
-    releaseWrite()
-    await login
-    await vi.waitFor(() => expect(mockClearStoredAuth).toHaveBeenCalledOnce())
-    expect(mockLoadStoredAuth).not.toHaveBeenCalled()
-    releaseClear()
-    await hydrate
-    expect(mockLoadStoredAuth).toHaveBeenCalledOnce()
-    expect(useAuthStore.getState().isAuthenticated).toBe(false)
-    expect(mockPostTokenToWorker.mock.calls.at(-1)).toEqual([null])
-  })
+  it('persists a user update under the lock at the held epoch', async () => {
+    await hydrateFrom(liveRecord(1, 'r1-access'))
 
+    useAuthStore.getState().updateUser({ name: 'Renamed' })
+
+    await vi.waitFor(() => expect(mockSaveStoredAuth).toHaveBeenCalledOnce())
+    expect(mockSaveStoredAuth).toHaveBeenCalledWith(expect.objectContaining({ user: { ...VALID_USER, name: 'Renamed' } }), 1)
+    expect(locks.requests).toEqual([{ name: AUTH_LOCK_NAME, outcome: 'granted' }])
+  })
 })

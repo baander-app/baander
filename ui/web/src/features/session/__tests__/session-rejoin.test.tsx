@@ -6,6 +6,7 @@ import { usePlayerStore } from '@/features/player/stores/player-store'
 import { getCurrentTime, updateTime } from '@/features/player/stores/player-time-tracker'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { mediator } from '@/shared/lib/mediator/bus'
+import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { useSession } from '../hooks/use-session'
 
 vi.mock('@/shared/api-client/axios-instance', () => ({ AXIOS_INSTANCE: {
@@ -15,8 +16,20 @@ vi.mock('@/shared/api-client/axios-instance', () => ({ AXIOS_INSTANCE: {
 } }))
 vi.mock('@/features/player/services/audio-service', () => ({ audioService: { getProcessor: () => null } }))
 vi.mock('@/features/player/services/activity-service', () => ({ activityService: { recordPlay: () => Promise.resolve() } }))
-const auth = vi.hoisted(() => ({ accessToken: 'token-at-connect' as string | null }))
-vi.mock('@/features/auth/stores/auth-store', () => ({ useAuthStore: { getState: () => auth } }))
+vi.mock('@/features/auth/stores/auth-store', async () => {
+  const { create } = await import('zustand')
+  interface AuthStub {
+    accessToken: string | null
+    isAuthenticated: boolean
+    clearAuth: () => void
+  }
+  const useAuthStore = create<AuthStub>((set) => ({
+    accessToken: 'token-at-connect',
+    isAuthenticated: true,
+    clearAuth: () => set({ accessToken: null, isAuthenticated: false }),
+  }))
+  return { useAuthStore }
+})
 vi.mock('../utils/device-id', () => ({ getDeviceId: () => 'local-device', getDeviceName: () => 'Test Browser' }))
 vi.mock('@/shared/lib/mediator/bus', () => ({ mediator: { dispatch: vi.fn() } }))
 
@@ -96,7 +109,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   FakeWebSocket.instances = []
   vi.stubGlobal('WebSocket', FakeWebSocket)
-  auth.accessToken = 'token-at-connect'
+  useAuthStore.setState({ accessToken: 'token-at-connect', isAuthenticated: true })
   usePlayerStore.setState(usePlayerStore.getInitialState(), true)
   usePlayerStore.getState().restoreQueue([{ publicId: 'first', title: 'First' }], 0, 0)
   usePlayerStore.getState().setDuration(300)
@@ -113,7 +126,7 @@ it('reconnects the session socket with the token that was refreshed while it was
   const { hook, socket } = await mountConnected('local-device')
   expect(socket.url).toBe('/api/ws?token=token-at-connect')
 
-  auth.accessToken = 'token-after-refresh'
+  useAuthStore.setState({ accessToken: 'token-after-refresh' })
   vi.useFakeTimers()
   act(() => {
     socket.drop()
@@ -164,5 +177,44 @@ it('keeps the queue the active device switched to while the server was away', as
   expect(AXIOS_INSTANCE.get).not.toHaveBeenCalledWith('/api/songs/', expect.anything())
   expect(mediator.dispatch).not.toHaveBeenCalled()
   expect(getCurrentTime()).toBe(45)
+  hook.unmount()
+})
+
+it('closes an open session socket when the tab clears its credentials and does not reconnect', async () => {
+  const { hook, socket } = await mountConnected('local-device')
+  expect(socket.readyState).toBe(FakeWebSocket.OPEN)
+  vi.useFakeTimers()
+
+  act(() => { useAuthStore.getState().clearAuth() })
+
+  expect(socket.readyState).toBe(FakeWebSocket.CLOSED)
+  act(() => { vi.runOnlyPendingTimers() })
+  expect(FakeWebSocket.instances).toHaveLength(1)
+  hook.unmount()
+})
+
+it('closes a session socket that is still connecting when the tab clears its credentials', async () => {
+  vi.mocked(AXIOS_INSTANCE.get).mockResolvedValue({ data: { data: sessionFor('local-device', 15) } })
+  const hook = renderHook(() => useSession(), { wrapper })
+  await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1))
+  const socket = FakeWebSocket.instances[0]
+  expect(socket.readyState).toBe(FakeWebSocket.CONNECTING)
+
+  act(() => { useAuthStore.getState().clearAuth() })
+
+  expect(socket.readyState).toBe(FakeWebSocket.CLOSED)
+  act(() => { socket.onopen?.() })
+  expect(socket.send).not.toHaveBeenCalled()
+  hook.unmount()
+})
+
+it('reconnects with the token current after a new login', async () => {
+  const { hook } = await mountConnected('local-device')
+  act(() => { useAuthStore.getState().clearAuth() })
+
+  act(() => { useAuthStore.setState({ accessToken: 'token-after-login', isAuthenticated: true }) })
+
+  await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(2))
+  expect(FakeWebSocket.instances[1].url).toBe('/api/ws?token=token-after-login')
   hook.unmount()
 })

@@ -48,8 +48,8 @@ vi.mock('@/shared/lib/mediator/bus', () => ({
 
 vi.mock('@/features/auth/stores/auth-store', () => ({
   useAuthStore: Object.assign(
-    (selector: (s: unknown) => unknown) => selector({ accessToken: 'test-token' }),
-    { getState: () => ({ accessToken: 'test-token' }) },
+    (selector: (s: unknown) => unknown) => selector({ accessToken: 'test-token', isAuthenticated: true }),
+    { getState: () => ({ accessToken: 'test-token', isAuthenticated: true }) },
   ),
 }))
 

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const auth = vi.hoisted(() => ({
   accessToken: 'old-access' as string | null,
   refreshToken: 'old-refresh' as string | null,
-  setTokens: vi.fn(), clearAuth: vi.fn(),
+  setTokens: vi.fn(), clearAuth: vi.fn(), adoptStoredAuth: vi.fn(),
 }));
 const crypto = vi.hoisted(() => ({ key: {}, nonce: null as string | null, proof: vi.fn() }));
 vi.mock('@/features/auth/stores/auth-store', () => ({ useAuthStore: { getState: () => auth } }));
@@ -16,12 +16,18 @@ vi.mock('@/shared/crypto/dpop-store', () => ({
 vi.mock('@/shared/crypto/dpop-proof', () => ({ createDpopProof: crypto.proof }));
 import { AXIOS_INSTANCE, ensureFreshAccessToken, getAuthSession } from '@/shared/api-client/axios-instance';
 import { schedulerAdminApi } from '@/features/admin/api/scheduler-admin-api';
-import { REFRESH_ATTEMPT_TIMEOUT_MS } from '@/shared/auth/refresh-budget';
+import { REFRESH_ATTEMPT_TIMEOUT_MS, REFRESH_BUDGET_MS } from '@/shared/auth/refresh-budget';
+import { FakeLockManager, installLocks } from '../auth/auth-fakes';
 
 let api: MockAdapter;
 let refresh: MockAdapter;
+let locks: FakeLockManager;
+let restoreLocks: () => void;
 beforeEach(() => {
   vi.clearAllMocks();
+  locks = new FakeLockManager();
+  restoreLocks = installLocks(locks);
+  auth.adoptStoredAuth.mockResolvedValue(false);
   window.__BAANDER_API_URL__ = 'https://api.baander.app';
   AXIOS_INSTANCE.defaults.baseURL = window.__BAANDER_API_URL__;
   auth.accessToken = 'old-access'; auth.refreshToken = 'old-refresh'; crypto.nonce = null;
@@ -30,7 +36,7 @@ beforeEach(() => {
   api = new MockAdapter(AXIOS_INSTANCE);
   refresh = new MockAdapter(Axios);
 });
-afterEach(() => { api.restore(); refresh.restore(); });
+afterEach(() => { api.restore(); refresh.restore(); restoreLocks(); });
 
 /** A private resource that is answered 401 until the request carries the rotated token. */
 function privateApi() {
@@ -126,7 +132,7 @@ it('discards an old session response and its nonce after account replacement', a
   expect(auth.accessToken).toBe('other-access');
 });
 
-it('starts a new session refresh independently of a pending old session refresh', async () => {
+it('refreshes a new session after a pending old session refresh releases the lock, and keeps its own rotation', async () => {
   let releaseOld!: (reply: [number, object]) => void;
   const oldReply = new Promise<[number, object]>(resolve => { releaseOld = resolve; });
   api.onGet('/old-private').reply(401);
@@ -141,14 +147,20 @@ it('starts a new session refresh independently of a pending old session refresh'
     auth.accessToken = 'other-access';
     auth.refreshToken = 'other-refresh';
     newRequest = AXIOS_INSTANCE.get('/new-private').catch(error => error);
-    await vi.waitFor(() => expect(refresh.history.post).toHaveLength(2));
-    await expect(newRequest).resolves.toHaveProperty('status', 200);
+    await vi.waitFor(() => expect(api.history.get).toHaveLength(2));
+    // One refresh per origin at a time: the new session waits for the old one's lock.
+    expect(refresh.history.post).toHaveLength(1);
+    expect(locks.isHeld()).toBe(true);
   } finally {
     releaseOld([200, { accessToken: 'old-late', refreshToken: 'old-late-refresh' }]);
-    await Promise.all([oldRequest, newRequest]);
+    await oldRequest;
   }
+  await expect(newRequest).resolves.toHaveProperty('status', 200);
+  expect(refresh.history.post).toHaveLength(2);
+  expect(auth.setTokens).not.toHaveBeenCalledWith('old-late', 'old-late-refresh');
   expect(auth.accessToken).toBe('other-rotated');
   expect(auth.clearAuth).not.toHaveBeenCalled();
+  expect(locks.isHeld()).toBe(false);
 });
 
 it('keeps the new refresh slot when an obsolete refresh finishes', async () => {
@@ -170,9 +182,10 @@ it('keeps the new refresh slot when an obsolete refresh finishes', async () => {
     auth.accessToken = 'other-access';
     auth.refreshToken = 'other-refresh';
     newRequest = AXIOS_INSTANCE.get('/new-private').catch(error => error);
-    await vi.waitFor(() => expect(refresh.history.post).toHaveLength(2));
+    await vi.waitFor(() => expect(api.history.get).toHaveLength(2));
     releaseOld([200, { accessToken: 'old-late', refreshToken: 'old-late-refresh' }]);
     await oldRequest;
+    await vi.waitFor(() => expect(refresh.history.post).toHaveLength(2));
     queuedRequest = AXIOS_INSTANCE.get('/queued-new-private').catch(error => error);
     await vi.waitFor(() => expect(api.history.get).toHaveLength(3));
     releaseNew([200, { accessToken: 'other-rotated', refreshToken: 'other-rotated-refresh' }]);
@@ -487,5 +500,128 @@ describe('a refresh answered 503', () => {
     expect(new Set(proofs).size).toBe(4);
     expect(crypto.proof.mock.calls.every(call => call[0] === crypto.key)).toBe(true);
     expect(crypto.proof).toHaveBeenCalledWith(crypto.key, 'POST', 'https://api.baander.app/api/auth/refresh', { nonce: 'required-nonce' });
+  });
+});
+
+describe('a refresh shared between tabs', () => {
+  let location: { href: string; origin: string };
+
+  beforeEach(() => {
+    location = { href: 'https://baander.app/library', origin: 'https://baander.app' };
+    vi.stubGlobal('location', location);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  function expectSessionKept() {
+    expect(auth.clearAuth).not.toHaveBeenCalled();
+    expect(auth.accessToken).toBe('old-access');
+    expect(auth.refreshToken).toBe('old-refresh');
+    expect(location.href).toBe('https://baander.app/library');
+  }
+
+  it('adopts the rotation another tab made under the lock and never calls the refresh endpoint (AE5)', async () => {
+    privateApi();
+    refresh.onPost().reply(200, { accessToken: 'server-access', refreshToken: 'server-refresh' });
+    auth.adoptStoredAuth.mockImplementation(async () => {
+      expect(locks.isHeld()).toBe(true);
+      Object.assign(auth, { accessToken: 'new-access', refreshToken: 'new-refresh' });
+      return true;
+    });
+
+    await expect(AXIOS_INSTANCE.get('/private')).resolves.toHaveProperty('status', 200);
+
+    expect(refresh.history.post).toHaveLength(0);
+    expect(auth.adoptStoredAuth).toHaveBeenCalledOnce();
+    expect(auth.setTokens).not.toHaveBeenCalled();
+    expect(api.history.get).toHaveLength(2);
+    expect(api.history.get[1].headers?.Authorization).toBe('DPoP new-access');
+    expect(locks.isHeld()).toBe(false);
+  });
+
+  it('does not call the server when the failed token was replaced while it waited for the lock', async () => {
+    privateApi();
+    refresh.onPost().reply(200, { accessToken: 'server-access', refreshToken: 'server-refresh' });
+    const release = locks.hold();
+
+    const request = AXIOS_INSTANCE.get('/private');
+    await vi.waitFor(() => expect(locks.requests).toHaveLength(2));
+    // The `rotated` event from the other tab was adopted before the lock was granted; the epochs now match.
+    Object.assign(auth, { accessToken: 'new-access', refreshToken: 'new-refresh' });
+    release();
+
+    await expect(request).resolves.toHaveProperty('status', 200);
+    expect(auth.adoptStoredAuth).toHaveBeenCalledOnce();
+    expect(refresh.history.post).toHaveLength(0);
+    expect(api.history.get[1].headers?.Authorization).toBe('DPoP new-access');
+  });
+
+  it('holds the lock until the rotation is written and releases it afterwards', async () => {
+    privateApi();
+    let release!: () => void;
+    auth.setTokens.mockImplementation((accessToken, refreshToken) => {
+      Object.assign(auth, { accessToken, refreshToken });
+      return new Promise<void>(resolve => { release = resolve; });
+    });
+    refresh.onPost().reply(200, { accessToken: 'new-access', refreshToken: 'new-refresh' });
+
+    const request = AXIOS_INSTANCE.get('/private');
+    await vi.waitFor(() => expect(auth.setTokens).toHaveBeenCalledOnce());
+    expect(locks.isHeld()).toBe(true);
+
+    release();
+    await expect(request).resolves.toHaveProperty('status', 200);
+    expect(locks.isHeld()).toBe(false);
+  });
+
+  it('fails as transient at the budget when another tab never releases the lock, after one re-read', async () => {
+    vi.useFakeTimers();
+    api.onGet('/private').reply(401);
+    refresh.onPost().reply(200, { accessToken: 'server-access', refreshToken: 'server-refresh' });
+    locks.hold();
+
+    const request = AXIOS_INSTANCE.get('/private').catch(error => error);
+    await vi.advanceTimersByTimeAsync(REFRESH_BUDGET_MS - 1);
+    expect(auth.adoptStoredAuth).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1);
+
+    await expect(request).resolves.toHaveProperty('name', 'AuthCoordinationError');
+    expect(auth.adoptStoredAuth).toHaveBeenCalledOnce();
+    expect(refresh.history.post).toHaveLength(0);
+    expectSessionKept();
+  });
+
+  it('adopts after an aborted lock wait when the other tab rotated meanwhile', async () => {
+    vi.useFakeTimers();
+    privateApi();
+    locks.hold();
+    auth.adoptStoredAuth.mockImplementation(async () => {
+      Object.assign(auth, { accessToken: 'new-access', refreshToken: 'new-refresh' });
+      return true;
+    });
+
+    const request = AXIOS_INSTANCE.get('/private');
+    await vi.advanceTimersByTimeAsync(REFRESH_BUDGET_MS);
+
+    await expect(request).resolves.toHaveProperty('status', 200);
+    expect(refresh.history.post).toHaveLength(0);
+    expect(auth.clearAuth).not.toHaveBeenCalled();
+  });
+
+  it('fails as transient and keeps the session without the Web Locks API', async () => {
+    restoreLocks();
+    api.onGet('/private').reply(401);
+    refresh.onPost().reply(200, { accessToken: 'server-access', refreshToken: 'server-refresh' });
+
+    const error = await AXIOS_INSTANCE.get('/private').catch(reason => reason);
+
+    expect(error).toHaveProperty('name', 'AuthCoordinationError');
+    expect(refresh.history.post).toHaveLength(0);
+    expect(auth.adoptStoredAuth).not.toHaveBeenCalled();
+    expectSessionKept();
   });
 });

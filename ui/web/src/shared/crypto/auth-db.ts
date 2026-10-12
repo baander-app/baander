@@ -1,43 +1,40 @@
 /**
- * Web-specific re-export of auth-db functions.
+ * Web-specific adapter over the shared IndexedDbAuthStorage.
  *
- * The web auth-store uses the old standalone function API:
- *   loadStoredAuth() -> { cryptoKeyPair, publicJwk, jkt, accessToken, ... } | null
- *   saveStoredAuth(data) -> void
- *   clearStoredAuth() -> void
- *
- * These wrap the shared IndexedDbAuthStorage which uses the new StoredAuth shape.
+ * The web auth-store keeps the flat record shape (cryptoKeyPair, publicJwk, jkt, ...); the shared
+ * storage keeps a DpopKeyPair. Both carry the epoch and the tombstone that make every write a
+ * compare-and-put; see `../../../../shared/crypto/auth-storage`.
  */
 
-import type { StoredAuth } from '../../../../shared/crypto/auth-storage';
+import type { StoredAuth, StoredAuthData, StoredAuthTombstone, StoredAuthUser } from '../../../../shared/crypto/auth-storage';
 import { IndexedDbAuthStorage } from '../../../../shared/crypto/auth-db';
 
-export type { StoredAuth, AuthStorageBackend } from '../../../../shared/crypto/auth-storage';
+export type { StoredAuth, AuthStorageBackend, StoredAuthTombstone } from '../../../../shared/crypto/auth-storage';
+export { isClearedRecord } from '../../../../shared/crypto/auth-storage';
 
-/**
- * Legacy record shape used by the web auth-store.
- * This matches the old IndexedDB record format.
- */
+/** The flat record shape the web auth-store reads and writes. */
 export interface LegacyStoredAuth {
-  id?: string;
+  epoch: number;
   cryptoKeyPair: CryptoKeyPair;
   publicJwk: JsonWebKey;
   jkt: string;
   accessToken: string;
   refreshToken: string;
-  user: {
-    uuid: string;
-    email: string;
-    publicId: string;
-    name: string | null;
-    roles: string[];
-  };
+  user: StoredAuthUser;
   nonce: string | null;
 }
 
+export type LegacyStoredAuthData = Omit<LegacyStoredAuth, 'epoch'>;
+
+export type LegacyStoredRecord = LegacyStoredAuth | StoredAuthTombstone;
+
+export type SaveStoredAuthResult =
+  | { ok: true; epoch: number }
+  | { ok: false; current: LegacyStoredRecord | null };
+
 const storage = new IndexedDbAuthStorage();
 
-function legacyToAuth(record: LegacyStoredAuth): StoredAuth {
+function legacyToAuth(record: LegacyStoredAuthData): StoredAuthData {
   return {
     accessToken: record.accessToken,
     refreshToken: record.refreshToken,
@@ -53,13 +50,17 @@ function legacyToAuth(record: LegacyStoredAuth): StoredAuth {
 }
 
 function authToLegacy(auth: StoredAuth): LegacyStoredAuth {
+  if (!auth.keyPair) {
+    throw new Error('Stored auth record has no key pair');
+  }
   return {
+    epoch: auth.epoch,
     cryptoKeyPair: {
-      publicKey: auth.keyPair!.publicKey,
-      privateKey: auth.keyPair!.privateKey,
+      publicKey: auth.keyPair.publicKey,
+      privateKey: auth.keyPair.privateKey,
     },
-    publicJwk: auth.keyPair!.jwk,
-    jkt: auth.keyPair!.jkt,
+    publicJwk: auth.keyPair.jwk,
+    jkt: auth.keyPair.jkt,
     accessToken: auth.accessToken,
     refreshToken: auth.refreshToken,
     user: auth.user,
@@ -67,26 +68,25 @@ function authToLegacy(auth: StoredAuth): LegacyStoredAuth {
   };
 }
 
-/**
- * Load stored auth from IndexedDB (returns legacy format for auth-store compatibility).
- */
-export async function loadStoredAuth(): Promise<LegacyStoredAuth | null> {
-  const auth = await storage.load();
-  if (!auth) return null;
-  return authToLegacy(auth);
+function recordToLegacy(record: StoredAuth | StoredAuthTombstone | null): LegacyStoredRecord | null {
+  if (record === null) return null;
+  if ('cleared' in record) return { epoch: record.epoch, cleared: true };
+  return authToLegacy(record);
 }
 
-/**
- * Save auth to IndexedDB (accepts legacy format from auth-store).
- */
-export async function saveStoredAuth(data: Omit<LegacyStoredAuth, 'id'>): Promise<void> {
-  const auth: StoredAuth = legacyToAuth(data as LegacyStoredAuth);
-  return storage.save(auth);
+/** The stored record (live or tombstone), or null when nothing is stored. */
+export async function loadStoredAuth(): Promise<LegacyStoredRecord | null> {
+  return recordToLegacy(await storage.load());
 }
 
-/**
- * Clear stored auth from IndexedDB.
- */
-export async function clearStoredAuth(): Promise<void> {
+/** Compare-and-put at `expectedEpoch`; see `AuthStorageBackend.save`. */
+export async function saveStoredAuth(data: LegacyStoredAuthData, expectedEpoch: number | null): Promise<SaveStoredAuthResult> {
+  const result = await storage.save(legacyToAuth(data), expectedEpoch);
+  if (result.ok) return result;
+  return { ok: false, current: recordToLegacy(result.current) };
+}
+
+/** Leaves a tombstone at the next epoch and resolves that epoch. */
+export async function clearStoredAuth(): Promise<number> {
   return storage.clear();
 }

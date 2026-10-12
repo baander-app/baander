@@ -174,6 +174,24 @@ describe('SessionSyncBus', () => {
     expect(bus.isConnected()).toBe(false)
   })
 
+  it('closes an open socket on disconnect and does not reconnect', async () => {
+    const bus = createBus(() => 'token')
+    await bus.connect('session-1')
+    const socket = FakeWebSocket.instances[0]
+    socket.readyState = FakeWebSocket.OPEN
+    socket.onopen?.()
+    expect(bus.isConnected()).toBe(true)
+
+    bus.disconnect()
+
+    expect(socket.close).toHaveBeenCalledOnce()
+    expect(socket.readyState).toBe(FakeWebSocket.CLOSED)
+    socket.onclose?.()
+    vi.runOnlyPendingTimers()
+    expect(FakeWebSocket.instances).toHaveLength(1)
+    expect(bus.isConnected()).toBe(false)
+  })
+
   it('starts again from a short delay once a connection opened', async () => {
     vi.spyOn(Math, 'random').mockReturnValue(1)
     const bus = createBus(() => 'token')

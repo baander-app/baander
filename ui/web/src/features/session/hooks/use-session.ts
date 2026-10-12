@@ -36,6 +36,8 @@ export function useSession() {
   const deviceRegistered = useRef(false)
 
   const [dismissedTransfer, setDismissedTransfer] = useState<{ sessionId: string; deviceId: string } | null>(null)
+  // The socket closes when this tab clears its credentials; a later login opens a new one with the current token.
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
 
   const query = useQuery({
     queryKey: SESSION_KEY,
@@ -141,7 +143,7 @@ export function useSession() {
   // reconnect backoff — on every setQueryData/staleTime refetch that produces a new object.
   const sessionId = query.data?.id ?? null
   useEffect(() => {
-    if (!sessionId) return
+    if (!sessionId || !isAuthenticated) return
 
     const bus = new SessionSyncBus({
       wsEndpoint: '/api/ws',
@@ -225,7 +227,7 @@ export function useSession() {
       bus.disconnect()
       if (sessionSyncBus.current === bus) sessionSyncBus.current = null
     }
-  }, [sessionId, deviceId, queryClient])
+  }, [sessionId, isAuthenticated, deviceId, queryClient])
 
   const claimMutation = useMutation({
     mutationFn: async (): Promise<SessionData> => {

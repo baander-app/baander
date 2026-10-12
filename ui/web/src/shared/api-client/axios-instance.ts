@@ -4,6 +4,7 @@ import { getDpopKeyPair, getDpopNonce, setDpopNonce } from '@/shared/crypto/dpop
 import { createDpopProof } from '@/shared/crypto/dpop-proof';
 import { REFRESH_ATTEMPT_TIMEOUT_MS, REFRESH_BUDGET_MS, outageWaitMs } from '@/shared/auth/refresh-budget';
 import { retryAfterSeconds } from '@/features/auth/lib/retry-after';
+import { coordinateRefresh } from '@/features/auth/services/auth-coordination';
 
 const getAuthStore = () => useAuthStore.getState();
 
@@ -148,11 +149,24 @@ function wait(ms: number): Promise<void> {
 let refreshInFlight: { session: number; promise: Promise<void> } | null = null;
 
 /**
- * One refresh has one wall-clock budget (see `@/shared/auth/refresh-budget`). A transport failure,
- * a nonce challenge and a 503 each buy one more attempt; the remaining budget is checked before every
- * attempt and bounds it; every attempt signs a fresh proof with the same key.
+ * One refresh has one wall-clock budget (see `@/shared/auth/refresh-budget`), shared by the wait for
+ * the origin's auth lock and the attempts. Under the lock the tab first adopts a rotation another tab
+ * already made; otherwise it presents its refresh token. A transport failure, a nonce challenge and a
+ * 503 each buy one more attempt; the remaining budget is checked before every attempt and bounds it;
+ * every attempt signs a fresh proof with the same key. The lock is held until the rotation's write has
+ * completed, which `setTokens` resolves on.
  */
-async function refreshSession(session: number): Promise<void> {
+async function refreshSession(session: number, failedAccessToken: string): Promise<void> {
+  const deadline = Date.now() + REFRESH_BUDGET_MS;
+  await coordinateRefresh({
+    budgetMs: REFRESH_BUDGET_MS,
+    // A rotation adopted from a `rotated` event while waiting for the lock also leaves nothing to refresh.
+    adopt: async () => await getAuthStore().adoptStoredAuth() || getAuthStore().accessToken !== failedAccessToken,
+    refresh: () => refreshWithServer(session, deadline),
+  });
+}
+
+async function refreshWithServer(session: number, deadline: number): Promise<void> {
   const {accessToken, refreshToken} = getAuthStore();
   const keyPair = getDpopKeyPair();
   const isCurrentSession = () => getAuthSession() === session && getAuthStore().refreshToken === refreshToken &&
@@ -161,7 +175,6 @@ async function refreshSession(session: number): Promise<void> {
     if (!refreshToken || !keyPair) throw new Error('No refresh credentials');
     const refreshUrl = new URL('/api/auth/refresh', window.__BAANDER_API_URL__ || window.location.origin).href;
     const htu = buildHtu(refreshUrl);
-    const deadline = Date.now() + REFRESH_BUDGET_MS;
     const retried = { transport: false, nonce: false, outage: false };
     let lastError: unknown = new Error('Refresh budget exhausted');
     for (;;) {
@@ -184,7 +197,7 @@ async function refreshSession(session: number): Promise<void> {
         }
         const nonce = response.headers['dpop-nonce'];
         if (typeof nonce === 'string' && nonce) setDpopNonce(nonce);
-        getAuthStore().setTokens(data.accessToken, data.refreshToken);
+        await getAuthStore().setTokens(data.accessToken, data.refreshToken);
         return;
       } catch (error) {
         if (!isCurrentSession()) throw error;
@@ -237,7 +250,7 @@ export async function ensureFreshAccessToken(expectedSession: number, failedAcce
   // A late 401 for the old token reuses the already rotated session.
   if (failedAccessToken !== currentToken) return currentToken;
   if (!refreshInFlight || refreshInFlight.session !== expectedSession) {
-    const pending = { session: expectedSession, promise: refreshSession(expectedSession) };
+    const pending = { session: expectedSession, promise: refreshSession(expectedSession, failedAccessToken) };
     refreshInFlight = pending;
     pending.promise = pending.promise.finally(() => {
       if (refreshInFlight === pending) refreshInFlight = null;
