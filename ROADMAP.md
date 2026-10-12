@@ -135,9 +135,16 @@ plans followed it, in this order, and all four are delivered:
 
    Found and fixed on the way: a throwing streamed-response generator ended the stream
    cleanly and killed its worker; a stopped encode ended a progressive stream as if it
-   were complete; a drain left video sessions live for 60 s with no loop behind them;
-   a start-up cleanup query in the master left the server half-started when PostgreSQL
-   was down; two unit tests hung or crashed the unit run in the CI image. Still open:
+   were complete; a drain left video sessions live for 60 s with no loop behind them,
+   so the drain now ends them as failed (kept by user decision, 2026-10-12); a start-up
+   cleanup query in the master left the server half-started when PostgreSQL was down;
+   two unit tests hung or crashed the unit run in the CI image. The code review added:
+   `/live` reports `"draining": true` so the player waits out a draining server; a worker
+   that reported drained withdraws while a late request runs; `swoole:server:stop` no
+   longer dies with a PID 1 master; `POST /api/auth/refresh` answers 401 only for a
+   refused token and 503 with `Retry-After` for server faults, so a restart no longer
+   signs users out; a DPoP-nonce 400 no longer ends the web session; a session socket
+   still connecting is closed on teardown. Still open:
    - Safari's resume after a restart is a manual check that has not been run;
      Playwright's Linux WebKit uses GStreamer and could not seek after an outage.
    - The manual restart of the dev stack with a song playing has not been run; the dev
@@ -146,6 +153,18 @@ plans followed it, in this order, and all four are delivered:
    - In development, Xdebug's `develop` mode crashes a coroutine woken by
      `Coroutine::cancel()`, so a dev server stopped with a stream in flight may log a
      worker crash. Production and the drills run without Xdebug.
+   - A refresh whose response is lost after the server rotated the token leaves the
+     client holding a consumed token; its next refresh is treated as reuse and signs the
+     user out. Closing this needs a server-side reuse grace for the same DPoP key, a
+     security design decision.
+   - During a Redis outage the DPoP nonce and replay checks fail closed, so refreshes
+     fail with 400 challenges; the web client now keeps the session, but no refresh
+     succeeds until Redis is back.
+   - A request that reaches a worker within the master's last 100 ms tick of the drain
+     window can still be reset.
+   - The web player retries a `play()` rejection other than "needs a gesture" until its
+     two-minute budget runs out, and the cost of Swoole's heartbeat scan, now every
+     second, with many idle WebSockets is unmeasured.
 
 The local dev database (`baander` in `baander-postgres`) records the migration class
 names from before the rename and is about 40 migrations behind (last migrated on
@@ -162,17 +181,21 @@ pairing endpoint that does not exist and needs a decision when that work resumes
 
 ## Current quality-gate checkpoint
 
-Last recorded on 2026-10-11, at the end of the ROADMAP item 4 drain work (branch
-`plan/item4-web-shutdown`), all in a CI image built from the branch unless noted:
+Last recorded on 2026-10-12, at the end of the ROADMAP item 4 drain work and its code
+review fixes (branch `plan/item4-web-shutdown`), all in a CI image built from the branch
+unless noted:
 
-- Unit suite: 6,008 tests in 24 shards pass. Functional: 1,449 tests in 131 shards;
-  Integration: 1,004 tests in 101 shards; no failures.
+- Unit suite with coverage, as CI runs it: 6,022 tests in 24 shards pass. Functional:
+  1,449 tests in 131 shards; Integration: 1,010 tests in 101 shards; no failures. A
+  coverage-mode run of the functional and integration suites hit one PostgreSQL deadlock
+  in `InstantColumnMigrationTest` that did not recur in eight reruns.
 - PHPStan: no errors on a full scan. Deptrac: 0 violations. Container lint passes.
-  The OpenAPI specification check passes.
+  The OpenAPI specification check passes. The Docker build-context check passes again;
+  it had failed on master since the Pi tooling was removed.
 - Runtime drills: the web drain drill (also in CI mode), the web runtime drill, the
   worker runtime, command, operator and production drills, the outbox and producer
   drills and the container start-up check pass.
-- Web: 1,888 tests in 176 files pass; the typecheck passes; lint has zero errors and
+- Web: 1,904 tests in 177 files pass; the typecheck passes; lint has zero errors and
   the four existing warnings. The audio-graph suite passes in Chromium and Firefox on
   the host and in WebKit in the Playwright container.
 - `ui/rn` is deferred indefinitely (84 `tsc` errors and 25 Jest failures); no CI
