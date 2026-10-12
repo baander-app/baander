@@ -1223,11 +1223,15 @@ describe('useAudioPlayback', () => {
     const ORIGINAL = '/api/stream/track?id=t0'
     const TRANSCODED = '/api/stream/track?id=t0&format=opus'
 
-    /** Each probe of the liveness endpoint gets the next answer: an HTTP status or no answer. */
-    function answerLiveness(...answers: Array<number | 'unreachable'>) {
+    /**
+     * Each probe of the liveness endpoint gets the next answer: an HTTP status, a 200 from a
+     * server that is draining, or no answer.
+     */
+    function answerLiveness(...answers: Array<number | 'draining' | 'unreachable'>) {
       for (const answer of answers) {
         if (answer === 'unreachable') liveness.get.mockRejectedValueOnce(new Error('Network Error'))
-        else liveness.get.mockResolvedValueOnce({ status: answer })
+        else if (answer === 'draining') liveness.get.mockResolvedValueOnce({ status: 200, data: { status: 'alive', draining: true } })
+        else liveness.get.mockResolvedValueOnce({ status: answer, data: { status: 'alive', draining: false } })
       }
     }
 
@@ -1309,6 +1313,29 @@ describe('useAudioPlayback', () => {
       expect(usePlayerStore.getState().isPlaying).toBe(true)
       expect(activityService.recordPlay).toHaveBeenCalledOnce()
       expect(processorMock.instance.resetProgramme).not.toHaveBeenCalled()
+      expect(toast.error).not.toHaveBeenCalled()
+    })
+
+    it('keeps waiting while a draining server still answers, and resumes once it stops draining', async () => {
+      const { a } = await playAtPosition()
+      answerLiveness('draining', 200)
+      await act(async () => { errorMedia(a, 2) })
+
+      expect(liveness.get).toHaveBeenCalledOnce()
+      expect(a.load).not.toHaveBeenCalled()
+      expect(toast.error).not.toHaveBeenCalled()
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
+      expect(usePlayerStore.getState().playbackRecovery).toBe('reconnecting')
+
+      await elapse(1000)
+      expect(liveness.get).toHaveBeenCalledTimes(2)
+      expect(a.load).toHaveBeenCalledOnce()
+      expect(a.src).toBe(ORIGINAL)
+
+      await loadMetadata(a, 200)
+      expect(a.currentTime).toBe(POSITION)
+      expect(usePlayerStore.getState().playbackRecovery).toBe('none')
+      expect(usePlayerStore.getState().isPlaying).toBe(true)
       expect(toast.error).not.toHaveBeenCalled()
     })
 

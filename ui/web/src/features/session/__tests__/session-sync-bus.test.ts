@@ -21,9 +21,9 @@ class FakeWebSocket {
     FakeWebSocket.instances.push(this)
   }
 
-  close(): void {
+  close = vi.fn(() => {
     this.readyState = FakeWebSocket.CLOSED
-  }
+  })
 
   /** The server or network ends the connection. */
   drop(): void {
@@ -138,6 +138,40 @@ describe('SessionSyncBus', () => {
     expect(secondReconnect).toBeGreaterThan(firstReconnect)
     first.disconnect()
     second.disconnect()
+  })
+
+  it('closes a socket that is still connecting on disconnect and ignores its later events', async () => {
+    const events = { onStateUpdate: vi.fn(), onError: vi.fn() }
+    const bus = new SessionSyncBus({
+      wsEndpoint: '/api/ws',
+      getAuthToken: () => 'token',
+      deviceId: 'device-1',
+      getPosition: () => 0,
+      getQueue: () => [],
+      getCurrentIndex: () => 0,
+      getIsPlaying: () => false,
+    }, events)
+    await bus.connect('session-1')
+    const socket = FakeWebSocket.instances[0]
+    expect(socket.readyState).toBe(FakeWebSocket.CONNECTING)
+
+    bus.disconnect()
+
+    expect(socket.close).toHaveBeenCalledOnce()
+    expect(socket.readyState).toBe(FakeWebSocket.CLOSED)
+
+    // The handshake completes, or the closed attempt reports itself, after the teardown.
+    socket.onopen?.()
+    socket.onmessage?.({ data: JSON.stringify({ type: 'session.state', data: {} }) })
+    socket.onerror?.()
+    socket.onclose?.()
+    vi.runOnlyPendingTimers()
+
+    expect(socket.send).not.toHaveBeenCalled()
+    expect(events.onStateUpdate).not.toHaveBeenCalled()
+    expect(events.onError).not.toHaveBeenCalled()
+    expect(FakeWebSocket.instances).toHaveLength(1)
+    expect(bus.isConnected()).toBe(false)
   })
 
   it('starts again from a short delay once a connection opened', async () => {

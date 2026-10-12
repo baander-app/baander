@@ -45,7 +45,7 @@ export const test = base.extend<Record<never, never>, { origin: string }>({
             ? 'export const activityService={recordPlay(payload){(globalThis.playbackActivity??=[]).push(payload.songId)}}'
             : args.path.endsWith('eq-reapply') ? 'export function reapplyAllEqState(){}'
             // The app probes through its shared API client; the fixture asks the same endpoint with the same rule.
-            : args.path.endsWith('server-liveness') ? "export async function probeServerLiveness(){try{return (await fetch('/live',{cache:'no-store'})).ok?'up':'down'}catch{return 'down'}}"
+            : args.path.endsWith('server-liveness') ? "export async function probeServerLiveness(){try{const response=await fetch('/live',{cache:'no-store'});if(!response.ok)return 'down';const body=await response.json().catch(()=>null);return body?.draining===true?'down':'up'}catch{return 'down'}}"
             : `const api=new Proxy({}, {get:()=>()=>{}}); export const getLoudness=async()=>api,getDynamics=async()=>api,getSpectralFeatures=async()=>api; export const getWasmUrl=()=>'/analysis.wasm',getAudioWorkletUrl=file=>'/'+file;` }))
         } }],
       })
@@ -85,7 +85,7 @@ export const test = base.extend<Record<never, never>, { origin: string }>({
         } else if (url.pathname === '/live') {
           if (down) { response.writeHead(502); response.end(); return }
           response.setHeader('Content-Type', 'application/json')
-          response.end('{"status":"alive"}')
+          response.end('{"status":"alive","draining":false}')
         } else if (url.pathname === '/api/stream/track' && url.searchParams.get('id') === 'long') {
           if (down) { response.writeHead(502); response.end(); return }
           response.setHeader('Content-Type', 'audio/wav'); response.setHeader('Accept-Ranges', 'bytes')

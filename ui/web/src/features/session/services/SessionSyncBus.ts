@@ -48,9 +48,12 @@ export class SessionSyncBus {
     this.cancelReconnect()
 
     const url = this.buildWsUrl()
-    this.ws = new WebSocket(url)
+    const ws = new WebSocket(url)
+    this.ws = ws
 
-    this.ws.onopen = () => {
+    // A socket this bus has replaced or released may still report events; only the current one counts.
+    ws.onopen = () => {
+      if (this.ws !== ws) return
       this.send({
         type: 'session.join',
         deviceId: this.config.deviceId,
@@ -58,7 +61,8 @@ export class SessionSyncBus {
       this.reconnectDelayMs = SessionSyncBus.RECONNECT_INITIAL_MS
     }
 
-    this.ws.onmessage = (event) => {
+    ws.onmessage = (event) => {
+      if (this.ws !== ws) return
       try {
         const msg = JSON.parse(event.data as string)
         if (msg.type === 'session.state' || msg.type === 'session.joined') {
@@ -67,11 +71,13 @@ export class SessionSyncBus {
       } catch { /* ignore malformed */ }
     }
 
-    this.ws.onerror = () => {
+    ws.onerror = () => {
+      if (this.ws !== ws) return
       this.events.onError(new Error('Session WebSocket error'))
     }
 
-    this.ws.onclose = () => {
+    ws.onclose = () => {
+      if (this.ws !== ws) return
       this.scheduleReconnect()
     }
   }
@@ -103,10 +109,12 @@ export class SessionSyncBus {
   disconnect(): void {
     this.sessionArgs = null
     this.cancelReconnect()
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.close()
-    }
+    const ws = this.ws
     this.ws = null
+    // A reconnect that is still connecting would otherwise open later and stay connected.
+    if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) {
+      ws.close()
+    }
   }
 
   isConnected(): boolean {

@@ -115,12 +115,15 @@ AXIOS_INSTANCE.interceptors.response.use((response) => {
 
 // --- Token refresh: queue concurrent 401s, retry after refresh ---
 /**
- * Only the refresh endpoint refusing the refresh token ends the session. A network error,
- * timeout or 5xx (a restarting server) keeps the user signed in and fails just the request.
+ * Only the refresh endpoint refusing the refresh token ends the session: a 401, or an OAuth
+ * 400 invalid_grant. A network error, a timeout, a 5xx (a restarting server) and any other
+ * 400, such as a nonce challenge still answered after the one nonce retry, keep the user
+ * signed in and fail just the request.
  */
 function isRefreshRejected(error: unknown): boolean {
-  const status = Axios.isAxiosError(error) ? error.response?.status : undefined;
-  return status === 400 || status === 401;
+  if (!Axios.isAxiosError(error)) return false;
+  const status = error.response?.status;
+  return status === 401 || (status === 400 && error.response?.data?.error === 'invalid_grant');
 }
 
 let refreshInFlight: { session: number; promise: Promise<void> } | null = null;

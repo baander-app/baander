@@ -287,10 +287,15 @@ describe('a refresh that fails', () => {
     expect(location.href).toBe('https://baander.app/library');
   });
 
-  for (const status of [400, 401]) {
-    it(`with ${status} signs the user out and sends them to the login page`, async () => {
+  const rejections: Array<[string, number, unknown]> = [
+    ['401 for a refused refresh token', 401, { error: { message: 'Invalid refresh token.', code: 401 } }],
+    ['400 invalid_grant', 400, { error: 'invalid_grant' }],
+  ];
+
+  for (const [rejection, status, body] of rejections) {
+    it(`with ${rejection} signs the user out and sends them to the login page`, async () => {
       api.onGet('/private').reply(401);
-      refresh.onPost().reply(status, { error: 'invalid_grant' });
+      refresh.onPost().reply(status, body);
 
       await expect(AXIOS_INSTANCE.get('/private')).rejects.toThrow();
 
@@ -298,4 +303,28 @@ describe('a refresh that fails', () => {
       expect(location.href).toBe('/login');
     });
   }
+
+  it('with a second nonce challenge after the nonce retry keeps the user signed in', async () => {
+    api.onGet('/private').reply(401);
+    // A restarting server forgets the nonce it just issued and challenges again.
+    refresh.onPost().replyOnce(400, { error: 'use_dpop_nonce' }, { 'dpop-nonce': 'first-nonce' })
+      .onPost().replyOnce(400, { error: 'use_dpop_nonce' }, { 'dpop-nonce': 'second-nonce' });
+
+    await expect(AXIOS_INSTANCE.get('/private')).rejects.toThrow();
+
+    expect(refresh.history.post).toHaveLength(2);
+    expect(auth.clearAuth).not.toHaveBeenCalled();
+    expect(auth.refreshToken).toBe('old-refresh');
+    expect(location.href).toBe('https://baander.app/library');
+  });
+
+  it('with a 400 that does not refuse the grant keeps the user signed in', async () => {
+    api.onGet('/private').reply(401);
+    refresh.onPost().reply(400, { error: { message: 'DPoP proof header is required.', code: 400 } });
+
+    await expect(AXIOS_INSTANCE.get('/private')).rejects.toThrow();
+
+    expect(auth.clearAuth).not.toHaveBeenCalled();
+    expect(location.href).toBe('https://baander.app/library');
+  });
 });
