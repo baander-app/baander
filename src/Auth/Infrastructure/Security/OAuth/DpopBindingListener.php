@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Infrastructure\Security\OAuth;
 
+use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use App\Auth\Infrastructure\Security\SecurityUser;
 use Lcobucci\JWT\Encoding\JoseEncoder;
 use Lcobucci\JWT\Token\Parser;
@@ -87,12 +88,20 @@ final class DpopBindingListener
             throw new AccessDeniedException('DPoP proof header is required.');
         }
 
-        $result = $this->dpopProofValidator->validate(
-            dpopJwt: $dpopHeader,
-            request: $request,
-            accessToken: $accessToken,
-            expectedJkt: $expectedJkt,
-        );
+        try {
+            $result = $this->dpopProofValidator->validate(
+                dpopJwt: $dpopHeader,
+                request: $request,
+                accessToken: $accessToken,
+                expectedJkt: $expectedJkt,
+            );
+        } catch (DpopStoreUnavailableException) {
+            // The replay check could not run, so the proof is neither accepted nor refused:
+            // the request waits (503), it is not denied (R7). The jti cache logged the failure.
+            $event->setResponse(DpopStoreUnavailableResponse::create());
+
+            return;
+        }
 
         if (!$result->isValid()) {
             $this->logger->warning('DPoP proof validation failed.', [

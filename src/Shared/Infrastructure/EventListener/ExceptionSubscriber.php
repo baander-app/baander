@@ -67,9 +67,16 @@ final class ExceptionSubscriber
             code: $status,
         );
 
+        // A 503 raised with a retry delay keeps its Retry-After and cache headers, so an
+        // endpoint can answer a server fault by throwing; other 5xx carry none.
+        $headers = $exception instanceof HttpExceptionInterface && $status === Response::HTTP_SERVICE_UNAVAILABLE
+            ? $exception->getHeaders()
+            : [];
+
         $event->setResponse(new JsonResponse(
             $error->toArray(),
             $status,
+            $headers,
         ));
     }
 

@@ -9841,7 +9841,7 @@ export const postOauthToken = async (postOauthTokenBody: PostOauthTokenBody, opt
 
 
 
-export const getPostOauthTokenMutationOptions = <TError = ErrorType<OAuthError>,
+export const getPostOauthTokenMutationOptions = <TError = ErrorType<OAuthError | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postOauthToken>>, TError,{data: BodyType<PostOauthTokenBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postOauthToken>>, TError,{data: BodyType<PostOauthTokenBody>}, TContext> => {
 
@@ -9870,12 +9870,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostOauthTokenMutationResult = NonNullable<Awaited<ReturnType<typeof postOauthToken>>>
     export type PostOauthTokenMutationBody = BodyType<PostOauthTokenBody>
-    export type PostOauthTokenMutationError = ErrorType<OAuthError>
+    export type PostOauthTokenMutationError = ErrorType<OAuthError | ApiError>
 
     /**
  * @summary OAuth 2.0 token endpoint (RFC 6749 section 3.2)
  */
-export const usePostOauthToken = <TError = ErrorType<OAuthError>,
+export const usePostOauthToken = <TError = ErrorType<OAuthError | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postOauthToken>>, TError,{data: BodyType<PostOauthTokenBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postOauthToken>>,

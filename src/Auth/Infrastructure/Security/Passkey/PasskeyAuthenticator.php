@@ -6,7 +6,9 @@ namespace App\Auth\Infrastructure\Security\Passkey;
 
 use App\Auth\Application\Command\Passkey\AuthenticatePasskeyCommand;
 use App\Auth\Application\DTO\VerifiedPasskeyLogin;
+use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
+use App\Auth\Infrastructure\Security\OAuth\DpopStoreUnavailableResponse;
 use App\Auth\Infrastructure\Security\OAuth\DpopTokenRequestVerifier;
 use App\Auth\Infrastructure\Security\AuthenticationFailureMessage;
 use App\Auth\Infrastructure\Security\SecurityUser;
@@ -14,6 +16,7 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
@@ -53,11 +56,29 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
             && $request->isMethod('POST');
     }
 
+    /**
+     * @throws DpopProofRejectedException when the proof is missing, stale or invalid
+     * @throws BadCredentialsException when the passkey assertion fails
+     * @throws ServiceUnavailableHttpException while the DPoP nonce store is unavailable (R7)
+     */
     public function authenticate(Request $request): Passport
     {
-        $proofKey = $this->dpopVerifier->verify($request);
-        if ($proofKey instanceof JsonResponse) {
-            throw new DpopProofRejectedException($proofKey);
+        try {
+            $proofKey = $this->dpopVerifier->verify($request);
+            if ($proofKey instanceof JsonResponse) {
+                throw new DpopProofRejectedException($proofKey);
+            }
+            // Issued before the ceremony, so a store failure never spends the assertion.
+            $nextNonce = $this->dpopVerifier->issueNonce();
+        } catch (DpopStoreUnavailableException $exception) {
+            // Not a credential failure: the store that logged the failure could not answer
+            // (R7). An HTTP exception leaves the firewall's failure handler out of it.
+            throw new ServiceUnavailableHttpException(
+                DpopStoreUnavailableResponse::RETRY_AFTER_SECONDS,
+                'The DPoP store is unavailable.',
+                $exception,
+                headers: ['Cache-Control' => 'no-store'],
+            );
         }
 
         try {
@@ -98,7 +119,7 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
         $request->attributes->set(VerifiedPasskeyLogin::class, new VerifiedPasskeyLogin(
             $uuid,
             $proofKey,
-            $this->dpopVerifier->issueNonce(),
+            $nextNonce,
         ));
 
         // The handler returns a user ID UUID string; use a custom loader that resolves

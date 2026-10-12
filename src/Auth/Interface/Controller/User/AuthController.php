@@ -14,6 +14,7 @@ use App\Auth\Application\Command\User\ResendEmailVerificationCommand;
 use App\Auth\Application\Command\User\ResetPasswordCommand;
 use App\Auth\Application\Command\User\VerifyEmailCommand;
 use App\Auth\Application\Exception\CurrentPasswordMismatchException;
+use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use App\Auth\Application\Exception\EmailAddressInUseException;
 use App\Auth\Application\Exception\EmailVerificationException;
 use App\Auth\Application\Exception\OAuthProtocolException;
@@ -208,7 +209,7 @@ final class AuthController
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
             new OA\Response(
                 response: '503',
-                description: 'The server could not decide on the token, for example while its database restarts; the token may still be valid, so retry after the Retry-After delay',
+                description: 'The server could not decide on the token, for example while its database restarts or the DPoP nonce store is unavailable; the token may still be valid, so retry after the Retry-After delay. Carries no DPoP-Nonce header.',
                 headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 5))],
                 content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
             ),
@@ -223,23 +224,29 @@ final class AuthController
             return $this->errorResponse('DPoP proof header is required.', Response::HTTP_BAD_REQUEST);
         }
 
-        // Nonce challenge-response (Auth0-style): require nonce in proof
-        $proofNonce = $this->dpopProofValidator->extractNonce($dpopHeader);
-        if ($proofNonce === null || $proofNonce === '') {
-            return $this->dpopNonceManager->createChallengeResponse();
-        }
+        try {
+            // Nonce challenge-response (Auth0-style): require nonce in proof
+            $proofNonce = $this->dpopProofValidator->extractNonce($dpopHeader);
+            if ($proofNonce === null || $proofNonce === '') {
+                return $this->dpopNonceManager->createChallengeResponse();
+            }
 
-        if (!$this->dpopNonceManager->isValid($proofNonce)) {
-            return $this->dpopNonceManager->createChallengeResponse(
-                'Authorization server requires a fresh nonce in DPoP proof.',
-            );
-        }
+            if (!$this->dpopNonceManager->isValid($proofNonce)) {
+                return $this->dpopNonceManager->createChallengeResponse(
+                    'Authorization server requires a fresh nonce in DPoP proof.',
+                );
+            }
 
-        $result = $this->dpopProofValidator->validate($dpopHeader, $request);
-        if (!$result->isValid()) {
-            return $this->dpopNonceManager->createChallengeResponse(
-                $result->getErrorDescription() ?? $result->getError() ?? 'DPoP proof validation failed.',
-            );
+            $result = $this->dpopProofValidator->validate($dpopHeader, $request);
+            if (!$result->isValid()) {
+                return $this->dpopNonceManager->createChallengeResponse(
+                    $result->getErrorDescription() ?? $result->getError() ?? 'DPoP proof validation failed.',
+                );
+            }
+        } catch (DpopStoreUnavailableException) {
+            // Not a verdict on the proof: the store that logged the failure could not answer
+            // (R7). The token stays unconsumed, so the client waits and presents it again.
+            return $this->serviceUnavailable();
         }
 
         $command = new RefreshTokenCommand(
@@ -257,13 +264,25 @@ final class AuthController
             return $this->refreshFailure($e);
         }
 
-        $nonce = $this->dpopNonceManager->generateNonce();
-        $this->dpopNonceManager->storeNonce($nonce);
-
         $response = $this->successResponse(TokenResource::from($tokenResponse));
-        $response->headers->set('DPoP-Nonce', $nonce);
+        $this->attachNextNonce($response);
 
         return $response;
+    }
+
+    /**
+     * The next nonce is best-effort once the tokens are committed (R8): a store failure
+     * leaves the header out, and the client's next refresh gets one challenge instead.
+     */
+    private function attachNextNonce(JsonResponse $response): void
+    {
+        $nonce = $this->dpopNonceManager->generateNonce();
+        try {
+            $this->dpopNonceManager->storeNonce($nonce);
+        } catch (DpopStoreUnavailableException) {
+            return;
+        }
+        $response->headers->set('DPoP-Nonce', $nonce);
     }
 
     #[OA\Post(
@@ -697,8 +716,16 @@ final class AuthController
         }
 
         $this->logger->error('Token refresh failed.', ['exception' => $cause]);
-        $response = $this->errorResponse($message, Response::HTTP_SERVICE_UNAVAILABLE);
+
+        return $this->serviceUnavailable();
+    }
+
+    /** 503 with Retry-After: the client keeps its session and retries; nothing was decided about the token. */
+    private function serviceUnavailable(): JsonResponse
+    {
+        $response = $this->errorResponse($this->trans('errors.internal', domain: 'auth'), Response::HTTP_SERVICE_UNAVAILABLE);
         $response->headers->set('Retry-After', (string) self::REFRESH_RETRY_AFTER_SECONDS);
+        $response->headers->set('Cache-Control', 'no-store');
 
         return $response;
     }

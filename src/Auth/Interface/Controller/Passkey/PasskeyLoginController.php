@@ -57,6 +57,12 @@ final class PasskeyLoginController
             ),
             new OA\Response(response: '400', description: 'DPoP nonce challenge (use_dpop_nonce) with a DPoP-Nonce header, or an invalid proof. A missing proof returns an ApiError.', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\OAuthError::class))),
             new OA\Response(response: '401', description: 'Invalid passkey or verification failed', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '503',
+                description: 'The DPoP nonce store is unavailable, so the proof could not be checked; retry after the Retry-After delay. Carries no DPoP-Nonce header.',
+                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 5))],
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ),
         ],
     )]
     #[Route('/passkey', name: 'passkey', methods: ['POST'])]

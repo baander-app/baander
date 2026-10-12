@@ -9,6 +9,7 @@ use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\LoginBlockRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Security\User\PasswordAuthenticator;
+use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use App\Auth\Application\Port\DpopJtiCacheInterface;
 use App\Auth\Infrastructure\Security\OAuth\DpopNonceManager;
 use App\Auth\Infrastructure\Security\OAuth\DpopProofValidator;
@@ -25,6 +26,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
@@ -65,6 +67,28 @@ final class PasskeyAuthenticatorTest extends TestCase
         $this->expectExceptionMessage('Invalid credentials.');
 
         $this->authenticator->authenticate($request);
+    }
+
+    /** R7: the nonce store not answering is not a credential failure; the login is told to wait before the ceremony runs. */
+    public function testAStoreOutageIsAnsweredWith503BeforeTheCeremony(): void
+    {
+        $redis = $this->createStub(RedisClientFactory::class);
+        $redis->method('borrow')->willThrowException(new \RedisException('Connection refused'));
+        $bus = $this->createMock(\Symfony\Component\Messenger\MessageBusInterface::class);
+        $bus->expects($this->never())->method('dispatch');
+        $verifier = new DpopTokenRequestVerifier(new DpopProofValidator($this->createStub(DpopJtiCacheInterface::class)), new DpopNonceManager($redis));
+        $authenticator = new PasskeyAuthenticator($bus, $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class), $this->createStub(LoggerInterface::class), new JsonEncoder(), $verifier, AuthenticationFailureMessages::create());
+        $request = Request::create('https://baander.app/api/auth/login/passkey', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], '{"challengeKey":"key","response":{}}');
+        $request->headers->set('DPoP', (new SignedDpopProof())->createWithNonce('POST', 'https://baander.app/api/auth/login/passkey', 'issued-nonce'));
+
+        try {
+            $authenticator->authenticate($request);
+            self::fail('The outage must not be reported as an authentication failure.');
+        } catch (ServiceUnavailableHttpException $exception) {
+            self::assertSame(503, $exception->getStatusCode());
+            self::assertEqualsCanonicalizing(['retry-after' => '5', 'cache-control' => 'no-store'], array_change_key_case(array_map(strval(...), $exception->getHeaders()), CASE_LOWER));
+            self::assertInstanceOf(DpopStoreUnavailableException::class, $exception->getPrevious());
+        }
     }
 
     public function testOnAuthenticationSuccessReturnsNull(): void

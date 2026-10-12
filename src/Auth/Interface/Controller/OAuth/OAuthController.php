@@ -32,6 +32,7 @@ use App\Auth\Interface\Resource\OAuth\AuthorizationRequestResource;
 use App\Auth\Interface\Resource\OAuth\DeviceAuthorizationResource;
 use App\Auth\Interface\Resource\OAuth\OAuthTokenResource;
 use App\Auth\Interface\Resource\OAuth\PendingDeviceAuthorizationResource;
+use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Application\Http\BaanderHeader;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
@@ -46,6 +47,8 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
+use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
@@ -75,6 +78,9 @@ final class OAuthController
 {
     use ApiResponsesTrait;
     use TranslatorTrait;
+
+    /** How long a client waits before retrying a token request the server could not decide on. */
+    private const int RETRY_AFTER_SECONDS = 5;
 
     public function __construct(
         private readonly Security $security,
@@ -184,6 +190,7 @@ final class OAuthController
         return self::noStore(new JsonResponse(['redirect_uri' => $redirect]));
     }
 
+    /** @throws ServiceUnavailableHttpException for a server fault during the grant (R10) */
     #[OA\Post(
         path: '/api/oauth/token',
         description: 'Requires a DPoP proof carrying a server-issued nonce. A missing or invalid proof is answered with `invalid_dpop_proof`, a proof without a fresh nonce with `use_dpop_nonce`; both carry a `DPoP-Nonce` header. Every answer carries the nonce for the next proof and `Cache-Control: no-store`. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded (RFC 6749) or JSON. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`.',
@@ -209,6 +216,12 @@ final class OAuthController
             new OA\Response(response: '200', description: 'DPoP-bound token pair (RFC 6749 section 5.1)', content: new OA\JsonContent(ref: new Model(type: OAuthTokenResource::class))),
             new OA\Response(response: '400', description: 'OAuth error, including the device polling answers authorization_pending, slow_down, access_denied and expired_token, and the DPoP answers invalid_dpop_proof and use_dpop_nonce', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
             new OA\Response(response: '401', description: 'Client authentication failed, or the client is revoked', content: new OA\JsonContent(ref: new Model(type: OAuthError::class))),
+            new OA\Response(
+                response: '503',
+                description: 'The server could not decide on the grant, for example while its database restarts or the DPoP nonce store is unavailable; the presented token may still be valid, so retry after the Retry-After delay. Carries no DPoP-Nonce header.',
+                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 5))],
+                content: new OA\JsonContent(ref: new Model(type: ApiError::class)),
+            ),
         ],
     )]
     #[Route('/token', name: 'token', methods: ['POST'])]
@@ -227,6 +240,18 @@ final class OAuthController
             $response = new JsonResponse(OAuthTokenResource::from($tokens));
         } catch (OAuthProtocolException $exception) {
             $response = $this->oauthError($exception);
+        } catch (HttpExceptionInterface $exception) {
+            throw $exception;
+        } catch (\Throwable $exception) {
+            // R10: a server fault, such as a database that is restarting, says nothing about
+            // the grant; 503 with Retry-After keeps the client's tokens, as the first-party
+            // refresh does. The exception subscriber renders it and keeps these headers.
+            throw new ServiceUnavailableHttpException(
+                self::RETRY_AFTER_SECONDS,
+                'The token endpoint could not complete the grant.',
+                HandlerFailure::cause($exception),
+                headers: ['Cache-Control' => 'no-store'],
+            );
         }
 
         $response->headers->set('DPoP-Nonce', $proof->nextNonce);

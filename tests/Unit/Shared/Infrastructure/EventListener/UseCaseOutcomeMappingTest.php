@@ -20,6 +20,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Controller\ArgumentResolverInterface;
 use Symfony\Component\HttpKernel\Controller\ControllerResolverInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 use Symfony\Component\HttpKernel\HttpKernel;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 use Symfony\Component\HttpKernel\KernelEvents;
@@ -113,6 +114,22 @@ final class UseCaseOutcomeMappingTest extends TestCase
             ['error' => ['message' => 'Et bibliotek med slug "jazz" findes allerede.', 'code' => 409, 'details' => ['reason' => 'slug_exists']]],
             $this->body($response),
         );
+    }
+
+    /**
+     * A 503 raised with a retry delay keeps its headers, so a token endpoint can answer a
+     * server fault by throwing (R10); the body stays the generic envelope.
+     */
+    public function testA503HttpExceptionKeepsItsRetryAfterAndCacheHeaders(): void
+    {
+        $response = $this->handle(static function (): never {
+            throw new ServiceUnavailableHttpException(5, 'The token store is unavailable.', new \RuntimeException('SQLSTATE[08006] connection terminated'), headers: ['Cache-Control' => 'no-store']);
+        });
+
+        $this->assertSame(Response::HTTP_SERVICE_UNAVAILABLE, $response->getStatusCode());
+        $this->assertSame('5', $response->headers->get('Retry-After'));
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+        $this->assertSame(['error' => ['message' => 'An unexpected error occurred.', 'code' => 503]], $this->body($response));
     }
 
     public function testAnHttpExceptionFromAHandlerIsPassedOnUnwrappedForTheFrameworkToRender(): void

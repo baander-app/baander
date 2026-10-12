@@ -28,7 +28,7 @@ use Throwable;
 class RedisClientFactory
 {
     /** Connect timeout and read timeout, in seconds, of every connection this factory opens. */
-    public const float TIMEOUT_SECONDS = 2.0;
+    public const float TIMEOUT_SECONDS = 1.0;
 
     /** @var array{host: string, port: int, password: string|null} */
     private readonly array $parsed;

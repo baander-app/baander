@@ -305,7 +305,7 @@ final class RedisClientFactoryTest extends TestCase
         );
 
         $this->assertSame($redis, $factory->connect($redis));
-        $this->assertSame(2.0, RedisClientFactory::TIMEOUT_SECONDS);
+        $this->assertSame(1.0, RedisClientFactory::TIMEOUT_SECONDS);
     }
 
     public function test_an_injected_connection_factory_supplies_a_ready_client_that_is_not_reconnected(): void

@@ -1,11 +1,11 @@
 framework:
     cache:
         # Default Redis provider for all pools. Every DSN carries a connect timeout and a
-        # read timeout of 2 s (RedisClientFactory::TIMEOUT_SECONDS), so a Redis that
+        # read timeout of 1 s (RedisClientFactory::TIMEOUT_SECONDS), so a Redis that
         # accepts connections but does not answer fails the request within a bound
         # instead of blocking its coroutine; the rate limiters and Doctrine's caches
         # reach Redis before any DPoP code runs.
-        default_redis_provider: 'redis://default:%env(REDIS_PASSWORD)%@redis:6379?timeout=2&read_timeout=2'
+        default_redis_provider: 'redis://default:%env(REDIS_PASSWORD)%@redis:6379?timeout=1&read_timeout=1'
 
         # Redis-backed cache pools for Swoole workers
         app: cache.adapter.redis
@@ -17,7 +17,7 @@ framework:
             # namespace, so clearing one limiter's pool leaves the others intact.
             cache.rate_limiter:
                 adapter: cache.adapter.redis
-                provider: 'redis://default:%env(REDIS_PASSWORD)%@redis:6379?timeout=2&read_timeout=2'
+                provider: 'redis://default:%env(REDIS_PASSWORD)%@redis:6379?timeout=1&read_timeout=1'
                 default_lifetime: 3600
             cache.rate_limiter.anonymous_api: { adapter: cache.rate_limiter }
             cache.rate_limiter.authenticated_api: { adapter: cache.rate_limiter }
@@ -42,13 +42,13 @@ framework:
             # Doctrine system cache (metadata, query) — indefinite, cleared on deploy
             doctrine.system_cache_pool:
                 adapter: cache.adapter.redis
-                provider: 'redis://default:%env(REDIS_PASSWORD)%@redis:6379?timeout=2&read_timeout=2'
+                provider: 'redis://default:%env(REDIS_PASSWORD)%@redis:6379?timeout=1&read_timeout=1'
                 default_lifetime: 0
 
             # Doctrine result cache — 1 hour default, overridable per-query
             doctrine.result_cache_pool:
                 adapter: cache.adapter.redis
-                provider: 'redis://default:%env(REDIS_PASSWORD)%@redis:6379?timeout=2&read_timeout=2'
+                provider: 'redis://default:%env(REDIS_PASSWORD)%@redis:6379?timeout=1&read_timeout=1'
                 default_lifetime: 3600
 
             # Tag-aware cache for application-level invalidation (RedisTagAwareAdapter)
@@ -56,7 +56,7 @@ framework:
             cache.tags:
                 tags: true
                 adapter: cache.adapter.redis
-                provider: 'redis://default:%env(REDIS_PASSWORD)%@redis:6379?timeout=2&read_timeout=2'
+                provider: 'redis://default:%env(REDIS_PASSWORD)%@redis:6379?timeout=1&read_timeout=1'
                 default_lifetime: 3600
 
 services:
@@ -70,7 +70,7 @@ services:
         class: Redis
         calls:
             # Connect and read timeouts match RedisClientFactory::TIMEOUT_SECONDS.
-            - [connect, ['redis', 6379, 2.0, null, 0, 2.0]]
+            - [connect, ['redis', 6379, 1.0, null, 0, 1.0]]
             - [auth, ['%env(REDIS_PASSWORD)%']]
 
 when@test:

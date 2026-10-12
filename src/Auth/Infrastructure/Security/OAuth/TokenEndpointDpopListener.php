@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Infrastructure\Security\OAuth;
 
 use App\Auth\Application\DTO\VerifiedDpopProof;
+use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -21,6 +22,9 @@ use Symfony\Component\HttpKernel\KernelEvents;
  * as a VerifiedDpopProof; the token endpoint binds the issued tokens to its key
  * and returns its next nonce with the answer, success or OAuth error alike,
  * because a device polls repeatedly and each nonce is accepted once.
+ *
+ * While the nonce or jti store is unavailable nothing is decided: the request is
+ * answered 503 with Retry-After and no nonce, before any grant runs (R7).
  *
  * Priority 6 runs after routing (32), the auth rate limits (10), the firewall (8)
  * and the generic API limit (7).
@@ -42,21 +46,25 @@ final readonly class TokenEndpointDpopListener
             return;
         }
 
-        $result = $this->verifier->inspect($request);
-        if ($result instanceof DpopProofRejection) {
-            $event->setResponse(new JsonResponse(
-                ['error' => $result->oauthError(), 'error_description' => $result->description],
-                Response::HTTP_BAD_REQUEST,
-                [
-                    'DPoP-Nonce' => $this->verifier->issueNonce(),
-                    'Cache-Control' => 'no-store',
-                    'Pragma' => 'no-cache',
-                ],
-            ));
+        try {
+            $result = $this->verifier->inspect($request);
+            if ($result instanceof DpopProofRejection) {
+                $event->setResponse(new JsonResponse(
+                    ['error' => $result->oauthError(), 'error_description' => $result->description],
+                    Response::HTTP_BAD_REQUEST,
+                    [
+                        'DPoP-Nonce' => $this->verifier->issueNonce(),
+                        'Cache-Control' => 'no-store',
+                        'Pragma' => 'no-cache',
+                    ],
+                ));
 
-            return;
+                return;
+            }
+
+            $request->attributes->set(VerifiedDpopProof::class, new VerifiedDpopProof($result, $this->verifier->issueNonce()));
+        } catch (DpopStoreUnavailableException) {
+            $event->setResponse(DpopStoreUnavailableResponse::create());
         }
-
-        $request->attributes->set(VerifiedDpopProof::class, new VerifiedDpopProof($result, $this->verifier->issueNonce()));
     }
 }

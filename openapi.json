@@ -2279,6 +2279,25 @@
                                 }
                             }
                         }
+                    },
+                    "503": {
+                        "description": "The server could not decide on the grant, for example while its database restarts or the DPoP nonce store is unavailable; the presented token may still be valid, so retry after the Retry-After delay. Carries no DPoP-Nonce header.",
+                        "headers": {
+                            "Retry-After": {
+                                "description": "Seconds to wait before retrying",
+                                "schema": {
+                                    "type": "integer",
+                                    "example": 5
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": []
@@ -3021,6 +3040,25 @@
                                 }
                             }
                         }
+                    },
+                    "503": {
+                        "description": "The DPoP nonce store is unavailable, so the proof could not be checked; retry after the Retry-After delay. Carries no DPoP-Nonce header.",
+                        "headers": {
+                            "Retry-After": {
+                                "description": "Seconds to wait before retrying",
+                                "schema": {
+                                    "type": "integer",
+                                    "example": 5
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": []
@@ -3432,7 +3470,7 @@
                         }
                     },
                     "503": {
-                        "description": "The server could not decide on the token, for example while its database restarts; the token may still be valid, so retry after the Retry-After delay",
+                        "description": "The server could not decide on the token, for example while its database restarts or the DPoP nonce store is unavailable; the token may still be valid, so retry after the Retry-After delay. Carries no DPoP-Nonce header.",
                         "headers": {
                             "Retry-After": {
                                 "description": "Seconds to wait before retrying",
@@ -4052,6 +4090,25 @@
                     },
                     "401": {
                         "description": "Invalid credentials",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The DPoP nonce store is unavailable, so the proof could not be checked; retry after the Retry-After delay. Carries no DPoP-Nonce header.",
+                        "headers": {
+                            "Retry-After": {
+                                "description": "Seconds to wait before retrying",
+                                "schema": {
+                                    "type": "integer",
+                                    "example": 5
+                                }
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
