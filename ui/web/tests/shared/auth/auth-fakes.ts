@@ -326,7 +326,12 @@ class FakeDatabase {
   }
 }
 
-/** An in-memory IndexedDB with one database and serialized transactions. */
+/**
+ * An in-memory IndexedDB with one database and serialized transactions. Records are kept by
+ * structured clone, as a browser does, so a CryptoKey written in one record reads back as a usable
+ * key with its extractability intact; any record id works, the credential record and the pending
+ * logouts alike.
+ */
 export class FakeIndexedDb {
   readonly log: StoreOperation[] = []
   private database: FakeDatabase | null = null

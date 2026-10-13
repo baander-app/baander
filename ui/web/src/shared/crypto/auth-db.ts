@@ -6,13 +6,26 @@
  * compare-and-put; see `../../../../shared/crypto/auth-storage`.
  */
 
-import type { StoredAuth, StoredAuthData, StoredAuthTombstone, StoredAuthUser } from '../../../../shared/crypto/auth-storage';
+import type {
+  PendingLogoutEntry,
+  PendingLogoutPatch,
+  StoredAuth,
+  StoredAuthData,
+  StoredAuthTombstone,
+  StoredAuthUser,
+} from '../../../../shared/crypto/auth-storage';
 import { IndexedDbAuthStorage } from '../../../../shared/crypto/auth-db';
 
-export type { StoredAuth, AuthStorageBackend, StoredAuthTombstone } from '../../../../shared/crypto/auth-storage';
-import { isClearedRecord } from '../../../../shared/crypto/auth-storage';
+export type {
+  StoredAuth,
+  AuthStorageBackend,
+  StoredAuthTombstone,
+  PendingLogoutEntry,
+  PendingLogoutPatch,
+} from '../../../../shared/crypto/auth-storage';
+import { PENDING_LOGOUT_LIMIT, isClearedRecord } from '../../../../shared/crypto/auth-storage';
 
-export { isClearedRecord };
+export { PENDING_LOGOUT_LIMIT, isClearedRecord };
 
 /** The flat record shape the web auth-store reads and writes. */
 export interface LegacyStoredAuth {
@@ -91,4 +104,27 @@ export async function saveStoredAuth(data: LegacyStoredAuthData, expectedEpoch: 
 /** Leaves a tombstone at the next epoch and resolves that epoch. */
 export async function clearStoredAuth(): Promise<number> {
   return storage.clear();
+}
+
+/**
+ * Records a logout and leaves the tombstone in one transaction; see `AuthStorageBackend.beginLogout`.
+ * Resolves the tombstone's epoch.
+ */
+export async function beginStoredLogout(entry: PendingLogoutEntry): Promise<number> {
+  return storage.beginLogout(entry);
+}
+
+/** The pending logouts, oldest first. */
+export async function listPendingLogouts(): Promise<PendingLogoutEntry[]> {
+  return storage.listPendingLogouts();
+}
+
+/** Patches one pending logout; resolves false when it is gone. */
+export async function updatePendingLogout(id: string, patch: PendingLogoutPatch): Promise<boolean> {
+  return storage.updatePendingLogout(id, patch);
+}
+
+/** Removes one pending logout; a missing entry is fine. */
+export async function removePendingLogout(id: string): Promise<void> {
+  return storage.removePendingLogout(id);
 }

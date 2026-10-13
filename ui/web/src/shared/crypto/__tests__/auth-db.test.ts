@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FakeIndexedDb, installIndexedDb } from '../../../../tests/shared/auth/auth-fakes'
-import { clearStoredAuth, loadStoredAuth, saveStoredAuth } from '../auth-db'
+import {
+  beginStoredLogout,
+  clearStoredAuth,
+  listPendingLogouts,
+  loadStoredAuth,
+  removePendingLogout,
+  saveStoredAuth,
+  updatePendingLogout,
+} from '../auth-db'
 
 const STORE = 'auth'
 
@@ -132,5 +140,120 @@ describe('loadStoredAuth', () => {
     await expect(loadStoredAuth()).resolves.toBeNull()
 
     expect(db.records(STORE).has('current')).toBe(false)
+  })
+})
+
+describe('pending logouts', () => {
+  function pendingEntry(id: string, createdAt = 1_000) {
+    return {
+      id,
+      createdAt,
+      keyPair: {
+        publicKey: { kid: `pub-${id}` } as unknown as CryptoKey,
+        privateKey: { kid: `priv-${id}` } as unknown as CryptoKey,
+        jwk: { kty: 'EC', x: id } as JsonWebKey,
+        jkt: `jkt-${id}`,
+      },
+      accessToken: `access-${id}`,
+      refreshToken: `refresh-${id}`,
+      accessTokenExpiresAt: 2_000,
+      origin: 'https://api.baander.app',
+      attempts: 0,
+    }
+  }
+
+  it('writes the entry and the tombstone in one readwrite transaction and resolves the epoch', async () => {
+    await saveStoredAuth(credentials('access-1'), null)
+    db.log.length = 0
+
+    await expect(beginStoredLogout(pendingEntry('a'))).resolves.toBe(2)
+
+    const transactions = new Set(db.log.map((entry) => entry.transaction))
+    expect(transactions.size).toBe(1)
+    expect(db.log.map((entry) => [entry.mode, entry.operation, entry.key])).toEqual([
+      ['readwrite', 'get', 'current'],
+      ['readwrite', 'get', 'pending-logouts'],
+      ['readwrite', 'put', 'pending-logouts'],
+      ['readwrite', 'put', 'current'],
+    ])
+    expect(db.records(STORE).get('current')).toEqual({ id: 'current', epoch: 2, cleared: true })
+    await expect(loadStoredAuth()).resolves.toEqual({ epoch: 2, cleared: true })
+    await expect(listPendingLogouts()).resolves.toEqual([pendingEntry('a')])
+  })
+
+  it('keeps the key pair, the tokens, the expiry, the origin and the attempt count of every entry', async () => {
+    await beginStoredLogout(pendingEntry('a', 1_000))
+    await beginStoredLogout(pendingEntry('b', 2_000))
+
+    await expect(listPendingLogouts()).resolves.toEqual([pendingEntry('a', 1_000), pendingEntry('b', 2_000)])
+  })
+
+  it('keeps both entries when two tabs append at the same time', async () => {
+    await Promise.all([beginStoredLogout(pendingEntry('a')), beginStoredLogout(pendingEntry('b'))])
+
+    const ids = (await listPendingLogouts()).map((entry) => entry.id)
+    expect(ids.sort()).toEqual(['a', 'b'])
+  })
+
+  it('loses nothing when a delete runs beside an append', async () => {
+    await beginStoredLogout(pendingEntry('a'))
+
+    await Promise.all([removePendingLogout('a'), beginStoredLogout(pendingEntry('b'))])
+
+    expect((await listPendingLogouts()).map((entry) => entry.id)).toEqual(['b'])
+  })
+
+  it('updates one entry in a readwrite transaction that re-reads the list', async () => {
+    await beginStoredLogout(pendingEntry('a'))
+    await beginStoredLogout(pendingEntry('b'))
+    db.log.length = 0
+
+    await expect(updatePendingLogout('a', { accessToken: 'access-a2', refreshToken: 'refresh-a2', accessTokenExpiresAt: 9_000, attempts: 1 })).resolves.toBe(true)
+
+    expect(db.log.map((entry) => [entry.mode, entry.operation, entry.key])).toEqual([
+      ['readwrite', 'get', 'pending-logouts'],
+      ['readwrite', 'put', 'pending-logouts'],
+    ])
+    expect(db.log[0].transaction).toBe(db.log[1].transaction)
+    await expect(listPendingLogouts()).resolves.toEqual([
+      { ...pendingEntry('a'), accessToken: 'access-a2', refreshToken: 'refresh-a2', accessTokenExpiresAt: 9_000, attempts: 1 },
+      pendingEntry('b'),
+    ])
+  })
+
+  it('resolves false from an update of an entry that is gone and writes nothing', async () => {
+    await beginStoredLogout(pendingEntry('a'))
+    db.log.length = 0
+
+    await expect(updatePendingLogout('missing', { attempts: 1 })).resolves.toBe(false)
+
+    expect(db.log.map((entry) => entry.operation)).toEqual(['get'])
+  })
+
+  it('removes one entry and leaves the others', async () => {
+    await beginStoredLogout(pendingEntry('a'))
+    await beginStoredLogout(pendingEntry('b'))
+
+    await removePendingLogout('a')
+
+    expect((await listPendingLogouts()).map((entry) => entry.id)).toEqual(['b'])
+    await removePendingLogout('a')
+    expect((await listPendingLogouts()).map((entry) => entry.id)).toEqual(['b'])
+  })
+
+  it('lists nothing when no logout was ever recorded', async () => {
+    await expect(listPendingLogouts()).resolves.toEqual([])
+  })
+
+  it('never touches the pending list on a save, a clear or a load', async () => {
+    await beginStoredLogout(pendingEntry('a'))
+    db.log.length = 0
+
+    await saveStoredAuth(credentials('after-login'), 1)
+    await loadStoredAuth()
+    await clearStoredAuth()
+
+    expect(db.log.every((entry) => entry.key === 'current')).toBe(true)
+    expect((await listPendingLogouts()).map((entry) => entry.id)).toEqual(['a'])
   })
 })

@@ -45,3 +45,30 @@ export function outageWaitMs(retryAfterSeconds: number, random: () => number = M
 
   return Math.min(REFRESH_RETRY_AFTER_CAP_MS, retryAfterMs + jitterMs);
 }
+
+/**
+ * Pending logouts: a logout ends the session in the browser at once and its server request is
+ * delivered afterwards, retried until the server confirms or refuses it. The delivery takes the
+ * origin's auth lock per entry, waiting at most PENDING_LOGOUT_LOCK_WAIT_MS, and every one of its
+ * requests carries REFRESH_ATTEMPT_TIMEOUT_MS, so a hung request cannot hold the lock past it.
+ * While entries remain, a page retries on a timer that backs off from PENDING_LOGOUT_BACKOFF_MS by
+ * PENDING_LOGOUT_BACKOFF_FACTOR up to PENDING_LOGOUT_BACKOFF_CAP_MS, with jitter, and at most
+ * PENDING_LOGOUT_TIMER_ATTEMPTS times per page session; the start, `online` and visibility
+ * triggers are not counted and reset the backoff.
+ */
+export const PENDING_LOGOUT_LOCK_WAIT_MS = 2_000;
+export const PENDING_LOGOUT_BACKOFF_MS = 2_000;
+export const PENDING_LOGOUT_BACKOFF_FACTOR = 2;
+export const PENDING_LOGOUT_BACKOFF_CAP_MS = 300_000;
+export const PENDING_LOGOUT_TIMER_ATTEMPTS = 8;
+
+/**
+ * Milliseconds until the next timer-driven delivery attempt after `step` consecutive ones: the
+ * backoff plus a uniform jitter of up to the same value, capped at PENDING_LOGOUT_BACKOFF_CAP_MS.
+ */
+export function pendingLogoutBackoffMs(step: number, random: () => number = Math.random): number {
+  const base = Math.min(PENDING_LOGOUT_BACKOFF_CAP_MS, PENDING_LOGOUT_BACKOFF_MS * PENDING_LOGOUT_BACKOFF_FACTOR ** Math.max(0, step));
+  const jitterMs = random() * base;
+
+  return Math.min(PENDING_LOGOUT_BACKOFF_CAP_MS, base + jitterMs);
+}

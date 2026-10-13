@@ -8,10 +8,17 @@
  * A save is get, compare, put inside one readwrite transaction with nothing awaited in between,
  * so two tabs writing at the same epoch cannot both succeed: IndexedDB serializes readwrite
  * transactions on the store. The transaction aborts on a mismatch and is never retried here.
+ *
+ * The pending logouts live in a second record of the same store, a list under one id, so a logout
+ * writes its entry and the credential tombstone in one transaction. Every list change is one
+ * readwrite transaction that reads the list, changes it and puts it back, which IndexedDB
+ * serializes against the other tabs' changes.
  */
 
 import type {
   AuthStorageBackend,
+  PendingLogoutEntry,
+  PendingLogoutPatch,
   SaveStoredAuthResult,
   StoredAuth,
   StoredAuthData,
@@ -22,6 +29,7 @@ const DB_NAME = 'baander-auth';
 const DB_VERSION = 1;
 const STORE_NAME = 'auth';
 const RECORD_ID = 'current';
+const PENDING_LOGOUTS_ID = 'pending-logouts';
 
 interface LiveRecord {
   id: string;
@@ -43,6 +51,25 @@ interface TombstoneRecord {
 }
 
 type IndexedDbRecord = LiveRecord | TombstoneRecord;
+
+/** One pending logout as stored: the key pair flat beside its JWK, as the live record keeps it. */
+interface StoredPendingLogout {
+  id: string;
+  createdAt: number;
+  cryptoKeyPair: CryptoKeyPair;
+  publicJwk: JsonWebKey;
+  jkt: string;
+  accessToken: string;
+  refreshToken: string;
+  accessTokenExpiresAt: number | null;
+  origin: string;
+  attempts: number;
+}
+
+interface PendingLogoutsRecord {
+  id: string;
+  entries: StoredPendingLogout[];
+}
 
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -103,6 +130,50 @@ function liveRecord(data: StoredAuthData, epoch: number): LiveRecord {
     user: data.user,
     nonce: data.nonce,
   };
+}
+
+function toStoredPendingLogout(entry: PendingLogoutEntry): StoredPendingLogout {
+  return {
+    id: entry.id,
+    createdAt: entry.createdAt,
+    cryptoKeyPair: {
+      publicKey: entry.keyPair.publicKey,
+      privateKey: entry.keyPair.privateKey,
+    },
+    publicJwk: entry.keyPair.jwk,
+    jkt: entry.keyPair.jkt,
+    accessToken: entry.accessToken,
+    refreshToken: entry.refreshToken,
+    accessTokenExpiresAt: entry.accessTokenExpiresAt,
+    origin: entry.origin,
+    attempts: entry.attempts,
+  };
+}
+
+/** The entry as the delivery reads it; a key that did not survive the store reads back as missing. */
+function toPendingLogoutEntry(stored: StoredPendingLogout): PendingLogoutEntry {
+  return {
+    id: stored.id,
+    createdAt: stored.createdAt,
+    keyPair: {
+      publicKey: stored.cryptoKeyPair?.publicKey,
+      privateKey: stored.cryptoKeyPair?.privateKey,
+      jwk: stored.publicJwk,
+      jkt: stored.jkt,
+    },
+    accessToken: stored.accessToken,
+    refreshToken: stored.refreshToken,
+    accessTokenExpiresAt: stored.accessTokenExpiresAt ?? null,
+    origin: stored.origin,
+    attempts: stored.attempts ?? 0,
+  };
+}
+
+/** The stored list, or an empty one when the record is missing or not a list. */
+function pendingEntries(raw: unknown): StoredPendingLogout[] {
+  const entries = (raw as Partial<PendingLogoutsRecord> | null | undefined)?.entries;
+  if (!Array.isArray(entries)) return [];
+  return entries.filter((entry): entry is StoredPendingLogout => typeof entry === 'object' && entry !== null && typeof entry.id === 'string');
 }
 
 export class IndexedDbAuthStorage implements AuthStorageBackend {
@@ -170,6 +241,80 @@ export class IndexedDbAuthStorage implements AuthStorageBackend {
 
       tx.oncomplete = () => { db.close(); resolve(epoch); };
       tx.onabort = () => { db.close(); reject(tx.error ?? new Error('Auth record clear aborted')); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    });
+  }
+
+  async beginLogout(entry: PendingLogoutEntry): Promise<number> {
+    const stored = toStoredPendingLogout(entry);
+    let epoch = 0;
+    await this.readwrite((store) => {
+      const readCurrent = store.get(RECORD_ID);
+      readCurrent.onsuccess = () => {
+        epoch = (hasEpoch(readCurrent.result) ? readCurrent.result.epoch : 0) + 1;
+      };
+      const readList = store.get(PENDING_LOGOUTS_ID);
+      readList.onsuccess = () => {
+        const entries = pendingEntries(readList.result).filter((existing) => existing.id !== stored.id);
+        entries.push(stored);
+        store.put({ id: PENDING_LOGOUTS_ID, entries } satisfies PendingLogoutsRecord);
+        const tombstone: TombstoneRecord = { id: RECORD_ID, epoch, cleared: true };
+        store.put(tombstone);
+      };
+    });
+    return epoch;
+  }
+
+  async listPendingLogouts(): Promise<PendingLogoutEntry[]> {
+    const db = await openDb();
+    const raw = await new Promise<unknown>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const request = tx.objectStore(STORE_NAME).get(PENDING_LOGOUTS_ID);
+
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => { db.close(); reject(request.error); };
+      tx.oncomplete = () => db.close();
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    });
+    return pendingEntries(raw).map(toPendingLogoutEntry);
+  }
+
+  async updatePendingLogout(id: string, patch: PendingLogoutPatch): Promise<boolean> {
+    let found = false;
+    await this.readwrite((store) => {
+      const read = store.get(PENDING_LOGOUTS_ID);
+      read.onsuccess = () => {
+        const entries = pendingEntries(read.result);
+        const index = entries.findIndex((entry) => entry.id === id);
+        if (index === -1) return;
+        found = true;
+        entries[index] = { ...entries[index], ...patch };
+        store.put({ id: PENDING_LOGOUTS_ID, entries } satisfies PendingLogoutsRecord);
+      };
+    });
+    return found;
+  }
+
+  async removePendingLogout(id: string): Promise<void> {
+    await this.readwrite((store) => {
+      const read = store.get(PENDING_LOGOUTS_ID);
+      read.onsuccess = () => {
+        const entries = pendingEntries(read.result);
+        if (!entries.some((entry) => entry.id === id)) return;
+        store.put({ id: PENDING_LOGOUTS_ID, entries: entries.filter((entry) => entry.id !== id) } satisfies PendingLogoutsRecord);
+      };
+    });
+  }
+
+  /** Runs `work` against the store in one readwrite transaction; resolves once it committed. */
+  private async readwrite(work: (store: IDBObjectStore) => void): Promise<void> {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      work(tx.objectStore(STORE_NAME));
+
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onabort = () => { db.close(); reject(tx.error ?? new Error('Auth store write aborted')); };
       tx.onerror = () => { db.close(); reject(tx.error); };
     });
   }

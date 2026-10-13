@@ -45,7 +45,7 @@ export const AXIOS_INSTANCE = Axios.create({
  * Build the htu (HTTP URI) for a DPoP proof.
  * Strips query and fragment, normalizes to https scheme.
  */
-function buildHtu(url: string): string {
+export function buildHtu(url: string): string {
   try {
     const baseUrl = window.__BAANDER_API_URL__ || window.location.origin;
     const parsed = new URL(url, baseUrl);
@@ -123,7 +123,7 @@ AXIOS_INSTANCE.interceptors.response.use((response) => {
  * and any other 400, such as a nonce challenge still answered after the one nonce retry, keep
  * the user signed in and fail just the request.
  */
-function isRefreshRejected(error: unknown): boolean {
+export function isRefreshRejected(error: unknown): boolean {
   if (!Axios.isAxiosError(error)) return false;
   const status = error.response?.status;
   return status === 401 || (status === 400 && error.response?.data?.error === 'invalid_grant');
@@ -135,14 +135,23 @@ function isTransportFailure(error: unknown): boolean {
 }
 
 /** The nonce a `use_dpop_nonce` challenge asks the next proof to carry, or null for any other answer. */
-function challengedNonce(error: unknown): string | null {
+export function challengedNonce(error: unknown): string | null {
   if (!Axios.isAxiosError(error) || error.response?.status !== 400) return null;
   if (error.response.data?.error !== 'use_dpop_nonce') return null;
   const nonce = error.response.headers?.['dpop-nonce'];
   return typeof nonce === 'string' && nonce !== '' ? nonce : null;
 }
 
-function wait(ms: number): Promise<void> {
+/**
+ * Milliseconds to wait out a 503 before one more attempt, from its `Retry-After` with jitter, or
+ * null for any other answer.
+ */
+export function outageWaitFor(error: unknown): number | null {
+  const retryAfter = retryAfterSeconds(error, { status: 503 });
+  return retryAfter === null ? null : outageWaitMs(retryAfter);
+}
+
+export function wait(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
@@ -212,10 +221,9 @@ async function refreshWithServer(session: number, deadline: number): Promise<voi
           retried.transport = true;
           continue;
         }
-        const retryAfter = retryAfterSeconds(error, { status: 503 });
-        if (retryAfter !== null && !retried.outage) {
+        const outageWait = outageWaitFor(error);
+        if (outageWait !== null && !retried.outage) {
           retried.outage = true;
-          const outageWait = outageWaitMs(retryAfter);
           // A wait that ends past the budget would start no attempt; fail now instead.
           if (Date.now() + outageWait >= deadline) throw error;
           await wait(outageWait);
