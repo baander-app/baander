@@ -782,6 +782,14 @@ final class DpopStoreOutageTest extends TestCase
             $this->borrowsDuringLastRequest = $pool->borrows() - $before;
         }
         $kernel->terminate($request, $response);
+        // The web server clears a pooled EntityManager when a request releases it; each
+        // kernel here reuses one manager, so clear it the same way between requests, or a
+        // row another kernel revoked is still read from this one's identity map.
+        $manager = $kernel->getContainer()->get('oauth.acceptance.entity_manager');
+        self::assertInstanceOf(EntityManagerInterface::class, $manager);
+        if ($manager->isOpen()) {
+            $manager->clear();
+        }
 
         return $response;
     }
