@@ -18,7 +18,6 @@ vi.mock('@/shared/api-client/axios-instance', () => ({
 }))
 
 vi.mock('@/shared/api-client/gen/endpoints', () => ({
-  postAuthLogout: vi.fn().mockResolvedValue({ data: {} }),
   postAuthRegister: vi.fn().mockResolvedValue({ data: {} }),
 }))
 
@@ -46,9 +45,10 @@ vi.mock('@/shared/crypto/dpop-store', () => ({
   setDpopNonce: vi.fn((nonce: string) => { dpop.nonce = nonce }),
 }))
 
-/** One origin's record, with the epoch rules of the IndexedDB adapter. */
+/** One origin's record and its pending logouts, with the epoch rules of the IndexedDB adapter. */
 const storage = vi.hoisted(() => ({
   record: null as LegacyStoredRecord | null,
+  pendingLogouts: [] as Array<{ id: string; keyPair: unknown; accessToken: string; refreshToken: string }>,
 }))
 
 vi.mock('@/shared/crypto/auth-db', () => ({
@@ -68,6 +68,21 @@ vi.mock('@/shared/crypto/auth-db', () => ({
   isClearedRecord: (record: LegacyStoredRecord) => 'cleared' in record && record.cleared === true,
 }))
 
+/**
+ * The delivery module: recording appends the entry and leaves the tombstone, as the storage does
+ * in one transaction; the drain never settles here, since a logout must not wait for it.
+ */
+vi.mock('@/features/auth/services/pending-logout', () => ({
+  recordLogout: vi.fn(async (credentials: { keyPair: unknown; accessToken: string; refreshToken: string }) => {
+    const epoch = (storage.record?.epoch ?? 0) + 1
+    storage.record = { epoch, cleared: true }
+    storage.pendingLogouts.push({ id: `entry-${storage.pendingLogouts.length + 1}`, ...credentials })
+    return epoch
+  }),
+  drainPendingLogouts: vi.fn(() => new Promise<void>(() => {})),
+  installPendingLogoutTriggers: vi.fn(),
+}))
+
 vi.mock('@/shared/lib/logger', () => ({
   createLogger: () => ({
     debug: vi.fn(),
@@ -78,7 +93,7 @@ vi.mock('@/shared/lib/logger', () => ({
 }))
 
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
-import { postAuthLogout } from '@/shared/api-client/gen/endpoints'
+import { drainPendingLogouts, recordLogout } from '@/features/auth/services/pending-logout'
 import { postTokenToWorker } from '@/features/player/services/service-worker-bridge'
 import { generateDpopKeyPair } from '@/shared/crypto/dpop-key-pair'
 import {
@@ -103,7 +118,8 @@ const mockPostTokenToWorker = vi.mocked(postTokenToWorker)
 const mockSetDpopKeyPair = vi.mocked(setDpopKeyPair)
 const mockClearDpopKeyPair = vi.mocked(clearDpopKeyPair)
 const mockSetDpopNonce = vi.mocked(setDpopNonce)
-const mockPostAuthLogout = vi.mocked(postAuthLogout)
+const mockRecordLogout = vi.mocked(recordLogout)
+const mockDrainPendingLogouts = vi.mocked(drainPendingLogouts)
 
 const FAKE_KEY_PAIR = {
   publicKey: {} as CryptoKey,
@@ -185,6 +201,7 @@ beforeEach(async () => {
   await vi.waitFor(() => expect(mockClearStoredAuth).toHaveBeenCalled())
   vi.clearAllMocks()
   storage.record = null
+  storage.pendingLogouts = []
   dpop.keyPair = null
   dpop.nonce = null
   FakeBroadcastChannel.posted = []
@@ -195,7 +212,6 @@ beforeEach(async () => {
 
   mockAxios.post.mockResolvedValue({ data: {} })
   mockGenerateDpopKeyPair.mockResolvedValue(FAKE_KEY_PAIR)
-  mockPostAuthLogout.mockResolvedValue({ data: {} } as Awaited<ReturnType<typeof postAuthLogout>>)
 })
 
 afterEach(() => {
@@ -324,14 +340,8 @@ describe('useAuthStore', () => {
   })
 
   describe('logout', () => {
-    it('clears auth (tokens/user/isAuthenticated) via clearAuth', async () => {
-      // Seed authenticated state.
-      useAuthStore.setState({
-        accessToken: 'stale',
-        refreshToken: 'stale-r',
-        user: VALID_USER,
-        isAuthenticated: true,
-      })
+    it('records the entry with the tombstone, clears the tab, broadcasts the tombstone epoch and starts a drain it does not wait for', async () => {
+      await hydrateFrom(liveRecord(3, 'held-access'))
 
       await useAuthStore.getState().logout()
 
@@ -342,33 +352,87 @@ describe('useAuthStore', () => {
       expect(state.isAuthenticated).toBe(false)
       expect(state.isLoading).toBe(false)
 
-      // clearAuth cleared both the DPoP key pair and IndexedDB.
+      expect(mockRecordLogout).toHaveBeenCalledOnce()
+      expect(mockRecordLogout).toHaveBeenCalledWith({
+        keyPair: expect.objectContaining({ jkt: FAKE_KEY_PAIR.jkt }),
+        accessToken: 'held-access',
+        refreshToken: 'held-access-refresh',
+      })
+      expect(storage.pendingLogouts).toEqual([expect.objectContaining({ accessToken: 'held-access' })])
+      expect(storage.record).toEqual({ epoch: 4, cleared: true })
+      expect(mockClearStoredAuth).not.toHaveBeenCalled()
+      expect(postedEvents()).toEqual([{ type: 'cleared', epoch: 4 }])
+      expect(JSON.stringify(FakeBroadcastChannel.posted)).not.toContain('held-access')
+
       expect(mockClearDpopKeyPair).toHaveBeenCalledOnce()
-      await vi.waitFor(() => expect(mockClearStoredAuth).toHaveBeenCalledOnce())
+      expect(mockPostTokenToWorker).toHaveBeenCalledWith(null)
+      expect(mockDrainPendingLogouts).toHaveBeenCalledOnce()
+      expect(mockDrainPendingLogouts.mock.invocationCallOrder[0]).toBeGreaterThan(mockRecordLogout.mock.invocationCallOrder[0])
     })
 
-    it('clears auth even when the logout network call rejects', async () => {
-      useAuthStore.setState({
-        accessToken: 'stale',
-        refreshToken: 'stale-r',
-        user: VALID_USER,
-        isAuthenticated: true,
-      })
-      mockPostAuthLogout.mockRejectedValue(new Error('logout endpoint down'))
+    it('clears as before, tombstone and broadcast included, when the entry could not be recorded', async () => {
+      await hydrateFrom(liveRecord(3, 'held-access'))
+      mockRecordLogout.mockResolvedValueOnce(null)
 
-      // logout's inner try/finally clears auth even when postAuthLogout rejects;
-      // the rejection still propagates to the caller, so expect it.
-      await expect(useAuthStore.getState().logout()).rejects.toThrow('logout endpoint down')
+      await useAuthStore.getState().logout()
+
+      expect(useAuthStore.getState().isAuthenticated).toBe(false)
+      expect(storage.pendingLogouts).toEqual([])
+      await vi.waitFor(() => expect(postedEvents()).toEqual([{ type: 'cleared', epoch: 4 }]))
+      expect(mockClearStoredAuth).toHaveBeenCalledOnce()
+      expect(storage.record).toEqual({ epoch: 4, cleared: true })
+      expect(mockDrainPendingLogouts).toHaveBeenCalledOnce()
+    })
+
+    it('records nothing when the tab holds no credentials and clears as before', async () => {
+      useAuthStore.setState({ accessToken: null, refreshToken: null, user: null, isAuthenticated: false })
+
+      await useAuthStore.getState().logout()
+
+      expect(mockRecordLogout).not.toHaveBeenCalled()
+      expect(storage.pendingLogouts).toEqual([])
+      await vi.waitFor(() => expect(mockClearStoredAuth).toHaveBeenCalledOnce())
+      expect(useAuthStore.getState().isLoading).toBe(false)
+    })
+
+    it('leaves the entry in place when a later login starts a new session', async () => {
+      await hydrateFrom(liveRecord(3, 'held-access'))
+      await useAuthStore.getState().logout()
+      mockAxios.post.mockResolvedValue(validLoginResponse())
+
+      await useAuthStore.getState().login('test@baander.app', 'secret')
+
+      expect(useAuthStore.getState().accessToken).toBe('access-token-123')
+      expect(useAuthStore.getState().isAuthenticated).toBe(true)
+      expect(storage.record).toMatchObject({ epoch: 5, accessToken: 'access-token-123' })
+      expect(storage.pendingLogouts).toEqual([expect.objectContaining({ accessToken: 'held-access' })])
+    })
+
+    it('keeps the clear when a sibling tab\'s rotation is adopted while the entry is being recorded', async () => {
+      await hydrateFrom(liveRecord(1, 'r1-access'))
+      let release!: () => void
+      const original = mockRecordLogout.getMockImplementation()!
+      mockRecordLogout.mockImplementationOnce(async (credentials) => {
+        await new Promise<void>((yes) => { release = yes })
+        return original(credentials)
+      })
+      const logout = useAuthStore.getState().logout()
+      await vi.waitFor(() => expect(mockRecordLogout).toHaveBeenCalledOnce())
+      storage.record = liveRecord(2, 'r2-access')
+
+      deliverFromOtherTab({ type: 'rotated', epoch: 2 })
+
+      await vi.waitFor(() => expect(useAuthStore.getState().accessToken).toBe('r2-access'))
+      release()
+      await logout
 
       const state = useAuthStore.getState()
-      expect(state.accessToken).toBeNull()
-      expect(state.refreshToken).toBeNull()
-      expect(state.user).toBeNull()
       expect(state.isAuthenticated).toBe(false)
+      expect(state.accessToken).toBeNull()
       expect(state.isLoading).toBe(false)
-
-      expect(mockClearDpopKeyPair).toHaveBeenCalledOnce()
-      await vi.waitFor(() => expect(mockClearStoredAuth).toHaveBeenCalledOnce())
+      expect(storage.pendingLogouts).toEqual([expect.objectContaining({ accessToken: 'r1-access', refreshToken: 'r1-access-refresh' })])
+      expect(storage.record).toEqual({ epoch: 3, cleared: true })
+      expect(postedEvents()).toContainEqual({ type: 'cleared', epoch: 3 })
     })
   })
 
@@ -552,7 +616,7 @@ describe('adoptStoredAuth under the refresh lock', () => {
     expect(state.isAuthenticated).toBe(false)
     expect(state.accessToken).toBeNull()
     expect(mockClearDpopKeyPair).toHaveBeenCalledOnce()
-    expect(mockPostAuthLogout).not.toHaveBeenCalled()
+    expect(mockRecordLogout).not.toHaveBeenCalled()
     expect(mockClearStoredAuth).not.toHaveBeenCalled()
     expect(mockPostTokenToWorker).toHaveBeenCalledWith(null)
     expect(location.href).toBe('/login')
@@ -576,7 +640,7 @@ describe('adoptStoredAuth under the refresh lock', () => {
 
     expect(useAuthStore.getState().accessToken).toBe('after-relogin-access')
     expect(mockAxios.post).not.toHaveBeenCalled()
-    expect(mockPostAuthLogout).not.toHaveBeenCalled()
+    expect(mockRecordLogout).not.toHaveBeenCalled()
     await useAuthStore.getState().setTokens('next-access', 'next-refresh')
     expect(mockSaveStoredAuth).toHaveBeenCalledWith(expect.objectContaining({ accessToken: 'next-access' }), 3)
   })
@@ -634,7 +698,7 @@ describe('events from other tabs', () => {
 
     await vi.waitFor(() => expect(useAuthStore.getState().isAuthenticated).toBe(false))
     expect(useAuthStore.getState().accessToken).toBeNull()
-    expect(mockPostAuthLogout).not.toHaveBeenCalled()
+    expect(mockRecordLogout).not.toHaveBeenCalled()
     expect(mockAxios.post).not.toHaveBeenCalled()
     expect(mockClearStoredAuth).not.toHaveBeenCalled()
     expect(mockPostTokenToWorker).toHaveBeenCalledWith(null)
@@ -751,42 +815,6 @@ describe('auth request ownership', () => {
     expect(notify).not.toHaveBeenCalled()
     expect(mockPostTokenToWorker).not.toHaveBeenCalled()
     unsubscribe()
-  })
-
-  it('cannot clear a newer login when an older logout finally returns', async () => {
-    let release!: (value: Awaited<ReturnType<typeof postAuthLogout>>) => void
-    mockPostAuthLogout.mockReturnValueOnce(new Promise((yes) => { release = yes }))
-    useAuthStore.setState({ accessToken: 'old', refreshToken: 'old-refresh', user: VALID_USER, isAuthenticated: true })
-    const logout = useAuthStore.getState().logout()
-    useAuthStore.getState().clearAuth()
-    mockAxios.post.mockResolvedValue(validLoginResponse())
-    await useAuthStore.getState().login('user@baander.app', 'secret')
-    release({ data: {} })
-    await logout
-    expect(useAuthStore.getState().accessToken).toBe('access-token-123')
-    expect(useAuthStore.getState().isAuthenticated).toBe(true)
-    expect(mockPostTokenToWorker.mock.calls.at(-1)).toEqual(['access-token-123'])
-  })
-
-  it('keeps the local clear of an in-flight logout when a sibling tab rotates meanwhile', async () => {
-    await hydrateFrom(liveRecord(1, 'r1-access'))
-    let release!: (value: Awaited<ReturnType<typeof postAuthLogout>>) => void
-    mockPostAuthLogout.mockReturnValueOnce(new Promise((yes) => { release = yes }))
-    const logout = useAuthStore.getState().logout()
-    storage.record = liveRecord(2, 'r2-access')
-
-    deliverFromOtherTab({ type: 'rotated', epoch: 2 })
-
-    await vi.waitFor(() => expect(useAuthStore.getState().accessToken).toBe('r2-access'))
-    release({ data: {} })
-    await logout
-
-    const state = useAuthStore.getState()
-    expect(state.isAuthenticated).toBe(false)
-    expect(state.accessToken).toBeNull()
-    expect(state.isLoading).toBe(false)
-    expect(mockClearStoredAuth).toHaveBeenCalledOnce()
-    await vi.waitFor(() => expect(postedEvents()).toContainEqual(expect.objectContaining({ type: 'cleared' })))
   })
 
   it('does not leave a login loading when a rotation is adopted before its credentials are written', async () => {

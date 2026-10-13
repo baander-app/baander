@@ -1,7 +1,7 @@
 import { withNoopGuard } from '@/shared/stores/with-noop-guard'
 import { create } from 'zustand'
 import { withStoreDebug } from '@/shared/stores/debug'
-import { type LoginRequest, postAuthLogout, postAuthRegister } from '@/shared/api-client/gen/endpoints'
+import { type LoginRequest, postAuthRegister } from '@/shared/api-client/gen/endpoints'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import type { AxiosRequestConfig } from 'axios'
 import { postTokenToWorker } from '@/features/player/services/service-worker-bridge'
@@ -17,6 +17,7 @@ import {
   type LegacyStoredRecord,
 } from '@/shared/crypto/auth-db'
 import { publishAuthEvent, subscribeAuthEvents, withAuthLock, type AuthEvent } from '@/features/auth/services/auth-coordination'
+import { drainPendingLogouts, recordLogout } from '@/features/auth/services/pending-logout'
 import { REFRESH_BUDGET_MS } from '@/shared/auth/refresh-budget'
 import { createLogger } from '@/shared/lib/logger'
 
@@ -41,6 +42,11 @@ interface AuthState {
   isLoading: boolean
   login: (email: string, password: string, totpCode?: string, honeypot?: string) => Promise<void>
   register: (email: string, password: string, name?: string) => Promise<void>
+  /**
+   * Ends the session in this tab at once: the logout is recorded beside the credential tombstone and
+   * delivered to the server afterwards, so the returned promise settles after the local clear, whether
+   * or not the server can be reached.
+   */
   logout: () => Promise<void>
   /**
    * Adopts a rotation and persists it. The caller holds the auth lock (the refresh runs inside it);
@@ -71,18 +77,36 @@ export const useAuthStore = create<AuthState>()(withStoreDebug('auth.auth', with
   let generation = 0
   // The epoch of the record this tab's credentials came from; null while it holds none.
   let heldEpoch: number | null = null
-  // Logouts awaiting the server; a record adopted meanwhile belongs to the session being ended.
-  let logoutsInFlight = 0
 
   const pushToken = (token: string | null) => postTokenToWorker(token).catch((error) => {
     logger.warn('Failed to push token to service worker:', error)
   })
   const holdsSession = () => heldEpoch !== null || get().isAuthenticated
 
+  /** Drops the credentials this tab holds, in memory and in the worker; nothing is written. */
+  const dropCredentials = () => {
+    generation++
+    heldEpoch = null
+    clearDpopKeyPair()
+    set((state) => !state.isAuthenticated && !state.isLoading && state.accessToken === null && state.refreshToken === null && state.user === null
+      ? state : CLEARED_STATE)
+    pushToken(null)
+  }
+
+  /** Leaves the tombstone and tells the other tabs; the tombstone does not wait for the lock. */
+  const tombstoneAndBroadcast = () => {
+    clearStoredAuth()
+      .then((epoch) => {
+        publishAuthEvent({ type: 'cleared', epoch })
+      })
+      .catch((error) => {
+        logger.warn('Failed to clear stored auth:', error)
+      })
+  }
+
   /** Takes the stored record as this tab's credentials; the shared key is kept when it is the same key. */
   const applyRecord = (record: LegacyStoredAuth) => {
-    // An adopted rotation of the same session must not cancel the local clear an in-flight logout ends with.
-    if (logoutsInFlight === 0) generation++
+    generation++
     const held = getDpopKeyPair()
     if (!held || held.jkt !== record.jkt) {
       setDpopKeyPair({
@@ -106,11 +130,7 @@ export const useAuthStore = create<AuthState>()(withStoreDebug('auth.auth', with
 
   /** Another tab ended the session: drop the credentials without writing and leave the app. */
   const applyCleared = () => {
-    generation++
-    heldEpoch = null
-    clearDpopKeyPair()
-    set(CLEARED_STATE)
-    pushToken(null)
+    dropCredentials()
     landOnLoginPage()
   }
 
@@ -225,22 +245,27 @@ export const useAuthStore = create<AuthState>()(withStoreDebug('auth.auth', with
     },
 
     logout: async () => {
-      const owner = ++generation
-      logoutsInFlight++
+      const keyPair = getDpopKeyPair()
+      const { accessToken, refreshToken } = get()
       set({ isLoading: true })
-      try {
+      if (isMockAuth() || !keyPair || !accessToken || !refreshToken) {
         if (isMockAuth()) await new Promise((resolve) => setTimeout(resolve, 100))
-        else await postAuthLogout()
-      } finally {
-        logoutsInFlight--
-        if (owner === generation) get().clearAuth()
+        get().clearAuth()
+        return
       }
+      // The entry and the tombstone are written together; a rotation adopted meanwhile belongs to the
+      // session being ended and does not keep the tab signed in.
+      const epoch = await recordLogout({ keyPair, accessToken, refreshToken })
+      dropCredentials()
+      if (epoch !== null) publishAuthEvent({ type: 'cleared', epoch })
+      else tombstoneAndBroadcast()
+      drainPendingLogouts()
     },
 
     setTokens: (accessToken, refreshToken) => {
       const state = get()
       if (state.accessToken === accessToken && state.refreshToken === refreshToken && state.isAuthenticated) return Promise.resolve()
-      // A refresh within the same session does not cancel an in-flight logout.
+      // A rotation within the same session keeps its owners; credentials on a signed-out tab start a new one.
       if (!state.isAuthenticated) generation++
       set({ accessToken, refreshToken, isAuthenticated: true })
       pushToken(accessToken)
@@ -259,20 +284,9 @@ export const useAuthStore = create<AuthState>()(withStoreDebug('auth.auth', with
     },
 
     clearAuth: () => {
-      generation++
-      heldEpoch = null
-      clearDpopKeyPair()
-      set((state) => !state.isAuthenticated && !state.isLoading && state.accessToken === null && state.refreshToken === null && state.user === null
-        ? state : CLEARED_STATE)
-      // The tombstone does not wait for the lock: a refresh holding it fails its write against the tombstone.
-      clearStoredAuth()
-        .then((epoch) => {
-          publishAuthEvent({ type: 'cleared', epoch })
-        })
-        .catch((error) => {
-          logger.warn('Failed to clear stored auth:', error)
-        })
-      pushToken(null)
+      dropCredentials()
+      // A refresh holding the lock fails its write against the tombstone.
+      tombstoneAndBroadcast()
     },
 
     adoptStoredAuth: async () => adoptRecord(await loadStoredAuth()),

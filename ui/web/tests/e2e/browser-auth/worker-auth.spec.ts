@@ -46,7 +46,7 @@ test('authorized Range GET and HEAD preserve their request semantics without coo
 })
 
 test('matching image path at a foreign origin receives no worker credentials', async ({ harness }) => {
-  expect(await harness.image(harness.foreignOrigin + '/api/images/cover')).toBe('loaded')
+  expect(await harness.image(`${harness.foreignOrigin}/api/images/cover`)).toBe('loaded')
   expect(harness.observations).toEqual([
     expect.objectContaining({ host: 'foreign.baander.app', authorization: null, proof: null }),
   ])
@@ -165,7 +165,7 @@ test('concurrent native expiries in one page share one refresh and both retry', 
 })
 
 test('a refresh answers one nonce challenge and succeeds with the issued nonce', async ({ harness }) => {
-  harness.setRefreshMode('nonce-challenge')
+  harness.setServerMode('nonce-challenge')
   expect(await harness.image(harness.apiOrigin + '/api/images/expired')).toBe('loaded')
   expect(harness.refreshes).toEqual([
     { token: 'transport-fixture-token-refresh', key: 'transport-fixture-token-key', nonce: null, status: 400 },
@@ -179,7 +179,7 @@ test('a refresh answers one nonce challenge and succeeds with the issued nonce',
 
 // The first refresh rotated the token on the server, but its answer never arrived.
 test('a lost refresh response is retried with the same token and graced; the next image loads', async ({ harness, page }) => {
-  harness.setRefreshMode('lose-next-response')
+  harness.setServerMode('lose-next-response')
   expect(await harness.image(harness.apiOrigin + '/api/images/expired')).toBe('loaded')
   expect(harness.refreshes).toEqual([
     { token: 'transport-fixture-token-refresh', key: 'transport-fixture-token-key', nonce: null, status: 'lost' },
@@ -200,7 +200,7 @@ test('a lost refresh response is retried with the same token and graced; the nex
 // The nonce store is down; the refresh is answered 503 with Retry-After and the session is kept.
 test('a 503 refresh waits Retry-After, retries once, keeps the session on a second 503 and succeeds once the outage ends', async ({ harness, page }) => {
   await page.clock.install()
-  harness.setRefreshMode('outage')
+  harness.setServerMode('outage')
   const image = harness.image(harness.apiOrigin + '/api/images/expired')
   await expect.poll(() => harness.refreshes.length).toBe(1)
 
@@ -216,7 +216,7 @@ test('a 503 refresh waits Retry-After, retries once, keeps the session on a seco
   expect(await harness.token(page)).toBe('transport-fixture-token')
   expect(new URL(page.url()).pathname).toBe('/')
 
-  harness.setRefreshMode('normal')
+  harness.setServerMode('normal')
   expect(await harness.image(harness.apiOrigin + '/api/images/expired?after=outage')).toBe('loaded')
   expect(harness.refreshes.map(refresh => refresh.status)).toEqual([503, 503, 200])
   expect(await harness.token(page)).toBe('transport-fixture-token-refresh-rotated')
@@ -251,7 +251,7 @@ test('foreign-origin exclusion holds after a worker stop: no credentials and no 
   expect(await harness.image(harness.apiOrigin + '/api/images/cover')).toBe('loaded')
   expect(await harness.pulls(page)).toBe(1)
 
-  expect(await harness.image(harness.foreignOrigin + '/api/images/cover')).toBe('loaded')
+  expect(await harness.image(`${harness.foreignOrigin}/api/images/cover`)).toBe('loaded')
   expect(await harness.pulls(page)).toBe(1)
   expect(harness.observations).toEqual([
     expect.objectContaining({ host: 'api.baander.app', authorization: 'DPoP transport-fixture-token', proof: 'transport-fixture-proof' }),
@@ -285,7 +285,7 @@ test.describe('two pages of one account on the real auth store', () => {
     expect(retries).toHaveLength(2)
   })
 
-  // The logout revokes the chain once; the other page leaves without asking the server.
+  // The logout revokes the chain once, delivered after the local clear; the other page leaves without asking the server.
   test('a logout in one page clears the other page without a server call and both workers drop their credentials', async ({ harness, page }) => {
     await harness.login(page, 'listener@baander.app')
     const other = await harness.openPage()
@@ -295,9 +295,10 @@ test.describe('two pages of one account on the real auth store', () => {
 
     await harness.logout(page)
     await expect.poll(() => new URL(other.url()).pathname).toBe('/login')
-    expect(harness.authCalls).toEqual([
+    await expect.poll(() => harness.authCalls).toEqual([
       { path: '/api/auth/logout', authorization: 'DPoP listener', status: 200 },
     ])
+    await expect.poll(() => harness.pendingLogouts(page)).toEqual([])
     expect(harness.refreshes).toEqual([])
     expect(harness.refreshState.accessTokenStatus('listener')).toBe('revoked')
     expect(await harness.token(page)).toBeNull()
@@ -310,5 +311,152 @@ test.describe('two pages of one account on the real auth store', () => {
       [null, null],
     ])
     expect(harness.authCalls).toHaveLength(1)
+  })
+})
+
+test.describe('pending logouts on the real auth store', () => {
+  test.use({ store: 'real' })
+
+  const confirmed = { path: '/api/auth/logout', authorization: 'DPoP listener', status: 200 }
+  const outage = { path: '/api/auth/logout', authorization: 'DPoP listener', status: 503 }
+  /**
+   * How long a delivery may take after the browser comes back online: at once from the `online`
+   * event, or from the backoff timer, floored by the server's 5 s Retry-After, on a host whose
+   * network state Chromium reports as offline throughout, as in a container without a network.
+   */
+  const delivered = { timeout: 10_000 }
+
+  // The session ends in the browser before the server hears of it; the delivery waits for the network.
+  test('a logout while offline ends the session at once and is sent exactly once when the browser comes back online', async ({ harness, page, context }) => {
+    await harness.login(page, 'listener@baander.app')
+    harness.authCalls.length = 0
+    await context.setOffline(true)
+
+    await harness.logout(page)
+
+    expect(new URL(page.url()).pathname).toBe('/login')
+    expect(await harness.token(page)).toBeNull()
+    expect(await harness.pendingLogouts(page)).toEqual([
+      expect.objectContaining({ accessToken: 'listener', refreshToken: 'listener-refresh' }),
+    ])
+    expect(harness.authCalls).toEqual([])
+    expect(harness.refreshState.accessTokenStatus('listener')).toBe('initial')
+
+    await context.setOffline(false)
+    await expect.poll(() => harness.pendingLogouts(page), delivered).toEqual([])
+    expect(harness.authCalls).toEqual([confirmed])
+    expect(harness.refreshes).toEqual([])
+    expect(harness.refreshState.accessTokenStatus('listener')).toBe('revoked')
+  })
+
+  // The server answers 503 during its outage; the entry stays until the listener's return delivers it.
+  test('a logout during a server outage is kept and delivered on the next trigger once the outage ends', async ({ harness, page }) => {
+    await harness.login(page, 'listener@baander.app')
+    harness.authCalls.length = 0
+    harness.setServerMode('outage')
+
+    await harness.logout(page)
+
+    expect(await harness.token(page)).toBeNull()
+    await expect.poll(() => harness.authCalls).toEqual([outage])
+    await expect.poll(() => harness.pendingLogouts(page)).toEqual([
+      expect.objectContaining({ accessToken: 'listener', attempts: 1 }),
+    ])
+
+    harness.setServerMode('normal')
+    await harness.revisit(page)
+    await expect.poll(() => harness.pendingLogouts(page)).toEqual([])
+    expect(harness.authCalls).toEqual([outage, confirmed])
+    expect(harness.refreshes).toEqual([])
+  })
+
+  // The entry outlived its access token; the start of the page refreshes it with the entry's key before the logout.
+  test('a page reopened with an entry whose access token expired refreshes first and then logs out with the new token', async ({ harness, page }) => {
+    await harness.login(page, 'listener@baander.app')
+    harness.authCalls.length = 0
+    harness.setServerMode('outage')
+    await harness.logout(page)
+    await expect.poll(() => harness.authCalls).toEqual([outage])
+    await harness.expirePendingLogouts(page)
+    harness.setServerMode('normal')
+
+    await page.reload()
+
+    await expect.poll(() => harness.pendingLogouts(page)).toEqual([])
+    expect(harness.refreshes).toEqual([
+      expect.objectContaining({ token: 'listener-refresh', nonce: null, status: 200 }),
+    ])
+    expect(harness.authCalls).toEqual([
+      outage,
+      { path: '/api/auth/logout', authorization: 'DPoP listener-refresh-rotated', status: 200 },
+    ])
+    expect(harness.refreshState.accessTokenStatus('listener-refresh-rotated')).toBe('revoked')
+    expect(await harness.token(page)).toBeNull()
+  })
+
+  // Another device revoked the chain meanwhile: the logout answers 401, the refresh refuses, nothing is left to send.
+  test('an entry whose chain was revoked elsewhere is dropped after the logout 401 and the refresh refusal', async ({ harness, page, context }) => {
+    await harness.login(page, 'listener@baander.app')
+    harness.authCalls.length = 0
+    await context.setOffline(true)
+    await harness.logout(page)
+    expect(await harness.pendingLogouts(page)).toHaveLength(1)
+    expect(harness.refreshState.revokeChainOfRefreshToken('listener-refresh')).toBe(true)
+
+    await context.setOffline(false)
+
+    await expect.poll(() => harness.pendingLogouts(page), delivered).toEqual([])
+    expect(harness.authCalls).toEqual([{ path: '/api/auth/logout', authorization: 'DPoP listener', status: 401 }])
+    expect(harness.refreshes).toEqual([
+      expect.objectContaining({ token: 'listener-refresh', status: 401 }),
+    ])
+    expect(harness.warnings.filter(warning => warning.includes('[PendingLogout]'))).toEqual([])
+  })
+
+  // Both pages hold the entry after the outage; coming back online, one delivers it and the other finds it gone.
+  test('two pages of one origin with one entry send one logout', async ({ harness, page, context }) => {
+    await harness.login(page, 'listener@baander.app')
+    const other = await harness.openPage()
+    expect(await harness.token(other)).toBe('listener')
+    harness.authCalls.length = 0
+    harness.setServerMode('outage')
+    await harness.logout(page)
+    await expect.poll(() => new URL(other.url()).pathname).toBe('/login')
+    // The logging-out page tried once; the other page, rebooted on the login route, tried once on its start.
+    await expect.poll(() => harness.authCalls).toEqual([outage, outage])
+    expect(await harness.pendingLogouts(other)).toEqual([expect.objectContaining({ accessToken: 'listener' })])
+    harness.setServerMode('normal')
+
+    await context.setOffline(true)
+    await context.setOffline(false)
+
+    await expect.poll(() => harness.pendingLogouts(page), delivered).toEqual([])
+    expect(await harness.pendingLogouts(other)).toEqual([])
+    expect(harness.authCalls).toEqual([outage, outage, confirmed])
+    expect(harness.refreshes).toEqual([])
+  })
+
+  // WebKit's IndexedDB must hand the non-extractable P-256 key back as a key that signs.
+  test('the stored key of a pending logout reads back after a reload and still signs a proof', { tag: '@webkit' }, async ({ harness, page }) => {
+    await harness.login(page, 'listener@baander.app')
+    harness.authCalls.length = 0
+    harness.setServerMode('outage')
+    await harness.logout(page)
+    await expect.poll(() => harness.authCalls).toEqual([outage])
+
+    await page.reload()
+
+    expect(await harness.signWithPendingKey(page)).toEqual({
+      verified: true,
+      extractable: false,
+      jkt: expect.any(String),
+      typ: 'dpop+jwt',
+      alg: 'ES256',
+    })
+
+    harness.setServerMode('normal')
+    await harness.revisit(page)
+    await expect.poll(() => harness.pendingLogouts(page)).toEqual([])
+    expect(harness.authCalls.at(-1)).toEqual(confirmed)
   })
 })

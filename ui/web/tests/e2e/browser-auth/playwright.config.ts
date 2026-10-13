@@ -13,4 +13,9 @@ export default defineConfig({
   reporter: [['list']],
   outputDir: '../../../test-results/browser-auth',
   use: { actionTimeout: 5_000, navigationTimeout: 5_000 },
+  // WebKit runs only the scenarios tagged for it: the ones about what its storage gives back.
+  projects: [
+    { name: 'chromium', use: { browserName: 'chromium' }, grepInvert: /@webkit/ },
+    { name: 'webkit', use: { browserName: 'webkit' }, grep: /@webkit/ },
+  ],
 })

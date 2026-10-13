@@ -1,16 +1,21 @@
 /**
  * The scripted server behind the browser-auth suite: one loopback HTTP server that answers for the
  * web origin (the fixture page and the service worker script), the API origin (login, logout,
- * refresh, images and streams) and a foreign origin that shares the image paths.
+ * refresh, images and streams) and a foreign origin that shares the image paths. The three hosts
+ * are given at start: the named baander.app hosts a Chromium flag resolves to the loopback, or the
+ * loopback names for a browser without such a flag.
  *
  * The refresh endpoint answers from the refresh state machine in ./refresh-state.ts, which mirrors
  * the integration matrix. Its answers take the shapes `/api/auth/refresh` gives: a 200 with the pair
  * under `data`, a 401 ApiError, a 400 `use_dpop_nonce` challenge with a `DPoP-Nonce` header, and a
- * 503 ApiError with `Retry-After` and `Cache-Control: no-store` and no nonce header.
+ * 503 ApiError with `Retry-After` and `Cache-Control: no-store` and no nonce header. The logout
+ * endpoint answers 200 for a live access token, 401 for an unknown or revoked one, and the same
+ * 503 as the refresh during an outage.
  *
  * Modes script the server-side faults: `nonce-challenge` challenges a proof that carries no issued
- * nonce; `outage` answers 503 until the mode ends; `lose-next-response` rotates the token and then
- * drops the connection once, so the client's transport retry presents the consumed token.
+ * nonce; `outage` answers refresh and logout 503 until the mode ends; `lose-next-response` rotates
+ * the token and then drops the connection once, so the client's transport retry presents the
+ * consumed token.
  */
 
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
@@ -20,7 +25,23 @@ import { transformSync } from 'esbuild'
 import type { FixtureBundles, StoreKind } from './fixture-bundles'
 import { RefreshState } from './refresh-state'
 
-export type RefreshMode = 'normal' | 'nonce-challenge' | 'outage' | 'lose-next-response'
+export type ServerMode = 'normal' | 'nonce-challenge' | 'outage' | 'lose-next-response'
+
+/** The hosts one scripted server answers for; a site without a foreign host serves no foreign origin. */
+export interface SiteHosts {
+  web: string
+  api: string
+  foreign: string | null
+}
+
+/** The named hosts; Chromium resolves them to the loopback through a flag. */
+export const NAMED_HOSTS: SiteHosts = { web: 'web.baander.app', api: 'api.baander.app', foreign: 'foreign.baander.app' }
+
+/**
+ * Two loopback names for a browser that cannot map a host name: `localhost` and `127.0.0.1` are
+ * distinct origins and both secure contexts, so the key store and the service worker work.
+ */
+export const LOOPBACK_HOSTS: SiteHosts = { web: 'localhost', api: '127.0.0.1', foreign: null }
 
 export interface Observation {
   host: string
@@ -53,10 +74,10 @@ interface Gate {
 export interface ScriptedServer {
   webOrigin: string
   apiOrigin: string
-  foreignOrigin: string
+  foreignOrigin: string | null
   /** Which page script the web origin serves; a page that navigates keeps getting the same one. */
   store: StoreKind
-  refreshMode: RefreshMode
+  mode: ServerMode
   refreshState: RefreshState
   observations: Observation[]
   refreshes: RefreshObservation[]
@@ -67,8 +88,6 @@ export interface ScriptedServer {
   close(): Promise<void>
 }
 
-export const HOSTS = ['web.baander.app', 'api.baander.app', 'foreign.baander.app']
-const FOREIGN_HOST = 'foreign.baander.app'
 const RETRY_AFTER_SECONDS = 5
 
 const workerPath = fileURLToPath(new URL('../../../src/features/player/services/auth-stream-worker.ts', import.meta.url))
@@ -119,6 +138,14 @@ function sendJson(response: ServerResponse, status: number, body: string, header
   response.end(body)
 }
 
+/** The outage answer of the refresh and logout routes: 503 with Retry-After and no nonce. */
+function sendOutage(response: ServerResponse): void {
+  sendJson(response, 503, apiError('The nonce store is unavailable', 503), {
+    'Retry-After': String(RETRY_AFTER_SECONDS),
+    'Cache-Control': 'no-store',
+  })
+}
+
 function fixtureHtml(apiOrigin: string): string {
   return [
     '<!doctype html>',
@@ -128,8 +155,9 @@ function fixtureHtml(apiOrigin: string): string {
   ].join('')
 }
 
-export async function startScriptedServer(bundles: FixtureBundles): Promise<ScriptedServer> {
+export async function startScriptedServer(bundles: FixtureBundles, hosts: SiteHosts = NAMED_HOSTS): Promise<ScriptedServer> {
   const worker = transformSync(readFileSync(workerPath, 'utf8'), { loader: 'ts' }).code
+  const knownHosts = [hosts.web, hosts.api, hosts.foreign].filter((host): host is string => host !== null)
   let nonces = new Set<string>()
   let issuedNonces = 0
 
@@ -147,15 +175,12 @@ export async function startScriptedServer(bundles: FixtureBundles): Promise<Scri
     scripted.refreshes.push(record)
     await scripted.gates.get(refreshToken)?.wait
 
-    if (scripted.refreshMode === 'outage') {
+    if (scripted.mode === 'outage') {
       record.status = 503
-      sendJson(response, 503, apiError('The nonce store is unavailable', 503), {
-        'Retry-After': String(RETRY_AFTER_SECONDS),
-        'Cache-Control': 'no-store',
-      })
+      sendOutage(response)
       return
     }
-    if (scripted.refreshMode === 'nonce-challenge' && !(proof.nonce !== null && nonces.delete(proof.nonce))) {
+    if (scripted.mode === 'nonce-challenge' && !(proof.nonce !== null && nonces.delete(proof.nonce))) {
       record.status = 400
       sendJson(response, 400, JSON.stringify({
         error: 'use_dpop_nonce',
@@ -165,9 +190,9 @@ export async function startScriptedServer(bundles: FixtureBundles): Promise<Scri
     }
 
     const verdict = scripted.refreshState.present(refreshToken, proof.key)
-    if (scripted.refreshMode === 'lose-next-response') {
+    if (scripted.mode === 'lose-next-response') {
       // The token was rotated; the answer never leaves the server.
-      scripted.refreshMode = 'normal'
+      scripted.mode = 'normal'
       record.status = 'lost'
       request.socket.destroy()
       return
@@ -201,9 +226,18 @@ export async function startScriptedServer(bundles: FixtureBundles): Promise<Scri
   const answerLogout = (request: IncomingMessage, response: ServerResponse): void => {
     const authorization = headerValue(request.headers.authorization)
     const token = bearerToken(authorization)
-    const status = token !== null && scripted.refreshState.revokeChainOfAccessToken(token) ? 200 : 401
-    scripted.authCalls.push({ path: '/api/auth/logout', authorization, status })
-    sendJson(response, status, status === 200 ? '{}' : apiError('Unknown access token', 401))
+    if (scripted.mode === 'outage') {
+      scripted.authCalls.push({ path: '/api/auth/logout', authorization, status: 503 })
+      sendOutage(response)
+      return
+    }
+    const verdict = token === null ? { status: 401, reason: 'missing' } as const : scripted.refreshState.logout(token)
+    scripted.authCalls.push({ path: '/api/auth/logout', authorization, status: verdict.status })
+    if (verdict.status === 200) {
+      sendJson(response, 200, JSON.stringify({ data: { message: 'Token revoked.' } }))
+      return
+    }
+    sendJson(response, 401, apiError(`Not authenticated: the access token is ${verdict.reason}`, 401))
   }
 
   const answerMedia = (request: IncomingMessage, response: ServerResponse, host: string, path: string): void => {
@@ -218,7 +252,7 @@ export async function startScriptedServer(bundles: FixtureBundles): Promise<Scri
       cookie: request.headers.cookie ?? null,
       range: request.headers.range ?? null,
     })
-    if (host !== FOREIGN_HOST) {
+    if (host !== hosts.foreign) {
       if (authorization === null || proof === null) {
         response.writeHead(401)
         response.end('Worker authentication missing')
@@ -243,7 +277,7 @@ export async function startScriptedServer(bundles: FixtureBundles): Promise<Scri
       return
     }
     if (path === '/api/images/redirect') {
-      response.writeHead(302, { Location: scripted.foreignOrigin + '/api/images/redirect-target' })
+      response.writeHead(302, { Location: `${scripted.foreignOrigin}/api/images/redirect-target` })
       response.end()
       return
     }
@@ -259,7 +293,7 @@ export async function startScriptedServer(bundles: FixtureBundles): Promise<Scri
 
   const handle = (request: IncomingMessage, response: ServerResponse): void => {
     const host = (request.headers.host ?? '').split(':')[0]
-    if (!HOSTS.includes(host)) {
+    if (!knownHosts.includes(host)) {
       response.writeHead(400)
       response.end()
       return
@@ -320,9 +354,9 @@ export async function startScriptedServer(bundles: FixtureBundles): Promise<Scri
   const scripted: ScriptedServer = {
     webOrigin: '',
     apiOrigin: '',
-    foreignOrigin: '',
+    foreignOrigin: null,
     store: 'fake',
-    refreshMode: 'normal',
+    mode: 'normal',
     refreshState: new RefreshState(),
     observations: [],
     refreshes: [],
@@ -330,7 +364,7 @@ export async function startScriptedServer(bundles: FixtureBundles): Promise<Scri
     gates: new Map(),
     reset(store) {
       scripted.store = store
-      scripted.refreshMode = 'normal'
+      scripted.mode = 'normal'
       scripted.refreshState = new RefreshState()
       scripted.observations.length = 0
       scripted.refreshes.length = 0
@@ -350,8 +384,8 @@ export async function startScriptedServer(bundles: FixtureBundles): Promise<Scri
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
   const address = server.address()
   if (!address || typeof address === 'string') throw new Error('Loopback fixture did not start')
-  scripted.webOrigin = `http://web.baander.app:${address.port}`
-  scripted.apiOrigin = `http://api.baander.app:${address.port}`
-  scripted.foreignOrigin = `http://foreign.baander.app:${address.port}`
+  scripted.webOrigin = `http://${hosts.web}:${address.port}`
+  scripted.apiOrigin = `http://${hosts.api}:${address.port}`
+  scripted.foreignOrigin = hosts.foreign === null ? null : `http://${hosts.foreign}:${address.port}`
   return scripted
 }

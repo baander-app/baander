@@ -4,8 +4,9 @@
  * Both bundles run the real service worker bridge and the real Axios instance against a fake DPoP
  * signer, so a proof is readable JSON the server can check. The fake-store bundle replaces the auth
  * store with a plain object whose tokens a test sets directly. The real-store bundle runs the real
- * auth store, its IndexedDB adapter and the cross-tab coordination module, with real Web Locks and
- * BroadcastChannel, so two pages of one account behave as two tabs do.
+ * auth store, its IndexedDB adapter, the cross-tab coordination module and the pending-logout
+ * delivery, with real Web Locks and BroadcastChannel, so two pages of one account behave as two
+ * tabs do; it boots as src/main.tsx does, installing the delivery triggers and draining once.
  */
 
 import { existsSync } from 'node:fs'
@@ -23,6 +24,8 @@ export interface FixtureBundles {
 
 const sourceRoot = fileURLToPath(new URL('../../../src/', import.meta.url))
 const bridgePath = resolve(sourceRoot, 'features/player/services/service-worker-bridge.ts')
+/** The real proof signer, for the one check that a stored key still signs; the bundles otherwise fake it. */
+const realProofPath = resolve(sourceRoot, '../../shared/dpop/proof.ts')
 
 /** A proof is JSON the scripted server reads back; the initial access token keeps its fixed proof. */
 const fakeProofModule = `
@@ -116,13 +119,23 @@ const fakeStoreEntry = `
 const realStoreEntry = `
   ${fixtureCommon}
   import { useAuthStore } from '@/features/auth/stores/auth-store'
+  import { drainPendingLogouts, installPendingLogoutTriggers } from '@/features/auth/services/pending-logout'
+  import { listPendingLogouts, updatePendingLogout } from '@/shared/crypto/auth-db'
+  import { createDpopProof } from ${JSON.stringify(realProofPath)}
 
   const store = () => useAuthStore.getState()
   const ready = (async () => {
     await registerWorker()
     await store().initAuth()
+    installPendingLogoutTriggers()
+    drainPendingLogouts()
     await initWorkerApiUrl()
   })()
+
+  const fromBase64url = input => {
+    const binary = atob(input.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(input.length / 4) * 4, '='))
+    return Uint8Array.from(binary, char => char.charCodeAt(0))
+  }
 
   window.fixture = {
     ready,
@@ -130,7 +143,37 @@ const realStoreEntry = `
     token: () => store().accessToken,
     clear: () => store().clearAuth(),
     login: (email, password) => store().login(email, password),
-    logout: () => store().logout(),
+    // The account page leaves for the login route once the store resolved; the fixture does the same without a reload.
+    logout: async () => {
+      await store().logout()
+      history.pushState({}, '', '/login')
+    },
+    pendingLogouts: async () => (await listPendingLogouts()).map(entry => ({
+      id: entry.id,
+      accessToken: entry.accessToken,
+      refreshToken: entry.refreshToken,
+      attempts: entry.attempts,
+    })),
+    expirePendingLogouts: async () => {
+      for (const entry of await listPendingLogouts()) {
+        await updatePendingLogout(entry.id, { accessTokenExpiresAt: Date.now() - 1 })
+      }
+    },
+    // Signs with the key pair the oldest entry read back from IndexedDB and verifies it with its public key.
+    signWithPendingKey: async () => {
+      const [entry] = await listPendingLogouts()
+      if (!entry) return null
+      const proof = await createDpopProof(entry.keyPair, 'POST', 'https://api.baander.app/api/auth/logout', { accessToken: entry.accessToken })
+      const [header, payload, signature] = proof.split('.')
+      const verified = await crypto.subtle.verify(
+        { name: 'ECDSA', hash: 'SHA-256' },
+        entry.keyPair.publicKey,
+        fromBase64url(signature),
+        new TextEncoder().encode(header + '.' + payload),
+      )
+      const { typ, alg } = JSON.parse(new TextDecoder().decode(fromBase64url(header)))
+      return { verified, extractable: entry.keyPair.privateKey.extractable, jkt: entry.keyPair.jkt, typ, alg }
+    },
   }
 `
 

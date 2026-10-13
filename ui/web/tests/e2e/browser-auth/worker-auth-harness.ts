@@ -1,23 +1,43 @@
 /**
- * Playwright fixtures for the browser-auth suite: one Chromium per worker, resolving the three
- * baander.app test hosts to the scripted server on the loopback, and one page per test whose
- * credentials are set up for the store the test chose (`test.use({ store: 'real' })`).
+ * Playwright fixtures for the browser-auth suite: one browser per worker and one page per test
+ * whose credentials are set up for the store the test chose (`test.use({ store: 'real' })`).
+ * Chromium resolves the three baander.app test hosts to the scripted server on the loopback; WebKit
+ * has no such flag and reaches the same server through the loopback names, which are secure
+ * contexts, so its key store and service worker work.
  */
 
 import { test as base, expect, type Page } from '@playwright/test'
 import { buildFixtureBundles, type StoreKind } from './fixture-bundles'
 import type { RefreshState } from './refresh-state'
 import {
-  HOSTS,
+  LOOPBACK_HOSTS,
+  NAMED_HOSTS,
   startScriptedServer,
   type AuthCall,
   type Observation,
-  type RefreshMode,
   type RefreshObservation,
   type ScriptedServer,
+  type ServerMode,
 } from './scripted-server'
 
-/** What the page script exposes on `window.fixture`; the real store exposes login and logout. */
+/** A pending logout as the page reads it back from its store. */
+export interface PendingLogoutView {
+  id: string
+  accessToken: string
+  refreshToken: string
+  attempts: number
+}
+
+/** What signing with a stored key gave: the signature checked against the stored public key. */
+export interface StoredKeySignature {
+  verified: boolean
+  extractable: boolean
+  jkt: string
+  typ: string
+  alg: string
+}
+
+/** What the page script exposes on `window.fixture`; the real store exposes the session and the pending logouts. */
 interface BrowserFixture {
   ready: Promise<void>
   pulls(): number
@@ -26,11 +46,14 @@ interface BrowserFixture {
   configure(token: string, keyId: string): Promise<void>
   login(email: string, password: string): Promise<void>
   logout(): Promise<void>
+  pendingLogouts(): Promise<PendingLogoutView[]>
+  expirePendingLogouts(): Promise<void>
+  signWithPendingKey(): Promise<StoredKeySignature | null>
 }
 
 export interface Harness {
   apiOrigin: string
-  foreignOrigin: string
+  foreignOrigin: string | null
   /** Every image and stream request the scripted server saw since the test started. */
   observations: Observation[]
   /** Every presentation of a refresh token, with its verdict. */
@@ -46,14 +69,25 @@ export interface Harness {
   token(page: Page): Promise<string | null>
   /** Holds the server's answer to presentations of `token` until the returned function runs. */
   gate(token: string): () => void
-  setRefreshMode(mode: RefreshMode): void
+  setServerMode(mode: ServerMode): void
   /** Stops the service worker through CDP, as the browser does with an idle worker. */
   stopWorker(page: Page): Promise<void>
   /** How many credential pulls the worker made from `page`. */
   pulls(page: Page): Promise<number>
   /** Real store: signs `page` in and waits until its worker serves a protected image. */
   login(page: Page, email: string): Promise<void>
+  /** Real store: ends the session as the account page does; resolves once the page is on the login route. */
   logout(page: Page): Promise<void>
+  /** Real store: the pending logouts `page` reads from its store, oldest first. */
+  pendingLogouts(page: Page): Promise<PendingLogoutView[]>
+  /** Real store: marks every pending logout's access token as expired. */
+  expirePendingLogouts(page: Page): Promise<void>
+  /** Real store: signs a proof with the stored key of the oldest pending logout; null without one. */
+  signWithPendingKey(page: Page): Promise<StoredKeySignature | null>
+  /** The listener returns to `page`: the visibility trigger of the pending-logout delivery. */
+  revisit(page: Page): Promise<void>
+  /** Console warnings every page of the test printed, with their `[scope]` prefix. */
+  warnings: string[]
   /** A second page of the same origin, booted; on the real store it adopts the stored session. */
   openPage(): Promise<Page>
 }
@@ -130,6 +164,40 @@ async function fixtureLogout(page: Page): Promise<void> {
   })
 }
 
+function fixturePendingLogouts(page: Page): Promise<PendingLogoutView[]> {
+  return page.evaluate(async () => {
+    const fixture = Reflect.get(window, 'fixture') as BrowserFixture
+    await fixture.ready
+    return fixture.pendingLogouts()
+  })
+}
+
+async function fixtureExpirePendingLogouts(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    const fixture = Reflect.get(window, 'fixture') as BrowserFixture
+    await fixture.ready
+    await fixture.expirePendingLogouts()
+  })
+}
+
+function fixtureSignWithPendingKey(page: Page): Promise<StoredKeySignature | null> {
+  return page.evaluate(async () => {
+    const fixture = Reflect.get(window, 'fixture') as BrowserFixture
+    await fixture.ready
+    return fixture.signWithPendingKey()
+  })
+}
+
+async function fixtureRevisit(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    document.dispatchEvent(new Event('visibilitychange'))
+  })
+}
+
+function serverOrigins(server: ScriptedServer): string[] {
+  return [server.webOrigin, server.apiOrigin, server.foreignOrigin].filter((origin): origin is string => origin !== null)
+}
+
 /** A real protected fetch is the readiness handshake; no activation or signing sleeps. */
 async function waitForSignedFetch(page: Page, apiOrigin: string): Promise<void> {
   await expect.poll(() => page.evaluate(async url => (await fetch(url)).status, apiOrigin + READY_PATH)).toBe(200)
@@ -180,8 +248,8 @@ export const test = base.extend<TestOptions & TestFixtures, WorkerFixtures>({
   store: ['fake', { option: true }],
 
   localServer: [async ({ browserName }, provide) => {
-    expect(browserName).toBe('chromium')
-    const server = await startScriptedServer(await buildFixtureBundles())
+    expect(['chromium', 'webkit']).toContain(browserName)
+    const server = await startScriptedServer(await buildFixtureBundles(), browserName === 'webkit' ? LOOPBACK_HOSTS : NAMED_HOSTS)
     try {
       await provide(server)
     } finally {
@@ -189,17 +257,19 @@ export const test = base.extend<TestOptions & TestFixtures, WorkerFixtures>({
     }
   }, { scope: 'worker' }],
 
-  browser: [async ({ playwright, localServer }, provide) => {
-    const origins = [localServer.webOrigin, localServer.apiOrigin, localServer.foreignOrigin]
-    const browser = await playwright.chromium.launch({
-      channel: 'chromium',
-      args: [
-        '--host-resolver-rules=' + HOSTS.map(host => `MAP ${host} 127.0.0.1`).join(', ') + ', MAP * ~NOTFOUND',
-        '--unsafely-treat-insecure-origin-as-secure=' + origins.join(','),
-        '--no-proxy-server',
-        '--disable-background-networking',
-      ],
-    })
+  browser: [async ({ playwright, browserName, localServer }, provide) => {
+    const origins = serverOrigins(localServer)
+    const browser = browserName === 'webkit'
+      ? await playwright.webkit.launch()
+      : await playwright.chromium.launch({
+        channel: 'chromium',
+        args: [
+          '--host-resolver-rules=' + Object.values(NAMED_HOSTS).map(host => `MAP ${host} 127.0.0.1`).join(', ') + ', MAP * ~NOTFOUND',
+          '--unsafely-treat-insecure-origin-as-secure=' + origins.join(','),
+          '--no-proxy-server',
+          '--disable-background-networking',
+        ],
+      })
     try {
       await provide(browser)
     } finally {
@@ -209,7 +279,7 @@ export const test = base.extend<TestOptions & TestFixtures, WorkerFixtures>({
 
   context: async ({ browser, localServer }, provide) => {
     const context = await browser.newContext({ serviceWorkers: 'allow' })
-    const origins = [localServer.webOrigin, localServer.apiOrigin, localServer.foreignOrigin]
+    const origins = serverOrigins(localServer)
     await context.route('**/*', route => origins.includes(new URL(route.request().url()).origin)
       ? route.continue()
       : route.abort())
@@ -220,8 +290,15 @@ export const test = base.extend<TestOptions & TestFixtures, WorkerFixtures>({
     }
   },
 
-  harness: async ({ page, context, localServer, store }, provide) => {
+  harness: async ({ page, context, browserName, localServer, store }, provide) => {
     localServer.reset(store)
+    const warnings: string[] = []
+    const collectWarnings = (target: Page) => {
+      target.on('console', message => {
+        if (message.type() === 'warning') warnings.push(message.text())
+      })
+    }
+    collectWarnings(page)
 
     const configure = async (target: Page, token: string): Promise<void> => {
       if (target.url() === 'about:blank') await target.goto(localServer.webOrigin)
@@ -237,7 +314,8 @@ export const test = base.extend<TestOptions & TestFixtures, WorkerFixtures>({
     } else {
       await fixtureReady(page)
     }
-    await seedCookies(page, [localServer.webOrigin, localServer.apiOrigin])
+    // WebKit refuses the cookie a cross-site fetch sets; its scenarios observe no media requests, which the seed is for.
+    await seedCookies(page, browserName === 'webkit' ? [localServer.webOrigin] : [localServer.webOrigin, localServer.apiOrigin])
     localServer.observations.length = 0
     localServer.refreshes.length = 0
     localServer.authCalls.length = 0
@@ -259,7 +337,7 @@ export const test = base.extend<TestOptions & TestFixtures, WorkerFixtures>({
         localServer.gates.set(token, { wait, release })
         return release
       },
-      setRefreshMode: mode => { localServer.refreshMode = mode },
+      setServerMode: mode => { localServer.mode = mode },
       stopWorker: stopServiceWorker,
       pulls: fixturePulls,
       login: async (target, email) => {
@@ -267,8 +345,14 @@ export const test = base.extend<TestOptions & TestFixtures, WorkerFixtures>({
         await waitForSignedFetch(target, localServer.apiOrigin)
       },
       logout: fixtureLogout,
+      pendingLogouts: fixturePendingLogouts,
+      expirePendingLogouts: fixtureExpirePendingLogouts,
+      signWithPendingKey: fixtureSignWithPendingKey,
+      revisit: fixtureRevisit,
+      warnings,
       openPage: async () => {
         const other = await context.newPage()
+        collectWarnings(other)
         await other.goto(localServer.webOrigin)
         await fixtureReady(other)
         return other

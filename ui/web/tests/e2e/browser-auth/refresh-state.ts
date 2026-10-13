@@ -1,6 +1,10 @@
 /**
  * The scripted server's refresh state machine.
  *
+ * A logout with a live access token revokes its chain; one with an unknown or a revoked token is
+ * refused with 401, as the authenticator answers before the route runs. A refresh token of a
+ * revoked chain is refused with 401 too: `/api/auth/refresh` answers every rejection that way.
+ *
  * It answers presentations of refresh tokens the way `/api/auth/refresh` does on real PostgreSQL,
  * pinned to tests/Integration/RefreshTokenGraceTest.php: an unused token is consumed and rotated;
  * a used token presented again with its own key inside the grace window, while its replacement is
@@ -27,6 +31,10 @@ export type RefreshVerdict =
   | { status: 401; reason: 'unknown' | 'different key' | 'revoked' | 'outside window' | 'replacement used' | 'superseded token presented' | 'concurrent loser' }
 
 export type AccessTokenStatus = 'unknown' | 'revoked' | 'initial' | 'rotated'
+
+export type LogoutVerdict =
+  | { status: 200 }
+  | { status: 401; reason: 'unknown' | 'revoked' }
 
 interface RefreshRecord {
   token: string
@@ -132,12 +140,13 @@ export class RefreshState {
     return record.initial ? 'initial' : 'rotated'
   }
 
-  /** A logout: every token of the chain that `accessToken` belongs to is revoked. */
-  revokeChainOfAccessToken(accessToken: string): boolean {
+  /** A logout: a live `accessToken` revokes every token of its chain; an unknown or revoked one is refused. */
+  logout(accessToken: string): LogoutVerdict {
     const record = this.accessTokens.get(accessToken)
-    if (!record) return false
+    if (!record) return { status: 401, reason: 'unknown' }
+    if (record.revoked) return { status: 401, reason: 'revoked' }
     this.revokeChain(record.chainId)
-    return true
+    return { status: 200 }
   }
 
   /** The chain of `refreshToken` was revoked elsewhere, as after a logout or an administrator's revocation. */
