@@ -195,7 +195,7 @@ final class RefreshTokenHandler
 
                 // Atomically consume the refresh token. If another request already used
                 // this token, the conditional UPDATE affects zero rows: the loser of the
-                // race gets the same locked verdict as a token presented again (R3).
+                // race gets the same locked verdict as a token presented again.
                 $consumedToken = $this->refreshTokenRepository->consumeByTokenId($refreshTokenId);
                 if ($consumedToken === null) {
                     return $this->evaluateUnderLock($refreshTokenId, $command);
@@ -223,7 +223,7 @@ final class RefreshTokenHandler
 
     /**
      * Judges a token that was already consumed, or revoked unused, on its row and its
-     * successors as they are under the row lock (KTD1). Returns the fresh pair of a
+     * successors as they are under the row lock. Returns the fresh pair of a
      * grace; every other outcome is a rejection, which rolls the transaction back.
      */
     private function evaluateUnderLock(TokenId $refreshTokenId, RefreshTokenCommand $command): TokenResponseDTO
@@ -353,8 +353,8 @@ final class RefreshTokenHandler
     }
 
     /**
-     * A reuse verdict ends the chain: refresh rows before access rows, each in id order
-     * (KTD11), in a transaction of its own that commits before the rejection is answered.
+     * A reuse verdict ends the chain: refresh rows before access rows, each in id order,
+     * in a transaction of its own that commits before the rejection is answered.
      * The chain's WebSocket connections are closed afterwards, as a logout closes them:
      * whoever presented the replayed token must not keep a live socket either.
      */
@@ -378,7 +378,8 @@ final class RefreshTokenHandler
 
     /**
      * The verdict stands whatever happens here: the chain is revoked and the rejection is
-     * answered. A socket that could not be closed fails at its next authenticated action.
+     * answered. A socket that could not be closed is closed by the socket reconciliation
+     * within its next tick.
      *
      * @param list<string> $accessTokenIds
      */
@@ -396,7 +397,7 @@ final class RefreshTokenHandler
         } catch (ServerControlException $exception) {
             $this->logger->error(
                 'The web server did not close the WebSocket connections of the revoked token chain "{chain}".',
-                ['chain' => $chainId->toString(), 'exception' => $exception],
+                ['chain' => $chainId->toString(), 'connections' => count($accessTokenIds), 'exception' => $exception],
             );
         }
     }

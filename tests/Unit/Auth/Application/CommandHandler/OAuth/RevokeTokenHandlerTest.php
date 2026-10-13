@@ -284,21 +284,28 @@ final class RevokeTokenHandlerTest extends TestCase
     }
 
     #[AllowMockObjectsWithoutExpectations]
-    public function testAWebServerThatDidNotCloseTheConnectionsFailsTheCommandAfterTheRevocation(): void
+    /** The chain is revoked, so the command completes; the error names the chain and the count, never a token. */
+    public function testAWebServerThatDidNotCloseTheConnectionsIsLoggedWithTheTokenIdsAndTheRevocationCompletes(): void
     {
         $this->refreshTokenRepository = $this->createMock(RefreshTokenRepositoryInterface::class);
-        $this->handler = $this->createRevokeTokenHandlerFixture();
+        $logger = $this->createMock(LoggerInterface::class);
+        $this->handler = $this->createRevokeTokenHandlerFixture($logger);
 
         $chainId = ChainId::generate();
         $accessToken = $this->createAccessToken($chainId);
         $refreshToken = RefreshToken::issue($accessToken, $chainId);
+        $tokenId = $accessToken->getTokenId()->toString();
 
         $this->refreshTokenRepository->method('findByTokenId')->willReturn($refreshToken);
-        $this->accessTokenRepository->method('findTokenIdsByChainId')->willReturn([$accessToken->getTokenId()->toString()]);
+        $this->accessTokenRepository->method('findTokenIdsByChainId')->willReturn([$tokenId]);
         $this->refreshTokenRepository->expects($this->once())->method('revokeByChainId');
         $this->liveConnections->method('closeForAccessTokens')->willThrowException(new ServerControlException('a worker did not answer'));
-
-        $this->expectException(ServerControlException::class);
+        $logger->expects($this->once())->method('error')->with(
+            $this->stringContains('did not close'),
+            $this->callback(static fn (array $context): bool => ($context['chain'] ?? null) === $chainId->toString()
+                && ($context['connections'] ?? null) === 1
+                && $context['exception'] instanceof ServerControlException),
+        );
 
         ($this->handler)(new RevokeTokenCommand($refreshToken->getTokenId()->toString(), revokeChain: true));
     }

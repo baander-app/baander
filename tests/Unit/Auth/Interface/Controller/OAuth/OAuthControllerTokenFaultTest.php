@@ -11,7 +11,6 @@ use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Interface\Controller\OAuth\OAuthController;
 use App\Auth\Interface\Request\OAuth\RevokeTokenRequest;
-use App\Shared\Application\Port\ServerControlException;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -24,10 +23,10 @@ use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
- * R10: the token endpoint answers a server fault with 503 and Retry-After, as the
+ * The token endpoint answers a server fault with 503 and Retry-After, as the
  * first-party refresh does, while a protocol error keeps its OAuth answer. The
  * revocation endpoint does the same: 200 once the handler completed, whether or not
- * it found a token to revoke, and 503 for a fault that may have left the chain live.
+ * it found a token to revoke, and 503 for a fault that left the chain unrevoked.
  */
 final class OAuthControllerTokenFaultTest extends TestCase
 {
@@ -99,9 +98,9 @@ final class OAuthControllerTokenFaultTest extends TestCase
         self::assertSame(200, $response->getStatusCode());
     }
 
-    public function testAChainWhoseSocketsWereNotClosedIsAnsweredWith503AndRetryAfter(): void
+    public function testARevocationTheDatabaseRefusedIsAnsweredWith503AndRetryAfter(): void
     {
-        $fault = new ServerControlException('a worker did not answer');
+        $fault = new \RuntimeException('SQLSTATE[08006] the database system is shutting down');
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($this->once())->method('dispatch')->willReturnCallback(
             static fn (object $command): never => throw new HandlerFailedException(new Envelope($command), [$fault]),
@@ -109,7 +108,7 @@ final class OAuthControllerTokenFaultTest extends TestCase
 
         try {
             $this->controller($bus, $this->signedInUser())->revoke(new RevokeTokenRequest(token: str_repeat('r', 80)));
-            self::fail('A chain whose sockets stay open is not revoked; the client must retry.');
+            self::fail('A chain that was not revoked still exists; the client must retry.');
         } catch (ServiceUnavailableHttpException $exception) {
             self::assertSame(503, $exception->getStatusCode());
             self::assertEqualsCanonicalizing(['retry-after' => '5', 'cache-control' => 'no-store'], array_change_key_case(array_map(strval(...), $exception->getHeaders()), CASE_LOWER));

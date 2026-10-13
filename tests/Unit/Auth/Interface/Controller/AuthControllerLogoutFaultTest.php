@@ -12,7 +12,6 @@ use App\Auth\Infrastructure\Security\OAuth\DpopProofValidator;
 use App\Auth\Infrastructure\Security\Passkey\PasskeyService;
 use App\Auth\Interface\Controller\User\AuthController;
 use App\Shared\Application\Http\AcceptLanguageMatcher;
-use App\Shared\Application\Port\ServerControlException;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -31,10 +30,10 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 use Webauthn\Counter\CounterChecker;
 
 /**
- * Logout answers 200 only when the handler completed: an unknown or already revoked
- * token completes silently (RFC 7009 section 2.2), while a fault that may have left the
- * chain or its sockets live answers 503 with Retry-After, so the client sends the
- * logout again.
+ * Logout answers 200 when the handler completed: an unknown or already revoked token
+ * completes silently (RFC 7009 section 2.2), and a socket close the web server could not
+ * finish is logged for the reconciliation rather than answered. A fault that left the
+ * chain unrevoked answers 503 with Retry-After, so the client sends the logout again.
  */
 final class AuthControllerLogoutFaultTest extends TestCase
 {
@@ -99,22 +98,6 @@ final class AuthControllerLogoutFaultTest extends TestCase
 
         self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
         self::assertSame('success.token_revoked', self::body($response)['data']['message']);
-    }
-
-    public function testAChainWhoseSocketsWereNotClosedAnswers503WithRetryAfter(): void
-    {
-        $fault = new ServerControlException('a worker did not answer');
-        $this->commandBus->expects($this->once())->method('dispatch')->willReturnCallback(
-            static fn (object $command): never => throw new HandlerFailedException(new Envelope($command), [$fault]),
-        );
-        $this->logger->expects($this->once())->method('error')->with(
-            'Logout could not revoke the token chain.',
-            ['exception' => $fault],
-        );
-
-        $response = $this->logout();
-
-        self::assertRetryLater($response);
     }
 
     public function testADatabaseFaultDuringTheRevocationAnswers503WithRetryAfter(): void

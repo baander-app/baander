@@ -45,9 +45,6 @@ final class RevokeTokenHandler
     ) {
     }
 
-    /**
-     * @throws ServerControlException when the chain is revoked but the web server did not close its connections
-     */
     #[AsMessageHandler]
     public function __invoke(RevokeTokenCommand $command): void
     {
@@ -134,7 +131,13 @@ final class RevokeTokenHandler
         $this->closeLiveConnections($accessTokenIds, $chainId);
     }
 
-    /** @param list<string> $accessTokenIds */
+    /**
+     * The chain is revoked whatever happens here. A connection this close could not end
+     * is closed by the socket reconciliation within its next tick; the error names the
+     * chain and how many connections it concerned, never a token string.
+     *
+     * @param list<string> $accessTokenIds
+     */
     private function closeLiveConnections(array $accessTokenIds, ChainId $chainId): void
     {
         try {
@@ -145,6 +148,11 @@ final class RevokeTokenHandler
             $this->logger->warning(
                 'No web server runs in this container, so the open WebSocket connections of token chain "{chain}" were not closed.',
                 ['chain' => $chainId->toString()],
+            );
+        } catch (ServerControlException $exception) {
+            $this->logger->error(
+                'The web server did not close the WebSocket connections of the revoked token chain "{chain}".',
+                ['chain' => $chainId->toString(), 'connections' => count($accessTokenIds), 'exception' => $exception],
             );
         }
     }

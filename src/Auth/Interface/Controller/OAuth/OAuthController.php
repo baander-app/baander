@@ -188,7 +188,7 @@ final class OAuthController
         return self::noStore(new JsonResponse(['redirect_uri' => $redirect]));
     }
 
-    /** @throws ServiceUnavailableHttpException for a server fault during the grant (R10) */
+    /** @throws ServiceUnavailableHttpException for a server fault during the grant */
     #[OA\Post(
         path: '/api/oauth/token',
         description: 'Requires a DPoP proof carrying a server-issued nonce. A missing or invalid proof is answered with `invalid_dpop_proof`, a proof without a fresh nonce with `use_dpop_nonce`; both carry a `DPoP-Nonce` header. Every answer carries the nonce for the next proof and `Cache-Control: no-store`. The issued tokens are bound to the proof key, and to the `X-Baander-Client-Fingerprint` header when it is sent. Parameters may be form-encoded (RFC 6749) or JSON. Public clients authenticate with `client_id` alone; confidential clients add `client_secret`.',
@@ -241,7 +241,7 @@ final class OAuthController
         } catch (HttpExceptionInterface $exception) {
             throw $exception;
         } catch (\Throwable $exception) {
-            // R10: a server fault, such as a database that is restarting, says nothing about
+            // A server fault, such as a database that is restarting, says nothing about
             // the grant; 503 with Retry-After keeps the client's tokens, as the first-party
             // refresh does. The exception subscriber renders it and keeps these headers.
             throw new ServiceUnavailableHttpException(
@@ -272,7 +272,7 @@ final class OAuthController
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
             new OA\Response(
                 response: '503',
-                description: 'The chain could not be revoked, or the web server could not close its connections; the token may still be live, so send the same request again after the Retry-After delay.',
+                description: 'The chain could not be revoked; the token is still live, so send the same request again after the Retry-After delay.',
                 headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 5))],
                 content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
             ),
@@ -303,8 +303,8 @@ final class OAuthController
                 return new JsonResponse(null, Response::HTTP_OK);
             }
 
-            // A fault means the chain, or a socket opened with it, may still be live. The
-            // client sends the same request again; the chain revocation is idempotent.
+            // A fault means the chain was not revoked. The client sends the same request
+            // again; the chain revocation is idempotent.
             throw new ServiceUnavailableHttpException(
                 DpopStoreUnavailableException::RETRY_AFTER_SECONDS,
                 'The token could not be revoked.',

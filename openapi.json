@@ -2353,7 +2353,7 @@
                         }
                     },
                     "503": {
-                        "description": "The chain could not be revoked, or the web server could not close its connections; the token may still be live, so send the same request again after the Retry-After delay.",
+                        "description": "The chain could not be revoked; the token is still live, so send the same request again after the Retry-After delay.",
                         "headers": {
                             "Retry-After": {
                                 "description": "Seconds to wait before retrying",
@@ -3408,7 +3408,7 @@
                         }
                     },
                     "503": {
-                        "description": "The chain could not be revoked, or the web server could not close its connections; the tokens may still be live, so send the logout again after the Retry-After delay.",
+                        "description": "The chain could not be revoked; the tokens are still live, so send the logout again after the Retry-After delay.",
                         "headers": {
                             "Retry-After": {
                                 "description": "Seconds to wait before retrying",

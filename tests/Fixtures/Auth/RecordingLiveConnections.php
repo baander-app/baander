@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Fixtures\Auth;
 
 use App\Shared\Application\Port\LiveConnectionsPortInterface;
+use App\Shared\Application\Port\ServerControlException;
 use App\Shared\Domain\Model\Uuid;
 use Throwable;
 
@@ -20,6 +21,9 @@ final readonly class RecordingLiveConnections implements LiveConnectionsPortInte
 {
     public const string FILE = 'live-connections.jsonl';
 
+    /** While this flag file exists in the kernel directory, every close request fails as the web server would. */
+    public const string CLOSE_FAULT = 'close-fault';
+
     public function __construct(private string $path)
     {
     }
@@ -27,6 +31,11 @@ final readonly class RecordingLiveConnections implements LiveConnectionsPortInte
     public static function path(string $directory): string
     {
         return $directory . '/' . self::FILE;
+    }
+
+    public static function closeFaultPath(string $directory): string
+    {
+        return $directory . '/' . self::CLOSE_FAULT;
     }
 
     /** The size of the recording right now; a test takes it before the calls it wants to read. */
@@ -93,6 +102,11 @@ final readonly class RecordingLiveConnections implements LiveConnectionsPortInte
     public function closeForAccessTokens(array $accessTokenIds): int
     {
         $this->record(['method' => 'closeForAccessTokens', 'access_token_ids' => $accessTokenIds]);
+        $fault = self::closeFaultPath(dirname($this->path));
+        clearstatcache(true, $fault);
+        if (is_file($fault)) {
+            throw new ServerControlException('the test asked the web server not to close these connections');
+        }
 
         return count($accessTokenIds);
     }

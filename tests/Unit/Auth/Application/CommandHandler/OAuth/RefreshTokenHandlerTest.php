@@ -315,7 +315,7 @@ final class RefreshTokenHandlerTest extends TestCase
 
     // --- Lost-response grace ---
 
-    /** AE1: the retry of a lost response gets a fresh pair; the unused replacement is superseded. */
+    /** The retry of a lost response gets a fresh pair; the unused replacement is superseded. */
     public function testAUsedTokenPresentedAgainWithinTheWindowGetsAFreshPairAndSupersedesTheUnusedReplacement(): void
     {
         $chainId = ChainId::generate();
@@ -374,7 +374,7 @@ final class RefreshTokenHandlerTest extends TestCase
         self::assertSame($r1, $this->savedRefreshTokens[0]->getPreviousRefreshToken());
     }
 
-    /** AE2: a replacement that was already used means the presented token is a replay. */
+    /** A replacement that was already used means the presented token is a replay. */
     public function testAUsedReplacementRevokesTheChainInItsOwnTransactionBeforeTheRejection(): void
     {
         $chainId = ChainId::generate();
@@ -428,6 +428,7 @@ final class RefreshTokenHandlerTest extends TestCase
         $errors = array_values(array_filter($this->logs, static fn (array $record): bool => $record['level'] === 'error'));
         self::assertCount(1, $errors);
         self::assertSame($chainId->toString(), $errors[0]['context']['chain'] ?? null);
+        self::assertSame(2, $errors[0]['context']['connections'] ?? null, 'The error counts the connections the reconciliation closes; it never carries a token.');
         $this->assertLogged('warning', 'replacement used', $chainId, [$r1, $r2]);
     }
 

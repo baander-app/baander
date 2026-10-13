@@ -150,7 +150,7 @@ final class AuthController
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(
                 response: '503',
-                description: 'The chain could not be revoked, or the web server could not close its connections; the tokens may still be live, so send the logout again after the Retry-After delay.',
+                description: 'The chain could not be revoked; the tokens are still live, so send the logout again after the Retry-After delay.',
                 headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 5))],
                 content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
             ),
@@ -173,9 +173,9 @@ final class AuthController
             ));
         } catch (\Throwable $e) {
             // An unknown or already revoked token is answered 200 by the handler itself
-            // (RFC 7009 section 2.2). A fault here means the chain, or a socket opened with
-            // it, may still be live: 503 with Retry-After has the client send the logout
-            // again, and the chain revocation is idempotent.
+            // (RFC 7009 section 2.2), and a socket the server could not close is left to
+            // the reconciliation. A fault here means the chain was not revoked: 503 with
+            // Retry-After has the client send the logout again; the revocation is idempotent.
             $this->logger->error('Logout could not revoke the token chain.', [
                 'exception' => HandlerFailure::cause($e),
             ]);
@@ -252,8 +252,8 @@ final class AuthController
                 );
             }
         } catch (DpopStoreUnavailableException) {
-            // Not a verdict on the proof: the store that logged the failure could not answer
-            // (R7). The token stays unconsumed, so the client waits and presents it again.
+            // Not a verdict on the proof: the store that logged the failure could not answer.
+            // The token stays unconsumed, so the client waits and presents it again.
             return $this->serviceUnavailable();
         }
 

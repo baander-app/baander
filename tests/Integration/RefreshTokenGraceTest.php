@@ -7,6 +7,9 @@ namespace App\Tests\Integration;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
+use App\Auth\Infrastructure\Repository\OAuth\AccessTokenRepository;
+use App\Auth\Infrastructure\Swoole\RevokedSocketReconciler;
+use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Tests\Fixtures\Auth\GrantPathOAuthKernel;
@@ -19,13 +22,15 @@ use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Tools\DsnParser;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 /**
  * The lost-response grace and every other reuse of a refresh token, through the production
- * refresh endpoint on real PostgreSQL and Redis (R1 to R3, R5, R6).
+ * refresh endpoint on real PostgreSQL and Redis.
  *
  * A token that was already consumed, presented again with its own DPoP key within the
  * window while its replacement is unused, gets a fresh pair and the replacement is
@@ -117,7 +122,7 @@ final class RefreshTokenGraceTest extends TestCase
         parent::tearDown();
     }
 
-    /** AE1: the retry of a lost response gets a fresh pair; the unused replacement and its access token are revoked. */
+    /** The retry of a lost response gets a fresh pair; the unused replacement and its access token are revoked. */
     public function testALostResponseRetryWithinTheWindowGetsAFreshPairAndSupersedesTheReplacement(): void
     {
         $login = $this->login();
@@ -141,7 +146,7 @@ final class RefreshTokenGraceTest extends TestCase
         self::assertSame(200, $this->me($retry['accessToken'])->getStatusCode(), 'The next API call succeeds.');
         self::assertSame(401, $this->me($first['accessToken'])->getStatusCode());
 
-        // The predecessor rules of the next rotation hold: R3's predecessor R1 is used and not revoked.
+        // The predecessor rules of the next rotation hold: the third token's predecessor, the first token, is used and not revoked.
         $this->refreshOk($retry['refreshToken']);
 
         $record = $this->lastLogRecord($r1['chain_id'], 'grace');
@@ -150,7 +155,7 @@ final class RefreshTokenGraceTest extends TestCase
     }
 
     /**
-     * AE2: a replacement that was already used makes the presentation a replay; the chain
+     * A replacement that was already used makes the presentation a replay; the chain
      * ends before the 401, and the web server is asked to close the sockets of every access
      * token of the chain, as a logout asks it.
      */
@@ -263,7 +268,7 @@ final class RefreshTokenGraceTest extends TestCase
         $this->refreshOk($graced['refreshToken']);
     }
 
-    /** R5: a window of 0 disables the grace; the lost-response case is a replay. */
+    /** A window of 0 disables the grace; the lost-response case is a replay. */
     public function testAWindowOfZeroAnswersTheLostResponseRetryWith401AndRevokes(): void
     {
         $this->kernel->shutdown();
@@ -321,7 +326,7 @@ final class RefreshTokenGraceTest extends TestCase
     }
 
     /**
-     * AE3: two database sessions present one token at once. Both wait on the row this process
+     * Two database sessions present one token at once. Both wait on the row this process
      * locks; the first to get it consumes the token and issues a pair, the second finds the
      * token consumed, supersedes that pair under the lock and issues its own. One usable pair
      * remains, and the client discards the late answer it did not adopt.
@@ -356,7 +361,7 @@ final class RefreshTokenGraceTest extends TestCase
         self::assertCount(1, $this->logRecords($chainId, 'grace'));
     }
 
-    /** After logout, no token of the chain refreshes (R13 meets the grace: nothing is live to grace into). */
+    /** After logout, no token of the chain refreshes (the grace has nothing live to grace into). */
     public function testAfterLogoutAPresentationOfAnEarlierTokenAnswers401(): void
     {
         $login = $this->login();
@@ -378,6 +383,115 @@ final class RefreshTokenGraceTest extends TestCase
         );
         self::assertSame(401, $this->refresh($login['refreshToken'])->getStatusCode());
         self::assertSame(401, $this->refresh($second['refreshToken'])->getStatusCode());
+    }
+
+    /**
+     * The chain is revoked and the logout answers 200 even when the web server could
+     * not close the chain's sockets; the error names the chain and the count, never a token.
+     */
+    public function testALogoutWhoseSocketCloseFailedAnswers200AndLogsTheChain(): void
+    {
+        $login = $this->login();
+        $second = $this->refreshOk($login['refreshToken']);
+        $chainId = $this->refreshRow($login['refreshToken'])['chain_id'];
+        $fault = RecordingLiveConnections::closeFaultPath(self::$sharedDirectory);
+        self::assertNotFalse(file_put_contents($fault, '1'));
+
+        try {
+            $logout = $this->send('POST', '/api/auth/logout', headers: [
+                'Authorization' => 'DPoP ' . $second['accessToken'],
+                'DPoP' => $this->key->create('POST', self::ORIGIN . '/api/auth/logout', $second['accessToken']),
+            ]);
+        } finally {
+            self::assertTrue(unlink($fault));
+        }
+
+        self::assertSame(200, $logout->getStatusCode(), (string) $logout->getContent());
+        $this->assertChainRevoked($chainId);
+        $errors = $this->closeFailureRecords($chainId);
+        self::assertCount(1, $errors, 'One error records the close the web server did not finish.');
+        self::assertSame('ERROR', $errors[0]['level_name']);
+        self::assertSame(2, $errors[0]['context']['connections'] ?? null);
+        $this->assertNoTokenStringLogged($chainId, [$login, $second]);
+        self::assertSame(401, $this->refresh($second['refreshToken'])->getStatusCode());
+    }
+
+    /**
+     * The reconciliation closes every registered connection whose access token is revoked,
+     * expired or gone, and leaves a live one open: a chain whose hot-path close failed, a
+     * token that expired while its socket stayed open, and a token that is still live.
+     */
+    public function testTheReconciliationClosesTheConnectionsOfDeadAccessTokensAndKeepsLiveOnes(): void
+    {
+        $revokedPair = $this->login();
+        $expiredPair = $this->login();
+        $livePair = $this->login();
+        $revokedId = self::claims($revokedPair['accessToken'])['jti'];
+        $expiredId = self::claims($expiredPair['accessToken'])['jti'];
+        $liveId = self::claims($livePair['accessToken'])['jti'];
+        $registry = WebSocketConnectionRegistry::create(maxConnections: 16, maxRoomMembers: 16);
+        $userId = $this->user->getId()->toString();
+        $registry->addConnection(1, $userId, 0, $revokedId);
+        $registry->addConnection(2, $userId, 0, $expiredId);
+        $registry->addConnection(3, $userId, 0, $liveId);
+
+        $fault = RecordingLiveConnections::closeFaultPath(self::$sharedDirectory);
+        self::assertNotFalse(file_put_contents($fault, '1'));
+        try {
+            $logout = $this->send('POST', '/api/auth/logout', headers: [
+                'Authorization' => 'DPoP ' . $revokedPair['accessToken'],
+                'DPoP' => $this->key->create('POST', self::ORIGIN . '/api/auth/logout', $revokedPair['accessToken']),
+            ]);
+        } finally {
+            self::assertTrue(unlink($fault));
+        }
+        self::assertSame(200, $logout->getStatusCode(), (string) $logout->getContent());
+        self::assertSame(1, $this->connection->executeStatement(
+            "UPDATE oauth_access_tokens SET expires_at = NOW() - INTERVAL '1 minute' WHERE token_id = ?",
+            [$expiredId],
+        ));
+
+        $logger = new class extends AbstractLogger {
+            /** @var list<array{level: string, message: string}> */
+            public array $records = [];
+
+            public function log($level, string|\Stringable $message, array $context = []): void
+            {
+                $this->records[] = ['level' => (string) $level, 'message' => (string) $message];
+            }
+        };
+        $reconciler = new RevokedSocketReconciler(
+            $registry,
+            new AccessTokenRepository($this->manager, new JsonEncoder()),
+            new RecordingLiveConnections(RecordingLiveConnections::path(self::$sharedDirectory)),
+            $logger,
+            60,
+        );
+        $offset = RecordingLiveConnections::size(self::$sharedDirectory);
+
+        $reconciler->tick();
+        $reconciler->tick();
+
+        $closes = RecordingLiveConnections::closedAccessTokens(self::$sharedDirectory, (int) getmypid(), $offset);
+        self::assertCount(2, $closes, 'Each tick asks the web server to close the dead connections again until they are gone.');
+        foreach ($closes as $closed) {
+            sort($closed);
+            self::assertSame(self::sorted([$revokedId, $expiredId]), $closed, 'The revoked and the expired token are closed; the live one is not.');
+        }
+        self::assertSame([], $logger->records, 'A complete close logs nothing.');
+        self::assertSame(200, $this->me($livePair['accessToken'])->getStatusCode(), 'The live token still works.');
+    }
+
+    /**
+     * @param list<string> $ids
+     *
+     * @return list<string>
+     */
+    private static function sorted(array $ids): array
+    {
+        sort($ids);
+
+        return $ids;
     }
 
     // --- Rows and logs ---
@@ -465,6 +579,30 @@ final class RefreshTokenGraceTest extends TestCase
                 continue;
             }
             $records[] = $record;
+        }
+
+        return $records;
+    }
+
+    /**
+     * The error records of a socket close the web server did not finish, for the chain.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function closeFailureRecords(string $chainId): array
+    {
+        $path = self::$sharedDirectory . '/logs/prod.log';
+        self::assertFileExists($path);
+        $records = [];
+        foreach (explode("\n", (string) file_get_contents($path)) as $line) {
+            if ($line === '') {
+                continue;
+            }
+            $record = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
+            self::assertIsArray($record);
+            if (($record['context']['chain'] ?? null) === $chainId && str_contains((string) $record['message'], 'did not close')) {
+                $records[] = $record;
+            }
         }
 
         return $records;
