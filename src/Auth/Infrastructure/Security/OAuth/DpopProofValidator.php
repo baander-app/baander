@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Infrastructure\Security\OAuth;
 
+use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use App\Auth\Application\Port\DpopJtiCacheInterface;
 use App\Auth\Domain\Model\OAuth\ValueObject\DpopValidationResult;
 use DateTimeImmutable;
@@ -91,11 +92,20 @@ final class DpopProofValidator
         return is_string($nonce) ? $nonce : null;
     }
 
+    /**
+     * @param bool $skipReplayCheckOnStoreFailure Accept the proof when the jti store cannot
+     *     answer, with the result flagged replay-unchecked; every other check still runs. Only
+     *     the revocation routes pass it: a replayed logout or revoke can end no session the key
+     *     holder could not end with the original. The store's replay verdict is never skipped.
+     *
+     * @throws DpopStoreUnavailableException when the jti store cannot answer and the caller did not allow skipping the replay check
+     */
     public function validate(
         string $dpopJwt,
         Request $request,
         ?string $accessToken = null,
         ?string $expectedJkt = null,
+        bool $skipReplayCheckOnStoreFailure = false,
     ): DpopValidationResult
     {
         // 1. Parse the JWT (structural check)
@@ -210,9 +220,18 @@ final class DpopProofValidator
         // 11. jti replay prevention (RFC 9449 §11.1) — checked after signature verification
         // to prevent poisoning the cache with JTIs from unsigned/forged proofs. The first
         // sight records the jti for the acceptance window. A store outage propagates as
-        // DpopStoreUnavailableException: a proof is never accepted without this check.
-        if ($this->jtiCache->isReplay($jti, $this->jtiTtlSeconds)) {
-            return DpopValidationResult::invalid('invalid_dpop_proof', 'DPoP proof "jti" has been reused.');
+        // DpopStoreUnavailableException unless the caller allowed this one check to be
+        // skipped; the jti is then not recorded, and the checks below still run.
+        $replayUnchecked = false;
+        try {
+            if ($this->jtiCache->isReplay($jti, $this->jtiTtlSeconds)) {
+                return DpopValidationResult::invalid('invalid_dpop_proof', 'DPoP proof "jti" has been reused.');
+            }
+        } catch (DpopStoreUnavailableException $outage) {
+            if (!$skipReplayCheckOnStoreFailure) {
+                throw $outage;
+            }
+            $replayUnchecked = true;
         }
 
         // 12. If access token present: ath claim and jkt matching
@@ -242,7 +261,7 @@ final class DpopProofValidator
             return DpopValidationResult::invalid('invalid_dpop_proof', 'Failed to compute JWK thumbprint.');
         }
 
-        return DpopValidationResult::valid($jkt);
+        return DpopValidationResult::valid($jkt, replayUnchecked: $replayUnchecked);
     }
 
     private function buildHtu(Request $request): string

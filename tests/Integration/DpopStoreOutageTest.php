@@ -11,6 +11,7 @@ use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Tests\Fixtures\Auth\BorrowLimitingRedisClientFactory;
+use App\Tests\Fixtures\Auth\RecordingLiveConnections;
 use App\Tests\Fixtures\Auth\RedisOutageOAuthKernel;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
 use App\Tests\Fixtures\Auth\WebAuthnTestCredential;
@@ -24,8 +25,8 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * The token endpoints and the DPoP-bound API during a Redis outage, on real PostgreSQL
- * and Redis through the production firewall (R7 to R10, AE4).
+ * The token endpoints, the DPoP-bound API and the two revocation routes during a Redis
+ * outage, on real PostgreSQL and Redis through the production firewall.
  *
  * The refused outage is a kernel whose every Redis client, the DPoP stores and the
  * Symfony cache connections behind the rate limiters and Doctrine's caches, points at a
@@ -34,7 +35,9 @@ use Symfony\Component\HttpFoundation\Response;
  * failed through the counting pool of the working kernel.
  *
  * A 503 during the outage decides nothing: no nonce is issued, no refusal header is
- * sent, and the same token refreshes once the store answers.
+ * sent, and the same token refreshes once the store answers. The logout and the revoke
+ * are the exception: they accept a proof whose replay check could not run, so a session
+ * still ends during the outage.
  */
 final class DpopStoreOutageTest extends TestCase
 {
@@ -55,6 +58,8 @@ final class DpopStoreOutageTest extends TestCase
     private EntityManagerInterface $manager;
     private Connection $connection;
     private User $user;
+    /** A second account, for the token of another user a revoke may name. */
+    private ?User $otherUser = null;
     private string $ip;
     /** Redis borrows of the working kernel's pool during the last handled request. */
     private int $borrowsDuringLastRequest = 0;
@@ -135,6 +140,9 @@ final class DpopStoreOutageTest extends TestCase
             // Tokens, token metadata and passkeys cascade from the user.
             $this->connection->executeStatement('DELETE FROM users WHERE id = ?', [$this->user->getId()->toString()]);
         }
+        if (isset($this->connection) && $this->otherUser !== null) {
+            $this->connection->executeStatement('DELETE FROM users WHERE id = ?', [$this->otherUser->getId()->toString()]);
+        }
         if (isset($this->manager) && $this->manager->isOpen()) {
             $this->manager->close();
         }
@@ -147,7 +155,7 @@ final class DpopStoreOutageTest extends TestCase
     }
 
     /**
-     * AE4: a refused store answers 503 with Retry-After and no nonce, at once (the rate
+     * A refused store answers 503 with Retry-After and no nonce, at once (the rate
      * limiters before the DPoP check neither throw nor block); the same token refreshes
      * once the store answers, with no sign-out in between.
      */
@@ -178,7 +186,7 @@ final class DpopStoreOutageTest extends TestCase
         $withNonce = $this->loginRequest($key->createWithNonce('POST', $uri, $this->nonce()), $this->refusedKernel());
         self::assertStoreUnavailable($withNonce);
 
-        // No challenge is issued either: a nonce that was not stored would only be challenged again (R8).
+        // No challenge is issued either: a nonce that was not stored would only be challenged again.
         $withoutNonce = $this->loginRequest($key->create('POST', $uri, 'no-access-token'), $this->refusedKernel());
         self::assertStoreUnavailable($withoutNonce);
 
@@ -216,7 +224,7 @@ final class DpopStoreOutageTest extends TestCase
         self::assertStoreUnavailable($response);
     }
 
-    /** R10: a database fault during the grant is answered like the first-party refresh answers it. */
+    /** A database fault during the grant is answered like the first-party refresh answers it. */
     public function testTheTokenEndpointAnswersADatabaseFaultWith503AndRetryAfter(): void
     {
         $key = new SignedDpopProof();
@@ -270,7 +278,7 @@ final class DpopStoreOutageTest extends TestCase
     }
 
     /**
-     * R9: a Redis that accepts connections but does not answer yields the 503 within the
+     * A Redis that accepts connections but does not answer yields the 503 within the
      * client's attempt timeout. The measured path includes the rate limiters and the
      * Doctrine cache reads that precede the DPoP check, each bounded by its read timeout.
      */
@@ -304,7 +312,7 @@ final class DpopStoreOutageTest extends TestCase
         self::assertSame(200, $retry->getStatusCode(), (string) $retry->getContent());
     }
 
-    /** R8: the tokens are committed before the next nonce is stored, so that store failing costs only the header. */
+    /** The tokens are committed before the next nonce is stored, so that store failing costs only the header. */
     public function testARefreshWhosePostCommitNonceStoreFailsAnswers200WithoutANonceAndTheNextRefreshGetsOneChallenge(): void
     {
         $key = new SignedDpopProof();
@@ -366,6 +374,245 @@ final class DpopStoreOutageTest extends TestCase
         self::assertIsString($retry->headers->get('DPoP-Nonce'));
     }
 
+    // --- Logout and revoke during the outage ---
+
+    /**
+     * A logout during the refused outage ends the session: the proof is accepted without
+     * the replay check, the chain is revoked, the sockets opened with it are closed, and
+     * one warning names the route, the key thumbprint and the user. Any other route keeps
+     * the 503, and once Redis is back the pair refuses to refresh.
+     */
+    public function testALogoutDuringTheRefusedOutageAnswers200AndRevokesTheChain(): void
+    {
+        $key = new SignedDpopProof();
+        $login = $this->login($key);
+        $chainId = $this->refreshRow($login['refreshToken'])['chain_id'];
+        $refused = $this->refusedKernel();
+
+        self::assertStoreUnavailable($this->me($login['accessToken'], $key, $refused));
+
+        $closeOffset = RecordingLiveConnections::size(self::$sharedDirectory . '/refused');
+        $proof = $key->create('POST', self::ORIGIN . '/api/auth/logout', $login['accessToken']);
+        $logout = $this->logout($login['accessToken'], $proof, $refused);
+
+        self::assertSame(200, $logout->getStatusCode(), (string) $logout->getContent());
+        $this->assertChainRevoked($chainId);
+        self::assertSame(
+            [$this->chainAccessTokenIds($chainId)],
+            RecordingLiveConnections::closedAccessTokens(self::$sharedDirectory . '/refused', (int) getmypid(), $closeOffset),
+            'The logout asked the web server to close the sockets of every access token of the chain, once.',
+        );
+        $records = $this->acceptedWithoutReplayCheck('refused', 'auth_logout');
+        self::assertCount(1, $records, 'One warning per accepted proof.');
+        self::assertSame('WARNING', $records[0]['level_name']);
+        self::assertSame($key->thumbprint(), $records[0]['context']['jkt'] ?? null);
+        $serialized = json_encode($records, JSON_THROW_ON_ERROR);
+        self::assertStringNotContainsString($login['accessToken'], $serialized, 'The warning never carries the access token.');
+        self::assertStringNotContainsString(self::claims($login['accessToken'])['jti'], $serialized, 'The warning never carries the access token id.');
+        self::assertStringNotContainsString($login['refreshToken'], $serialized, 'The warning never carries the refresh token.');
+        self::assertStringNotContainsString($proof, $serialized, 'The warning never carries the proof.');
+
+        $refresh = $this->refresh($login['refreshToken'], $key, $this->nonce());
+        self::assertSame(401, $refresh->getStatusCode(), (string) $refresh->getContent());
+    }
+
+    /**
+     * Through the counting pool of the working kernel with every borrow failing: the jti
+     * check is the only Redis call a logout makes, so no nonce is read or stored, and the
+     * logout still ends the session.
+     */
+    public function testALogoutWhoseEveryPoolBorrowFailsTouchesNoNonceStoreAndStillRevokes(): void
+    {
+        $key = new SignedDpopProof();
+        $login = $this->login($key);
+        $chainId = $this->refreshRow($login['refreshToken'])['chain_id'];
+        $pool = $this->pool();
+
+        $pool->resetBorrows();
+        $pool->failFrom(1);
+        try {
+            $logout = $this->logout($login['accessToken'], $key->create('POST', self::ORIGIN . '/api/auth/logout', $login['accessToken']));
+        } finally {
+            $pool->failFrom(null);
+        }
+
+        self::assertSame(200, $logout->getStatusCode(), (string) $logout->getContent());
+        self::assertSame(1, $this->borrowsDuringLastRequest, 'The replay check is the only Redis call of a logout: the nonce store is never touched.');
+        $this->assertChainRevoked($chainId);
+        self::assertCount(1, $this->acceptedWithoutReplayCheck('working', 'auth_logout'));
+    }
+
+    /**
+     * A captured logout proof whose logout succeeded meets a revoked access token, during
+     * the outage and after it: the authenticator answers 401 before any proof is read. A
+     * copy of a logout that never arrived is the logout, inside its acceptance window. A
+     * copy for another token or from another key is refused on the degraded path.
+     */
+    public function testALogoutProofReplayedDuringTheOutageEndsNoOtherSession(): void
+    {
+        $key = new SignedDpopProof();
+        $uri = self::ORIGIN . '/api/auth/logout';
+        $refused = $this->refusedKernel();
+
+        $first = $this->login($key);
+        $proof = $key->create('POST', $uri, $first['accessToken']);
+        self::assertSame(200, $this->logout($first['accessToken'], $proof, $refused)->getStatusCode());
+        self::assertSame(401, $this->logout($first['accessToken'], $proof, $refused)->getStatusCode(), 'The replay meets a revoked token during the outage.');
+        self::assertSame(401, $this->logout($first['accessToken'], $proof)->getStatusCode(), 'The replay meets a revoked token once Redis is back; its jti was never recorded, so this is no 403.');
+
+        $lost = $this->login($key);
+        $lostChainId = $this->refreshRow($lost['refreshToken'])['chain_id'];
+        $lostProof = $key->create('POST', $uri, $lost['accessToken']);
+        self::assertSame(200, $this->logout($lost['accessToken'], $lostProof, $refused)->getStatusCode(), 'The late copy of a lost logout is the logout.');
+        $this->assertChainRevoked($lostChainId);
+
+        $third = $this->login($key);
+        $thirdChainId = $this->refreshRow($third['refreshToken'])['chain_id'];
+        $otherAth = $key->create('POST', $uri, $lost['accessToken']);
+        self::assertSame(403, $this->logout($third['accessToken'], $otherAth, $refused)->getStatusCode(), 'A proof hashing another token is refused during the outage.');
+        $otherKey = new SignedDpopProof();
+        self::assertSame(403, $this->logout($third['accessToken'], $otherKey->create('POST', $uri, $third['accessToken']), $refused)->getStatusCode(), 'A proof from another key is refused during the outage.');
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM oauth_refresh_tokens WHERE chain_id = ? AND revoked = FALSE', [$thirdChainId]), 'The refused copies ended nothing.');
+    }
+
+    /**
+     * A revoke during the refused outage ends at most a chain of the caller: a foreign
+     * token revokes nothing, the caller's own token ends the session. The proof does not
+     * cover the body, so a captured revoke replayed with the same user's other chain id
+     * revokes that chain; this is the residual the acceptance window bounds. The proof's
+     * jti is never recorded, so the same proof is answered the same once Redis is back,
+     * and only then does the working store make its next copy a replay.
+     */
+    public function testARevokeDuringTheRefusedOutageEndsOnlyAChainOfTheCaller(): void
+    {
+        $key = new SignedDpopProof();
+        $uri = self::ORIGIN . '/api/oauth/revoke';
+        $refused = $this->refusedKernel();
+        $caller = $this->login($key);
+        $callerChainId = $this->refreshRow($caller['refreshToken'])['chain_id'];
+        $other = $this->login($key);
+        $otherChainId = $this->refreshRow($other['refreshToken'])['chain_id'];
+        $foreign = $this->login(new SignedDpopProof(), $this->otherUser());
+
+        $captured = $key->create('POST', $uri, $caller['accessToken']);
+        self::assertSame(200, $this->revoke($caller['accessToken'], $captured, $foreign['refreshToken'], $refused)->getStatusCode());
+        self::assertFalse($this->refreshRow($foreign['refreshToken'])['revoked'], 'A foreign token revokes nothing.');
+        self::assertCount(1, $this->acceptedWithoutReplayCheck('refused', 'oauth_revoke'));
+
+        self::assertSame(200, $this->revoke($caller['accessToken'], $captured, $other['refreshToken'], $refused)->getStatusCode());
+        $this->assertChainRevoked($otherChainId);
+        self::assertCount(2, $this->acceptedWithoutReplayCheck('refused', 'oauth_revoke'), 'One warning per accepted proof.');
+
+        self::assertSame(200, $this->revoke($caller['accessToken'], $captured, $foreign['refreshToken'])->getStatusCode(), 'The jti was never recorded: the working store sees the proof for the first time.');
+        self::assertSame(403, $this->revoke($caller['accessToken'], $captured, $foreign['refreshToken'])->getStatusCode(), 'The working store recorded it now.');
+        self::assertFalse($this->refreshRow($foreign['refreshToken'])['revoked']);
+
+        $own = $key->create('POST', $uri, $caller['accessToken']);
+        self::assertSame(200, $this->revoke($caller['accessToken'], $own, $caller['refreshToken'], $refused)->getStatusCode());
+        $this->assertChainRevoked($callerChainId);
+        self::assertSame(401, $this->refresh($caller['refreshToken'], $key, $this->nonce())->getStatusCode());
+    }
+
+    private function logout(string $accessToken, string $proof, ?RedisOutageOAuthKernel $kernel = null): Response
+    {
+        return $this->send('POST', '/api/auth/logout', headers: [
+            'Authorization' => 'DPoP ' . $accessToken,
+            'DPoP' => $proof,
+        ], kernel: $kernel);
+    }
+
+    private function revoke(string $accessToken, string $proof, string $token, ?RedisOutageOAuthKernel $kernel = null): Response
+    {
+        return $this->send('POST', '/api/oauth/revoke', json: ['token' => $token, 'tokenTypeHint' => 'refresh_token'], headers: [
+            'Authorization' => 'DPoP ' . $accessToken,
+            'DPoP' => $proof,
+        ], kernel: $kernel);
+    }
+
+    private function otherUser(): User
+    {
+        if ($this->otherUser === null) {
+            $users = $this->kernel->getContainer()->get('oauth.acceptance.users');
+            self::assertInstanceOf(UserRepositoryInterface::class, $users);
+            $this->otherUser = User::register(
+                new Email('store-outage-other-' . bin2hex(random_bytes(8)) . '@baander.app'),
+                password_hash(self::PASSWORD, PASSWORD_BCRYPT),
+                'Store outage other user',
+            );
+            $users->save($this->otherUser);
+        }
+
+        return $this->otherUser;
+    }
+
+    /** @return array{id: string, chain_id: string, revoked: bool} */
+    private function refreshRow(string $refreshToken): array
+    {
+        $row = $this->connection->fetchAssociative('SELECT id, chain_id, revoked FROM oauth_refresh_tokens WHERE token_id = ?', [$refreshToken]);
+        self::assertIsArray($row, 'The refresh token must be persisted.');
+
+        /** @var array{id: string, chain_id: string, revoked: bool} $row */
+        return $row;
+    }
+
+    /**
+     * The token ids (the JWT jti) of every access token of the chain, in the order a revocation lists them.
+     *
+     * @return list<string>
+     */
+    private function chainAccessTokenIds(string $chainId): array
+    {
+        /** @var list<string> $ids */
+        $ids = $this->connection->fetchFirstColumn('SELECT token_id FROM oauth_access_tokens WHERE chain_id = ? ORDER BY id', [$chainId]);
+
+        return $ids;
+    }
+
+    private function assertChainRevoked(string $chainId): void
+    {
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM oauth_refresh_tokens WHERE chain_id = ? AND revoked = FALSE', [$chainId]), 'Every refresh token of the chain is revoked.');
+        self::assertSame(0, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM oauth_access_tokens WHERE chain_id = ? AND revoked = FALSE', [$chainId]), 'Every access token of the chain is revoked.');
+    }
+
+    /** @return array<string, mixed> */
+    private static function claims(string $jwt): array
+    {
+        $parts = explode('.', $jwt);
+        self::assertCount(3, $parts);
+        $claims = json_decode(base64_decode(strtr($parts[1], '-_', '+/'), true) ?: '', true, flags: JSON_THROW_ON_ERROR);
+        self::assertIsArray($claims);
+
+        return $claims;
+    }
+
+    /**
+     * The warnings the given kernel variant logged for a proof it accepted without the
+     * replay check on the route, for this test's user; the file handler writes one JSON
+     * line per record, and the refused kernel's file is shared by every test of the class.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function acceptedWithoutReplayCheck(string $variant, string $route): array
+    {
+        $path = self::$sharedDirectory . '/' . $variant . '/logs/prod.log';
+        self::assertFileExists($path);
+        $records = [];
+        foreach (explode("\n", (string) file_get_contents($path)) as $line) {
+            if ($line === '') {
+                continue;
+            }
+            $record = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
+            self::assertIsArray($record);
+            $context = $record['context'] ?? [];
+            if (($context['route'] ?? null) !== $route || ($context['user_id'] ?? null) !== $this->user->getId()->toString()) {
+                continue;
+            }
+            $records[] = $record;
+        }
+
+        return $records;
+    }
+
     private static function assertStoreUnavailable(Response $response): void
     {
         self::assertSame(503, $response->getStatusCode(), (string) $response->getContent());
@@ -419,9 +666,9 @@ final class DpopStoreOutageTest extends TestCase
     }
 
     /** @return array{accessToken: string, refreshToken: string, nonce: string} */
-    private function login(SignedDpopProof $key): array
+    private function login(SignedDpopProof $key, ?User $user = null): array
     {
-        $response = $this->loginRequest($key->createWithNonce('POST', self::ORIGIN . '/api/auth/login', $this->nonce()));
+        $response = $this->loginRequest($key->createWithNonce('POST', self::ORIGIN . '/api/auth/login', $this->nonce()), user: $user);
         self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
         $data = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
         $nonce = $response->headers->get('DPoP-Nonce');
@@ -430,10 +677,10 @@ final class DpopStoreOutageTest extends TestCase
         return ['accessToken' => $data['accessToken'], 'refreshToken' => $data['refreshToken'], 'nonce' => $nonce];
     }
 
-    private function loginRequest(string $proof, ?RedisOutageOAuthKernel $kernel = null): Response
+    private function loginRequest(string $proof, ?RedisOutageOAuthKernel $kernel = null, ?User $user = null): Response
     {
         return $this->send('POST', '/api/auth/login', json: [
-            'email' => $this->user->getEmail(),
+            'email' => ($user ?? $this->user)->getEmail(),
             'password' => self::PASSWORD,
         ], headers: ['DPoP' => $proof], kernel: $kernel);
     }

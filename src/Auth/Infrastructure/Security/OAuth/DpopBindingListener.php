@@ -19,6 +19,15 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 final class DpopBindingListener
 {
+    /**
+     * The routes that end a session. They accept a proof whose replay check could not run
+     * because the jti store was unavailable: a replayed logout can only re-end the session
+     * its access token belongs to, and a replayed revoke reaches at most another chain of
+     * the same user whose token id the replayer already knows. Every other route keeps the
+     * fail-closed 503, and these routes keep every other verdict.
+     */
+    private const array REVOCATION_ROUTES = ['auth_logout', 'oauth_revoke'];
+
     private Parser $parser;
 
     public function __construct(
@@ -88,16 +97,20 @@ final class DpopBindingListener
             throw new AccessDeniedException('DPoP proof header is required.');
         }
 
+        $route = $request->attributes->get('_route');
+        $revocationRoute = is_string($route) && in_array($route, self::REVOCATION_ROUTES, true);
+
         try {
             $result = $this->dpopProofValidator->validate(
                 dpopJwt: $dpopHeader,
                 request: $request,
                 accessToken: $accessToken,
                 expectedJkt: $expectedJkt,
+                skipReplayCheckOnStoreFailure: $revocationRoute,
             );
         } catch (DpopStoreUnavailableException) {
             // The replay check could not run, so the proof is neither accepted nor refused:
-            // the request waits (503), it is not denied (R7). The jti cache logged the failure.
+            // the request waits (503), it is not denied. The jti cache logged the failure.
             $event->setResponse(DpopStoreUnavailableResponse::create());
 
             return;
@@ -110,6 +123,15 @@ final class DpopBindingListener
             ]);
 
             throw new AccessDeniedException($result->getErrorDescription() ?? $result->getError() ?? 'DPoP proof validation failed.');
+        }
+
+        if ($result->isReplayUnchecked()) {
+            // Neither the token nor the proof is logged: the thumbprint and the user name the key holder.
+            $this->logger->warning('DPoP proof accepted without the replay check: the jti store is unavailable and the route ends a session.', [
+                'route' => $route,
+                'jkt' => $result->getJkt(),
+                'user_id' => $user->getId(),
+            ]);
         }
     }
 
