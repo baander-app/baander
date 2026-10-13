@@ -71,6 +71,8 @@ export const useAuthStore = create<AuthState>()(withStoreDebug('auth.auth', with
   let generation = 0
   // The epoch of the record this tab's credentials came from; null while it holds none.
   let heldEpoch: number | null = null
+  // Logouts awaiting the server; a record adopted meanwhile belongs to the session being ended.
+  let logoutsInFlight = 0
 
   const pushToken = (token: string | null) => postTokenToWorker(token).catch((error) => {
     logger.warn('Failed to push token to service worker:', error)
@@ -79,7 +81,8 @@ export const useAuthStore = create<AuthState>()(withStoreDebug('auth.auth', with
 
   /** Takes the stored record as this tab's credentials; the shared key is kept when it is the same key. */
   const applyRecord = (record: LegacyStoredAuth) => {
-    generation++
+    // An adopted rotation of the same session must not cancel the local clear an in-flight logout ends with.
+    if (logoutsInFlight === 0) generation++
     const held = getDpopKeyPair()
     if (!held || held.jkt !== record.jkt) {
       setDpopKeyPair({
@@ -96,6 +99,7 @@ export const useAuthStore = create<AuthState>()(withStoreDebug('auth.auth', with
       refreshToken: record.refreshToken,
       user: record.user as User,
       isAuthenticated: true,
+      isLoading: false,
     })
     pushToken(record.accessToken)
   }
@@ -222,11 +226,13 @@ export const useAuthStore = create<AuthState>()(withStoreDebug('auth.auth', with
 
     logout: async () => {
       const owner = ++generation
+      logoutsInFlight++
       set({ isLoading: true })
       try {
         if (isMockAuth()) await new Promise((resolve) => setTimeout(resolve, 100))
         else await postAuthLogout()
       } finally {
+        logoutsInFlight--
         if (owner === generation) get().clearAuth()
       }
     },

@@ -179,7 +179,8 @@ it('answers a credential pull with the current snapshot at the last published re
   auth.accessToken = 'rotated';
   await bridge.postTokenToWorker('rotated');
   expect(active.postMessage).toHaveBeenCalledTimes(2);
-  const { port, done } = pull(); await done;
+  const { port, done } = pull();
+  await done;
   expect(port.postMessage).toHaveBeenCalledExactlyOnceWith({
     type: 'SW_AUTH_PULLED', auth: { apiUrl: 'https://api.baander.app', token: 'rotated', session: 1, revision: 2 },
   });
@@ -189,7 +190,8 @@ it('answers a credential pull with the current snapshot at the last published re
 });
 
 it('does not answer a credential pull from an unrelated worker', async () => {
-  const { port, done } = pull(new ServiceWorker()); await done;
+  const { port, done } = pull(new ServiceWorker());
+  await done;
   expect(port.postMessage).not.toHaveBeenCalled();
   expect(port.close).toHaveBeenCalledOnce();
 });

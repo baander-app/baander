@@ -36,7 +36,11 @@ beforeEach(() => {
   api = new MockAdapter(AXIOS_INSTANCE);
   refresh = new MockAdapter(Axios);
 });
-afterEach(() => { api.restore(); refresh.restore(); restoreLocks(); });
+afterEach(() => {
+  api.restore();
+  refresh.restore();
+  restoreLocks();
+});
 
 /** A private resource that is answered 401 until the request carries the rotated token. */
 function privateApi() {

@@ -768,6 +768,46 @@ describe('auth request ownership', () => {
     expect(mockPostTokenToWorker.mock.calls.at(-1)).toEqual(['access-token-123'])
   })
 
+  it('keeps the local clear of an in-flight logout when a sibling tab rotates meanwhile', async () => {
+    await hydrateFrom(liveRecord(1, 'r1-access'))
+    let release!: (value: Awaited<ReturnType<typeof postAuthLogout>>) => void
+    mockPostAuthLogout.mockReturnValueOnce(new Promise((yes) => { release = yes }))
+    const logout = useAuthStore.getState().logout()
+    storage.record = liveRecord(2, 'r2-access')
+
+    deliverFromOtherTab({ type: 'rotated', epoch: 2 })
+
+    await vi.waitFor(() => expect(useAuthStore.getState().accessToken).toBe('r2-access'))
+    release({ data: {} })
+    await logout
+
+    const state = useAuthStore.getState()
+    expect(state.isAuthenticated).toBe(false)
+    expect(state.accessToken).toBeNull()
+    expect(state.isLoading).toBe(false)
+    expect(mockClearStoredAuth).toHaveBeenCalledOnce()
+    await vi.waitFor(() => expect(postedEvents()).toContainEqual(expect.objectContaining({ type: 'cleared' })))
+  })
+
+  it('does not leave a login loading when a rotation is adopted before its credentials are written', async () => {
+    let resolve!: (value: unknown) => void
+    mockAxios.post.mockReturnValueOnce(new Promise((yes) => { resolve = yes }))
+    const login = useAuthStore.getState().login('user@baander.app', 'secret')
+    await vi.waitFor(() => expect(mockAxios.post).toHaveBeenCalled())
+    storage.record = liveRecord(2, 'r2-access')
+
+    deliverFromOtherTab({ type: 'rotated', epoch: 2 })
+
+    await vi.waitFor(() => expect(useAuthStore.getState().accessToken).toBe('r2-access'))
+    resolve(validLoginResponse())
+    await login.catch(() => {})
+
+    const state = useAuthStore.getState()
+    expect(state.isLoading).toBe(false)
+    expect(state.accessToken).toBe('r2-access')
+    expect(state.isAuthenticated).toBe(true)
+  })
+
   it('persists a user update under the lock at the held epoch', async () => {
     await hydrateFrom(liveRecord(1, 'r1-access'))
 
