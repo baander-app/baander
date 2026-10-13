@@ -17,7 +17,7 @@ interface UseVisualizerLoopOptions {
 }
 
 /** Hook that manages a requestAnimationFrame loop reading audio analysis data.
- *  Returns nothing — the return type from the plan was for debugging/introspection only. */
+ *  Returns nothing; the loop's state is for the renderer, not the caller. */
 export function useVisualizerLoop(options: UseVisualizerLoopOptions): void {
   const { rendererRef, canvasRef, smoothingAlpha = 0.35, compact = false, albumPublicId } = options
 

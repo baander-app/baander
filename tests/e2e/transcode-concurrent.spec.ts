@@ -73,7 +73,7 @@ async function runViewer(context: Awaited<ReturnType<typeof browser.newContext>>
   );
 
   // Gate on first-segment buffering so cold-start encoding latency doesn't
-  // race the playback assertion (KTD-2).
+  // race the playback assertion.
   await page.waitForFunction(
     () => (window as any).firstSegmentBuffered === true,
     { timeout: 60000 },

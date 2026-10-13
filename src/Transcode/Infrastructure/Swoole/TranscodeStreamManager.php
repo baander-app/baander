@@ -23,7 +23,7 @@ use RuntimeException;
  * directory for new segment files and signals their availability through the
  * SegmentAvailabilityInterface (Swoole Table).
  *
- * Lifecycle (KTD-3 — hybrid seek/throttle):
+ * Lifecycle (hybrid seek/throttle):
  * - Throttle: SIGSTOP/SIGCONT (preserves amortized encoder init; 0.38s resume)
  * - Seek:     kill + restart-with-headroom (SIGSTOP cannot reposition the read head;
  *             cold-start ~0.6s is imperceptible)

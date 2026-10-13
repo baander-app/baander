@@ -188,7 +188,7 @@ final class PreferenceController
 
     private function getDefaultEnabled(NotificationCategory $category, NotificationChannel $channel): bool
     {
-        // R24: All categories enabled for InApp. Security also enabled for Email.
+        // Defaults: every category enabled in-app; security alone also by email.
         if ($channel === NotificationChannel::InApp) {
             return true;
         }

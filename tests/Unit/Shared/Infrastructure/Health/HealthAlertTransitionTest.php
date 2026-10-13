@@ -12,7 +12,7 @@ use App\Shared\Infrastructure\Health\HealthStatus;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
-/** The state diagram in the plan, edge by edge. */
+/** The alert state machine, edge by edge. */
 final class HealthAlertTransitionTest extends TestCase
 {
     private const int NOW = 1_791_633_600;

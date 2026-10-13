@@ -60,6 +60,11 @@ Do not prefix function or method calls with `void`. Keep asynchronous error
 handling explicit.
 Prefix Baander-defined HTTP headers with `X-Baander-`; preserve generic protocol,
 proxy, and security header names.
+Code stands on its own: source, tests, comments and docblocks never cite planning
+artifacts (requirement, acceptance-example or decision ids such as `R5`, `AE4`,
+`KTD2`, roadmap item numbers, or plan file paths). State the behaviour or rule in
+plain words instead. Plan ids belong in plans, the roadmap, commit messages and
+reports.
 
 For backend changes, read [architecture rules](.agents/rules/architecture-rules.md)
 and the relevant `ddd-*.md` reference in `.agents/rules/`. For admin routes, console

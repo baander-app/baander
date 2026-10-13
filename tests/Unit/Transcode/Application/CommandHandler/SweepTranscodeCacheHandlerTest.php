@@ -24,7 +24,7 @@ use ReflectionClass;
 /**
  * Unit tests for SweepTranscodeCacheHandler.
  *
- * Covers the six sweep-policy scenarios from the cache-sweep plan (R1–R4):
+ * Covers the six sweep-policy scenarios:
  * TTL eviction, active-job protection, active-session protection, TTL
  * retention, LRU size-budget eviction, and dry-run reporting. Uses a real
  * temp filesystem so file mtimes drive the TTL and LRU decisions exactly as

@@ -46,7 +46,7 @@ use Throwable;
  * extraction remain on the CPU process pool (short one-shot jobs).
  * Remaining audio segments are dispatched via the pool's sliding-window path.
  *
- * Seek/throttle (KTD-3 — hybrid):
+ * Seek/throttle (hybrid):
  * - Throttle: SIGSTOP/SIGCONT the long-lived process (0.38s resume, preserves
  *   amortized encoder init).
  * - Seek: kill + restart-with-headroom (SIGSTOP cannot reposition the read head;
@@ -329,7 +329,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
             // Step 9: Start the long-lived video stream and poll until completion.
             // The stream manager spawns ONE FFmpeg process that produces all video
             // segments continuously. Seek/throttle are handled inside dispatchLongStream
-            // per KTD-3 (SIGSTOP/SIGCONT for throttle, kill+restart for seek).
+            // (SIGSTOP/SIGCONT for throttle, kill+restart for seek).
             $this->dispatchLongStream(
                 $job, $session, $sourcePath, $tier, $videoFilters, $totalSegments, $ownership,
             );
@@ -601,7 +601,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
     }
     /**
      * Start the long-lived video stream and poll for completion, handling
-     * seek/throttle signals per KTD-3.
+     * seek/throttle signals.
      *
      * The stream manager spawns ONE FFmpeg process that produces all video
      * segments continuously via the HLS muxer with fMP4 fragments. The
@@ -612,7 +612,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
      *   SIGSTOP the process. When playback catches up (<= THROTTLE_LOW_SEGMENTS),
      *   SIGCONT it. This prevents the encoder from producing segments far
      *   ahead of what the player needs.
-     * - Seek (KTD-3 kill+restart): stop the stream, clear the availability
+     * - Seek (kill+restart): stop the stream, clear the availability
      *   table, compute startSegment = floor(position/segDur) - headroom,
      *   and start a new stream from that position.
      * - Pause: SIGSTOP the stream and mark the session paused.
@@ -705,7 +705,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                 }
 
                 if ($signal['action'] === 'seek') {
-                    // KTD-3: kill + restart-with-headroom
+                    // Kill + restart with headroom.
                     $this->assertLoopOwnership($job->getId(), $ownership);
                     $this->streamManager->stopStream($jobId);
                     $this->assertLoopOwnership($job->getId(), $ownership);
@@ -756,7 +756,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                 continue;
             }
 
-            // Buffer-depth throttle (KTD-3 SIGSTOP/SIGCONT)
+            // Buffer-depth throttle (SIGSTOP/SIGCONT)
             $playbackSegment = $this->playbackPositionToSegment($lastPlaybackPosition, $segmentDuration);
             $aheadSegments = $lastProducedSegment - $playbackSegment;
 

@@ -21,7 +21,7 @@ final class SeedDefaultPreferencesHandler
     #[AsMessageHandler]
     public function __invoke(SeedDefaultPreferencesCommand $command): void
     {
-        // R24 defaults: All categories enabled for InApp. Security also enabled for Email.
+        // Defaults: every category enabled in-app; security alone also by email.
         $defaults = [
             [NotificationCategory::Security, NotificationChannel::InApp, true],
             [NotificationCategory::Security, NotificationChannel::Email, true],

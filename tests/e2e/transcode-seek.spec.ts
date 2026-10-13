@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 const SERVER_URL = process.env.SERVER_URL || 'http://localhost:9501';
 
 /**
- * Seek scenario — exercises the kill+restart-with-headroom path (KTD-3).
+ * Seek scenario — exercises the kill+restart-with-headroom path.
  *
  * Loads the HLS player, lets it play to ~5s, seeks to 60s, and asserts
  * playback resumes past 63s within the seek-latency budget. U1 measured
@@ -37,7 +37,7 @@ test.describe('Baander on-the-fly transcode seek', () => {
     );
 
     // Gate on first-segment buffering so cold-start encoding latency doesn't
-    // race the playback assertion (KTD-2).
+    // race the playback assertion.
     await page.waitForFunction(
       () => (window as any).firstSegmentBuffered === true,
       { timeout: 60000 },
@@ -61,7 +61,7 @@ test.describe('Baander on-the-fly transcode seek', () => {
     });
 
     // Assert playback resumes past 63s after the seek.
-    // The refactor's kill+restart-with-headroom path (KTD-3) must produce
+    // The kill+restart-with-headroom path must produce
     // segments around 60s and let hls.js resume.
     await page.waitForFunction(
       () => {

@@ -475,7 +475,7 @@ final class HealthCheckService
     {
         $results = [];
 
-        // VAPID key pairs (R19)
+        // VAPID key pairs
         $vapidPub = $this->vapidPublicKey;
         $vapidPriv = $this->vapidPrivateKey;
         $hasPub = $vapidPub !== '' && $vapidPub !== '0';
@@ -513,7 +513,7 @@ final class HealthCheckService
         foreach ($checks as $envVar => $service) {
             $val = $this->apiKeys[$service] ?? '';
             if ($val === '') {
-                continue; // R25: empty keys produce no result
+                continue; // An empty key produces no result.
             }
 
             if (strlen(trim($val)) < 8) {

@@ -54,7 +54,7 @@ test.describe('Baander on-the-fly DASH transcode', () => {
     expect(manifestInfo.videoCodecs.every((c) => c?.startsWith('avc1.'))).toBe(true);
 
     // Gate on first-segment delivery (readyState >= HAVE_CURRENT_DATA) so the
-    // playback assertion doesn't race the cold-start encoding latency (KTD-2).
+    // playback assertion doesn't race the cold-start encoding latency.
     await page.waitForFunction(
       () => (window as any).firstSegmentReady === true,
       { timeout: 60000 },

@@ -21,14 +21,14 @@ use Psr\Log\NullLogger;
  * implements two eviction policies, whichever triggers first:
  *
  *  - **TTL:** delete a video's entire cache directory when its newest file is
- *    older than the configured TTL (R1). Eviction granularity is the whole
+ *    older than the configured TTL. Eviction granularity is the whole
  *    video directory, not individual segments — a video's segments across
- *    tiers form an atomic cache unit (KTD-1).
+ *    tiers form an atomic cache unit.
  *  - **LRU size budget:** when the total cache exceeds the size budget, evict
  *    the least-recently-accessed video directories first (by newest-file
- *    mtime) until under budget (R2).
+ *    mtime) until under budget.
  *
- * Safety (R4): a video directory is never swept while it is in active use.
+ * Safety: a video directory is never swept while it is in active use.
  * "In use" means either (a) the video has a job that is still pending or
  * in-progress, or (b) a viewer has a session that was updated within the
  * active-playback window (default 30 min — a recently-touched session means
@@ -108,7 +108,7 @@ final class SweepTranscodeCacheHandler
             $totalBytes += $size;
             $dirNewestMtime[$unit] = $this->newestFileMtime($dir);
 
-            // R4 — never sweep active content.
+            // Never sweep active content.
             if ($active[$unit]()) {
                 $skippedActive[] = $unit;
                 $retained[$unit] = true;
@@ -116,7 +116,7 @@ final class SweepTranscodeCacheHandler
                 continue;
             }
 
-            // R1 — TTL: delete if the newest file is older than the TTL cutoff.
+            // TTL: delete if the newest file is older than the TTL cutoff.
             $newestMtime = $dirNewestMtime[$unit];
             if ($newestMtime !== null && (new DateTimeImmutable('@' . $newestMtime)) < $ttlCutoff) {
                 $this->deleteDirectory($unit, $dir, $size, $dryRun, $deleted, $bytesFreed);
@@ -127,7 +127,7 @@ final class SweepTranscodeCacheHandler
 
         $alreadySkipped = array_flip($skippedActive);
 
-        // R2 — LRU size budget: if still over budget, evict oldest-accessed
+        // LRU size budget: if still over budget, evict oldest-accessed
         // non-active directories (by newest-file mtime) until under budget.
         if ($totalBytes > $maxBytes) {
             $evictionCandidates = [];
