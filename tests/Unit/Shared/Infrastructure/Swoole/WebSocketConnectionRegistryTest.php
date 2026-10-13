@@ -104,6 +104,21 @@ final class WebSocketConnectionRegistryTest extends TestCase
         self::assertSame([], $this->registry->getConnectionFdsForAccessTokens(['token-a']));
     }
 
+    public function testTheConnectedAccessTokenIdsAreListedOnceAcrossWorkersWithoutRemovedConnections(): void
+    {
+        $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-a');
+        $this->registry->addConnection(2, 'user-uuid-1', 1, 'token-a');
+        $this->registry->addConnection(3, 'user-uuid-2', 0, 'token-b');
+        $this->registry->addConnection(4, 'user-uuid-3', 1, 'token-c');
+        $this->registry->removeConnection(4);
+
+        $tokenIds = $this->registry->getConnectedAccessTokenIds();
+        sort($tokenIds);
+
+        self::assertSame(['token-a', 'token-b'], $tokenIds);
+        self::assertSame([], WebSocketConnectionRegistry::create(maxConnections: 8, maxRoomMembers: 8)->getConnectedAccessTokenIds());
+    }
+
     public function testWorkerConnectionsAreTheOnesItsWorkerRegistered(): void
     {
         $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-1');

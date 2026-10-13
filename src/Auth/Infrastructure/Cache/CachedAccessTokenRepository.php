@@ -54,6 +54,16 @@ final readonly class CachedAccessTokenRepository implements AccessTokenRepositor
         return $this->inner->findTokenIdsByChainId($chainId);
     }
 
+    /**
+     * @param list<string> $tokenIds
+     *
+     * @return list<string>
+     */
+    public function findLiveTokenIds(array $tokenIds): array
+    {
+        return $this->inner->findLiveTokenIds($tokenIds);
+    }
+
     public function revokeByChainId(ChainId $chainId): void
     {
         $this->inner->revokeByChainId($chainId);

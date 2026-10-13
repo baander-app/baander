@@ -5,14 +5,17 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Swoole\Drain;
 
 use App\Shared\Application\Port\ServerDrainStateInterface;
+use App\Shared\Application\Port\WorkerTimerInterface;
 use App\Shared\Infrastructure\Health\HealthMonitorSubscriber;
 use App\Shared\Infrastructure\Swoole\WorkerMemoryReporter;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerExitedEvent;
 use SwooleBundle\SwooleBundle\Server\WorkerHandler\CoroutineWatchdogWorkerStartHandler;
+use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
- * Clears the Shared timers of a worker that stops because the server drains.
+ * Clears the timers of a worker that stops because the server drains: the Shared timers it
+ * holds, and every timer another context tagged with WorkerTimerInterface.
  *
  * Once Swoole has signalled a worker, the worker runs WorkerExit, again and again, until its
  * event loop is empty, and a timer left in it keeps the loop running until Swoole kills the
@@ -33,6 +36,9 @@ final class DrainWorkerExitSubscriber implements EventSubscriberInterface
         private readonly WorkerDrain $workerDrain,
         private readonly HealthMonitorSubscriber $healthMonitor,
         private readonly WorkerMemoryReporter $memoryReporter,
+        /** @var iterable<WorkerTimerInterface> */
+        #[AutowireIterator(WorkerTimerInterface::class)]
+        private readonly iterable $workerTimers,
         private readonly ?CoroutineWatchdogWorkerStartHandler $coroutineWatchdog = null,
     ) {
     }
@@ -52,6 +58,9 @@ final class DrainWorkerExitSubscriber implements EventSubscriberInterface
         $this->workerDrain->stop();
         $this->healthMonitor->stop();
         $this->memoryReporter->stop();
+        foreach ($this->workerTimers as $timer) {
+            $timer->stop();
+        }
         $this->coroutineWatchdog?->stop();
     }
 }

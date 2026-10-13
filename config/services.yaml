@@ -274,6 +274,12 @@ services:
         arguments:
             $intervalSeconds: '%app.health_monitor.interval_seconds%'
 
+    # Socket reconciliation: a timer in HTTP worker 0 closes the WebSocket connections
+    # whose access token is revoked, expired or gone, whatever revoked it.
+    App\Auth\Infrastructure\Swoole\RevokedSocketReconciler:
+        arguments:
+            $intervalSeconds: 60
+
     # The table is the sighting; outside the server (worker, console) it is not
     # booted and keeps the sighting in process memory.
     App\Shared\Infrastructure\Health\WorkerHeartbeatSightingInterface:

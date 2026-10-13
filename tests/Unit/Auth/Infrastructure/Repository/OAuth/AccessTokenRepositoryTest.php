@@ -54,6 +54,60 @@ final class AccessTokenRepositoryTest extends TestCase
     }
 
     // =========================================================================
+    // findLiveTokenIds: the stored, unrevoked, unexpired subset on the database clock
+    // =========================================================================
+
+    private const string LIVE_TOKEN_IDS_SQL = 'SELECT token_id FROM oauth_access_tokens WHERE token_id IN (:ids) AND revoked = FALSE AND (expires_at IS NULL OR expires_at > NOW())';
+
+    public function testFindLiveTokenIdsAsksTheDatabaseWhichOfTheIdsAreStoredUnrevokedAndUnexpired(): void
+    {
+        // Of five ids: one revoked, one expired, one the database never stored, two live.
+        $asked = ['token-revoked', 'token-expired', 'token-unknown', 'token-live-1', 'token-live-2'];
+        $this->connection->expects($this->once())
+            ->method('fetchFirstColumn')
+            ->with(self::LIVE_TOKEN_IDS_SQL, ['ids' => $asked], ['ids' => ArrayParameterType::STRING])
+            ->willReturn(['token-live-1', 'token-live-2']);
+        $this->connection->expects($this->never())->method('executeStatement');
+        $this->entityManager->expects($this->never())->method('clear');
+
+        $this->assertSame(['token-live-1', 'token-live-2'], $this->repository->findLiveTokenIds($asked));
+    }
+
+    public function testFindLiveTokenIdsSendsTheIdsInChunksOfFiveHundred(): void
+    {
+        $asked = [];
+        for ($i = 1; $i <= 1200; ++$i) {
+            $asked[] = sprintf('token-%04d', $i);
+        }
+        $sent = [];
+        $this->entityManager->expects($this->never())->method('clear');
+        $this->connection->expects($this->exactly(3))
+            ->method('fetchFirstColumn')
+            ->willReturnCallback(function (string $sql, array $params, array $types) use (&$sent): array {
+                $this->assertSame(self::LIVE_TOKEN_IDS_SQL, $sql);
+                $this->assertSame(['ids' => ArrayParameterType::STRING], $types);
+                $sent[] = $params['ids'];
+
+                // The first id of each chunk is live.
+                return [$params['ids'][0]];
+            });
+
+        $live = $this->repository->findLiveTokenIds($asked);
+
+        $this->assertSame([500, 500, 200], array_map(count(...), $sent));
+        $this->assertSame($asked, array_merge(...$sent));
+        $this->assertSame(['token-0001', 'token-0501', 'token-1001'], $live);
+    }
+
+    public function testFindLiveTokenIdsWithNoIdsAsksNothing(): void
+    {
+        $this->connection->expects($this->never())->method('fetchFirstColumn');
+        $this->entityManager->expects($this->never())->method('clear');
+
+        $this->assertSame([], $this->repository->findLiveTokenIds([]));
+    }
+
+    // =========================================================================
     // revokeByChainId: bulk UPDATE
     // =========================================================================
 

@@ -152,6 +152,23 @@ final class WebSocketConnectionRegistry
     }
 
     /**
+     * The distinct access token ids of every registered connection, whichever worker holds
+     * it, found in one scan. The socket reconciliation asks the database which of them are
+     * still live and closes the connections of the rest.
+     *
+     * @return list<string>
+     */
+    public function getConnectedAccessTokenIds(): array
+    {
+        $tokenIds = [];
+        foreach ($this->connections as $row) {
+            $tokenIds[$row['access_token_id']] = true;
+        }
+
+        return array_keys($tokenIds);
+    }
+
+    /**
      * The connections whose handshake this worker handled. With dispatch_mode 2 the same worker
      * receives every later frame of the connection.
      *
