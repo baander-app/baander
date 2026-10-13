@@ -23,6 +23,7 @@ use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Domain\Service\TokenChainValidator;
+use App\Shared\Application\Port\LiveConnectionsPortInterface;
 use App\Shared\Domain\Model\Email;
 use App\Tests\Fixtures\Catalog\PassThroughTransaction;
 use App\Shared\Domain\Model\Uuid;
@@ -130,6 +131,7 @@ final class RefreshTokenHandlerConcurrencyTest extends TestCase
             $this->users(),
             $transaction,
             new NullLogger(),
+            $this->createStub(LiveConnectionsPortInterface::class),
             accessTokenTtl: 3600,
             refreshTokenTtl: 2592000,
             reuseGraceSeconds: 60,

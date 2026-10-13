@@ -32,9 +32,6 @@ final class LoginController
 {
     use ApiResponsesTrait;
 
-    /** How long a client waits before retrying a login the server could not decide on. */
-    private const int RETRY_AFTER_SECONDS = 5;
-
     public function __construct(
         private readonly Security $security,
         private readonly MessageBusInterface $bus,
@@ -138,33 +135,16 @@ final class LoginController
             ...TokenResource::from($tokenResponse),
             'user' => UserResource::from($user),
         ]);
-        $this->attachNextNonce($response);
+        $this->dpopNonceManager->attachNextNonce($response);
 
         return $response;
-    }
-
-    /**
-     * The next nonce is best-effort once the tokens are issued (R8): a store failure
-     * leaves the header out, and the client's first refresh gets one challenge instead.
-     */
-    private function attachNextNonce(JsonResponse $response): void
-    {
-        try {
-            $nonce = $this->dpopNonceManager->issueNonce();
-        } catch (DpopStoreUnavailableException) {
-            return;
-        }
-        $response->headers->set('DPoP-Nonce', $nonce);
     }
 
     /** 503 with Retry-After: the client retries the same login; no nonce and no refusal header. */
     private function serviceUnavailable(): JsonResponse
     {
-        $response = $this->errorResponse(
-            'The authorization server is temporarily unavailable; retry after the Retry-After delay.',
-            Response::HTTP_SERVICE_UNAVAILABLE,
-        );
-        $response->headers->set('Retry-After', (string) self::RETRY_AFTER_SECONDS);
+        $response = $this->errorResponse(DpopStoreUnavailableException::CLIENT_MESSAGE, Response::HTTP_SERVICE_UNAVAILABLE);
+        $response->headers->set('Retry-After', (string) DpopStoreUnavailableException::RETRY_AFTER_SECONDS);
         $response->headers->set('Cache-Control', 'no-store');
 
         return $response;

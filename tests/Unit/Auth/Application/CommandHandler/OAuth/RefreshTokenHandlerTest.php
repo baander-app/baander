@@ -28,6 +28,8 @@ use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Domain\Service\TokenChainValidator;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
+use App\Shared\Application\Port\LiveConnectionsPortInterface;
+use App\Shared\Application\Port\ServerControlException;
 use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Driver\AbstractException;
@@ -57,6 +59,11 @@ final class RefreshTokenHandlerTest extends TestCase
     private array $savedRefreshTokens = [];
     private TokenChainValidator $chainValidator;
     private TransactionPortInterface&Stub $transaction;
+    private LiveConnectionsPortInterface&Stub $liveConnections;
+    /** What the web server throws when asked to close the chain's sockets; null closes them. */
+    private ?\Throwable $socketCloseFailure = null;
+    /** @var list<list<string>> The access token ids handed to the web server to close, per call. */
+    private array $closedAccessTokenIds = [];
     private EntityManagerInterface&Stub $entityManager;
     private JwtGeneratorInterface&Stub $jwtGenerator;
     private TokenMetadataRepositoryInterface&Stub $tokenMetadataRepository;
@@ -142,8 +149,29 @@ final class RefreshTokenHandlerTest extends TestCase
         $this->refreshTokenRepository->method('revokeByChainId')->willReturnCallback(function (ChainId $chainId): void {
             $this->events[] = 'revoke chain refresh tokens ' . $chainId->toString();
         });
+        $this->accessTokenRepository->method('findTokenIdsByChainId')->willReturnCallback(function (ChainId $chainId): array {
+            $this->events[] = 'list chain access tokens ' . $chainId->toString();
+            $ids = [];
+            foreach ($this->rows as $row) {
+                if ($row->getChainId()?->equals($chainId) ?? false) {
+                    $ids[] = $row->getAccessToken()->getTokenId()->toString();
+                }
+            }
+
+            return $ids;
+        });
         $this->accessTokenRepository->method('revokeByChainId')->willReturnCallback(function (ChainId $chainId): void {
             $this->events[] = 'revoke chain access tokens ' . $chainId->toString();
+        });
+        $this->liveConnections = $this->createStub(LiveConnectionsPortInterface::class);
+        $this->liveConnections->method('closeForAccessTokens')->willReturnCallback(function (array $ids): int {
+            $this->events[] = 'close sockets';
+            $this->closedAccessTokenIds[] = $ids;
+            if ($this->socketCloseFailure !== null) {
+                throw $this->socketCloseFailure;
+            }
+
+            return count($ids);
         });
 
         // TokenChainValidator is final and cannot be mocked. Use a real instance
@@ -357,9 +385,49 @@ final class RefreshTokenHandlerTest extends TestCase
         $this->assertRejected(
             $r1,
             'Refresh token reuse detected: a replacement was already used.',
-            ['begin', 'lock presented', 'lock successors', 'window check', 'rolled back', 'begin', 'revoke chain refresh tokens ' . $chainId->toString(), 'revoke chain access tokens ' . $chainId->toString(), 'committed'],
+            ['begin', 'lock presented', 'lock successors', 'window check', 'rolled back', 'begin', 'revoke chain refresh tokens ' . $chainId->toString(), 'list chain access tokens ' . $chainId->toString(), 'revoke chain access tokens ' . $chainId->toString(), 'committed', 'close sockets'],
         );
         self::assertSame([], $this->savedRefreshTokens);
+        $this->assertLogged('warning', 'replacement used', $chainId, [$r1, $r2]);
+    }
+
+    /** A reuse verdict closes the sockets opened with the chain's access tokens, as a logout does. */
+    public function testAReuseVerdictClosesTheSocketsOfTheWholeChainAfterTheCommit(): void
+    {
+        $chainId = ChainId::generate();
+        $r1 = $this->usedRefreshToken($chainId, new \DateTimeImmutable('-5 seconds'));
+        $r2 = $this->replacementOf($r1);
+        $r2->markUsed();
+
+        $this->assertRejected(
+            $r1,
+            'Refresh token reuse detected: a replacement was already used.',
+            ['begin', 'lock presented', 'lock successors', 'window check', 'rolled back', 'begin', 'revoke chain refresh tokens ' . $chainId->toString(), 'list chain access tokens ' . $chainId->toString(), 'revoke chain access tokens ' . $chainId->toString(), 'committed', 'close sockets'],
+        );
+        self::assertSame(
+            [[$r1->getAccessToken()->getTokenId()->toString(), $r2->getAccessToken()->getTokenId()->toString()]],
+            $this->closedAccessTokenIds,
+            'Every access token of the chain, listed under the refresh-row locks, is handed to the web server.',
+        );
+    }
+
+    /** The verdict stands when the web server cannot close the sockets: the chain is revoked and the 401 is answered. */
+    public function testAReuseVerdictIsAnsweredEvenWhenTheSocketsCannotBeClosed(): void
+    {
+        $chainId = ChainId::generate();
+        $r1 = $this->usedRefreshToken($chainId, new \DateTimeImmutable('-5 seconds'));
+        $r2 = $this->replacementOf($r1);
+        $r2->markUsed();
+        $this->socketCloseFailure = new ServerControlException('a worker did not answer');
+
+        $this->assertRejected(
+            $r1,
+            'Refresh token reuse detected: a replacement was already used.',
+            ['begin', 'lock presented', 'lock successors', 'window check', 'rolled back', 'begin', 'revoke chain refresh tokens ' . $chainId->toString(), 'list chain access tokens ' . $chainId->toString(), 'revoke chain access tokens ' . $chainId->toString(), 'committed', 'close sockets'],
+        );
+        $errors = array_values(array_filter($this->logs, static fn (array $record): bool => $record['level'] === 'error'));
+        self::assertCount(1, $errors);
+        self::assertSame($chainId->toString(), $errors[0]['context']['chain'] ?? null);
         $this->assertLogged('warning', 'replacement used', $chainId, [$r1, $r2]);
     }
 
@@ -372,7 +440,7 @@ final class RefreshTokenHandlerTest extends TestCase
         $this->assertRejected(
             $r1,
             'Refresh token reuse detected: presented again outside the grace window.',
-            ['begin', 'lock presented', 'lock successors', 'window check', 'rolled back', 'begin', 'revoke chain refresh tokens ' . $chainId->toString(), 'revoke chain access tokens ' . $chainId->toString(), 'committed'],
+            ['begin', 'lock presented', 'lock successors', 'window check', 'rolled back', 'begin', 'revoke chain refresh tokens ' . $chainId->toString(), 'list chain access tokens ' . $chainId->toString(), 'revoke chain access tokens ' . $chainId->toString(), 'committed', 'close sockets'],
         );
         self::assertSame([], $this->revokedRefreshIds, 'No replacement is superseded on a reuse verdict.');
         $this->assertLogged('warning', 'outside window', $chainId, [$r1, $r2]);
@@ -388,7 +456,7 @@ final class RefreshTokenHandlerTest extends TestCase
         $this->assertRejected(
             $r1,
             'Refresh token reuse detected: presented again outside the grace window.',
-            ['begin', 'lock presented', 'lock successors', 'rolled back', 'begin', 'revoke chain refresh tokens ' . $chainId->toString(), 'revoke chain access tokens ' . $chainId->toString(), 'committed'],
+            ['begin', 'lock presented', 'lock successors', 'rolled back', 'begin', 'revoke chain refresh tokens ' . $chainId->toString(), 'list chain access tokens ' . $chainId->toString(), 'revoke chain access tokens ' . $chainId->toString(), 'committed', 'close sockets'],
         );
     }
 
@@ -437,7 +505,7 @@ final class RefreshTokenHandlerTest extends TestCase
         $this->assertRejected(
             $r2,
             'Refresh token reuse detected: a superseded token was presented.',
-            ['begin', 'lock presented', 'lock successors', 'rolled back', 'begin', 'revoke chain refresh tokens ' . $chainId->toString(), 'revoke chain access tokens ' . $chainId->toString(), 'committed'],
+            ['begin', 'lock presented', 'lock successors', 'rolled back', 'begin', 'revoke chain refresh tokens ' . $chainId->toString(), 'list chain access tokens ' . $chainId->toString(), 'revoke chain access tokens ' . $chainId->toString(), 'committed', 'close sockets'],
         );
         $this->assertLogged('warning', 'superseded token presented', $chainId, [$r1, $r2]);
     }
@@ -972,6 +1040,7 @@ final class RefreshTokenHandlerTest extends TestCase
             $this->users(),
             $transaction,
             $this->logger(),
+            $this->liveConnections,
             accessTokenTtl: 3600,
             refreshTokenTtl: 2592000,
             reuseGraceSeconds: 60,
@@ -1003,6 +1072,7 @@ final class RefreshTokenHandlerTest extends TestCase
             $this->users(),
             $this->transaction,
             $this->logger(),
+            $this->liveConnections,
             accessTokenTtl: 3600,
             refreshTokenTtl: 2592000,
             reuseGraceSeconds: $reuseGraceSeconds,

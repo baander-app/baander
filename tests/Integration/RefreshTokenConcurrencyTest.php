@@ -16,6 +16,7 @@ use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePoolCo
 use App\Shared\Infrastructure\Swoole\SwoolePoolStatsProvider;
 use App\Tests\Fixtures\Auth\GrantPathOAuthKernel;
 use App\Tests\Fixtures\Auth\IssuanceFaults;
+use App\Tests\Fixtures\Auth\RecordingLiveConnections;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
@@ -35,7 +36,9 @@ use Symfony\Component\HttpFoundation\Response;
  * that fails once or stalls on a file flag, which holds an issuing transaction open with
  * every lock it took, and a driver that commits and then reports the connection lost. A
  * child process (refresh-race.php) runs the other session; pg_stat_activity shows when it
- * waits on a row lock.
+ * waits on a row lock. The kernel's live-connections port records every close request
+ * (RecordingLiveConnections), so the sockets a logout asked the web server to close are
+ * read from the file the child wrote.
  */
 final class RefreshTokenConcurrencyTest extends TestCase
 {
@@ -186,6 +189,7 @@ final class RefreshTokenConcurrencyTest extends TestCase
         $second = $this->refreshOk($login['refreshToken']);
         $chainId = $this->refreshRow($login['refreshToken'])['chain_id'];
         $logOffset = $this->logSize();
+        $closeOffset = RecordingLiveConnections::size(self::$sharedDirectory);
 
         // The access row is held, so the logout (refresh rows, then access rows) stops at the
         // access row holding the refresh rows, and the refresh stops at its refresh row.
@@ -203,7 +207,55 @@ final class RefreshTokenConcurrencyTest extends TestCase
         self::assertContains($refreshAnswer['status'], [401, 503], json_encode($refreshAnswer, JSON_THROW_ON_ERROR));
         $this->assertChainRevoked($chainId);
         self::assertStringNotContainsStringIgnoringCase('deadlock', $this->logSince($logOffset), 'Neither side reports a deadlock.');
+        self::assertSame(
+            [$this->chainAccessTokenIds($chainId)],
+            $this->closedAccessTokens($logout, $closeOffset),
+            'The logout asked the web server to close the sockets of every access token of the chain, once.',
+        );
         self::assertSame(401, $this->refresh($second['refreshToken'])->getStatusCode());
+    }
+
+    /**
+     * KTD11, the other order: the refresh holds its refresh row (stalled in the signer,
+     * after the flush) when the logout queues on the chain's refresh rows, so the refresh
+     * commits its replacement pair first and the logout revokes the chain afterwards. The
+     * logout lists the chain's access tokens under the refresh-row locks, so the pair the
+     * refresh committed while the logout waited is in the list it hands the web server:
+     * a socket opened with the replacement is closed with the rest of the chain.
+     */
+    public function testALogoutThatWaitsOnARefreshClosesTheSocketOfThePairThatRefreshCommitted(): void
+    {
+        $login = $this->login();
+        $second = $this->refreshOk($login['refreshToken']);
+        $chainId = $this->refreshRow($login['refreshToken'])['chain_id'];
+        $logOffset = $this->logSize();
+        $closeOffset = RecordingLiveConnections::size(self::$sharedDirectory);
+
+        $stalled = $this->childFaultDirectory();
+        touch(IssuanceFaults::path($stalled, IssuanceFaults::SIGN_BLOCK));
+        $refresh = $this->startChild('refresh', $second['refreshToken'], $stalled);
+        $this->awaitFlag($refresh, $stalled, IssuanceFaults::SIGN_BLOCKED);
+        // The logout authenticates on the committed rows, where the token is still live,
+        // and then waits on the chain's refresh rows, which the refresh holds.
+        $logout = $this->startChild('logout', $second['accessToken']);
+        $this->awaitLockWait($logout);
+        self::assertTrue(unlink(IssuanceFaults::path($stalled, IssuanceFaults::SIGN_BLOCK)));
+        $refreshAnswer = $this->finish($refresh);
+        $logoutAnswer = $this->finish($logout);
+
+        self::assertSame(200, $refreshAnswer['status'], json_encode($refreshAnswer, JSON_THROW_ON_ERROR));
+        self::assertSame(200, $logoutAnswer['status'], json_encode($logoutAnswer, JSON_THROW_ON_ERROR));
+        $third = $refreshAnswer['body']['data'];
+        self::assertIsArray($third);
+        $replacementJti = self::claims($third['accessToken'])['jti'];
+        $this->assertChainRevoked($chainId);
+        self::assertStringNotContainsStringIgnoringCase('deadlock', $this->logSince($logOffset), 'Neither side reports a deadlock.');
+        $closed = $this->closedAccessTokens($logout, $closeOffset);
+        self::assertCount(1, $closed, 'The logout asked the web server to close the chain\'s sockets once.');
+        self::assertContains($replacementJti, $closed[0], 'The access token the refresh committed while the logout waited is closed too.');
+        self::assertSame($this->chainAccessTokenIds($chainId), $closed[0], 'Every access token of the chain, the replacement among them, is closed.');
+        self::assertSame(401, $this->me($third['accessToken'])->getStatusCode());
+        self::assertSame(401, $this->refresh($third['refreshToken'])->getStatusCode());
     }
 
     // --- Failures inside the issuing transaction ---
@@ -470,6 +522,31 @@ final class RefreshTokenConcurrencyTest extends TestCase
         return (int) $this->observer()->fetchOne('SELECT COUNT(*) FROM oauth_access_tokens WHERE chain_id = ? AND revoked = FALSE', [$chainId]);
     }
 
+    /**
+     * The token ids (the JWT jti) of every access token of the chain, in the order the revocation lists them.
+     *
+     * @return list<string>
+     */
+    private function chainAccessTokenIds(string $chainId): array
+    {
+        /** @var list<string> $ids */
+        $ids = $this->observer()->fetchFirstColumn('SELECT token_id FROM oauth_access_tokens WHERE chain_id = ? ORDER BY id', [$chainId]);
+
+        return $ids;
+    }
+
+    /**
+     * The access token ids each close request of the child since the offset carried.
+     *
+     * @param array{process: resource, output: resource, application: string, pid: int} $child
+     *
+     * @return list<list<string>>
+     */
+    private function closedAccessTokens(array $child, int $offset): array
+    {
+        return RecordingLiveConnections::closedAccessTokens(self::$sharedDirectory, $child['pid'], $offset);
+    }
+
     private function assertChainRevoked(string $chainId): void
     {
         self::assertSame(0, (int) $this->observer()->fetchOne('SELECT COUNT(*) FROM oauth_refresh_tokens WHERE chain_id = ? AND revoked = FALSE', [$chainId]), 'Every refresh token of the chain is revoked.');
@@ -519,7 +596,7 @@ final class RefreshTokenConcurrencyTest extends TestCase
         return $this->observer;
     }
 
-    /** @return array{process: resource, output: resource, application: string} */
+    /** @return array{process: resource, output: resource, application: string, pid: int} */
     private function startChild(string $operation, string $token, ?string $faultDirectory = null): array
     {
         $application = 'refresh_concurrency_' . bin2hex(random_bytes(6));
@@ -539,7 +616,7 @@ final class RefreshTokenConcurrencyTest extends TestCase
         );
         self::assertIsResource($process);
 
-        return ['process' => $process, 'output' => $output, 'application' => $application];
+        return ['process' => $process, 'output' => $output, 'application' => $application, 'pid' => proc_get_status($process)['pid']];
     }
 
     /** @param array{process: resource, output: resource, application: string} $child */

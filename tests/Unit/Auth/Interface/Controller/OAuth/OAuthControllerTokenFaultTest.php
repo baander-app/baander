@@ -5,9 +5,14 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Auth\Interface\Controller\OAuth;
 
 use App\Auth\Application\Command\OAuth\ExchangeRefreshTokenCommand;
+use App\Auth\Application\Command\OAuth\RevokeTokenCommand;
 use App\Auth\Application\DTO\VerifiedDpopProof;
 use App\Auth\Application\Exception\OAuthProtocolException;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Interface\Controller\OAuth\OAuthController;
+use App\Auth\Interface\Request\OAuth\RevokeTokenRequest;
+use App\Shared\Application\Port\ServerControlException;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Request;
@@ -15,11 +20,14 @@ use Symfony\Component\HttpKernel\Exception\ServiceUnavailableHttpException;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\HandlerFailedException;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Contracts\Translation\TranslatorInterface;
 
 /**
  * R10: the token endpoint answers a server fault with 503 and Retry-After, as the
- * first-party refresh does, while a protocol error keeps its OAuth answer.
+ * first-party refresh does, while a protocol error keeps its OAuth answer. The
+ * revocation endpoint does the same: 200 once the handler completed, whether or not
+ * it found a token to revoke, and 503 for a fault that may have left the chain live.
  */
 final class OAuthControllerTokenFaultTest extends TestCase
 {
@@ -61,9 +69,78 @@ final class OAuthControllerTokenFaultTest extends TestCase
         self::assertSame('next-nonce', $response->headers->get('DPoP-Nonce'));
     }
 
-    private function controller(MessageBusInterface $bus): OAuthController
+    public function testARevocationThatCompletedAnswers200(): void
     {
-        $controller = new OAuthController($this->createStub(Security::class), $bus, 'https://baander.app');
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects($this->once())->method('dispatch')->willReturnCallback(
+            static function (object $command): Envelope {
+                self::assertInstanceOf(RevokeTokenCommand::class, $command);
+                self::assertSame('user-7', $command->getOwnerUserId());
+                self::assertTrue($command->shouldRevokeChain());
+
+                return new Envelope($command);
+            },
+        );
+
+        $response = $this->controller($bus, $this->signedInUser())->revoke(new RevokeTokenRequest(token: str_repeat('r', 80)));
+
+        self::assertSame(200, $response->getStatusCode());
+    }
+
+    public function testAStringThatIsNoTokenIdIsAnsweredLikeAnUnknownToken(): void
+    {
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects($this->once())->method('dispatch')->willReturnCallback(
+            static fn (object $command): never => throw new HandlerFailedException(new Envelope($command), [new \InvalidArgumentException('Token ID must be at least 32 characters long, got 5.')]),
+        );
+
+        $response = $this->controller($bus, $this->signedInUser())->revoke(new RevokeTokenRequest(token: 'short'));
+
+        self::assertSame(200, $response->getStatusCode());
+    }
+
+    public function testAChainWhoseSocketsWereNotClosedIsAnsweredWith503AndRetryAfter(): void
+    {
+        $fault = new ServerControlException('a worker did not answer');
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects($this->once())->method('dispatch')->willReturnCallback(
+            static fn (object $command): never => throw new HandlerFailedException(new Envelope($command), [$fault]),
+        );
+
+        try {
+            $this->controller($bus, $this->signedInUser())->revoke(new RevokeTokenRequest(token: str_repeat('r', 80)));
+            self::fail('A chain whose sockets stay open is not revoked; the client must retry.');
+        } catch (ServiceUnavailableHttpException $exception) {
+            self::assertSame(503, $exception->getStatusCode());
+            self::assertEqualsCanonicalizing(['retry-after' => '5', 'cache-control' => 'no-store'], array_change_key_case(array_map(strval(...), $exception->getHeaders()), CASE_LOWER));
+            self::assertSame($fault, $exception->getPrevious());
+        }
+    }
+
+    public function testARevocationWithoutASignedInUserIsRefused(): void
+    {
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects($this->never())->method('dispatch');
+
+        $response = $this->controller($bus)->revoke(new RevokeTokenRequest(token: str_repeat('r', 80)));
+
+        self::assertSame(401, $response->getStatusCode());
+    }
+
+    private function signedInUser(): UserInterface&AuthenticatedUserIdentityInterface
+    {
+        /** @var Stub&UserInterface&AuthenticatedUserIdentityInterface $user */
+        $user = $this->createStubForIntersectionOfInterfaces([UserInterface::class, AuthenticatedUserIdentityInterface::class]);
+        $user->method('getId')->willReturn('user-7');
+
+        return $user;
+    }
+
+    private function controller(MessageBusInterface $bus, (UserInterface&AuthenticatedUserIdentityInterface)|null $user = null): OAuthController
+    {
+        $security = $this->createStub(Security::class);
+        $security->method('getUser')->willReturn($user);
+        $controller = new OAuthController($security, $bus, 'https://baander.app');
         $translator = $this->createStub(TranslatorInterface::class);
         $translator->method('trans')->willReturnArgument(0);
         $controller->setTranslator($translator);

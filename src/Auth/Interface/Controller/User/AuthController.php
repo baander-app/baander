@@ -37,6 +37,7 @@ use App\Auth\Interface\Request\User\UpdateProfileRequest;
 use App\Auth\Interface\Request\User\VerifyEmailRequest;
 use App\Auth\Interface\Resource\TokenResource;
 use App\Auth\Interface\Resource\UserResource;
+use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Application\Http\AcceptLanguageMatcher;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
@@ -63,9 +64,6 @@ final class AuthController
 {
     use ApiResponsesTrait;
     use TranslatorTrait;
-
-    /** How long a client waits before retrying a refresh that failed on the server's side. */
-    private const int REFRESH_RETRY_AFTER_SECONDS = 5;
 
     public function __construct(
         private readonly Security $security,
@@ -150,6 +148,12 @@ final class AuthController
                 ),
             ),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(
+                response: '503',
+                description: 'The chain could not be revoked, or the web server could not close its connections; the tokens may still be live, so send the logout again after the Retry-After delay.',
+                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 5))],
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ),
         ],
     )]
     #[Route('/logout', name: 'logout', methods: ['POST'])]
@@ -168,13 +172,17 @@ final class AuthController
                 revokeChain: true,
             ));
         } catch (\Throwable $e) {
-            // RFC 7009: revocation endpoint must return 200 even on failure.
-            $this->logger->warning('Token revocation failed during logout.', [
-                'exception' => $e,
+            // An unknown or already revoked token is answered 200 by the handler itself
+            // (RFC 7009 section 2.2). A fault here means the chain, or a socket opened with
+            // it, may still be live: 503 with Retry-After has the client send the logout
+            // again, and the chain revocation is idempotent.
+            $this->logger->error('Logout could not revoke the token chain.', [
+                'exception' => HandlerFailure::cause($e),
             ]);
+
+            return $this->serviceUnavailable();
         }
 
-        // RFC 7009: Always return 200 OK, even if token was not found
         return $this->successResponse([
             'message' => $this->trans('success.token_revoked', domain: 'auth'),
         ]);
@@ -265,23 +273,9 @@ final class AuthController
         }
 
         $response = $this->successResponse(TokenResource::from($tokenResponse));
-        $this->attachNextNonce($response);
+        $this->dpopNonceManager->attachNextNonce($response);
 
         return $response;
-    }
-
-    /**
-     * The next nonce is best-effort once the tokens are committed (R8): a store failure
-     * leaves the header out, and the client's next refresh gets one challenge instead.
-     */
-    private function attachNextNonce(JsonResponse $response): void
-    {
-        try {
-            $nonce = $this->dpopNonceManager->issueNonce();
-        } catch (DpopStoreUnavailableException) {
-            return;
-        }
-        $response->headers->set('DPoP-Nonce', $nonce);
     }
 
     #[OA\Post(
@@ -723,7 +717,7 @@ final class AuthController
     private function serviceUnavailable(): JsonResponse
     {
         $response = $this->errorResponse($this->trans('errors.internal', domain: 'auth'), Response::HTTP_SERVICE_UNAVAILABLE);
-        $response->headers->set('Retry-After', (string) self::REFRESH_RETRY_AFTER_SECONDS);
+        $response->headers->set('Retry-After', (string) DpopStoreUnavailableException::RETRY_AFTER_SECONDS);
         $response->headers->set('Cache-Control', 'no-store');
 
         return $response;

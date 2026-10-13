@@ -2335,7 +2335,7 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Token revoked (always 200, even for an unknown token or one of another user, per RFC 7009 section 2.2)",
+                        "description": "Token revoked (always 200 for an unknown token or one of another user, per RFC 7009 section 2.2); the chain and the WebSocket connections opened with it are closed",
                         "content": {
                             "application/json": {
                                 "schema": {}
@@ -2348,6 +2348,25 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The chain could not be revoked, or the web server could not close its connections; the token may still be live, so send the same request again after the Retry-After delay.",
+                        "headers": {
+                            "Retry-After": {
+                                "description": "Seconds to wait before retrying",
+                                "schema": {
+                                    "type": "integer",
+                                    "example": 5
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
                                 }
                             }
                         }
@@ -3380,6 +3399,25 @@
                     },
                     "401": {
                         "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The chain could not be revoked, or the web server could not close its connections; the tokens may still be live, so send the logout again after the Retry-After delay.",
+                        "headers": {
+                            "Retry-After": {
+                                "description": "Seconds to wait before retrying",
+                                "schema": {
+                                    "type": "integer",
+                                    "example": 5
+                                }
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {

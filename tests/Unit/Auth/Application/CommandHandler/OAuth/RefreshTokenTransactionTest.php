@@ -18,6 +18,7 @@ use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Domain\Service\TokenChainValidator;
+use App\Shared\Application\Port\LiveConnectionsPortInterface;
 use App\Shared\Infrastructure\Doctrine\DoctrineTransaction;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
@@ -86,6 +87,7 @@ final class RefreshTokenTransactionTest extends TestCase
             userRepository: $this->createStub(UserRepositoryInterface::class),
             transaction: new DoctrineTransaction($registry, new Swoole()),
             logger: new NullLogger(),
+            liveConnections: $this->createStub(LiveConnectionsPortInterface::class),
             accessTokenTtl: 3600,
             refreshTokenTtl: 86400,
             reuseGraceSeconds: 60,

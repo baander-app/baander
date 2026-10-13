@@ -132,23 +132,6 @@ final class WebSocketConnectionRegistry
     }
 
     /**
-     * The connections that authenticated with the access token.
-     *
-     * @return list<int>
-     */
-    public function getAccessTokenConnectionFds(string $accessTokenId): array
-    {
-        $fds = [];
-        foreach ($this->connections as $fd => $row) {
-            if ($row['access_token_id'] === $accessTokenId) {
-                $fds[] = (int) $fd;
-            }
-        }
-
-        return $fds;
-    }
-
-    /**
      * The connections that authenticated with any of the access tokens, found in one scan.
      *
      * @param list<string> $accessTokenIds

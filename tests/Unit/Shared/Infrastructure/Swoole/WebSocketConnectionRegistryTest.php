@@ -49,7 +49,7 @@ final class WebSocketConnectionRegistryTest extends TestCase
         $this->registry->addConnection(1, 'user-uuid-1', 0, $tokenId);
 
         self::assertSame($tokenId, $this->registry->getConnection(1)['access_token_id'] ?? null);
-        self::assertSame([1], $this->registry->getAccessTokenConnectionFds($tokenId));
+        self::assertSame([1], $this->registry->getConnectionFdsForAccessTokens([$tokenId]));
     }
 
     public function testALongerAccessTokenIdIsRefusedBeforeAnythingIsStored(): void
@@ -64,7 +64,7 @@ final class WebSocketConnectionRegistryTest extends TestCase
         }
 
         self::assertNull($this->registry->getConnection(1));
-        self::assertSame([], $this->registry->getAccessTokenConnectionFds($tooLong));
+        self::assertSame([], $this->registry->getConnectionFdsForAccessTokens([$tooLong]));
     }
 
     public function testAccessTokenConnectionsAreTheOnesRegisteredWithThatToken(): void
@@ -73,12 +73,12 @@ final class WebSocketConnectionRegistryTest extends TestCase
         $this->registry->addConnection(2, 'user-uuid-1', 1, 'token-b');
         $this->registry->addConnection(3, 'user-uuid-2', 0, 'token-a');
 
-        $fds = $this->registry->getAccessTokenConnectionFds('token-a');
+        $fds = $this->registry->getConnectionFdsForAccessTokens(['token-a']);
         sort($fds);
 
         self::assertSame([1, 3], $fds);
-        self::assertSame([2], $this->registry->getAccessTokenConnectionFds('token-b'));
-        self::assertSame([], $this->registry->getAccessTokenConnectionFds('token-c'));
+        self::assertSame([2], $this->registry->getConnectionFdsForAccessTokens(['token-b']));
+        self::assertSame([], $this->registry->getConnectionFdsForAccessTokens(['token-c']));
     }
 
     public function testConnectionsOfSeveralAccessTokensAreFoundInOneScan(): void
@@ -101,7 +101,7 @@ final class WebSocketConnectionRegistryTest extends TestCase
         $this->registry->addConnection(1, 'user-uuid-1', 0, 'token-a');
         $this->registry->removeConnection(1);
 
-        self::assertSame([], $this->registry->getAccessTokenConnectionFds('token-a'));
+        self::assertSame([], $this->registry->getConnectionFdsForAccessTokens(['token-a']));
     }
 
     public function testWorkerConnectionsAreTheOnesItsWorkerRegistered(): void

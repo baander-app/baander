@@ -90,13 +90,17 @@ final class RevokeTokenHandlerTest extends TestCase
             ->method('findByTokenId')
             ->with($this->callback(fn (TokenId $id): bool => $id->toString() === $tokenId))
             ->willReturn($secondRefresh);
+        $order = [];
         $this->accessTokenRepository
             ->expects($this->once())
             ->method('findTokenIdsByChainId')
             ->with($this->callback(fn (ChainId $c): bool => $c->equals($chainId)))
-            ->willReturn([$first->getTokenId()->toString(), $second->getTokenId()->toString()]);
+            ->willReturnCallback(static function () use (&$order, $first, $second): array {
+                $order[] = 'list';
 
-        $order = [];
+                return [$first->getTokenId()->toString(), $second->getTokenId()->toString()];
+            });
+
         $this->refreshTokenRepository
             ->expects($this->once())
             ->method('revokeByChainId')
@@ -127,7 +131,7 @@ final class RevokeTokenHandlerTest extends TestCase
 
         ($this->handler)(new RevokeTokenCommand($tokenId, revokeChain: true));
 
-        $this->assertSame(['refresh', 'access', 'close'], $order, 'Refresh rows lock before access rows; sockets close after the commit.');
+        $this->assertSame(['refresh', 'list', 'access', 'close'], $order, 'Refresh rows lock before the access tokens are listed and revoked; sockets close after the commit.');
     }
 
     public function testChainRevocationViaAccessToken(): void

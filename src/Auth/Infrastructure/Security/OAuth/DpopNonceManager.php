@@ -47,6 +47,21 @@ final class DpopNonceManager
         return $nonce;
     }
 
+    /**
+     * Sets the next nonce on a response whose tokens are already committed (R8): the nonce
+     * is best-effort there, so a store failure leaves the header out and the client's next
+     * token request gets one challenge instead.
+     */
+    public function attachNextNonce(Response $response): void
+    {
+        try {
+            $nonce = $this->issueNonce();
+        } catch (DpopStoreUnavailableException) {
+            return;
+        }
+        $response->headers->set('DPoP-Nonce', $nonce);
+    }
+
     /** @throws DpopStoreUnavailableException */
     public function storeNonce(string $nonce): void
     {

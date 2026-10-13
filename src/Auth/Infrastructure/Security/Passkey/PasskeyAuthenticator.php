@@ -8,7 +8,6 @@ use App\Auth\Application\Command\Passkey\AuthenticatePasskeyCommand;
 use App\Auth\Application\DTO\VerifiedPasskeyLogin;
 use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
-use App\Auth\Infrastructure\Security\OAuth\DpopStoreUnavailableResponse;
 use App\Auth\Infrastructure\Security\OAuth\DpopTokenRequestVerifier;
 use App\Auth\Infrastructure\Security\AuthenticationFailureMessage;
 use App\Auth\Infrastructure\Security\SecurityUser;
@@ -74,7 +73,7 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
             // Not a credential failure: the store that logged the failure could not answer
             // (R7). An HTTP exception leaves the firewall's failure handler out of it.
             throw new ServiceUnavailableHttpException(
-                DpopStoreUnavailableResponse::RETRY_AFTER_SECONDS,
+                DpopStoreUnavailableException::RETRY_AFTER_SECONDS,
                 'The DPoP store is unavailable.',
                 $exception,
                 headers: ['Cache-Control' => 'no-store'],

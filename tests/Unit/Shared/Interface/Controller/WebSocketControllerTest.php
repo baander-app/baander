@@ -269,7 +269,7 @@ final class WebSocketControllerTest extends TestCase
         $this->assertSame('user-uuid-1', $conn['user_id']);
         $this->assertSame('token-1', $conn['access_token_id']);
         $this->assertSame(0, $conn['worker_id']);
-        $this->assertSame([1], $this->registry->getAccessTokenConnectionFds('token-1'));
+        $this->assertSame([1], $this->registry->getConnectionFdsForAccessTokens(['token-1']));
     }
 
     public function testOnOpenStoresConnectionWithCorrectWorkerId(): void

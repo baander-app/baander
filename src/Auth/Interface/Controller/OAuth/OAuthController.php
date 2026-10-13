@@ -19,6 +19,7 @@ use App\Auth\Application\DTO\PendingDeviceAuthorizationDTO;
 use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Application\DTO\VerifiedDpopProof;
 use App\Auth\Application\Exception\DeviceUserCodeException;
+use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Auth\Application\Query\OAuth\GetAuthorizationRequestQuery;
@@ -78,9 +79,6 @@ final class OAuthController
 {
     use ApiResponsesTrait;
     use TranslatorTrait;
-
-    /** How long a client waits before retrying a token request the server could not decide on. */
-    private const int RETRY_AFTER_SECONDS = 5;
 
     public function __construct(
         private readonly Security $security,
@@ -247,7 +245,7 @@ final class OAuthController
             // the grant; 503 with Retry-After keeps the client's tokens, as the first-party
             // refresh does. The exception subscriber renders it and keeps these headers.
             throw new ServiceUnavailableHttpException(
-                self::RETRY_AFTER_SECONDS,
+                DpopStoreUnavailableException::RETRY_AFTER_SECONDS,
                 'The token endpoint could not complete the grant.',
                 HandlerFailure::cause($exception),
                 headers: ['Cache-Control' => 'no-store'],
@@ -270,8 +268,14 @@ final class OAuthController
                 ]),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Token revoked (always 200, even for an unknown token or one of another user, per RFC 7009 section 2.2)', content: new OA\JsonContent()),
+            new OA\Response(response: '200', description: 'Token revoked (always 200 for an unknown token or one of another user, per RFC 7009 section 2.2); the chain and the WebSocket connections opened with it are closed', content: new OA\JsonContent()),
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(
+                response: '503',
+                description: 'The chain could not be revoked, or the web server could not close its connections; the token may still be live, so send the same request again after the Retry-After delay.',
+                headers: [new OA\Header(header: 'Retry-After', description: 'Seconds to wait before retrying', schema: new OA\Schema(type: 'integer', example: 5))],
+                content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class)),
+            ),
         ],
     )]
     #[Route('/revoke', name: 'revoke', methods: ['POST'])]
@@ -291,9 +295,22 @@ final class OAuthController
                 revokeChain: true,
                 ownerUserId: $user->getId(),
             ));
-        } catch (\Throwable) {
-            // Per RFC 7009 section 2.2, the revocation endpoint answers 200
-            // even if the token is invalid, which prevents token probing.
+        } catch (\Throwable $exception) {
+            $cause = HandlerFailure::cause($exception);
+            if ($cause instanceof \InvalidArgumentException) {
+                // A string that is no token id is an unknown token: 200, like one that was
+                // never issued (RFC 7009 section 2.2), so the endpoint probes nothing.
+                return new JsonResponse(null, Response::HTTP_OK);
+            }
+
+            // A fault means the chain, or a socket opened with it, may still be live. The
+            // client sends the same request again; the chain revocation is idempotent.
+            throw new ServiceUnavailableHttpException(
+                DpopStoreUnavailableException::RETRY_AFTER_SECONDS,
+                'The token could not be revoked.',
+                $cause,
+                headers: ['Cache-Control' => 'no-store'],
+            );
         }
 
         return new JsonResponse(null, Response::HTTP_OK);

@@ -117,14 +117,15 @@ final class RevokeTokenHandler
     private function revokeChain(ChainId $chainId): void
     {
         $accessTokenIds = $this->entityManager->getConnection()->transactional(function () use ($chainId): array {
-            // The ids are listed before the revoking UPDATEs so the sockets to close are
-            // known.
-            $accessTokenIds = $this->accessTokenRepository->findTokenIdsByChainId($chainId);
-
             // Lock order of every chain revocation: refresh rows before access rows. A
             // refresh of the same chain locks its refresh row first, so the two never
             // wait on each other in opposite order.
             $this->refreshTokenRepository->revokeByChainId($chainId);
+
+            // The ids are listed under the refresh-row locks, before the access rows are
+            // revoked: a rotation that committed a replacement pair while this revocation
+            // waited is in the list, so its socket is closed too.
+            $accessTokenIds = $this->accessTokenRepository->findTokenIdsByChainId($chainId);
             $this->accessTokenRepository->revokeByChainId($chainId);
 
             return $accessTokenIds;

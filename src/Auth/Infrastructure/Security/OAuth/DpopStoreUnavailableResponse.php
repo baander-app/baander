@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Auth\Infrastructure\Security\OAuth;
 
+use App\Auth\Application\Exception\DpopStoreUnavailableException;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -17,17 +18,15 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class DpopStoreUnavailableResponse
 {
-    public const int RETRY_AFTER_SECONDS = 5;
-
     public static function create(): JsonResponse
     {
         return new JsonResponse([
             'error' => [
-                'message' => 'The authorization server is temporarily unavailable; retry after the Retry-After delay.',
+                'message' => DpopStoreUnavailableException::CLIENT_MESSAGE,
                 'code' => Response::HTTP_SERVICE_UNAVAILABLE,
             ],
         ], Response::HTTP_SERVICE_UNAVAILABLE, [
-            'Retry-After' => (string) self::RETRY_AFTER_SECONDS,
+            'Retry-After' => (string) DpopStoreUnavailableException::RETRY_AFTER_SECONDS,
             'Cache-Control' => 'no-store',
         ]);
     }

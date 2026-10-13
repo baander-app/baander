@@ -7,6 +7,7 @@ namespace App\Tests\Fixtures\Auth;
 use App\Auth\Application\Port\JwtGeneratorInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Kernel;
+use App\Shared\Application\Port\LiveConnectionsPortInterface;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\ServicePool\ServicePoolContainer;
 use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
@@ -22,7 +23,9 @@ use Symfony\Component\DependencyInjection\Reference;
  * The production kernel over a disposable PostgreSQL and Redis, for the OAuth acceptance
  * tests. The issuance fault injectors (IssuanceFaults) are registered here and stay inert
  * unless a process names a flag directory; the pool statistics are exposed for the
- * pool-growth proof.
+ * pool-growth proof. No web server runs, so the live-connections port is the recording
+ * fake (RecordingLiveConnections), whose file in the kernel directory is shared with the
+ * child processes that boot the same kernel.
  */
 class ProductionOAuthKernel extends Kernel
 {
@@ -79,6 +82,9 @@ class ProductionOAuthKernel extends Kernel
                 // environment reads OTEL_ENABLED from the real environment, so the
                 // application parameter is set directly, as when@test does.
                 $container->setParameter('app.otel.enabled', false);
+                $container->register(RecordingLiveConnections::class, RecordingLiveConnections::class)
+                    ->setArguments([RecordingLiveConnections::path($this->directory)]);
+                $container->setAlias(LiveConnectionsPortInterface::class, RecordingLiveConnections::class);
             }
         });
     }

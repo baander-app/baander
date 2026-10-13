@@ -9911,7 +9911,7 @@ export const postOauthRevoke = async (postOauthRevokeBody: PostOauthRevokeBody, 
 
 
 
-export const getPostOauthRevokeMutationOptions = <TError = ErrorType<ValidationError>,
+export const getPostOauthRevokeMutationOptions = <TError = ErrorType<ValidationError | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postOauthRevoke>>, TError,{data: BodyType<PostOauthRevokeBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
 ): UseMutationOptions<Awaited<ReturnType<typeof postOauthRevoke>>, TError,{data: BodyType<PostOauthRevokeBody>}, TContext> => {
 
@@ -9940,12 +9940,12 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type PostOauthRevokeMutationResult = NonNullable<Awaited<ReturnType<typeof postOauthRevoke>>>
     export type PostOauthRevokeMutationBody = BodyType<PostOauthRevokeBody>
-    export type PostOauthRevokeMutationError = ErrorType<ValidationError>
+    export type PostOauthRevokeMutationError = ErrorType<ValidationError | ApiError>
 
     /**
  * @summary Revoke an access or refresh token of the signed-in user and its chain (RFC 7009)
  */
-export const usePostOauthRevoke = <TError = ErrorType<ValidationError>,
+export const usePostOauthRevoke = <TError = ErrorType<ValidationError | ApiError>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postOauthRevoke>>, TError,{data: BodyType<PostOauthRevokeBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postOauthRevoke>>,

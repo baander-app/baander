@@ -12,6 +12,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Redis;
 use RedisException;
+use Symfony\Component\HttpFoundation\JsonResponse;
 
 final class DpopNonceManagerTest extends TestCase
 {
@@ -68,6 +69,29 @@ final class DpopNonceManagerTest extends TestCase
         self::assertSame(400, $response->getStatusCode());
         self::assertArrayHasKey('dpop:nonce:' . $nonce, $this->store);
         self::assertTrue($manager->isValid($nonce));
+    }
+
+    public function testTheNextNonceOfACommittedAnswerIsTheOneItStored(): void
+    {
+        $manager = new DpopNonceManager($this->workingFactory(), nonceTtlSeconds: 300);
+        $response = new JsonResponse(['data' => []]);
+
+        $manager->attachNextNonce($response);
+
+        $nonce = $response->headers->get('DPoP-Nonce');
+        self::assertIsString($nonce);
+        self::assertArrayHasKey('dpop:nonce:' . $nonce, $this->store);
+    }
+
+    public function testACommittedAnswerCarriesNoNonceWhenTheStoreIsUnavailable(): void
+    {
+        $manager = new DpopNonceManager($this->failingFactory(new RedisException('Connection refused')), logger: $this->loggerWarningOnce());
+        $response = new JsonResponse(['data' => []]);
+
+        $manager->attachNextNonce($response);
+
+        self::assertFalse($response->headers->has('DPoP-Nonce'));
+        self::assertSame([], $this->store);
     }
 
     public function testAnUnreachableStoreTurnsTheChallengeIntoTheOutageSignal(): void

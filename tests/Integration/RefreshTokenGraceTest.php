@@ -10,6 +10,7 @@ use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
 use App\Tests\Fixtures\Auth\GrantPathOAuthKernel;
+use App\Tests\Fixtures\Auth\RecordingLiveConnections;
 use App\Tests\Fixtures\Auth\ProductionOAuthKernel;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
 use App\Tests\Fixtures\Auth\ZeroGraceOAuthKernel;
@@ -148,18 +149,28 @@ final class RefreshTokenGraceTest extends TestCase
         $this->assertNoTokenStringLogged($r1['chain_id'], [$login, $first, $retry]);
     }
 
-    /** AE2: a replacement that was already used makes the presentation a replay; the chain ends before the 401. */
+    /**
+     * AE2: a replacement that was already used makes the presentation a replay; the chain
+     * ends before the 401, and the web server is asked to close the sockets of every access
+     * token of the chain, as a logout asks it.
+     */
     public function testAReplacementAlreadyUsedRevokesTheChain(): void
     {
         $login = $this->login();
         $second = $this->refreshOk($login['refreshToken']);
         $third = $this->refreshOk($second['refreshToken']);
         $chainId = $this->refreshRow($login['refreshToken'])['chain_id'];
+        $closeOffset = RecordingLiveConnections::size(self::$sharedDirectory);
 
         $replay = $this->refresh($login['refreshToken']);
 
         self::assertSame(401, $replay->getStatusCode(), (string) $replay->getContent());
         $this->assertChainRevoked($chainId);
+        self::assertSame(
+            [$this->chainAccessTokenIds($chainId)],
+            RecordingLiveConnections::closedAccessTokens(self::$sharedDirectory, (int) getmypid(), $closeOffset),
+            'The reuse verdict asked the web server to close the sockets of every access token of the chain, once.',
+        );
         self::assertSame(401, $this->refresh($third['refreshToken'])->getStatusCode());
         self::assertSame(401, $this->me($third['accessToken'])->getStatusCode());
         self::assertSame('WARNING', $this->lastLogRecord($chainId, 'replacement used')['level_name']);
@@ -352,6 +363,7 @@ final class RefreshTokenGraceTest extends TestCase
         $second = $this->refreshOk($login['refreshToken']);
         $chainId = $this->refreshRow($login['refreshToken'])['chain_id'];
 
+        $closeOffset = RecordingLiveConnections::size(self::$sharedDirectory);
         $logout = $this->send('POST', '/api/auth/logout', headers: [
             'Authorization' => 'DPoP ' . $second['accessToken'],
             'DPoP' => $this->key->create('POST', self::ORIGIN . '/api/auth/logout', $second['accessToken']),
@@ -359,6 +371,11 @@ final class RefreshTokenGraceTest extends TestCase
 
         self::assertSame(200, $logout->getStatusCode(), (string) $logout->getContent());
         $this->assertChainRevoked($chainId);
+        self::assertSame(
+            [$this->chainAccessTokenIds($chainId)],
+            RecordingLiveConnections::closedAccessTokens(self::$sharedDirectory, (int) getmypid(), $closeOffset),
+            'The logout asked the web server to close the sockets of every access token of the chain, once.',
+        );
         self::assertSame(401, $this->refresh($login['refreshToken'])->getStatusCode());
         self::assertSame(401, $this->refresh($second['refreshToken'])->getStatusCode());
     }
@@ -394,6 +411,19 @@ final class RefreshTokenGraceTest extends TestCase
             'SELECT COUNT(*) FROM oauth_refresh_tokens WHERE chain_id = ? AND revoked = FALSE AND used_at IS NULL',
             [$chainId],
         );
+    }
+
+    /**
+     * The token ids (the JWT jti) of every access token of the chain, in the order a revocation lists them.
+     *
+     * @return list<string>
+     */
+    private function chainAccessTokenIds(string $chainId): array
+    {
+        /** @var list<string> $ids */
+        $ids = $this->connection->fetchFirstColumn('SELECT token_id FROM oauth_access_tokens WHERE chain_id = ? ORDER BY id', [$chainId]);
+
+        return $ids;
     }
 
     private function assertChainRevoked(string $chainId): void

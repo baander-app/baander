@@ -18,6 +18,12 @@ use Throwable;
  */
 final class DpopStoreUnavailableException extends RuntimeException
 {
+    /** The Retry-After every edge answers with: how long a client waits before presenting the same request again. */
+    public const int RETRY_AFTER_SECONDS = 5;
+
+    /** The message of the 503 body at the edges that render their own error envelope. */
+    public const string CLIENT_MESSAGE = 'The authorization server is temporarily unavailable; retry after the Retry-After delay.';
+
     public static function nonceStore(Throwable $cause): self
     {
         return new self('The DPoP nonce store is unavailable.', previous: $cause);
