@@ -7,12 +7,15 @@ declare(strict_types=1);
  * next to app:serve, against the real Swoole server on 127.0.0.1:9501, over HTTP only; the
  * session (its DPoP key, token pair and next nonce) is kept in a state file between steps.
  *
- *   login      sign in with a fresh DPoP key, as the web app does: a nonce challenge, then the login
+ *   login      sign in twice, each with a fresh DPoP key, as the web app does: a nonce challenge, then
+ *              the login; the first pair is the session, the second pair is the one logged out
  *   outage     while Redis is stopped: a refresh of the session and a DPoP-bound API call both answer
  *              503 with Retry-After, no DPoP-Nonce and no WWW-Authenticate, inside the web client's
- *              per-attempt timeout
+ *              per-attempt timeout; a logout with the second pair answers 200, since logout verifies
+ *              its proof without the replay check
  *   recovered  after Redis is back: the same refresh token refreshes, taking one nonce challenge if
- *              the restart lost the stored nonce, and the new access token is accepted
+ *              the restart lost the stored nonce, and the new access token is accepted; the second
+ *              pair's access token and refresh token are refused (401), its chain being revoked
  */
 
 use App\Tests\Fixtures\Auth\SignedDpopProof;
@@ -93,6 +96,53 @@ function refresh(SignedDpopProof $key, string $refreshToken, string $nonce): arr
     return ['status' => $exchange->status(), 'exchange' => $exchange, 'seconds' => microtime(true) - $start];
 }
 
+/**
+ * The web client's nonce retry: a restart may have lost the nonce the login issued.
+ *
+ * @return array{status: int, exchange: HttpExchange, seconds: float, challenged: bool}
+ */
+function refreshWithNonceRetry(SignedDpopProof $key, string $refreshToken, string $nonce): array
+{
+    $refresh = refresh($key, $refreshToken, $nonce);
+    $challenged = false;
+    if ($refresh['status'] === 400 && is_string($refresh['exchange']->header('DPoP-Nonce'))) {
+        $challenged = true;
+        $refresh = refresh($key, $refreshToken, (string) $refresh['exchange']->header('DPoP-Nonce'));
+    }
+
+    return [...$refresh, 'challenged' => $challenged];
+}
+
+/**
+ * Signs in with a fresh DPoP key and returns the session: key, token pair and the next nonce.
+ *
+ * @return array{privateKey: string, accessToken: string, refreshToken: string, nonce: string}
+ */
+function signIn(): array
+{
+    $pem = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
+    $privateKey = null;
+    if ($pem === false || !openssl_pkey_export($pem, $privateKey) || !is_string($privateKey)) {
+        throw new RuntimeException('Cannot generate the session key.');
+    }
+    $key = new SignedDpopProof($privateKey);
+    $login = send('POST', '/api/auth/login', [
+        'DPoP: ' . $key->createWithNonce('POST', SERVER . '/api/auth/login', challengeNonce()),
+    ], ['email' => USER, 'password' => PASSWORD]);
+    check($login->status() === 200, 'The login answered ' . describe($login));
+    $data = json_decode($login->body, true, 512, JSON_THROW_ON_ERROR)['data'] ?? [];
+    $nonce = $login->header('DPoP-Nonce');
+    check(is_string($data['accessToken'] ?? null) && is_string($data['refreshToken'] ?? null), 'The login issued no token pair: ' . $login->body);
+    check(is_string($nonce) && $nonce !== '', 'The login carried no DPoP-Nonce for the next proof.');
+
+    return [
+        'privateKey' => $privateKey,
+        'accessToken' => $data['accessToken'],
+        'refreshToken' => $data['refreshToken'],
+        'nonce' => $nonce,
+    ];
+}
+
 function me(SignedDpopProof $key, string $accessToken): HttpExchange
 {
     return send('GET', '/api/auth/me', [
@@ -119,27 +169,10 @@ set_exception_handler(static function (Throwable $error) use ($mode): never {
 });
 
 if ($mode === 'login') {
-    $pem = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
-    $privateKey = null;
-    if ($pem === false || !openssl_pkey_export($pem, $privateKey) || !is_string($privateKey)) {
-        throw new RuntimeException('Cannot generate the session key.');
-    }
-    $key = new SignedDpopProof($privateKey);
-    $login = send('POST', '/api/auth/login', [
-        'DPoP: ' . $key->createWithNonce('POST', SERVER . '/api/auth/login', challengeNonce()),
-    ], ['email' => USER, 'password' => PASSWORD]);
-    check($login->status() === 200, 'The login answered ' . describe($login));
-    $data = json_decode($login->body, true, 512, JSON_THROW_ON_ERROR)['data'] ?? [];
-    $nonce = $login->header('DPoP-Nonce');
-    check(is_string($data['accessToken'] ?? null) && is_string($data['refreshToken'] ?? null), 'The login issued no token pair: ' . $login->body);
-    check(is_string($nonce) && $nonce !== '', 'The login carried no DPoP-Nonce for the next proof.');
-    save([
-        'privateKey' => $privateKey,
-        'accessToken' => $data['accessToken'],
-        'refreshToken' => $data['refreshToken'],
-        'nonce' => $nonce,
-    ]);
-    echo sprintf("Signed in as %s with a DPoP-bound token pair and the next nonce.\n", USER);
+    $session = signIn();
+    // The pair logged out during the outage: a second sign-in, with its own key.
+    save([...$session, 'second' => signIn()]);
+    echo sprintf("Signed in twice as %s, each with its own DPoP key, a DPoP-bound token pair and the next nonce.\n", USER);
 } elseif ($mode === 'outage') {
     $state = state();
     $key = new SignedDpopProof($state['privateKey']);
@@ -165,17 +198,22 @@ if ($mode === 'login') {
         "GET /api/auth/me during the outage answered 503 with Retry-After: %s, not 403, in %.2f s.\n",
         $me->header('Retry-After'), $seconds,
     );
+
+    // The logout verifies its proof without the replay check, so it is not told to wait.
+    $second = $state['second'];
+    $secondKey = new SignedDpopProof($second['privateKey']);
+    $logout = send('POST', '/api/auth/logout', [
+        'Authorization: DPoP ' . $second['accessToken'],
+        'DPoP: ' . $secondKey->create('POST', SERVER . '/api/auth/logout', $second['accessToken']),
+    ]);
+    check($logout->status() === 200, 'The logout during the outage answered ' . describe($logout));
+    echo "The logout during the outage answered 200 with the second pair.\n";
 } elseif ($mode === 'recovered') {
     $state = state();
     $key = new SignedDpopProof($state['privateKey']);
 
-    // The web client's nonce retry: a restart may have lost the nonce the login issued.
-    $refresh = refresh($key, $state['refreshToken'], $state['nonce']);
-    $challenged = false;
-    if ($refresh['status'] === 400 && is_string($refresh['exchange']->header('DPoP-Nonce'))) {
-        $challenged = true;
-        $refresh = refresh($key, $state['refreshToken'], (string) $refresh['exchange']->header('DPoP-Nonce'));
-    }
+    $refresh = refreshWithNonceRetry($key, $state['refreshToken'], $state['nonce']);
+    $challenged = $refresh['challenged'];
     check($refresh['status'] === 200, 'The refresh after the outage answered ' . describe($refresh['exchange']));
     $data = json_decode($refresh['exchange']->body, true, 512, JSON_THROW_ON_ERROR)['data'] ?? [];
     check(is_string($data['accessToken'] ?? null) && is_string($data['refreshToken'] ?? null), 'The refresh issued no token pair: ' . $refresh['exchange']->body);
@@ -189,6 +227,17 @@ if ($mode === 'login') {
         "The same refresh token refreshed after Redis returned%s, and the new access token is accepted.\n",
         $challenged ? ' after one nonce challenge' : ' with the nonce the login issued',
     );
+
+    // The pair logged out during the outage: its chain was revoked in PostgreSQL, so Redis
+    // returning does not bring it back.
+    $second = $state['second'];
+    $secondKey = new SignedDpopProof($second['privateKey']);
+    $secondMe = me($secondKey, $second['accessToken']);
+    check($secondMe->status() === 401, 'GET /api/auth/me with the logged-out access token answered ' . describe($secondMe));
+    echo "GET /api/auth/me with the access token logged out during the outage answered 401.\n";
+    $secondRefresh = refreshWithNonceRetry($secondKey, $second['refreshToken'], $second['nonce']);
+    check($secondRefresh['status'] === 401, 'The refresh with the pair logged out during the outage answered ' . describe($secondRefresh['exchange']));
+    echo "The refresh with the pair logged out during the outage answered 401.\n";
 } else {
     throw new RuntimeException('Unknown redis-outage mode.');
 }

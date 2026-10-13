@@ -5,7 +5,8 @@
 # encodes, byte ranges once it is complete, the answers to Safari's opening request
 # sequence against an in-progress rendition (a committed baseline), the health alert
 # for a PostgreSQL outage that spans a reload of the server's workers, and a Redis outage
-# during which a signed-in session is told to wait (503) rather than signed out.
+# during which a signed-in session is told to wait (503) rather than signed out and a
+# logout still revokes its chain.
 set -euo pipefail
 if [ "${BAANDER_WEB_RUNTIME_TIMEOUT_ACTIVE:-0}" != 1 ]; then
     exec env BAANDER_WEB_RUNTIME_TIMEOUT_ACTIVE=1 timeout 180s bash "$0" "$@"
@@ -172,8 +173,11 @@ echo "No second alert arrived in the next $((3 * monitor_interval)) seconds."
 
 # Redis goes down while a signed-in client holds a session. The DPoP nonce and replay
 # stores live in Redis, so every DPoP-bound request is answered 503 with Retry-After and
-# no nonce: the client keeps its tokens and waits. The monitor alerts once, and delivers
-# at once, since PostgreSQL is up. After Redis returns the same refresh token refreshes.
+# no nonce: the client keeps its tokens and waits. A logout is the exception: it verifies
+# its proof without the replay check, so a second signed-in pair logs out during the
+# outage (200) and its chain is refused once Redis returns. The monitor alerts once, and
+# delivers at once, since PostgreSQL is up. After Redis returns the first pair's refresh
+# token refreshes.
 redis_outage() {
     app php scripts/web-runtime/redis-outage.php "$@"
 }
