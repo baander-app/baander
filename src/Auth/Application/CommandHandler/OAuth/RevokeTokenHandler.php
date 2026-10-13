@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Application\CommandHandler\OAuth;
 
 use App\Auth\Application\Command\OAuth\RevokeTokenCommand;
+use App\Auth\Application\Service\ChainConnectionCloser;
 use App\Auth\Domain\Event\OAuth\TokenRevoked;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\RefreshToken;
@@ -12,11 +13,7 @@ use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\ValueObject\ChainId;
 use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
-use App\Shared\Application\Port\LiveConnectionsPortInterface;
-use App\Shared\Application\Port\ServerControlException;
-use App\Shared\Application\Port\ServerNotRunningException;
 use Doctrine\ORM\EntityManagerInterface;
-use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
@@ -40,8 +37,7 @@ final class RevokeTokenHandler
         private readonly RefreshTokenRepositoryInterface $refreshTokenRepository,
         private readonly EntityManagerInterface $entityManager,
         private readonly EventDispatcherInterface $eventDispatcher,
-        private readonly LiveConnectionsPortInterface $liveConnections,
-        private readonly LoggerInterface $logger,
+        private readonly ChainConnectionCloser $connectionCloser,
     ) {
     }
 
@@ -128,32 +124,6 @@ final class RevokeTokenHandler
             return $accessTokenIds;
         });
 
-        $this->closeLiveConnections($accessTokenIds, $chainId);
-    }
-
-    /**
-     * The chain is revoked whatever happens here. A connection this close could not end
-     * is closed by the socket reconciliation within its next tick; the error names the
-     * chain and how many connections it concerned, never a token string.
-     *
-     * @param list<string> $accessTokenIds
-     */
-    private function closeLiveConnections(array $accessTokenIds, ChainId $chainId): void
-    {
-        try {
-            $this->liveConnections->closeForAccessTokens($accessTokenIds);
-        } catch (ServerNotRunningException) {
-            // Only reached outside the web server: a console command in a container
-            // without one, so the server's connections are not reachable from here.
-            $this->logger->warning(
-                'No web server runs in this container, so the open WebSocket connections of token chain "{chain}" were not closed.',
-                ['chain' => $chainId->toString()],
-            );
-        } catch (ServerControlException $exception) {
-            $this->logger->error(
-                'The web server did not close the WebSocket connections of the revoked token chain "{chain}".',
-                ['chain' => $chainId->toString(), 'connections' => count($accessTokenIds), 'exception' => $exception],
-            );
-        }
+        $this->connectionCloser->close($accessTokenIds, $chainId);
     }
 }

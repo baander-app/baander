@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Auth\Application\CommandHandler;
 
 use App\Auth\Application\Command\OAuth\RevokeTokenCommand;
 use App\Auth\Application\CommandHandler\OAuth\RevokeTokenHandler;
+use App\Auth\Application\Service\ChainConnectionCloser;
 use App\Shared\Domain\Model\Email;
 use App\Auth\Domain\Model\OAuth\AccessToken;
 use App\Auth\Domain\Model\OAuth\Client;
@@ -64,8 +65,7 @@ final class RevokeTokenHandlerTest extends TestCase
             $this->refreshTokenRepository,
             $this->entityManager,
             $this->eventDispatcher,
-            $this->liveConnections,
-            $logger ?? new NullLogger(),
+            new ChainConnectionCloser($this->liveConnections, $logger ?? new NullLogger()),
         );
     }
 
@@ -285,7 +285,7 @@ final class RevokeTokenHandlerTest extends TestCase
 
     #[AllowMockObjectsWithoutExpectations]
     /** The chain is revoked, so the command completes; the error names the chain and the count, never a token. */
-    public function testAWebServerThatDidNotCloseTheConnectionsIsLoggedWithTheTokenIdsAndTheRevocationCompletes(): void
+    public function testAWebServerThatDidNotCloseTheConnectionsIsLoggedWithTheChainAndTheConnectionCountAndTheRevocationCompletes(): void
     {
         $this->refreshTokenRepository = $this->createMock(RefreshTokenRepositoryInterface::class);
         $logger = $this->createMock(LoggerInterface::class);

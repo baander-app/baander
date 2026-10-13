@@ -475,23 +475,10 @@ final class RefreshTokenGraceTest extends TestCase
         $closes = RecordingLiveConnections::closedAccessTokens(self::$sharedDirectory, (int) getmypid(), $offset);
         self::assertCount(2, $closes, 'Each tick asks the web server to close the dead connections again until they are gone.');
         foreach ($closes as $closed) {
-            sort($closed);
-            self::assertSame(self::sorted([$revokedId, $expiredId]), $closed, 'The revoked and the expired token are closed; the live one is not.');
+            self::assertEqualsCanonicalizing([$revokedId, $expiredId], $closed, 'The revoked and the expired token are closed; the live one is not.');
         }
         self::assertSame([], $logger->records, 'A complete close logs nothing.');
         self::assertSame(200, $this->me($livePair['accessToken'])->getStatusCode(), 'The live token still works.');
-    }
-
-    /**
-     * @param list<string> $ids
-     *
-     * @return list<string>
-     */
-    private static function sorted(array $ids): array
-    {
-        sort($ids);
-
-        return $ids;
     }
 
     // --- Rows and logs ---
@@ -562,15 +549,8 @@ final class RefreshTokenGraceTest extends TestCase
      */
     private function logRecords(string $chainId, ?string $reason = null): array
     {
-        $path = self::$sharedDirectory . '/logs/prod.log';
-        self::assertFileExists($path);
         $records = [];
-        foreach (explode("\n", (string) file_get_contents($path)) as $line) {
-            if ($line === '') {
-                continue;
-            }
-            $record = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
-            self::assertIsArray($record);
+        foreach ($this->prodLogRecords() as $record) {
             $context = $record['context'] ?? [];
             if (($context['chain_id'] ?? null) !== $chainId) {
                 continue;
@@ -591,6 +571,20 @@ final class RefreshTokenGraceTest extends TestCase
      */
     private function closeFailureRecords(string $chainId): array
     {
+        return array_values(array_filter(
+            $this->prodLogRecords(),
+            static fn (array $record): bool => ($record['context']['chain'] ?? null) === $chainId
+                && str_contains((string) $record['message'], 'did not close'),
+        ));
+    }
+
+    /**
+     * Every record of the web server's JSON log, in order.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function prodLogRecords(): array
+    {
         $path = self::$sharedDirectory . '/logs/prod.log';
         self::assertFileExists($path);
         $records = [];
@@ -600,9 +594,7 @@ final class RefreshTokenGraceTest extends TestCase
             }
             $record = json_decode($line, true, flags: JSON_THROW_ON_ERROR);
             self::assertIsArray($record);
-            if (($record['context']['chain'] ?? null) === $chainId && str_contains((string) $record['message'], 'did not close')) {
-                $records[] = $record;
-            }
+            $records[] = $record;
         }
 
         return $records;

@@ -56,10 +56,11 @@ final class DpopBindingListener
         }
 
         $request = $event->getRequest();
+        $route = $request->attributes->get('_route');
 
         // These delivery actions independently require a valid URL signature.
         // Session controls and playback initiation must still validate DPoP.
-        if ($request->isMethod('GET') && in_array($request->attributes->get('_route'), [
+        if ($request->isMethod('GET') && in_array($route, [
             'stream_master_manifest',
             'stream_media_manifest',
             'stream_dash_manifest',
@@ -97,7 +98,6 @@ final class DpopBindingListener
             throw new AccessDeniedException('DPoP proof header is required.');
         }
 
-        $route = $request->attributes->get('_route');
         $revocationRoute = is_string($route) && in_array($route, self::REVOCATION_ROUTES, true);
 
         try {

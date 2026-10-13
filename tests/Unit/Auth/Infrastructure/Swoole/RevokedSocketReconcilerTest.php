@@ -9,7 +9,6 @@ use App\Auth\Infrastructure\Swoole\RevokedSocketReconciler;
 use App\Shared\Application\Port\LiveConnectionsPortInterface;
 use App\Shared\Application\Port\ServerControlException;
 use App\Shared\Application\Port\ServerDrainStateInterface;
-use App\Shared\Application\Port\ServerNotRunningException;
 use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
@@ -225,19 +224,6 @@ final class RevokedSocketReconcilerTest extends TestCase
         $reconciler->tick();
         self::assertCount(2, $this->asked);
         self::assertCount(2, $this->logger->records);
-    }
-
-    public function testNoWebServerInThisProcessIsLoggedAsAWarning(): void
-    {
-        $this->registry->addConnection(1, 'user-1', 0, 'token-revoked');
-        $connections = $this->createStub(LiveConnectionsPortInterface::class);
-        $connections->method('closeForAccessTokens')->willThrowException(new ServerNotRunningException());
-
-        $this->reconciler($connections)->tick();
-
-        self::assertSame(['warning'], array_column($this->logger->records, 0));
-        self::assertSame(1, $this->logger->records[0][2]['count']);
-        self::assertStringNotContainsString('token-revoked', json_encode($this->logger->records, JSON_THROW_ON_ERROR), 'A log never carries a token id.');
     }
 
     private function reconciler(

@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Auth\Application\CommandHandler;
 
 use App\Auth\Application\Command\OAuth\ExchangeRefreshTokenCommand;
 use App\Auth\Application\CommandHandler\OAuth\ExchangeRefreshTokenHandler;
+use App\Auth\Application\Service\ChainConnectionCloser;
 use App\Auth\Application\CommandHandler\OAuth\RefreshTokenHandler;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Port\JwtGeneratorInterface;
@@ -106,7 +107,7 @@ final class ExchangeRefreshTokenHandlerTest extends TestCase
                 $this->createStub(UserRepositoryInterface::class),
                 $this->createStub(TransactionPortInterface::class),
                 new NullLogger(),
-                $this->createStub(LiveConnectionsPortInterface::class),
+                new ChainConnectionCloser($this->createStub(LiveConnectionsPortInterface::class), new NullLogger()),
                 accessTokenTtl: 3600,
                 refreshTokenTtl: 2592000,
                 reuseGraceSeconds: 60,

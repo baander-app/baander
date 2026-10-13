@@ -8,7 +8,6 @@ use App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface;
 use App\Shared\Application\Port\LiveConnectionsPortInterface;
 use App\Shared\Application\Port\ServerControlException;
 use App\Shared\Application\Port\ServerDrainStateInterface;
-use App\Shared\Application\Port\ServerNotRunningException;
 use App\Shared\Application\Port\WorkerTimerInterface;
 use App\Shared\Infrastructure\Swoole\WebSocketConnectionRegistry;
 use Psr\Log\LoggerInterface;
@@ -133,8 +132,7 @@ final class RevokedSocketReconciler implements EventSubscriberInterface, WorkerT
             return;
         }
 
-        $live = array_flip($this->accessTokens->findLiveTokenIds($tokenIds));
-        $dead = array_values(array_filter($tokenIds, static fn (string $tokenId): bool => !isset($live[$tokenId])));
+        $dead = array_values(array_diff($tokenIds, $this->accessTokens->findLiveTokenIds($tokenIds)));
         if ($dead === []) {
             return;
         }
@@ -144,14 +142,6 @@ final class RevokedSocketReconciler implements EventSubscriberInterface, WorkerT
         $expected = count($this->registry->getConnectionFdsForAccessTokens($dead));
         try {
             $closed = $this->liveConnections->closeForAccessTokens($dead);
-        } catch (ServerNotRunningException $e) {
-            // Only reachable outside the web server, where this timer never runs.
-            $this->logger->warning(
-                'No web server runs in this process, so the WebSocket connections of {count} dead access tokens were not closed.',
-                ['count' => count($dead), 'exception' => $e],
-            );
-
-            return;
         } catch (ServerControlException $e) {
             $this->logger->error(
                 'The web server did not close the WebSocket connections of {count} dead access tokens; the next tick retries.',

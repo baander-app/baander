@@ -34,7 +34,7 @@ export type AccessTokenStatus = 'unknown' | 'revoked' | 'initial' | 'rotated'
 
 export type LogoutVerdict =
   | { status: 200 }
-  | { status: 401; reason: 'unknown' | 'revoked' }
+  | { status: 401; reason: 'missing' | 'unknown' | 'revoked' }
 
 interface RefreshRecord {
   token: string

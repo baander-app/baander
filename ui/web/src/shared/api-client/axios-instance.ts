@@ -41,14 +41,18 @@ export const AXIOS_INSTANCE = Axios.create({
   },
 });
 
+/** The origin the API is served from: the configured API URL, or the page's own origin. */
+export function apiOrigin(): string {
+  return new URL(window.__BAANDER_API_URL__ || window.location.origin).origin;
+}
+
 /**
  * Build the htu (HTTP URI) for a DPoP proof.
  * Strips query and fragment, normalizes to https scheme.
  */
 export function buildHtu(url: string): string {
   try {
-    const baseUrl = window.__BAANDER_API_URL__ || window.location.origin;
-    const parsed = new URL(url, baseUrl);
+    const parsed = new URL(url, apiOrigin());
     // Normalize http/https to https per RFC 9449 §4.3
     return `https://${parsed.host}${parsed.pathname}`;
   } catch {
@@ -58,9 +62,8 @@ export function buildHtu(url: string): string {
 
 function isApiRequest(config: AxiosRequestConfig): boolean {
   try {
-    const api = new URL(window.__BAANDER_API_URL__ || window.location.origin);
     const target = new URL(AXIOS_INSTANCE.getUri(config), window.location.origin);
-    return target.origin === api.origin && !target.username && !target.password;
+    return target.origin === apiOrigin() && !target.username && !target.password;
   } catch {
     return false;
   }

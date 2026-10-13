@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Auth\Application\CommandHandler\OAuth;
 
 use App\Auth\Application\CommandHandler\OAuth\RefreshTokenHandler;
+use App\Auth\Application\Service\ChainConnectionCloser;
 use App\Auth\Application\Command\OAuth\RefreshTokenCommand;
 use App\Auth\Application\Port\JwtGeneratorInterface;
 use App\Auth\Application\Service\IssuanceLockTimeout;
@@ -87,7 +88,7 @@ final class RefreshTokenTransactionTest extends TestCase
             userRepository: $this->createStub(UserRepositoryInterface::class),
             transaction: new DoctrineTransaction($registry, new Swoole()),
             logger: new NullLogger(),
-            liveConnections: $this->createStub(LiveConnectionsPortInterface::class),
+            connectionCloser: new ChainConnectionCloser($this->createStub(LiveConnectionsPortInterface::class), new NullLogger()),
             accessTokenTtl: 3600,
             refreshTokenTtl: 86400,
             reuseGraceSeconds: 60,

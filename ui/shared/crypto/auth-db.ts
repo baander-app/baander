@@ -178,16 +178,7 @@ function pendingEntries(raw: unknown): StoredPendingLogout[] {
 
 export class IndexedDbAuthStorage implements AuthStorageBackend {
   async load(): Promise<StoredAuthRecord | null> {
-    const db = await openDb();
-    const raw = await new Promise<unknown>((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readonly');
-      const request = tx.objectStore(STORE_NAME).get(RECORD_ID);
-
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => { db.close(); reject(request.error); };
-      tx.oncomplete = () => db.close();
-      tx.onerror = () => { db.close(); reject(tx.error); };
-    });
+    const raw = await this.read(RECORD_ID);
     if (raw === undefined || raw === null) return null;
     if (hasEpoch(raw)) return recordToAuth(raw);
     await this.wipe();
@@ -266,17 +257,7 @@ export class IndexedDbAuthStorage implements AuthStorageBackend {
   }
 
   async listPendingLogouts(): Promise<PendingLogoutEntry[]> {
-    const db = await openDb();
-    const raw = await new Promise<unknown>((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readonly');
-      const request = tx.objectStore(STORE_NAME).get(PENDING_LOGOUTS_ID);
-
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => { db.close(); reject(request.error); };
-      tx.oncomplete = () => db.close();
-      tx.onerror = () => { db.close(); reject(tx.error); };
-    });
-    return pendingEntries(raw).map(toPendingLogoutEntry);
+    return pendingEntries(await this.read(PENDING_LOGOUTS_ID)).map(toPendingLogoutEntry);
   }
 
   async updatePendingLogout(id: string, patch: PendingLogoutPatch): Promise<boolean> {
@@ -306,6 +287,20 @@ export class IndexedDbAuthStorage implements AuthStorageBackend {
     });
   }
 
+  /** The record stored under `id`, in one readonly transaction; undefined when there is none. */
+  private async read(id: string): Promise<unknown> {
+    const db = await openDb();
+    return new Promise<unknown>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const request = tx.objectStore(STORE_NAME).get(id);
+
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => { db.close(); reject(request.error); };
+      tx.oncomplete = () => db.close();
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    });
+  }
+
   /** Runs `work` against the store in one readwrite transaction; resolves once it committed. */
   private async readwrite(work: (store: IDBObjectStore) => void): Promise<void> {
     const db = await openDb();
@@ -319,14 +314,7 @@ export class IndexedDbAuthStorage implements AuthStorageBackend {
     });
   }
 
-  private async wipe(): Promise<void> {
-    const db = await openDb();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      tx.objectStore(STORE_NAME).delete(RECORD_ID);
-
-      tx.oncomplete = () => { db.close(); resolve(); };
-      tx.onerror = () => { db.close(); reject(tx.error); };
-    });
+  private wipe(): Promise<void> {
+    return this.readwrite((store) => { store.delete(RECORD_ID); });
   }
 }

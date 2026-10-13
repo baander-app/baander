@@ -9,6 +9,7 @@ use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Application\Exception\OAuthProtocolException;
 use App\Auth\Application\Exception\RefreshTokenRejectedException;
 use App\Auth\Application\Port\JwtGeneratorInterface;
+use App\Auth\Application\Service\ChainConnectionCloser;
 use App\Auth\Application\Service\IssuanceLockTimeout;
 use App\Auth\Domain\Exception\TokenChainViolationException;
 use App\Auth\Domain\Model\OAuth\AccessToken;
@@ -22,9 +23,6 @@ use App\Auth\Domain\Repository\OAuth\RefreshTokenRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Domain\Service\TokenChainValidator;
-use App\Shared\Application\Port\LiveConnectionsPortInterface;
-use App\Shared\Application\Port\ServerControlException;
-use App\Shared\Application\Port\ServerNotRunningException;
 use App\Shared\Application\Port\TransactionPortInterface;
 use DateInterval;
 use Doctrine\ORM\EntityManagerInterface;
@@ -82,7 +80,7 @@ final class RefreshTokenHandler
         private readonly UserRepositoryInterface $userRepository,
         private readonly TransactionPortInterface $transaction,
         private readonly LoggerInterface $logger,
-        private readonly LiveConnectionsPortInterface $liveConnections,
+        private readonly ChainConnectionCloser $connectionCloser,
         int $accessTokenTtl,
         int $refreshTokenTtl,
         #[Autowire(param: 'auth.refresh.reuse_grace_seconds')]
@@ -373,33 +371,7 @@ final class RefreshTokenHandler
             'chain_id' => $chainId->toString(),
             'reason' => $reason,
         ]);
-        $this->closeLiveConnections($accessTokenIds, $chainId);
-    }
-
-    /**
-     * The verdict stands whatever happens here: the chain is revoked and the rejection is
-     * answered. A socket that could not be closed is closed by the socket reconciliation
-     * within its next tick.
-     *
-     * @param list<string> $accessTokenIds
-     */
-    private function closeLiveConnections(array $accessTokenIds, ChainId $chainId): void
-    {
-        try {
-            $this->liveConnections->closeForAccessTokens($accessTokenIds);
-        } catch (ServerNotRunningException) {
-            // Only reached outside the web server: a console command in a container
-            // without one, so the server's connections are not reachable from here.
-            $this->logger->warning(
-                'No web server runs in this container, so the open WebSocket connections of token chain "{chain}" were not closed.',
-                ['chain' => $chainId->toString()],
-            );
-        } catch (ServerControlException $exception) {
-            $this->logger->error(
-                'The web server did not close the WebSocket connections of the revoked token chain "{chain}".',
-                ['chain' => $chainId->toString(), 'connections' => count($accessTokenIds), 'exception' => $exception],
-            );
-        }
+        $this->connectionCloser->close($accessTokenIds, $chainId);
     }
 
     private static function clientRevoked(): OAuthProtocolException

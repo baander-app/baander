@@ -42,14 +42,17 @@ final readonly class SignedDpopProof
         return DpopJwkThumbprint::compute($this->jwk);
     }
 
-    /** @param array<string, mixed>|null $jwk Override only for deliberately malformed proof fixtures. */
-    public function create(string $method, string $uri, string $accessToken, ?array $jwk = null): string
+    /**
+     * @param array<string, mixed>|null $jwk      Override only for deliberately malformed proof fixtures.
+     * @param int|null                  $issuedAt The `iat` claim; now unless a test wants a stale or future proof.
+     */
+    public function create(string $method, string $uri, string $accessToken, ?array $jwk = null, ?int $issuedAt = null): string
     {
         return $this->sign([
             'jti' => bin2hex(random_bytes(16)),
             'htm' => $method,
             'htu' => $uri,
-            'iat' => time(),
+            'iat' => $issuedAt ?? time(),
             'ath' => self::encode(hash('sha256', $accessToken, true)),
         ], $jwk);
     }

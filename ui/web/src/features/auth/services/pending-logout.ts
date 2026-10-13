@@ -31,7 +31,7 @@ import {
   type PendingLogoutEntry,
 } from '@/shared/crypto/auth-db'
 import { AuthCoordinationError, withAuthLock } from '@/features/auth/services/auth-coordination'
-import { buildHtu, challengedNonce, isRefreshRejected, outageWaitFor, wait } from '@/shared/api-client/axios-instance'
+import { apiOrigin, buildHtu, challengedNonce, isRefreshRejected, outageWaitFor, wait } from '@/shared/api-client/axios-instance'
 import { retryAfterSeconds } from '@/features/auth/lib/retry-after'
 import {
   PENDING_LOGOUT_LOCK_WAIT_MS,
@@ -81,10 +81,6 @@ class UnusableKeyError extends Error {
     super('The pending logout key cannot sign', { cause })
     this.name = 'UnusableKeyError'
   }
-}
-
-function apiOrigin(): string {
-  return new URL(window.__BAANDER_API_URL__ || window.location.origin).origin
 }
 
 function apiUrl(path: string): string {

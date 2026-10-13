@@ -40,10 +40,12 @@ export const WORKER_PROOF_DEADLINE_MS = 3_000;
  * windows that failed together do not retry together, capped at REFRESH_RETRY_AFTER_CAP_MS in total.
  */
 export function outageWaitMs(retryAfterSeconds: number, random: () => number = Math.random): number {
-  const retryAfterMs = Math.max(0, retryAfterSeconds) * 1000;
-  const jitterMs = random() * retryAfterMs;
+  return jitteredWaitMs(Math.max(0, retryAfterSeconds) * 1000, REFRESH_RETRY_AFTER_CAP_MS, random);
+}
 
-  return Math.min(REFRESH_RETRY_AFTER_CAP_MS, retryAfterMs + jitterMs);
+/** `baseMs` plus a uniform jitter of up to the same value, capped at `capMs` in total. */
+function jitteredWaitMs(baseMs: number, capMs: number, random: () => number): number {
+  return Math.min(capMs, baseMs + random() * baseMs);
 }
 
 /**
@@ -68,7 +70,6 @@ export const PENDING_LOGOUT_TIMER_ATTEMPTS = 8;
  */
 export function pendingLogoutBackoffMs(step: number, random: () => number = Math.random): number {
   const base = Math.min(PENDING_LOGOUT_BACKOFF_CAP_MS, PENDING_LOGOUT_BACKOFF_MS * PENDING_LOGOUT_BACKOFF_FACTOR ** Math.max(0, step));
-  const jitterMs = random() * base;
 
-  return Math.min(PENDING_LOGOUT_BACKOFF_CAP_MS, base + jitterMs);
+  return jitteredWaitMs(base, PENDING_LOGOUT_BACKOFF_CAP_MS, random);
 }

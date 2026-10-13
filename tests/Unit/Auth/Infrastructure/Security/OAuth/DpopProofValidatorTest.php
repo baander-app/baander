@@ -9,8 +9,6 @@ use App\Auth\Application\Port\DpopJtiCacheInterface;
 use App\Auth\Infrastructure\Security\OAuth\DpopProofValidator;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
 use App\Tests\Fixtures\Auth\LeadingZeroDpopKey;
-use Lcobucci\JWT\Signer\Ecdsa\Sha256;
-use Lcobucci\JWT\Signer\Key\InMemory;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
@@ -105,7 +103,7 @@ final class DpopProofValidatorTest extends TestCase
             'DPoP proof "htu" does not match request URI.',
         ];
         yield 'iat outside the window' => [
-            static fn (SignedDpopProof $key): array => [self::staleProof(), Request::create(self::LOGOUT_URI, 'POST'), self::ACCESS_TOKEN, $key->thumbprint()],
+            static fn (SignedDpopProof $key): array => [$key->create('POST', self::LOGOUT_URI, self::ACCESS_TOKEN, issuedAt: time() - 3600), Request::create(self::LOGOUT_URI, 'POST'), self::ACCESS_TOKEN, $key->thumbprint()],
             'DPoP proof "iat" is outside acceptable clock skew.',
         ];
     }
@@ -253,34 +251,5 @@ final class DpopProofValidatorTest extends TestCase
         $cache->method('isReplay')->willThrowException(DpopStoreUnavailableException::jtiStore(new \RedisException('Connection refused')));
 
         return $cache;
-    }
-
-    /**
-     * A logout proof for the test's access token issued an hour ago, signed by a key of its
-     * own; the fixture signs its proofs now, and the `iat` check runs before the key binding.
-     */
-    private static function staleProof(): string
-    {
-        $key = openssl_pkey_new(['private_key_type' => OPENSSL_KEYTYPE_EC, 'curve_name' => 'prime256v1']);
-        self::assertNotFalse($key);
-        self::assertTrue(openssl_pkey_export($key, $pem));
-        $details = openssl_pkey_get_details($key);
-        self::assertIsArray($details);
-        $jwk = [
-            'kty' => 'EC',
-            'crv' => 'P-256',
-            'x' => SignedDpopProof::encode(str_pad($details['ec']['x'], 32, "\0", STR_PAD_LEFT)),
-            'y' => SignedDpopProof::encode(str_pad($details['ec']['y'], 32, "\0", STR_PAD_LEFT)),
-        ];
-        $body = SignedDpopProof::encode(json_encode(['typ' => 'dpop+jwt', 'alg' => 'ES256', 'jwk' => $jwk], JSON_THROW_ON_ERROR)) . '.'
-            . SignedDpopProof::encode(json_encode([
-                'jti' => bin2hex(random_bytes(16)),
-                'htm' => 'POST',
-                'htu' => self::LOGOUT_URI,
-                'iat' => time() - 3600,
-                'ath' => SignedDpopProof::encode(hash('sha256', self::ACCESS_TOKEN, true)),
-            ], JSON_THROW_ON_ERROR));
-
-        return $body . '.' . SignedDpopProof::encode((new Sha256())->sign($body, InMemory::plainText($pem)));
     }
 }

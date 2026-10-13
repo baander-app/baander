@@ -231,7 +231,7 @@ export async function startScriptedServer(bundles: FixtureBundles, hosts: SiteHo
       sendOutage(response)
       return
     }
-    const verdict = token === null ? { status: 401, reason: 'missing' } as const : scripted.refreshState.logout(token)
+    const verdict: LogoutVerdict = token === null ? { status: 401, reason: 'missing' } : scripted.refreshState.logout(token)
     scripted.authCalls.push({ path: '/api/auth/logout', authorization, status: verdict.status })
     if (verdict.status === 200) {
       sendJson(response, 200, JSON.stringify({ data: { message: 'Token revoked.' } }))

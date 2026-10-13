@@ -80,7 +80,6 @@ vi.mock('@/features/auth/services/pending-logout', () => ({
     return epoch
   }),
   drainPendingLogouts: vi.fn(() => new Promise<void>(() => {})),
-  installPendingLogoutTriggers: vi.fn(),
 }))
 
 vi.mock('@/shared/lib/logger', () => ({
