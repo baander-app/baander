@@ -116,7 +116,7 @@ final class LoginController
                 );
             }
         } catch (DpopStoreUnavailableException) {
-            // Not a verdict on the proof: the store that logged the failure could not answer (R7).
+            // Not a verdict on the proof: the store that logged the failure could not answer.
             return $this->serviceUnavailable();
         }
 

@@ -527,7 +527,7 @@ describe('a refresh shared between tabs', () => {
     expect(location.href).toBe('https://baander.app/library');
   }
 
-  it('adopts the rotation another tab made under the lock and never calls the refresh endpoint (AE5)', async () => {
+  it('adopts the rotation another tab made under the lock and never calls the refresh endpoint', async () => {
     privateApi();
     refresh.onPost().reply(200, { accessToken: 'server-access', refreshToken: 'server-refresh' });
     auth.adoptStoredAuth.mockImplementation(async () => {

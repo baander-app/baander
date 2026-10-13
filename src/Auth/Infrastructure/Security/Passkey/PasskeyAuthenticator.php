@@ -58,7 +58,7 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
     /**
      * @throws DpopProofRejectedException when the proof is missing, stale or invalid
      * @throws BadCredentialsException when the passkey assertion fails
-     * @throws ServiceUnavailableHttpException while the DPoP nonce store is unavailable (R7)
+     * @throws ServiceUnavailableHttpException while the DPoP nonce store is unavailable
      */
     public function authenticate(Request $request): Passport
     {
@@ -70,8 +70,8 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
             // Issued before the ceremony, so a store failure never spends the assertion.
             $nextNonce = $this->dpopVerifier->issueNonce();
         } catch (DpopStoreUnavailableException $exception) {
-            // Not a credential failure: the store that logged the failure could not answer
-            // (R7). An HTTP exception leaves the firewall's failure handler out of it.
+            // Not a credential failure: the store that logged the failure could not answer.
+            // An HTTP exception leaves the firewall's failure handler out of it.
             throw new ServiceUnavailableHttpException(
                 DpopStoreUnavailableException::RETRY_AFTER_SECONDS,
                 'The DPoP store is unavailable.',

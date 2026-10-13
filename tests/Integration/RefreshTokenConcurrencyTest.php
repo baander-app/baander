@@ -30,7 +30,7 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Two database sessions, a failing or stalled signer, a lost commit acknowledgment, a
  * stuck lock and fifty rotations, through the production endpoints on real PostgreSQL
- * and Redis (R3, R4, R14, R24; KTD10, KTD11).
+ * and Redis.
  *
  * The production kernel carries two inert fault injectors (IssuanceFaults): a signer
  * that fails once or stalls on a file flag, which holds an issuing transaction open with
@@ -147,7 +147,7 @@ final class RefreshTokenConcurrencyTest extends TestCase
     // --- Two sessions ---
 
     /**
-     * R3: session A consumed the token and holds every lock of its issuing transaction
+     * Session A consumed the token and holds every lock of its issuing transaction
      * (stalled in the signer, after the flush and the metadata); session B presents the same
      * token and waits on the row. A commits its pair; B finds the token consumed, supersedes
      * A's unused pair under the lock and issues its own. One usable pair, chain intact.
@@ -178,7 +178,7 @@ final class RefreshTokenConcurrencyTest extends TestCase
     }
 
     /**
-     * KTD11: the logout revokes the chain while a refresh of its live token runs in another
+     * The logout revokes the chain while a refresh of its live token runs in another
      * session. Both sides take refresh rows before access rows, so neither waits on the other
      * in the opposite order: the logout, which queued first, wins; the refresh then finds its
      * token revoked. No deadlock, the chain ends revoked, the refresh never answers 200.
@@ -216,7 +216,7 @@ final class RefreshTokenConcurrencyTest extends TestCase
     }
 
     /**
-     * KTD11, the other order: the refresh holds its refresh row (stalled in the signer,
+     * The other lock order: the refresh holds its refresh row (stalled in the signer,
      * after the flush) when the logout queues on the chain's refresh rows, so the refresh
      * commits its replacement pair first and the logout revokes the chain afterwards. The
      * logout lists the chain's access tokens under the refresh-row locks, so the pair the
@@ -260,7 +260,7 @@ final class RefreshTokenConcurrencyTest extends TestCase
 
     // --- Failures inside the issuing transaction ---
 
-    /** R4: the signer fails after the consume; the transaction rolls back and the retry succeeds. */
+    /** The signer fails after the consume; the transaction rolls back and the retry succeeds. */
     public function testASigningFailureAfterTheConsumeRollsBackAndTheRetrySucceeds(): void
     {
         $login = $this->login();
@@ -279,7 +279,7 @@ final class RefreshTokenConcurrencyTest extends TestCase
     }
 
     /**
-     * R4: the flush after the consume fails on the server (the failure that closes the
+     * The flush after the consume fails on the server (the failure that closes the
      * entity manager); the transaction rolls back, the closed manager is released, and the
      * next refresh in the same kernel and coroutine succeeds on a fresh one.
      */
@@ -312,7 +312,7 @@ final class RefreshTokenConcurrencyTest extends TestCase
         );
     }
 
-    /** R14: login signs inside the issuing transaction; a signing failure commits no pair and no metadata. */
+    /** Login signs inside the issuing transaction; a signing failure commits no pair and no metadata. */
     public function testALoginWhoseSigningFailsCommitsNoPairAndNoMetadata(): void
     {
         $login = $this->login();
@@ -356,7 +356,7 @@ final class RefreshTokenConcurrencyTest extends TestCase
 
     // --- Lock waits and pools ---
 
-    /** KTD11: a lock held past the issuing transaction's lock_timeout is a server fault inside the client's 10 s attempt. */
+    /** A lock held past the issuing transaction's lock_timeout is a server fault inside the client's 10 s attempt. */
     public function testALockHeldPastTheLockTimeoutAnswers503WithinTheClientAttemptTimeout(): void
     {
         $login = $this->login();

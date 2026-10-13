@@ -32,7 +32,7 @@ use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 /**
- * Password login while the DPoP nonce store is unavailable (R7, R8).
+ * Password login while the DPoP nonce store is unavailable.
  *
  * The outage answers 503 with Retry-After and no nonce before any token is issued;
  * a login that issued its tokens before the nonce store failed still answers 200,

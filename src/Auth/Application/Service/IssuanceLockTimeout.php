@@ -7,7 +7,7 @@ namespace App\Auth\Application\Service;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
- * Bounds the lock waits of a token-issuing transaction (KTD11).
+ * Bounds the lock waits of a token-issuing transaction.
  *
  * Issuance and refresh lock the client row, the presented refresh row, its successors
  * and the access rows in one order, so they never deadlock; what remains is a lock a

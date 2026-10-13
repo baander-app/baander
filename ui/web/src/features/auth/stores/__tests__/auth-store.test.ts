@@ -485,7 +485,7 @@ describe('useAuthStore', () => {
 })
 
 describe('adoptStoredAuth under the refresh lock', () => {
-  it('adopts the tokens and nonce another tab rotated and keeps the shared key (AE5)', async () => {
+  it('adopts the tokens and nonce another tab rotated and keeps the shared key', async () => {
     await hydrateFrom(liveRecord(1, 'r1-access'))
     storage.record = liveRecord(2, 'r2-access', { nonce: 'nonce-after-rotation' })
 
@@ -626,7 +626,7 @@ describe('setTokens', () => {
 })
 
 describe('events from other tabs', () => {
-  it('clears on `cleared` when the record is tombstoned at that epoch, without calling the server (AE6)', async () => {
+  it('clears on `cleared` when the record is tombstoned at that epoch, without calling the server', async () => {
     await hydrateFrom(liveRecord(1, 'r1-access'))
     storage.record = { epoch: 2, cleared: true }
 

@@ -101,7 +101,7 @@ function me(SignedDpopProof $key, string $accessToken): HttpExchange
     ]);
 }
 
-/** The unavailable answer of R7: 503, a retry delay, nothing cached, no nonce and no refusal. */
+/** The answer while the DPoP store is unavailable: 503, a retry delay, nothing cached, no nonce and no refusal. */
 function checkUnavailable(HttpExchange $exchange, string $what): void
 {
     check($exchange->status() === 503, $what . ' answered ' . describe($exchange));

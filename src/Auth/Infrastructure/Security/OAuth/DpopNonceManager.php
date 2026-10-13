@@ -48,7 +48,7 @@ final class DpopNonceManager
     }
 
     /**
-     * Sets the next nonce on a response whose tokens are already committed (R8): the nonce
+     * Sets the next nonce on a response whose tokens are already committed: the nonce
      * is best-effort there, so a store failure leaves the header out and the client's next
      * token request gets one challenge instead.
      */

@@ -69,7 +69,7 @@ final class PasskeyAuthenticatorTest extends TestCase
         $this->authenticator->authenticate($request);
     }
 
-    /** R7: the nonce store not answering is not a credential failure; the login is told to wait before the ceremony runs. */
+    /** The nonce store not answering is not a credential failure; the login is told to wait before the ceremony runs. */
     public function testAStoreOutageIsAnsweredWith503BeforeTheCeremony(): void
     {
         $redis = $this->createStub(RedisClientFactory::class);

@@ -22,7 +22,7 @@ use Symfony\Component\HttpKernel\Event\RequestEvent;
 use Symfony\Component\HttpKernel\HttpKernelInterface;
 
 /**
- * The OAuth token endpoint's proof listener while the DPoP store is unavailable (R7).
+ * The OAuth token endpoint's proof listener while the DPoP store is unavailable.
  *
  * The outage answers 503 with Retry-After and no nonce before any grant runs; a
  * genuine nonce miss keeps its use_dpop_nonce challenge with a fresh nonce.

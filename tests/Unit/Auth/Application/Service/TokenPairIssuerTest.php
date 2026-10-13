@@ -28,7 +28,7 @@ use Throwable;
 
 /**
  * Issuance writes the pair, its metadata and the signature inside one transaction, in
- * the order flush, metadata, sign, commit (KTD10), with the lock waits bounded (KTD11).
+ * the order flush, metadata, sign, commit, with the lock waits bounded.
  */
 final class TokenPairIssuerTest extends TestCase
 {

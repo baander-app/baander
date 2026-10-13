@@ -177,7 +177,7 @@ test('a refresh answers one nonce challenge and succeeds with the issued nonce',
   ])
 })
 
-// AE1: the first refresh rotated the token on the server, but its answer never arrived.
+// The first refresh rotated the token on the server, but its answer never arrived.
 test('a lost refresh response is retried with the same token and graced; the next image loads', async ({ harness, page }) => {
   harness.setRefreshMode('lose-next-response')
   expect(await harness.image(harness.apiOrigin + '/api/images/expired')).toBe('loaded')
@@ -197,7 +197,7 @@ test('a lost refresh response is retried with the same token and graced; the nex
   ])
 })
 
-// AE4: the nonce store is down; the refresh is answered 503 with Retry-After and the session is kept.
+// The nonce store is down; the refresh is answered 503 with Retry-After and the session is kept.
 test('a 503 refresh waits Retry-After, retries once, keeps the session on a second 503 and succeeds once the outage ends', async ({ harness, page }) => {
   await page.clock.install()
   harness.setRefreshMode('outage')
@@ -222,7 +222,7 @@ test('a 503 refresh waits Retry-After, retries once, keeps the session on a seco
   expect(await harness.token(page)).toBe('transport-fixture-token-refresh-rotated')
 })
 
-// AE7: the browser stopped the idle worker; the next image makes it pull its credentials from the page.
+// The browser stopped the idle worker; the next image makes it pull its credentials from the page.
 test('a worker stopped by the browser pulls its credentials from the page once and signs the next image', async ({ harness, page }) => {
   expect(await harness.image(harness.apiOrigin + '/api/images/cover?before=stop')).toBe('loaded')
   await harness.stopWorker(page)
@@ -262,7 +262,7 @@ test('foreign-origin exclusion holds after a worker stop: no credentials and no 
 test.describe('two pages of one account on the real auth store', () => {
   test.use({ store: 'real' })
 
-  // AE5: the second page waits for the lock, reads the rotation the first page wrote, and adopts it.
+  // The second page waits for the lock, reads the rotation the first page wrote, and adopts it.
   test('the second page adopts the first page\'s rotation and never calls the refresh endpoint', async ({ harness, page }) => {
     await harness.login(page, 'listener@baander.app')
     const other = await harness.openPage()
@@ -285,7 +285,7 @@ test.describe('two pages of one account on the real auth store', () => {
     expect(retries).toHaveLength(2)
   })
 
-  // AE6: the logout revokes the chain once; the other page leaves without asking the server.
+  // The logout revokes the chain once; the other page leaves without asking the server.
   test('a logout in one page clears the other page without a server call and both workers drop their credentials', async ({ harness, page }) => {
     await harness.login(page, 'listener@baander.app')
     const other = await harness.openPage()

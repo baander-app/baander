@@ -9,7 +9,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * The answer of a request listener while the DPoP nonce or jti store is unavailable (R7).
+ * The answer of a request listener while the DPoP nonce or jti store is unavailable.
  *
  * 503 with Retry-After tells the client to wait and retry with the same credentials;
  * nothing about the proof was decided. No nonce is issued, since none could be stored,

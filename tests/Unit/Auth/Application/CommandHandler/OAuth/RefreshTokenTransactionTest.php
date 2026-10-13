@@ -33,7 +33,7 @@ use SwooleBundle\SwooleBundle\Bridge\Swoole\Swoole;
 /**
  * The rotation is one transaction over a real connection: a failure after the consume
  * rolls the consumption and the replacement back, and the transaction bounds its lock
- * waits before it takes the first lock (KTD11).
+ * waits before it takes the first lock.
  */
 final class RefreshTokenTransactionTest extends TestCase
 {

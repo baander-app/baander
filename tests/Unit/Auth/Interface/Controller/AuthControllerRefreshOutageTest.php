@@ -34,7 +34,7 @@ use Symfony\Contracts\Translation\TranslatorInterface;
 use Webauthn\Counter\CounterChecker;
 
 /**
- * The refresh endpoint while the DPoP nonce store is unavailable (R7, R8).
+ * The refresh endpoint while the DPoP nonce store is unavailable.
  *
  * An outage answers 503 with Retry-After and no nonce, so the client keeps its session
  * and waits; a genuine nonce miss keeps its use_dpop_nonce challenge. A refresh that

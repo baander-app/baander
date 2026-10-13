@@ -24,7 +24,7 @@ use Symfony\Component\HttpKernel\KernelEvents;
  * because a device polls repeatedly and each nonce is accepted once.
  *
  * While the nonce or jti store is unavailable nothing is decided: the request is
- * answered 503 with Retry-After and no nonce, before any grant runs (R7).
+ * answered 503 with Retry-After and no nonce, before any grant runs.
  *
  * Priority 6 runs after routing (32), the auth rate limits (10), the firewall (8)
  * and the generic API limit (7).

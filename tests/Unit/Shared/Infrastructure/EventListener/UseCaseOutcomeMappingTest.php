@@ -118,7 +118,7 @@ final class UseCaseOutcomeMappingTest extends TestCase
 
     /**
      * A 503 raised with a retry delay keeps its headers, so a token endpoint can answer a
-     * server fault by throwing (R10); the body stays the generic envelope.
+     * server fault by throwing; the body stays the generic envelope.
      */
     public function testA503HttpExceptionKeepsItsRetryAfterAndCacheHeaders(): void
     {

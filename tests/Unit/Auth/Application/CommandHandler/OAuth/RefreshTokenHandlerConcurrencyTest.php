@@ -36,7 +36,7 @@ use Psr\Log\NullLogger;
  * Two requests present one refresh token at once. Both read it unused before the
  * transaction; one consumes it with the conditional UPDATE and the other, whose UPDATE
  * changed no row, re-reads the token and its replacements under the row lock and gets
- * one of the locked verdicts (R3). This test plays the second request with repository
+ * one of the locked verdicts. This test plays the second request with repository
  * stubs that answer as the committed winner left the rows.
  */
 final class RefreshTokenHandlerConcurrencyTest extends TestCase
@@ -138,7 +138,7 @@ final class RefreshTokenHandlerConcurrencyTest extends TestCase
         );
     }
 
-    /** AE3: the loser of the consume race supersedes the winner's unused pair and gets its own. */
+    /** The loser of the consume race supersedes the winner's unused pair and gets its own. */
     public function testTheConsumeRaceLoserGetsAFreshPairWhenTheWinnersReplacementIsUnused(): void
     {
         $command = new RefreshTokenCommand(refreshTokenId: $this->tokenIdString, dpopJkt: self::JKT);
