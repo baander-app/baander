@@ -33,3 +33,11 @@ The server's answer to a client that lost the response of a rotation: a consumed
 ### DPoP store outage
 
 The state in which the Redis store behind the DPoP nonce and replay checks cannot answer. The checks stay fail-closed: no proof is accepted, but the server answers "come back later" (503 with a retry delay) rather than a nonce challenge or a denial, so clients keep their session and retry.
+
+### Pending logout
+
+A logout the browser has recorded but the server has not yet confirmed. The tab ends its session locally at once; the record keeps the DPoP key pair and the tokens of the ended session so the logout can be signed and sent again on the next start or when the browser is back online, until the server answers that the chain is revoked or gone.
+
+### Socket reconciliation
+
+The periodic check inside the web server that closes every WebSocket connection whose access token is revoked, expired or gone from the database. The close on logout, revoke and reuse verdicts is the fast path; the reconciliation is the backstop that ends a socket within a minute whatever revoked its token, including a console process in another container or plain expiry.
