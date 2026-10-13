@@ -18,8 +18,8 @@ roadmap records scope and acceptance; the linked design documents, current sourc
 and CI workflow are the executable detail. Measurements in later historical
 batches describe their own checkpoints; the current gate below takes precedence.
 
-The backend release-gate package is complete (see the next two sections). Four
-plans followed it, in this order, and all four are delivered:
+The backend release-gate package is complete (see the next two sections). Five
+plans followed it, in this order, and all five are delivered:
 
 1. [General settings and email language](docs/plans/2026-10-07-1736-feat-general-settings-email-language-plan.md):
    one definition-driven settings mechanism, the per-user email language, and the
@@ -153,18 +153,88 @@ plans followed it, in this order, and all four are delivered:
    - In development, Xdebug's `develop` mode crashes a coroutine woken by
      `Coroutine::cancel()`, so a dev server stopped with a stream in flight may log a
      worker crash. Production and the drills run without Xdebug.
-   - A refresh whose response is lost after the server rotated the token leaves the
-     client holding a consumed token; its next refresh is treated as reuse and signs the
-     user out. Closing this needs a server-side reuse grace for the same DPoP key, a
-     security design decision.
-   - During a Redis outage the DPoP nonce and replay checks fail closed, so refreshes
-     fail with 400 challenges; the web client now keeps the session, but no refresh
-     succeeds until Redis is back.
+   - Closed by item 5: a refresh whose response was lost after the server rotated the
+     token signed the user out at the next refresh (the lost-response grace), and a
+     Redis outage answered every refresh with a 400 challenge (now 503 with
+     `Retry-After`).
    - A request that reaches a worker within the master's last 100 ms tick of the drain
      window can still be reset.
    - The web player retries a `play()` rejection other than "needs a gesture" until its
      two-minute budget runs out, and the cost of Swoole's heartbeat scan, now every
      second, with many idle WebSockets is unmeasured.
+
+5. [Browser credential and session qualification](docs/plans/2026-10-12-1748-fix-browser-credential-session-qualification-plan.md):
+   a signed-in listener stays signed in through a refresh whose answer never arrived, a
+   second tab of the same account, a Redis outage, a service worker the browser restarted
+   and a server restart, and logout ends the session everywhere it was in use. Delivered
+   on 2026-10-13 (branch `plan/item5-browser-session`).
+
+   Found and fixed on the way: logout revoked nothing (the controller passed the raw JWT
+   where a token id was expected), so a refresh token stayed redeemable for 30 days and
+   the session socket stayed open; `/api/oauth/revoke` let any signed-in user revoke any
+   token whose string they knew; two tabs of one account never coordinated their
+   refreshes; an idle service worker the browser respawned forwarded media requests
+   without credentials; the DPoP nonce and jti checks turned a Redis failure into the
+   same boolean as a miss, so token endpoints handed out nonces they could not store and
+   every DPoP-bound request answered 403; a listener put an unstored nonce on every API
+   response, so even a refresh inside the nonce lifetime was challenged; the jti cache's
+   TTL never reached Redis; `TokenPairIssuer` signed after its commit; the rotation
+   re-stamped `used_at` with PHP's clock; a hung Redis blocked requests until TCP gave
+   up; the host vendor directory had drifted 82 packages behind `composer.lock`. The
+   code review added: a reuse verdict closes the chain's WebSocket connections as a
+   logout does; a chain revocation lists the access tokens to close under the refresh
+   row locks, so a replacement a concurrent rotation just committed is closed too;
+   logout and `/api/oauth/revoke` answer 503 with `Retry-After` when the chain or its
+   sockets could not be revoked, instead of a 200 that hid the fault; a tab whose
+   logout was in flight no longer keeps the session a sibling tab rotated meanwhile,
+   and a rotation adopted during a login no longer leaves the tab loading.
+
+   Server: a used refresh token presented again by the same DPoP key within
+   `auth.refresh.reuse_grace_seconds` (60, maximum 60, 0 disables) while every live
+   replacement is unused gets a fresh pair and the replacements are revoked; the decision
+   is taken from rows locked `FOR UPDATE` inside the refresh transaction, the
+   consume-race loser runs the same evaluation under the lock, and every other reuse
+   revokes the chain in its own transaction before the 401. A different key never
+   revokes. Chain rows lock in one order (client, presented refresh row, successors,
+   access rows) and both issuing transactions set a local `lock_timeout`. One
+   `DpopStoreUnavailableException` from the two Redis-backed checks is answered at five
+   edges (refresh, login, passkey, the token endpoint's DPoP listener, the request
+   binding listener) with 503, `Retry-After: 5` and `Cache-Control: no-store`, no nonce
+   header; every Redis connection, the factory's and the Symfony cache pools', carries a
+   1 s connect and read timeout. Logout revokes the chain of the presented access token
+   and closes the WebSocket connections opened with any of its access tokens through a
+   new server control operation; `/api/oauth/revoke` revokes only the caller's own
+   tokens and answers foreign and unknown tokens alike.
+
+   Web: one refresh runs inside a 30 s budget with a 10 s attempt timeout, one transport
+   retry, one nonce retry and one 503 wait (`Retry-After` plus jitter, capped at 10 s),
+   a fresh proof per attempt, and one outcome for the initiator and every queued request;
+   tabs of one origin refresh under a Web Lock, re-read the stored record and adopt a
+   rotation another tab made, write credentials by compare-and-put against an epoch that
+   only grows, and broadcast rotation and clearing as events without tokens; a restarted
+   service worker pulls its credentials from the requesting tab over one bounded channel
+   bound to the client id and origin, and capacity overflow answers a synthetic 503.
+
+   Evidence: `RefreshTokenGraceTest` (12), `RefreshTokenConcurrencyTest` (9, two database
+   sessions, a logout against a refresh of the same chain in both lock orders, signing and
+   flush failures, a lost commit acknowledgement, a lock past its timeout, pool stability) and
+   `DpopStoreOutageTest` (9, a refused and a paused Redis) on real PostgreSQL and Redis;
+   `LogoutTest`; the browser-auth suite's eighteen Chromium scenarios, including a nonce
+   challenge, a lost response recovered by the grace, the 503 wait, a worker stopped
+   through CDP, two pages of one account on the real store and a logout that clears the
+   other page; `scripts/test-web-runtime-container.sh` stops Redis on the real server
+   and asserts the 503s, one alert and the recovery. Still open:
+   - The refresh rate limiter is keyed by the token string before any proof check, so a
+     string holder can spend a victim's bucket; it is skipped in `dev`.
+   - Logout during a Redis outage ends the session locally only; the chain stays until
+     it expires. The same holds for a logout the server answered 503: the web app has
+     cleared its credentials and does not send the logout again.
+   - A connectivity gap longer than the grace window after a lost response still ends
+     the session; the retry then lands outside the window.
+   - The runtime drill stops Redis rather than pausing it, so the read timeouts on
+     Swoole-hooked streams are proven on the test kernel, not observed on the server.
+   - Password change and client revocation revoke without closing sockets.
+   - The main e2e suite still uses `baander.test` fixtures and does not run in CI.
 
 The local dev database (`baander` in `baander-postgres`) records the migration class
 names from before the rename and is about 40 migrations behind (last migrated on
@@ -172,9 +242,8 @@ names from before the rename and is about 40 migrations behind (last migrated on
 `doctrine:migrations:version`, or reset it, before it can reach the timestamp
 migration (user decision, 2026-10-10: kept out of item 3).
 
-Other local work can proceed independently: finish the browser credential/session
-integration below; qualify the registry's remaining failure, fixed-runner load,
-resource, and soak gates. Regional hosts and the S3 destination remain external
+Other local work can proceed independently: qualify the registry's remaining
+failure, fixed-runner load, resource, and soak gates. Regional hosts and the S3 destination remain external
 blockers. Do not mark deployment or restore acceptance complete from local cluster
 tests. React Native and Android remain deferred; Android's device login posts to a
 pairing endpoint that does not exist and needs a decision when that work resumes.
@@ -200,6 +269,10 @@ unless noted:
   the host and in WebKit in the Playwright container.
 - `ui/rn` is deferred indefinitely (84 `tsc` errors and 25 Jest failures); no CI
   job runs it.
+
+The item 5 checkpoint, on 2026-10-13: unit 6,128; functional 1,455;
+integration 1,040; web 1,978 with typecheck and lint at zero errors;
+browser-auth 18; PHPStan clean; Deptrac 0; container lint and the OpenAPI check passing.
 
 The item 3 checkpoint, on 2026-10-10: unit 5,950; functional 1,449; integration 1,000;
 web 1,842 (from item 2); PHPStan clean; Deptrac 0.
@@ -514,7 +587,7 @@ tracks. The repository now selects the associated library ID as a scalar; focuse
 PostgreSQL lookup and the 16-case firewall/range suite pass. Revoked access and
 replayed proofs fail before media path resolution. Removing the invalid entity
 selection also removes two Deptrac violations, leaving 198 active. The wider browser
-and session qualification remains open.
+and session qualification was delivered as item 5 (see the top of this file).
 
 Library authorization voting now lives in Library Infrastructure and depends on the
 authenticated identity contract. The voter still grants administrators, denies
@@ -1031,15 +1104,16 @@ the agreed host budget.
 - [ ] Check every catalog mutation and library-scoped query, including search,
   counts, and related resources. Eliminate fallback administrator identities.
   Signing accepts only authorized media paths and valid bounded durations.
-- [ ] Verify concurrent refresh against PostgreSQL: one usable replacement,
+- [x] Verify concurrent refresh against PostgreSQL: one usable replacement,
   rollback recoverability on persistence/signing failure, and replay detection.
   Exercise expiry, logout, multiple tabs, concurrent requests, service-worker
   restart, nonce challenges, and foreign-origin credential exclusion together.
   Bound retry attempts for both initiating and queued Axios requests. Bind each
   signing request to its requesting browser client, and close MessageChannels and
   timers on success, timeout, cancellation, logout, and service-worker restart.
-  The real PostgreSQL/League transaction suite passes seven tests and 107
-  assertions; the combined browser/session qualification remains open.
+  Delivered as item 5: `RefreshTokenGraceTest`, `RefreshTokenConcurrencyTest` and
+  `DpopStoreOutageTest` on real PostgreSQL and Redis, `LogoutTest`, the eighteen
+  browser-auth Chromium scenarios and the web runtime drill's Redis outage.
 - [x] Verify actual Messenger middleware/Redis delivery when Swoole dispatch fails,
   concrete outbox consumers without replay re-enqueue, expiring leases across
   independent PostgreSQL connections, poison-event retry/dead-letter handling, and

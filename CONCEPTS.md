@@ -19,7 +19,7 @@ Replacing the web server's worker processes while the server itself keeps runnin
 
 ### Refresh token chain
 
-The sequence of refresh tokens one sign-in produces through rotation. Each rotation consumes the presented token and issues a replacement that links back to it; every token in the chain is bound to the same DPoP key. Revoking the chain ends that sign-in everywhere it was in use; it is what logout and reuse detection do.
+The sequence of refresh tokens one sign-in produces through rotation. Each rotation consumes the presented token and issues a replacement that links back to it; every token in the chain is bound to the same DPoP key. Revoking the chain ends that sign-in everywhere it was in use and closes the WebSocket connections it opened; it is what logout and reuse detection do.
 *Avoid: token family (the vendor term).*
 
 ### Consumed refresh token
