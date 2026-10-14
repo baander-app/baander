@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import signal
+import subprocess
 import sys
 import tempfile
 import time
@@ -37,7 +38,9 @@ class Regression:
         self.artifacts = artifacts
         self.runtime = coordinator.Runtime(artifacts, timeout)
         self.runtime.image = os.environ.get("BAANDER_TEST_IMAGE", "baander-ci-prewarm:local")
-        self.prefix = self.runtime.prefix
+        self.projects = {}
+        self.apps = {}
+        self.resources = {"containers": [], "networks": [], "volumes": []}
         self.results = []
         self.sequence = 0
 
@@ -55,7 +58,7 @@ class Regression:
         return result
 
     def php(self, stack, code):
-        return self.command("docker", "exec", "--user", "www-data", f"{self.prefix}-{stack}-app",
+        return self.command("docker", "exec", "--user", "www-data", self.apps[stack],
                             "php", "-d", "memory_limit=512M", "-r", code).stdout.strip()
 
     def expect(self, name, actual, expected):
@@ -66,8 +69,10 @@ class Regression:
             raise AssertionError(f"{name}: expected {expected!r}, received {actual!r}")
 
     def start(self, stack):
-        network = self.runtime.start_services(stack)
-        self.runtime.create_app(stack + "-app", network, privileged=True, services=True)
+        project = self.runtime.start_services(stack)
+        self.projects[stack] = project
+        self.apps[stack] = self.runtime.create_app(stack + "-app", network=project,
+                                                  privileged=True, services=True)
 
     def seed(self, stack):
         self.php(stack, PHP_CONNECT + f"""
@@ -77,7 +82,7 @@ $redis->set('isolation-probe', '{stack}');
 if (!is_dir(dirname('{CACHE_PATH}'))) {{ mkdir(dirname('{CACHE_PATH}'), 0777, true); }}
 file_put_contents('{CACHE_PATH}', '{stack}');
 """)
-        self.command("docker", "exec", "-d", "--user", "www-data", f"{self.prefix}-{stack}-app", "php", "-d", "memory_limit=512M", "-r", f"""
+        self.command("docker", "exec", "-d", "--user", "www-data", self.apps[stack], "php", "-d", "memory_limit=512M", "-r", f"""
 $server = stream_socket_server('unix://{SOCKET_PATH}', $error, $message);
 if (!$server) {{ throw new RuntimeException($message); }}
 while ($connection = stream_socket_accept($server, -1)) {{ fwrite($connection, '{stack}'); fclose($connection); }}
@@ -106,8 +111,9 @@ while ($connection = stream_socket_accept($server, -1)) {{ fwrite($connection, '
         self.php("left", PHP_CONNECT + "$db->exec('TRUNCATE isolation_probe'); echo $db->query('SELECT count(*) FROM isolation_probe')->fetchColumn();")
         self.expect("left database truncated", self.php("left", PHP_CONNECT + "echo $db->query('SELECT count(*) FROM isolation_probe')->fetchColumn();"), "0")
         self.expect("peer survives database truncate", self.probe("right"), "right:right")
-        self.command("docker", "stop", "--time", "1", f"{self.prefix}-left-postgres")
-        failed = self.command("docker", "exec", "--user", "www-data", f"{self.prefix}-left-app", "php", "-d", "memory_limit=512M", "-r", PHP_CONNECT, check=False)
+        postgres = self.runtime.service_container(self.projects["left"], "postgres")
+        self.command("docker", "stop", "--time", "1", postgres)
+        failed = self.command("docker", "exec", "--user", "www-data", self.apps["left"], "php", "-d", "memory_limit=512M", "-r", PHP_CONNECT, check=False)
         self.expect("left database outage observed", failed.returncode != 0, True)
         self.expect("peer survives database outage", self.probe("right"), "right:right")
 
@@ -130,8 +136,65 @@ while ($connection = stream_socket_accept($server, -1)) {{ fwrite($connection, '
         self.expect("peer cache survives deletion", self.php("right", f"echo file_get_contents('{CACHE_PATH}');"), "right")
         self.expect("peer socket survives deletion", self.php("right", f"$s = stream_socket_client('unix://{SOCKET_PATH}'); echo stream_get_contents($s);"), "right")
 
+    def inventory(self, phase):
+        resources = {"containers": set(), "networks": set(), "volumes": set()}
+        for project in self.runtime.projects:
+            for kind, listing in (("containers", ["ps", "-a", "-q"]),
+                                  ("networks", ["network", "ls", "-q"]),
+                                  ("volumes", ["volume", "ls", "-q"])):
+                # Inventory has its own deadline so stopped and timed-out runs
+                # still record their resources before Compose removes them.
+                command = ["docker", *listing, "--filter", f"label=com.docker.compose.project={project}"]
+                result = subprocess.run(command, text=True, capture_output=True, timeout=15)
+                log = self.artifacts / f"{phase}-{project}-{kind}.log"
+                log.write_text(json.dumps(command) + "\n" + result.stdout + result.stderr)
+                if result.returncode:
+                    raise RuntimeError(f"Could not inventory {kind} for {project}; see {log}")
+                resources[kind].update(result.stdout.split())
+        if resources["containers"]:
+            result = subprocess.run(["docker", "inspect", *sorted(resources["containers"])],
+                                    text=True, capture_output=True, timeout=15)
+            log = self.artifacts / f"{phase}-container-inspect.log"
+            log.write_text(result.stdout + result.stderr)
+            if result.returncode:
+                raise RuntimeError(f"Could not inspect project mounts; see {log}")
+            for container in json.loads(result.stdout):
+                for mount in container["Mounts"]:
+                    if mount["Type"] == "volume":
+                        resources["volumes"].add(mount["Name"])
+        return {kind: sorted(values) for kind, values in resources.items()}
+
     def cleanup(self):
-        return [] if self.runtime.cleanup() else ["Coordinator resource cleanup failed"]
+        errors = []
+        try:
+            self.resources = self.inventory("before-cleanup")
+            (self.artifacts / "resources.json").write_text(json.dumps({
+                "projects": self.runtime.projects, **self.resources}, indent=2) + "\n")
+        except Exception as failure:
+            errors.append(str(failure))
+        try:
+            if not self.runtime.cleanup():
+                errors.append("Coordinator resource cleanup failed")
+        except Exception as failure:
+            errors.append(str(failure))
+        try:
+            remaining = self.inventory("after-cleanup")
+            for kind, values in remaining.items():
+                if values:
+                    errors.append(f"Compose {kind} remain after cleanup: {values}")
+            # Image-created anonymous volumes can lack Compose labels. Check
+            # every recorded mount against all surviving Docker volumes.
+            result = subprocess.run(["docker", "volume", "ls", "-q"], text=True,
+                                    capture_output=True, timeout=15)
+            (self.artifacts / "after-cleanup-all-volumes.log").write_text(result.stdout + result.stderr)
+            if result.returncode:
+                raise RuntimeError("Could not verify recorded volume removal")
+            surviving = sorted(set(result.stdout.split()) & set(self.resources["volumes"]))
+            if surviving:
+                errors.append(f"Recorded volumes remain after cleanup: {surviving}")
+        except Exception as failure:
+            errors.append(str(failure))
+        return errors
 
 
 def main():
@@ -163,7 +226,7 @@ def main():
             cleanup_errors = [str(failure)]
         (artifacts / "results.json").write_text(json.dumps({"checks": regression.results,
             "error": error, "cleanup_errors": cleanup_errors,
-            "containers": regression.runtime.containers, "networks": regression.runtime.networks}, indent=2) + "\n")
+            "projects": regression.runtime.projects, **regression.resources}, indent=2) + "\n")
     if error or cleanup_errors:
         print(f"Stack isolation failed: {error or cleanup_errors}; artifacts: {artifacts}", file=sys.stderr)
         return 1

@@ -25,7 +25,7 @@ RUN curl -fsSL https://download.docker.com/linux/debian/gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker.gpg] https://download.docker.com/linux/debian $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
         > /etc/apt/sources.list.d/docker.list \
     && apt-get update \
-    && apt-get install -y --no-install-recommends docker-ce-cli docker-buildx-plugin \
+    && apt-get install -y --no-install-recommends docker-ce-cli docker-buildx-plugin docker-compose-plugin \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
@@ -47,6 +47,7 @@ RUN cd /opt/emsdk && . ./emsdk_env.sh \
     && javac --version \
     && docker --version \
     && docker buildx version \
+    && docker compose version \
     && g++ --version \
     && cmake --version \
     && emcc --version

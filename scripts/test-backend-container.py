@@ -24,7 +24,7 @@ ARCHIVE_PATHS = [
     'docker', 'templates', 'public', 'phpunit.xml.dist', '.env', '.env.test',
     '.forgejo', 'composer.json', 'composer.lock', 'symfony.lock', 'deptrac.yaml',
     'deptrac.baseline.yaml', 'phpstan.dist.neon', 'translations', 'docs-book',
-    'docker-compose.yml', 'compose.override.yaml', 'openapi.json',
+    'docker-compose.yml', 'compose.override.yaml', 'compose.test.yaml', 'openapi.json',
 ]
 
 
@@ -71,11 +71,18 @@ class Runtime:
         self.stopped = threading.Event()
         self.containers: list[str] = []
         self.networks: list[str] = []
+        self.volumes: list[str] = []
+        self.projects: list[str] = []
+        self.project_environments: dict[str, dict[str, str]] = {}
+        self.project_containers: set[str] = set()
+        self.project_networks: set[str] = set()
+        self.environment = dict(os.environ)
         self.prefix = 'baander-tests-' + uuid.uuid4().hex[:12]
         self.image = os.environ.get('BAANDER_TEST_IMAGE', 'martinjuul/baander-app:latest')
         self.archive: Path | None = None
 
-    def command(self, args: list[str], log: Path | None = None, check: bool = True) -> subprocess.CompletedProcess:
+    def command(self, args: list[str], log: Path | None = None, check: bool = True,
+                env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
         if self.stopped.is_set():
             raise RuntimeError('Backend run interrupted')
         if time.monotonic() >= self.deadline:
@@ -83,7 +90,7 @@ class Runtime:
         destination = log.open('ab') if log else tempfile.TemporaryFile()
         try:
             with subprocess.Popen(args, stdout=destination, stderr=subprocess.STDOUT,
-                                  start_new_session=True) as process:
+                                  start_new_session=True, env=env) as process:
                 while process.poll() is None:
                     if self.stopped.is_set() or time.monotonic() >= self.deadline:
                         os.killpg(process.pid, signal.SIGKILL)
@@ -108,6 +115,25 @@ class Runtime:
     def docker(self, *args: str, **kwargs):
         return self.command(['docker', *args], **kwargs)
 
+    def compose_args(self, project: str, *args: str) -> list[str]:
+        return ['docker', 'compose', '--project-name', project, '--project-directory', str(ROOT),
+                '--file', str(ROOT / 'compose.test.yaml'), *args]
+
+    def compose(self, project: str, *args: str, **kwargs):
+        if project not in self.projects:
+            raise ValueError('Unregistered Compose test project: ' + project)
+        return self.command(self.compose_args(project, *args), env=self.project_environments[project], **kwargs)
+
+    def service_container(self, project: str, service: str) -> str:
+        identifiers = self.compose(project, 'ps', '--quiet', service).stdout.split()
+        if len(identifiers) != 1 or not re.fullmatch(r'[a-f0-9]{12,64}', identifiers[0]):
+            raise RuntimeError(f'Expected one running {service} container for Compose project {project}')
+        identifier = identifiers[0]
+        if identifier not in self.project_containers:
+            self.containers.append(identifier)
+            self.project_containers.add(identifier)
+        return identifier
+
     def prepare_archive(self):
         if os.environ.get('BAANDER_TEST_CHECKOUT_IN_IMAGE') == '1':
             return
@@ -120,26 +146,23 @@ class Runtime:
 
     def create_app(self, lane: str, network: str = 'none', privileged: bool = False,
                    services: bool = False, coverage: bool = False) -> str:
-        name = self.prefix + '-' + lane
-        self.containers.append(name)
-        args = ['create', '--user', '0:0', '--name', name, '--network', network, '--workdir', CONTAINER_ROOT,
-                '--entrypoint', 'sh', '-e', 'APP_ENV=test', '-e', 'APP_DEBUG=0',
-                '-e', 'XDEBUG_MODE=' + ('coverage' if coverage else 'off')]
-        if privileged:
-            args.append('--privileged')
         if services:
-            database = 'postgresql://baander:test-only@postgres:5432/functional_test?serverVersion=18&charset=utf8'
-            for key, value in {
-                'DATABASE_URL': database, 'OUTBOX_TEST_DATABASE_URL': database,
-                'REDIS_PASSWORD': 'test-only', 'REDIS_URL': 'redis://default:test-only@redis:6379',
-                'MESSENGER_TEST_REDIS_DSN': 'redis://default:test-only@redis:6379',
-                'MESSENGER_TRANSPORT_DSN': 'redis://default:test-only@redis:6379/messages',
-                'OAUTH_PRIVATE_KEY_PATH': '/tmp/baander-oauth/private.key',
-                'OAUTH_PUBLIC_KEY_PATH': '/tmp/baander-oauth/public.key',
-            }.items():
-                args += ['-e', f'{key}={value}']
-        self.docker(*args, self.image, '-c', 'exec sleep infinity')
-        self.docker('start', name)
+            if network not in self.projects:
+                raise ValueError('Service app requires a registered Compose project')
+            self.project_environments[network]['BAANDER_TEST_XDEBUG_MODE'] = 'coverage' if coverage else 'off'
+            self.project_environments[network]['BAANDER_TEST_APP_PRIVILEGED'] = 'true' if privileged else 'false'
+            self.compose(network, 'up', '--detach', '--wait', '--wait-timeout', '60', 'app')
+            name = self.service_container(network, 'app')
+        else:
+            name = self.prefix + '-' + lane
+            self.containers.append(name)
+            args = ['create', '--user', '0:0', '--name', name, '--network', network, '--workdir', CONTAINER_ROOT,
+                    '--entrypoint', 'sh', '-e', 'APP_ENV=test', '-e', 'APP_DEBUG=0',
+                    '-e', 'XDEBUG_MODE=' + ('coverage' if coverage else 'off')]
+            if privileged:
+                args.append('--privileged')
+            self.docker(*args, self.image, '-c', 'exec sleep infinity')
+            self.docker('start', name)
         if self.archive:
             self.docker('cp', str(self.archive), name + ':/tmp/checkout.tar')
             self.docker('exec', name, 'sh', '-ec',
@@ -148,30 +171,26 @@ class Runtime:
         return name
 
     def start_services(self, lane: str) -> str:
-        network = self.prefix + '-' + lane
+        project = self.prefix + '-' + lane
+        if project in self.projects:
+            raise ValueError('Compose test project already registered: ' + project)
+        self.projects.append(project)
+        self.project_environments[project] = {
+            **self.environment,
+            'BAANDER_TEST_IMAGE': self.image,
+            'BAANDER_TEST_POSTGRES_IMAGE': self.environment.get('BAANDER_TEST_POSTGRES_IMAGE', 'baander-database:latest'),
+            'BAANDER_TEST_REDIS_IMAGE': self.environment.get('BAANDER_TEST_REDIS_IMAGE', 'redis/redis-stack-server:edge'),
+            'BAANDER_TEST_XDEBUG_MODE': 'off',
+            'BAANDER_TEST_APP_PRIVILEGED': 'true',
+        }
+        network = project + '_private'
         self.networks.append(network)
-        self.docker('network', 'create', '--internal', network)
-        for service, image, environment in [
-            ('postgres', os.environ.get('BAANDER_TEST_POSTGRES_IMAGE', 'baander-database:latest'),
-             ['POSTGRES_USER=baander', 'POSTGRES_PASSWORD=test-only', 'POSTGRES_DB=functional_test']),
-            ('redis', os.environ.get('BAANDER_TEST_REDIS_IMAGE', 'redis/redis-stack-server:edge'),
-             ['REDIS_ARGS=--requirepass test-only']),
-        ]:
-            name = network + '-' + service
-            self.containers.append(name)
-            args = ['run', '-d', '--name', name, '--network', network, '--network-alias', service]
-            for value in environment:
-                args += ['-e', value]
-            self.docker(*args, image)
-        for _ in range(60):
-            pg = self.docker('exec', network + '-postgres', 'pg_isready', '-h', '127.0.0.1',
-                             '-U', 'baander', '-d', 'functional_test', check=False)
-            redis = self.docker('exec', '-e', 'REDISCLI_AUTH=test-only', network + '-redis',
-                                'redis-cli', 'ping', check=False)
-            if pg.returncode == 0 and redis.returncode == 0 and redis.stdout.strip() == 'PONG':
-                return network
-            self.stopped.wait(1)
-        raise RuntimeError('Isolated services did not become ready')
+        self.project_networks.add(network)
+        self.volumes.extend([project + '_postgres_data', project + '_redis_data'])
+        self.compose(project, 'up', '--detach', '--wait', '--wait-timeout', '60', 'postgres', 'redis')
+        self.service_container(project, 'postgres')
+        self.service_container(project, 'redis')
+        return project
 
     def helper(self, app: str, *args: str, log: Path | None = None, check: bool = True):
         self.docker('exec', app, 'chown', '-R', 'www-data:www-data', RUN_DIRECTORY)
@@ -219,7 +238,27 @@ class Runtime:
     def cleanup(self) -> bool:
         success = True
         # Cleanup has an independent bound: it must run even after the run deadline.
+        for project in reversed(self.projects):
+            try:
+                with (self.artifacts / (project + '.compose.log')).open('wb') as log:
+                    subprocess.run(self.compose_args(project, 'logs', '--no-color'),
+                                   env=self.project_environments[project], stdout=log,
+                                   stderr=subprocess.STDOUT, timeout=10)
+            except (OSError, subprocess.TimeoutExpired) as error:
+                print(f'Log collection failed for {project}: {error}', file=sys.stderr)
+            try:
+                result = subprocess.run(self.compose_args(project, 'down', '--volumes', '--remove-orphans', '--timeout', '5'),
+                                        env=self.project_environments[project], stdout=subprocess.DEVNULL,
+                                        stderr=subprocess.DEVNULL, timeout=30)
+                if result.returncode != 0:
+                    success = False
+                    print(f'Cleanup failed for Compose project {project}: exit {result.returncode}', file=sys.stderr)
+            except (OSError, subprocess.TimeoutExpired) as error:
+                success = False
+                print(f'Cleanup failed for Compose project {project}: {error}', file=sys.stderr)
         for name in reversed(self.containers):
+            if name in self.project_containers:
+                continue
             try:
                 with (self.artifacts / (name + '.container.log')).open('wb') as log:
                     subprocess.run(['docker', 'logs', name], stdout=log, stderr=subprocess.STDOUT, timeout=10)
@@ -235,6 +274,8 @@ class Runtime:
                 success = False
                 print(f'Cleanup failed for {name}: {error}', file=sys.stderr)
         for name in reversed(self.networks):
+            if name in self.project_networks:
+                continue
             try:
                 result = subprocess.run(['docker', 'network', 'rm', name], stdout=subprocess.DEVNULL,
                                stderr=subprocess.DEVNULL, timeout=20)

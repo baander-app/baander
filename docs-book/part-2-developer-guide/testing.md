@@ -278,7 +278,7 @@ bash scripts/test-backend-container.sh tests/Integration/RefreshTokenGraceTest.p
 bash scripts/test-backend-container.sh --coverage-text=coverage/report.txt --coverage-clover=coverage/clover.xml
 ```
 
-It requires Python 3 and Docker on the host. `BAANDER_TEST_PROCESSES` defaults to
+It requires Python 3, Docker and the Docker Compose plugin on the host. `BAANDER_TEST_PROCESSES` defaults to
 `2` and accepts integers from `1` through `8`; `1` is the diagnostic setting.
 `BAANDER_TEST_TIMEOUT` bounds the complete run, including setup, and defaults to
 `3600` seconds. Cleanup has separate bounded attempts after interruption or timeout.
@@ -293,8 +293,8 @@ manifest, `scripts/backend-native-tests.json`, assigns Swoole, fork, signal and
 fixed-resource tests to one worker in a privileged container with networking
 disabled; that worker starts afresh for every file. Add new native tests to this
 manifest. Functional and integration files are distributed round-robin across at
-most the requested number of independent app/PostgreSQL/Redis stacks. Each stack
-runs one worker with a fresh process for every file. Scheduling stays at class/file
+most the requested number of independent app/PostgreSQL/Redis stacks declared in
+`compose.test.yaml`. Each stack uses a unique disposable Compose project and runs one worker with a fresh process for every file. Scheduling stays at class/file
 level; ParaTest's method-level `--functional` mode is not used.
 
 Each stack owns its cache, temporary files, sockets, database, Redis server and
@@ -314,8 +314,9 @@ relative paths and source filters, but suite-specific bootstraps are rejected.
 Logs, manifests, JUnit and serialized coverage remain under the printed
 `var/test-runs/<run>/` directory, including failed runs. Set
 `BAANDER_TEST_ARTIFACTS` to choose a different parent directory. Containers and
-networks are removed on completion, timeout or interruption, and cleanup failure
-fails the run. Final coverage is published only after identity and artifact checks;
+networks and volumes are removed on completion, timeout or interruption, and
+cleanup failure fails the run. Service stacks use bounded
+`docker compose down --volumes --remove-orphans` after collecting diagnostics. Final coverage is published only after identity and artifact checks;
 merging retains uncovered executable lines and exclusions. Validate the standard
 reports with `python3 scripts/validate-backend-coverage.py coverage` before using
 `coverage/metrics.json`.

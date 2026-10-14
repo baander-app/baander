@@ -95,3 +95,23 @@ runner equivalence qualification.
 Independent addendum review approved the fix before implementation: synchronize
 both timestamps after all entity setters and cover creation, update and unchanged
 save while preserving `createdAt`. Retain the existing CLI resource comparison.
+
+## Infrastructure addendum: disposable Compose projects
+
+The user selected disposable infrastructure in a dedicated test Compose file.
+Declare the application, PostgreSQL and Redis services there, and create a unique
+Compose project for each service lane. Keep ordinary and native lanes isolated
+without service networking. Preserve canonical source paths, per-stack environment,
+root setup followed by unprivileged test execution, and the existing artifact and
+completeness checks. No host ports or shared writable mounts are permitted.
+
+The coordinator owns project lifecycle. Collect diagnostics before teardown and run
+`docker compose down --volumes --remove-orphans` after completion, interruption or
+timeout, with bounded cleanup independent of the test deadline. Requalify actual
+Compose isolation, cleanup, full-suite results and timings before adoption. Prior
+Docker CLI measurements remain historical evidence, not Compose qualification.
+
+Independent review approved this addendum before implementation. Register projects
+before startup, keep names project-scoped, and verify removal of anonymous image
+volumes after partial startup as well as normal completion. The CI runner image
+must include the Docker Compose plugin and verify it during its build.

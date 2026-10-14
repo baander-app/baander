@@ -1631,11 +1631,22 @@ adoption awaits complete equivalence and performance qualification.
   warnings or errors), container lint and OpenAPI drift all passed in the CI image.
   Docker build-context checks and all 41 Python runner regressions also passed.
   Independent review accepted the rate-limit fixture fix.
+- The full parallel rerun after the limiter fix passed 9,097 tests / 74,304
+  assertions across 869 files in 731.2 seconds. All discovered identities were
+  observed once and cleanup passed. Artifacts:
+  `var/test-runs/20261014-192156-b53cbe92`.
 - Qualification comparison reads exact executable and covered lines from
   hash-validated serialized artifacts: Clover can omit statement rows that overlap
   method rows. Ten new comparator regressions and the real PHP serialization
   check pass; all 51 Python runner regressions pass. Independent review accepted
   the correction.
+- Infrastructure direction: the user selected a dedicated test Compose file with
+  disposable projects. Service lanes now declare app/PostgreSQL/Redis in
+  `compose.test.yaml`, with project-owned networks and volumes. Cleanup includes
+  named and anonymous volumes. Compose configuration and all 58 Python regressions
+  pass; real Compose isolation and benchmark qualification remain pending. Earlier
+  direct-Docker measurements do not qualify this topology. The runner Dockerfile
+  now installs and verifies the Compose plugin.
 - Remaining: full sequential/parallel identity and coverage comparisons, a second
   successful parallel run, timing qualification, authoritative static gates,
   wrapper/CI adoption, removal of the old sharder, final review and documentation.

@@ -89,6 +89,20 @@ class ConfigurationTest(unittest.TestCase):
                 self.assertTrue(path.endswith("Test.php"))
                 self.assertTrue(reason.strip())
 
+    def test_compose_disables_webserver_healthcheck_and_preserves_service_readiness(self):
+        result = subprocess.run(
+            ["docker", "compose", "--project-name", "baander-coordinator-config-test",
+             "--file", str(SCRIPT.parents[1] / "compose.test.yaml"), "config", "--format", "json"],
+            capture_output=True, text=True, timeout=10, check=True,
+        )
+        config = json.loads(result.stdout)
+        self.assertTrue(config["services"]["app"]["healthcheck"]["disable"])
+        for service in ("postgres", "redis"):
+            healthcheck = config["services"][service]["healthcheck"]
+            self.assertTrue(healthcheck["test"])
+            self.assertFalse(healthcheck.get("disable", False))
+            self.assertEqual("service_healthy", config["services"]["app"]["depends_on"][service]["condition"])
+
 
 class LifecycleTest(unittest.TestCase):
     def setUp(self):
@@ -184,17 +198,103 @@ class LifecycleTest(unittest.TestCase):
                 self.assertFalse(self.runtime.cleanup())
                 self.assertIn(["docker", "network", "rm", "stack"], [call.args[0] for call in run.call_args_list])
 
-    def test_service_app_exports_nested_process_dsns_without_shared_mounts(self):
-        with patch.object(self.runtime, "docker") as docker:
-            self.runtime.create_app("stack-1", "private-network", True, True)
-        args = docker.call_args_list[0].args
-        environment = dict(args[index + 1].split("=", 1) for index, value in enumerate(args) if value == "-e")
-        self.assertEqual(environment["DATABASE_URL"], environment["OUTBOX_TEST_DATABASE_URL"])
-        self.assertEqual(environment["REDIS_URL"], environment["MESSENGER_TEST_REDIS_DSN"])
-        self.assertEqual("test-only", environment["REDIS_PASSWORD"])
-        self.assertIn("private-network", args)
-        for flag in ("--mount", "-v", "--publish", "-p"):
-            self.assertNotIn(flag, args)
+    def compose_result(self, project, *args, **kwargs):
+        identifiers = {"postgres": "a" * 64, "redis": "b" * 64, "app": "c" * 64}
+        output = identifiers[args[-1]] + "\n" if args[0] == "ps" else ""
+        return subprocess.CompletedProcess(args, 0, output)
+
+    def test_service_app_uses_registered_compose_project_and_actual_container_id(self):
+        with patch.object(self.runtime, "compose", side_effect=self.compose_result) as compose, \
+                patch.object(self.runtime, "docker") as docker:
+            project = self.runtime.start_services("stack-1")
+            app = self.runtime.create_app("stack-1", project, True, True, coverage=True)
+        self.assertEqual("c" * 64, app)
+        self.assertIn(project, self.runtime.projects)
+        self.assertIn(app, self.runtime.project_containers)
+        self.assertCountEqual(["a" * 64, "b" * 64, "c" * 64], self.runtime.containers)
+        compose.assert_any_call(project, "up", "--detach", "--wait", "--wait-timeout", "60", "app")
+        self.assertEqual("coverage", self.runtime.project_environments[project]["BAANDER_TEST_XDEBUG_MODE"])
+        self.assertEqual([project + "_private"], self.runtime.networks)
+        self.assertEqual([project + "_postgres_data", project + "_redis_data"], self.runtime.volumes)
+        self.assertEqual("exec", docker.call_args.args[0])
+
+    def test_service_app_rejects_unregistered_project(self):
+        with self.assertRaisesRegex(ValueError, "registered Compose project"):
+            self.runtime.create_app("stack-1", "unknown", True, True)
+
+    def test_failed_service_start_is_registered_for_compose_cleanup(self):
+        with patch.object(self.runtime, "compose", side_effect=RuntimeError("partial up failed")):
+            with self.assertRaisesRegex(RuntimeError, "partial up failed"):
+                self.runtime.start_services("stack-1")
+        self.assertEqual([self.runtime.prefix + "-stack-1"], self.runtime.projects)
+        self.runtime.deadline = -1
+        self.runtime.stopped.set()
+        with patch.object(coordinator.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as run:
+            self.assertTrue(self.runtime.cleanup())
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertEqual(2, len(commands))
+        self.assertIn("logs", commands[0])
+        self.assertIn("down", commands[1])
+        self.assertIn("--volumes", commands[1])
+        self.assertIn("--remove-orphans", commands[1])
+        self.assertEqual(30, run.call_args_list[1].kwargs["timeout"])
+
+    def test_project_environments_do_not_modify_process_environment(self):
+        before = dict(coordinator.os.environ)
+        with patch.object(self.runtime, "compose", side_effect=self.compose_result), \
+                patch.object(self.runtime, "docker"):
+            first = self.runtime.start_services("stack-1")
+            second = self.runtime.start_services("stack-2")
+            self.runtime.create_app("stack-1", first, True, True, coverage=True)
+        self.assertNotEqual(first, second)
+        self.assertIsNot(self.runtime.project_environments[first], self.runtime.project_environments[second])
+        self.assertEqual("coverage", self.runtime.project_environments[first]["BAANDER_TEST_XDEBUG_MODE"])
+        self.assertEqual("off", self.runtime.project_environments[second]["BAANDER_TEST_XDEBUG_MODE"])
+        self.assertEqual(before, dict(coordinator.os.environ))
+
+    def test_compose_cleanup_does_not_delete_project_resources_twice(self):
+        with patch.object(self.runtime, "compose", side_effect=self.compose_result):
+            project = self.runtime.start_services("stack-1")
+        self.runtime.containers.append("ordinary")
+        with patch.object(coordinator.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as run:
+            self.assertTrue(self.runtime.cleanup())
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertEqual(1, sum("down" in command for command in commands))
+        self.assertEqual([["docker", "rm", "-f", "ordinary"]], [command for command in commands if command[:2] == ["docker", "rm"]])
+        self.assertFalse(any(command[:3] == ["docker", "network", "rm"] for command in commands))
+        self.assertIn(project, commands[0])
+
+    def test_compose_down_errors_fail_cleanup_after_log_collection(self):
+        with patch.object(self.runtime, "compose", side_effect=self.compose_result):
+            self.runtime.start_services("stack-1")
+        for error in (None, subprocess.TimeoutExpired(["docker", "compose", "down"], 30), OSError("Docker unavailable")):
+            def execute(args, **kwargs):
+                if "down" in args:
+                    if error is not None:
+                        raise error
+                    return subprocess.CompletedProcess(args, 1)
+                return subprocess.CompletedProcess(args, 0)
+
+            with self.subTest(error=type(error).__name__), \
+                    patch.object(coordinator.subprocess, "run", side_effect=execute) as run, \
+                    patch.object(coordinator.sys, "stderr", io.StringIO()):
+                self.assertFalse(self.runtime.cleanup())
+                self.assertIn("logs", run.call_args_list[0].args[0])
+                self.assertIn("down", run.call_args_list[1].args[0])
+
+    def test_compose_log_timeout_does_not_skip_down(self):
+        with patch.object(self.runtime, "compose", side_effect=self.compose_result):
+            self.runtime.start_services("stack-1")
+
+        def execute(args, **kwargs):
+            if "logs" in args:
+                raise subprocess.TimeoutExpired(args, 10)
+            return subprocess.CompletedProcess(args, 0)
+
+        with patch.object(coordinator.subprocess, "run", side_effect=execute) as run, \
+                patch.object(coordinator.sys, "stderr", io.StringIO()):
+            self.assertTrue(self.runtime.cleanup())
+        self.assertIn("down", run.call_args.args[0])
 
     def test_native_app_has_no_network_and_is_privileged(self):
         with patch.object(self.runtime, "docker") as docker:
