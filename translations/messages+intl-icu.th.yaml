@@ -6,6 +6,8 @@ errors:
   invalid_input: ข้อมูลที่ระบุไม่ถูกต้อง
   invalid_parent_id: รูปแบบรหัสหมวดหมู่หลักไม่ถูกต้อง
   invalid_merge_request: คำขอรวมไม่ถูกต้อง
+  invalid_library_id: รูปแบบรหัสไลบรารีไม่ถูกต้อง
+  invalid_uuid: รูปแบบ UUID ไม่ถูกต้อง
   validation:
     failed: การตรวจสอบล้มเหลว
   not_found:

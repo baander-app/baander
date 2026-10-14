@@ -6,6 +6,8 @@ errors:
   invalid_input: "Ugyldigt input."
   invalid_parent_id: "Ugyldigt overordnet ID-format."
   invalid_merge_request: "Ugyldigt fletningsanmodning."
+  invalid_library_id: "Ugyldigt biblioteks-ID-format."
+  invalid_uuid: "Ugyldigt UUID-format."
   validation:
     failed: "Validering mislykkedes."
   not_found:
