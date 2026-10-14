@@ -26,8 +26,9 @@ use Symfony\Component\Security\Core\User\UserInterface;
 
 /**
  * The collaborator routes ask the voter before any lookup: the owner manages the rows,
- * a collaborator naming their own public id leaves, and everyone else is refused with
- * the attribute's message.
+ * a collaborator naming their own public id leaves, a collaborator naming anyone else is
+ * refused as management, and a user with no collaborator row is refused as a leaver
+ * before the named user is looked up.
  */
 final class PlaylistCollaboratorRoutesTest extends TestCase
 {
@@ -39,6 +40,8 @@ final class PlaylistCollaboratorRoutesTest extends TestCase
     private MessageBusInterface&MockObject $bus;
     private PlaylistCollaboratorResolverInterface&MockObject $users;
     private PlaylistController $controller;
+    /** @var list<string> the attributes the voter has been asked, in order */
+    private array $asked = [];
 
     protected function setUp(): void
     {
@@ -110,12 +113,7 @@ final class PlaylistCollaboratorRoutesTest extends TestCase
     public function testACollaboratorNamingTheirOwnPublicIdLeavesThroughTheLeaveAttribute(): void
     {
         $this->actingAs($this->collaboratorId);
-        $this->security->expects($this->exactly(2))->method('isGranted')
-            ->willReturnCallback(fn (string $attribute, Playlist $subject): bool => match ($attribute) {
-                'MANAGE_COLLABORATORS' => false,
-                'LEAVE' => $subject === $this->playlist,
-                default => throw new \LogicException(sprintf('Unexpected attribute %s.', $attribute)),
-            });
+        $this->leaveIsDecided(true);
         $this->users->expects($this->once())->method('userId')->with($this->collaboratorPublicId)->willReturn($this->collaboratorId);
         $this->bus->expects($this->once())->method('dispatch')
             ->with($this->isInstanceOf(RemoveCollaboratorCommand::class))
@@ -126,24 +124,23 @@ final class PlaylistCollaboratorRoutesTest extends TestCase
         self::assertSame(204, $response->getStatusCode());
     }
 
-    public function testAUserWhoIsNoCollaboratorHasNothingToLeaveAndNothingIsWritten(): void
+    public function testAUserWhoIsNoCollaboratorIsRefusedLeaveBeforeAnyLookup(): void
     {
-        $stranger = Uuid::v4();
-        $strangerPublicId = new PublicId();
-        $this->actingAs($stranger);
-        $this->security->expects($this->once())->method('isGranted')->with('MANAGE_COLLABORATORS', $this->playlist)->willReturn(false);
-        $this->users->expects($this->once())->method('userId')->with($strangerPublicId)->willReturn($stranger);
+        $this->actingAs(Uuid::v4());
+        $this->leaveIsDecided(false);
+        $this->users->expects($this->never())->method('userId');
         $this->bus->expects($this->never())->method('dispatch');
 
-        $response = $this->controller->removeCollaborator($this->playlist->getPublicId()->toString(), $strangerPublicId->toString());
+        $this->expectException(AccessDeniedException::class);
+        $this->expectExceptionMessage(PlaylistController::REFUSAL_MESSAGES['LEAVE']);
 
-        self::assertSame(204, $response->getStatusCode());
+        $this->controller->removeCollaborator($this->playlist->getPublicId()->toString(), (new PublicId())->toString());
     }
 
-    public function testANonOwnerNamingSomeoneElseIsRefusedAsManagement(): void
+    public function testACollaboratorNamingSomeoneElseIsRefusedAsManagement(): void
     {
         $this->actingAs($this->collaboratorId);
-        $this->security->expects($this->once())->method('isGranted')->with('MANAGE_COLLABORATORS', $this->playlist)->willReturn(false);
+        $this->leaveIsDecided(true);
         $other = new PublicId();
         $this->users->expects($this->once())->method('userId')->with($other)->willReturn(Uuid::v4());
         $this->bus->expects($this->never())->method('dispatch');
@@ -154,10 +151,10 @@ final class PlaylistCollaboratorRoutesTest extends TestCase
         $this->controller->removeCollaborator($this->playlist->getPublicId()->toString(), $other->toString());
     }
 
-    public function testANonOwnerNamingAnUnknownUserIsNotFound(): void
+    public function testACollaboratorNamingAnUnknownUserIsNotFound(): void
     {
         $this->actingAs($this->collaboratorId);
-        $this->security->expects($this->once())->method('isGranted')->with('MANAGE_COLLABORATORS', $this->playlist)->willReturn(false);
+        $this->leaveIsDecided(true);
         $unknown = new PublicId();
         $this->users->expects($this->once())->method('userId')->with($unknown)->willThrowException(new NotFoundException('User not found.'));
         $this->bus->expects($this->never())->method('dispatch');
@@ -176,6 +173,22 @@ final class PlaylistCollaboratorRoutesTest extends TestCase
 
         self::assertSame(404, $this->controller->addCollaborator((new PublicId())->toString(), $this->collaboratorPublicId->toString())->getStatusCode());
         self::assertSame(404, $this->controller->removeCollaborator((new PublicId())->toString(), $this->collaboratorPublicId->toString())->getStatusCode());
+    }
+
+    /**
+     * The voter refuses management and answers LEAVE as given, in that order, and is asked
+     * nothing else.
+     */
+    private function leaveIsDecided(bool $granted): void
+    {
+        $this->security->expects($this->exactly(2))->method('isGranted')
+            ->willReturnCallback(function (string $attribute, Playlist $subject) use ($granted): bool {
+                self::assertSame($this->playlist, $subject);
+                self::assertSame($this->asked === [] ? 'MANAGE_COLLABORATORS' : 'LEAVE', $attribute, 'Management is asked first, then leave.');
+                $this->asked[] = $attribute;
+
+                return $attribute === 'LEAVE' && $granted;
+            });
     }
 
     private function actingAs(Uuid $userId): void

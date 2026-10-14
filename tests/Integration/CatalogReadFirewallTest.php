@@ -288,6 +288,42 @@ final class CatalogReadFirewallTest extends TestCase
         self::assertSame($expectedIds, $ids);
     }
 
+    /** @return iterable<string, array{string, list<string>, list<string>}> genres value with fixture names in braces, fixtures the administrator's page holds, fixtures the member's page holds */
+    public static function genreFilterForms(): iterable
+    {
+        yield 'songs outside a genre' => ['!{denied-genre}', ['allowed-song'], ['allowed-song']];
+        yield 'songs in either of two genres' => ['{denied-genre},{allowed-genre}', ['denied-song', 'allowed-song'], ['allowed-song']];
+    }
+
+    /**
+     * The genres filter's other forms: a leading "!" excludes the songs tagged with the slug
+     * and a comma-separated list matches a song tagged with any of them. Each form is still
+     * bounded by the reader's scope, so the member's page holds only the permitted song.
+     *
+     * @param list<string> $administratorSees
+     * @param list<string> $memberSees
+     */
+    #[DataProvider('genreFilterForms')]
+    public function testGenreExclusionAndMultipleSlugsFilterTheSongsTheReaderMaySee(string $form, array $administratorSees, array $memberSees): void
+    {
+        $value = preg_replace_callback('/\{([a-z-]+)\}/', fn (array $match): string => $this->filterValue($match[1]), $form);
+        self::assertIsString($value);
+        $path = '/api/songs/?' . http_build_query(['genres' => $value]);
+
+        foreach (['admin' => $administratorSees, 'member' => $memberSees] as $actor => $expected) {
+            $this->authenticate($actor);
+            $response = $this->request($path);
+            self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+            $body = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+            self::assertSame(count($expected), $body['meta']['total'], $actor . ' total for genres=' . $value);
+            $ids = array_column($body['data'], 'publicId');
+            $expectedIds = array_map(fn (string $fixture): string => $this->filterValue($fixture), $expected);
+            sort($ids);
+            sort($expectedIds);
+            self::assertSame($expectedIds, $ids, $actor . ' page for genres=' . $value);
+        }
+    }
+
     /** @return iterable<string, array{string}> */
     public static function relatedResourceActors(): iterable
     {
@@ -589,6 +625,8 @@ final class CatalogReadFirewallTest extends TestCase
             'denied-album' => $this->catalog['denied']['album']->getPublicId()->toString(),
             'denied-song' => $this->catalog['denied']['song']->getPublicId()->toString(),
             'denied-genre' => $this->genres['denied-child']->getSlug(),
+            'allowed-genre' => $this->genres['allowed-song']->getSlug(),
+            'allowed-song' => $this->catalog['allowed']['song']->getPublicId()->toString(),
             'shared-artist' => $this->sharedArtist->getPublicId()->toString(),
             default => throw new \InvalidArgumentException('Unknown filter fixture ' . $fixture),
         };

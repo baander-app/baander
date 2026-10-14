@@ -500,8 +500,9 @@ final class PlaylistController
     }
 
     /**
-     * Remove a collaborator. The owner may remove any; a collaborator may remove their own
-     * row, which is leaving. Removing a user who does not collaborate changes nothing.
+     * Remove a collaborator. The owner may remove any, and removing a user who does not
+     * collaborate changes nothing. Anyone else must be a collaborator, asked of the voter
+     * before the named user is looked up, and may remove only their own row: leaving.
      */
     #[OA\Delete(
         path: '/api/playlists/{publicId}/collaborators/{userPublicId}',
@@ -528,17 +529,13 @@ final class PlaylistController
 
         $resolvedUserPublicId = PublicId::fromString($userPublicId);
         if (!$this->security->isGranted('MANAGE_COLLABORATORS', $playlist)) {
-            // Not the owner: the only admissible request names the actor's own row.
+            // Not the owner: only a collaborator may leave, and only by naming their own row.
+            $this->authorize('LEAVE', $playlist);
             $userId = $this->collaborators->userId($resolvedUserPublicId);
             $actor = $this->security->getUser();
             if (!$actor instanceof AuthenticatedUserIdentityInterface || !$userId->equals(Uuid::fromString($actor->getId()))) {
                 throw new AccessDeniedException(self::REFUSAL_MESSAGES['MANAGE_COLLABORATORS']);
             }
-            if (!$playlist->isCollaborator($userId)) {
-                // Nothing to leave: the actor already holds no row.
-                return $this->noContent();
-            }
-            $this->authorize('LEAVE', $playlist);
         }
 
         $this->commandBus->dispatch(new RemoveCollaboratorCommand(

@@ -16,9 +16,10 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
  *
  * The owner may do everything but leave. A collaborator may view, may change the
  * songs while the playlist is collaborative, and may leave (remove their own
- * collaborator row); the controller asks LEAVE only when the row named in the
- * request is the actor's own. An administrator may view any playlist and nothing
- * more: a playlist is personal data. Everyone else is refused.
+ * collaborator row); the controller asks LEAVE of every non-owner on the removal
+ * route before it looks the named user up, and then admits only the actor's own
+ * row. An administrator may view any playlist and nothing more: a playlist is
+ * personal data. Everyone else is refused.
  *
  * @extends Voter<'VIEW'|'EDIT_SONGS'|'EDIT'|'DELETE'|'MANAGE_COLLABORATORS'|'LEAVE', Playlist>
  */

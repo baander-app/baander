@@ -68,9 +68,10 @@ final class PlaylistMutationFirewallTest extends TestCase
 
     /**
      * The status each authenticated actor gets per route, in ACTORS order without the
-     * anonymous request, and the voter attribute a 403 names.
+     * anonymous request, and the voter attribute a 403 names: one for the route, or one per
+     * refused actor where the controller asks a different attribute of each.
      *
-     * @var array<string, array{statuses: array<string, int>, attribute: ?string}>
+     * @var array<string, array{statuses: array<string, int>, attribute: string|array<string, string>|null}>
      */
     private const array MATRIX = [
         'playlist_store' => ['statuses' => ['owner' => 201, 'collaborator' => 201, 'collaborator-off' => 201, 'unrelated' => 201, 'admin' => 201], 'attribute' => null],
@@ -80,7 +81,7 @@ final class PlaylistMutationFirewallTest extends TestCase
         'playlist_remove_song' => ['statuses' => ['owner' => 204, 'collaborator' => 204, 'collaborator-off' => 403, 'unrelated' => 403, 'admin' => 403], 'attribute' => 'EDIT_SONGS'],
         'playlist_reorder' => ['statuses' => ['owner' => 200, 'collaborator' => 200, 'collaborator-off' => 403, 'unrelated' => 403, 'admin' => 403], 'attribute' => 'EDIT_SONGS'],
         'playlist_add_collaborator' => ['statuses' => ['owner' => 204, 'collaborator' => 403, 'collaborator-off' => 403, 'unrelated' => 403, 'admin' => 403], 'attribute' => 'MANAGE_COLLABORATORS'],
-        'playlist_remove_collaborator' => ['statuses' => ['owner' => 204, 'collaborator' => 204, 'collaborator-off' => 204, 'unrelated' => 403, 'admin' => 403], 'attribute' => 'MANAGE_COLLABORATORS'],
+        'playlist_remove_collaborator' => ['statuses' => ['owner' => 204, 'collaborator' => 204, 'collaborator-off' => 204, 'unrelated' => 403, 'admin' => 403], 'attribute' => ['unrelated' => 'LEAVE', 'admin' => 'LEAVE']],
     ];
 
     private const string CREATED_NAME = 'Matrix created playlist';
@@ -196,10 +197,21 @@ final class PlaylistMutationFirewallTest extends TestCase
                     continue;
                 }
                 $status = self::MATRIX[$route]['statuses'][$actor];
-                $attribute = self::MATRIX[$route]['attribute'];
-                yield $route . ' ' . $actor => [$route, $actor, $status, $status === 403 && $attribute !== null ? PlaylistController::REFUSAL_MESSAGES[$attribute] : null];
+                yield $route . ' ' . $actor => [$route, $actor, $status, $status === 403 ? self::refusalMessage($route, $actor) : null];
             }
         }
+    }
+
+    /** The message the voter refusal of this actor on this route carries. */
+    private static function refusalMessage(string $route, string $actor): string
+    {
+        $attribute = self::MATRIX[$route]['attribute'];
+        if (is_array($attribute)) {
+            $attribute = $attribute[$actor];
+        }
+        self::assertNotNull($attribute, $route . ' refuses nobody.');
+
+        return PlaylistController::REFUSAL_MESSAGES[$attribute];
     }
 
     #[DataProvider('matrix')]
@@ -312,8 +324,8 @@ final class PlaylistMutationFirewallTest extends TestCase
 
         $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/collaborators/' . $this->actors['collaborator']['publicId']), 'collaborator'), 204, null, 'collaborator leaves');
         self::assertSame([], $this->state()['collaborators']);
-        $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/collaborators/' . $this->actors['collaborator']['publicId']), 'collaborator'), 204, null, 'collaborator leaves again');
-        self::assertSame([], $this->state()['collaborators']);
+        $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/collaborators/' . $this->actors['collaborator']['publicId']), 'collaborator'), 403, PlaylistController::REFUSAL_MESSAGES['LEAVE'], 'collaborator leaves again');
+        self::assertSame([], $this->state()['collaborators'], 'A user who left holds no row, so the voter refuses a second leave.');
     }
 
     /** @return iterable<string, array{string, string}> */
@@ -351,8 +363,27 @@ final class PlaylistMutationFirewallTest extends TestCase
         self::assertSame([$this->actors['collaborator']['id']->toString(), $this->actors['unrelated']['id']->toString()], $before['collaborators']);
 
         $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/collaborators/' . $this->actors['unrelated']['publicId']), 'collaborator'), 403, PlaylistController::REFUSAL_MESSAGES['MANAGE_COLLABORATORS'], 'collaborator removes another');
-        $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/collaborators/' . $this->actors['collaborator']['publicId']), 'admin'), 403, PlaylistController::REFUSAL_MESSAGES['MANAGE_COLLABORATORS'], 'administrator removes a collaborator');
+        $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/collaborators/' . $this->actors['collaborator']['publicId']), 'admin'), 403, PlaylistController::REFUSAL_MESSAGES['LEAVE'], 'administrator removes a collaborator');
         $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/collaborators/' . $this->actors['collaborator']['publicId']), 'unrelated'), 403, PlaylistController::REFUSAL_MESSAGES['MANAGE_COLLABORATORS'], 'a collaborator removes the other');
+        self::assertSame($before, $this->state());
+    }
+
+    /**
+     * The delete route asks the voter whether the actor may leave before it looks the named
+     * user up: a member with no collaborator row is refused as a leaver whoever the id names,
+     * their own or one nobody has, while a collaborator naming an unknown user reaches the
+     * lookup and its 404.
+     */
+    public function testAUserWithNoCollaboratorRowIsRefusedLeaveBeforeAnyUserLookup(): void
+    {
+        $before = $this->state();
+        $unknown = (new PublicId())->toString();
+
+        foreach (['unrelated', 'admin'] as $actor) {
+            $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/collaborators/' . $this->actors[$actor]['publicId']), $actor), 403, PlaylistController::REFUSAL_MESSAGES['LEAVE'], $actor . ' names their own id');
+            $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/collaborators/' . $unknown), $actor), 403, PlaylistController::REFUSAL_MESSAGES['LEAVE'], $actor . ' names an unknown user');
+        }
+        $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/collaborators/' . $unknown), 'collaborator'), 404, sprintf('User "%s" not found.', $unknown), 'collaborator names an unknown user');
         self::assertSame($before, $this->state());
     }
 
@@ -365,8 +396,7 @@ final class PlaylistMutationFirewallTest extends TestCase
                 continue;
             }
             $mutation = $this->mutation($route);
-            $message = PlaylistController::REFUSAL_MESSAGES[self::MATRIX[$route]['attribute']];
-            $this->assertDecidedBy($this->request($mutation['method'], $mutation['path'], 'admin', $mutation['data']), 403, $message, $route);
+            $this->assertDecidedBy($this->request($mutation['method'], $mutation['path'], 'admin', $mutation['data']), 403, self::refusalMessage($route, 'admin'), $route);
         }
         self::assertSame($before, $this->state());
         $this->assertView($this->request('GET', $this->playlistPath(), 'admin'), 'admin', ['s1', 'o1', 's2', 'o2', 's3']);
@@ -382,7 +412,7 @@ final class PlaylistMutationFirewallTest extends TestCase
         self::assertSame([], $before['collaborators']);
         $this->assertDecidedBy($this->request('GET', $this->playlistPath(), 'collaborator'), 403, PlaylistController::REFUSAL_MESSAGES['VIEW'], 'view after removal');
         $this->assertDecidedBy($this->request('POST', $this->playlistPath('/songs'), 'collaborator', ['songId' => $this->songs['s4']->toString()]), 403, PlaylistController::REFUSAL_MESSAGES['EDIT_SONGS'], 'add after removal');
-        $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/collaborators/' . $this->actors['collaborator']['publicId']), 'collaborator'), 204, null, 'leave after removal');
+        $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/collaborators/' . $this->actors['collaborator']['publicId']), 'collaborator'), 403, PlaylistController::REFUSAL_MESSAGES['LEAVE'], 'leave after removal');
         self::assertSame($before, $this->state());
         $list = $this->json($this->request('GET', '/api/playlists/', 'collaborator'))['data'];
         self::assertSame([], $list, 'The list no longer carries the playlist.');
