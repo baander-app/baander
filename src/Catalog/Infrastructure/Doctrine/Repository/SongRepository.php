@@ -722,14 +722,14 @@ final class SongRepository implements SongRepositoryInterface
         }
 
         $isExclusion = str_starts_with($value, '!');
-        $genreNames = $isExclusion ? substr($value, 1) : $value;
+        $genreSlugs = $isExclusion ? substr($value, 1) : $value;
 
-        if ($genreNames === '') {
+        if ($genreSlugs === '') {
             return;
         }
 
-        $names = array_filter(array_map('trim', explode(',', $genreNames)));
-        if ($names === []) {
+        $slugs = array_filter(array_map('trim', explode(',', $genreSlugs)));
+        if ($slugs === []) {
             return;
         }
 
@@ -738,16 +738,16 @@ final class SongRepository implements SongRepositoryInterface
             $qb->andWhere($qb->expr()->notIn(
                 's.id',
                 sprintf(
-                    'SELECT IDENTITY(gs.song) FROM App\Catalog\Infrastructure\Doctrine\Entity\GenreSongEntity gs JOIN gs.genre g WHERE g.name IN (:excluded_genres)',
+                    'SELECT IDENTITY(gs.song) FROM App\Catalog\Infrastructure\Doctrine\Entity\GenreSongEntity gs JOIN gs.genre g WHERE g.slug IN (:excluded_genres)',
                 ),
-            ))->setParameter('excluded_genres', $names);
+            ))->setParameter('excluded_genres', $slugs);
         } else {
             $qb->andWhere($qb->expr()->in(
                 's.id',
                 sprintf(
-                    'SELECT IDENTITY(gs.song) FROM App\Catalog\Infrastructure\Doctrine\Entity\GenreSongEntity gs JOIN gs.genre g WHERE g.name IN (:included_genres)',
+                    'SELECT IDENTITY(gs.song) FROM App\Catalog\Infrastructure\Doctrine\Entity\GenreSongEntity gs JOIN gs.genre g WHERE g.slug IN (:included_genres)',
                 ),
-            ))->setParameter('included_genres', $names);
+            ))->setParameter('included_genres', $slugs);
         }
     }
 

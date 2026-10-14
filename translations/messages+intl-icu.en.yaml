@@ -6,6 +6,8 @@ errors:
   invalid_input: "Invalid input provided."
   invalid_parent_id: "Invalid parent ID format."
   invalid_merge_request: "Invalid merge request."
+  invalid_library_id: "Invalid library ID format."
+  invalid_uuid: "Invalid UUID format."
   validation:
     failed: "Validation failed."
   not_found:
