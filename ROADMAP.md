@@ -23,9 +23,11 @@ batches describe their own checkpoints; the current gate below takes precedence.
 Any harness can take over from this section; nothing below depends on a tool that
 only one agent host has.
 
-- **Branch.** `plan/application-threat-model` contains the local application-security
-  delivery from `a86f5ea`. See its [checkpoint](#application-threat-model-delivery-2026-10-14)
-  for verification and open findings. Nothing from this delivery has been pushed.
+- **Branch.** `master` includes the five application-security commits through
+  `6ac28214`, merged by fast-forward from `plan/application-threat-model`. See the
+  [checkpoint](#application-threat-model-delivery-2026-10-14) for verification and
+  open findings. The user authorized delivery to `origin` and `baander-github`
+  on 2026-10-14.
 - **Previous baseline.** Item 8 was merged and pushed. `master` (eced16d6) holds its fifteen
   commits and the roadmap commit on top of 63466d0d by fast-forward, code-reviewed
   with both findings applied and every gate green (the item 8 checkpoint below).
@@ -1468,8 +1470,9 @@ manual sequence: saved plan, independent plan review before implementation,
 simplification and independent code review, including the runtime-discovered
 proxy configuration correction. GitNexus was stale (indexed commit `2503505`).
 Source and caller inspection and Git diff supplied the edit evidence. Prose-fix
-preserves the evidence limits in the guide and model. No API schema change or generated-client update is
-required; no changes are pushed.
+preserves the evidence limits in the guide and model. No API schema change or
+generated-client update is required. The delivery is merged into `master`; the
+verification checkpoint applies unchanged to the fast-forwarded implementation.
 
 ### Parallel test execution
 
