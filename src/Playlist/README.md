@@ -34,3 +34,22 @@ The `Playlist` aggregate manages an ordered list of songs. Operations are pure C
 <!-- Everything below this line is hand-written. Edit freely. -->
 
 ## Notes
+
+### Collaborators
+
+A playlist is shared with named collaborators. The owner adds and removes them by the
+user's public id through `PUT` and `DELETE /api/playlists/{publicId}/collaborators/{userPublicId}`;
+both answer 204 and repeat without effect. A collaborator may view the playlist, may
+change its songs while the owner keeps `isCollaborative` on (the metadata update is
+the switch), and may leave by deleting their own public id. The owner alone updates
+metadata, deletes the playlist and manages collaborators; an administrator may view and
+nothing more.
+
+The collaborator ids live on the `Playlist` aggregate, and `PlaylistRepository::save`
+is the only writer of `playlist_collaborators`. `PlaylistVoter` decides every route on
+the aggregate; `PlaylistController::REFUSAL_MESSAGES` names the message each attribute
+refuses with. The handlers turn a public id into a user id through
+`PlaylistCollaboratorResolverInterface`, whose adapter calls only the public-id lookup of
+the Auth user-identifier contract, so a member route never looks a user up by email
+address. Responses name the owner and the collaborators by public id
+(`ownerPublicId`, `collaboratorPublicIds`); no user UUID leaves the API.

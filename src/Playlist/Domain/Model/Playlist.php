@@ -113,12 +113,14 @@ final class Playlist
     }
 
     /**
-     * Update playlist metadata fields.
+     * Update the playlist's metadata. The collaborative flag is the owner's switch for
+     * collaborator editing; turning it off keeps the collaborator rows.
      */
     public function updateMetadata(
         string $name,
         ?string $description,
         bool $isPublic,
+        bool $isCollaborative,
     ): void {
         if (trim($name) === '') {
             throw new InvalidArgumentException('Playlist name cannot be empty.');
@@ -127,6 +129,7 @@ final class Playlist
         $this->name = $name;
         $this->description = $description;
         $this->isPublic = $isPublic;
+        $this->isCollaborative = $isCollaborative;
         $this->updatedAt = new DateTimeImmutable();
     }
 

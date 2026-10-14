@@ -123,11 +123,13 @@ final class PlaylistTest extends TestCase
             name: 'New Name',
             description: 'Updated description',
             isPublic: true,
+            isCollaborative: true,
         );
 
         $this->assertSame('New Name', $playlist->getName());
         $this->assertSame('Updated description', $playlist->getDescription());
         $this->assertTrue($playlist->isPublic());
+        $this->assertTrue($playlist->isCollaborative());
         $this->assertGreaterThan($before, $playlist->getUpdatedAt());
     }
 
@@ -138,7 +140,7 @@ final class PlaylistTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Playlist name cannot be empty.');
 
-        $playlist->updateMetadata(name: '', description: null, isPublic: false);
+        $playlist->updateMetadata(name: '', description: null, isPublic: false, isCollaborative: false);
     }
 
     public function testAddSong(): void

@@ -1267,6 +1267,7 @@ deptrac:
       - 'Shared Application'
     'Playlist Infrastructure':
       - 'Auth Identity Contract'
+      - 'Auth User Identifier Contract'
       - 'Catalog Song Lookup Contract'
       - 'Playlist Deletion Preview Contract'
       - 'Shared Application'

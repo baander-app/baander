@@ -8,13 +8,21 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 
+/**
+ * A playlist as a viewer reads it: the owner and the collaborators by public id, and the
+ * number of songs the viewer can see.
+ */
 final readonly class PlaylistReadView
 {
-    /** @param array<array-key, mixed> $smartRules */
+    /**
+     * @param list<PublicId> $collaboratorPublicIds
+     * @param array<array-key, mixed> $smartRules
+     */
     public function __construct(
         private Uuid $id,
         private PublicId $publicId,
-        private Uuid $userId,
+        private PublicId $ownerPublicId,
+        private array $collaboratorPublicIds,
         private string $name,
         private ?string $description,
         private bool $isPublic,
@@ -37,9 +45,15 @@ final readonly class PlaylistReadView
         return $this->publicId;
     }
 
-    public function getUserId(): Uuid
+    public function getOwnerPublicId(): PublicId
     {
-        return $this->userId;
+        return $this->ownerPublicId;
+    }
+
+    /** @return list<PublicId> */
+    public function getCollaboratorPublicIds(): array
+    {
+        return $this->collaboratorPublicIds;
     }
 
     public function getName(): string

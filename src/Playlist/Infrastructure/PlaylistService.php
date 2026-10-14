@@ -21,9 +21,14 @@ final class PlaylistService implements PlaylistPortInterface, PlaylistDeletionPr
     }
 
     /** @return list<PlaylistReadView> */
-    public function findReadByUser(Uuid $ownerId, LibraryReadScope $scope): array
+    public function findReadByUser(Uuid $actorId, LibraryReadScope $scope): array
     {
-        return $this->playlistRepository->findReadByUser($ownerId, $scope);
+        return $this->playlistRepository->findReadByUser($actorId, $scope);
+    }
+
+    public function findRead(Uuid $playlistId, LibraryReadScope $scope): ?PlaylistReadView
+    {
+        return $this->playlistRepository->findRead($playlistId, $scope);
     }
 
     /**

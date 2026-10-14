@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Playlist\Interface\Controller;
 
 use App\Catalog\Application\Port\SongPortInterface;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
+use App\Playlist\Application\Port\PlaylistCollaboratorResolverInterface;
 use App\Playlist\Application\Port\PlaylistPortInterface;
 use App\Playlist\Domain\Model\Playlist;
 use App\Playlist\Interface\Controller\PlaylistController;
@@ -34,6 +35,7 @@ final class PlaylistIdentityTest extends TestCase
             $this->createStub(SongPortInterface::class),
             $bus,
             $this->createStub(LibraryReadScopeProviderInterface::class),
+            $this->createStub(PlaylistCollaboratorResolverInterface::class),
         );
 
         self::assertSame(401, $controller->index(new Request())->getStatusCode());
@@ -59,6 +61,7 @@ final class PlaylistIdentityTest extends TestCase
             $songs,
             $this->createStub(MessageBusInterface::class),
             $scopes,
+            $this->createStub(PlaylistCollaboratorResolverInterface::class),
         );
 
         $this->expectException(AccessDeniedException::class);

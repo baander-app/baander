@@ -20,6 +20,7 @@ use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Shared\Application\Exception\NotFoundException;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Tests\Fixtures\Library\InMemoryLibraryRepository;
@@ -57,6 +58,11 @@ final class LibraryAccessHandlersTest extends TestCase
                 }
 
                 throw new NotFoundException(sprintf('User "%s" not found.', $identifier));
+            }
+
+            public function userIdByPublicId(PublicId $publicId): Uuid
+            {
+                throw new NotFoundException(sprintf('User "%s" not found.', $publicId));
             }
         };
         $this->access = new class implements LibraryAccessPortInterface {

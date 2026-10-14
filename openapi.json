@@ -11765,7 +11765,8 @@
                 "tags": [
                     "Playlist"
                 ],
-                "summary": "List playlists belonging to the authenticated user",
+                "summary": "List the playlists the authenticated user owns or collaborates on",
+                "description": "Each playlist carries the owner's public id and the number of songs the caller can see.",
                 "operationId": "get_playlist_index",
                 "responses": {
                     "200": {
@@ -11912,10 +11913,21 @@
                                                     "maxLength": 21,
                                                     "minLength": 21
                                                 },
-                                                "userId": {
+                                                "ownerPublicId": {
                                                     "type": "string",
-                                                    "format": "uuid",
-                                                    "example": "660f9510-f30c-52e5-b827-557755550111"
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "example": "oWn3rPubL1cIdExampl_1",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
+                                                },
+                                                "collaboratorPublicIds": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                        "maxLength": 21,
+                                                        "minLength": 21
+                                                    }
                                                 },
                                                 "name": {
                                                     "type": "string",
@@ -12092,6 +12104,16 @@
                             }
                         }
                     },
+                    "403": {
+                        "description": "Only the owner may delete the playlist",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Not found",
                         "content": {
@@ -12138,6 +12160,11 @@
                                     "isPublic": {
                                         "type": "boolean",
                                         "nullable": true
+                                    },
+                                    "isCollaborative": {
+                                        "description": "The owner's switch for collaborator editing; collaborators keep viewing while it is off",
+                                        "type": "boolean",
+                                        "nullable": true
                                     }
                                 },
                                 "type": "object"
@@ -12163,6 +12190,16 @@
                     },
                     "401": {
                         "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Only the owner may update the playlist",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -12262,8 +12299,18 @@
                             }
                         }
                     },
+                    "403": {
+                        "description": "Only the owner, or a collaborator while the playlist is collaborative, may change its songs",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "404": {
-                        "description": "Not found",
+                        "description": "Playlist not found, or the song does not exist or is not visible to the caller",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -12326,8 +12373,162 @@
                             }
                         }
                     },
+                    "403": {
+                        "description": "Only the owner, or a collaborator while the playlist is collaborative, may change its songs",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/playlists/{publicId}/collaborators/{userPublicId}": {
+            "put": {
+                "tags": [
+                    "Playlist"
+                ],
+                "summary": "Add a collaborator to a playlist",
+                "description": "Only the owner may add collaborators. A collaborator may view the playlist, and may change its songs while the playlist is collaborative. Adding a user who already collaborates changes nothing.",
+                "operationId": "put_playlist_add_collaborator",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "description": "Playlist public ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "userPublicId",
+                        "in": "path",
+                        "description": "The user's public id",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "The user is a collaborator"
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Only the owner may manage the collaborators",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Playlist not found, the value is not a public id, or no user has it",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The owner named themself",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Playlist"
+                ],
+                "summary": "Remove a collaborator from a playlist",
+                "description": "The owner may remove any collaborator; a collaborator may remove their own row to leave. Removing a user who does not collaborate changes nothing.",
+                "operationId": "delete_playlist_remove_collaborator",
+                "parameters": [
+                    {
+                        "name": "publicId",
+                        "in": "path",
+                        "description": "Playlist public ID",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "userPublicId",
+                        "in": "path",
+                        "description": "The user's public id",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "The user is not a collaborator"
+                    },
+                    "401": {
+                        "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Only the owner may remove another user; only a collaborator may leave",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Playlist not found, the value is not a public id, or no user has it",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -12402,6 +12603,16 @@
                     },
                     "401": {
                         "description": "Not authenticated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Only the owner, or a collaborator while the playlist is collaborative, may change its songs",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -22135,6 +22346,12 @@
                         "type": "boolean",
                         "example": true,
                         "nullable": true
+                    },
+                    "isCollaborative": {
+                        "description": "The owner's switch for collaborator editing",
+                        "type": "boolean",
+                        "example": false,
+                        "nullable": true
                     }
                 },
                 "type": "object"
@@ -24815,7 +25032,8 @@
                 "required": [
                     "uuid",
                     "publicId",
-                    "userId",
+                    "ownerPublicId",
+                    "collaboratorPublicIds",
                     "name",
                     "isPublic",
                     "isCollaborative",
@@ -24836,10 +25054,22 @@
                         "maxLength": 21,
                         "minLength": 21
                     },
-                    "userId": {
-                        "description": "Owner user UUID",
+                    "ownerPublicId": {
+                        "description": "The owner's public id",
                         "type": "string",
-                        "format": "uuid"
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
+                    },
+                    "collaboratorPublicIds": {
+                        "description": "The public ids of the collaborators, oldest first",
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
+                        }
                     },
                     "name": {
                         "description": "Playlist name",
@@ -24855,7 +25085,7 @@
                         "type": "boolean"
                     },
                     "isCollaborative": {
-                        "description": "Whether the playlist is collaborative",
+                        "description": "Whether collaborators may change the songs",
                         "type": "boolean"
                     },
                     "isSmart": {
@@ -24863,7 +25093,7 @@
                         "type": "boolean"
                     },
                     "songCount": {
-                        "description": "Number of accessible songs",
+                        "description": "Number of songs the viewer can see",
                         "type": "integer"
                     },
                     "createdAt": {

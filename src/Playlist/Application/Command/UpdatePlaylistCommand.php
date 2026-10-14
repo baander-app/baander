@@ -13,6 +13,7 @@ final readonly class UpdatePlaylistCommand
         private string $name,
         private ?string $description,
         private bool $isPublic,
+        private bool $isCollaborative,
     ) {
     }
 
@@ -34,5 +35,10 @@ final readonly class UpdatePlaylistCommand
     public function isPublic(): bool
     {
         return $this->isPublic;
+    }
+
+    public function isCollaborative(): bool
+    {
+        return $this->isCollaborative;
     }
 }

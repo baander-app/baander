@@ -23,8 +23,16 @@ interface PlaylistRepositoryInterface
      */
     public function findByUser(Uuid $userId): array;
 
-    /** @return list<PlaylistReadView> */
-    public function findReadByUser(Uuid $ownerId, LibraryReadScope $scope): array;
+    /**
+     * The playlists the actor owns or collaborates on, by name, each with the number of
+     * songs the actor can see under the scope.
+     *
+     * @return list<PlaylistReadView>
+     */
+    public function findReadByUser(Uuid $actorId, LibraryReadScope $scope): array;
+
+    /** One playlist as the viewer reads it: the song count is the viewer's visible count. */
+    public function findRead(Uuid $playlistId, LibraryReadScope $scope): ?PlaylistReadView;
 
     public function findWithSongs(Uuid $id): ?Playlist;
 

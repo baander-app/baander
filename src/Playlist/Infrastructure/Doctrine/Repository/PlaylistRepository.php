@@ -17,6 +17,7 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\QueryBuilder;
 
 final class PlaylistRepository implements PlaylistRepositoryInterface
 {
@@ -70,37 +71,77 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
         return array_map(fn(PlaylistEntity $entity) => $this->toDomain($entity), $entities);
     }
 
-    public function findReadByUser(Uuid $ownerId, LibraryReadScope $scope): array
+    public function findReadByUser(Uuid $actorId, LibraryReadScope $scope): array
     {
-        $query = $this->entityManager->createQueryBuilder()
+        $collaborated = sprintf(
+            'SELECT shared.id FROM %s c INNER JOIN c.playlist shared WHERE IDENTITY(c.user) = :actorId',
+            PlaylistCollaboratorEntity::class,
+        );
+        $query = $this->readProjection()
+            ->where(sprintf('IDENTITY(p.user) = :actorId OR p.id IN (%s)', $collaborated))
+            ->setParameter('actorId', $actorId, 'uuid')
+            ->orderBy('p.name', 'ASC')
+            ->addOrderBy('p.id', 'ASC');
+
+        return $this->readViews($query, $scope);
+    }
+
+    public function findRead(Uuid $playlistId, LibraryReadScope $scope): ?PlaylistReadView
+    {
+        $query = $this->readProjection()
+            ->where('p.id = :playlistId')
+            ->setParameter('playlistId', $playlistId, 'uuid');
+
+        return $this->readViews($query, $scope)[0] ?? null;
+    }
+
+    /**
+     * The list projection: metadata and the owner's public id, no songs, since no save follows a read.
+     */
+    private function readProjection(): QueryBuilder
+    {
+        return $this->entityManager->createQueryBuilder()
             ->select(
-                'p.id, p.publicId, IDENTITY(p.user) AS userId',
+                'p.id, p.publicId, owner.publicId AS ownerPublicId',
                 'p.name, p.description, p.isPublic, p.isCollaborative, p.isSmart',
                 'p.smartRules, p.createdAt, p.updatedAt',
             )
             ->from(PlaylistEntity::class, 'p')
-            ->where('IDENTITY(p.user) = :ownerId')
-            ->setParameter('ownerId', $ownerId, 'uuid')
-            ->orderBy('p.name', 'ASC')
-            ->addOrderBy('p.id', 'ASC');
+            ->innerJoin('p.user', 'owner');
+    }
 
+    /**
+     * Runs the projection and completes each row with its collaborators' public ids and
+     * the number of songs visible under the scope.
+     *
+     * @return list<PlaylistReadView>
+     */
+    private function readViews(QueryBuilder $query, LibraryReadScope $scope): array
+    {
         if ($scope->isUnrestricted()) {
-            $query->addSelect('COUNT(membership.id) AS songCount')
-                ->leftJoin(PlaylistSongEntity::class, 'membership', 'WITH', 'membership.playlist = p.id')
-                ->groupBy('p.id');
+            $query->addSelect(sprintf(
+                '(SELECT COUNT(membership.id) FROM %s membership WHERE membership.playlist = p.id) AS songCount',
+                PlaylistSongEntity::class,
+            ));
         }
 
         /**
          * @var list<array{
-         *     id: Uuid, publicId: PublicId, userId: string, name: string,
+         *     id: Uuid, publicId: PublicId, ownerPublicId: PublicId, name: string,
          *     description: ?string, isPublic: bool, isCollaborative: bool, isSmart: bool,
          *     smartRules: array<array-key, mixed>, createdAt: \DateTimeImmutable,
          *     updatedAt: \DateTimeImmutable, songCount?: int|string
          * }> $rows
          */
         $rows = $query->getQuery()->getArrayResult();
+        if ($rows === []) {
+            return [];
+        }
+
+        $playlistIds = array_map(static fn (array $row): Uuid => $row['id'], $rows);
+        $collaborators = $this->loadCollaboratorPublicIdsByPlaylist($playlistIds);
         if (!$scope->isUnrestricted()) {
-            $visibleCounts = $rows === [] ? [] : $this->countVisibleSongsByPlaylist($ownerId, $scope);
+            $visibleCounts = $this->countVisibleSongsByPlaylist($playlistIds, $scope);
             foreach ($rows as $index => $row) {
                 $rows[$index]['songCount'] = $visibleCounts[$row['id']->toString()] ?? 0;
             }
@@ -109,7 +150,8 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
         return array_map(static fn (array $row): PlaylistReadView => new PlaylistReadView(
             id: $row['id'],
             publicId: $row['publicId'],
-            userId: Uuid::fromString($row['userId']),
+            ownerPublicId: $row['ownerPublicId'],
+            collaboratorPublicIds: $collaborators[$row['id']->toString()] ?? [],
             name: $row['name'],
             description: $row['description'],
             isPublic: $row['isPublic'],
@@ -123,11 +165,41 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
     }
 
     /**
-     * Counts each owned playlist's entries whose songs Catalog reports visible under the scope.
+     * The collaborators' public ids of each playlist, oldest row first.
      *
+     * @param list<Uuid> $playlistIds
+     * @return array<string, list<PublicId>> playlist UUID => public ids; playlists without one are absent
+     */
+    private function loadCollaboratorPublicIdsByPlaylist(array $playlistIds): array
+    {
+        /** @var list<array{playlistId: Uuid, userPublicId: PublicId}> $rows */
+        $rows = $this->entityManager->createQueryBuilder()
+            ->select('shared.id AS playlistId', 'collaborator.publicId AS userPublicId')
+            ->from(PlaylistCollaboratorEntity::class, 'c')
+            ->innerJoin('c.playlist', 'shared')
+            ->innerJoin('c.user', 'collaborator')
+            ->where('shared.id IN (:playlistIds)')
+            ->setParameter('playlistIds', $playlistIds)
+            ->orderBy('c.createdAt', 'ASC')
+            ->addOrderBy('c.id', 'ASC')
+            ->getQuery()
+            ->getArrayResult();
+
+        $byPlaylist = [];
+        foreach ($rows as $row) {
+            $byPlaylist[$row['playlistId']->toString()][] = $row['userPublicId'];
+        }
+
+        return $byPlaylist;
+    }
+
+    /**
+     * Counts each playlist's entries whose songs Catalog reports visible under the scope.
+     *
+     * @param list<Uuid> $playlistIds
      * @return array<string, int> playlist UUID => visible entry count; playlists without one are absent
      */
-    private function countVisibleSongsByPlaylist(Uuid $ownerId, LibraryReadScope $scope): array
+    private function countVisibleSongsByPlaylist(array $playlistIds, LibraryReadScope $scope): array
     {
         if ($scope->getLibraryIds() === []) {
             return [];
@@ -137,9 +209,8 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
         $memberships = $this->entityManager->createQueryBuilder()
             ->select('IDENTITY(membership.playlist) AS playlistId', 'membership.songId')
             ->from(PlaylistSongEntity::class, 'membership')
-            ->innerJoin('membership.playlist', 'p')
-            ->where('IDENTITY(p.user) = :ownerId')
-            ->setParameter('ownerId', $ownerId, 'uuid')
+            ->where('membership.playlist IN (:playlistIds)')
+            ->setParameter('playlistIds', $playlistIds)
             ->getQuery()
             ->getArrayResult();
         if ($memberships === []) {

@@ -6,10 +6,13 @@ namespace App\Playlist\Interface\Controller;
 
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
+use App\Playlist\Application\Command\AddCollaboratorCommand;
 use App\Playlist\Application\Command\AddSongCommand;
 use App\Playlist\Application\Command\CreatePlaylistCommand;
+use App\Playlist\Application\Command\RemoveCollaboratorCommand;
 use App\Playlist\Application\Command\RemoveSongCommand;
 use App\Playlist\Application\Command\UpdatePlaylistCommand;
+use App\Playlist\Application\Port\PlaylistCollaboratorResolverInterface;
 use App\Playlist\Application\Port\PlaylistPortInterface;
 use App\Playlist\Domain\Model\Playlist;
 use App\Playlist\Interface\Request\AddSongRequest;
@@ -54,21 +57,26 @@ final class PlaylistController
         'LEAVE' => 'Only a collaborator may leave this playlist.',
     ];
 
+    /** A user's public id as it appears in a route: 21 characters of the public-id alphabet. */
+    private const string PUBLIC_ID_REQUIREMENT = '[0-9a-zA-Z_-]{21}';
+
     public function __construct(
         private readonly Security $security,
         private readonly PlaylistPortInterface $playlistService,
         private readonly SongPortInterface $songService,
         private readonly MessageBusInterface $commandBus,
         private readonly LibraryReadScopeProviderInterface $libraryScopes,
+        private readonly PlaylistCollaboratorResolverInterface $collaborators,
     ) {
     }
 
     /**
-     * List playlists belonging to the authenticated user.
+     * List the playlists the authenticated user owns or collaborates on.
      */
     #[OA\Get(
         path: '/api/playlists/',
-        summary: 'List playlists belonging to the authenticated user',
+        summary: 'List the playlists the authenticated user owns or collaborates on',
+        description: 'Each playlist carries the owner\'s public id and the number of songs the caller can see.',
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: PlaylistResource::class)))], type: 'object',
@@ -140,8 +148,11 @@ final class PlaylistController
         ));
 
         $playlist = $envelope->last(HandledStamp::class)?->getResult();
+        if (!$playlist instanceof Playlist) {
+            throw new \LogicException('Playlist creation did not return a playlist.');
+        }
 
-        return $this->created(PlaylistResource::from($playlist));
+        return $this->created($this->readResource($playlist));
     }
 
     /**
@@ -159,7 +170,8 @@ final class PlaylistController
                     new OA\Property(property: 'data', properties: [
                         new OA\Property(property: 'uuid', type: 'string', format: 'uuid', example: '550e8400-e29b-41d4-a716-446655440000'),
                         new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, example: 'aB3dE5fG7hJ9kL1mN3pQr'),
-                        new OA\Property(property: 'userId', type: 'string', format: 'uuid', example: '660f9510-f30c-52e5-b827-557755550111'),
+                        new OA\Property(property: 'ownerPublicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, example: 'oWn3rPubL1cIdExampl_1'),
+                        new OA\Property(property: 'collaboratorPublicIds', type: 'array', items: new OA\Items(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
                         new OA\Property(property: 'name', type: 'string', example: 'My Favorites'),
                         new OA\Property(property: 'description', type: 'string', nullable: true, example: 'A collection of my favorite songs'),
                         new OA\Property(property: 'isPublic', type: 'boolean', example: true),
@@ -238,7 +250,7 @@ final class PlaylistController
         }
 
         return $this->successResponse(array_merge(
-            PlaylistResource::from($playlist),
+            $this->readResource($playlist),
             ['songs' => $songs, 'songCount' => count($songs)],
         ));
     }
@@ -258,6 +270,7 @@ final class PlaylistController
                         new OA\Property(property: 'name', type: 'string', nullable: true),
                         new OA\Property(property: 'description', type: 'string', nullable: true),
                         new OA\Property(property: 'isPublic', type: 'boolean', nullable: true),
+                        new OA\Property(property: 'isCollaborative', type: 'boolean', nullable: true, description: "The owner's switch for collaborator editing; collaborators keep viewing while it is off"),
                     ],
                 ),
             ),
@@ -270,6 +283,7 @@ final class PlaylistController
                 properties: [new OA\Property(property: 'data', ref: new Model(type: PlaylistResource::class))], type: 'object',
             )),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '403', description: 'Only the owner may update the playlist', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
@@ -287,6 +301,7 @@ final class PlaylistController
         $name = $payload->name ?? $playlist->getName();
         $description = $payload->description ?? $playlist->getDescription();
         $isPublic = $payload->isPublic ?? $playlist->isPublic();
+        $isCollaborative = $payload->isCollaborative ?? $playlist->isCollaborative();
 
         if (trim($name) === '') {
             return $this->errorResponse('Playlist name cannot be empty.');
@@ -297,22 +312,15 @@ final class PlaylistController
             name: $name,
             description: $description,
             isPublic: $isPublic,
+            isCollaborative: $isCollaborative,
         ));
 
         $updatedPlaylist = $envelope->last(HandledStamp::class)?->getResult();
         if (!$updatedPlaylist instanceof Playlist) {
             throw new \LogicException('Playlist update did not return a playlist.');
         }
-        $songIds = array_map(
-            static fn(\App\Playlist\Domain\Model\PlaylistSong $song) => $song->getSongId(),
-            $updatedPlaylist->getSongs(),
-        );
-        $visibleCount = count($this->songService->findVisibleByUuids($songIds, $this->libraryScopes->current()));
 
-        return $this->successResponse(array_merge(
-            PlaylistResource::from($updatedPlaylist),
-            ['songCount' => $visibleCount],
-        ));
+        return $this->successResponse($this->readResource($updatedPlaylist));
     }
 
     /**
@@ -327,6 +335,7 @@ final class PlaylistController
         responses: [
             new OA\Response(response: '204', description: 'Deleted'),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '403', description: 'Only the owner may delete the playlist', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
@@ -374,7 +383,8 @@ final class PlaylistController
                 ], type: 'object',
             )),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '403', description: 'Only the owner, or a collaborator while the playlist is collaborative, may change its songs', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '404', description: 'Playlist not found, or the song does not exist or is not visible to the caller', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
@@ -424,6 +434,7 @@ final class PlaylistController
         responses: [
             new OA\Response(response: '204', description: 'Deleted'),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '403', description: 'Only the owner, or a collaborator while the playlist is collaborative, may change its songs', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
@@ -446,6 +457,93 @@ final class PlaylistController
         $this->commandBus->dispatch(new RemoveSongCommand(
             playlistId: $playlist->getId(),
             songId: $resolvedSongId,
+        ));
+
+        return $this->noContent();
+    }
+
+    /**
+     * Add a collaborator. Only the owner may; adding a user who already collaborates changes nothing.
+     */
+    #[OA\Put(
+        path: '/api/playlists/{publicId}/collaborators/{userPublicId}',
+        summary: 'Add a collaborator to a playlist',
+        description: 'Only the owner may add collaborators. A collaborator may view the playlist, and may change its songs while the playlist is collaborative. Adding a user who already collaborates changes nothing.',
+        parameters: [
+            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'userPublicId', description: "The user's public id", in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+        ],
+        responses: [
+            new OA\Response(response: '204', description: 'The user is a collaborator'),
+            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '403', description: 'Only the owner may manage the collaborators', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '404', description: 'Playlist not found, the value is not a public id, or no user has it', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '422', description: 'The owner named themself', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        ],
+    )]
+    #[Route('/{publicId}/collaborators/{userPublicId}', name: 'add_collaborator', requirements: ['userPublicId' => self::PUBLIC_ID_REQUIREMENT], methods: ['PUT'])]
+    public function addCollaborator(string $publicId, string $userPublicId): JsonResponse
+    {
+        $playlist = $this->resolvePlaylist($publicId);
+        if ($playlist === null) {
+            return $this->notFound();
+        }
+
+        $this->authorize('MANAGE_COLLABORATORS', $playlist);
+
+        $this->commandBus->dispatch(new AddCollaboratorCommand(
+            playlistId: $playlist->getId(),
+            userPublicId: PublicId::fromString($userPublicId),
+        ));
+
+        return $this->noContent();
+    }
+
+    /**
+     * Remove a collaborator. The owner may remove any; a collaborator may remove their own
+     * row, which is leaving. Removing a user who does not collaborate changes nothing.
+     */
+    #[OA\Delete(
+        path: '/api/playlists/{publicId}/collaborators/{userPublicId}',
+        summary: 'Remove a collaborator from a playlist',
+        description: 'The owner may remove any collaborator; a collaborator may remove their own row to leave. Removing a user who does not collaborate changes nothing.',
+        parameters: [
+            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'userPublicId', description: "The user's public id", in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+        ],
+        responses: [
+            new OA\Response(response: '204', description: 'The user is not a collaborator'),
+            new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '403', description: 'Only the owner may remove another user; only a collaborator may leave', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '404', description: 'Playlist not found, the value is not a public id, or no user has it', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+        ],
+    )]
+    #[Route('/{publicId}/collaborators/{userPublicId}', name: 'remove_collaborator', requirements: ['userPublicId' => self::PUBLIC_ID_REQUIREMENT], methods: ['DELETE'])]
+    public function removeCollaborator(string $publicId, string $userPublicId): JsonResponse
+    {
+        $playlist = $this->resolvePlaylist($publicId);
+        if ($playlist === null) {
+            return $this->notFound();
+        }
+
+        $resolvedUserPublicId = PublicId::fromString($userPublicId);
+        if (!$this->security->isGranted('MANAGE_COLLABORATORS', $playlist)) {
+            // Not the owner: the only admissible request names the actor's own row.
+            $userId = $this->collaborators->userId($resolvedUserPublicId);
+            $actor = $this->security->getUser();
+            if (!$actor instanceof AuthenticatedUserIdentityInterface || !$userId->equals(Uuid::fromString($actor->getId()))) {
+                throw new AccessDeniedException(self::REFUSAL_MESSAGES['MANAGE_COLLABORATORS']);
+            }
+            if (!$playlist->isCollaborator($userId)) {
+                // Nothing to leave: the actor already holds no row.
+                return $this->noContent();
+            }
+            $this->authorize('LEAVE', $playlist);
+        }
+
+        $this->commandBus->dispatch(new RemoveCollaboratorCommand(
+            playlistId: $playlist->getId(),
+            userPublicId: $resolvedUserPublicId,
         ));
 
         return $this->noContent();
@@ -479,6 +577,7 @@ final class PlaylistController
                 ], type: 'object')], type: 'object',
             )),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '403', description: 'Only the owner, or a collaborator while the playlist is collaborative, may change its songs', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
@@ -534,6 +633,20 @@ final class PlaylistController
         }
 
         return $this->playlistService->findByPublicId($resolvedPublicId);
+    }
+
+    /**
+     * The playlist as the caller reads it: public ids for the owner and collaborators,
+     * and the caller's visible song count.
+     *
+     * @return array<string, mixed>
+     */
+    private function readResource(Playlist $playlist): array
+    {
+        $view = $this->playlistService->findRead($playlist->getId(), $this->libraryScopes->current())
+            ?? throw new \LogicException(sprintf('Playlist %s vanished while answering.', $playlist->getId()->toString()));
+
+        return PlaylistResource::from($view);
     }
 
     /**

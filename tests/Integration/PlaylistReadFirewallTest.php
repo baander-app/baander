@@ -167,7 +167,7 @@ final class PlaylistReadFirewallTest extends TestCase
         }
         self::assertSame(200, $response->getStatusCode());
         $data = json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR)['data'];
-        self::assertSame($this->owner->getId()->toString(), $data['userId']);
+        self::assertSame($this->owner->getPublicId()->toString(), $data['ownerPublicId']);
         $expectedCount = $actor === 'admin' ? 2 : 1;
         self::assertSame($expectedCount, $data['songCount']);
         self::assertCount($expectedCount, $data['songs']);
@@ -200,7 +200,7 @@ final class PlaylistReadFirewallTest extends TestCase
         $data = json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR)['data'];
         self::assertCount($actor === 'owner' ? 3 : 0, $data);
         foreach ($data as $playlist) {
-            self::assertSame($this->owner->getId()->toString(), $playlist['userId']);
+            self::assertSame($this->owner->getPublicId()->toString(), $playlist['ownerPublicId']);
             self::assertSame(1, $playlist['songCount']);
         }
     }

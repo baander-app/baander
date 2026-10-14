@@ -626,6 +626,11 @@ export interface UpdatePlaylistRequest {
   description?: string | null;
   /** @nullable */
   isPublic?: boolean | null;
+  /**
+     * The owner's switch for collaborator editing
+     * @nullable
+     */
+  isCollaborative?: boolean | null;
 }
 
 export interface AddSongRequest {
@@ -2137,8 +2142,20 @@ export interface PlaylistResource {
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   publicId: string;
-  /** Owner user UUID */
-  userId: string;
+  /**
+     * The owner's public id
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  ownerPublicId: string;
+  /**
+     * The public ids of the collaborators, oldest first
+     * @items.minLength 21
+     * @items.maxLength 21
+     * @items.pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  collaboratorPublicIds: string[];
   /** Playlist name */
   name: string;
   /**
@@ -2148,11 +2165,11 @@ export interface PlaylistResource {
   description?: string | null;
   /** Whether the playlist is public */
   isPublic: boolean;
-  /** Whether the playlist is collaborative */
+  /** Whether collaborators may change the songs */
   isCollaborative: boolean;
   /** Whether the playlist is auto-generated */
   isSmart: boolean;
-  /** Number of accessible songs */
+  /** Number of songs the viewer can see */
   songCount: number;
   /** Creation timestamp */
   createdAt: string;
@@ -5059,7 +5076,18 @@ export type GetPlaylistShow200Data = {
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   publicId?: string;
-  userId?: string;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  ownerPublicId?: string;
+  /**
+     * @items.minLength 21
+     * @items.maxLength 21
+     * @items.pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  collaboratorPublicIds?: string[];
   name?: string;
   /** @nullable */
   description?: string | null;
@@ -5086,6 +5114,11 @@ export type PatchPlaylistUpdateBody = {
   description?: string | null;
   /** @nullable */
   isPublic?: boolean | null;
+  /**
+     * The owner's switch for collaborator editing; collaborators keep viewing while it is off
+     * @nullable
+     */
+  isCollaborative?: boolean | null;
 };
 
 export type PatchPlaylistUpdate200 = {
@@ -21341,7 +21374,8 @@ export const getGetPlaylistIndexUrl = () => {
 }
 
 /**
- * @summary List playlists belonging to the authenticated user
+ * Each playlist carries the owner's public id and the number of songs the caller can see.
+ * @summary List the playlists the authenticated user owns or collaborates on
  */
 export const getPlaylistIndex = async ( options?: RequestInit): Promise<GetPlaylistIndex200> => {
 
@@ -21412,7 +21446,7 @@ export function useGetPlaylistIndex<TData = Awaited<ReturnType<typeof getPlaylis
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary List playlists belonging to the authenticated user
+ * @summary List the playlists the authenticated user owns or collaborates on
  */
 
 export function useGetPlaylistIndex<TData = Awaited<ReturnType<typeof getPlaylistIndex>>, TError = ErrorType<ApiError>>(
@@ -21512,7 +21546,7 @@ export const getGetPlaylistShowUrl = (publicId: string,) => {
 }
 
 /**
- * @summary Get an owned playlist and accessible songs (administrators may read any playlist)
+ * @summary Get a playlist and its accessible songs (owner, collaborators and administrators)
  */
 export const getPlaylistShow = async (publicId: string, options?: RequestInit): Promise<GetPlaylistShow200> => {
 
@@ -21583,7 +21617,7 @@ export function useGetPlaylistShow<TData = Awaited<ReturnType<typeof getPlaylist
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get an owned playlist and accessible songs (administrators may read any playlist)
+ * @summary Get a playlist and its accessible songs (owner, collaborators and administrators)
  */
 
 export function useGetPlaylistShow<TData = Awaited<ReturnType<typeof getPlaylistShow>>, TError = ErrorType<ApiError>>(
@@ -21886,6 +21920,152 @@ export const useDeletePlaylistRemoveSong = <TError = ErrorType<ApiError>,
         TContext
       > => {
       return useMutation(getDeletePlaylistRemoveSongMutationOptions(options), queryClient);
+    }
+
+export const getPutPlaylistAddCollaboratorUrl = (publicId: string,
+    userPublicId: string,) => {
+
+
+
+
+  return `/api/playlists/${publicId}/collaborators/${userPublicId}`
+}
+
+/**
+ * Only the owner may add collaborators. A collaborator may view the playlist, and may change its songs while the playlist is collaborative. Adding a user who already collaborates changes nothing.
+ * @summary Add a collaborator to a playlist
+ */
+export const putPlaylistAddCollaborator = async (publicId: string,
+    userPublicId: string, options?: RequestInit): Promise<void> => {
+
+  return customInstance<void>(getPutPlaylistAddCollaboratorUrl(publicId,userPublicId),
+  {
+    ...options,
+    method: 'PUT'
+
+
+  }
+);}
+
+
+
+
+export const getPutPlaylistAddCollaboratorMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putPlaylistAddCollaborator>>, TError,{publicId: string;userPublicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof putPlaylistAddCollaborator>>, TError,{publicId: string;userPublicId: string}, TContext> => {
+
+const mutationKey = ['putPlaylistAddCollaborator'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putPlaylistAddCollaborator>>, {publicId: string;userPublicId: string}> = (props) => {
+          const {publicId,userPublicId} = props ?? {};
+
+          return  putPlaylistAddCollaborator(publicId,userPublicId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PutPlaylistAddCollaboratorMutationResult = NonNullable<Awaited<ReturnType<typeof putPlaylistAddCollaborator>>>
+
+    export type PutPlaylistAddCollaboratorMutationError = ErrorType<ApiError>
+
+    /**
+ * @summary Add a collaborator to a playlist
+ */
+export const usePutPlaylistAddCollaborator = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putPlaylistAddCollaborator>>, TError,{publicId: string;userPublicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof putPlaylistAddCollaborator>>,
+        TError,
+        {publicId: string;userPublicId: string},
+        TContext
+      > => {
+      return useMutation(getPutPlaylistAddCollaboratorMutationOptions(options), queryClient);
+    }
+
+export const getDeletePlaylistRemoveCollaboratorUrl = (publicId: string,
+    userPublicId: string,) => {
+
+
+
+
+  return `/api/playlists/${publicId}/collaborators/${userPublicId}`
+}
+
+/**
+ * The owner may remove any collaborator; a collaborator may remove their own row to leave. Removing a user who does not collaborate changes nothing.
+ * @summary Remove a collaborator from a playlist
+ */
+export const deletePlaylistRemoveCollaborator = async (publicId: string,
+    userPublicId: string, options?: RequestInit): Promise<void> => {
+
+  return customInstance<void>(getDeletePlaylistRemoveCollaboratorUrl(publicId,userPublicId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeletePlaylistRemoveCollaboratorMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePlaylistRemoveCollaborator>>, TError,{publicId: string;userPublicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deletePlaylistRemoveCollaborator>>, TError,{publicId: string;userPublicId: string}, TContext> => {
+
+const mutationKey = ['deletePlaylistRemoveCollaborator'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deletePlaylistRemoveCollaborator>>, {publicId: string;userPublicId: string}> = (props) => {
+          const {publicId,userPublicId} = props ?? {};
+
+          return  deletePlaylistRemoveCollaborator(publicId,userPublicId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeletePlaylistRemoveCollaboratorMutationResult = NonNullable<Awaited<ReturnType<typeof deletePlaylistRemoveCollaborator>>>
+
+    export type DeletePlaylistRemoveCollaboratorMutationError = ErrorType<ApiError>
+
+    /**
+ * @summary Remove a collaborator from a playlist
+ */
+export const useDeletePlaylistRemoveCollaborator = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePlaylistRemoveCollaborator>>, TError,{publicId: string;userPublicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof deletePlaylistRemoveCollaborator>>,
+        TError,
+        {publicId: string;userPublicId: string},
+        TContext
+      > => {
+      return useMutation(getDeletePlaylistRemoveCollaboratorMutationOptions(options), queryClient);
     }
 
 export const getPostPlaylistReorderUrl = (publicId: string,) => {

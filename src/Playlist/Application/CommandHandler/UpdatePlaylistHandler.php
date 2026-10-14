@@ -30,6 +30,7 @@ final class UpdatePlaylistHandler
             $command->getName(),
             $command->getDescription(),
             $command->isPublic(),
+            $command->isCollaborative(),
         );
 
         $this->playlistRepository->save($playlist);
