@@ -901,6 +901,11 @@ services:
     Symfony\Bridge\Monolog\Processor\WebProcessor:
         tags: [ 'monolog.processor' ]
 
+    # Runs after the web processor (lower priority) so the request URL it adds is redacted too.
+    App\Shared\Infrastructure\Logging\StreamSignatureRedactionProcessor:
+        tags:
+            - { name: 'monolog.processor', priority: -10 }
+
     # --- Per-Context Logger Channel Bindings ---
     # Handled by BoundedContextLoggerPass (registers automatically via Kernel)
 
