@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-10-11. This is the working delivery record for the remediation,
+Updated: 2026-10-14. This is the working delivery record for the remediation,
 registry, and web-state plans. Update it when scope changes or a stage is verified.
 Completed code is not proof of production or performance qualification.
 
@@ -17,6 +17,68 @@ Read [AGENTS.md](AGENTS.md) for working rules and the
 roadmap records scope and acceptance; the linked design documents, current source,
 and CI workflow are the executable detail. Measurements in later historical
 batches describe their own checkpoints; the current gate below takes precedence.
+
+### Handoff state on 2026-10-14
+
+Any harness can take over from this section; nothing below depends on a tool that
+only one agent host has.
+
+- **Branch.** `plan/item8-catalog-authorization` (973b2db5) holds item 8: fifteen
+  commits on top of `master` (63466d0d), code-reviewed with both findings applied,
+  every gate green (the item 8 checkpoint below), working tree clean. It is neither
+  merged nor pushed; the next action, when the user asks, is a fast-forward merge
+  into `master` and a push of `master` to both remotes.
+- **History.** On 2026-10-14 the `Claude-Session:` trailer was removed from the 25
+  local commits that carried it (12 on `master` from 61ce0205 onward, 13 on the
+  branch) with a message filter; every tree is unchanged, so `git diff` between an
+  old and its rewritten commit is empty. Local `master` therefore has the same
+  content as `origin/master` and `baander-github/master` (71df8f57) under new
+  hashes, and pushing `master` needs `git push --force-with-lease` to both remotes.
+  Any other checkout of `master` must then reset to the pushed history; the
+  pre-rewrite heads stay in the reflog until it expires.
+- **Remotes.** `origin` is the Forgejo instance (`ssh://git@192.168.50.151:222/martin/baander.git`,
+  whose `.forgejo/workflows/ci.yaml` is the authoritative gate) and `baander-github`
+  is `git@github.com:baander-app/baander.git`. Push only when the user asks.
+- **Gates.** Build the CI image with the command in the
+  [testing guide](docs-book/part-2-developer-guide/testing.md#running-tests) and pass
+  its tag as `BAANDER_TEST_IMAGE`; the checkpoints below used a local tag of that
+  `ci` target named `baander-ci-prewarm:local`. The suite runners are
+  `scripts/test-unit-container.sh` and `scripts/test-functional-container.sh <path>`
+  (the latter for `tests/Functional`, `tests/Integration` or one file; set
+  `BAANDER_FUNCTIONAL_TIMEOUT_ACTIVE=1`; each run gets its own network and
+  container names, so runs may overlap). The static gates run inside the same image
+  with the checkout mounted read-only at `/var/www/html`: mount `src`, `tests`,
+  `config`, `migrations`, `bin`, `templates`, `translations`, `vendor`, `packages`
+  (required: `vendor` symlinks into it), `phpstan.dist.neon`, `deptrac.yaml`,
+  `deptrac.baseline.yaml`, `composer.json`, `composer.lock`, `symfony.lock`, `.env`,
+  `.env.test` and `openapi.json`, with `--security-opt label=disable` and
+  `XDEBUG_MODE=off`, then run `php vendor/bin/phpstan analyse --memory-limit=1G`,
+  `vendor/bin/deptrac analyse --no-cache`, `php bin/console lint:container --env=test`
+  and `php bin/console app:export-openapi-spec --env=test --check`. The OpenAPI
+  export fails on the host on an unrelated PropertyInfo error, so regenerate the
+  specification in the image, writing to a path outside the mounted file and copying
+  it into the checkout. Web gates run in `ui/web`: `yarn typecheck`, `yarn lint`
+  (zero errors, seven standing warnings), `yarn test --run`, and `yarn generate`
+  after an API change. Host runs skip the integration suites and fail
+  `StagedOAuthSecretBundleTest` and the Swoole, drain and process-pool suites for
+  host reasons; use the image for the authoritative numbers.
+- **Workflow.** AGENTS.md names the compound-engineering skills (`ce-plan`,
+  `ce-doc-review`, `ce-work`, `ce-simplify-code`, `ce-code-review`). A harness
+  without them follows the same sequence by hand: a plan under `docs/plans/`
+  reviewed before implementation, a branch named after the plan, path-limited local
+  commits, a simplification pass, an independent code review whose justified findings
+  are applied, and the delivered item with its checkpoint counts recorded here.
+  Commit messages carry no agent attribution trailer.
+- **Open from item 8's review, not acted on.** Two concurrent identical
+  add-collaborator requests can hit the unique constraint and answer 500; a reorder
+  under concurrent writers has no version check; sharing has no invitation step, so
+  an owner can add any user unasked; removing a song is not judged by the actor's
+  visibility; the visible-song count materialises rows. None blocks the item.
+- **Next.** The first open lines of the
+  [application security backlog](#application-security-and-reliability): the
+  Messenger/Redis fallback in a qualified runtime, the route, schema, client and
+  identifier reconciliation, and the threat model. The local dev database note at
+  the end of this section still stands.
 
 The backend release-gate package is complete (see the next two sections). Eight
 plans followed it, in this order, and all eight are delivered:
@@ -1416,8 +1478,10 @@ contracts; neither old prose nor the current branch name establishes completion.
 
 ## Completion and next updates
 
-Before edits, refresh GitNexus and assess symbol impact. Before commits, run
-`detect_changes` and inspect the actual scope, including unindexed test callbacks.
+Before edits, assess symbol impact with whatever index the harness has (GitNexus
+where it is connected, otherwise the search tools and the test suites). Before
+commits, inspect the actual scope with `git status` and `git diff --stat`, including
+unindexed test callbacks, and commit by path.
 Keep independent changes reviewable and record checks without implying broader
 coverage. The complete programme is done only when blocking checks, security and
 workflow integrations, and registry consistency/resource/failover/restore gates pass.
