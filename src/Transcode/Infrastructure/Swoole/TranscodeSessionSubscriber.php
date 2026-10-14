@@ -799,7 +799,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
      * Determine the highest segment index produced so far in the output dir.
      *
      * Used for buffer-depth throttle calculations. The manager does not expose
-     * a getter for this (U3), so we glob the output directory — segments are
+     * a getter for this, so we glob the output directory — segments are
      * named v{vIdx}_a{aIdx}_{tier}_{seg}.m4s, segment index is the trailing group.
      */
     private function getLastProducedSegmentIndex(string $outputDir): int

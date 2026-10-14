@@ -5,6 +5,7 @@ import { generateDpopKeyPair } from '@/shared/crypto/dpop-key-pair'
 import { getDpopKeyPair } from '@/shared/crypto/dpop-store'
 import { beginStoredLogout, listPendingLogouts, type PendingLogoutEntry } from '@/shared/crypto/auth-db'
 import {
+  PENDING_LOGOUT_BACKOFF_CAP_MS,
   PENDING_LOGOUT_BACKOFF_MS,
   PENDING_LOGOUT_LOCK_WAIT_MS,
   PENDING_LOGOUT_TIMER_ATTEMPTS,
@@ -572,6 +573,100 @@ describe('drainPendingLogouts', () => {
     await vi.advanceTimersByTimeAsync(PENDING_LOGOUT_BACKOFF_MS)
     await untilRequests(4)
     expect(requests).toHaveLength(4)
+  })
+  it('caps a logout 503 Retry-After at the backoff cap, so a proxy delay of hours cannot park the timer', async () => {
+    await beginStoredLogout(entry())
+    script = () => ({ status: 503, headers: { 'retry-after': '86400' } })
+
+    await drain.drainPendingLogouts()
+
+    expect(requests).toHaveLength(1)
+    expect(vi.getTimerCount()).toBe(1)
+    await vi.advanceTimersByTimeAsync(PENDING_LOGOUT_BACKOFF_CAP_MS)
+    await untilRequests(2)
+    expect(requests).toHaveLength(2)
+  })
+
+  it('starts the timer budget over for a later logout once the list emptied', async () => {
+    await beginStoredLogout(entry())
+    script = () => 'network'
+    await drain.drainPendingLogouts()
+    for (let attempt = 0; attempt < PENDING_LOGOUT_TIMER_ATTEMPTS; attempt++) {
+      await vi.advanceTimersByTimeAsync(PENDING_LOGOUT_BACKOFF_MS * 2 ** attempt)
+      await untilRequests(2 + attempt)
+    }
+    expect(vi.getTimerCount()).toBe(0)
+    script = () => ok
+    await drain.drainPendingLogouts()
+    await expect(storedIds()).resolves.toEqual([])
+
+    // A new logout after the exhausted run gets its own timer-driven retries.
+    await beginStoredLogout(entry({ id: 'entry-2' }))
+    script = () => 'network'
+    await drain.drainPendingLogouts()
+
+    expect(vi.getTimerCount()).toBe(1)
+    const sent = requests.length
+    await vi.advanceTimersByTimeAsync(PENDING_LOGOUT_BACKOFF_MS)
+    await untilRequests(sent + 1)
+    expect(requests).toHaveLength(sent + 1)
+  })
+
+  it('runs a fresh pass for a trigger that lands while the previous pass is being scheduled', async () => {
+    await beginStoredLogout(entry())
+    script = () => 'network'
+
+    const first = drain.drainPendingLogouts()
+    await untilRequests(1)
+    // The pass has made its request and is settling; a trigger now must not be lost.
+    const second = drain.drainPendingLogouts()
+    await first
+    await second
+    await settle()
+
+    expect(requests.length).toBeGreaterThanOrEqual(2)
+    expect(vi.getTimerCount()).toBe(1)
+  })
+})
+
+describe('sendLogoutOnce', () => {
+  it('sends one logout signed with the session key and resolves on a 200', async () => {
+    const token = liveToken()
+
+    await drain.sendLogoutOnce({ keyPair, accessToken: token })
+
+    expect(requests).toHaveLength(1)
+    expect(requests[0]).toMatchObject({ url: LOGOUT_URL, method: 'POST', authorization: `DPoP ${token}`, timeout: REFRESH_ATTEMPT_TIMEOUT_MS })
+    const proof = await decodeProof(requests[0].proof!)
+    expect(proof.verified).toBe(true)
+    expect(proof.payload).toMatchObject({ htm: 'POST', htu: LOGOUT_URL, ath: await ath(token) })
+    expect(log.warnings).toHaveLength(0)
+    await expect(storedIds()).resolves.toEqual([])
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('warns and resolves when the one attempt fails, keeping no entry and no timer', async () => {
+    script = () => 'network'
+
+    await drain.sendLogoutOnce({ keyPair, accessToken: liveToken() })
+
+    expect(requests).toHaveLength(1)
+    expect(log.warnings).toHaveLength(1)
+    await expect(storedIds()).resolves.toEqual([])
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('answers one nonce challenge and then resolves', async () => {
+    script = (_request, index) => index === 0
+      ? { status: 400, data: { error: 'use_dpop_nonce' }, headers: { 'dpop-nonce': 'n-1' } }
+      : ok
+
+    await drain.sendLogoutOnce({ keyPair, accessToken: liveToken() })
+
+    expect(requests).toHaveLength(2)
+    const proof = await decodeProof(requests[1].proof!)
+    expect(proof.payload).toMatchObject({ nonce: 'n-1' })
+    expect(log.warnings).toHaveLength(0)
   })
 })
 

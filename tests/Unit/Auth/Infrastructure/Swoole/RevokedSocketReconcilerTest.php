@@ -26,7 +26,7 @@ final class RevokedSocketReconcilerTest extends TestCase
 {
     private WebSocketConnectionRegistry $registry;
     private ReconcilerRecordingLogger $logger;
-    /** @var list<list<string>> the ids each findLiveTokenIds() call asked about */
+    /** @var list<list<string>> the ids each findTokenIdsOfLiveChains() call asked about */
     private array $asked = [];
     /** @var list<string> what the repository answers */
     private array $live = [];
@@ -226,12 +226,38 @@ final class RevokedSocketReconcilerTest extends TestCase
         self::assertCount(2, $this->logger->records);
     }
 
+    public function testAQueryThatThrowsIsLoggedAndTheNextTickQueriesAgain(): void
+    {
+        $this->registry->addConnection(1, 'user-1', 0, 'token-live');
+        $this->live = ['token-live'];
+        $this->duringQuery = static function (): void {
+            throw new \RuntimeException('the database went away');
+        };
+        $connections = $this->createMock(LiveConnectionsPortInterface::class);
+        $connections->expects($this->never())->method('closeForAccessTokens');
+        $reconciler = $this->reconciler($connections);
+
+        $reconciler->tick();
+
+        self::assertSame(['error'], array_column($this->logger->records, 0));
+        [, $message, $context] = $this->logger->records[0];
+        self::assertStringContainsString('next tick', $message);
+        self::assertInstanceOf(\RuntimeException::class, $context['exception']);
+        self::assertStringNotContainsString('token-live', json_encode($this->logger->records, JSON_THROW_ON_ERROR), 'A log never carries a token id.');
+
+        // The failed tick released the reconciler: the next one queries again, without the overlap
+        // warning, and finds the token live.
+        $reconciler->tick();
+        self::assertCount(2, $this->asked);
+        self::assertSame(['error'], array_column($this->logger->records, 0));
+    }
+
     private function reconciler(
         ?LiveConnectionsPortInterface $connections = null,
         ?ServerDrainStateInterface $drain = null,
     ): RevokedSocketReconciler {
         $accessTokens = $this->createStub(AccessTokenRepositoryInterface::class);
-        $accessTokens->method('findLiveTokenIds')->willReturnCallback(function (array $tokenIds): array {
+        $accessTokens->method('findTokenIdsOfLiveChains')->willReturnCallback(function (array $tokenIds): array {
             $this->asked[] = $tokenIds;
             $during = $this->duringQuery;
             $this->duringQuery = null;

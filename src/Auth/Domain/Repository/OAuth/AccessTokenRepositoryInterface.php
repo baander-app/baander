@@ -23,15 +23,17 @@ interface AccessTokenRepositoryInterface
     public function findTokenIdsByChainId(ChainId $chainId): array;
 
     /**
-     * Which of these token ids belong to an access token that is stored, not revoked and not
-     * expired on the database clock. An id the database never stored is not returned. The
-     * list may be long: it is sent in chunks.
+     * Which of these token ids belong to a chain that still has a live access token: one that
+     * is stored, not revoked and not expired on the database clock. A rotation revokes the
+     * access token it replaces, so a socket opened with that token stays open while its chain
+     * lives; the chain is dead once every access token of it is revoked or expired. An id the
+     * database never stored is not returned. The list may be long: it is sent in chunks.
      *
      * @param list<string> $tokenIds
      *
      * @return list<string>
      */
-    public function findLiveTokenIds(array $tokenIds): array;
+    public function findTokenIdsOfLiveChains(array $tokenIds): array;
 
     /** Revokes every access token of the chain after locking the chain's rows in id order. */
     public function revokeByChainId(ChainId $chainId): void;

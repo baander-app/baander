@@ -137,7 +137,7 @@ final class AuthController
         responses: [
             new OA\Response(
                 response: '200',
-                description: 'The access token, its refresh token and every token of their chain are revoked; WebSocket connections opened with them are closed',
+                description: 'The access token, its refresh token and every token of their chain are revoked; WebSocket connections opened with them are closed at once, or by the next socket reconciliation when the web server could not close them now',
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'data', properties: [

@@ -18,16 +18,18 @@ use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerStoppedEvent;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 
 /**
- * Closes every WebSocket connection whose access token is no longer live, whatever revoked it.
+ * Closes every WebSocket connection whose token chain is dead, whatever revoked it.
  *
  * A logout, a revoke or a reuse verdict closes the chain's sockets at once from the request
  * that revoked it. This tick is the backstop for everything else: a close that request could
  * not finish, a user disabled from a console process in another container, a password change,
  * a client revocation, or an access token that simply expired while its socket stayed open.
  * Each run lists the distinct access token ids of every registered connection, asks the
- * database which of them are still stored, unrevoked and unexpired on its clock, and closes
- * the connections of the rest in-process through the server control channel. A connection
- * whose token died is closed within one interval.
+ * database which of them belong to a chain that still has a live access token, and closes
+ * the connections of the rest in-process through the server control channel. The chain is
+ * the unit, not the handshake token: a rotation revokes the token a socket was opened with
+ * while the session goes on, and rotation alone never closes a socket. A connection whose
+ * chain died is closed within one interval.
  *
  * The timer runs in HTTP worker 0 only, the first time one interval after the worker starts.
  * Task workers and the other HTTP workers start nothing. The timer is cleared when the worker
@@ -132,7 +134,7 @@ final class RevokedSocketReconciler implements EventSubscriberInterface, WorkerT
             return;
         }
 
-        $dead = array_values(array_diff($tokenIds, $this->accessTokens->findLiveTokenIds($tokenIds)));
+        $dead = array_values(array_diff($tokenIds, $this->accessTokens->findTokenIdsOfLiveChains($tokenIds)));
         if ($dead === []) {
             return;
         }

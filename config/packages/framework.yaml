@@ -20,7 +20,7 @@ parameters:
         config_check: 'Admin configuration check'
         batch_cover_extract: 'Album cover batch extraction'
         discovery_endpoint_ip: 'Discovery registration and pairing requests per IP'
-        # Email verification (U44)
+        # Email verification
         auth_email_verification_ip: 'Email verification attempts and resend requests per IP'
         auth_email_verification_user: 'Verification email resend requests per user'
 

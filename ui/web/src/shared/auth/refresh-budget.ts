@@ -55,8 +55,9 @@ function jitteredWaitMs(baseMs: number, capMs: number, random: () => number): nu
  * requests carries REFRESH_ATTEMPT_TIMEOUT_MS, so a hung request cannot hold the lock past it.
  * While entries remain, a page retries on a timer that backs off from PENDING_LOGOUT_BACKOFF_MS by
  * PENDING_LOGOUT_BACKOFF_FACTOR up to PENDING_LOGOUT_BACKOFF_CAP_MS, with jitter, and at most
- * PENDING_LOGOUT_TIMER_ATTEMPTS times per page session; the start, `online` and visibility
- * triggers are not counted and reset the backoff.
+ * PENDING_LOGOUT_TIMER_ATTEMPTS times while the list stays non-empty; the start, `online` and
+ * visibility triggers are not counted and reset the backoff, and an emptied list resets the count.
+ * A server's Retry-After is honoured up to PENDING_LOGOUT_BACKOFF_CAP_MS.
  */
 export const PENDING_LOGOUT_LOCK_WAIT_MS = 2_000;
 export const PENDING_LOGOUT_BACKOFF_MS = 2_000;

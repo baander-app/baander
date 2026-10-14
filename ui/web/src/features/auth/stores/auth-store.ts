@@ -17,7 +17,7 @@ import {
   type LegacyStoredRecord,
 } from '@/shared/crypto/auth-db'
 import { publishAuthEvent, subscribeAuthEvents, withAuthLock, type AuthEvent } from '@/features/auth/services/auth-coordination'
-import { drainPendingLogouts, recordLogout } from '@/features/auth/services/pending-logout'
+import { drainPendingLogouts, recordLogout, sendLogoutOnce } from '@/features/auth/services/pending-logout'
 import { REFRESH_BUDGET_MS } from '@/shared/auth/refresh-budget'
 import { createLogger } from '@/shared/lib/logger'
 
@@ -256,6 +256,9 @@ export const useAuthStore = create<AuthState>()(withStoreDebug('auth.auth', with
       // The entry and the tombstone are written together; a rotation adopted meanwhile belongs to the
       // session being ended and does not keep the tab signed in.
       const epoch = await recordLogout({ keyPair, accessToken, refreshToken })
+      // Without an entry nothing would send the logout later, so it is sent now, once, before the
+      // tab clears: the same bounded wait a logout had before entries existed.
+      if (epoch === null) await sendLogoutOnce({ keyPair, accessToken })
       dropCredentials()
       if (epoch !== null) publishAuthEvent({ type: 'cleared', epoch })
       else tombstoneAndBroadcast()

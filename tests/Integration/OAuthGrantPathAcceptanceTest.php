@@ -395,7 +395,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertSame(200, $this->me($login['accessToken'], $key, hash('sha256', 'any-device'))->getStatusCode());
     }
 
-    /** Introspection stays removed: it always answered inactive (U36). */
+    /** Introspection stays removed: it always answered inactive. */
     public function testIntrospectionIsNotRouted(): void
     {
         $key = new SignedDpopProof();

@@ -33,7 +33,7 @@ final class TickRepository implements App\Auth\Domain\Repository\OAuth\AccessTok
     /** @var list<int> */
     public array $ticks = [];
     public ?Closure $afterQuery = null;
-    public function findLiveTokenIds(array $tokenIds): array {
+    public function findTokenIdsOfLiveChains(array $tokenIds): array {
         $this->ticks[] = Swoole\Coroutine::getCid();
         ($this->afterQuery)?->__invoke(count($this->ticks));
         return [];

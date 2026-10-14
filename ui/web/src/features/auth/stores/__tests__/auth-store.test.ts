@@ -80,6 +80,7 @@ vi.mock('@/features/auth/services/pending-logout', () => ({
     return epoch
   }),
   drainPendingLogouts: vi.fn(() => new Promise<void>(() => {})),
+  sendLogoutOnce: vi.fn(async () => {}),
 }))
 
 vi.mock('@/shared/lib/logger', () => ({
@@ -92,7 +93,7 @@ vi.mock('@/shared/lib/logger', () => ({
 }))
 
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
-import { drainPendingLogouts, recordLogout } from '@/features/auth/services/pending-logout'
+import { drainPendingLogouts, recordLogout, sendLogoutOnce } from '@/features/auth/services/pending-logout'
 import { postTokenToWorker } from '@/features/player/services/service-worker-bridge'
 import { generateDpopKeyPair } from '@/shared/crypto/dpop-key-pair'
 import {
@@ -118,6 +119,7 @@ const mockSetDpopKeyPair = vi.mocked(setDpopKeyPair)
 const mockClearDpopKeyPair = vi.mocked(clearDpopKeyPair)
 const mockSetDpopNonce = vi.mocked(setDpopNonce)
 const mockRecordLogout = vi.mocked(recordLogout)
+const mockSendLogoutOnce = vi.mocked(sendLogoutOnce)
 const mockDrainPendingLogouts = vi.mocked(drainPendingLogouts)
 
 const FAKE_KEY_PAIR = {
@@ -369,12 +371,19 @@ describe('useAuthStore', () => {
       expect(mockDrainPendingLogouts.mock.invocationCallOrder[0]).toBeGreaterThan(mockRecordLogout.mock.invocationCallOrder[0])
     })
 
-    it('clears as before, tombstone and broadcast included, when the entry could not be recorded', async () => {
+    it('sends the logout once before clearing, tombstone and broadcast included, when the entry could not be recorded', async () => {
       await hydrateFrom(liveRecord(3, 'held-access'))
       mockRecordLogout.mockResolvedValueOnce(null)
+      let signedInWhenSent: boolean | null = null
+      mockSendLogoutOnce.mockImplementationOnce(async () => {
+        signedInWhenSent = useAuthStore.getState().isAuthenticated
+      })
 
       await useAuthStore.getState().logout()
 
+      expect(mockSendLogoutOnce).toHaveBeenCalledOnce()
+      expect(mockSendLogoutOnce).toHaveBeenCalledWith({ keyPair: expect.anything(), accessToken: 'held-access' })
+      expect(signedInWhenSent).toBe(true)
       expect(useAuthStore.getState().isAuthenticated).toBe(false)
       expect(storage.pendingLogouts).toEqual([])
       await vi.waitFor(() => expect(postedEvents()).toEqual([{ type: 'cleared', epoch: 4 }]))

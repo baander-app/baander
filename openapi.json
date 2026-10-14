@@ -2335,7 +2335,7 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Token revoked (always 200 for an unknown token or one of another user, per RFC 7009 section 2.2); the chain and the WebSocket connections opened with it are closed",
+                        "description": "Token revoked (always 200 for an unknown token or one of another user, per RFC 7009 section 2.2); the chain is revoked and the WebSocket connections opened with it are closed at once, or by the next socket reconciliation when the web server could not close them now",
                         "content": {
                             "application/json": {
                                 "schema": {}
@@ -3377,7 +3377,7 @@
                 "operationId": "post_auth_logout",
                 "responses": {
                     "200": {
-                        "description": "The access token, its refresh token and every token of their chain are revoked; WebSocket connections opened with them are closed",
+                        "description": "The access token, its refresh token and every token of their chain are revoked; WebSocket connections opened with them are closed at once, or by the next socket reconciliation when the web server could not close them now",
                         "content": {
                             "application/json": {
                                 "schema": {

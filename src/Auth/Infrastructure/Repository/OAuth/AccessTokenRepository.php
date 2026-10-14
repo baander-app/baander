@@ -27,7 +27,7 @@ use Symfony\Component\Serializer\Encoder\JsonEncoder;
  */
 final class AccessTokenRepository implements AccessTokenRepositoryInterface
 {
-    /** The longest parameterised IN list one findLiveTokenIds() query carries. */
+    /** The longest parameterised IN list one findTokenIdsOfLiveChains() query carries. */
     private const int LIVE_TOKEN_IDS_CHUNK = 500;
 
     public function __construct(
@@ -72,13 +72,13 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
      *
      * @return list<string>
      */
-    public function findLiveTokenIds(array $tokenIds): array
+    public function findTokenIdsOfLiveChains(array $tokenIds): array
     {
         $live = [];
         foreach (array_chunk($tokenIds, self::LIVE_TOKEN_IDS_CHUNK) as $chunk) {
             /** @var list<string> $found */
             $found = $this->entityManager->getConnection()->fetchFirstColumn(
-                'SELECT token_id FROM oauth_access_tokens WHERE token_id IN (:ids) AND revoked = FALSE AND (expires_at IS NULL OR expires_at > NOW())',
+                'SELECT a.token_id FROM oauth_access_tokens a WHERE a.token_id IN (:ids) AND EXISTS (SELECT 1 FROM oauth_access_tokens live WHERE live.chain_id = a.chain_id AND live.revoked = FALSE AND (live.expires_at IS NULL OR live.expires_at > NOW()))',
                 ['ids' => $chunk],
                 ['ids' => ArrayParameterType::STRING],
             );

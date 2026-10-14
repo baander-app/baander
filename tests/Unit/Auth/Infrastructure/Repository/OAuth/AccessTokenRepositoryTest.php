@@ -54,26 +54,27 @@ final class AccessTokenRepositoryTest extends TestCase
     }
 
     // =========================================================================
-    // findLiveTokenIds: the stored, unrevoked, unexpired subset on the database clock
+    // findTokenIdsOfLiveChains: the ids whose chain still has a live access token
     // =========================================================================
 
-    private const string LIVE_TOKEN_IDS_SQL = 'SELECT token_id FROM oauth_access_tokens WHERE token_id IN (:ids) AND revoked = FALSE AND (expires_at IS NULL OR expires_at > NOW())';
+    private const string LIVE_CHAIN_IDS_SQL = 'SELECT a.token_id FROM oauth_access_tokens a WHERE a.token_id IN (:ids) AND EXISTS (SELECT 1 FROM oauth_access_tokens live WHERE live.chain_id = a.chain_id AND live.revoked = FALSE AND (live.expires_at IS NULL OR live.expires_at > NOW()))';
 
-    public function testFindLiveTokenIdsAsksTheDatabaseWhichOfTheIdsAreStoredUnrevokedAndUnexpired(): void
+    public function testFindTokenIdsOfLiveChainsAsksTheDatabaseWhichOfTheIdsBelongToAChainWithALiveAccessToken(): void
     {
-        // Of five ids: one revoked, one expired, one the database never stored, two live.
-        $asked = ['token-revoked', 'token-expired', 'token-unknown', 'token-live-1', 'token-live-2'];
+        // Of five ids: one of a revoked chain, one of an expired chain, one the database never
+        // stored, one rotated away inside a live chain, one live.
+        $asked = ['token-revoked', 'token-expired', 'token-unknown', 'token-rotated', 'token-live'];
         $this->connection->expects($this->once())
             ->method('fetchFirstColumn')
-            ->with(self::LIVE_TOKEN_IDS_SQL, ['ids' => $asked], ['ids' => ArrayParameterType::STRING])
-            ->willReturn(['token-live-1', 'token-live-2']);
+            ->with(self::LIVE_CHAIN_IDS_SQL, ['ids' => $asked], ['ids' => ArrayParameterType::STRING])
+            ->willReturn(['token-rotated', 'token-live']);
         $this->connection->expects($this->never())->method('executeStatement');
         $this->entityManager->expects($this->never())->method('clear');
 
-        $this->assertSame(['token-live-1', 'token-live-2'], $this->repository->findLiveTokenIds($asked));
+        $this->assertSame(['token-rotated', 'token-live'], $this->repository->findTokenIdsOfLiveChains($asked));
     }
 
-    public function testFindLiveTokenIdsSendsTheIdsInChunksOfFiveHundred(): void
+    public function testFindTokenIdsOfLiveChainsSendsTheIdsInChunksOfFiveHundred(): void
     {
         $asked = [];
         for ($i = 1; $i <= 1200; ++$i) {
@@ -84,7 +85,7 @@ final class AccessTokenRepositoryTest extends TestCase
         $this->connection->expects($this->exactly(3))
             ->method('fetchFirstColumn')
             ->willReturnCallback(function (string $sql, array $params, array $types) use (&$sent): array {
-                $this->assertSame(self::LIVE_TOKEN_IDS_SQL, $sql);
+                $this->assertSame(self::LIVE_CHAIN_IDS_SQL, $sql);
                 $this->assertSame(['ids' => ArrayParameterType::STRING], $types);
                 $sent[] = $params['ids'];
 
@@ -92,19 +93,19 @@ final class AccessTokenRepositoryTest extends TestCase
                 return [$params['ids'][0]];
             });
 
-        $live = $this->repository->findLiveTokenIds($asked);
+        $live = $this->repository->findTokenIdsOfLiveChains($asked);
 
         $this->assertSame([500, 500, 200], array_map(count(...), $sent));
         $this->assertSame($asked, array_merge(...$sent));
         $this->assertSame(['token-0001', 'token-0501', 'token-1001'], $live);
     }
 
-    public function testFindLiveTokenIdsWithNoIdsAsksNothing(): void
+    public function testFindTokenIdsOfLiveChainsWithNoIdsAsksNothing(): void
     {
         $this->connection->expects($this->never())->method('fetchFirstColumn');
         $this->entityManager->expects($this->never())->method('clear');
 
-        $this->assertSame([], $this->repository->findLiveTokenIds([]));
+        $this->assertSame([], $this->repository->findTokenIdsOfLiveChains([]));
     }
 
     // =========================================================================

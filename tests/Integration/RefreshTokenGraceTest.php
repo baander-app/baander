@@ -426,14 +426,19 @@ final class RefreshTokenGraceTest extends TestCase
         $revokedPair = $this->login();
         $expiredPair = $this->login();
         $livePair = $this->login();
+        $rotatedPair = $this->login();
         $revokedId = self::claims($revokedPair['accessToken'])['jti'];
         $expiredId = self::claims($expiredPair['accessToken'])['jti'];
         $liveId = self::claims($livePair['accessToken'])['jti'];
+        // The socket was opened with the access token a rotation then revoked; its chain lives on.
+        $rotatedAwayId = self::claims($rotatedPair['accessToken'])['jti'];
+        $rotated = $this->refreshOk($rotatedPair['refreshToken']);
         $registry = WebSocketConnectionRegistry::create(maxConnections: 16, maxRoomMembers: 16);
         $userId = $this->user->getId()->toString();
         $registry->addConnection(1, $userId, 0, $revokedId);
         $registry->addConnection(2, $userId, 0, $expiredId);
         $registry->addConnection(3, $userId, 0, $liveId);
+        $registry->addConnection(4, $userId, 0, $rotatedAwayId);
 
         $fault = RecordingLiveConnections::closeFaultPath(self::$sharedDirectory);
         self::assertNotFalse(file_put_contents($fault, '1'));
@@ -475,10 +480,11 @@ final class RefreshTokenGraceTest extends TestCase
         $closes = RecordingLiveConnections::closedAccessTokens(self::$sharedDirectory, (int) getmypid(), $offset);
         self::assertCount(2, $closes, 'Each tick asks the web server to close the dead connections again until they are gone.');
         foreach ($closes as $closed) {
-            self::assertEqualsCanonicalizing([$revokedId, $expiredId], $closed, 'The revoked and the expired token are closed; the live one is not.');
+            self::assertEqualsCanonicalizing([$revokedId, $expiredId], $closed, 'The revoked and the expired chain are closed; the live chain and the rotated chain are not.');
         }
         self::assertSame([], $logger->records, 'A complete close logs nothing.');
         self::assertSame(200, $this->me($livePair['accessToken'])->getStatusCode(), 'The live token still works.');
+        self::assertSame(200, $this->me($rotated['accessToken'])->getStatusCode(), 'The rotated chain still works.');
     }
 
     // --- Rows and logs ---

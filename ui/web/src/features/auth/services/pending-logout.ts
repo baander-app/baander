@@ -34,6 +34,7 @@ import { AuthCoordinationError, withAuthLock } from '@/features/auth/services/au
 import { apiOrigin, buildHtu, challengedNonce, isRefreshRejected, outageWaitFor, wait } from '@/shared/api-client/axios-instance'
 import { retryAfterSeconds } from '@/features/auth/lib/retry-after'
 import {
+  PENDING_LOGOUT_BACKOFF_CAP_MS,
   PENDING_LOGOUT_LOCK_WAIT_MS,
   PENDING_LOGOUT_TIMER_ATTEMPTS,
   REFRESH_ATTEMPT_TIMEOUT_MS,
@@ -148,9 +149,10 @@ async function sign(keyPair: DpopKeyPair, htu: string, options: { accessToken?: 
   }
 }
 
+/** The server's Retry-After on a 503, capped at the backoff cap so a proxy's long delay never parks the timer. */
 function serverRetryAfterMs(error: unknown): number {
   const seconds = retryAfterSeconds(error, { status: 503 })
-  return seconds === null ? 0 : seconds * 1000
+  return seconds === null ? 0 : Math.min(PENDING_LOGOUT_BACKOFF_CAP_MS, seconds * 1000)
 }
 
 /**
@@ -226,6 +228,20 @@ async function sendLogout(keyPair: DpopKeyPair, accessToken: string, state: Nonc
       if (Axios.isAxiosError(error) && error.response?.status === 401) return { kind: 'unauthorized' }
       return { kind: 'failed', retryAfterMs: serverRetryAfterMs(error) }
     }
+  }
+}
+
+/**
+ * Sends the logout once with the session's own key and access token, for a logout whose pending
+ * entry could not be written: nothing is retried later, so this is the one chance the server has
+ * to hear of it. Resolves once the attempt is over, whatever the answer; never rejects.
+ */
+export async function sendLogoutOnce(credentials: Pick<LogoutCredentials, 'keyPair' | 'accessToken'>): Promise<void> {
+  try {
+    const answer = await sendLogout(credentials.keyPair, credentials.accessToken, { nonce: null })
+    if (answer.kind === 'failed') logger.warn('The logout could not be delivered and no pending entry keeps it; the chain stays until it expires')
+  } catch (error) {
+    logger.warn('The logout could not be signed and no pending entry keeps it; the chain stays until it expires:', error)
   }
 }
 
@@ -355,6 +371,7 @@ function cancelTimer(): void {
 function schedule(pass: DrainPass): void {
   if (!pass.remaining) {
     backoffStep = 0
+    timerAttempts = 0
     return
   }
   if (timerAttempts >= PENDING_LOGOUT_TIMER_ATTEMPTS) {
@@ -376,6 +393,8 @@ function start(): Promise<void> {
     passRequested = true
     return running
   }
+  // `running` is released before the pass is scheduled, so a trigger that lands between the two
+  // starts a fresh pass rather than asking a finished one for another round.
   running = (async () => {
     let pass: DrainPass
     do {
@@ -383,10 +402,12 @@ function start(): Promise<void> {
       pass = await drainOnce()
     } while (passRequested)
     return pass
-  })().then(schedule, (error) => {
-    logger.warn('The pending logout drain failed:', error)
-  }).finally(() => {
+  })().then((pass) => {
     running = null
+    schedule(pass)
+  }, (error) => {
+    running = null
+    logger.warn('The pending logout drain failed:', error)
   })
   return running
 }

@@ -6,7 +6,7 @@ const SERVER_URL = process.env.SERVER_URL || 'http://localhost:9501';
  * Seek scenario — exercises the kill+restart-with-headroom path.
  *
  * Loads the HLS player, lets it play to ~5s, seeks to 60s, and asserts
- * playback resumes past 63s within the seek-latency budget. U1 measured
+ * playback resumes past 63s within the seek-latency budget. An earlier run measured
  * cold-start seek at ~0.6s, so the budget is generous (30s) to allow for
  * segment production + buffer fill after the restart.
  */

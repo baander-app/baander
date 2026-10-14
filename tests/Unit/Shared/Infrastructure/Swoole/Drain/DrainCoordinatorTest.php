@@ -93,7 +93,7 @@ final class DrainCoordinatorTest extends TestCase
         });
         $server->on('workerStart', static function (Swoole\Server $server, int $workerId) use ($mode, $state): void {
             if ($mode !== 'drained' && $mode !== 'sendfile') { return; }
-            // What each event worker's drain steps end with (U3): report drained once the flag is set.
+            // What each event worker's drain steps end with: report drained once the flag is set.
             Swoole\Timer::tick(50, static function (int $timer) use ($state, $workerId): void {
                 if ($state->isDraining()) { Swoole\Timer::clear($timer); $state->markWorkerDrained($workerId); }
             });

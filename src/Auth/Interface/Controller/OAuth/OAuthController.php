@@ -268,7 +268,7 @@ final class OAuthController
                 ]),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Token revoked (always 200 for an unknown token or one of another user, per RFC 7009 section 2.2); the chain and the WebSocket connections opened with it are closed', content: new OA\JsonContent()),
+            new OA\Response(response: '200', description: 'Token revoked (always 200 for an unknown token or one of another user, per RFC 7009 section 2.2); the chain is revoked and the WebSocket connections opened with it are closed at once, or by the next socket reconciliation when the web server could not close them now', content: new OA\JsonContent()),
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
             new OA\Response(
                 response: '503',
