@@ -1605,8 +1605,9 @@ adoption awaits complete equivalence and performance qualification.
   configuration-path preservation and cleanup failure propagation.
 - Isolation: the first Docker probe passed 20 checks for database disruption,
   Redis pause/flush, fixed cache/socket paths and nested-process DSNs. Its
-  simplification now uses the shipped coordinator topology; requalification is
-  pending.
+  simplification now uses the shipped coordinator topology and passed all 20
+  checks again. Timeout and SIGTERM drills returned failure and removed every
+  recorded container and network without cleanup errors.
 - The sequential reference run exposed an existing user timestamp persistence
   defect. The user authorized its focused fix: repository synchronization copies
   both aggregate timestamps after the entity setters. The deterministic PostgreSQL
@@ -1614,6 +1615,12 @@ adoption awaits complete equivalence and performance qualification.
   parity suite pass afterward: 9 tests / 133 assertions in
   `baander-ci-prewarm:local`, PHP 8.5.2, 42.6 seconds including setup and cleanup.
   Independent review found no issues; no schema, API shape or dependency changed.
-- Remaining: full sequential/parallel identity and coverage comparisons, two
-  successful parallel runs, timing qualification, authoritative static gates,
+- First full parallel run: 9,096 tests / 74,276 assertions, 869 files, no failures
+  or missing identities; cleanup passed. Suite counts: Unit 6,270,
+  StaticAnalysisRules 11, Functional 1,460, Integration 1,355. Runtime:
+  `baander-ci-prewarm:local`, PHP 8.5.2, ParaTest 7.22.4, PHPUnit 13.1.11, seed
+  3742. Total elapsed time was 724.1 seconds, including setup, report validation
+  and cleanup. Artifacts: `var/test-runs/20261014-185722-ae5ac728`.
+- Remaining: full sequential/parallel identity and coverage comparisons, a second
+  successful parallel run, timing qualification, authoritative static gates,
   wrapper/CI adoption, removal of the old sharder, final review and documentation.

@@ -38,3 +38,5 @@ ui/rn/ios/build/
 ui/rn/ios/DerivedData/
 ui/web/playwright-report/
 ui/web/test-results/
+coverage/
+**/__pycache__/
