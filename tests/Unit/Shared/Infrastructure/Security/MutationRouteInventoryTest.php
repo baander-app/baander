@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Shared\Infrastructure\Security;
 
 use App\Tests\Integration\CatalogMutationFirewallTest;
+use App\Tests\Integration\PlaylistMutationFirewallTest;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\FrameworkBundle\Routing\AttributeRouteControllerLoader;
 use Symfony\Component\Config\FileLocator;
@@ -171,9 +172,7 @@ final class MutationRouteInventoryTest extends TestCase
         self::assertNotSame([], $suites, 'The playlist mutation suite ' . self::PLAYLIST_SUITE . ' is missing; its route keys are part of this inventory.');
         $constants = array_filter([self::PLAYLIST_SUITE . '::ROUTE_KEYS'], defined(...));
         self::assertNotSame([], $constants, 'The playlist mutation suite must expose its route keys as the public constant ROUTE_KEYS.');
-        $playlist = constant(self::PLAYLIST_SUITE . '::ROUTE_KEYS');
-        self::assertIsArray($playlist);
-        $covered = [...CatalogMutationFirewallTest::ROUTE_KEYS, ...array_values($playlist)];
+        $covered = [...CatalogMutationFirewallTest::ROUTE_KEYS, ...PlaylistMutationFirewallTest::ROUTE_KEYS];
         self::assertSame($covered, array_values(array_unique($covered)), 'A route key is listed twice across the matrices.');
 
         return $covered;

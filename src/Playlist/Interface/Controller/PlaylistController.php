@@ -391,7 +391,7 @@ final class PlaylistController
     #[Route('/{publicId}/songs', name: 'add_song', methods: ['POST'])]
     public function addSong(string $publicId, #[MapRequestPayload] AddSongRequest $payload): JsonResponse
     {
-        $playlist = $this->resolvePlaylistWithSongs($publicId);
+        $playlist = $this->resolvePlaylist($publicId);
         if ($playlist === null) {
             return $this->notFound();
         }
@@ -441,7 +441,7 @@ final class PlaylistController
     #[Route('/{publicId}/songs/{songId}', name: 'remove_song', methods: ['DELETE'])]
     public function removeSong(string $publicId, string $songId): JsonResponse
     {
-        $playlist = $this->resolvePlaylistWithSongs($publicId);
+        $playlist = $this->resolvePlaylist($publicId);
         if ($playlist === null) {
             return $this->notFound();
         }
@@ -585,7 +585,7 @@ final class PlaylistController
     #[Route('/{publicId}/reorder', name: 'reorder', methods: ['POST'])]
     public function reorder(string $publicId, #[MapRequestPayload] ReorderSongsRequest $payload): JsonResponse
     {
-        $playlist = $this->resolvePlaylistWithSongs($publicId);
+        $playlist = $this->resolvePlaylist($publicId);
         if ($playlist === null) {
             return $this->notFound();
         }
@@ -607,23 +607,6 @@ final class PlaylistController
     /**
      * Resolve a playlist by its public ID and load its songs.
      */
-    private function resolvePlaylistWithSongs(string $publicId): ?Playlist
-    {
-        try {
-            $resolvedPublicId = PublicId::fromString($publicId);
-        } catch (\Throwable) {
-            return null;
-        }
-
-        $playlist = $this->playlistService->findByPublicId($resolvedPublicId);
-
-        if ($playlist === null) {
-            return null;
-        }
-
-        return $this->playlistService->findWithSongs($playlist->getId());
-    }
-
     private function resolvePlaylist(string $publicId): ?Playlist
     {
         try {

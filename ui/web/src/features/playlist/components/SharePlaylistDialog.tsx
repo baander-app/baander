@@ -3,13 +3,12 @@ import styled from 'styled-components'
 import { useQueryClient } from '@tanstack/react-query'
 import { Copy, Share2, X } from 'lucide-react'
 import {
-  getGetPlaylistIndexQueryKey,
-  getGetPlaylistShowQueryKey,
   useDeletePlaylistRemoveCollaborator,
   useGetPlaylistShow,
   usePatchPlaylistUpdate,
   usePutPlaylistAddCollaborator,
 } from '@/shared/api-client/gen/endpoints'
+import { invalidatePlaylistQueries } from '../lib/playlist-queries'
 import { parseApiError } from '@/features/auth/lib/parse-api-error'
 import { createLogger } from '@/shared/lib/logger'
 import { Button } from '@/shared/components/ui/button'
@@ -151,12 +150,7 @@ function SharePlaylistForm({ playlistPublicId }: SharePlaylistDialogProps) {
   const [error, setError] = useState<string | null>(null)
   const [copyState, setCopyState] = useState<CopyState>('idle')
 
-  const refresh = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: getGetPlaylistShowQueryKey(playlistPublicId) }),
-      queryClient.invalidateQueries({ queryKey: getGetPlaylistIndexQueryKey() }),
-    ])
-  }
+  const refresh = () => invalidatePlaylistQueries(queryClient, playlistPublicId)
   const mutationOptions = (fallback: string) => ({
     mutation: {
       onMutate: () => setError(null),

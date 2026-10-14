@@ -2,12 +2,11 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
 import { useQueryClient } from '@tanstack/react-query'
 import {
-  getGetPlaylistIndexQueryKey,
-  getGetPlaylistShowQueryKey,
   useDeletePlaylistRemoveCollaborator,
   useGetPlaylistShow,
   type GetPlaylistShow200DataSongsItem,
 } from '@/shared/api-client/gen/endpoints'
+import { forgetPlaylistQueries } from '../lib/playlist-queries'
 import { usePlayerStore, type Track } from '@/features/player/stores/player-store'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { parseApiError } from '@/features/auth/lib/parse-api-error'
@@ -161,10 +160,8 @@ export function PlaylistDetailPage() {
   const leave = useDeletePlaylistRemoveCollaborator({
     mutation: {
       onSuccess: async () => {
-        await Promise.all([
-          queryClient.invalidateQueries({ queryKey: getGetPlaylistIndexQueryKey() }),
-          queryClient.invalidateQueries({ queryKey: getGetPlaylistShowQueryKey(publicId!) }),
-        ])
+        // The viewer can no longer read this playlist, so the show query is dropped, not refetched.
+        await forgetPlaylistQueries(queryClient, publicId!)
         navigate('/music/playlists')
       },
       onError: (failure: unknown) => {

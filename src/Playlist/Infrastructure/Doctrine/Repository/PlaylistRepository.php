@@ -30,9 +30,10 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
     public function save(Playlist $playlist): void
     {
         $entity = $this->findEntityOrCreate($playlist);
+        $isNew = !$this->entityManager->contains($entity);
         $this->syncToEntity($playlist, $entity);
         $this->syncSongsToEntity($playlist, $entity);
-        $this->syncCollaboratorsToEntity($playlist, $entity);
+        $this->syncCollaboratorsToEntity($playlist, $entity, $isNew);
 
         $this->entityManager->persist($entity);
         $this->entityManager->flush();
@@ -44,7 +45,7 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
             ->getRepository(PlaylistEntity::class)
             ->find($uuid);
 
-        return $entity !== null ? $this->toDomain($entity, $this->loadSongs($entity)) : null;
+        return $entity !== null ? $this->toDomain($entity, $this->loadSongs($entity), $this->loadCollaboratorIds($entity)) : null;
     }
 
     public function findByPublicId(PublicId $publicId): ?Playlist
@@ -53,7 +54,7 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
             ->getRepository(PlaylistEntity::class)
             ->findOneBy(['publicId' => $publicId]);
 
-        return $entity !== null ? $this->toDomain($entity, $this->loadSongs($entity)) : null;
+        return $entity !== null ? $this->toDomain($entity, $this->loadSongs($entity), $this->loadCollaboratorIds($entity)) : null;
     }
 
     public function findByUser(Uuid $userId): array
@@ -68,7 +69,12 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
             ->getQuery()
             ->getResult();
 
-        return array_map(fn(PlaylistEntity $entity) => $this->toDomain($entity), $entities);
+        $collaborators = $this->loadCollaboratorIdsByPlaylist($entities);
+
+        return array_map(
+            fn(PlaylistEntity $entity) => $this->toDomain($entity, [], $collaborators[$entity->getId()->toString()] ?? []),
+            $entities,
+        );
     }
 
     public function findReadByUser(Uuid $actorId, LibraryReadScope $scope): array
@@ -242,7 +248,7 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
             ->getRepository(PlaylistEntity::class)
             ->find($id);
 
-        return $entity !== null ? $this->toDomain($entity, $this->loadSongs($entity)) : null;
+        return $entity !== null ? $this->toDomain($entity, $this->loadSongs($entity), $this->loadCollaboratorIds($entity)) : null;
     }
 
     public function findPlaylistNamesContainingSong(Uuid $songId): array
@@ -326,8 +332,9 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
 
     /**
      * @param PlaylistSong[] $songs
+     * @param list<Uuid>     $collaboratorIds
      */
-    private function toDomain(PlaylistEntity $entity, array $songs = []): Playlist
+    private function toDomain(PlaylistEntity $entity, array $songs, array $collaboratorIds): Playlist
     {
         return Playlist::reconstitute(
             $entity->getId(),
@@ -342,7 +349,7 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
             $entity->getCreatedAt(),
             $entity->getUpdatedAt(),
             $songs,
-            $this->loadCollaboratorIds($entity),
+            $collaboratorIds,
         );
     }
 
@@ -365,6 +372,39 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
             ->getArrayResult();
 
         return array_map(static fn (array $row): Uuid => Uuid::fromString($row['userId']), $rows);
+    }
+
+    /**
+     * The collaborator user ids of every given playlist in one query, keyed by playlist id,
+     * oldest row first within a playlist.
+     *
+     * @param list<PlaylistEntity> $entities
+     *
+     * @return array<string, list<Uuid>>
+     */
+    private function loadCollaboratorIdsByPlaylist(array $entities): array
+    {
+        if ($entities === []) {
+            return [];
+        }
+
+        /** @var list<array{playlistId: string, userId: string}> $rows */
+        $rows = $this->entityManager->createQueryBuilder()
+            ->select('IDENTITY(c.playlist) AS playlistId', 'IDENTITY(c.user) AS userId')
+            ->from(PlaylistCollaboratorEntity::class, 'c')
+            ->where('c.playlist IN (:playlists)')
+            ->setParameter('playlists', $entities)
+            ->orderBy('c.createdAt', 'ASC')
+            ->addOrderBy('c.id', 'ASC')
+            ->getQuery()
+            ->getArrayResult();
+
+        $byPlaylist = [];
+        foreach ($rows as $row) {
+            $byPlaylist[$row['playlistId']][] = Uuid::fromString($row['userId']);
+        }
+
+        return $byPlaylist;
     }
 
     /**
@@ -449,15 +489,16 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
      * a user the aggregate no longer names loses the row, a new one gets a row. This is the
      * only writer of that table. fk_playlist_collaborators_user_id rejects unknown users.
      */
-    private function syncCollaboratorsToEntity(Playlist $playlist, PlaylistEntity $entity): void
+    private function syncCollaboratorsToEntity(Playlist $playlist, PlaylistEntity $entity, bool $isNew): void
     {
         $desired = [];
         foreach ($playlist->collaboratorIds() as $userId) {
             $desired[$userId->toString()] = $userId;
         }
 
+        // A playlist created in this save has no rows yet, so there is nothing to diff against.
         /** @var list<PlaylistCollaboratorEntity> $existing */
-        $existing = $this->entityManager
+        $existing = $isNew ? [] : $this->entityManager
             ->getRepository(PlaylistCollaboratorEntity::class)
             ->createQueryBuilder('c')
             ->innerJoin('c.playlist', 'p')

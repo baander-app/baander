@@ -58,8 +58,7 @@ final readonly class LibraryScanClaims
      */
     public function claim(string $identifier): LibraryScanClaim
     {
-        // Unrestricted: the claim service acts on every library for the scan route, the console and the scan job.
-        $library = $this->lookup->byIdentifier($identifier, LibraryReadScope::unrestricted());
+        $library = $this->library($identifier);
         $claimId = new Uuid();
         self::ensureClaimed($library, $this->libraries->claimScan($library->getId(), $claimId, $this->leaseSeconds));
 
@@ -119,8 +118,7 @@ final readonly class LibraryScanClaims
      */
     public function release(string $identifier, bool $force): ?LibraryClaimKind
     {
-        // Unrestricted: the claim service acts on every library for the scan route, the console and the scan job.
-        $library = $this->lookup->byIdentifier($identifier, LibraryReadScope::unrestricted());
+        $library = $this->library($identifier);
         $release = $this->libraries->releaseClaim($library->getId(), $force);
         if ($release->live !== null) {
             throw LibraryScanClaimLiveException::heldBy($library->getName(), $release->live);
@@ -152,5 +150,11 @@ final readonly class LibraryScanClaims
             ?? throw LibraryNotFoundException::forIdentifier($library->getId()->toString());
 
         return new LibraryScanClaim($claimed, $claimId);
+    }
+
+    private function library(string $identifier): Library
+    {
+        // Unrestricted: the claim service acts on every library for the scan route, the console and the scan job.
+        return $this->lookup->byIdentifier($identifier, LibraryReadScope::unrestricted());
     }
 }

@@ -104,6 +104,7 @@ describe('PlaylistDetailPage sharing controls', () => {
     const user = userEvent.setup()
     const client = renderPage()
     const invalidate = vi.spyOn(client, 'invalidateQueries')
+    const remove = vi.spyOn(client, 'removeQueries')
 
     await user.click(await screen.findByRole('button', { name: 'Leave playlist' }))
 
@@ -112,7 +113,8 @@ describe('PlaylistDetailPage sharing controls', () => {
     expect(deletes).toHaveLength(1)
     expect(deletes[0][0]).toBe(`${PLAYLIST_URL}/collaborators/${COLLABORATOR}`)
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['/api/playlists/'] })
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: [PLAYLIST_URL] })
+    expect(remove).toHaveBeenCalledWith({ queryKey: [PLAYLIST_URL] })
+    expect(invalidate).not.toHaveBeenCalledWith({ queryKey: [PLAYLIST_URL] })
     expect(screen.queryByRole('button', { name: 'Share' })).not.toBeInTheDocument()
   })
 

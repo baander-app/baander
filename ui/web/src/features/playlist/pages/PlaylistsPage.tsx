@@ -322,12 +322,16 @@ export function PlaylistsPage() {
             </EmptyState>
           ) : (
             <PlaylistList>
-              {items.map((item) => (
+              {items.map((item) => {
+                // Until the viewer is known, no playlist is treated as shared or as owned.
+                const isOwner = viewerPublicId !== undefined && item.ownerPublicId === viewerPublicId
+                const isShared = viewerPublicId !== undefined && item.ownerPublicId !== viewerPublicId
+                return (
                 <PlaylistItem key={item.publicId}>
                   <PlaylistLink to={`/music/playlists/${item.publicId}`}>
                     <NameRow>
                       <PlaylistName>{item.name}</PlaylistName>
-                      {item.ownerPublicId !== viewerPublicId && (
+                      {isShared && (
                         <SharedBadge variant="secondary">Shared with you</SharedBadge>
                       )}
                     </NameRow>
@@ -335,7 +339,7 @@ export function PlaylistsPage() {
                       <PlaylistMeta>Smart</PlaylistMeta>
                     )}
                   </PlaylistLink>
-                  {item.ownerPublicId === viewerPublicId && (
+                  {isOwner && (
                     <DeleteButton
                       type="button"
                       onClick={(e) => {
@@ -348,7 +352,8 @@ export function PlaylistsPage() {
                     </DeleteButton>
                   )}
                 </PlaylistItem>
-              ))}
+                )
+              })}
             </PlaylistList>
           )}
         </ItemsArea>
