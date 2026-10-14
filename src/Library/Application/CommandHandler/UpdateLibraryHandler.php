@@ -10,6 +10,7 @@ use App\Library\Application\Service\LibraryLookup;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /** Renames or reorders a library, for the admin panel and `app:library:update`. */
@@ -28,7 +29,8 @@ final readonly class UpdateLibraryHandler
     #[AsMessageHandler]
     public function __invoke(UpdateLibraryCommand $command): Library
     {
-        $library = $this->lookup->byIdentifier($command->library);
+        // Unrestricted: the update route and `app:library:update` are administrator-only.
+        $library = $this->lookup->byIdentifier($command->library, LibraryReadScope::unrestricted());
 
         try {
             $library->updateMetadata(name: $command->name, sortOrder: $command->sortOrder);

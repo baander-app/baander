@@ -20,14 +20,13 @@ final readonly class LibraryLookup
     }
 
     /**
-     * @param LibraryReadScope|null $scope the libraries the caller may see; null for every library
+     * @param LibraryReadScope $scope the libraries the caller may see; a caller that may see every
+     *                                library passes the unrestricted scope and says why
      *
      * @throws LibraryNotFoundException when no visible library has the UUID or slug
      */
-    public function byIdentifier(string $identifier, ?LibraryReadScope $scope = null): Library
+    public function byIdentifier(string $identifier, LibraryReadScope $scope): Library
     {
-        $scope ??= LibraryReadScope::unrestricted();
-
         return $this->find($identifier, $scope) ?? throw LibraryNotFoundException::forIdentifier($identifier);
     }
 

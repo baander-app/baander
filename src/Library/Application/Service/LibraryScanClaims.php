@@ -14,6 +14,7 @@ use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Library\Domain\ValueObject\LibraryClaimAttempt;
 use App\Library\Domain\ValueObject\LibraryClaimKind;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use Psr\Clock\ClockInterface;
 
 /**
@@ -57,7 +58,8 @@ final readonly class LibraryScanClaims
      */
     public function claim(string $identifier): LibraryScanClaim
     {
-        $library = $this->lookup->byIdentifier($identifier);
+        // Unrestricted: the claim service acts on every library for the scan route, the console and the scan job.
+        $library = $this->lookup->byIdentifier($identifier, LibraryReadScope::unrestricted());
         $claimId = new Uuid();
         self::ensureClaimed($library, $this->libraries->claimScan($library->getId(), $claimId, $this->leaseSeconds));
 
@@ -117,7 +119,8 @@ final readonly class LibraryScanClaims
      */
     public function release(string $identifier, bool $force): ?LibraryClaimKind
     {
-        $library = $this->lookup->byIdentifier($identifier);
+        // Unrestricted: the claim service acts on every library for the scan route, the console and the scan job.
+        $library = $this->lookup->byIdentifier($identifier, LibraryReadScope::unrestricted());
         $release = $this->libraries->releaseClaim($library->getId(), $force);
         if ($release->live !== null) {
             throw LibraryScanClaimLiveException::heldBy($library->getName(), $release->live);

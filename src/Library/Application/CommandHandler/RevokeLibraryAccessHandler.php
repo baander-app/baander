@@ -11,6 +11,7 @@ use App\Library\Application\Exception\LibraryNotFoundException;
 use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Application\Service\LibraryLookup;
 use App\Shared\Application\Exception\NotFoundException;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
@@ -35,7 +36,8 @@ final readonly class RevokeLibraryAccessHandler
     public function __invoke(RevokeLibraryAccessCommand $command): LibraryAccess
     {
         $userId = $this->users->userId($command->user);
-        $library = $this->lookup->byIdentifier($command->library);
+        // Unrestricted: the revoke route and `app:library:member:revoke` are administrator-only.
+        $library = $this->lookup->byIdentifier($command->library, LibraryReadScope::unrestricted());
 
         $this->access->revoke($userId, $library->getId());
 
