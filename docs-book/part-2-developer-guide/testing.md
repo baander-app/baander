@@ -326,6 +326,12 @@ Runner regressions use `python3 -m unittest discover -s scripts/tests` and the
 check database outages, Redis pause/flush, cache/socket separation and inherited
 DSNs. Runtime security drills remain separate serial commands.
 
+For qualification, `python3 scripts/compare-backend-runs.py <reference> <candidate>`
+compares selected and completed identities, seed, timings, coverage denominators
+and exact executable/covered line sets. Coverage comparison requires host PHP and
+the installed Composer dependencies to read serialized artifacts; the Python
+regression suite does not.
+
 For strict unit and messaging checks, run from the checkout:
 
 ```bash

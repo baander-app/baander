@@ -1631,6 +1631,11 @@ adoption awaits complete equivalence and performance qualification.
   warnings or errors), container lint and OpenAPI drift all passed in the CI image.
   Docker build-context checks and all 41 Python runner regressions also passed.
   Independent review accepted the rate-limit fixture fix.
+- Qualification comparison reads exact executable and covered lines from
+  hash-validated serialized artifacts: Clover can omit statement rows that overlap
+  method rows. Ten new comparator regressions and the real PHP serialization
+  check pass; all 51 Python runner regressions pass. Independent review accepted
+  the correction.
 - Remaining: full sequential/parallel identity and coverage comparisons, a second
   successful parallel run, timing qualification, authoritative static gates,
   wrapper/CI adoption, removal of the old sharder, final review and documentation.

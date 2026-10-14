@@ -1,9 +1,38 @@
 #!/usr/bin/env python3
 """Compare exact completed identities and executable coverage between two runs."""
 import argparse
+import hashlib
 import json
 from pathlib import Path
+import subprocess
 import xml.etree.ElementTree as ET
+
+
+ROOT = Path(__file__).resolve().parent.parent
+EXTRACT_COVERAGE = r"""
+require $argv[1];
+$unserializer = new SebastianBergmann\CodeCoverage\Serialization\Unserializer();
+$files = $lines = $covered = [];
+foreach (array_slice($argv, 2) as $path) {
+    $data = $unserializer->unserialize($path);
+    foreach ($data['codeCoverage']->lineCoverage() as $file => $entries) {
+        $absolute = str_starts_with($file, '/') ? $file : rtrim($data['basePath'], '/') . '/' . $file;
+        $files[$absolute] = true;
+        foreach ($entries as $number => $tests) {
+            if ($tests === null) {
+                continue;
+            }
+            $key = $absolute . ':' . $number;
+            $lines[$key] = [$absolute, $number];
+            if ($tests !== []) {
+                $covered[$key] = [$absolute, $number];
+            }
+        }
+    }
+}
+echo json_encode(['files' => array_keys($files), 'lines' => array_values($lines),
+                  'covered' => array_values($covered)], JSON_THROW_ON_ERROR);
+"""
 
 
 def identities(directory):
@@ -15,28 +44,39 @@ def identities(directory):
         if result['status'] != 0 or result['runId'] != discovery['runId']:
             raise ValueError(f'Failed or stale result: {file}')
         observed.extend(result['identities'])
-    if len(expected) != len(set(expected)) or expected != sorted(observed):
+    if not expected or len(expected) != len(set(expected)) or expected != sorted(observed):
         raise ValueError(f'Incomplete or duplicate results: {directory}')
     return expected, discovery.get('seed'), discovery['coverage']
 
 
 def coverage(directory):
+    discovery = json.loads((directory / 'run/discovery.json').read_text())
+    paths = []
+    for result_path in sorted((directory / 'run').glob('*.result.json')):
+        result = json.loads(result_path.read_text())
+        path = result_path.with_name(result_path.name.removesuffix('.result.json') + '.cov')
+        if result['status'] != 0 or result['runId'] != discovery['runId']:
+            raise ValueError(f'Failed or stale coverage result: {result_path}')
+        if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != result.get('hashes', {}).get('coverage'):
+            raise ValueError(f'Missing or changed serialized coverage: {path}')
+        paths.append(str(path.resolve()))
+    if not paths:
+        raise ValueError('No serialized coverage lanes found')
+    extracted = subprocess.run(['php', '-d', 'memory_limit=512M', '-r', EXTRACT_COVERAGE,
+                                str(ROOT / 'vendor/autoload.php'), *paths],
+                               capture_output=True, text=True, timeout=120)
+    if extracted.returncode:
+        raise ValueError('Cannot read serialized coverage: ' + extracted.stderr.strip())
+    data = json.loads(extracted.stdout)
+    lines = {tuple(identity) for identity in data['lines']}
+    covered = {tuple(identity) for identity in data['covered']}
     project = ET.parse(directory / 'reports/clover.xml').getroot().find('project')
-    lines, covered = set(), set()
-    for file in project.findall('.//file'):
-        for line in file.findall('line'):
-            if line.get('type') != 'stmt':
-                continue
-            identity = (file.get('name'), int(line.get('num')))
-            if identity in lines:
-                raise ValueError('Duplicate executable coverage line')
-            lines.add(identity)
-            if int(line.get('count')) > 0:
-                covered.add(identity)
     metrics = project.find('metrics')
     denominators = {name: int(metrics.get(name)) for name in ('files', 'classes', 'methods', 'statements')}
-    if len(lines) != denominators['statements']:
-        raise ValueError('Clover line denominator disagrees with executable lines')
+    if denominators['statements'] <= 0 or len(lines) != denominators['statements']:
+        raise ValueError('Clover line denominator disagrees with serialized executable lines')
+    if len(data['files']) != denominators['files'] or len(covered) != int(metrics.get('coveredstatements')):
+        raise ValueError('Clover file or covered-line count disagrees with serialized coverage')
     return denominators, lines, covered
 
 
