@@ -9,7 +9,8 @@ swoole:
         host: 0.0.0.0
         port: 9501
         trusted_hosts: [ ]
-        trusted_proxies: [ '*' ]
+        # The bundle parses comma-separated values after resolving this scalar env.
+        trusted_proxies: '%env(TRUSTED_PROXIES)%'
         running_mode: process # One of "process"; "reactor"
         socket_type: tcp # One of "tcp"; "tcp_ipv6"; "udp"; "udp_ipv6"; "unix_dgram"; "unix_stream"
         ssl_enabled: false
@@ -34,7 +35,7 @@ swoole:
             verbosity: auto # One of "trace"; "verbose"; "default"; "auto"
             handler_id: null
         services:
-            trust_all_proxies_handler: true
+            trust_all_proxies_handler: false
             cloudfront_proto_header_handler: false
             access_log:
                 enabled: true

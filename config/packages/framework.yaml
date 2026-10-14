@@ -1,5 +1,6 @@
 # see https://symfony.com/doc/current/reference/configuration/framework.html
 parameters:
+    env(TRUSTED_PROXIES): ''
     # Shown by the admin panel and app:rate-limiter:list next to each limiter
     # configured under framework.rate_limiter below.
     app.rate_limiter.descriptions:
@@ -29,8 +30,8 @@ framework:
     http_method_override: false
     handle_all_throwables: true
 
-    # Trust X-Forwarded-* headers from nginx
-    trusted_proxies: '172.18.0.0/16'  # Docker network
+    # Only explicitly configured proxy peers may supply forwarding headers.
+    trusted_proxies: '%env(csv:TRUSTED_PROXIES)%'
     trusted_headers: [X-Forwarded-For, X-Forwarded-Host, X-Forwarded-Proto, X-Forwarded-Port]
 
     # PHP session configuration

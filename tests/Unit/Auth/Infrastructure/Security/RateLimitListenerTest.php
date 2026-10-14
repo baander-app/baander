@@ -127,6 +127,34 @@ final class RateLimitListenerTest extends TestCase
         return $request;
     }
 
+    /** @return iterable<string, array{string}> */
+    public static function malformedBodies(): iterable
+    {
+        yield 'invalid JSON' => ['{'];
+        yield 'array field' => ['{"email":[],"refreshToken":[]}'];
+        yield 'object field' => ['{"email":{},"refreshToken":{}}'];
+        yield 'numeric field' => ['{"email":123,"refreshToken":123}'];
+        yield 'null field' => ['{"email":null,"refreshToken":null}'];
+        yield 'scalar body' => ['"value"'];
+    }
+
+    #[DataProvider('malformedBodies')]
+    public function testMalformedLoginBodyStillChargesIpWithoutCompoundKey(string $body): void
+    {
+        $request = Request::create('/api/auth/login', 'POST', server: ['REMOTE_ADDR' => '192.0.2.20'], content: $body);
+        $this->loginIpLimiter->expects($this->once())->method('create')->with('192.0.2.20')->willReturn($this->createAcceptedLimit());
+        $this->loginIpEmailLimiter->expects($this->never())->method('create');
+        $this->listener->onKernelRequest($this->createRequestEvent($request));
+    }
+
+    #[DataProvider('malformedBodies')]
+    public function testMalformedRefreshBodyUsesIpBucket(string $body): void
+    {
+        $request = Request::create('/api/auth/refresh', 'POST', server: ['REMOTE_ADDR' => '192.0.2.20'], content: $body);
+        $this->refreshClientLimiter->expects($this->once())->method('create')->with('192.0.2.20')->willReturn($this->createAcceptedLimit());
+        $this->listener->onKernelRequest($this->createRequestEvent($request));
+    }
+
     // --- Login rate limiting tests ---
 
     public function testLoginUnderLimitPassesThrough(): void

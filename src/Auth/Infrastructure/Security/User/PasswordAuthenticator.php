@@ -24,6 +24,7 @@ use Symfony\Component\Security\Http\Authenticator\AbstractAuthenticator;
 use Symfony\Component\Security\Http\Authenticator\Passport\Badge\UserBadge;
 use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPassport;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
+use Symfony\Component\Serializer\Exception\NotEncodableValueException;
 
 final class PasswordAuthenticator extends AbstractAuthenticator
 {
@@ -46,11 +47,25 @@ final class PasswordAuthenticator extends AbstractAuthenticator
 
     public function authenticate(Request $request): SelfValidatingPassport
     {
-        $data = $this->jsonEncoder->decode((string) $request->getContent(), 'json');
+        try {
+            $data = $this->jsonEncoder->decode((string) $request->getContent(), 'json');
+        } catch (NotEncodableValueException) {
+            throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
+        }
+
+        if (!is_array($data)) {
+            throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
+        }
 
         $email = $data['email'] ?? '';
         $password = $data['password'] ?? '';
         $totpCode = $data['totpCode'] ?? null;
+
+        if (!is_string($email) || !is_string($password)
+            || ($totpCode !== null && !is_string($totpCode))
+            || (isset($data['username']) && !is_string($data['username']))) {
+            throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
+        }
 
         // Honeypot: bots auto-fill hidden fields
         if (!empty($data['username'])) {
@@ -68,7 +83,13 @@ final class PasswordAuthenticator extends AbstractAuthenticator
             throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
         }
 
-        $user = $this->userRepository->findByEmail(new Email($email));
+        try {
+            $address = new Email($email);
+        } catch (\InvalidArgumentException) {
+            throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
+        }
+
+        $user = $this->userRepository->findByEmail($address);
 
         if ($user === null) {
             $this->logger->debug('Password authentication failed: user not found.', ['email' => $email]);

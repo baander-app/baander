@@ -12,6 +12,7 @@ use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Symfony\Component\HttpKernel\KernelEvents;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
+use Symfony\Component\Serializer\Exception\NotEncodableValueException;
 
 /**
  * Kernel event listener that enforces rate limits on auth endpoints.
@@ -69,8 +70,7 @@ final class RateLimitListener
                 'limiter' => $authLoginIpEmailLimiter,
                 'key_resolver' => function (Request $r): string {
                     $ip = $r->getClientIp() ?? 'unknown';
-                    $body = $this->jsonEncoder->decode((string) $r->getContent(), 'json');
-                    $email = is_array($body) && isset($body['email']) ? strtolower(trim((string) $body['email'])) : '';
+                    $email = strtolower(trim($this->jsonStringField($r, 'email')));
 
                     // When no email is provided, skip the compound check
                     // (validation will reject it later anyway)
@@ -112,8 +112,7 @@ final class RateLimitListener
                 'pattern' => '#^/api/auth/refresh$#',
                 'limiter' => $authRefreshClientLimiter,
                 'key_resolver' => function (Request $r): string {
-                    $body = $this->jsonEncoder->decode((string) $r->getContent(), 'json');
-                    $token = is_array($body) && isset($body['refreshToken']) ? (string) $body['refreshToken'] : '';
+                    $token = $this->jsonStringField($r, 'refreshToken');
 
                     return $token !== '' ? $token : ($r->getClientIp() ?? 'unknown');
                 },
@@ -153,17 +152,25 @@ final class RateLimitListener
         ];
     }
 
+    private function jsonStringField(Request $request, string $field): string
+    {
+        try {
+            $body = $this->jsonEncoder->decode((string) $request->getContent(), 'json');
+        } catch (NotEncodableValueException) {
+            return '';
+        }
+
+        $value = is_array($body) ? ($body[$field] ?? null) : null;
+
+        return is_string($value) ? $value : '';
+    }
+
     /** The client_id of a form-encoded or JSON token request, or an empty string. */
     private function oauthClientId(Request $request): string
     {
         $clientId = $request->request->all()['client_id'] ?? null;
         if ($clientId === null) {
-            try {
-                $body = $this->jsonEncoder->decode((string) $request->getContent(), 'json');
-            } catch (\Throwable) {
-                return '';
-            }
-            $clientId = is_array($body) ? ($body['client_id'] ?? null) : null;
+            return $this->jsonStringField($request, 'client_id');
         }
 
         return is_string($clientId) ? $clientId : '';
