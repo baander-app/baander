@@ -191,6 +191,7 @@ final class UserRepository implements UserRepositoryInterface
         $entity->setDisabled($user->isDisabled());
         // The domain clears verification when the address changes, so copy it both ways.
         $entity->setEmailVerifiedAt($user->getEmailVerifiedAt());
+        $entity->setTimestamps($user->getCreatedAt(), $user->getUpdatedAt());
     }
 
     private function findEntityOrCreate(User $user): UserEntity

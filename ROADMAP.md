@@ -1590,3 +1590,30 @@ unindexed test callbacks, and commit by path.
 Keep independent changes reviewable and record checks without implying broader
 coverage. The complete programme is done only when blocking checks, security and
 workflow integrations, and registry consistency/resource/failover/restore gates pass.
+
+## Parallel backend verification — qualification in progress
+
+Implementation follows [the ParaTest plan](docs/plans/parallel-test-execution.md)
+on `plan/parallel-test-execution`. The shared coordinator, explicit native manifest,
+identity checks, coverage merging and blocking report validator are implemented.
+The existing local wrappers and CI still use their previous runners; default
+adoption awaits complete equivalence and performance qualification.
+
+- Runner regressions: 21 PHP tests / 53 assertions and 41 Python tests passed.
+  A real CI-image coverage smoke preserved the uncovered denominator of 43,704
+  executable lines. Independent plan and code reviews were applied, including
+  configuration-path preservation and cleanup failure propagation.
+- Isolation: the first Docker probe passed 20 checks for database disruption,
+  Redis pause/flush, fixed cache/socket paths and nested-process DSNs. Its
+  simplification now uses the shipped coordinator topology; requalification is
+  pending.
+- The sequential reference run exposed an existing user timestamp persistence
+  defect. The user authorized its focused fix: repository synchronization copies
+  both aggregate timestamps after the entity setters. The deterministic PostgreSQL
+  regression failed before the fix (2 tests / 2 failures). It and the existing CLI
+  parity suite pass afterward: 9 tests / 133 assertions in
+  `baander-ci-prewarm:local`, PHP 8.5.2, 42.6 seconds including setup and cleanup.
+  Independent review found no issues; no schema, API shape or dependency changed.
+- Remaining: full sequential/parallel identity and coverage comparisons, two
+  successful parallel runs, timing qualification, authoritative static gates,
+  wrapper/CI adoption, removal of the old sharder, final review and documentation.

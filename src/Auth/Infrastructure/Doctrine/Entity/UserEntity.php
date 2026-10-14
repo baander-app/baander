@@ -145,6 +145,12 @@ class UserEntity
         return $this->updatedAt;
     }
 
+    public function setTimestamps(\DateTimeImmutable $createdAt, \DateTimeImmutable $updatedAt): void
+    {
+        $this->createdAt = $createdAt;
+        $this->updatedAt = $updatedAt;
+    }
+
     public function getTotpSecret(): string
     {
         return $this->totp_secret;
