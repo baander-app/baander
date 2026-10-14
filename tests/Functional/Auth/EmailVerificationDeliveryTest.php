@@ -35,6 +35,8 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
 {
     private const string LINK_PATTERN = '~(https?://[^\s"<]+/verify-email#token=([0-9a-f]{64}))~';
 
+    private int $nextIp = 60;
+
     public function testRegistrationSendsOneEmailWhoseLinkVerifiesTheAddress(): void
     {
         $logs = $this->captureLogs();
@@ -295,6 +297,18 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
         $this->assertSame(401, $response->getStatusCode(), (string) $response->getContent());
     }
 
+    public function testOrdinaryVerificationBucketsAreResetDuringTeardown(): void
+    {
+        $ip = $this->ip();
+        $response = $this->requestFrom($ip, 'POST', '/api/auth/email/verify', content: ['token' => str_repeat('0', 64)]);
+        $this->assertJsonResponse($response, 400, 'error');
+
+        $this->tearDown();
+        $this->setUp();
+
+        $this->exhaust('auth_email_verification_ip', $ip);
+    }
+
     private function registerThroughTheApi(): User
     {
         $address = $this->uniqueEmail();
@@ -395,7 +409,14 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
 
     private function ip(): string
     {
-        return '198.51.100.' . random_int(60, 250);
+        if ($this->nextIp > 250) {
+            throw new \LogicException('Email verification fixture exhausted its IP addresses.');
+        }
+
+        $ip = '198.51.100.' . $this->nextIp++;
+        $this->trackLimiter('auth_email_verification_ip', $ip);
+
+        return $ip;
     }
 
     private function connection(): Connection

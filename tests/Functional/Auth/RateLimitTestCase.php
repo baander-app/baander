@@ -10,29 +10,34 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 
 /**
- * Exhausts real limiter buckets and resets them afterwards, so the Redis-backed
+ * Tracks real limiter buckets and resets them afterwards, so the Redis-backed
  * state never leaks into other functional tests.
  */
 abstract class RateLimitTestCase extends TestCase
 {
     /** @var list<array{string, string}> */
-    private array $exhausted = [];
+    private array $limitersToReset = [];
 
     protected function tearDown(): void
     {
-        foreach ($this->exhausted as [$name, $key]) {
+        foreach ($this->limitersToReset as [$name, $key]) {
             $this->limiter($name)->create($key)->reset();
         }
-        $this->exhausted = [];
+        $this->limitersToReset = [];
 
         parent::tearDown();
     }
 
     protected function exhaust(string $name, string $key): void
     {
-        $this->exhausted[] = [$name, $key];
+        $this->trackLimiter($name, $key);
         // The test environment sets every limit to 10000.
         self::assertTrue($this->limiter($name)->create($key)->consume(10000)->isAccepted(), sprintf('Limiter "%s" was already in use for "%s".', $name, $key));
+    }
+
+    protected function trackLimiter(string $name, string $key): void
+    {
+        $this->limitersToReset[] = [$name, $key];
     }
 
     protected function limiter(string $name): RateLimiterFactoryInterface

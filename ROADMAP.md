@@ -1621,6 +1621,16 @@ adoption awaits complete equivalence and performance qualification.
   `baander-ci-prewarm:local`, PHP 8.5.2, ParaTest 7.22.4, PHPUnit 13.1.11, seed
   3742. Total elapsed time was 724.1 seconds, including setup, report validation
   and cleanup. Artifacts: `var/test-runs/20261014-185722-ae5ac728`.
+- The next reference attempt exposed a fixture leak: ordinary email-verification
+  requests left Redis limiter buckets behind, and random IP reuse could collide
+  with a later exhaustion assertion. The fixture now allocates deterministic IPs
+  and resets every tracked bucket. The new lifecycle regression and neighboring
+  rate-limit suites pass: 49 tests / 451 assertions, 50.7 seconds including setup
+  and cleanup. Artifacts: `var/test-runs/20261014-191936-b5140c11`.
+- Static checkpoint: platform requirements, PHPStan, Deptrac (zero violations,
+  warnings or errors), container lint and OpenAPI drift all passed in the CI image.
+  Docker build-context checks and all 41 Python runner regressions also passed.
+  Independent review accepted the rate-limit fixture fix.
 - Remaining: full sequential/parallel identity and coverage comparisons, a second
   successful parallel run, timing qualification, authoritative static gates,
   wrapper/CI adoption, removal of the old sharder, final review and documentation.
