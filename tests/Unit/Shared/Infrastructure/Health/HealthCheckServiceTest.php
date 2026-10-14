@@ -116,17 +116,38 @@ final class HealthCheckServiceTest extends TestCase
     public function testExternalKeysUseInjectedConfigurationWithoutGetenv(string $key, int $expectedWarnings): void
     {
         $variables = ['DISCOGS_TOKEN', 'LASTFM_API_KEY', 'SPOTIFY_CLIENT_ID'];
+        $requiredVariables = ['DATABASE_URL', 'REDIS_URL', 'APP_SECRET', 'APP_URL', 'APP_DOMAIN', 'REDIS_PASSWORD'];
+        $optionalVariables = ['MAILER_DSN', 'OAUTH_PRIVATE_KEY_PATH', 'OAUTH_PUBLIC_KEY_PATH', 'MESSENGER_TRANSPORT_DSN'];
         $previous = [];
-        foreach ($variables as $variable) {
+        $environmentVariables = [...$variables, ...$requiredVariables, ...$optionalVariables];
+        foreach ($environmentVariables as $variable) {
             $previous[$variable] = getenv($variable);
             putenv($variable);
         }
         try {
-            foreach ($variables as $variable) {
+            foreach ($environmentVariables as $variable) {
                 self::assertFalse(getenv($variable));
             }
             $service = $this->service(array_fill_keys(['Discogs', 'Last.fm', 'Spotify'], $key));
-            $results = array_values(array_filter($service->checkConfiguration(), static fn (HealthCheckResult $result): bool => $result->component === 'api_keys'));
+            $configuration = $service->checkConfiguration();
+            $environmentResults = [];
+            foreach ($configuration as $result) {
+                if ($result->component === 'env') {
+                    $environmentResults[$result->details['var']] = $result;
+                }
+            }
+            self::assertCount(count($requiredVariables) + count($optionalVariables), $environmentResults);
+            foreach ($requiredVariables as $variable) {
+                self::assertArrayHasKey($variable, $environmentResults);
+                self::assertSame(HealthStatus::Unhealthy, $environmentResults[$variable]->status);
+                self::assertSame('error', $environmentResults[$variable]->details['severity']);
+            }
+            foreach ($optionalVariables as $variable) {
+                self::assertArrayHasKey($variable, $environmentResults);
+                self::assertSame(HealthStatus::NotAvailable, $environmentResults[$variable]->status);
+                self::assertSame('warning', $environmentResults[$variable]->details['severity']);
+            }
+            $results = array_values(array_filter($configuration, static fn (HealthCheckResult $result): bool => $result->component === 'api_keys'));
             self::assertCount($expectedWarnings, $results);
             foreach ($results as $index => $result) {
                 self::assertSame(HealthStatus::NotAvailable, $result->status);

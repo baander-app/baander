@@ -1673,6 +1673,27 @@ adoption awaits complete equivalence and performance qualification.
   runner coverage-merging regressions; report validation and cleanup passed.
   Artifacts: `var/test-runs/20261014-204317-35fceb05`. All 58 Python checks pass;
   independent review accepted the coverage and timing corrections.
+- Full coverage runs completed successfully with 9,097 tests / 74,304 assertions:
+  the sequential reference took 2,594.7 seconds and disposable Compose parallel
+  execution took 1,952.8 seconds (24.7% less elapsed time). Both cleaned up all
+  recorded resources. Artifacts: `var/test-runs/20261014-204839-0f854e1b` and
+  `var/test-runs/20261014-213233-7750f8da`.
+- Exact coverage qualification found equal selected/completed identities and equal
+  source denominators (1,988 files, 1,720 classes, 8,314 methods, 44,191 executable
+  lines), but 29 reference-only covered lines. These were incidental missing-env
+  warning branches: ParaTest's Symfony Process launcher promotes Dotenv values from
+  `$_ENV` into child process environment variables, while the reference launcher
+  inherits only the OS environment. Deterministic health-warning fixtures and a
+  fresh comparison are required before default adoption; no coverage exclusions
+  or comparison tolerances have been added.
+- Health-warning fixtures now control and restore OS environment values explicitly.
+  The existing three configuration datasets failed with populated ambient values
+  before the fix and pass afterward; a new listener test checks warning details
+  and once-only logging. CI-image coverage passed 12 tests / 189 assertions in
+  177.2 seconds and covered all 29 previously different lines. Reports and cleanup
+  passed; all 58 Python regressions remain green. Artifacts:
+  `var/test-runs/20261014-221206-beb170cd`. Full comparison on this corrected
+  checkout remains pending.
 - Remaining: full sequential/parallel identity and coverage comparisons, a second
   successful parallel run, timing qualification, authoritative static gates,
   wrapper/CI adoption, removal of the old sharder, final review and documentation.
