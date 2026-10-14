@@ -8,6 +8,7 @@ use App\Auth\Domain\Model\OAuth\TokenId;
 use App\Auth\Domain\Model\OAuth\TokenMetadata;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Infrastructure\Security\OAuth\OAuth2Authenticator;
+use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Auth\AuthenticationFailureMessages;
 use League\OAuth2\Server\Exception\OAuthServerException;
@@ -201,7 +202,67 @@ final class OAuth2AuthenticatorTest extends TestCase
         }
     }
 
-    private function setupSuccessfulResourceServerValidation(string $accessTokenId, string $userId): void
+    /** A DPoP-bound token presented under the Bearer scheme is refused like any other invalid token, before any user is loaded. */
+    public function testABoundTokenUnderTheBearerSchemeIsRefused(): void
+    {
+        $user = $this->user('bound@baander.app');
+        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), $user->getId()->toString(), 'bound-key-thumbprint');
+        $userRepository = $this->createMock(\App\Auth\Domain\Repository\UserRepositoryInterface::class);
+        $userRepository->expects($this->never())->method('findByUuid');
+        $authenticator = $this->createAuthenticator($this->createStub(TokenMetadataRepositoryInterface::class), userRepository: $userRepository);
+
+        $request = Request::create('/');
+        $request->headers->set('Authorization', 'Bearer token123');
+
+        try {
+            $authenticator->authenticate($request);
+            self::fail('A DPoP-bound token must not authenticate under the Bearer scheme.');
+        } catch (CustomUserMessageAuthenticationException $exception) {
+            self::assertSame('Invalid or expired token.', $exception->getMessageKey());
+            $response = $authenticator->onAuthenticationFailure($request, $exception);
+            self::assertSame(401, $response->getStatusCode());
+            self::assertSame(
+                ['error' => ['message' => 'Invalid or expired token.', 'code' => 'AUTH_INVALID_TOKEN']],
+                json_decode((string) $response->getContent(), true),
+            );
+        }
+    }
+
+    public function testABoundTokenUnderTheDpopSchemeAuthenticatesItsUser(): void
+    {
+        $user = $this->user('bound@baander.app');
+        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), $user->getId()->toString(), 'bound-key-thumbprint');
+
+        $request = Request::create('/');
+        $request->headers->set('Authorization', 'DPoP token123');
+        $passport = $this->createAuthenticator($this->createStub(TokenMetadataRepositoryInterface::class), $user)->authenticate($request);
+
+        $securityUser = $passport->getUser();
+        self::assertInstanceOf(SecurityUser::class, $securityUser);
+        self::assertSame($user->getId()->toString(), $securityUser->getId());
+    }
+
+    public function testAnUnboundTokenUnderTheBearerSchemeAuthenticatesItsUser(): void
+    {
+        $user = $this->user('unbound@baander.app');
+        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), $user->getId()->toString());
+
+        $request = Request::create('/');
+        $request->headers->set('Authorization', 'Bearer token123');
+        $passport = $this->createAuthenticator($this->createStub(TokenMetadataRepositoryInterface::class), $user)->authenticate($request);
+
+        $securityUser = $passport->getUser();
+        self::assertInstanceOf(SecurityUser::class, $securityUser);
+        self::assertSame($user->getId()->toString(), $securityUser->getId());
+    }
+
+    private function user(string $email): \App\Auth\Domain\Model\User
+    {
+        return \App\Auth\Domain\Model\User::register(new \App\Shared\Domain\Model\Email($email), 'hashed-pw', 'Test User');
+    }
+
+    /** @param string|null $dpopJkt The thumbprint of the key the token is bound to; unbound when null. */
+    private function setupSuccessfulResourceServerValidation(string $accessTokenId, string $userId, ?string $dpopJkt = null): void
     {
         $psrRequest = new Psr7Request('GET', '/');
         $psrRequest = $psrRequest
@@ -209,6 +270,9 @@ final class OAuth2AuthenticatorTest extends TestCase
             ->withAttribute('oauth_user_id', $userId)
             ->withAttribute('oauth_client_id', 'client-uuid')
             ->withAttribute('oauth_scopes', ['profile']);
+        if ($dpopJkt !== null) {
+            $psrRequest = $psrRequest->withAttribute('oauth_dpop_jkt', $dpopJkt);
+        }
 
         $this->psrFactory->method('createRequest')->willReturn($psrRequest);
         $this->resourceServer->method('validateAuthenticatedRequest')->willReturn($psrRequest);
@@ -217,15 +281,12 @@ final class OAuth2AuthenticatorTest extends TestCase
     private function createAuthenticator(
         TokenMetadataRepositoryInterface $tokenMetadataRepository,
         ?\App\Auth\Domain\Model\User $user = null,
+        ?\App\Auth\Domain\Repository\UserRepositoryInterface $userRepository = null,
     ): OAuth2Authenticator {
-        $userRepository = $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class);
-        $userRepository->method('findByUuid')->willReturn(
-            $user ?? \App\Auth\Domain\Model\User::register(
-                new \App\Shared\Domain\Model\Email('test@baander.app'),
-                'hashed-pw',
-                'Test User',
-            ),
-        );
+        if ($userRepository === null) {
+            $userRepository = $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class);
+            $userRepository->method('findByUuid')->willReturn($user ?? $this->user('test@baander.app'));
+        }
 
         return new OAuth2Authenticator(
             $this->resourceServer,

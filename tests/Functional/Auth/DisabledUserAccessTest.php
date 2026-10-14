@@ -33,7 +33,7 @@ use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Security\Core\Exception\AuthenticationException;
 
 /**
- * Disabling an account ends its sessions at once: bearer requests, WebSocket
+ * Disabling an account ends its sessions at once: API requests, WebSocket
  * handshakes and refreshes with tokens issued before the disable are refused.
  *
  * The test firewall swaps in TestAuthenticator, so the production authenticators
@@ -52,12 +52,12 @@ final class DisabledUserAccessTest extends TestCase
         $clientPublicId = $this->createPersonalAccessClient($user);
         $tokens = $this->refresh($clientPublicId, $this->issueTokens($user, $clientPublicId)->getRefreshToken());
 
-        self::assertSame(Response::HTTP_OK, $this->bearerStatus($tokens->getAccessToken()));
+        self::assertSame(Response::HTTP_OK, $this->accessTokenStatus($tokens->getAccessToken()));
         self::assertSame($user->getId()->toString(), $this->webSocketUserId($tokens->getAccessToken()));
 
         $this->bus()->dispatch(new DisableUserCommand($user->getEmail()));
 
-        self::assertSame(Response::HTTP_UNAUTHORIZED, $this->bearerStatus($tokens->getAccessToken()));
+        self::assertSame(Response::HTTP_UNAUTHORIZED, $this->accessTokenStatus($tokens->getAccessToken()));
         self::assertNull($this->webSocketUserId($tokens->getAccessToken()));
         self::assertSame('invalid_grant', $this->refreshError($clientPublicId, $tokens->getRefreshToken()));
         self::assertSame(['access' => 0, 'refresh' => 0], $this->activeTokenCounts($user));
@@ -86,12 +86,12 @@ final class DisabledUserAccessTest extends TestCase
         $this->bus()->dispatch(new EnableUserCommand($user->getEmail()));
 
         self::assertFalse($this->storedUser($user)->isDisabled());
-        self::assertSame(Response::HTTP_UNAUTHORIZED, $this->bearerStatus($tokens->getAccessToken()));
+        self::assertSame(Response::HTTP_UNAUTHORIZED, $this->accessTokenStatus($tokens->getAccessToken()));
         self::assertSame('invalid_grant', $this->refreshError($clientPublicId, $tokens->getRefreshToken()));
 
         // Signing in again issues a working pair.
         $fresh = $this->issueTokens($user, $clientPublicId);
-        self::assertSame(Response::HTTP_OK, $this->bearerStatus($fresh->getAccessToken()));
+        self::assertSame(Response::HTTP_OK, $this->accessTokenStatus($fresh->getAccessToken()));
     }
 
     public function testAnAuthorizationCodeIssuedBeforeADisableCannotBeExchanged(): void
@@ -125,8 +125,8 @@ final class DisabledUserAccessTest extends TestCase
         self::assertSame(['access' => 0, 'refresh' => 0], $this->activeTokenCounts($user));
     }
 
-    /** The response the production bearer authenticator gives: 200 lets the request through. */
-    private function bearerStatus(string $accessToken): int
+    /** The response the production access token authenticator gives a DPoP-bound token presented under its scheme: 200 lets the request through. */
+    private function accessTokenStatus(string $accessToken): int
     {
         $authenticator = new OAuth2Authenticator(
             $this->service(ResourceServer::class),
@@ -138,7 +138,7 @@ final class DisabledUserAccessTest extends TestCase
         );
 
         $request = Request::create('https://baander.app/api/auth/me');
-        $request->headers->set('Authorization', 'Bearer ' . $accessToken);
+        $request->headers->set('Authorization', 'DPoP ' . $accessToken);
         self::assertTrue($authenticator->supports($request));
 
         try {

@@ -52,8 +52,30 @@ final class DpopAwareBearerTokenValidatorTest extends TestCase
         self::assertSame('client-uuid', $validator->validateAuthorization($request)->getAttribute('oauth_client_id'));
     }
 
-    /** @return array{ServerRequest, CryptKey} */
-    private function signedRequest(string $audience): array
+    /** The thumbprint of the key a DPoP-bound token carries in its cnf.jkt claim reaches the authenticator as an attribute. */
+    public function testABoundTokenExposesItsKeyThumbprint(): void
+    {
+        [$request, $publicKey] = $this->signedRequest('https://api.baander.app', 'bound-key-thumbprint');
+        $validator = new DpopAwareBearerTokenValidator($this->accessTokenRepository, null, 'https://api.baander.app');
+        $validator->setPublicKey($publicKey);
+
+        self::assertSame('bound-key-thumbprint', $validator->validateAuthorization($request)->getAttribute('oauth_dpop_jkt'));
+    }
+
+    public function testAnUnboundTokenExposesNoKeyThumbprint(): void
+    {
+        [$request, $publicKey] = $this->signedRequest('https://api.baander.app');
+        $validator = new DpopAwareBearerTokenValidator($this->accessTokenRepository, null, 'https://api.baander.app');
+        $validator->setPublicKey($publicKey);
+
+        self::assertNull($validator->validateAuthorization($request)->getAttribute('oauth_dpop_jkt'));
+    }
+
+    /**
+     * @param string|null $jkt The DPoP key thumbprint the token is bound to; unbound when null.
+     * @return array{ServerRequest, CryptKey}
+     */
+    private function signedRequest(string $audience, ?string $jkt = null): array
     {
         $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
         self::assertNotFalse($key);
@@ -65,6 +87,9 @@ final class DpopAwareBearerTokenValidatorTest extends TestCase
             'client_id' => 'client-uuid', 'scopes' => ['profile'],
             'iat' => time(), 'nbf' => time() - 1, 'exp' => time() + 60,
         ];
+        if ($jkt !== null) {
+            $claims['cnf'] = ['jkt' => $jkt];
+        }
         $body = $encode(json_encode(['alg' => 'RS256', 'typ' => 'JWT'], JSON_THROW_ON_ERROR)) . '.'
             . $encode(json_encode($claims, JSON_THROW_ON_ERROR));
         self::assertTrue(openssl_sign($body, $signature, $key, OPENSSL_ALGO_SHA256));

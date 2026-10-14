@@ -39,7 +39,7 @@ use Symfony\Component\Security\Core\Exception\AuthenticationException;
  *
  * The test firewall swaps in TestAuthenticator, which never sees an access token,
  * so the `oauth_access_token_id` attribute that OAuth2Authenticator sets in
- * production is set here by a request listener. The production bearer
+ * production is set here by a request listener. The production access token
  * authenticator is built from the container's services and driven directly to
  * show what a revoked token gets.
  */
@@ -54,7 +54,7 @@ final class LogoutTest extends TestCase
         $tokens = $this->refresh($client, $this->issueTokens($user, $client)->getRefreshToken());
         $chainId = $this->chainIdOf($tokens);
 
-        self::assertSame(Response::HTTP_OK, $this->bearerStatus($tokens->getAccessToken()));
+        self::assertSame(Response::HTTP_OK, $this->accessTokenStatus($tokens->getAccessToken()));
         self::assertGreaterThan(0, $this->liveTokenCounts($chainId)['access']);
         self::assertGreaterThan(0, $this->liveTokenCounts($chainId)['refresh']);
 
@@ -64,7 +64,7 @@ final class LogoutTest extends TestCase
         self::assertSame(['access' => 0, 'refresh' => 0], $this->liveTokenCounts($chainId));
         self::assertSame(['access' => 2, 'refresh' => 2], $this->tokenCounts($chainId), 'Both pairs of the chain are revoked, none is deleted.');
         self::assertSame('invalid_grant', $this->refreshError($client, $tokens->getRefreshToken()));
-        self::assertSame(Response::HTTP_UNAUTHORIZED, $this->bearerStatus($tokens->getAccessToken()));
+        self::assertSame(Response::HTTP_UNAUTHORIZED, $this->accessTokenStatus($tokens->getAccessToken()));
     }
 
     public function testLogoutWithoutATokenAnswers401(): void
@@ -96,7 +96,7 @@ final class LogoutTest extends TestCase
         self::assertSame($unknown->getStatusCode(), $foreign->getStatusCode());
         self::assertSame($unknown->getContent(), $foreign->getContent());
         self::assertSame($before, $this->liveTokenCounts($chainId), 'A foreign token revokes nothing.');
-        self::assertSame(Response::HTTP_OK, $this->bearerStatus($tokens->getAccessToken()));
+        self::assertSame(Response::HTTP_OK, $this->accessTokenStatus($tokens->getAccessToken()));
     }
 
     public function testRevokeRevokesTheCallersOwnChain(): void
@@ -114,7 +114,7 @@ final class LogoutTest extends TestCase
         self::assertSame(Response::HTTP_OK, $response->getStatusCode(), $response->getContent());
         self::assertSame(['access' => 0, 'refresh' => 0], $this->liveTokenCounts($chainId));
         self::assertSame('invalid_grant', $this->refreshError($client, $tokens->getRefreshToken()));
-        self::assertSame(Response::HTTP_UNAUTHORIZED, $this->bearerStatus($tokens->getAccessToken()));
+        self::assertSame(Response::HTTP_UNAUTHORIZED, $this->accessTokenStatus($tokens->getAccessToken()));
     }
 
     /**
@@ -136,8 +136,8 @@ final class LogoutTest extends TestCase
         }
     }
 
-    /** The response the production bearer authenticator gives: 200 lets the request through. */
-    private function bearerStatus(string $accessToken): int
+    /** The response the production access token authenticator gives a DPoP-bound token presented under its scheme: 200 lets the request through. */
+    private function accessTokenStatus(string $accessToken): int
     {
         $authenticator = new OAuth2Authenticator(
             $this->service(ResourceServer::class),
@@ -149,7 +149,7 @@ final class LogoutTest extends TestCase
         );
 
         $request = Request::create('https://baander.app/api/auth/me');
-        $request->headers->set('Authorization', 'Bearer ' . $accessToken);
+        $request->headers->set('Authorization', 'DPoP ' . $accessToken);
         $request->headers->remove(BaanderHeader::TestUserId->value);
         self::assertTrue($authenticator->supports($request));
 

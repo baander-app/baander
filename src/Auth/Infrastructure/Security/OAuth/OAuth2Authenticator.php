@@ -27,11 +27,15 @@ use Symfony\Component\Security\Http\Authenticator\Passport\Passport;
 use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPassport;
 
 /**
- * Authenticates API requests using OAuth 2.0 Bearer tokens.
+ * Authenticates API requests using OAuth 2.0 access tokens.
  *
  * Extracts the token from the Authorization header, validates it through
  * the league/oauth2-server ResourceServer, and creates a Passport with
  * the user loaded from the database by UUID. A disabled account does not authenticate.
+ *
+ * A DPoP-bound token is accepted under the DPoP scheme only (RFC 9449 section 7.1);
+ * presented as a Bearer token it is refused like any other invalid token. The
+ * proof itself is verified later by the DPoP binding listener.
  */
 final class OAuth2Authenticator extends AbstractAuthenticator
 {
@@ -58,8 +62,9 @@ final class OAuth2Authenticator extends AbstractAuthenticator
         $psrRequest = $this->psrHttpFactory->createRequest($request);
 
         // Translate DPoP Authorization scheme to Bearer for League's BearerTokenValidator
-        $authHeader = $psrRequest->getHeaderLine('Authorization');
-        if (str_starts_with($authHeader, 'DPoP ')) {
+        $authHeader = (string) $request->headers->get('Authorization', '');
+        $presentedAsDpop = str_starts_with($authHeader, 'DPoP ');
+        if ($presentedAsDpop) {
             $psrRequest = $psrRequest->withHeader('Authorization', 'Bearer ' . substr($authHeader, 5));
         }
 
@@ -77,8 +82,22 @@ final class OAuth2Authenticator extends AbstractAuthenticator
         $clientId = $validatedRequest->getAttribute('oauth_client_id');
         $scopes = $validatedRequest->getAttribute('oauth_scopes', []);
         $accessTokenId = $validatedRequest->getAttribute('oauth_access_token_id');
+        $dpopJkt = $validatedRequest->getAttribute(DpopAwareBearerTokenValidator::DPOP_JKT_ATTRIBUTE);
 
         if ($userIdentifier === null || $userIdentifier === '') {
+            throw new CustomUserMessageAuthenticationException(
+                AuthenticationFailureMessage::INVALID_TOKEN,
+                ['error_code' => 'AUTH_INVALID_TOKEN'],
+            );
+        }
+
+        if ($dpopJkt !== null && !$presentedAsDpop) {
+            // The thumbprint names the bound key; the token itself is never logged.
+            $this->logger->info('DPoP-bound token presented under the Bearer scheme refused.', [
+                'access_token_id' => $accessTokenId,
+                'jkt' => $dpopJkt,
+            ]);
+
             throw new CustomUserMessageAuthenticationException(
                 AuthenticationFailureMessage::INVALID_TOKEN,
                 ['error_code' => 'AUTH_INVALID_TOKEN'],

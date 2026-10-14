@@ -11,11 +11,18 @@ use League\OAuth2\Server\Repositories\AccessTokenRepositoryInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
 /**
- * Extends BearerTokenValidator to read client_id from a dedicated JWT claim
- * and validate the aud claim against the configured resource server identifier.
+ * Extends BearerTokenValidator to read client_id from a dedicated JWT claim,
+ * validate the aud claim against the configured resource server identifier and
+ * expose the DPoP key binding of a bound token.
  */
 final class DpopAwareBearerTokenValidator extends BearerTokenValidator
 {
+    /**
+     * The request attribute carrying the cnf.jkt claim of a DPoP-bound token: the
+     * thumbprint of the key the token is bound to. Absent for an unbound token.
+     */
+    public const string DPOP_JKT_ATTRIBUTE = 'oauth_dpop_jkt';
+
     public function __construct(
         AccessTokenRepositoryInterface $accessTokenRepository,
         ?DateInterval $jwtValidAtDateLeeway = null,
@@ -51,6 +58,11 @@ final class DpopAwareBearerTokenValidator extends BearerTokenValidator
             }
             $validatedRequest = $validatedRequest
                 ->withAttribute('oauth_client_id', $claims['client_id']);
+        }
+
+        $jkt = $claims['cnf']['jkt'] ?? null;
+        if (is_string($jkt) && $jkt !== '') {
+            $validatedRequest = $validatedRequest->withAttribute(self::DPOP_JKT_ATTRIBUTE, $jkt);
         }
 
         return $validatedRequest;
