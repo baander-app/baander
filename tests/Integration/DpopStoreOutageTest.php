@@ -163,9 +163,10 @@ final class DpopStoreOutageTest extends TestCase
     {
         $key = new SignedDpopProof();
         $login = $this->login($key);
+        $refused = $this->refusedKernel();
 
         $started = microtime(true);
-        $response = $this->refresh($login['refreshToken'], $key, $login['nonce'], $this->refusedKernel());
+        $response = $this->refresh($login['refreshToken'], $key, $login['nonce'], $refused);
         $elapsed = microtime(true) - $started;
 
         self::assertStoreUnavailable($response);

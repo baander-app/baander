@@ -11,27 +11,22 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parent.parent
 EXTRACT_COVERAGE = r"""
 require $argv[1];
-$unserializer = new SebastianBergmann\CodeCoverage\Serialization\Unserializer();
+$data = (new SebastianBergmann\CodeCoverage\Serialization\Merger())->merge(array_slice($argv, 2));
 $files = $lines = $covered = [];
-foreach (array_slice($argv, 2) as $path) {
-    $data = $unserializer->unserialize($path);
-    foreach ($data['codeCoverage']->lineCoverage() as $file => $entries) {
-        $absolute = str_starts_with($file, '/') ? $file : rtrim($data['basePath'], '/') . '/' . $file;
-        $files[$absolute] = true;
-        foreach ($entries as $number => $tests) {
-            if ($tests === null) {
-                continue;
-            }
-            $key = $absolute . ':' . $number;
-            $lines[$key] = [$absolute, $number];
-            if ($tests !== []) {
-                $covered[$key] = [$absolute, $number];
-            }
+foreach ($data['codeCoverage']->lineCoverage() as $file => $entries) {
+    $absolute = str_starts_with($file, '/') ? $file : rtrim($data['basePath'], '/') . '/' . $file;
+    $files[] = $absolute;
+    foreach ($entries as $number => $tests) {
+        if ($tests === null) {
+            continue;
+        }
+        $lines[] = [$absolute, $number];
+        if ($tests !== []) {
+            $covered[] = [$absolute, $number];
         }
     }
 }
-echo json_encode(['files' => array_keys($files), 'lines' => array_values($lines),
-                  'covered' => array_values($covered)], JSON_THROW_ON_ERROR);
+echo json_encode(['files' => $files, 'lines' => $lines, 'covered' => $covered], JSON_THROW_ON_ERROR);
 """
 
 
@@ -62,7 +57,7 @@ def coverage(directory):
         paths.append(str(path.resolve()))
     if not paths:
         raise ValueError('No serialized coverage lanes found')
-    extracted = subprocess.run(['php', '-d', 'memory_limit=512M', '-r', EXTRACT_COVERAGE,
+    extracted = subprocess.run(['php', '-d', 'memory_limit=2G', '-r', EXTRACT_COVERAGE,
                                 str(ROOT / 'vendor/autoload.php'), *paths],
                                capture_output=True, text=True, timeout=120)
     if extracted.returncode:

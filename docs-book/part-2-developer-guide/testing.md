@@ -294,15 +294,18 @@ fixed-resource tests to one worker in a privileged container with networking
 disabled; that worker starts afresh for every file. Add new native tests to this
 manifest. Functional and integration files are distributed round-robin across at
 most the requested number of independent app/PostgreSQL/Redis stacks declared in
-`compose.test.yaml`. Each stack uses a unique disposable Compose project and runs one worker with a fresh process for every file. Scheduling stays at class/file
+`compose.test.yaml`. Each stack uses a unique disposable Compose project and runs
+one worker with a fresh process for every file. Scheduling stays at class/file
 level; ParaTest's method-level `--functional` mode is not used.
 
 Each stack owns its cache, temporary files, sockets, database, Redis server and
 OAuth keys. No writable host mounts or published ports are used. Database and Redis
 DSNs are exported so nested PHP processes reach the same stack. Each database runs
 migrations twice. Setup uses root inside the disposable container; tests run as
-`www-data`, preserving permission checks. Parent and worker PHP processes receive
-an explicit 512 MiB memory limit.
+`www-data`, preserving permission checks. Test worker PHP processes receive an
+explicit 512 MiB memory limit. Coordinator and reporting PHP processes receive
+2 GiB because full-suite serialized coverage needs more memory than individual
+test files.
 
 JUnit validation requires every discovered class, method and dataset label exactly
 once. Crashes, missing reports, unexpected identities and configured strict failures

@@ -55,7 +55,7 @@ class CoverageComparisonTest(unittest.TestCase):
         self.assertEqual({(SOURCE, 5)}, lines)
         self.assertEqual(lines, covered)
         command = run.call_args.args[0]
-        self.assertEqual(["php", "-d", "memory_limit=512M", "-r"], command[:4])
+        self.assertEqual(["php", "-d", "memory_limit=2G", "-r"], command[:4])
         self.assertEqual(str((self.directory / "run/ordinary.cov").resolve()), command[-1])
 
     def test_nonexecutable_method_header_is_excluded(self):

@@ -220,6 +220,10 @@ function remainsUncovered(): int
 {
     return 3;
 }
+function classifiedAsDead(): int
+{
+    return 4;
+}
 PHP_SOURCE;
         file_put_contents($this->directory . '/included.php', $source);
         file_put_contents($this->directory . '/excluded.php', '<?php function excluded(): int { return 4; }');
@@ -231,7 +235,7 @@ PHP_SOURCE;
             $report = $this->directory . '/' . $lane . '.junit.xml';
             file_put_contents($report, '<testsuite><testcase classname="' . $identity[0] . '" name="test"/></testsuite>');
             $data = new \SebastianBergmann\CodeCoverage\Data\ProcessedCodeCoverageData();
-            $lines = [4 => [], 8 => [], 12 => []];
+            $lines = [4 => null, 8 => null, 12 => [], 16 => $lane === 'first' ? [] : null];
             $lines[$coveredLine] = [$identity];
             $data->setLineCoverage(['included.php' => $lines]);
             $serialized = [

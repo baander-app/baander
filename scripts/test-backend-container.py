@@ -194,7 +194,7 @@ class Runtime:
 
     def helper(self, app: str, *args: str, log: Path | None = None, check: bool = True):
         self.docker('exec', app, 'chown', '-R', 'www-data:www-data', RUN_DIRECTORY)
-        return self.docker('exec', '--user', 'www-data', app, 'php', '-d', 'memory_limit=512M',
+        return self.docker('exec', '--user', 'www-data', app, 'php', '-d', 'memory_limit=2G',
                            'scripts/backend-test-runner.php', *args, log=log, check=check)
 
     def run_lane(self, lane: str, spec: dict, run: Path, coverage: bool):
@@ -216,7 +216,7 @@ class Runtime:
                 ''', log=log)
             if spec.get('engine') == 'reference':
                 self.docker('exec', app, 'chown', '-R', 'www-data:www-data', RUN_DIRECTORY)
-                result = self.docker('exec', '--user', 'www-data', app, 'php', '-d', 'memory_limit=512M',
+                result = self.docker('exec', '--user', 'www-data', app, 'php', '-d', 'memory_limit=2G',
                                      'scripts/backend-test-reference.php', RUN_DIRECTORY, lane, log=log, check=False)
             else:
                 result = self.helper(app, 'run', RUN_DIRECTORY, lane, log=log, check=False)

@@ -1640,13 +1640,39 @@ adoption awaits complete equivalence and performance qualification.
   method rows. Ten new comparator regressions and the real PHP serialization
   check pass; all 51 Python runner regressions pass. Independent review accepted
   the correction.
+- The completed sequential reference passed the same 9,097 selected/completed
+  identities in 1,070.6 seconds. The direct-Docker parallel run took 731.2 seconds
+  (1.46× speedup). Reference artifacts:
+  `var/test-runs/20261014-193447-79b5e1b5`. Coverage comparison is still pending.
 - Infrastructure direction: the user selected a dedicated test Compose file with
   disposable projects. Service lanes now declare app/PostgreSQL/Redis in
   `compose.test.yaml`, with project-owned networks and volumes. Cleanup includes
   named and anonymous volumes. Compose configuration and all 58 Python regressions
-  pass; real Compose isolation and benchmark qualification remain pending. Earlier
-  direct-Docker measurements do not qualify this topology. The runner Dockerfile
+  pass. Real Compose isolation passed all 20 checks and removed six containers,
+  two networks and four volumes. Timeout and SIGTERM drills returned the expected
+  failure and removed every recorded resource without cleanup errors. Artifacts:
+  `/tmp/baander-stack-isolation-pbici7ww`,
+  `/tmp/baander-stack-isolation-compose-timeout-_6ave1nj`, and
+  `/tmp/baander-stack-isolation-compose-sigterm-j_8netho`. Full Compose benchmark
+  qualification remains pending; earlier direct-Docker measurements do not qualify
+  this topology. The runner Dockerfile
   now installs and verifies the Compose plugin.
+- First full Compose run: 9,097 tests, exact selected/completed equivalence to
+  the sequential reference, and successful cleanup in 752.3 seconds (1.42× faster
+  than the 1,070.6-second reference). No project containers, networks or volumes
+  remain. Artifacts: `var/test-runs/20261014-195442-737ed4d0`.
+- Full coverage qualification exposed two runner issues: lane coverage can classify
+  executable lines differently, and a service lane exceeded the reporting parent's
+  512 MiB limit while serializing coverage. The finalizer and comparator now use
+  the installed coverage merger's line classifications; reporting parents receive
+  2 GiB while test children retain 512 MiB. The failed run is diagnostic evidence,
+  not a qualification pass (`var/test-runs/20261014-200726-2b089c64`).
+- The refused-store latency fixture now builds its Symfony kernel before timing
+  the request, preserving its five-second bound and response assertions. Focused
+  CI-image coverage passed 22 tests / 91 assertions in 250.2 seconds, including
+  runner coverage-merging regressions; report validation and cleanup passed.
+  Artifacts: `var/test-runs/20261014-204317-35fceb05`. All 58 Python checks pass;
+  independent review accepted the coverage and timing corrections.
 - Remaining: full sequential/parallel identity and coverage comparisons, a second
   successful parallel run, timing qualification, authoritative static gates,
   wrapper/CI adoption, removal of the old sharder, final review and documentation.

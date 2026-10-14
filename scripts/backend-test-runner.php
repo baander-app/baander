@@ -220,7 +220,7 @@ final class BackendTestRunner
                 unlink($prefix . $suffix);
             }
         }
-        $command = [PHP_BINARY, '-d', 'memory_limit=512M', 'vendor/bin/paratest', '-c', $config, ...$discovery['arguments'], '--processes=' . $manifest['processes'], '--max-batch-size=' . $manifest['batch'], '--passthru-php=-d memory_limit=512M', '--log-junit=' . $prefix . '.junit.xml'];
+        $command = [PHP_BINARY, '-d', 'memory_limit=2G', 'vendor/bin/paratest', '-c', $config, ...$discovery['arguments'], '--processes=' . $manifest['processes'], '--max-batch-size=' . $manifest['batch'], '--passthru-php=-d memory_limit=512M', '--log-junit=' . $prefix . '.junit.xml'];
         if ($discovery['coverage']) {
             $command[] = '--coverage-php=' . $prefix . '.cov';
         }
@@ -299,12 +299,9 @@ final class BackendTestRunner
                 $data = (new Unserializer())->unserialize($prefix . '.cov');
                 $files = $data['codeCoverage']->coveredFiles();
                 sort($files);
-                $executableLines = [];
-                foreach ($data['codeCoverage']->lineCoverage() as $file => $lines) {
-                    $executableLines[$file] = array_keys(array_filter($lines, static fn ($tests): bool => $tests !== null));
-                    sort($executableLines[$file]);
-                }
-                $current = [$data['basePath'], $files, $executableLines];
+                // Xdebug and static analysis can classify the same source line
+                // differently; the coverage merger resolves those classifications.
+                $current = [$data['basePath'], $files];
                 if ($signature !== null && $signature !== $current) {
                     throw new RuntimeException('Coverage source paths or filters differ.');
                 }
