@@ -368,6 +368,12 @@ final class ImageRepository implements ImageRepositoryInterface
                 $entity->setAlbum($albumEntity);
             }
         }
+        if ($image->getArtistId() !== null) {
+            $artistEntity = $this->entityManager->getRepository(ArtistEntity::class)->find($image->getArtistId());
+            if ($artistEntity !== null) {
+                $entity->setArtist($artistEntity);
+            }
+        }
 
         return $entity;
     }
