@@ -18,8 +18,8 @@ roadmap records scope and acceptance; the linked design documents, current sourc
 and CI workflow are the executable detail. Measurements in later historical
 batches describe their own checkpoints; the current gate below takes precedence.
 
-The backend release-gate package is complete (see the next two sections). Six
-plans followed it, in this order, and all six are delivered:
+The backend release-gate package is complete (see the next two sections). Seven
+plans followed it, in this order, and all seven are delivered:
 
 1. [General settings and email language](docs/plans/2026-10-07-1736-feat-general-settings-email-language-plan.md):
    one definition-driven settings mechanism, the per-user email language, and the
@@ -282,6 +282,47 @@ plans followed it, in this order, and all six are delivered:
    - A socket of a revoked chain stays open for up to one tick when the hot-path close
      failed.
 
+7. [Video delivery authorization matrix](docs/plans/2026-10-14-1319-test-video-delivery-authorization-matrix-plan.md):
+   the seven signed delivery routes, the signing endpoint and the quality ladder are
+   exercised through the real firewall against PostgreSQL and Redis, for anonymous,
+   owner, library member, unrelated user and administrator under every credential
+   condition. Delivered on 2026-10-14 (branch `plan/item7-authorization-matrix`).
+
+   The recorded contract: a valid signed URL is a bearer capability that serves any
+   holder without a credential, a member of another library included; a credential
+   that is presented must be valid, so an expired, revoked, foreign-audience,
+   malformed or fingerprint-mismatched token answers 401 even with a valid signature;
+   the DPoP proof is never read on a delivery route, so a missing, foreign-key or
+   reused proof serves and records no replay key; a signature fault (missing,
+   expired, wrong key, tampered path or query, substituted segment index) answers 403
+   on every delivery route before the streaming port is called; the signing endpoint
+   and the ladder refuse a missing proof, a foreign key, a reused proof and an unbound
+   token with 403, a bad token with 401 and a video of another library with 403; and
+   a DPoP-bound token presented with the Bearer scheme answers 401 on every route the
+   `api` firewall authenticates (user decision, RFC 9449 section 7.1, over recording
+   the previous acceptance). Every 403 is told apart by a kernel-exception probe that
+   records the refusing exception, since the API answers one generic 403 body; 401
+   rows read the authenticator's code. Membership removal and token revocation after
+   signing leave the signed URL serving and refuse new grants.
+
+   Two defects fixed on the way: `OAuth2Authenticator` accepted a bound token under
+   `Bearer`, and the signed URL's signature reached `prod.log` and `error.log`
+   through the web processor's request URL and the Swoole access log; a Monolog
+   processor now redacts the `sig` value from every record. A unit guard holds the
+   delivery route set equal across the firewall's public rows, the binding listener's
+   exemptions and the rate limiter's exemptions, and the fixture the matrix loops over
+   is derived from it.
+
+   Evidence: `SignedDeliveryFirewallTest` (77 tests, 2,571 assertions: 42 credential
+   rows on a manifest and a segment representative, 18 bound-endpoint rows on the
+   ladder and the sign endpoint, the signature kinds on every route, the cross-route
+   proof, the foreign-library member, the two transitions and a credential scan over
+   every response body and log file), `DeliveryRouteInventoryTest` (2),
+   `StreamSignatureRedactionProcessorTest` (2), `OAuthAccessTokenJwtTest` (9), and
+   `LogoutTest` and `DisabledUserAccessTest` moved to the DPoP scheme. Not covered:
+   `HEAD` requests, the audio, catalog and image suites (their own real-firewall
+   tests stand), and the WebSocket handshake's query-token authenticator.
+
 The local dev database (`baander` in `baander-postgres`) records the migration class
 names from before the rename and is about 40 migrations behind (last migrated on
 2026-07-15). `make migrate` now refuses it. Reconcile its recorded history with
@@ -315,6 +356,12 @@ unless noted:
   the host and in WebKit in the Playwright container.
 - `ui/rn` is deferred indefinitely (84 `tsc` errors and 25 Jest failures); no CI
   job runs it.
+
+The item 7 checkpoint, on 2026-10-14: unit 6,176; functional 1,445 in 133 files (the
+item 6 line's 1,455 was over-counted: the functional file set and test methods are
+unchanged since); integration 1,096 in 104 files; web unchanged from item 6 (no `ui/`
+change); PHPStan clean; Deptrac 0; container lint and the OpenAPI check passing, all in
+the CI image against the branch tree.
 
 The item 6 checkpoint, on 2026-10-14: unit 6,158; functional 1,455; integration 1,046;
 web 2,018 with typecheck and lint at zero errors; browser-auth 24 (Chromium and WebKit);
@@ -1148,10 +1195,13 @@ the agreed host budget.
 
 ### Application security and reliability
 
-- [ ] Exercise anonymous, owner, unrelated user, library member, administrator,
+- [x] Exercise anonymous, owner, unrelated user, library member, administrator,
   and revoked-token cases through the real firewall. Include missing proofs,
   wrong keys, replayed proofs, audience variations, expired signatures, and
   cross-library requests. Cover master/rendition/DASH/subtitle manifests and segments.
+  Delivered as item 7 on 2026-10-14: `SignedDeliveryFirewallTest` (77 cases) with the
+  route-inventory guard; `HEAD` requests and the audio, catalog and image suites stay
+  out of its scope.
 - [ ] Check every catalog mutation and library-scoped query, including search,
   counts, and related resources. Eliminate fallback administrator identities.
   Signing accepts only authorized media paths and valid bounded durations.

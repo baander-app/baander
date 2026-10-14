@@ -55,14 +55,14 @@ While Redis is unreachable, the web server cannot check DPoP nonces and proof re
 
 ## Job Monitoring
 
-Background jobs (library scans, transcoding, notifications) are tracked by a job monitoring system. All job endpoints require authentication with `ROLE_ADMIN`.
+Background jobs (library scans, transcoding, notifications) are tracked by a job monitoring system. All job endpoints require authentication with `ROLE_ADMIN`. Every request carries the access token with the `DPoP` scheme and a `DPoP` proof header signed by the key the token is bound to; the `Bearer` scheme is refused for a bound token. The examples below show the scheme and leave the proof to the client that signs it.
 
 ### Status overview
 
 Get a quick summary of all jobs grouped by status, plus a list of currently running jobs:
 
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN" https://baander.test/api/monitor/status | jq .
+curl -s -H "Authorization: DPoP $TOKEN" https://baander.test/api/monitor/status | jq .
 ```
 
 The response includes `counts` (jobs per status) and `running` (active jobs with progress).
@@ -73,11 +73,11 @@ Browse jobs with filtering, sorting, and cursor-based pagination:
 
 ```bash
 # Failed jobs, sorted by creation date
-curl -s -H "Authorization: Bearer $TOKEN" \
+curl -s -H "Authorization: DPoP $TOKEN" \
   "https://baander.test/api/monitor/jobs?status=failed&sort=createdAt&direction=desc&limit=20" | jq .
 
 # Scan jobs
-curl -s -H "Authorization: Bearer $TOKEN" \
+curl -s -H "Authorization: DPoP $TOKEN" \
   "https://baander.test/api/monitor/jobs?name=scan" | jq .
 ```
 
@@ -88,7 +88,7 @@ Available filters: `status` (`queued`, `running`, `finished`, `failed`, `cancell
 Get the full record for a specific job, including exception details for failures:
 
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN" \
+curl -s -H "Authorization: DPoP $TOKEN" \
   "https://baander.test/api/monitor/jobs/<jobId>" | jq .
 ```
 
@@ -100,11 +100,11 @@ You can retry failed jobs or cancel running jobs through the API. Retrying a job
 
 ```bash
 # Retry a failed job
-curl -X POST -s -H "Authorization: Bearer $TOKEN" \
+curl -X POST -s -H "Authorization: DPoP $TOKEN" \
   "https://baander.test/api/monitor/jobs/<jobId>/retry" | jq .
 
 # Cancel a running job
-curl -X POST -s -H "Authorization: Bearer $TOKEN" \
+curl -X POST -s -H "Authorization: DPoP $TOKEN" \
   "https://baander.test/api/monitor/jobs/<jobId>/cancel" | jq .
 ```
 
@@ -117,7 +117,7 @@ A finished bulk lyrics fetch can still be cancelled while the fetches it queued 
 The admin **Transport Health** card shows the number of entries in the async Redis stream, the number of messages in the failure transport, and whether the consumer this container is configured with is registered on the stream. The same figures come from the API and the console:
 
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN" "https://baander.test/api/monitor/transport/status" | jq .
+curl -s -H "Authorization: DPoP $TOKEN" "https://baander.test/api/monitor/transport/status" | jq .
 
 make exec cmd="php bin/console app:monitor:transport"
 ```
@@ -130,16 +130,16 @@ A message that exhausts its retries moves to the failure transport, the `failed_
 
 ```bash
 # List failed messages, newest first (page and limit are optional; limit is at most 100)
-curl -s -H "Authorization: Bearer $TOKEN" \
+curl -s -H "Authorization: DPoP $TOKEN" \
   "https://baander.test/api/monitor/transport/failed?page=1&limit=50" | jq .
 
 # Show, retry or remove one message
-curl -s -H "Authorization: Bearer $TOKEN" "https://baander.test/api/monitor/transport/failed/<id>" | jq .
-curl -X POST -s -H "Authorization: Bearer $TOKEN" "https://baander.test/api/monitor/transport/failed/<id>/retry" | jq .
-curl -X DELETE -s -H "Authorization: Bearer $TOKEN" "https://baander.test/api/monitor/transport/failed/<id>" | jq .
+curl -s -H "Authorization: DPoP $TOKEN" "https://baander.test/api/monitor/transport/failed/<id>" | jq .
+curl -X POST -s -H "Authorization: DPoP $TOKEN" "https://baander.test/api/monitor/transport/failed/<id>/retry" | jq .
+curl -X DELETE -s -H "Authorization: DPoP $TOKEN" "https://baander.test/api/monitor/transport/failed/<id>" | jq .
 
 # Remove every failed message
-curl -X POST -s -H "Authorization: Bearer $TOKEN" \
+curl -X POST -s -H "Authorization: DPoP $TOKEN" \
   "https://baander.test/api/monitor/transport/failed/flush?confirm=true" | jq .
 ```
 
@@ -162,7 +162,7 @@ The analytics endpoints provide aggregate insights into job performance over a t
 Status counts, job type breakdown, success rate, and throughput:
 
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN" \
+curl -s -H "Authorization: DPoP $TOKEN" \
   "https://baander.test/api/monitor/analytics/summary?from=2026-04-24T00:00:00Z&to=2026-04-25T00:00:00Z" | jq .
 ```
 
@@ -173,7 +173,7 @@ Each endpoint counts the jobs created from `from` up to but not including `to`, 
 Average, median, and P95 execution times per job type, plus average queue latency:
 
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN" \
+curl -s -H "Authorization: DPoP $TOKEN" \
   "https://baander.test/api/monitor/analytics/timing" | jq .
 ```
 
@@ -182,7 +182,7 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 Top failing job types, top exception classes, retry frequency, and recent failure details:
 
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN" \
+curl -s -H "Authorization: DPoP $TOKEN" \
   "https://baander.test/api/monitor/analytics/failures?limit=20" | jq .
 ```
 
@@ -197,7 +197,7 @@ curl -s -H "Authorization: Bearer $TOKEN" \
 The server stats endpoint returns a snapshot of every HTTP worker of the web server. Requires `ROLE_ADMIN`. The [`app:server:stats`](commands/app-server-stats.md) command prints the same data from the web container.
 
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN" https://baander.test/api/debug/stats | jq .
+curl -s -H "Authorization: DPoP $TOKEN" https://baander.test/api/debug/stats | jq .
 ```
 
 The `data` object holds:
@@ -259,7 +259,7 @@ Inspect and manage configured rate limiters. Requires `ROLE_ADMIN`.
 ### List all rate limiters
 
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN" https://baander.test/api/monitor/rate-limiters | jq .
+curl -s -H "Authorization: DPoP $TOKEN" https://baander.test/api/monitor/rate-limiters | jq .
 ```
 
 This returns every limiter configured under `framework.rate_limiter` in `config/packages/framework.yaml`, with its effective policy, limit, interval, description, and cache pool. The CLI equivalent is:
@@ -273,7 +273,7 @@ make exec cmd="php bin/console app:rate-limiter:list"
 To unblock rate-limited users (for example, after a configuration change or during an incident), clear one limiter's state:
 
 ```bash
-curl -X DELETE -s -H "Authorization: Bearer $TOKEN" \
+curl -X DELETE -s -H "Authorization: DPoP $TOKEN" \
   "https://baander.test/api/monitor/rate-limiters/auth_login_ip/clear?confirm=true" | jq .
 ```
 
@@ -301,7 +301,7 @@ This runs all configuration checks and prints a table of results. See the [full 
 ### API
 
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN" https://baander.test/api/debug/config-check | jq .
+curl -s -H "Authorization: DPoP $TOKEN" https://baander.test/api/debug/config-check | jq .
 ```
 
 The endpoint validates environment variables, key file existence, secret strength, and framework config. It returns a summary with `errors`, `warnings`, and `passed` counts. Rate-limited to prevent abuse.

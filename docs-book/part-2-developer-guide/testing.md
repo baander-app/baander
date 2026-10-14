@@ -187,6 +187,49 @@ runner's disposable PostgreSQL and Redis and do not run on the host:
   `/api/oauth/revoke` revokes only the caller's own tokens and answers a foreign
   token exactly like an unknown one.
 
+The video delivery surface has its own real-firewall matrix in
+`tests/Integration/SignedDeliveryFirewallTest.php`, run through the same runner
+against the disposable PostgreSQL and Redis. A player holds a signed manifest URL
+and may or may not hold a token, so the suite crosses anonymous, owner, library
+member, unrelated user and administrator with every credential condition on the
+seven signature-only delivery endpoints (the HLS master, media and subtitle
+manifests, the DASH manifest, the init, media and subtitle segments), the signing
+endpoint and the quality ladder. The contract it records follows the order the
+firewall works in. A valid signed URL is a bearer capability and serves any holder
+without a credential. A credential that is presented must be valid: an expired,
+revoked, foreign-audience, malformed or fingerprint-mismatched token answers `401`
+even with a valid signature. The DPoP proof is never read on a delivery route, so a
+missing, foreign-key or reused proof answers `200` there and records no replay key.
+A signature fault answers `403` on every delivery route before the streaming port
+is called, the segment index included. On the signing endpoint and the ladder, a
+missing proof, a foreign key, a reused proof and an unbound token answer `403`, a
+bad token `401`, and a video of another library `403`. A DPoP-bound token
+presented with the Bearer scheme answers `401` everywhere the `api` firewall
+authenticates. Every refusal row also asserts which component refused: the API
+answers every `403` with one generic body, so the suite registers a
+kernel-exception probe that records the refusing exception's message, and the
+`401` rows read the authenticator's code from the body. One assertion scans every
+response body and every log file of the kernel for the tokens, proofs and
+signatures the matrix used; the signature scan is what found the request URL,
+signature included, in the web processor's `url` field and the access log, and
+`StreamSignatureRedactionProcessor` now redacts it.
+`tests/Unit/Shared/Infrastructure/Security/DeliveryRouteInventoryTest.php` keeps
+the delivery route set equal across the security configuration, the binding
+listener's exemption list and the rate limiter's exemption list, and the suite
+derives its unsigned-request loop from that inventory.
+
+The other real-firewall suites under `tests/Integration/` are
+`OAuthFirewallAcceptanceTest.php` (the production firewall with real RS256 tokens,
+ES256 proofs and Redis replay storage: a bound proof reconstructs the user, a
+replay is refused, an invalid presentation is refused), `TrackStreamFirewallTest.php`
+(audio track streams: authorization before filesystem resolution, exact range bytes,
+membership and token revocation between range requests, replayed proofs),
+`CatalogReadFirewallTest.php` (library-scoped catalog reads and searches through
+real membership), `ImageReadFirewallTest.php`, `PlaylistReadFirewallTest.php`,
+`ArtistMutationFirewallTest.php` and `PushUnsubscribeFirewallTest.php` (the
+production OAuth and DPoP chain over the image, playlist, artist mutation and push
+unsubscribe routes with PostgreSQL adapters).
+
 ## Running Tests
 
 Use an application image that satisfies the current Composer lockfile. To build

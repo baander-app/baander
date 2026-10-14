@@ -104,15 +104,15 @@ Endpoints are split between session management and streaming delivery.
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| POST | `/api/stream/sign` | Sign a stream URL for playback |
-| GET | `/api/stream/{videoId}/master.m3u8` | HLS master manifest |
-| GET | `/api/stream/{jobPublicId}/media.m3u8` | HLS media playlist |
-| GET | `/api/stream/{videoId}/manifest.mpd` | DASH manifest |
-| GET | `/api/stream/{videoId}/quality-ladder` | Available quality tiers |
-| GET | `/api/stream/{jobPublicId}/audio/{language}/media.m3u8` | HLS audio manifest |
-| GET | `/api/stream/{jobPublicId}/subtitles/{language}/media.m3u8` | HLS subtitle manifest |
-| GET | `/api/stream/{jobPublicId}/init.mp4` | HLS init segment |
-| GET | `/api/stream/{jobPublicId}/seg_{index}.m4s` | HLS media segment |
+| POST | `/api/stream/sign` | Sign a master manifest URL for playback (token and DPoP proof required; library membership checked) |
+| GET | `/api/transcode/{videoId}/quality-ladder` | Available quality tiers (token and DPoP proof required; library membership checked) |
+| GET | `/api/transcode/{videoId}/master.m3u8` | HLS master manifest (signed URL) |
+| GET | `/api/transcode/{videoId}/manifest.mpd` | DASH manifest (signed URL) |
+| GET | `/api/transcode/{jobPublicId}/media.m3u8` | HLS media playlist (signed URL) |
+| GET | `/api/transcode/{jobPublicId}/subtitles/{language}/media.m3u8` | HLS subtitle manifest (signed URL) |
+| GET | `/api/transcode/{jobPublicId}/init` | Init segment (signed URL) |
+| GET | `/api/transcode/{jobPublicId}/segment?index={index}` | Media segment (signed URL) |
+| GET | `/api/transcode/{jobPublicId}/subtitles/{language}/{segment}.vtt` | Subtitle segment (signed URL) |
 
 ## Cross-Context Relationships
 
