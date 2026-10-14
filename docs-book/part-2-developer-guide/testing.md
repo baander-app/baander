@@ -218,6 +218,27 @@ the delivery route set equal across the security configuration, the binding
 listener's exemption list and the rate limiter's exemption list, and the suite
 derives its unsigned-request loop from that inventory.
 
+The catalog, library and playlist mutations have their own matrices.
+`tests/Integration/CatalogMutationFirewallTest.php` crosses thirty routes (albums,
+songs, movies, genres, covers, cover extraction, the admin deletes and previews, the
+admin duplicates listing and the library routes) with anonymous, member, unrelated
+member and administrator: every denied row asserts the role voter's refusal, an
+unchanged catalog snapshot, empty in-memory transports, no storage call and no Redis
+growth, and every administrator row asserts the change and the port calls it makes,
+with scan-all, file deletion on a real library root, album deletion with a cover,
+cross-library merge and path validation as their own rows. Its kernel,
+`tests/Fixtures/Auth/CatalogMutationOAuthKernel.php`, replaces the Messenger
+transports with in-memory ones and makes the storage port synthetic.
+`tests/Integration/PlaylistMutationFirewallTest.php` crosses every playlist mutation
+and both collaborator routes with owner, collaborator, collaborator with sharing
+switched off, unrelated member, administrator and anonymous, each refusal asserting
+the voter's message. `tests/Unit/Shared/Infrastructure/Security/MutationRouteInventoryTest.php`
+holds the two suites' route keys to every write route under `/api/` the router knows,
+minus an explicit list of routes other suites own, so a new mutation route fails a unit
+test until it has rows. The read suite also proves the denied-filter, related-resource
+and anonymous-detail rows, and the delivery suite proves the signing endpoint's own
+`400` answers through the kernel.
+
 The other real-firewall suites under `tests/Integration/` are
 `OAuthFirewallAcceptanceTest.php` (the production firewall with real RS256 tokens,
 ES256 proofs and Redis replay storage: a bound proof reconstructs the user, a
@@ -226,9 +247,10 @@ replay is refused, an invalid presentation is refused), `TrackStreamFirewallTest
 membership and token revocation between range requests, replayed proofs),
 `CatalogReadFirewallTest.php` (library-scoped catalog reads and searches through
 real membership), `ImageReadFirewallTest.php`, `PlaylistReadFirewallTest.php`,
-`ArtistMutationFirewallTest.php` and `PushUnsubscribeFirewallTest.php` (the
-production OAuth and DPoP chain over the image, playlist, artist mutation and push
-unsubscribe routes with PostgreSQL adapters).
+`ArtistMutationFirewallTest.php`, `LyricsFirewallTest.php`, `CatalogMutationFirewallTest.php`,
+`PlaylistMutationFirewallTest.php` and `PushUnsubscribeFirewallTest.php` (the
+production OAuth and DPoP chain over the image, playlist, artist, catalog and library
+mutation, lyrics and push unsubscribe routes with PostgreSQL adapters).
 
 ## Running Tests
 

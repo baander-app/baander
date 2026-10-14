@@ -18,8 +18,8 @@ roadmap records scope and acceptance; the linked design documents, current sourc
 and CI workflow are the executable detail. Measurements in later historical
 batches describe their own checkpoints; the current gate below takes precedence.
 
-The backend release-gate package is complete (see the next two sections). Seven
-plans followed it, in this order, and all seven are delivered:
+The backend release-gate package is complete (see the next two sections). Eight
+plans followed it, in this order, and all eight are delivered:
 
 1. [General settings and email language](docs/plans/2026-10-07-1736-feat-general-settings-email-language-plan.md):
    one definition-driven settings mechanism, the per-user email language, and the
@@ -323,6 +323,52 @@ plans followed it, in this order, and all seven are delivered:
    `HEAD` requests, the audio, catalog and image suites (their own real-firewall
    tests stand), and the WebSocket handshake's query-token authenticator.
 
+8. [Catalog authorization matrix and playlist collaborators](docs/plans/2026-10-14-1532-feat-catalog-authorization-matrix-plan.md):
+   every catalog, library and playlist mutation and the library-scoped reads the read
+   suite skipped are proven through the real firewall against PostgreSQL and Redis, the
+   playlist's unused collaborator table became a working feature with sharing controls
+   on the playlist page, the signing validation answers through the kernel, and the
+   fallback-identity audit is recorded with one tightening. Delivered on 2026-10-14
+   (branch `plan/item8-catalog-authorization`).
+
+   The recorded contract: every catalog and library change is administrator-only, and a
+   refused request leaves no row, file or queued job behind; reads stay bounded by
+   membership, so a filter naming something of another library answers an empty page.
+   Playlists are shared with named collaborators (user decision, chosen over owner-only
+   mutations and over an administrator grant): the owner names and removes
+   collaborators by public id, a collaborator views and, while the owner keeps
+   collaboration on, changes the songs under their own library membership, and may
+   leave, while a user holding no collaborator row is refused as a leaver before any
+   user lookup, so a repeat leave answers 403 (code review fix, a deviation from the
+   plan's idempotent 204); the owner alone edits details, deletes and manages
+   collaborators; a non-owner administrator views and nothing more. Users are named by public id and no UUID
+   leaves the API (user decision). Every playlist refusal names the rule that decided.
+   The audit found no path that acts as an administrator without a signed-in user; the
+   library lookup's unrestricted default became an explicit choice at its six callers.
+
+   Fixed on the way, found by the matrix: adding a song never checked that the actor
+   could see it and an unknown id answered 500; a partial reorder deleted the entries
+   it was not told about; the song list's genre filter matched names while the API
+   documents slugs; a new artist cover image row was never linked to its artist; two
+   admin duplicate-listing error messages had no translation. A unit guard holds the
+   two mutation suites' route keys to every write route under the API prefix, so a new
+   mutation route fails a unit test until it has rows.
+
+   Evidence: `CatalogMutationFirewallTest` (130 tests: thirty routes crossed with
+   anonymous, member, unrelated member and administrator, with scan-all, file deletion
+   on a real root, cover rows, cross-library merge, path validation and a credential
+   scan), `PlaylistMutationFirewallTest` (72 tests: eight routes crossed with owner,
+   collaborator, collaborator with sharing off, unrelated member, administrator and
+   anonymous, plus the visibility, reorder, idempotency and router rows),
+   `CatalogReadFirewallTest` (60, with the genre-form, denied-filter, related-resource and
+   anonymous-detail rows), `PlaylistReadFirewallTest` (21, with the collaborator rows),
+   `SignedDeliveryFirewallTest` (90, with the signing 400 rows),
+   `MutationRouteInventoryTest` (2), `PlaylistCollaboratorListRepositoryTest` (3), the
+   playlist, voter, handler and lookup unit suites, and twelve web tests for the sharing
+   dialog, the detail page and the list badge. Not covered: `HEAD` requests, audio,
+   image and user-administration suites (their own tests stand), and a browser pass of
+   the sharing dialog.
+
 The local dev database (`baander` in `baander-postgres`) records the migration class
 names from before the rename and is about 40 migrations behind (last migrated on
 2026-07-15). `make migrate` now refuses it. Reconcile its recorded history with
@@ -356,6 +402,11 @@ unless noted:
   the host and in WebKit in the Playwright container.
 - `ui/rn` is deferred indefinitely (84 `tsc` errors and 25 Jest failures); no CI
   job runs it.
+
+The item 8 checkpoint, on 2026-10-14: unit 6,220; functional 1,448 in 134 files;
+integration 1,326 in 106 files; web 2,030 in 183 files with typecheck and lint at zero
+errors; PHPStan clean; Deptrac 0; container lint and the OpenAPI check passing, all in
+the CI image against the branch tree.
 
 The item 7 checkpoint, on 2026-10-14: unit 6,176; functional 1,445 in 133 files (the
 item 6 line's 1,455 was over-counted: the functional file set and test methods are
@@ -1202,9 +1253,14 @@ the agreed host budget.
   Delivered as item 7 on 2026-10-14: `SignedDeliveryFirewallTest` (77 cases) with the
   route-inventory guard; `HEAD` requests and the audio, catalog and image suites stay
   out of its scope.
-- [ ] Check every catalog mutation and library-scoped query, including search,
+- [x] Check every catalog mutation and library-scoped query, including search,
   counts, and related resources. Eliminate fallback administrator identities.
   Signing accepts only authorized media paths and valid bounded durations.
+  Delivered as item 8 on 2026-10-14: `CatalogMutationFirewallTest` (130 cases),
+  `PlaylistMutationFirewallTest`, the read and delivery rows and the route inventory
+  guard; the audit found no fallback identity and made the one unscoped default
+  explicit; `HEAD` requests and the audio, image and user-administration suites stay
+  out of its scope.
 - [x] Verify concurrent refresh against PostgreSQL: one usable replacement,
   rollback recoverability on persistence/signing failure, and replay detection.
   Exercise expiry, logout, multiple tabs, concurrent requests, service-worker
