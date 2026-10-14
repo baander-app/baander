@@ -2,6 +2,9 @@
 
 Guidance for operators on rotating secrets, recovering from a breach, and hardening a Baander installation.
 
+The [application threat model](../part-2-developer-guide/application-threat-model.md)
+records trust boundaries, regression evidence and unresolved findings.
+
 ## Rotating APP_SECRET
 
 `APP_SECRET` is one literal value used by Symfony security components and to encrypt stored webhook signing secrets. Changing it invalidates existing sessions and CSRF tokens. Webhook delivery cannot decrypt its stored secrets until each webhook is rotated under the new value or the matching old value is restored. Comma-separated values are not a rotation mechanism in this application.
@@ -234,7 +237,7 @@ After recovery, review the [hardening checklist](#hardening-checklist) before br
 - [ ] **Strong database password** — not the default `baander`
 - [ ] **`APP_ENV=prod`** in production — disables debug mode, verbose errors, and the profiler
 - [ ] **HTTPS in production** — set `DEFAULT_URI` and `APP_URL` to `https://`
-- [ ] **Reverse proxy configured** — Nginx terminates TLS and sets `X-Forwarded-*` headers (already configured in `swoole.yaml` with `trusted_proxies: ['*']`)
+- [ ] **Reverse proxy configured** — set `TRUSTED_PROXIES` to the actual trusted proxy addresses or CIDRs. Both HTTP layers default to no trust. Proxies must replace incoming `X-Forwarded-*` headers; direct access leaves the list empty.
 - [ ] **Rate limiting active** — relies on Redis; verify Redis is reachable
 - [ ] **External API keys secured** — store in `.env`, never in source code or config committed to git
 - [ ] **OAuth keys not in version control** — `config/secrets/oauth/` should be in `.gitignore`
@@ -267,7 +270,7 @@ VAPID_PRIVATE_KEY=<from app:generate-vapid-keys>
 
 Besides Baander's own apps, other clients can obtain tokens through the OAuth 2.0 authorization server: the authorization code grant with mandatory S256 PKCE, the device authorization grant for devices without a browser, and personal access clients that users create for their own tools. Administrators register device, public and confidential clients with the `app:oauth:client:*` commands or the admin API; see [OAuth Clients](user-management.md#oauth-clients).
 
-- **Token binding.** Every access token and refresh token, from any grant, is bound to the DPoP key that requested it. API requests with the token must carry a proof signed by that key, except signed stream delivery URLs, and refresh requires the same key. A token request that sends `X-Baander-Client-Fingerprint` also binds the access token to that fingerprint. Refresh tokens rotate, and reusing one revokes its whole chain, with one exception: a consumed token presented again with its own key within `auth.refresh.reuse_grace_seconds`, while the pair it was exchanged for is still unused, gets a fresh pair and that unused pair is revoked, so a client whose refresh answer was lost keeps its session. See [Token lifetimes](configuration.md#token-lifetimes).
+- **Token binding.** Every access token and refresh token, from any grant, is bound to the DPoP key that requested it. API requests with the token must carry a proof signed by that key, except signed stream delivery URLs and the current WebSocket query-token handshake, and refresh requires the same key. The handshake does not verify proof possession; see the open finding in the [threat model](../part-2-developer-guide/application-threat-model.md#open-findings-and-qualification-work). A token request that sends `X-Baander-Client-Fingerprint` also binds the access token to that fingerprint. Refresh tokens rotate, and reusing one revokes its whole chain, with one exception: a consumed token presented again with its own key within `auth.refresh.reuse_grace_seconds`, while the pair it was exchanged for is still unused, gets a fresh pair and that unused pair is revoked, so a client whose refresh answer was lost keeps its session. See [Token lifetimes](configuration.md#token-lifetimes).
 - **Client secrets.** A confidential client's secret is shown once, when it is generated, and stored only as a SHA-256 digest. Rotating it ends the old secret at once and leaves issued tokens valid.
 - **Cross-origin access.** The token endpoint and the device authorization endpoint accept requests from any origin, because their callers prove possession with DPoP instead of cookies. Revocation, device approval, the authorization endpoint `/api/oauth/authorize`, and all other API routes accept only the `APP_URL` origin. Third-party clients do not call the authorization endpoint; they send the user's browser to the web app's consent page, which calls it for the signed-in user. See [HTTP](configuration.md#http).
 - **Rate limits.** The authorization, token, and device authorization endpoints each have a per-IP limiter, and the token endpoint also counts requests per client. User code lookups and approvals share a per-IP limit that bounds code guessing. See [Rate limiting](configuration.md#rate-limiting).

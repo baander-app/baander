@@ -23,13 +23,16 @@ batches describe their own checkpoints; the current gate below takes precedence.
 Any harness can take over from this section; nothing below depends on a tool that
 only one agent host has.
 
-- **Branch.** Item 8 is merged and pushed. `master` (eced16d6) holds its fifteen
+- **Branch.** `plan/application-threat-model` contains the local application-security
+  delivery from `a86f5ea`. See its [checkpoint](#application-threat-model-delivery-2026-10-14)
+  for verification and open findings. Nothing from this delivery has been pushed.
+- **Previous baseline.** Item 8 was merged and pushed. `master` (eced16d6) holds its fifteen
   commits and the roadmap commit on top of 63466d0d by fast-forward, code-reviewed
   with both findings applied and every gate green (the item 8 checkpoint below).
   `origin/master` and `baander-github/master` are at the same commit, the working
   tree is clean, and nothing is unmerged or unpushed. The local branch
   `plan/item8-catalog-authorization` points at the same commit and can be deleted.
-  The next plan starts on a new branch named after it.
+
 - **History.** On 2026-10-14 the `Claude-Session:` trailer was removed from the 25
   local commits that carried it with a message filter; every tree is unchanged, so
   `git diff` between an old and its rewritten commit is empty. Both remotes now hold
@@ -1381,6 +1384,105 @@ the agreed host budget.
   access, malformed HTTP/JSON, rate-limit abuse, SSRF, TLS failures, and quorum
   downgrade. Record observed findings and remediation. The EICAR scanner canary
   is only a scanner check, not evidence of penetration resistance.
+
+### Application threat-model delivery (2026-10-14)
+
+Branch `plan/application-threat-model` implements the reviewed
+[plan](docs/plans/application-threat-model.md). The
+[application threat model](docs-book/part-2-developer-guide/application-threat-model.md)
+records assets, trust boundaries, source/test evidence and open findings. PHP
+Discovery registration/pairing is local persistence; registry internals and quorum
+downgrade remain pending, so the combined checkbox above stays open.
+
+Delivered changes:
+
+- Both HTTP layers use explicit `TRUSTED_PROXIES`, empty by default; development
+  no longer trusts a Docker subnet and Swoole no longer trusts every peer. The
+  real command consumes the raw environment string while Symfony uses CSV;
+  a container-resolution regression protects against nested-array startup failure.
+- Malformed login JSON, email/password/TOTP types and rate-limit identity fields
+  receive bounded rejection. The initial real-runtime drill reproduced three 500
+  responses before validation was corrected.
+- Application logs redact WebSocket query tokens as well as signed delivery
+  signatures, including encoded parameter names. Real-firewall tests add method
+  binding, revocation, protected-route and credential-disclosure cases.
+- Lyrics requests reject redirects. Local Native/Curl TLS fixtures cover trusted
+  success, untrusted certificates, hostname mismatch and private HTTP downgrade.
+- `scripts/test-security-runtime-container.sh` is a blocking Forgejo step with
+  disposable PostgreSQL/Redis, an internal network and bounded socket deadlines.
+  It checks malformed wire/JSON input, oversized declarations, fresh-connection
+  liveness and unchanged credential/user counts without resetting development data.
+
+Open findings are explicit: WebSocket query authentication accepts a bound JWT
+without proof possession; rate-limit cache failure and unlocked concurrent updates
+can admit requests beyond the budget; metadata, radio-catalog and push egress need
+separate destination policy. A local PHP stream reproduction follows HTTPS to
+loopback HTTP; CI PHP 8.5.2 forwards Authorization while host PHP 8.5.11 strips it.
+This is transport evidence, not an exploit against a live provider. Live socket
+upgrades, authenticated pairing races, exhaustive parser/DoS testing and all
+external transports remain unqualified. Regional qualification and mobile work
+retain their earlier pending/deferred status.
+
+Verification checkpoint: authoritative gates passed against
+`baander-ci-prewarm:local` (CI target, PHP 8.5.2 ZTS, Swoole 6.2.0,
+OpenSSL 3.0.18), with the current checkout streamed or mounted into disposable
+containers.
+
+- Unit and StaticAnalysisRules: 6,260 tests, 29,375 assertions across 26 passing
+  shards. The unsharded `test-unit-container.sh` exited 139 before a report; the
+  complete rerun used its same isolated image/archive with
+  `scripts/run-phpunit-shards.php --testsuite Unit,StaticAnalysisRules`, matching
+  Forgejo's fresh-process execution. This does not diagnose the unsharded native
+  crash.
+- Security runtime: 15 rejection cases passed, with fresh-connection liveness,
+  unchanged user/token/login-block counts and no credential canary in runtime logs.
+- Functional: 1,458 tests, 13,016 assertions across 134 passing shards, using
+  `scripts/test-functional-container.sh tests/Functional` with
+  `BAANDER_TEST_IMAGE=baander-ci-prewarm:local BAANDER_FUNCTIONAL_TIMEOUT_ACTIVE=1`.
+- Integration: 1,355 tests, 37,054 assertions across 106 passing shards, using
+  the same disposable runner with `tests/Integration`. The extended OAuth firewall
+  file passes 29 tests and 227 assertions. Backend suites total 9,073 tests and
+  79,445 assertions.
+- PHPStan: zero errors. Deptrac: zero violations, 495 skipped, 15,629 allowed,
+  17,848 uncovered, zero warnings/errors; baseline unchanged. Container lint and
+  OpenAPI `--check` pass. Commands in the CI image were
+  `php vendor/bin/phpstan analyse --memory-limit=1G --no-progress`,
+  `vendor/bin/deptrac analyse --no-cache --no-progress`,
+  `php bin/console lint:container --env=test` and
+  `php bin/console app:export-openapi-spec --env=test --check`, using read-only
+  checkout mounts and `--network none`. Initial PHPStan findings in test fixture
+  annotations and the outbound peer loop were corrected before this checkpoint.
+- Browser-auth: 23 Chromium cases pass on the host with
+  `yarn --cwd ui/web test:browser-auth`. The host cannot start WebKit because its
+  system libraries are absent. Its one case passes in
+  `mcr.microsoft.com/playwright:v1.60.0-noble` with `--network none`, the full `ui`
+  directory mounted read-only and `node node_modules/@playwright/test/cli.js test
+  -c tests/e2e/browser-auth/playwright.config.ts --project=webkit
+  --output=/tmp/browser-auth-results` from `ui/web`. Total: 24 browser cases.
+  An initial container attempt omitted `ui/shared`; the corrected mount includes
+  it. No browser production code changed, so web build/type/lint gates were not
+  rerun for this backend/documentation change.
+
+The unavailable compound-engineering skills were replaced by the documented
+manual sequence: saved plan, independent plan review before implementation,
+simplification and independent code review, including the runtime-discovered
+proxy configuration correction. GitNexus was stale (indexed commit `2503505`).
+Source and caller inspection and Git diff supplied the edit evidence. Prose-fix
+preserves the evidence limits in the guide and model. No API schema change or generated-client update is
+required; no changes are pushed.
+
+### Parallel test execution
+
+- [ ] Use the installed ParaTest 7.22.4 to shorten backend verification. It supports
+  the current PHPUnit 13.1.11. Qualify isolated unit/static-rule tests first and
+  measure runtime against the fresh-process shard runner. Keep native Swoole,
+  process and fixed-resource tests separate until their parallel behavior is
+  verified. Before parallel functional/integration runs, use `TEST_TOKEN` or
+  `UNIQUE_TEST_TOKEN` to isolate each worker's PostgreSQL database, Redis state,
+  Symfony cache, temporary files and native sockets/ports. Current fixtures include
+  whole-table cleanup, so sharing one database between workers is unsafe. Preserve
+  the authoritative suite counts, failure gates and coverage aggregation; do not
+  trade isolation or reproducibility for speed. Requested on 2026-10-14.
 
 ### Worker architecture and resource control
 
