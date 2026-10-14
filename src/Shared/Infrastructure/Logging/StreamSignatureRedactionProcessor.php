@@ -22,11 +22,14 @@ final class StreamSignatureRedactionProcessor implements ProcessorInterface
 
     public function __invoke(LogRecord $record): LogRecord
     {
-        return $record->with(
-            message: $this->redactString($record->message),
-            context: $this->redact($record->context),
-            extra: $this->redact($record->extra),
-        );
+        $message = $this->redactString($record->message);
+        $context = $this->redact($record->context);
+        $extra = $this->redact($record->extra);
+        if ($message === $record->message && $context === $record->context && $extra === $record->extra) {
+            return $record;
+        }
+
+        return $record->with(message: $message, context: $context, extra: $extra);
     }
 
     /**
@@ -37,10 +40,11 @@ final class StreamSignatureRedactionProcessor implements ProcessorInterface
     private function redact(array $values): array
     {
         foreach ($values as $key => $value) {
-            if (is_string($value)) {
-                $values[$key] = $this->redactString($value);
-            } elseif (is_array($value)) {
-                $values[$key] = $this->redact($value);
+            if (is_string($value) || is_array($value)) {
+                $redacted = is_string($value) ? $this->redactString($value) : $this->redact($value);
+                if ($redacted !== $value) {
+                    $values[$key] = $redacted;
+                }
             }
         }
 
@@ -49,6 +53,10 @@ final class StreamSignatureRedactionProcessor implements ProcessorInterface
 
     private function redactString(string $value): string
     {
+        if (!str_contains($value, 'sig=')) {
+            return $value;
+        }
+
         return preg_replace(self::PATTERN, self::REPLACEMENT, $value) ?? $value;
     }
 }

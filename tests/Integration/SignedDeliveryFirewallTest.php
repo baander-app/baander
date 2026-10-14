@@ -65,7 +65,8 @@ final class SignedDeliveryFirewallTest extends TestCase
     private const string TOKEN_UNBOUND = 'Access token is not DPoP-bound.';
     private const string PROOF_REUSED = 'DPoP proof "jti" has been reused.';
     private const string FINGERPRINT = 'disposable-client-fingerprint';
-    private const string SIGN_URL = 'https://baander.app/api/stream/sign';
+    private const string SIGN_PATH = '/api/stream/sign';
+    private const string SIGN_URL = 'https://baander.app' . self::SIGN_PATH;
     private const array STREAMING_METHODS = [
         'getMasterManifest', 'getMediaManifest', 'getDashManifest', 'getSubtitleManifest',
         'getInitSegmentPath', 'getSubtitleSegmentPath', 'resolveVideoSegmentAvailability',
@@ -683,7 +684,7 @@ final class SignedDeliveryFirewallTest extends TestCase
     private function assertNoCredentialInResponsesOrLogs(): void
     {
         foreach ($this->bodies as [$path, $body]) {
-            $secrets = [...$this->tokens, ...$this->proofs, ...($path === '/api/stream/sign' ? [] : $this->signatures)];
+            $secrets = [...$this->tokens, ...$this->proofs, ...($path === self::SIGN_PATH ? [] : $this->signatures)];
             foreach ($secrets as $secret) {
                 self::assertStringNotContainsString($secret, $body, 'The response body of ' . $path . ' carries a credential.');
             }
