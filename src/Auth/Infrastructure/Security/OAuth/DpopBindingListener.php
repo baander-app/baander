@@ -28,6 +28,25 @@ final class DpopBindingListener
      */
     private const array REVOCATION_ROUTES = ['auth_logout', 'oauth_revoke'];
 
+    /**
+     * The video delivery routes whose URL signature stands in for the DPoP proof: a GET to
+     * one of them skips the proof check, and the controller validates the signature instead.
+     * Session controls and playback initiation keep the proof check. The firewall grants these
+     * routes public access and the API rate limiter exempts them; a test holds the three lists
+     * to the compiled routes.
+     *
+     * @var list<string>
+     */
+    public const array SIGNED_DELIVERY_ROUTES = [
+        'stream_master_manifest',
+        'stream_media_manifest',
+        'stream_dash_manifest',
+        'stream_subtitle_manifest',
+        'stream_segment_init_segment',
+        'stream_segment_segment',
+        'stream_segment_subtitle_segment',
+    ];
+
     private Parser $parser;
 
     public function __construct(
@@ -58,17 +77,7 @@ final class DpopBindingListener
         $request = $event->getRequest();
         $route = $request->attributes->get('_route');
 
-        // These delivery actions independently require a valid URL signature.
-        // Session controls and playback initiation must still validate DPoP.
-        if ($request->isMethod('GET') && in_array($route, [
-            'stream_master_manifest',
-            'stream_media_manifest',
-            'stream_dash_manifest',
-            'stream_subtitle_manifest',
-            'stream_segment_init_segment',
-            'stream_segment_segment',
-            'stream_segment_subtitle_segment',
-        ], true)) {
+        if ($request->isMethod('GET') && in_array($route, self::SIGNED_DELIVERY_ROUTES, true)) {
             return;
         }
 
