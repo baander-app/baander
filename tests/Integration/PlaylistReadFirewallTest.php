@@ -16,6 +16,7 @@ use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Library\Infrastructure\Doctrine\Entity\UserLibraryAccessEntity;
+use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistCollaboratorEntity;
 use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistEntity;
 use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistSongEntity;
 use App\Shared\Domain\Model\Email;
@@ -31,7 +32,12 @@ use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-/** Actual production OAuth/DPoP, playlist voter, library policy and PostgreSQL adapters. */
+/**
+ * Actual production OAuth/DPoP, playlist voter, library policy and PostgreSQL adapters.
+ *
+ * The owner reads the allowed library; the collaborator, when an actor, reads only the
+ * library denied to the owner, so each viewer's songs and counts are their own.
+ */
 final class PlaylistReadFirewallTest extends TestCase
 {
     private static string $directory;
@@ -41,6 +47,7 @@ final class PlaylistReadFirewallTest extends TestCase
     private UserRepositoryInterface $users;
     private UserEntity $owner;
     private LibraryEntity $allowedLibrary;
+    private LibraryEntity $deniedLibrary;
     private SongEntity $allowedSong;
     private SongEntity $deniedSong;
     /** @var array<string, PlaylistEntity> */
@@ -109,6 +116,7 @@ final class PlaylistReadFirewallTest extends TestCase
                 $this->allowedSong = $song;
                 $this->manager->persist(new UserLibraryAccessEntity($this->owner->getId(), $library, new \DateTimeImmutable()));
             } else {
+                $this->deniedLibrary = $library;
                 $this->deniedSong = $song;
             }
         }
@@ -146,7 +154,7 @@ final class PlaylistReadFirewallTest extends TestCase
     /** @return iterable<string, array{string, string}> */
     public static function actorsAndPlaylists(): iterable
     {
-        foreach (['owner', 'unrelated', 'admin'] as $actor) {
+        foreach (['owner', 'collaborator', 'unrelated', 'admin'] as $actor) {
             foreach (['private', 'public', 'collaborative'] as $kind) {
                 yield $actor . '/' . $kind => [$actor, $kind];
             }
@@ -168,40 +176,59 @@ final class PlaylistReadFirewallTest extends TestCase
         self::assertSame(200, $response->getStatusCode());
         $data = json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR)['data'];
         self::assertSame($this->owner->getPublicId()->toString(), $data['ownerPublicId']);
+        self::assertSame($actor === 'collaborator' ? [$this->actor->getPublicId()->toString()] : [], $data['collaboratorPublicIds']);
+        self::assertArrayNotHasKey('userId', $data);
         $expectedCount = $actor === 'admin' ? 2 : 1;
         self::assertSame($expectedCount, $data['songCount']);
         self::assertCount($expectedCount, $data['songs']);
-        self::assertSame($this->allowedSong->getId()->toString(), $data['songs'][0]['uuid']);
-        self::assertSame('allowed song', $data['songs'][0]['title']);
-        self::assertSame('allowed artist', $data['songs'][0]['artistName']);
-        self::assertSame('allowed album', $data['songs'][0]['albumName']);
+        // The collaborator reads the library the owner cannot, so their one song is the other one.
+        $visibility = $actor === 'collaborator' ? 'denied' : 'allowed';
+        $visibleSong = $actor === 'collaborator' ? $this->deniedSong : $this->allowedSong;
+        self::assertSame($visibleSong->getId()->toString(), $data['songs'][0]['uuid']);
+        self::assertSame($visibility . ' song', $data['songs'][0]['title']);
+        self::assertSame($visibility . ' artist', $data['songs'][0]['artistName']);
+        self::assertSame($visibility . ' album', $data['songs'][0]['albumName']);
         foreach ($data['songs'] as $song) {
             self::assertArrayNotHasKey('path', $song);
         }
         if ($actor === 'owner') {
             self::assertNotContains($this->deniedSong->getId()->toString(), array_column($data['songs'], 'uuid'));
         }
+        if ($actor === 'collaborator') {
+            self::assertNotContains($this->allowedSong->getId()->toString(), array_column($data['songs'], 'uuid'));
+        }
     }
 
     /** @return iterable<string, array{string}> */
     public static function authenticatedActors(): iterable
     {
-        foreach (['owner', 'unrelated', 'admin'] as $actor) {
+        foreach (['owner', 'collaborator', 'unrelated', 'admin'] as $actor) {
             yield $actor => [$actor];
         }
     }
 
+    /**
+     * The list holds the playlists the actor owns or collaborates on, each naming the owner
+     * and the collaborators by public id with the actor's own visible count: the owner and
+     * the collaborator each count the one song of the library they read.
+     */
     #[DataProvider('authenticatedActors')]
-    public function testPlaylistListIsOwnerOnlyWithVisibleCounts(string $actor): void
+    public function testPlaylistListHoldsOwnedAndSharedPlaylistsWithVisibleCounts(string $actor): void
     {
         $this->authenticate($actor);
         $response = $this->request('/api/playlists/');
         self::assertSame(200, $response->getStatusCode());
         $data = json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR)['data'];
-        self::assertCount($actor === 'owner' ? 3 : 0, $data);
+        self::assertCount(in_array($actor, ['owner', 'collaborator'], true) ? 3 : 0, $data);
+        $expectedPublicIds = array_map(static fn(PlaylistEntity $playlist): string => $playlist->getPublicId()->toString(), array_values($this->playlists));
+        if ($data !== []) {
+            self::assertEqualsCanonicalizing($expectedPublicIds, array_column($data, 'publicId'));
+        }
         foreach ($data as $playlist) {
             self::assertSame($this->owner->getPublicId()->toString(), $playlist['ownerPublicId']);
+            self::assertSame($actor === 'collaborator' ? [$this->actor->getPublicId()->toString()] : [], $playlist['collaboratorPublicIds']);
             self::assertSame(1, $playlist['songCount']);
+            self::assertArrayNotHasKey('userId', $playlist);
         }
     }
 
@@ -311,6 +338,13 @@ final class PlaylistReadFirewallTest extends TestCase
         $this->manager->persist($token);
         $this->entities[] = $client;
         $this->entities[] = $token;
+        if ($actor === 'collaborator') {
+            // A collaborator of every seeded playlist who reads only the library the owner cannot.
+            foreach ($this->playlists as $playlist) {
+                $this->manager->persist(new PlaylistCollaboratorEntity($playlist, $entity));
+            }
+            $this->manager->persist(new UserLibraryAccessEntity($entity->getId(), $this->deniedLibrary, new \DateTimeImmutable()));
+        }
         $this->manager->flush();
         $this->jwt = OAuthAccessTokenJwt::sign(self::$privateKey, $token);
     }
