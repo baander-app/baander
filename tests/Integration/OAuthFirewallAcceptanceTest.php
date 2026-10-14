@@ -15,9 +15,12 @@ use App\Shared\Domain\Model\Uuid;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
 use App\Tests\Fixtures\Auth\LeadingZeroDpopKey;
 use App\Tests\Fixtures\Auth\ProductionOAuthKernel;
+use App\Tests\Fixtures\Auth\SecuritySurfaceOAuthKernel;
+use App\Shared\Infrastructure\Security\WsQueryTokenAuthenticator;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Filesystem\Filesystem;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -66,7 +69,7 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         }
         $this->directory = self::$sharedDirectory;
         $this->privateKey = self::$sharedPrivateKey;
-        $this->kernel = new ProductionOAuthKernel($this->directory, $url);
+        $this->kernel = new SecuritySurfaceOAuthKernel($this->directory, $url);
         $this->kernel->boot();
         $container = $this->kernel->getContainer();
         self::assertSame('prod', $container->getParameter('kernel.environment'));
@@ -170,6 +173,145 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         self::assertSame(403, $this->request($jwt, $proof)->getStatusCode());
     }
 
+    /** @return iterable<string, array{string}> */
+    public static function profileMethods(): iterable
+    {
+        yield 'GET' => ['GET'];
+        yield 'HEAD' => ['HEAD'];
+        yield 'PUT' => ['PUT'];
+    }
+
+    #[DataProvider('profileMethods')]
+    public function testRevocationRefusesTheNextRequestIncludingAlternateMethods(string $method): void
+    {
+        $jwt = $this->accessJwt();
+        self::assertSame(200, $this->request($jwt, $this->proof->create('GET', 'https://baander.app/api/auth/me', $jwt))->getStatusCode());
+        $this->token->revoke();
+        $this->manager->flush();
+
+        $response = $this->request($jwt, $this->proof->create($method, 'https://baander.app/api/auth/me', $jwt), method: $method);
+
+        self::assertSame(401, $response->getStatusCode(), (string) $response->getContent());
+        $users = $this->kernel->getContainer()->get('oauth.acceptance.users');
+        self::assertInstanceOf(UserRepositoryInterface::class, $users);
+        self::assertSame('OAuth acceptance user', $users->findByUuid($this->user->getId())?->getName());
+    }
+
+    #[DataProvider('profileMethods')]
+    public function testAProofForAnotherMethodCannotReadOrUpdateTheProfile(string $method): void
+    {
+        $jwt = $this->accessJwt();
+        $proofMethod = $method === 'GET' ? 'PUT' : 'GET';
+        $response = $this->request($jwt, $this->proof->create($proofMethod, 'https://baander.app/api/auth/me', $jwt), method: $method);
+
+        self::assertSame(403, $response->getStatusCode(), (string) $response->getContent());
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function protectedRoutes(): iterable
+    {
+        yield 'user administration read' => ['GET', '/api/admin/users'];
+        yield 'user administration write' => ['POST', '/api/admin/users'];
+        yield 'library read' => ['GET', '/api/libraries'];
+        yield 'library create' => ['POST', '/api/libraries'];
+        yield 'playlist read' => ['GET', '/api/playlists/'];
+        yield 'playlist create' => ['POST', '/api/playlists/'];
+        yield 'server registration' => ['POST', '/api/discovery/register'];
+        yield 'pairing code' => ['POST', '/api/discovery/pairing-code'];
+        yield 'pairing completion' => ['POST', '/api/discovery/complete-pairing'];
+        yield 'pairing QR payload' => ['GET', '/api/discovery/qr-payload/' . '00000000-0000-7000-8000-000000000001'];
+    }
+
+    #[DataProvider('protectedRoutes')]
+    public function testAnonymousAndRevokedCredentialsCannotReachProtectedRoutes(string $method, string $path): void
+    {
+        $uri = 'https://baander.app' . $path;
+        $request = Request::create($uri, $method, server: ['CONTENT_TYPE' => 'application/json'], content: '{}');
+        $response = $this->kernel->handle($request);
+        $this->kernel->terminate($request, $response);
+        self::assertSame(401, $response->getStatusCode(), (string) $response->getContent());
+
+        $this->token->revoke();
+        $this->manager->flush();
+        $jwt = $this->accessJwt();
+        $response = $this->request($jwt, $this->proof->create($method, $uri, $jwt), $uri, $method);
+        self::assertSame(401, $response->getStatusCode(), (string) $response->getContent());
+    }
+
+    public function testAMemberCannotAdministerUsersOrRegisterAServer(): void
+    {
+        $jwt = $this->accessJwt();
+        foreach ([['GET', '/api/admin/users'], ['POST', '/api/admin/users'], ['POST', '/api/discovery/register']] as [$method, $path]) {
+            $uri = 'https://baander.app' . $path;
+            $response = $this->request($jwt, $this->proof->create($method, $uri, $jwt), $uri, $method);
+            self::assertSame(403, $response->getStatusCode(), (string) $response->getContent());
+        }
+    }
+
+    public function testABoundTokenUnderTheBearerSchemeCannotAuthenticateTheHttpApi(): void
+    {
+        $jwt = $this->accessJwt();
+        $request = Request::create('https://baander.app/api/auth/me');
+        $request->headers->set('Authorization', 'Bearer ' . $jwt);
+        $response = $this->kernel->handle($request);
+        $this->kernel->terminate($request, $response);
+
+        self::assertSame(401, $response->getStatusCode(), (string) $response->getContent());
+    }
+
+    public function testProfileAndFailureResponsesAndApplicationLogsDoNotExposePresentedCredentials(): void
+    {
+        $logger = $this->kernel->getContainer()->get('oauth.acceptance.auth_logger');
+        self::assertInstanceOf(LoggerInterface::class, $logger);
+        $marker = 'Security response logging check ' . bin2hex(random_bytes(8));
+        $logger->warning($marker);
+        $jwt = $this->accessJwt();
+        $proof = $this->proof->create('GET', 'https://baander.app/api/auth/me', $jwt);
+        $response = $this->request($jwt, $proof);
+        self::assertSame(200, $response->getStatusCode());
+        $data = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(['uuid', 'publicId', 'name', 'email', 'emailVerifiedAt', 'createdAt', 'roles'], array_keys($data['data']));
+        $failure = $this->request($jwt, $proof);
+        self::assertSame(403, $failure->getStatusCode());
+        foreach ([$response, $failure] as $result) {
+            $serialized = (string) $result->getContent() . $result->headers;
+            foreach ([$jwt, $proof, 'test-only-password'] as $credential) {
+                self::assertStringNotContainsString($credential, $serialized);
+            }
+            self::assertFalse($result->headers->has('Location'));
+        }
+        $logs = glob($this->kernel->getLogDir() . '/*.log');
+        self::assertIsArray($logs);
+        self::assertNotEmpty($logs);
+        $markerRecorded = false;
+        foreach ($logs as $path) {
+            $log = file_get_contents($path);
+            self::assertIsString($log);
+            $markerRecorded = $markerRecorded || str_contains($log, $marker);
+            self::assertStringNotContainsString($jwt, $log);
+            self::assertStringNotContainsString($proof, $log);
+        }
+        self::assertTrue($markerRecorded, 'The production auth logger must write to the inspected files.');
+    }
+
+    public function testARevokedQueryTokenCannotAuthenticateAWebSocketHandshake(): void
+    {
+        $authenticator = $this->kernel->getContainer()->get('oauth.acceptance.websocket');
+        self::assertInstanceOf(WsQueryTokenAuthenticator::class, $authenticator);
+        $request = new \Swoole\Http\Request();
+        $request->get = ['token' => $this->accessJwt()];
+        $request->server = ['request_uri' => '/api/ws'];
+        self::assertSame([
+            'user_id' => $this->user->getId()->toString(),
+            'access_token_id' => $this->token->getTokenId(),
+        ], $authenticator->authenticate($request));
+
+        $this->token->revoke();
+        $this->manager->flush();
+
+        self::assertNull($authenticator->authenticate($request));
+    }
+
     private function accessJwt(string $audience = 'https://baander.app'): string
     {
         $claims = [
@@ -190,9 +332,9 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         return $body . '.' . SignedDpopProof::encode($signature);
     }
 
-    private function request(string $jwt, ?string $proof, string $uri = 'https://baander.app/api/auth/me'): Response
+    private function request(string $jwt, ?string $proof, string $uri = 'https://baander.app/api/auth/me', string $method = 'GET'): Response
     {
-        $request = Request::create($uri);
+        $request = Request::create($uri, $method, server: ['CONTENT_TYPE' => 'application/json'], content: '{"name":"Changed by request"}');
         $request->headers->set('Authorization', 'DPoP ' . $jwt);
         if ($proof !== null) {
             $request->headers->set('DPoP', $proof);

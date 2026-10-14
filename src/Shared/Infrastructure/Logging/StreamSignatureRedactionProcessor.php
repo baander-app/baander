@@ -8,17 +8,17 @@ use Monolog\LogRecord;
 use Monolog\Processor\ProcessorInterface;
 
 /**
- * Removes the signature of a signed delivery URL from every log record.
+ * Removes signed delivery signatures and WebSocket query tokens from every log record.
  *
  * The signature is a bearer capability for the media until the URL expires, and a request
  * URL reaches the log through the web processor's `url` field, the access log line and any
- * message or context value that quotes a request. The `sig` query value is replaced wherever
- * it appears; the rest of the URL, including `exp`, is kept. Runs after the web processor.
+ * message or context value that quotes a request. The `sig` and `token` query values are
+ * replaced wherever they appear, including percent-encoded parameter names; the rest of
+ * the URL, including `exp`, is kept. Runs after the web processor.
  */
 final class StreamSignatureRedactionProcessor implements ProcessorInterface
 {
-    private const string PATTERN = '/([?&]sig=)[^&\s"\'<>\\\\]+/';
-    private const string REPLACEMENT = '$1[redacted]';
+    private const string PATTERN = '/([?&])([^=&\s"\'<>\\\\]+)=([^&\s"\'<>\\\\]+)/';
 
     public function __invoke(LogRecord $record): LogRecord
     {
@@ -53,10 +53,17 @@ final class StreamSignatureRedactionProcessor implements ProcessorInterface
 
     private function redactString(string $value): string
     {
-        if (!str_contains($value, 'sig=')) {
+        if (!str_contains($value, '?') && !str_contains($value, '&')) {
             return $value;
         }
 
-        return preg_replace(self::PATTERN, self::REPLACEMENT, $value) ?? $value;
+        return preg_replace_callback(self::PATTERN, static function (array $match): string {
+            $name = rawurldecode($match[2]);
+            if ($name !== 'sig' && $name !== 'token') {
+                return $match[0];
+            }
+
+            return $match[1] . $match[2] . '=[redacted]';
+        }, $value) ?? $value;
     }
 }

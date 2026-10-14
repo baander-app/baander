@@ -44,4 +44,40 @@ final class StreamSignatureRedactionProcessorTest extends TestCase
         self::assertSame('GET /api/catalog?design=modern&page=2', $other->message);
         self::assertSame(['exp' => 42], $other->context);
     }
+
+    public function testWebSocketQueryTokensAreRemovedFromAccessLogsAndNestedRequestUrls(): void
+    {
+        $token = 'signed.websocket.access-token';
+        $url = '/api/ws?token=' . $token . '&channel=notifications&token=' . $token;
+        $record = new LogRecord(
+            new \DateTimeImmutable(),
+            'swoole.access_log',
+            Level::Info,
+            '"GET ' . $url . ' HTTP/1.1" 101',
+            ['request' => ['uri' => 'https://baander.app' . $url]],
+            ['url' => $url],
+        );
+
+        $redacted = (new StreamSignatureRedactionProcessor())($record);
+
+        $expected = '/api/ws?token=[redacted]&channel=notifications&token=[redacted]';
+        self::assertSame('"GET ' . $expected . ' HTTP/1.1" 101', $redacted->message);
+        self::assertSame(['request' => ['uri' => 'https://baander.app' . $expected]], $redacted->context);
+        self::assertSame(['url' => $expected], $redacted->extra);
+        self::assertStringNotContainsString($token, json_encode($redacted->toArray(), JSON_THROW_ON_ERROR));
+    }
+
+    public function testPercentEncodedCredentialNamesAreRedactedWithoutChangingOtherQueryParameters(): void
+    {
+        $record = new LogRecord(
+            new \DateTimeImmutable(),
+            'swoole.access_log',
+            Level::Info,
+            'GET /api/ws?%74o%6ben=secret%2Ejwt&Token=display&token_hint=visible&%73ig=signature&exp=42',
+        );
+
+        $redacted = (new StreamSignatureRedactionProcessor())($record);
+
+        self::assertSame('GET /api/ws?%74o%6ben=[redacted]&Token=display&token_hint=visible&%73ig=[redacted]&exp=42', $redacted->message);
+    }
 }
