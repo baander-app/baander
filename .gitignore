@@ -97,3 +97,7 @@ ui/web/playwright-report
 ui/web/tests/e2e/__screenshots__
 .context/compound-engineering/
 /build
+
+# Disposable backend verification artifacts.
+/coverage/
+__pycache__/

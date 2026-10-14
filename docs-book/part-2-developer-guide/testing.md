@@ -269,6 +269,63 @@ requirements pass. The unit and messaging runners stream the current checkout an
 installed Composer dependencies into an isolated container. Image selection does
 not select an older copy of the application source.
 
+The shared backend coordinator runs all four suites when no selection is given:
+
+```bash
+bash scripts/test-backend-container.sh
+bash scripts/test-backend-container.sh --testsuite Unit,StaticAnalysisRules
+bash scripts/test-backend-container.sh tests/Integration/RefreshTokenGraceTest.php --filter test
+bash scripts/test-backend-container.sh --coverage-text=coverage/report.txt --coverage-clover=coverage/clover.xml
+```
+
+It requires Python 3 and Docker on the host. `BAANDER_TEST_PROCESSES` defaults to
+`2` and accepts integers from `1` through `8`; `1` is the diagnostic setting.
+`BAANDER_TEST_TIMEOUT` bounds the complete run, including setup, and defaults to
+`3600` seconds. Cleanup has separate bounded attempts after interruption or timeout.
+`BAANDER_TEST_IMAGE` selects the application runtime, and
+`BAANDER_TEST_POSTGRES_IMAGE` selects the extension-capable database image. CI uses
+`BAANDER_TEST_CHECKOUT_IN_IMAGE=1` with its freshly built image; local runs copy the
+current source and installed dependencies into each container.
+
+The coordinator discovers the selection once, then runs three phases. Ordinary unit
+and rule tests use ParaTest workers recycled after 25 files. The explicit native
+manifest, `scripts/backend-native-tests.json`, assigns Swoole, fork, signal and
+fixed-resource tests to one worker in a privileged container with networking
+disabled; that worker starts afresh for every file. Add new native tests to this
+manifest. Functional and integration files are distributed round-robin across at
+most the requested number of independent app/PostgreSQL/Redis stacks. Each stack
+runs one worker with a fresh process for every file. Scheduling stays at class/file
+level; ParaTest's method-level `--functional` mode is not used.
+
+Each stack owns its cache, temporary files, sockets, database, Redis server and
+OAuth keys. No writable host mounts or published ports are used. Database and Redis
+DSNs are exported so nested PHP processes reach the same stack. Each database runs
+migrations twice. Setup uses root inside the disposable container; tests run as
+`www-data`, preserving permission checks. Parent and worker PHP processes receive
+an explicit 512 MiB memory limit.
+
+JUnit validation requires every discovered class, method and dataset label exactly
+once. Crashes, missing reports, unexpected identities and configured strict failures
+fail the run. Skipped or incomplete cases remain observed identities without
+suppressing PHPUnit's failure policy. The coordinator pins one random seed across
+lanes; use `--random-order-seed` to reproduce it. Custom configurations preserve
+relative paths and source filters, but suite-specific bootstraps are rejected.
+
+Logs, manifests, JUnit and serialized coverage remain under the printed
+`var/test-runs/<run>/` directory, including failed runs. Set
+`BAANDER_TEST_ARTIFACTS` to choose a different parent directory. Containers and
+networks are removed on completion, timeout or interruption, and cleanup failure
+fails the run. Final coverage is published only after identity and artifact checks;
+merging retains uncovered executable lines and exclusions. Validate the standard
+reports with `python3 scripts/validate-backend-coverage.py coverage` before using
+`coverage/metrics.json`.
+
+Runner regressions use `python3 -m unittest discover -s scripts/tests` and the
+`BackendTestRunnerTest` PHPUnit file. The destructive isolation probe,
+`python3 scripts/test-backend-stack-isolation.py`, creates two disposable stacks to
+check database outages, Redis pause/flush, cache/socket separation and inherited
+DSNs. Runtime security drills remain separate serial commands.
+
 For strict unit and messaging checks, run from the checkout:
 
 ```bash
