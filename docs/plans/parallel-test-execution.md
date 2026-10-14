@@ -76,3 +76,22 @@ as missing identities; use `/var/www/html` and the same seed in all containers;
 validate artifact freshness and stage coverage publication; make metric extraction
 blocking. The coordinator uses Python (already in the CI runner) and a PHP helper
 for discovery, lane execution and report validation.
+
+## Qualification addendum: user timestamps
+
+The sequential reference run exposed an existing failure in
+`AdminUserCliParityTest`: the CLI returns the aggregate's creation timestamps,
+while `UserEntity` creates fresh timestamps during persistence. Crossing a second
+boundary makes the stored resource differ from the command output. On 2026-10-14,
+the user authorized a focused persistence fix as part of qualification.
+
+Preserve the aggregate's creation and update instants when synchronizing it to the
+entity, and add a deterministic regression using fixed instants. Keep the existing
+CLI parity assertion. This addendum changes no API shape, schema or dependencies;
+it makes the stored values agree with the use-case result. Review the bounded fix
+before integration and rerun the affected functional/integration tests before full
+runner equivalence qualification.
+
+Independent addendum review approved the fix before implementation: synchronize
+both timestamps after all entity setters and cover creation, update and unchanged
+save while preserving `createdAt`. Retain the existing CLI resource comparison.

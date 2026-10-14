@@ -17,6 +17,9 @@ parameters:
   scanDirectories:
     - migrations/
 
+  scanFiles:
+    - scripts/backend-test-runner.php
+
   bootstrapFiles:
     - vendor/autoload.php
 
