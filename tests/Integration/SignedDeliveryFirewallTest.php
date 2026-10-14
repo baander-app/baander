@@ -97,6 +97,7 @@ final class SignedDeliveryFirewallTest extends TestCase
     private array $signatures = [];
     /** @var list<array{string, string}> request path and response body */
     private array $bodies = [];
+    private bool $signedUrlRequested = false;
 
     public static function setUpBeforeClass(): void
     {
@@ -168,6 +169,7 @@ final class SignedDeliveryFirewallTest extends TestCase
         $this->proofs = [];
         $this->signatures = [];
         $this->bodies = [];
+        $this->signedUrlRequested = false;
     }
 
     protected function tearDown(): void
@@ -680,9 +682,14 @@ final class SignedDeliveryFirewallTest extends TestCase
     /**
      * No response body and no log file of the kernel carries an access token, a proof or a
      * signature the test minted; only the signing response carries the signature it issues.
+     * Manifest bodies are signature-free here only because the streaming port is mocked; the
+     * real port lists signed segment URLs in them. When a signed URL was requested, the log
+     * must also show the redaction marker, so the scan cannot pass on a log that never
+     * quoted the URL.
      */
     private function assertNoCredentialInResponsesOrLogs(): void
     {
+        $redactedUrlLogged = false;
         foreach ($this->bodies as [$path, $body]) {
             $secrets = [...$this->tokens, ...$this->proofs, ...($path === self::SIGN_PATH ? [] : $this->signatures)];
             foreach ($secrets as $secret) {
@@ -694,6 +701,10 @@ final class SignedDeliveryFirewallTest extends TestCase
             foreach ([...$this->tokens, ...$this->proofs, ...$this->signatures] as $secret) {
                 self::assertStringNotContainsString($secret, $content, basename($file) . ' carries a credential.');
             }
+            $redactedUrlLogged = $redactedUrlLogged || str_contains($content, 'sig=[redacted]');
+        }
+        if ($this->signedUrlRequested) {
+            self::assertTrue($redactedUrlLogged, 'No log record shows the signed URL with its signature redacted.');
         }
     }
 
@@ -729,12 +740,16 @@ final class SignedDeliveryFirewallTest extends TestCase
             $request->headers->set($name, $value);
         }
         if ($jwt !== null) {
+            if ($jwt !== '' && !in_array($jwt, $this->tokens, true)) {
+                $this->tokens[] = $jwt;
+            }
             $request->headers->set('Authorization', $scheme . ' ' . $jwt);
             if ($proof !== false) {
                 $request->headers->set('DPoP', is_string($proof) ? $proof : $this->mintProof($proof === true ? $this->proof : $proof, $method, $uri, $jwt));
             }
         }
         $this->refusal = null;
+        $this->signedUrlRequested = $this->signedUrlRequested || str_contains($uri, 'sig=');
         $response = $this->kernel->handle($request);
         $this->kernel->terminate($request, $response);
         $this->bodies[] = [$request->getPathInfo(), (string) $response->getContent()];
