@@ -8,7 +8,9 @@ import {
   useDeletePlaylistDestroy,
 } from '@/shared/api-client/gen/endpoints'
 import { SmartPlaylistEditor, type SmartRule } from '../components/SmartPlaylistEditor'
+import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { Skeleton } from '@/shared/components/ui/skeleton'
+import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
 import { Plus, Trash2 } from 'lucide-react'
@@ -130,7 +132,21 @@ const PlaylistLink = styled(Link)`
   color: inherit;
 `
 
+const NameRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+`
+
+const SharedBadge = styled(Badge)`
+  height: 1rem;
+  padding: 0 0.375rem;
+  font-size: 10px;
+`
+
 const PlaylistName = styled.p`
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -184,6 +200,8 @@ export function PlaylistsPage() {
   const { data, isLoading, refetch } = useGetPlaylistIndex()
   const createPlaylist = usePostPlaylistStore()
   const deletePlaylist = useDeletePlaylistDestroy()
+
+  const viewerPublicId = useAuthStore((s) => s.user?.publicId)
 
   const items = data?.data
 
@@ -307,21 +325,28 @@ export function PlaylistsPage() {
               {items.map((item) => (
                 <PlaylistItem key={item.publicId}>
                   <PlaylistLink to={`/music/playlists/${item.publicId}`}>
-                    <PlaylistName>{item.name}</PlaylistName>
+                    <NameRow>
+                      <PlaylistName>{item.name}</PlaylistName>
+                      {item.ownerPublicId !== viewerPublicId && (
+                        <SharedBadge variant="secondary">Shared with you</SharedBadge>
+                      )}
+                    </NameRow>
                     {item.isSmart && (
                       <PlaylistMeta>Smart</PlaylistMeta>
                     )}
                   </PlaylistLink>
-                  <DeleteButton
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDelete(item.publicId)
-                    }}
-                    aria-label="Delete playlist"
-                  >
-                    <Trash2 size={12} />
-                  </DeleteButton>
+                  {item.ownerPublicId === viewerPublicId && (
+                    <DeleteButton
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDelete(item.publicId)
+                      }}
+                      aria-label="Delete playlist"
+                    >
+                      <Trash2 size={12} />
+                    </DeleteButton>
+                  )}
                 </PlaylistItem>
               ))}
             </PlaylistList>

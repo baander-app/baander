@@ -1,13 +1,24 @@
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import styled from 'styled-components'
-import { useGetPlaylistShow } from '@/shared/api-client/gen/endpoints'
+import { useQueryClient } from '@tanstack/react-query'
+import {
+  getGetPlaylistIndexQueryKey,
+  getGetPlaylistShowQueryKey,
+  useDeletePlaylistRemoveCollaborator,
+  useGetPlaylistShow,
+  type GetPlaylistShow200DataSongsItem,
+} from '@/shared/api-client/gen/endpoints'
 import { usePlayerStore, type Track } from '@/features/player/stores/player-store'
+import { useAuthStore } from '@/features/auth/stores/auth-store'
+import { parseApiError } from '@/features/auth/lib/parse-api-error'
 import { Button } from '@/shared/components/ui/button'
 import { Badge } from '@/shared/components/ui/badge'
 import { Skeleton } from '@/shared/components/ui/skeleton'
-import { ArrowLeft, Play } from 'lucide-react'
+import { ArrowLeft, LogOut, Play } from 'lucide-react'
 import { useMemo } from 'react'
+import { toast } from 'sonner'
 import { formatDuration } from '@/shared/utils/format-duration'
+import { SharePlaylistDialog } from '../components/SharePlaylistDialog'
 
 const PageContainer = styled.div`
   display: flex;
@@ -70,6 +81,13 @@ const MetaText = styled.span`
   color: var(--color-muted-foreground);
 `
 
+const ActionRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+`
+
 const SongList = styled.ul`
   display: flex;
   flex-direction: column;
@@ -124,17 +142,7 @@ const SongDuration = styled.span`
   color: var(--color-muted-foreground);
 `
 
-interface PlaylistSongResponse {
-  position: number
-  publicId: string
-  title: string
-  artistName?: string
-  albumName?: string
-  albumId?: string
-  length?: number
-}
-
-const EMPTY_SONGS: PlaylistSongResponse[] = []
+const EMPTY_SONGS: GetPlaylistShow200DataSongsItem[] = []
 
 function formatTrackDuration(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${(seconds % 60).toString().padStart(2, '0')}`
@@ -142,18 +150,35 @@ function formatTrackDuration(seconds: number): string {
 
 export function PlaylistDetailPage() {
   const { publicId } = useParams<{ publicId: string }>()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { data, isLoading } = useGetPlaylistShow(
     publicId!,
     { query: { enabled: !!publicId } }
   )
   const playTrack = usePlayerStore((s) => s.playTrack)
+  const viewerPublicId = useAuthStore((s) => s.user?.publicId)
+  const leave = useDeletePlaylistRemoveCollaborator({
+    mutation: {
+      onSuccess: async () => {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: getGetPlaylistIndexQueryKey() }),
+          queryClient.invalidateQueries({ queryKey: getGetPlaylistShowQueryKey(publicId!) }),
+        ])
+        navigate('/music/playlists')
+      },
+      onError: (failure: unknown) => {
+        toast.error(parseApiError(failure, 'You could not leave the playlist.').message)
+      },
+    },
+  })
 
-  const playlist = (data as { data?: Record<string, unknown> })?.data ?? data as Record<string, unknown> | undefined
-  const songs = (playlist?.songs as PlaylistSongResponse[] | undefined) ?? EMPTY_SONGS
+  const playlist = data?.data
+  const songs = playlist?.songs ?? EMPTY_SONGS
 
   const tracks: Track[] = useMemo(() =>
     songs
-      .filter((s) => s.publicId)
+      .filter((s): s is GetPlaylistShow200DataSongsItem & { publicId: string } => !!s.publicId)
       .map((s) => ({
         publicId: s.publicId,
         title: s.title ?? 'Unknown',
@@ -175,14 +200,21 @@ export function PlaylistDetailPage() {
     )
   }
 
-  if (!playlist) {
+  if (!playlist || !publicId) {
     return <NotFoundMessage>Playlist not found</NotFoundMessage>
   }
 
   const totalDuration = songs.reduce((sum, s) => sum + (s.length ?? 0), 0)
+  const isOwner = viewerPublicId !== undefined && playlist.ownerPublicId === viewerPublicId
+  const isCollaborator = viewerPublicId !== undefined && (playlist.collaboratorPublicIds ?? []).includes(viewerPublicId)
 
   const handlePlayAll = () => {
     if (tracks.length > 0) playTrack(tracks[0], tracks)
+  }
+
+  const handleLeave = () => {
+    if (!viewerPublicId) return
+    leave.mutate({ publicId, userPublicId: viewerPublicId })
   }
 
   return (
@@ -192,24 +224,32 @@ export function PlaylistDetailPage() {
           <ArrowLeft size={20} />
         </BackLink>
         <HeaderInfo>
-          <PlaylistTitle>{playlist.name as string}</PlaylistTitle>
-          {(playlist.description as string) && (
-            <PlaylistDescription>{playlist.description as string}</PlaylistDescription>
+          <PlaylistTitle>{playlist.name}</PlaylistTitle>
+          {playlist.description && (
+            <PlaylistDescription>{playlist.description}</PlaylistDescription>
           )}
           <MetaRow>
             <MetaText>
               {songs.length} {songs.length === 1 ? 'song' : 'songs'}
               {totalDuration > 0 && ` · ${formatTrackDuration(totalDuration)}`}
             </MetaText>
-            {playlist.isSmart as boolean && <Badge variant="secondary" style={{ fontSize: '10px' }}>Smart</Badge>}
+            {playlist.isSmart && <Badge variant="secondary" style={{ fontSize: '10px' }}>Smart</Badge>}
           </MetaRow>
         </HeaderInfo>
       </HeaderRow>
-      {tracks.length > 0 && (
-        <Button size="sm" onClick={handlePlayAll} style={{ width: 'fit-content' }}>
-          <Play size={14} style={{ marginRight: '0.25rem' }} /> Play all
-        </Button>
-      )}
+      <ActionRow>
+        {tracks.length > 0 && (
+          <Button size="sm" onClick={handlePlayAll}>
+            <Play size={14} style={{ marginRight: '0.25rem' }} /> Play all
+          </Button>
+        )}
+        {isOwner && <SharePlaylistDialog playlistPublicId={publicId} />}
+        {isCollaborator && (
+          <Button variant="outline" size="sm" onClick={handleLeave} disabled={leave.isPending}>
+            <LogOut size={14} /> Leave playlist
+          </Button>
+        )}
+      </ActionRow>
       <SongList>
         {songs.map((song, i) => (
           <SongItem
