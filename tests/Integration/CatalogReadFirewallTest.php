@@ -45,6 +45,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 /** Real production OAuth/DPoP firewall, ORM catalog adapters, and disposable PostgreSQL/Redis. */
 final class CatalogReadFirewallTest extends TestCase
@@ -245,6 +246,99 @@ final class CatalogReadFirewallTest extends TestCase
         self::assertSame([], $body['data']);
     }
 
+    /** @return iterable<string, array{string, string, string, list<string>}> list, query parameter, fixture the value names, fixtures the administrator's page holds */
+    public static function deniedFilters(): iterable
+    {
+        yield 'songs by a denied artist' => ['songs', 'artistId', 'denied-artist', ['denied-song']];
+        yield 'songs by a denied album' => ['songs', 'albumId', 'denied-album', ['denied-song']];
+        yield 'songs by a denied genre' => ['songs', 'genres', 'denied-genre', ['denied-song']];
+        yield 'songs by a denied public id' => ['songs', 'publicIds', 'denied-song', ['denied-song']];
+        yield 'albums by a denied genre' => ['albums', 'genre', 'denied-genre', ['denied-album']];
+        yield 'artists by a denied genre' => ['artists', 'genre', 'denied-genre', ['denied-artist', 'shared-artist']];
+    }
+
+    /**
+     * A filter naming an artist, album, genre or song the member cannot read is bounded by the
+     * member's scope: the page is empty with total 0, while the administrator's page holds the
+     * matching rows. The shared artist has a song in the denied genre only through the denied
+     * library, so the member's genre filter does not reach it either.
+     *
+     * @param list<string> $expected
+     */
+    #[DataProvider('deniedFilters')]
+    public function testDeniedFiltersAnswerAnEmptyPageForTheMemberAndTheRowsForTheAdministrator(string $kind, string $parameter, string $value, array $expected): void
+    {
+        $path = '/api/' . $kind . '/?' . http_build_query([$parameter => $this->filterValue($value)]);
+        $this->authenticate('member');
+        $response = $this->request($path);
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+        $body = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(0, $body['meta']['total']);
+        self::assertSame([], $body['data']);
+
+        $this->authenticate('admin');
+        $response = $this->request($path);
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+        $body = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(count($expected), $body['meta']['total']);
+        $ids = array_column($body['data'], 'publicId');
+        $expectedIds = array_map(fn (string $fixture): string => $this->filterValue($fixture), $expected);
+        sort($ids);
+        sort($expectedIds);
+        self::assertSame($expectedIds, $ids);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function relatedResourceActors(): iterable
+    {
+        yield 'unrelated' => ['unrelated'];
+        yield 'admin' => ['admin'];
+    }
+
+    /** Album duplicates and the cover redirect answer 404 to a user of no library and succeed for an administrator on every album. */
+    #[DataProvider('relatedResourceActors')]
+    public function testAlbumDuplicatesAndCoverAnswerByLibraryMembership(string $actor): void
+    {
+        $this->authenticate($actor);
+        foreach ($this->catalog as $visibility => $entities) {
+            $base = '/api/albums/' . $entities['album']->getPublicId();
+            $duplicates = $this->request($base . '/duplicates');
+            self::assertSame($actor === 'admin' ? 200 : 404, $duplicates->getStatusCode(), $visibility . ': ' . (string) $duplicates->getContent());
+            $cover = $this->request($base . '/cover');
+            self::assertSame($actor === 'admin' ? 302 : 404, $cover->getStatusCode(), $visibility . ': ' . (string) $cover->getContent());
+            if ($actor === 'admin') {
+                $body = json_decode((string) $duplicates->getContent(), true, flags: JSON_THROW_ON_ERROR);
+                self::assertSame([], $body['data']);
+                self::assertStringStartsWith('/api/images/', (string) $cover->headers->get('Location'));
+            }
+        }
+    }
+
+    /** The admin duplicates listing is refused by role for a member and answers the administrator, who gets 400 for a library id that is not a UUID. */
+    public function testAdminDuplicatesListingIsAdministratorOnly(): void
+    {
+        $libraryId = $this->catalog['denied']['library']->getId()->toString();
+        $path = '/api/admin/albums/duplicates?' . http_build_query(['libraryId' => $libraryId]);
+        $this->authenticate('member');
+        $response = $this->request($path);
+        self::assertSame(403, $response->getStatusCode(), (string) $response->getContent());
+        self::assertInstanceOf(AccessDeniedException::class, $this->lastException);
+        self::assertSame("Access Denied. The user doesn't have ROLE_ADMIN.", $this->lastException->getMessage());
+
+        $this->authenticate('admin');
+        $response = $this->request($path);
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+        $body = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame([], $body['data']);
+        self::assertNull($this->lastException);
+
+        $response = $this->request('/api/admin/albums/duplicates?' . http_build_query(['libraryId' => 'not-a-library-id']));
+        self::assertSame(400, $response->getStatusCode(), (string) $response->getContent());
+        $body = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(400, $body['error']['code']);
+        self::assertNull($this->lastException);
+    }
+
     public function testSongCursorCannotResumeIntoAnInaccessibleLibrary(): void
     {
         $this->authenticate('admin');
@@ -265,6 +359,18 @@ final class CatalogReadFirewallTest extends TestCase
     {
         foreach (['artists', 'albums', 'songs', 'movies', 'genres'] as $kind) {
             self::assertSame(401, $this->request('/api/' . $kind . '/')->getStatusCode());
+        }
+        $allowed = $this->catalog['allowed'];
+        $details = [
+            '/api/artists/' . $allowed['artist']->getPublicId(),
+            '/api/albums/' . $allowed['album']->getPublicId() . '/duplicates',
+            '/api/albums/' . $allowed['album']->getPublicId() . '/cover',
+            '/api/genres/' . $this->genres['allowed-root']->getSlug(),
+            '/api/libraries/' . $allowed['library']->getId() . '/stats',
+        ];
+        foreach ($details as $path) {
+            $response = $this->request($path);
+            self::assertSame(401, $response->getStatusCode(), $path . ': ' . (string) $response->getContent());
         }
     }
 
@@ -471,7 +577,21 @@ final class CatalogReadFirewallTest extends TestCase
         $this->manager->persist(new GenreSongEntity($this->genres['allowed-song'], $this->catalog['allowed']['song']));
         $this->manager->persist(new GenreMovieEntity($this->genres['allowed-movie'], $this->catalog['allowed']['movie']));
         $this->manager->persist(new GenreAlbumEntity($this->genres['denied-child'], $this->catalog['denied']['album']));
+        $this->manager->persist(new GenreSongEntity($this->genres['denied-child'], $this->catalog['denied']['song']));
         $this->manager->persist(new GenreMovieEntity($deniedParent, $this->catalog['denied']['movie']));
+    }
+
+    /** The public id or genre slug a filter fixture name stands for. */
+    private function filterValue(string $fixture): string
+    {
+        return match ($fixture) {
+            'denied-artist' => $this->catalog['denied']['artist']->getPublicId()->toString(),
+            'denied-album' => $this->catalog['denied']['album']->getPublicId()->toString(),
+            'denied-song' => $this->catalog['denied']['song']->getPublicId()->toString(),
+            'denied-genre' => $this->genres['denied-child']->getSlug(),
+            'shared-artist' => $this->sharedArtist->getPublicId()->toString(),
+            default => throw new \InvalidArgumentException('Unknown filter fixture ' . $fixture),
+        };
     }
 
     private function persistFixture(object $entity, Uuid $id): void

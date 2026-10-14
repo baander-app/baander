@@ -67,6 +67,8 @@ final class SignedDeliveryFirewallTest extends TestCase
     private const string FINGERPRINT = 'disposable-client-fingerprint';
     private const string SIGN_PATH = '/api/stream/sign';
     private const string SIGN_URL = 'https://baander.app' . self::SIGN_PATH;
+    private const string SIGN_BODY_REFUSED = 'Expected a JSON object.';
+    private const string SIGN_REQUEST_REFUSED = 'Expected a video manifest path and a lifetime from 1 to 86400 seconds.';
     private const array STREAMING_METHODS = [
         'getMasterManifest', 'getMediaManifest', 'getDashManifest', 'getSubtitleManifest',
         'getInitSegmentPath', 'getSubtitleSegmentPath', 'resolveVideoSegmentAvailability',
@@ -407,6 +409,58 @@ final class SignedDeliveryFirewallTest extends TestCase
         $this->assertNoCredentialInResponsesOrLogs();
     }
 
+    /**
+     * @return iterable<string, array{array<string, mixed>|string, string}> request body (an array to encode or
+     *                                                                       the raw content) and the controller's message
+     */
+    public static function signingValidationRows(): iterable
+    {
+        $manifest = '/api/transcode/{video}/master.m3u8';
+        yield 'media manifest path' => [['path' => '/api/transcode/{job}/media.m3u8'], self::SIGN_REQUEST_REFUSED];
+        yield 'segment path' => [['path' => '/api/transcode/{job}/segment'], self::SIGN_REQUEST_REFUSED];
+        yield 'path with a query' => [['path' => $manifest . '?index=0'], self::SIGN_REQUEST_REFUSED];
+        yield 'path with a trailing newline' => [['path' => $manifest . "\n"], self::SIGN_REQUEST_REFUSED];
+        yield 'lifetime of 0' => [['path' => $manifest, 'expiresInSeconds' => 0], self::SIGN_REQUEST_REFUSED];
+        yield 'lifetime of -1' => [['path' => $manifest, 'expiresInSeconds' => -1], self::SIGN_REQUEST_REFUSED];
+        yield 'lifetime of 86401' => [['path' => $manifest, 'expiresInSeconds' => 86401], self::SIGN_REQUEST_REFUSED];
+        yield 'lifetime as a string' => [['path' => $manifest, 'expiresInSeconds' => '60'], self::SIGN_REQUEST_REFUSED];
+        yield 'lifetime as a float' => [['path' => $manifest, 'expiresInSeconds' => 1.5], self::SIGN_REQUEST_REFUSED];
+        yield 'lifetime as null' => [['path' => $manifest, 'expiresInSeconds' => null], self::SIGN_REQUEST_REFUSED];
+        yield 'lifetime as an array' => [['path' => $manifest, 'expiresInSeconds' => [60]], self::SIGN_REQUEST_REFUSED];
+        yield 'malformed JSON body' => ['{"path": "' . $manifest, self::SIGN_BODY_REFUSED];
+        yield 'JSON string body' => [json_encode($manifest, JSON_THROW_ON_ERROR), self::SIGN_BODY_REFUSED];
+    }
+
+    /**
+     * A member with a valid token and proof is answered 400 by the signing controller's own
+     * validation, before any playback session starts: the probe records no exception, the bus
+     * dispatches nothing and the ladder port is never read. The video in the path exists and
+     * the member can read it, so the request shape alone is what the controller refuses.
+     *
+     * @param array<string, mixed>|string $body
+     */
+    #[DataProvider('signingValidationRows')]
+    public function testSigningRefusesAMalformedRequestBeforePlaybackStarts(array|string $body, string $message): void
+    {
+        $jwt = $this->actorToken('member');
+        $video = $this->createVideoLibrary(true);
+        $this->bus->expects($this->never())->method('dispatch');
+        $this->streaming->expects($this->never())->method('getQualityLadderForVideo');
+        $placeholders = ['{video}' => $video->getId()->toString(), '{job}' => $this->jobId->toString()];
+        $body = is_string($body)
+            ? strtr($body, $placeholders)
+            : array_map(static fn (mixed $value): mixed => is_string($value) ? strtr($value, $placeholders) : $value, $body);
+
+        $response = $this->request('POST', self::SIGN_URL, $jwt, true, $body);
+
+        self::assertSame(400, $response->getStatusCode(), $this->responseDetails($response));
+        $decoded = json_decode((string) $response->getContent(), true);
+        self::assertIsArray($decoded);
+        self::assertSame(['message' => $message, 'code' => 400], $decoded['error'] ?? null);
+        self::assertNull($this->refusal);
+        $this->assertNoCredentialInResponsesOrLogs();
+    }
+
     public function testRevokedCredentialsCannotAuthenticateEvenWithValidDeliverySignature(): void
     {
         $jwt = $this->actorToken('member');
@@ -729,12 +783,13 @@ final class SignedDeliveryFirewallTest extends TestCase
     /**
      * @param bool|string|SignedDpopProof $proof         false for none, true for a proof from the token's key,
      *                                                   a key for a proof from it, a string for that proof verbatim
-     * @param array<string, mixed>        $data
+     * @param array<string, mixed>|string $data         fields to encode as the JSON body, or the raw body verbatim
      * @param array<string, string>       $headers
      */
-    private function request(string $method, string $uri, ?string $jwt = null, bool|string|SignedDpopProof $proof = false, array $data = [], string $scheme = 'DPoP', array $headers = []): Response
+    private function request(string $method, string $uri, ?string $jwt = null, bool|string|SignedDpopProof $proof = false, array|string $data = [], string $scheme = 'DPoP', array $headers = []): Response
     {
-        $request = Request::create($uri, $method, content: $data === [] ? null : json_encode($data, JSON_THROW_ON_ERROR));
+        $content = is_string($data) ? $data : ($data === [] ? null : json_encode($data, JSON_THROW_ON_ERROR));
+        $request = Request::create($uri, $method, content: $content);
         $request->headers->set('Content-Type', 'application/json');
         foreach ($headers as $name => $value) {
             $request->headers->set($name, $value);
