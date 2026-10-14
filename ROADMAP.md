@@ -23,19 +23,19 @@ batches describe their own checkpoints; the current gate below takes precedence.
 Any harness can take over from this section; nothing below depends on a tool that
 only one agent host has.
 
-- **Branch.** `plan/item8-catalog-authorization` (973b2db5) holds item 8: fifteen
-  commits on top of `master` (63466d0d), code-reviewed with both findings applied,
-  every gate green (the item 8 checkpoint below), working tree clean. It is neither
-  merged nor pushed; the next action, when the user asks, is a fast-forward merge
-  into `master` and a push of `master` to both remotes.
+- **Branch.** Item 8 is merged and pushed. `master` (eced16d6) holds its fifteen
+  commits and the roadmap commit on top of 63466d0d by fast-forward, code-reviewed
+  with both findings applied and every gate green (the item 8 checkpoint below).
+  `origin/master` and `baander-github/master` are at the same commit, the working
+  tree is clean, and nothing is unmerged or unpushed. The local branch
+  `plan/item8-catalog-authorization` points at the same commit and can be deleted.
+  The next plan starts on a new branch named after it.
 - **History.** On 2026-10-14 the `Claude-Session:` trailer was removed from the 25
-  local commits that carried it (12 on `master` from 61ce0205 onward, 13 on the
-  branch) with a message filter; every tree is unchanged, so `git diff` between an
-  old and its rewritten commit is empty. Local `master` therefore has the same
-  content as `origin/master` and `baander-github/master` (71df8f57) under new
-  hashes, and pushing `master` needs `git push --force-with-lease` to both remotes.
-  Any other checkout of `master` must then reset to the pushed history; the
-  pre-rewrite heads stay in the reflog until it expires.
+  local commits that carried it with a message filter; every tree is unchanged, so
+  `git diff` between an old and its rewritten commit is empty. Both remotes now hold
+  the rewritten history, so any checkout of `master` taken before the rewrite (head
+  71df8f57 or earlier) must reset to the pushed history; the pre-rewrite heads stay
+  in this clone's reflog until it expires.
 - **Remotes.** `origin` is the Forgejo instance (`ssh://git@192.168.50.151:222/martin/baander.git`,
   whose `.forgejo/workflows/ci.yaml` is the authoritative gate) and `baander-github`
   is `git@github.com:baander-app/baander.git`. Push only when the user asks.
@@ -391,7 +391,7 @@ plans followed it, in this order, and all eight are delivered:
    playlist's unused collaborator table became a working feature with sharing controls
    on the playlist page, the signing validation answers through the kernel, and the
    fallback-identity audit is recorded with one tightening. Delivered on 2026-10-14
-   (branch `plan/item8-catalog-authorization`).
+   (branch `plan/item8-catalog-authorization`, merged into `master` the same day).
 
    The recorded contract: every catalog and library change is administrator-only, and a
    refused request leaves no row, file or queued job behind; reads stay bounded by
@@ -468,7 +468,7 @@ unless noted:
 The item 8 checkpoint, on 2026-10-14: unit 6,220; functional 1,448 in 134 files;
 integration 1,326 in 106 files; web 2,030 in 183 files with typecheck and lint at zero
 errors; PHPStan clean; Deptrac 0; container lint and the OpenAPI check passing, all in
-the CI image against the branch tree.
+the CI image against the branch tree, which `master` now carries unchanged.
 
 The item 7 checkpoint, on 2026-10-14: unit 6,176; functional 1,445 in 133 files (the
 item 6 line's 1,455 was over-counted: the functional file set and test methods are
