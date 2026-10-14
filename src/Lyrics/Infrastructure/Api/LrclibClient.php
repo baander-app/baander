@@ -151,6 +151,7 @@ final class LrclibClient implements LrclibClientInterface
                 ],
                 'timeout' => self::TIMEOUT_SECONDS,
                 'max_duration' => self::TIMEOUT_SECONDS,
+                'max_redirects' => 0,
             ]);
 
             $statusCode = $response->getStatusCode();
@@ -159,7 +160,7 @@ final class LrclibClient implements LrclibClientInterface
                 return null;
             }
 
-            if ($statusCode >= 400) {
+            if ($statusCode >= 300) {
                 return $this->unavailable($endpoint, sprintf('HTTP %d', $statusCode));
             }
 
