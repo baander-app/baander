@@ -68,22 +68,44 @@ the remaining loudness and codec qualification limits.
 
 ## Browser authentication transport
 
-`yarn --cwd ui/web test:browser-auth` runs `ui/web/tests/e2e/browser-auth/` in
-Chromium, Firefox and WebKit against a scripted server at `api.baander.app`,
-mapped to loopback; it runs as a blocking step in the frontend workflow. The
-scripted server's refresh state machine (`refresh-state.ts`) answers refresh
+`yarn --cwd ui/web test:browser-auth` runs `ui/web/tests/e2e/browser-auth/`
+against a scripted server on the loopback; it runs as a blocking step in the
+frontend workflow. The Chromium project runs every scenario except the ones
+tagged `@webkit`, with the named hosts `web.baander.app`, `api.baander.app` and
+`foreign.baander.app` resolved to the loopback through a browser flag. The WebKit
+project runs only the tagged scenarios, which check what WebKit's storage gives
+back; WebKit has no such flag, so that project uses `localhost` and `127.0.0.1`
+as two secure origins and skips the foreign host. These loopback names are the
+one accepted exception to the `baander.app` rule in `AGENTS.md`. On a host
+without a WebKit build, run the suite in the Playwright image with the
+repository mounted and `node node_modules/@playwright/test/cli.js test -c
+tests/e2e/browser-auth/playwright.config.ts` from `ui/web`.
+
+The scripted server's refresh state machine (`refresh-state.ts`) answers refresh
 tokens the way `/api/auth/refresh` does on PostgreSQL and is pinned to
-`tests/Integration/RefreshTokenGraceTest.php`. The suite checks that the service
-worker signs native image and media requests with the page's DPoP credentials
-and sends none to a foreign origin, that an expired token refreshes once and
-retries, and that a refresh failure is bounded. Its modes cover a nonce challenge
-answered with one re-signed proof, a `503` with `Retry-After` that keeps the
-session and retries after the delay, a lost refresh response re-presented inside
-the grace window, two tabs sharing one real credential store so the second tab
-adopts the pair the first rotated instead of presenting a consumed token, and a
-service worker stopped through CDP that pulls its credentials back from the page
-before signing the next request. Mock proofs qualify the browser transport; they
-do not validate the server's DPoP cryptography.
+`tests/Integration/RefreshTokenGraceTest.php`; it also answers logout, and an
+outage mode makes refresh and logout answer `503` with `Retry-After` until the
+test ends it. The suite checks that the service worker signs native image and
+media requests with the page's DPoP credentials and sends none to a foreign
+origin, that an expired token refreshes once and retries, and that a refresh
+failure is bounded. Its modes cover a nonce challenge answered with one
+re-signed proof, a `503` with `Retry-After` that keeps the session and retries
+after the delay, a lost refresh response re-presented inside the grace window,
+two tabs sharing one real credential store so the second tab adopts the pair the
+first rotated instead of presenting a consumed token, and a service worker
+stopped through CDP that pulls its credentials back from the page before signing
+the next request.
+
+The pending-logout scenarios run on the real auth store. A logout while offline
+ends the session at once and is sent exactly once when the browser comes back
+online; a logout during a server outage is kept and delivered on the next
+trigger once the outage ends; a reopened page whose entry's access token expired
+refreshes first and logs out with the new token; an entry whose chain was
+revoked elsewhere is dropped after the logout `401` and the refresh refusal; two
+pages of one origin send one logout for one entry; and the stored key of a
+pending logout reads back after a reload and still signs a proof. Mock proofs
+qualify the browser transport; they do not validate the server's DPoP
+cryptography.
 
 ## Web store isolation and debugging
 
@@ -147,7 +169,19 @@ runner's disposable PostgreSQL and Redis and do not run on the host:
   `Retry-After`, no `DPoP-Nonce` and no `WWW-Authenticate`, inside the web
   client's attempt timeout; a genuine replay is still `403`; a refresh whose
   post-commit nonce store fails answers `200` without a nonce; and the same token
-  refreshes once the store answers.
+  refreshes once the store answers. Logout and `/api/oauth/revoke` are the
+  exception: during the refused outage and under pool exhaustion they answer
+  `200` and revoke the chain. Every other proof check still refuses a wrong key,
+  hash, method, URL or age; a replay of a successful logout meets the revoked
+  token; and the nonce store is never touched.
+- `tests/Integration/RefreshTokenGraceTest.php` also proves the socket
+  reconciliation: with the connections of a revoked chain, an expired chain, a
+  live chain and a chain whose handshake token a rotation revoked registered,
+  one pass of `RevokedSocketReconciler` closes the first two and leaves the
+  other two open, and a logout whose close the web server could not finish
+  answers `200` with the error logged. The unit probe
+  `tests/Unit/Auth/Infrastructure/Swoole/RevokedSocketReconcilerProbeTest.php`
+  proves each tick releases its pooled services.
 - `tests/Functional/Auth/LogoutTest.php`: logout revokes the chain of the access
   token that authenticated the request, so neither token works afterwards, and
   `/api/oauth/revoke` revokes only the caller's own tokens and answers a foreign
@@ -644,20 +678,25 @@ unless the admin and the super-admin each receive exactly one PostgreSQL alert,
 delivered after PostgreSQL returns and naming an outage that began before the
 reload, and no second alert arrives in the next three checks.
 
-The drill then stops Redis while a signed-in session exists. It signs in as the
-admin with a fresh DPoP key through the real login (`app:auth:setup-clients` has
-seeded the first-party client), stops the Redis container, and drives the session
-with `scripts/web-runtime/redis-outage.php` inside the app container. It fails
-unless:
+The drill then stops Redis while signed-in sessions exist. It signs in as the
+admin twice, each time with a fresh DPoP key, through the real login
+(`app:auth:setup-clients` has seeded the first-party client), stops the Redis
+container, and drives both sessions with `scripts/web-runtime/redis-outage.php`
+inside the app container. The first pair is the session that survives the
+outage; the second pair is logged out during it. The drill fails unless:
 
 - the refresh of that session answers `503` with a `Retry-After` delay,
   `Cache-Control: no-store`, no `DPoP-Nonce` and no `WWW-Authenticate`, and
   `GET /api/auth/me` with the session's access token answers the same `503`, not
   `403`, each within the web client's 10-second attempt;
+- a logout with the second pair answers `200` during the outage, because logout
+  verifies its proof without the replay check;
 - the monitor logs Redis unhealthy during the outage;
 - after Redis starts again, the same refresh token refreshes, taking one nonce
   challenge when the restart lost the stored nonce, and the new access token is
   accepted;
+- the second pair's access token and refresh token answer `401`, since its chain
+  was revoked during the outage;
 - the admin and the super-admin each hold exactly one Redis alert, and no second
   alert arrives in the next three checks.
 

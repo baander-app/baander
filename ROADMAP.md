@@ -18,8 +18,8 @@ roadmap records scope and acceptance; the linked design documents, current sourc
 and CI workflow are the executable detail. Measurements in later historical
 batches describe their own checkpoints; the current gate below takes precedence.
 
-The backend release-gate package is complete (see the next two sections). Five
-plans followed it, in this order, and all five are delivered:
+The backend release-gate package is complete (see the next two sections). Six
+plans followed it, in this order, and all six are delivered:
 
 1. [General settings and email language](docs/plans/2026-10-07-1736-feat-general-settings-email-language-plan.md):
    one definition-driven settings mechanism, the per-user email language, and the
@@ -226,15 +226,61 @@ plans followed it, in this order, and all five are delivered:
    and asserts the 503s, one alert and the recovery. Still open:
    - The refresh rate limiter is keyed by the token string before any proof check, so a
      string holder can spend a victim's bucket; it is skipped in `dev`.
-   - Logout during a Redis outage ends the session locally only; the chain stays until
-     it expires. The same holds for a logout the server answered 503: the web app has
-     cleared its credentials and does not send the logout again.
+   - Closed by item 6: a logout during a Redis outage, or one the server answered 503,
+     ended the session locally only; the server now accepts the outage logout and the
+     web app keeps a pending logout until the server confirms it.
    - A connectivity gap longer than the grace window after a lost response still ends
      the session; the retry then lands outside the window.
    - The runtime drill stops Redis rather than pausing it, so the read timeouts on
      Swoole-hooked streams are proven on the test kernel, not observed on the server.
-   - Password change and client revocation revoke without closing sockets.
+   - Closed by item 6: password change and client revocation revoked without closing
+     sockets; the socket reconciliation now ends them within a minute.
    - The main e2e suite still uses `baander.test` fixtures and does not run in CI.
+
+6. [Queued server-side logout](docs/plans/2026-10-13-1841-feat-queued-server-side-logout-plan.md):
+   a logout ends the session on the server even when it happens during a Redis outage,
+   while the browser is offline, or when the web server could not close the session's
+   sockets. Delivered on 2026-10-13 (branch `plan/item6-queued-logout`, on top of the
+   unmerged item 5 branch).
+
+   Server: `POST /api/auth/logout` and `POST /api/oauth/revoke` accept a DPoP proof whose
+   replay check could not run (a refused or hung Redis, an exhausted pool) after every
+   other check passed, log one warning with the route, the thumbprint and the user, and
+   revoke the chain in PostgreSQL; every other route keeps the fail-closed 503. A
+   revocation whose socket close failed answers 200 with the error logged, since the
+   token is gone; 503 is kept for a revocation that did not commit. A reconciliation tick
+   in HTTP worker 0 closes, once a minute, every WebSocket connection whose token chain
+   has no live access token left (revoked, expired or no longer stored), whatever ended
+   it, through a new tagged timer port the drain subscriber stops; the chain is the unit,
+   so a rotation alone never closes a socket (a review finding changed the query from
+   per-token to per-chain liveness). The planned PostgreSQL-queued close job was dropped
+   during review (user decision): the in-process close cannot fail the way a queue would
+   retry, and the reconciliation bounds every open-socket case with one timer.
+
+   Web: a logout ends the session in the browser first and keeps a pending entry, with
+   the ended session's key pair and tokens, in the credential store's second record,
+   written with the tombstone in one transaction; a drain delivers it on start, on
+   `online`, on visibility and on a backoff timer, per entry under the shared auth lock,
+   refreshing with the entry's own pair first when the access token expired or the logout
+   answered 401, and ends the entry on a logout 200 or the refresh's refusal (user
+   decision over a 7-day cap); at most 20 entries, the oldest sent once before it is
+   dropped.
+
+   Evidence: `DpopStoreOutageTest` (13, logout and revoke during a refused Redis and
+   under pool exhaustion, the retained refusals, the replay cases, the untouched nonce
+   store), `RefreshTokenGraceTest` (14, a close the server could not finish answered 200
+   and a reconciliation pass closing a revoked and an expired token's connections while a
+   live one stays), the reconciler's unit and probe suites, the browser-auth suite's
+   pending-logout scenarios, and the web runtime drill, which now logs out a second pair
+   during the Redis outage and sees it refused after Redis returns. Still open:
+   - A logged-out browser holds the ended session's refresh token and signing key until
+     the logout lands or the refresh token is refused; a script on the origin can keep
+     that chain alive by rotating it, and no absolute chain lifetime bounds it yet.
+   - The revoke endpoint's request body is not covered by the DPoP proof, so a replay
+     during an outage can reach another chain of the same user whose token id the
+     replayer holds.
+   - A socket of a revoked chain stays open for up to one tick when the hot-path close
+     failed.
 
 The local dev database (`baander` in `baander-postgres`) records the migration class
 names from before the rename and is about 40 migrations behind (last migrated on
@@ -269,6 +315,11 @@ unless noted:
   the host and in WebKit in the Playwright container.
 - `ui/rn` is deferred indefinitely (84 `tsc` errors and 25 Jest failures); no CI
   job runs it.
+
+The item 6 checkpoint, on 2026-10-14: unit 6,158; functional 1,455; integration 1,046;
+web 2,018 with typecheck and lint at zero errors; browser-auth 24 (Chromium and WebKit);
+PHPStan clean; Deptrac 0; container lint, the OpenAPI check and the web runtime drill
+passing.
 
 The item 5 checkpoint, on 2026-10-13: unit 6,128; functional 1,455;
 integration 1,040; web 1,978 with typecheck and lint at zero errors;
