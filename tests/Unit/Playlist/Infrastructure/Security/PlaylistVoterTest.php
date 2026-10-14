@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Playlist\Infrastructure\Security;
 
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
-use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Playlist\Domain\Model\Playlist;
-use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistEntity;
 use App\Playlist\Infrastructure\Security\PlaylistVoter;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use DateTimeImmutable;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
@@ -19,35 +18,63 @@ use Symfony\Component\Security\Core\User\UserInterface;
 
 final class PlaylistVoterTest extends TestCase
 {
-    /** @return iterable<string, array{string, string, string, int}> */
-    public static function resourceVotes(): iterable
+    private const array ATTRIBUTES = ['VIEW', 'EDIT_SONGS', 'EDIT', 'DELETE', 'MANAGE_COLLABORATORS', 'LEAVE'];
+
+    /**
+     * The whole matrix: who gets what, with the collaborative flag on and off.
+     *
+     * @return iterable<string, array{string, bool, string, int}>
+     */
+    public static function matrix(): iterable
     {
-        foreach (['domain', 'orm', 'string'] as $kind) {
-            foreach (['owner', 'other', 'admin'] as $actor) {
-                foreach (['VIEW', 'EDIT', 'DELETE', 'MANAGE_COLLABORATORS'] as $attribute) {
-                    $expected = (($kind !== 'string' && $actor === 'owner') || $actor === 'admin') ? VoterInterface::ACCESS_GRANTED : VoterInterface::ACCESS_DENIED;
-                    yield "$kind $actor $attribute" => [$kind, $actor, $attribute, $expected];
-                }
+        $granted = [
+            'owner' => ['VIEW', 'EDIT_SONGS', 'EDIT', 'DELETE', 'MANAGE_COLLABORATORS'],
+            'collaborator' => ['VIEW', 'EDIT_SONGS', 'LEAVE'],
+            'collaborator flag off' => ['VIEW', 'LEAVE'],
+            'admin' => ['VIEW'],
+            'unrelated' => [],
+        ];
+        foreach ($granted as $actor => $grants) {
+            $collaborative = $actor !== 'collaborator flag off';
+            foreach (self::ATTRIBUTES as $attribute) {
+                $expected = in_array($attribute, $grants, true) ? VoterInterface::ACCESS_GRANTED : VoterInterface::ACCESS_DENIED;
+                yield "$actor $attribute" => [$actor, $collaborative, $attribute, $expected];
             }
         }
     }
 
-    #[DataProvider('resourceVotes')]
-    public function testRealResourceAndExplicitStringPolicy(string $kind, string $actor, string $attribute, int $expected): void
+    #[DataProvider('matrix')]
+    public function testMatrix(string $actor, bool $collaborative, string $attribute, int $expected): void
     {
         $ownerId = Uuid::generate();
-        $userId = $actor === 'owner' ? $ownerId : Uuid::generate();
+        $collaboratorId = Uuid::generate();
+        $playlist = $this->playlist($ownerId, [$collaboratorId], $collaborative);
+        $userId = match ($actor) {
+            'owner' => $ownerId,
+            'collaborator', 'collaborator flag off' => $collaboratorId,
+            default => Uuid::generate(),
+        };
         $roles = $actor === 'admin' ? ['ROLE_ADMIN'] : ['ROLE_USER'];
 
-        self::assertSame($expected, $this->voter()->vote($this->token($userId, $roles), $this->subject($kind, $ownerId), [$attribute]));
+        self::assertSame($expected, $this->voter()->vote($this->token($userId, $roles), $playlist, [$attribute]));
+    }
+
+    public function testAnAdministratorWhoCollaboratesEditsSongsAsACollaborator(): void
+    {
+        $adminId = Uuid::generate();
+        $token = $this->token($adminId, ['ROLE_ADMIN']);
+
+        self::assertSame(VoterInterface::ACCESS_GRANTED, $this->voter()->vote($token, $this->playlist(Uuid::generate(), [$adminId], true), ['EDIT_SONGS']));
+        self::assertSame(VoterInterface::ACCESS_DENIED, $this->voter()->vote($token, $this->playlist(Uuid::generate(), [$adminId], false), ['EDIT_SONGS']));
+        self::assertSame(VoterInterface::ACCESS_DENIED, $this->voter()->vote($token, $this->playlist(Uuid::generate(), [$adminId], true), ['EDIT']));
     }
 
     /** @return iterable<string, array{string, bool, string}> */
     public static function unrelatedVotes(): iterable
     {
-        foreach (['duck', 'plain', 'null', 'other string'] as $kind) {
+        foreach (['duck', 'plain', 'null', 'string'] as $kind) {
             foreach ([false, true] as $admin) {
-                foreach (['VIEW', 'EDIT', 'DELETE', 'MANAGE_COLLABORATORS'] as $attribute) {
+                foreach (self::ATTRIBUTES as $attribute) {
                     yield $kind . ($admin ? ' admin ' : ' ordinary ') . $attribute => [$kind, $admin, $attribute];
                 }
             }
@@ -64,11 +91,12 @@ final class PlaylistVoterTest extends TestCase
                 public function getOwnerId(): string { return $this->ownerId->toString(); }
                 public function getUserId(): Uuid { return $this->ownerId; }
                 public function getId(): Uuid { return Uuid::generate(); }
-                public function isCollaborator(string $userId): bool { return true; }
+                public function isCollaborator(Uuid $userId): bool { return true; }
+                public function isCollaborative(): bool { return true; }
             },
             'plain' => new \stdClass(),
             'null' => null,
-            default => 'unrelated',
+            default => 'playlist',
         };
 
         self::assertSame(VoterInterface::ACCESS_ABSTAIN, $this->voter()->vote($this->token($userId, $admin ? ['ROLE_ADMIN'] : ['ROLE_USER']), $subject, [$attribute]));
@@ -76,7 +104,8 @@ final class PlaylistVoterTest extends TestCase
 
     public function testUnknownAttributeAbstains(): void
     {
-        self::assertSame(VoterInterface::ACCESS_ABSTAIN, $this->voter()->vote($this->token(Uuid::generate(), ['ROLE_ADMIN']), 'playlist', ['UNKNOWN']));
+        $ownerId = Uuid::generate();
+        self::assertSame(VoterInterface::ACCESS_ABSTAIN, $this->voter()->vote($this->token($ownerId, ['ROLE_ADMIN']), $this->playlist($ownerId, [], true), ['UNKNOWN']));
     }
 
     public function testPrincipalWithoutIdentityContractIsDeniedEvenWithAdminRole(): void
@@ -86,7 +115,7 @@ final class PlaylistVoterTest extends TestCase
             $token->method('getUser')->willReturn($principal);
             $token->method('getRoleNames')->willReturn(['ROLE_ADMIN']);
 
-            self::assertSame(VoterInterface::ACCESS_DENIED, $this->voter()->vote($token, 'playlist', ['VIEW']));
+            self::assertSame(VoterInterface::ACCESS_DENIED, $this->voter()->vote($token, $this->playlist(Uuid::generate(), [], true), ['VIEW']));
         }
     }
 
@@ -95,13 +124,23 @@ final class PlaylistVoterTest extends TestCase
         return new PlaylistVoter();
     }
 
-    private function subject(string $kind, Uuid $ownerId): object|string
+    /** @param list<Uuid> $collaboratorIds */
+    private function playlist(Uuid $ownerId, array $collaboratorIds, bool $collaborative): Playlist
     {
-        return match ($kind) {
-            'domain' => Playlist::create('Playlist', $ownerId, isPublic: true, isCollaborative: true),
-            'orm' => new PlaylistEntity(new PublicId(), new UserEntity(new PublicId(), 'Owner', 'owner@baander.app', 'hashed', '', $ownerId), 'Playlist'),
-            default => 'playlist',
-        };
+        return Playlist::reconstitute(
+            id: Uuid::generate(),
+            publicId: new PublicId(),
+            userId: $ownerId,
+            name: 'Playlist',
+            description: null,
+            isPublic: false,
+            isCollaborative: $collaborative,
+            isSmart: false,
+            smartRules: [],
+            createdAt: new DateTimeImmutable(),
+            updatedAt: new DateTimeImmutable(),
+            collaboratorIds: $collaboratorIds,
+        );
     }
 
     /** @param list<string> $roles */

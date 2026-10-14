@@ -66,15 +66,17 @@ final class VoterIsolationTest extends TestCase
         }
     }
 
-    public function testRealPlaylistRetainsOwnerAndScopedAdminAccess(): void
+    public function testRealPlaylistRetainsOwnerAccessAndLimitsAdminToViewing(): void
     {
         $owner = Uuid::v4();
         $playlist = Playlist::create('Voter isolation playlist', $owner);
-        foreach (['VIEW', 'EDIT', 'DELETE', 'MANAGE_COLLABORATORS'] as $attribute) {
+        foreach (['VIEW', 'EDIT_SONGS', 'EDIT', 'DELETE', 'MANAGE_COLLABORATORS'] as $attribute) {
             $this->assertTrue($this->manager()->decide($this->token($owner), [$attribute], $playlist));
-            $this->assertTrue($this->manager()->decide($this->token(Uuid::v4(), admin: true), [$attribute], $playlist));
+            $this->assertSame($attribute === 'VIEW', $this->manager()->decide($this->token(Uuid::v4(), admin: true), [$attribute], $playlist));
             $this->assertFalse($this->manager()->decide($this->token(Uuid::v4()), [$attribute], $playlist));
         }
+        $this->assertFalse($this->manager()->decide($this->token($owner), ['LEAVE'], $playlist));
+        $this->assertFalse($this->manager()->decide($this->token(Uuid::v4(), admin: true), ['LEAVE'], $playlist));
     }
 
     public function testRealLibraryRetainsScopedAdminAccess(): void

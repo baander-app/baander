@@ -254,20 +254,49 @@ final class PlaylistTest extends TestCase
         $this->assertSame(2, $songs[2]->getPosition());
     }
 
-    public function testReorderSongsThrowsOnMissingSong(): void
+    public function testReorderWithSubsetPlacesItFirstAndKeepsTheRestInStoredOrder(): void
+    {
+        $playlist = Playlist::create(name: 'My Playlist', userId: $this->userId);
+        $songs = [Uuid::v4(), Uuid::v4(), Uuid::v4(), Uuid::v4(), Uuid::v4()];
+        foreach ($songs as $position => $songId) {
+            $playlist->addSong($songId, $position);
+        }
+
+        $playlist->reorderSongs([$songs[4], $songs[1]]);
+
+        $this->assertSame(
+            [$songs[4], $songs[1], $songs[0], $songs[2], $songs[3]],
+            array_map(static fn($song) => $song->getSongId(), $playlist->getSongs()),
+        );
+        $this->assertSame([0, 1, 2, 3, 4], array_map(static fn($song) => $song->getPosition(), $playlist->getSongs()));
+    }
+
+    public function testReorderIgnoresSongsNotInThePlaylist(): void
     {
         $playlist = Playlist::create(name: 'My Playlist', userId: $this->userId);
         $song1 = Uuid::v4();
         $song2 = Uuid::v4();
-        $missingSong = Uuid::v4();
-
         $playlist->addSong($song1, 0);
         $playlist->addSong($song2, 1);
 
-        $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('is not in this playlist');
+        $playlist->reorderSongs([Uuid::v4(), $song2, $song1]);
 
-        $playlist->reorderSongs([$missingSong, $song1]);
+        $this->assertSame([$song2, $song1], array_map(static fn($song) => $song->getSongId(), $playlist->getSongs()));
+        $this->assertSame([0, 1], array_map(static fn($song) => $song->getPosition(), $playlist->getSongs()));
+    }
+
+    public function testReorderListsEachSongOnce(): void
+    {
+        $playlist = Playlist::create(name: 'My Playlist', userId: $this->userId);
+        $song1 = Uuid::v4();
+        $song2 = Uuid::v4();
+        $playlist->addSong($song1, 0);
+        $playlist->addSong($song2, 1);
+
+        $playlist->reorderSongs([$song2, $song2]);
+
+        $this->assertSame([$song2, $song1], array_map(static fn($song) => $song->getSongId(), $playlist->getSongs()));
+        $this->assertSame([0, 1], array_map(static fn($song) => $song->getPosition(), $playlist->getSongs()));
     }
 
     public function testUpdateSmartRulesOnSmartPlaylist(): void
@@ -368,5 +397,74 @@ final class PlaylistTest extends TestCase
         $playlist->clearSongs();
 
         $this->assertGreaterThan($afterAdd, $playlist->getUpdatedAt());
+    }
+
+    public function testReconstituteRestoresCollaborators(): void
+    {
+        $first = Uuid::v4();
+        $second = Uuid::v4();
+        $playlist = $this->reconstituteWithCollaborators([$first, $second]);
+
+        $this->assertTrue($playlist->isCollaborator($first));
+        $this->assertTrue($playlist->isCollaborator($second));
+        $this->assertFalse($playlist->isCollaborator(Uuid::v4()));
+        $this->assertFalse($playlist->isCollaborator($this->userId));
+        $this->assertSame([$first, $second], $playlist->collaboratorIds());
+    }
+
+    public function testAddCollaboratorIsIdempotent(): void
+    {
+        $playlist = Playlist::create(name: 'My Playlist', userId: $this->userId);
+        $collaborator = Uuid::v4();
+
+        $playlist->addCollaborator($collaborator);
+        $playlist->addCollaborator(Uuid::fromString($collaborator->toString()));
+
+        $this->assertTrue($playlist->isCollaborator($collaborator));
+        $this->assertCount(1, $playlist->collaboratorIds());
+    }
+
+    public function testAddCollaboratorRefusesTheOwner(): void
+    {
+        $playlist = Playlist::create(name: 'My Playlist', userId: $this->userId);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('owner');
+
+        $playlist->addCollaborator($this->userId);
+    }
+
+    public function testRemoveCollaboratorIsIdempotent(): void
+    {
+        $first = Uuid::v4();
+        $second = Uuid::v4();
+        $playlist = $this->reconstituteWithCollaborators([$first, $second]);
+
+        $playlist->removeCollaborator($first);
+        $playlist->removeCollaborator($first);
+        $playlist->removeCollaborator(Uuid::v4());
+
+        $this->assertFalse($playlist->isCollaborator($first));
+        $this->assertSame([$second], $playlist->collaboratorIds());
+    }
+
+    /** @param list<Uuid> $collaboratorIds */
+    private function reconstituteWithCollaborators(array $collaboratorIds): Playlist
+    {
+        return Playlist::reconstitute(
+            id: Uuid::v4(),
+            publicId: new PublicId(),
+            userId: $this->userId,
+            name: 'Shared Playlist',
+            description: null,
+            isPublic: false,
+            isCollaborative: true,
+            isSmart: false,
+            smartRules: [],
+            createdAt: new DateTimeImmutable('2025-03-01 00:00:00'),
+            updatedAt: new DateTimeImmutable('2025-03-15 00:00:00'),
+            songs: [],
+            collaboratorIds: $collaboratorIds,
+        );
     }
 }

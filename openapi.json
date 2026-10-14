@@ -11878,7 +11878,7 @@
                 "tags": [
                     "Playlist"
                 ],
-                "summary": "Get an owned playlist and accessible songs (administrators may read any playlist)",
+                "summary": "Get a playlist and its accessible songs (owner, collaborators and administrators)",
                 "operationId": "get_playlist_show",
                 "parameters": [
                     {
@@ -12040,7 +12040,7 @@
                         }
                     },
                     "403": {
-                        "description": "Playlist belongs to another user; public and collaborative flags do not grant read access",
+                        "description": "The actor is neither the owner, a collaborator nor an administrator; the public flag grants no read access",
                         "content": {
                             "application/json": {
                                 "schema": {

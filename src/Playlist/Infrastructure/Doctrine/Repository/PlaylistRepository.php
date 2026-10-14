@@ -10,6 +10,7 @@ use App\Playlist\Domain\Model\Playlist;
 use App\Playlist\Domain\Model\PlaylistSong;
 use App\Playlist\Domain\ReadModel\PlaylistReadView;
 use App\Playlist\Domain\Repository\PlaylistRepositoryInterface;
+use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistCollaboratorEntity;
 use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistEntity;
 use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistSongEntity;
 use App\Shared\Domain\Model\PublicId;
@@ -30,6 +31,7 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
         $entity = $this->findEntityOrCreate($playlist);
         $this->syncToEntity($playlist, $entity);
         $this->syncSongsToEntity($playlist, $entity);
+        $this->syncCollaboratorsToEntity($playlist, $entity);
 
         $this->entityManager->persist($entity);
         $this->entityManager->flush();
@@ -269,7 +271,29 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
             $entity->getCreatedAt(),
             $entity->getUpdatedAt(),
             $songs,
+            $this->loadCollaboratorIds($entity),
         );
+    }
+
+    /**
+     * The playlist's collaborator user ids, oldest row first.
+     *
+     * @return list<Uuid>
+     */
+    private function loadCollaboratorIds(PlaylistEntity $entity): array
+    {
+        /** @var list<array{userId: string}> $rows */
+        $rows = $this->entityManager->createQueryBuilder()
+            ->select('IDENTITY(c.user) AS userId')
+            ->from(PlaylistCollaboratorEntity::class, 'c')
+            ->where('c.playlist = :playlist')
+            ->setParameter('playlist', $entity)
+            ->orderBy('c.createdAt', 'ASC')
+            ->addOrderBy('c.id', 'ASC')
+            ->getQuery()
+            ->getArrayResult();
+
+        return array_map(static fn (array $row): Uuid => Uuid::fromString($row['userId']), $rows);
     }
 
     /**
@@ -346,6 +370,45 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
         // Insert newly added songs; fk_playlist_song_song_id rejects unknown songs.
         foreach (array_diff_key($desired, $existingBySong) as $songIdStr => $position) {
             $this->entityManager->persist(new PlaylistSongEntity($entity, Uuid::fromString((string) $songIdStr), $position));
+        }
+    }
+
+    /**
+     * Reconcile persisted playlist_collaborators rows with the aggregate's collaborator ids:
+     * a user the aggregate no longer names loses the row, a new one gets a row. This is the
+     * only writer of that table. fk_playlist_collaborators_user_id rejects unknown users.
+     */
+    private function syncCollaboratorsToEntity(Playlist $playlist, PlaylistEntity $entity): void
+    {
+        $desired = [];
+        foreach ($playlist->collaboratorIds() as $userId) {
+            $desired[$userId->toString()] = $userId;
+        }
+
+        /** @var list<PlaylistCollaboratorEntity> $existing */
+        $existing = $this->entityManager
+            ->getRepository(PlaylistCollaboratorEntity::class)
+            ->createQueryBuilder('c')
+            ->innerJoin('c.playlist', 'p')
+            ->where('p.id = :playlistId')
+            ->setParameter('playlistId', $playlist->getId())
+            ->getQuery()
+            ->getResult();
+
+        $existingByUser = [];
+        foreach ($existing as $row) {
+            $existingByUser[$row->getUser()->getId()->toString()] = $row;
+        }
+
+        foreach ($existingByUser as $userIdStr => $row) {
+            if (!array_key_exists($userIdStr, $desired)) {
+                $this->entityManager->remove($row);
+            }
+        }
+
+        foreach (array_diff_key($desired, $existingByUser) as $userId) {
+            $user = $this->entityManager->getReference(UserEntity::class, $userId);
+            $this->entityManager->persist(new PlaylistCollaboratorEntity($entity, $user));
         }
     }
 }

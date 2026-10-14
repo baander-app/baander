@@ -14,6 +14,9 @@ final class Playlist
     /** @var PlaylistSong[] */
     private array $songs = [];
 
+    /** @var array<string, Uuid> collaborator user id string => id */
+    private array $collaboratorIds = [];
+
     /**
      * @param array<array-key, mixed> $smartRules
      */
@@ -71,6 +74,7 @@ final class Playlist
      *
      * @param PlaylistSong[] $songs
      * @param array<array-key, mixed> $smartRules
+     * @param list<Uuid> $collaboratorIds
      */
     public static function reconstitute(
         Uuid $id,
@@ -85,6 +89,7 @@ final class Playlist
         DateTimeImmutable $createdAt,
         DateTimeImmutable $updatedAt,
         array $songs = [],
+        array $collaboratorIds = [],
     ): self {
         $playlist = new self(
             $id,
@@ -100,6 +105,9 @@ final class Playlist
             $updatedAt,
         );
         $playlist->songs = $songs;
+        foreach ($collaboratorIds as $collaboratorId) {
+            $playlist->collaboratorIds[$collaboratorId->toString()] = $collaboratorId;
+        }
 
         return $playlist;
     }
@@ -158,7 +166,9 @@ final class Playlist
     }
 
     /**
-     * Reorder all songs according to the given song ID sequence.
+     * Place the listed songs first, in the given order, and keep every other entry
+     * after them in its stored order. Positions are renumbered from zero. An id that
+     * is not in the playlist, or is listed again, is ignored.
      *
      * @param Uuid[] $songIds
      */
@@ -170,17 +180,22 @@ final class Playlist
         }
 
         $reordered = [];
-        foreach ($songIds as $position => $songId) {
+        foreach ($songIds as $songId) {
             $key = $songId->toString();
             if (!isset($existingById[$key])) {
-                throw new InvalidArgumentException(
-                    sprintf('Song %s is not in this playlist.', $key),
-                );
+                continue;
             }
-            $reordered[] = new PlaylistSong($songId, $position);
+            $reordered[] = $existingById[$key]->getSongId();
+            unset($existingById[$key]);
+        }
+        foreach ($existingById as $song) {
+            $reordered[] = $song->getSongId();
         }
 
-        $this->songs = $reordered;
+        $this->songs = [];
+        foreach ($reordered as $position => $songId) {
+            $this->songs[] = new PlaylistSong($songId, $position);
+        }
         $this->updatedAt = new DateTimeImmutable();
     }
 
@@ -205,6 +220,49 @@ final class Playlist
 
         $this->smartRules = $rules;
         $this->updatedAt = new DateTimeImmutable();
+    }
+
+    /**
+     * Give a user editing rights while the playlist is collaborative. Adding a user
+     * twice changes nothing; the owner cannot be their own collaborator.
+     */
+    public function addCollaborator(Uuid $userId): void
+    {
+        if ($userId->equals($this->userId)) {
+            throw new InvalidArgumentException('The playlist owner cannot be added as a collaborator.');
+        }
+        if (isset($this->collaboratorIds[$userId->toString()])) {
+            return;
+        }
+
+        $this->collaboratorIds[$userId->toString()] = $userId;
+        $this->updatedAt = new DateTimeImmutable();
+    }
+
+    /**
+     * Remove a user's collaborator row. Removing a user who is not a collaborator changes nothing.
+     */
+    public function removeCollaborator(Uuid $userId): void
+    {
+        if (!isset($this->collaboratorIds[$userId->toString()])) {
+            return;
+        }
+
+        unset($this->collaboratorIds[$userId->toString()]);
+        $this->updatedAt = new DateTimeImmutable();
+    }
+
+    public function isCollaborator(Uuid $userId): bool
+    {
+        return isset($this->collaboratorIds[$userId->toString()]);
+    }
+
+    /**
+     * @return list<Uuid>
+     */
+    public function collaboratorIds(): array
+    {
+        return array_values($this->collaboratorIds);
     }
 
     public function getId(): Uuid

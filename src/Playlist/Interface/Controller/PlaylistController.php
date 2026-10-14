@@ -41,6 +41,19 @@ final class PlaylistController
     use ApiResponsesTrait;
     use TranslatorTrait;
 
+    /**
+     * The message a refusal carries, by the voter attribute that decided it. A 403 on a
+     * playlist route therefore names the rule that refused the actor.
+     */
+    public const array REFUSAL_MESSAGES = [
+        'VIEW' => 'Only the owner, a collaborator or an administrator may view this playlist.',
+        'EDIT_SONGS' => 'Only the owner, or a collaborator while the playlist is collaborative, may change its songs.',
+        'EDIT' => 'Only the owner may update this playlist.',
+        'DELETE' => 'Only the owner may delete this playlist.',
+        'MANAGE_COLLABORATORS' => 'Only the owner may manage the collaborators of this playlist.',
+        'LEAVE' => 'Only a collaborator may leave this playlist.',
+    ];
+
     public function __construct(
         private readonly Security $security,
         private readonly PlaylistPortInterface $playlistService,
@@ -136,7 +149,7 @@ final class PlaylistController
      */
     #[OA\Get(
         path: '/api/playlists/{publicId}',
-        summary: 'Get an owned playlist and accessible songs (administrators may read any playlist)',
+        summary: 'Get a playlist and its accessible songs (owner, collaborators and administrators)',
         parameters: [
             new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
@@ -175,7 +188,7 @@ final class PlaylistController
                 ], type: 'object',
             )),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '403', description: 'Playlist belongs to another user; public and collaborative flags do not grant read access', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '403', description: 'The actor is neither the owner, a collaborator nor an administrator; the public flag grants no read access', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
@@ -194,9 +207,7 @@ final class PlaylistController
             return $this->notFound();
         }
 
-        if (!$this->security->isGranted('VIEW', $playlist)) {
-            throw new AccessDeniedException();
-        }
+        $this->authorize('VIEW', $playlist);
 
         $scope = $this->libraryScopes->current();
         $songIds = array_map(
@@ -271,10 +282,7 @@ final class PlaylistController
             return $this->notFound();
         }
 
-        $forbidden = $this->requireOwnership($playlist);
-        if ($forbidden !== null) {
-            return $forbidden;
-        }
+        $this->authorize('EDIT', $playlist);
 
         $name = $payload->name ?? $playlist->getName();
         $description = $payload->description ?? $playlist->getDescription();
@@ -330,10 +338,7 @@ final class PlaylistController
             return $this->notFound();
         }
 
-        $forbidden = $this->requireOwnership($playlist);
-        if ($forbidden !== null) {
-            return $forbidden;
-        }
+        $this->authorize('DELETE', $playlist);
 
         $this->playlistService->delete($playlist);
 
@@ -381,10 +386,7 @@ final class PlaylistController
             return $this->notFound();
         }
 
-        $forbidden = $this->requireOwnership($playlist);
-        if ($forbidden !== null) {
-            return $forbidden;
-        }
+        $this->authorize('EDIT_SONGS', $playlist);
 
         try {
             $songId = Uuid::fromString($payload->songId);
@@ -394,12 +396,13 @@ final class PlaylistController
 
         $position = count($playlist->getSongs());
 
-        // AddSongHandler is idempotent: a duplicate add returns success rather
-        // than an error.
+        // The handler answers not-found for a song the actor cannot see, and a
+        // duplicate add returns success rather than an error.
         $this->commandBus->dispatch(new AddSongCommand(
             playlistId: $playlist->getId(),
             songId: $songId,
             position: $position,
+            scope: $this->libraryScopes->current(),
         ));
 
         return $this->created([
@@ -432,10 +435,7 @@ final class PlaylistController
             return $this->notFound();
         }
 
-        $forbidden = $this->requireOwnership($playlist);
-        if ($forbidden !== null) {
-            return $forbidden;
-        }
+        $this->authorize('EDIT_SONGS', $playlist);
 
         try {
             $resolvedSongId = Uuid::fromString($songId);
@@ -491,20 +491,15 @@ final class PlaylistController
             return $this->notFound();
         }
 
-        $forbidden = $this->requireOwnership($playlist);
-        if ($forbidden !== null) {
-            return $forbidden;
-        }
+        $this->authorize('EDIT_SONGS', $playlist);
 
         try {
             $uuids = array_map(static fn(string $id) => Uuid::fromString($id), $payload->songIds);
-            $playlist->reorderSongs($uuids);
-        } catch (\InvalidArgumentException $e) {
-            return $this->errorResponse($e->getMessage());
         } catch (\Throwable) {
             return $this->errorResponse($this->trans('errors.invalid_song_ids_format'));
         }
 
+        $playlist->reorderSongs($uuids);
         $this->playlistService->save($playlist);
 
         return $this->successResponse(['message' => $this->trans('success.reordered', domain: 'playlist')]);
@@ -541,17 +536,15 @@ final class PlaylistController
         return $this->playlistService->findByPublicId($resolvedPublicId);
     }
 
-    private function requireOwnership(Playlist $playlist): ?JsonResponse
+    /**
+     * Asks the playlist voter and refuses with the attribute's message.
+     *
+     * @param key-of<self::REFUSAL_MESSAGES> $attribute
+     */
+    private function authorize(string $attribute, Playlist $playlist): void
     {
-        $user = $this->security->getUser();
-        if (!$user instanceof AuthenticatedUserIdentityInterface) {
-            return $this->unauthorized();
+        if (!$this->security->isGranted($attribute, $playlist)) {
+            throw new AccessDeniedException(self::REFUSAL_MESSAGES[$attribute]);
         }
-
-        if ($playlist->getUserId()->toString() !== $user->getId()) {
-            return $this->errorResponse('You do not own this playlist.', 403);
-        }
-
-        return null;
     }
 }
