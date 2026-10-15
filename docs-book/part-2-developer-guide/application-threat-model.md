@@ -8,10 +8,12 @@ a malicious outbound destination, and unavailable infrastructure.
 
 The evidence applies to the checkout and runtime recorded in
 [ROADMAP.md](../../ROADMAP.md), not to an independently assessed deployment.
-Registry internals, quorum downgrade, regional deployment qualification and deferred
-mobile work remain outside this delivery. The combined application and registry
-roadmap item remains open. A scanner canary establishes scanner operation, not
-resistance to hostile requests.
+The separate [registry threat model](registry-threat-model.md) covers the C++
+service's credential ownership, replay, parsing, TLS and quorum boundaries. The
+application checkpoint below does not qualify those boundaries. Regional deployment
+qualification and deferred mobile work remain separate work. The combined
+model/regression checkpoint and remaining findings are recorded in the roadmap.
+A scanner canary establishes scanner operation, not resistance to hostile requests.
 
 ## Assets and actors
 

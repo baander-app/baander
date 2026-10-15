@@ -8,6 +8,10 @@ The local implementation includes validation, parameterized rqlite requests, a
 bounded asynchronous mTLS connection pool, and a TLS HTTP server. Regional
 infrastructure, deployment and backup automation remain separate acceptance gates.
 
+The [registry threat model](../docs-book/part-2-developer-guide/registry-threat-model.md)
+describes credential ownership, replay limits, parser and transport boundaries, and
+the distinction between local contract evidence and deployment qualification.
+
 ## Contract
 
 Registration retains the `publicId`, `url`, `name`, `version`, and `apiKey` fields.

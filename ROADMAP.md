@@ -23,13 +23,12 @@ batches describe their own checkpoints; the current gate below takes precedence.
 Any harness can take over from this section; nothing below depends on a tool that
 only one agent host has.
 
-- **Branch.** `plan/api-contract-reconciliation` continues from published `master`
-  (`fa948313`). It reconciles API identifier schemas, the generated web client,
-  the embedded remix response and canonical reference guides. The
-  [checkpoint](#api-contract-reconciliation) records the current verification.
-  Messenger-without-Swoole was fast-forwarded into `master` and pushed to both
-  remotes at the user's request; its [checkpoint](#messenger-without-swoole) remains
-  valid. This follow-up remains local until publishing is requested.
+- **Branch.** `plan/registry-threat-model` continues from published `master`
+  (`bb6bdc3c`). API contract reconciliation was fast-forwarded into `master` and
+  pushed to both remotes at the user's request. This branch completes the registry
+  threat model and focused security regressions; its checkpoint below records
+  verification and remaining risks. This follow-up remains local until publishing
+  is requested.
 - **Previous baseline.** Item 8 was merged and pushed. `master` (eced16d6) holds its fifteen
   commits and the roadmap commit on top of 63466d0d by fast-forward, code-reviewed
   with both findings applied and every gate green (the item 8 checkpoint below).
@@ -83,11 +82,11 @@ only one agent host has.
   under concurrent writers has no version check; sharing has no invitation step, so
   an owner can add any user unasked; removing a song is not judged by the actor's
   visibility; the visible-song count materialises rows. None blocks the item.
-- **Next.** The remaining registry threat-model work in the
-  [application security backlog](#application-security-and-reliability).
-  Messenger/Redis fallback and API contract reconciliation are qualified below.
-  React Native and Android remain deferred. The local dev database note at the
-  end of this section still stands.
+- **Next.** Address WebSocket proof possession and origin validation from the
+  [application threat model](docs-book/part-2-developer-guide/application-threat-model.md#open-findings-and-qualification-work).
+  The combined application/registry model and focused regressions are qualified;
+  their remaining security findings are still open. React Native and Android
+  remain deferred. The local dev database note at the end of this section stands.
 
 The backend release-gate package is complete (see the next two sections). Eight
 plans followed it, in this order, and all eight are delivered:
@@ -1389,11 +1388,65 @@ the agreed host budget.
   current Deptrac count at the top of this document; lower counts recorded in older
   batches are historical measurements. League exchange tests reject missing and
   incorrect PKCE verifiers from codes issued by the controller.
-- [ ] Build a truthful application and registry threat model, then run focused
+- [x] Build a truthful application and registry threat model, then run focused
   penetration-defense regressions for credential leakage, replay, cross-tenant
   access, malformed HTTP/JSON, rate-limit abuse, SSRF, TLS failures, and quorum
   downgrade. Record observed findings and remediation. The EICAR scanner canary
   is only a scanner check, not evidence of penetration resistance.
+
+### Registry threat-model delivery (2026-10-15)
+
+Implementation follows the [reviewed plan](docs/plans/registry-threat-model.md).
+The [registry threat model](docs-book/part-2-developer-guide/registry-threat-model.md)
+records the standalone C++ service's assets, credential ownership, replay,
+parsing, egress, TLS and quorum boundaries. The registry has no application tenant
+model; public lookup is intentional and credential ownership controls mutation.
+
+- A pinned-parser reproduction accepted a valid JSON object followed by a raw NUL,
+  including another JSON value after that byte. The shared parser now rejects raw
+  NUL before DOM parsing, retaining size-limit precedence and valid escaped
+  Unicode. Native tests cover embedded/trailing NUL, hidden suffixes and the
+  positive controls. This also protects configuration and database response parsing.
+- The HTTP contract adds eleven malformed JSON byte/type cases, checks unchanged
+  public metadata/revision and fresh liveness, and checks responses, headers and
+  captured logs for actual credential, digest, enrollment and database secret markers.
+- Replaying the original owner body and enrollment token after a newer update
+  restores old metadata with an advancing revision. This regression documents
+  accepted replay behavior; it does not claim freshness or replay prevention.
+- Two API instances now exercise distinct-owner takeover refusal despite valid
+  enrollment, full stored-row invariance, capability identity binding and the
+  legitimate owner's retry through the second API without enrollment.
+
+Verification uses the native CI recipes in a disposable Debian trixie container
+with Clang 19.1.7, pinned OpenSSL 3.5.3 and rqlite 10.5.1. The optimized release gate
+passed in 292.4 seconds: 32 CTests, three cleanup tests, authenticated SQL/TLS,
+HTTP, three-voter ownership/partition/quorum-loss, fresh restore and load-smoke
+contracts. The smoke recorded normal/burst lookup p99 of 5.58/14.02 ms and sampled
+API peak RSS of 11.4 MiB; it does not qualify regional or whole-host budgets.
+The ASan/LeakSanitizer/UBSan recipe passed the same 32 CTests, three cleanup tests
+and SQL/TLS, HTTP, three-voter and restore contracts in 253.5 seconds. Production
+Clang 19 analysis, its analyzer/compiler failure controls, first-party license
+checks and five direct dependency notices passed in 199.3 seconds. The existing
+Boost.Asio diagnostic remains outside first-party scope. The sanitizer-backed fuzz
+recipe passed the 32 CTests, three cleanup tests and native contracts, then 10,000
+parser executions in 34 seconds and the deliberate ASan failure control; the full
+recipe took 300.1 seconds. Both disposable qualification containers were removed.
+Logs remain under `/tmp/baander-registry-security-d0865f1dfc/` (release) and
+`/tmp/baander-registry-security-2fe31ae4b9/` (sanitizer, static and fuzz).
+
+Early attempts stopped on a new fixture's receipt/resource mismatch and a missing
+Clang sanitizer runtime in the disposable tooling. Both were corrected before the
+successful runs above; their time is excluded from those passing-gate measurements.
+Independent plan, code, simplification and documentation reviews passed, and
+prose-preservation audits and whitespace checks passed.
+
+The shared enrollment key, absent credential rotation/recovery, global rate-limit
+fairness, duplicate JSON key behavior, live HTTP fuzzing, inbound legacy TLS and
+session saturation probes remain explicit limitations. Regional deployment,
+constrained-host soak and S3 backup/restore acceptance remain open. Existing
+container startup guard evidence is historical; this task does not rerun that gate.
+The application model's existing WebSocket proof, rate-limit and outbound-policy
+findings also remain open.
 
 ### Application threat-model delivery (2026-10-14)
 
@@ -1401,8 +1454,9 @@ Branch `plan/application-threat-model` implements the reviewed
 [plan](docs/plans/application-threat-model.md). The
 [application threat model](docs-book/part-2-developer-guide/application-threat-model.md)
 records assets, trust boundaries, source/test evidence and open findings. PHP
-Discovery registration/pairing is local persistence; registry internals and quorum
-downgrade remain pending, so the combined checkbox above stays open.
+Discovery registration/pairing is local persistence. Registry internals and quorum
+downgrade were pending at that checkpoint; the registry delivery above now completes
+the combined model/regression item while retaining its open security findings.
 
 Delivered changes:
 
