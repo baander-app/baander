@@ -9,6 +9,7 @@ use App\Shared\Infrastructure\Swoole\Async;
 use App\Metadata\Infrastructure\Api\MusicBrainz\DTO\MusicBrainzRecordingDto;
 use App\Metadata\Infrastructure\Api\MusicBrainz\DTO\MusicBrainzReleaseGroupDto;
 use App\Metadata\Infrastructure\Api\MusicBrainz\DTO\MusicBrainzSearchResultDto;
+use App\Shared\Infrastructure\Http\PublicHttpClient;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Serializer\Exception\NotEncodableValueException;
@@ -29,6 +30,7 @@ final readonly class MusicBrainzAdapter
     public function __construct(
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
+        private readonly PublicHttpClient $httpClient,
     )
     {
     }
@@ -209,8 +211,8 @@ final readonly class MusicBrainzAdapter
      * Execute an HTTP GET request against the MusicBrainz API.
      *
      * Respects the MusicBrainz rate limit of 1 request per second by sleeping
-     * after each call. Uses file_get_contents with stream_context to avoid
-     * external HTTP client dependencies.
+     * after each successful call. Destination validation and connection pinning
+     * are handled by the public provider transport.
      *
      * @param array<string, mixed> $params Query string parameters
      * @return array<string, mixed> Parsed JSON response, or empty array on failure
@@ -219,47 +221,31 @@ final readonly class MusicBrainzAdapter
     {
         $query = http_build_query($params);
         $url = self::BASE_URL . $endpoint . ($query !== '' ? '?' . $query : '');
-
-        $context = stream_context_create([
-            'http' => [
-                'method' => 'GET',
-                'header' => [
-                    'User-Agent: ' . self::USER_AGENT,
-                    'Accept: application/json',
-                ],
-                'ignore_errors' => true,
-                'timeout' => 10,
-            ],
-        ]);
-
-        $response = @file_get_contents($url, false, $context);
-
-        if ($response === false) {
-            $this->logger->warning('MusicBrainz request failed', [
-                'service' => 'musicbrainz',
-                'endpoint' => $url,
-                'error' => error_get_last()['message'] ?? 'Unknown error',
-            ]);
-
-            return [];
-        }
-
+        $response = null;
         try {
-            $data = $this->jsonEncoder->decode($response, 'json');
-        } catch (NotEncodableValueException $e) {
-            $this->logger->warning('MusicBrainz JSON decode failed', [
-                'service' => 'musicbrainz',
-                'endpoint' => $url,
-                'error' => $e->getMessage(),
+            $response = $this->httpClient->request('GET', $url, ['musicbrainz.org'], [
+                'headers' => ['User-Agent' => self::USER_AGENT, 'Accept' => 'application/json'],
+                'timeout' => 10,
             ]);
+            $body = $response->getContent(false);
+        } catch (\Throwable) {
+            $this->logger->warning('MusicBrainz request failed', ['service' => 'musicbrainz']);
+
+            return [];
+        } finally {
+            $response?->cancel();
+        }
+        try {
+            $data = $this->jsonEncoder->decode($body, 'json');
+        } catch (NotEncodableValueException) {
+            $this->logger->warning('MusicBrainz JSON decode failed', ['service' => 'musicbrainz']);
 
             return [];
         }
-
-        // MusicBrainz requires at most 1 request per second.
+        // MusicBrainz requires at most one request per second.
         Async::sleep(1.0);
 
-        return $data;
+        return is_array($data) ? $data : [];
     }
 
     /**

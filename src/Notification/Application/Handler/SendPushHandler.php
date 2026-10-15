@@ -68,25 +68,22 @@ final class SendPushHandler
         ], 'json');
 
         $failureCount = 0;
-        $firstFailure = null;
 
         foreach ($subscriptions as $entity) {
             try {
                 $this->sendToSubscription($entity, $payload);
-            } catch (\Throwable $e) {
+            } catch (\Throwable) {
                 ++$failureCount;
-                $firstFailure ??= $e;
                 $this->logger->error('Failed to send push notification.', [
                     'channel' => 'notification.push',
                     'notification_id' => $command->notificationPublicId,
-                    'endpoint' => $entity->getEndpoint(),
-                    'exception' => $e,
+                    'subscription_id' => $entity->getId()->toString(),
                 ]);
             }
         }
 
-        if ($firstFailure !== null) {
-            throw new \RuntimeException(sprintf('Push delivery failed for %d subscription(s).', $failureCount), 0, $firstFailure);
+        if ($failureCount !== 0) {
+            throw new \RuntimeException(sprintf('Push delivery failed for %d subscription(s).', $failureCount));
         }
     }
 
@@ -112,6 +109,6 @@ final class SendPushHandler
             return;
         }
 
-        throw new \RuntimeException(sprintf('Push service rejected notification: %s', $report->getReason()));
+        throw new \RuntimeException('Push service rejected notification.');
     }
 }

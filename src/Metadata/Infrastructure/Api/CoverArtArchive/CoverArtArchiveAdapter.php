@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Metadata\Infrastructure\Api\CoverArtArchive;
 
+use App\Shared\Infrastructure\Http\PublicHttpClient;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Symfony\Component\Serializer\Exception\NotEncodableValueException;
@@ -15,6 +16,7 @@ final readonly class CoverArtArchiveAdapter
     public function __construct(
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
+        private readonly PublicHttpClient $httpClient,
     )
     {
     }
@@ -84,43 +86,28 @@ final readonly class CoverArtArchiveAdapter
      */
     private function request(string $endpoint): array
     {
-        $url = self::BASE_URL . $endpoint;
-        $options = [
-            'http' => [
-                'method' => 'GET',
-                'header' => [
-                    'User-Agent: Baander/1.0',
-                    'Accept: application/json',
-                ],
-                'ignore_errors' => true,
-                'timeout' => 10.0,
-            ],
-        ];
-
-        $context = stream_context_create($options);
-        $response = file_get_contents($url, false, $context);
-
-        if ($response === false) {
-            $this->logger->warning('CoverArtArchive request failed', [
-                'service' => 'coverartarchive',
-                'endpoint' => $url,
-                'error' => error_get_last()['message'] ?? 'Unknown error',
-            ]);
-            return [];
-        }
-
+        $response = null;
         try {
-            $data = $this->jsonEncoder->decode($response, 'json');
-        } catch (NotEncodableValueException $e) {
-            $this->logger->warning('CoverArtArchive JSON decode failed', [
-                'service' => 'coverartarchive',
-                'endpoint' => $url,
-                'error' => $e->getMessage(),
-            ]);
+            $response = $this->httpClient->request('GET', self::BASE_URL . $endpoint, ['coverartarchive.org'], [
+                'headers' => ['User-Agent' => 'Baander/1.0', 'Accept' => 'application/json'], 'timeout' => 10,
+            ], ['coverartarchive.org', 'archive.org']);
+            $body = $response->getContent(false);
+        } catch (\Throwable) {
+            $this->logger->warning('CoverArtArchive request failed', ['service' => 'coverartarchive']);
+
+            return [];
+        } finally {
+            $response?->cancel();
+        }
+        try {
+            $data = $this->jsonEncoder->decode($body, 'json');
+        } catch (NotEncodableValueException) {
+            $this->logger->warning('CoverArtArchive JSON decode failed', ['service' => 'coverartarchive']);
+
             return [];
         }
 
-        return $data;
+        return is_array($data) ? $data : [];
     }
 
     /**

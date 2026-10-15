@@ -51,7 +51,7 @@ final class SendPushHandlerTest extends TestCase
             $this->handler($repository, $webPush)($this->command());
             self::fail('Push failures must reach Messenger.');
         } catch (\RuntimeException $exception) {
-            self::assertSame($failure, $exception->getPrevious());
+            self::assertNull($exception->getPrevious());
             self::assertStringContainsString('2', $exception->getMessage());
         }
         self::assertSame(array_map(static fn (PushSubscriptionEntity $entity): string => $entity->getEndpoint(), $entities), $attempted);
@@ -125,7 +125,7 @@ final class SendPushHandlerTest extends TestCase
             $this->handler($repository, $webPush)($this->command());
             self::fail('Subscription cleanup failure must reach Messenger.');
         } catch (\RuntimeException $exception) {
-            self::assertSame($failure, $exception->getPrevious());
+            self::assertNull($exception->getPrevious());
         }
     }
 
@@ -181,6 +181,31 @@ final class SendPushHandlerTest extends TestCase
         $webPush = $this->createMock(WebPush::class);
         $webPush->expects($this->never())->method('sendOneNotification');
         $this->handler($repository, $webPush)($this->command());
+    }
+
+    public function testCapabilityUrlsAndTransportExceptionsNeverEnterLogsOrTheMessengerFailure(): void
+    {
+        $entity = $this->subscription('capability-secret');
+        $repository = $this->createStub(PushSubscriptionRepositoryInterface::class);
+        $repository->method('findByUser')->willReturn([$entity]);
+        $webPush = $this->createMock(WebPush::class);
+        $webPush->expects($this->once())->method('sendOneNotification')->willThrowException(
+            new \RuntimeException('Failed request to ' . $entity->getEndpoint() . '?key=credential-secret'),
+        );
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('error')->with('Failed to send push notification.', [
+            'channel' => 'notification.push',
+            'notification_id' => 'notification-1',
+            'subscription_id' => $entity->getId()->toString(),
+        ]);
+
+        try {
+            $this->handler($repository, $webPush, logger: $logger)($this->command());
+            self::fail('Push failure must reach Messenger.');
+        } catch (\RuntimeException $exception) {
+            self::assertSame('Push delivery failed for 1 subscription(s).', $exception->getMessage());
+            self::assertNull($exception->getPrevious());
+        }
     }
 
     private function handler(

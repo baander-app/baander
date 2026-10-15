@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Metadata\Infrastructure\Api\TasteDive;
 
+use App\Shared\Infrastructure\Http\PublicHttpClient;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
@@ -15,6 +16,7 @@ final readonly class TasteDiveAdapter
         private readonly string $apiKey,
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
+        private readonly PublicHttpClient $httpClient,
     ) {
     }
 
@@ -53,34 +55,29 @@ final readonly class TasteDiveAdapter
     private function request(array $params): array
     {
         $params['k'] = $this->apiKey;
-
         $url = self::BASE_URL . '?' . http_build_query($params);
+        $this->logger->debug('TasteDive API request', ['service' => 'tastedive']);
+        $response = null;
+        try {
+            $response = $this->httpClient->request('GET', $url, ['tastedive.com'], [
+                'headers' => ['User-Agent' => 'Baander/1.0'], 'timeout' => 10,
+            ]);
+            if ($response->getStatusCode() >= 300) {
+                $this->logger->error('TasteDive API request failed', ['service' => 'tastedive']);
 
-        $this->logger->debug('TasteDive API request', ['service' => 'tastedive', 'endpoint' => $url]);
-
-        $context = stream_context_create([
-            'http' => [
-                'timeout' => 10.0,
-                'user_agent' => 'Baander/1.0',
-            ],
-        ]);
-
-        $response = @file_get_contents($url, false, $context);
-
-        if ($response === false) {
-            $this->logger->error('TasteDive API request failed', ['service' => 'tastedive', 'endpoint' => $url]);
+                return [];
+            }
+            $body = $response->getContent(false);
+        } catch (\Throwable) {
+            $this->logger->error('TasteDive API request failed', ['service' => 'tastedive']);
 
             return [];
+        } finally {
+            $response?->cancel();
         }
-
-        $data = $this->jsonEncoder->decode($response, 'json');
-
-        if (isset($data['error'])) {
-            $this->logger->error('TasteDive API returned error', [
-                'service' => 'tastedive',
-                'code' => $data['error']['code'] ?? 'unknown',
-                'message' => $data['error']['message'] ?? '',
-            ]);
+        $data = $this->jsonEncoder->decode($body, 'json');
+        if (!is_array($data) || isset($data['error'])) {
+            $this->logger->error('TasteDive API returned error', ['service' => 'tastedive']);
 
             return [];
         }

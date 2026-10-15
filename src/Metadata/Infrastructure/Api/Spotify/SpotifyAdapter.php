@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Metadata\Infrastructure\Api\Spotify;
 
 use App\Shared\Infrastructure\Swoole\Async;
+use App\Shared\Infrastructure\Http\PublicHttpClient;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
@@ -22,6 +23,7 @@ final class SpotifyAdapter
         private readonly string $clientSecret,
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
+        private readonly PublicHttpClient $httpClient,
     ) {
     }
 
@@ -130,51 +132,31 @@ final class SpotifyAdapter
         if ($this->accessToken !== null && time() < $this->tokenExpiresAt) {
             return $this->accessToken;
         }
-
-        $credentials = base64_encode($this->clientId . ':' . $this->clientSecret);
-
-        $context = stream_context_create([
-            'http' => [
-                'method' => 'POST',
-                'header' => [
-                    'Authorization: Basic ' . $credentials,
-                    'Content-Type: application/x-www-form-urlencoded',
+        $response = null;
+        try {
+            $response = $this->httpClient->request('POST', self::TOKEN_URL, ['accounts.spotify.com'], [
+                'headers' => [
+                    'Authorization' => 'Basic ' . base64_encode($this->clientId . ':' . $this->clientSecret),
+                    'Content-Type' => 'application/x-www-form-urlencoded',
                 ],
-                'content' => http_build_query(['grant_type' => 'client_credentials']),
-                'ignore_errors' => true,
-                'timeout' => 5.0,
-            ],
-        ]);
-
-        $this->logger->debug('Spotify authentication request', ['service' => 'spotify']);
-
-        $response = @file_get_contents(self::TOKEN_URL, false, $context);
-
-        if ($response === false) {
-            $this->logger->error('Spotify authentication failed', ['service' => 'spotify']);
-
-            throw new \RuntimeException('Failed to authenticate with Spotify API.');
-        }
-
-        $data = $this->jsonEncoder->decode($response, 'json');
-
-        if (!isset($data['access_token'])) {
-            $this->logger->error('Spotify authentication returned no access token', [
-                'service' => 'spotify',
-                'error' => $data['error'] ?? 'unknown',
-                'description' => $data['error_description'] ?? '',
+                'body' => http_build_query(['grant_type' => 'client_credentials']),
+                'timeout' => 5,
             ]);
-
+            $body = $response->getContent(false);
+        } catch (\Throwable) {
+            $this->logger->error('Spotify authentication failed', ['service' => 'spotify']);
+            throw new \RuntimeException('Failed to authenticate with Spotify API.');
+        } finally {
+            $response?->cancel();
+        }
+        $data = $this->jsonEncoder->decode($body, 'json');
+        if (!is_array($data) || !isset($data['access_token'])) {
+            $this->logger->error('Spotify authentication returned no access token', ['service' => 'spotify']);
             throw new \RuntimeException('Spotify API returned no access token.');
         }
-
         $this->accessToken = $data['access_token'];
         $this->tokenExpiresAt = time() + ($data['expires_in'] ?? self::TOKEN_TTL) - 30;
-
-        $this->logger->debug('Spotify authentication successful', [
-            'service' => 'spotify',
-            'expires_in' => $data['expires_in'] ?? self::TOKEN_TTL,
-        ]);
+        $this->logger->debug('Spotify authentication successful', ['service' => 'spotify']);
 
         return $this->accessToken;
     }
@@ -185,62 +167,38 @@ final class SpotifyAdapter
      */
     private function request(string $method, string $endpoint, array $params = []): array
     {
-        $url = self::BASE_URL . $endpoint;
-
-        if (!empty($params)) {
-            $url .= '?' . http_build_query($params);
-        }
-
+        $url = self::BASE_URL . $endpoint . ($params !== [] ? '?' . http_build_query($params) : '');
         $token = $this->authenticate();
-
-        $context = stream_context_create([
-            'http' => [
-                'method' => $method,
-                'header' => [
-                    'Authorization: Bearer ' . $token,
-                    'Accept: application/json',
-                ],
-                'ignore_errors' => true,
-                'timeout' => 10,
-            ],
-        ]);
-
-        $retryCount = 0;
-        $maxRetries = 1;
-
-        while ($retryCount <= $maxRetries) {
+        for ($attempt = 0; $attempt < 2; ++$attempt) {
             $this->logger->debug('Spotify API request', ['service' => 'spotify', 'method' => $method, 'endpoint' => $endpoint]);
-
-            $response = @file_get_contents($url, false, $context);
-
-            if ($response === false) {
-                $this->logger->error('Spotify API request failed', ['service' => 'spotify', 'method' => $method, 'endpoint' => $endpoint]);
+            $response = null;
+            try {
+                $response = $this->httpClient->request($method, $url, ['api.spotify.com'], [
+                    'headers' => ['Authorization' => 'Bearer ' . $token, 'Accept' => 'application/json'], 'timeout' => 10,
+                ]);
+                $status = $response->getStatusCode();
+                $headers = $response->getHeaders(false);
+                $body = $response->getContent(false);
+            } catch (\Throwable) {
+                $this->logger->error('Spotify API request failed', ['service' => 'spotify']);
 
                 return [];
+            } finally {
+                $response?->cancel();
             }
-
-            $data = $this->jsonEncoder->decode($response, 'json');
-
-            $status = $data['error']['status'] ?? null;
-
-            if ($status === 429) {
-                $retryAfter = (int) ($data['error']['retry-after']['value'] ?? 1);
-                $this->logger->info('Spotify rate limit hit, retrying', [
-                    'service' => 'spotify',
-                    'endpoint' => $endpoint,
-                    'retry_after' => $retryAfter,
-                ]);
-                Async::sleep($retryAfter);
-                $retryCount++;
+            $data = $this->jsonEncoder->decode($body, 'json');
+            if (!is_array($data)) {
+                return [];
+            }
+            $errorStatus = $data['error']['status'] ?? null;
+            if (($status === 429 || $errorStatus === 429) && $attempt === 0) {
+                $wait = max(0, (int) ($headers['retry-after'][0] ?? $data['error']['retry-after']['value'] ?? 1));
+                $this->logger->info('Spotify rate limit hit, retrying', ['service' => 'spotify', 'retry_after' => $wait]);
+                Async::sleep($wait);
                 continue;
             }
-
-            if (isset($data['error'])) {
-                $this->logger->error('Spotify API returned error', [
-                    'service' => 'spotify',
-                    'status' => $status ?? 'unknown',
-                    'message' => $data['error']['message'] ?? '',
-                ]);
+            if ($status >= 300 || isset($data['error'])) {
+                $this->logger->error('Spotify API returned error', ['service' => 'spotify', 'status' => $status]);
 
                 return [];
             }

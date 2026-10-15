@@ -49,6 +49,9 @@ use Symfony\Component\Messenger\Handler\HandlerDescriptor;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\ReceivedStamp;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
+use App\Shared\Infrastructure\Http\PublicHttpClient;
+use App\Shared\Infrastructure\Http\PublicDestinationPolicy;
+use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\Messenger\Event\WorkerRunningEvent;
 use Symfony\Component\Messenger\Event\WorkerMessageRetriedEvent;
 use Symfony\Component\Messenger\EventListener\AddErrorDetailsStampListener;
@@ -242,8 +245,9 @@ final class MessengerJsonDeliveryTest extends TestCase
         $effects = 0;
         $logger = new NullLogger();
         $encoder = new JsonEncoder();
-        $musicBrainz = new MusicBrainzAdapter($logger, $encoder);
-        $discogs = new DiscogsAdapter('unused-local-test-token', $logger, $encoder);
+        $httpClient = new PublicHttpClient(new MockHttpClient(), new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1']));
+        $musicBrainz = new MusicBrainzAdapter($logger, $encoder, $httpClient);
+        $discogs = new DiscogsAdapter('unused-local-test-token', $logger, $encoder, $httpClient);
         $genres = $this->createStub(GenrePortInterface::class);
         if ($messageType === SyncSongMessage::class) {
             $message = new SyncSongMessage($id, true);

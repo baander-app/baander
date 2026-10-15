@@ -9,6 +9,7 @@ use App\Metadata\Infrastructure\Api\Tmdb\DTO\TmdbGenreDto;
 use App\Metadata\Infrastructure\Api\Tmdb\DTO\TmdbMovieDto;
 use App\Metadata\Infrastructure\Api\Tmdb\DTO\TmdbSearchResultDto;
 use App\Shared\Infrastructure\Swoole\Async;
+use App\Shared\Infrastructure\Http\PublicHttpClient;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
@@ -25,6 +26,7 @@ final class TmdbAdapter
         private readonly string $bearerToken,
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
+        private readonly PublicHttpClient $httpClient,
     ) {
     }
 
@@ -84,83 +86,47 @@ final class TmdbAdapter
     private function request(string $endpoint, array $params = []): array
     {
         $url = self::BASE_URL . $endpoint . '?' . http_build_query($params);
-        $context = stream_context_create([
-            'http' => [
-                'method' => 'GET',
-                'header' => implode("\r\n", [
-                    'Authorization: Bearer ' . $this->bearerToken,
-                    'Accept: application/json',
-                ]),
-                'timeout' => self::REQUEST_TIMEOUT,
-                'ignore_errors' => true,
-            ],
-        ]);
+        $this->logger->debug('TMDB API request', ['service' => 'tmdb', 'endpoint' => $endpoint]);
+        for ($attempt = 0; $attempt < 2; ++$attempt) {
+            $response = null;
+            try {
+                $response = $this->httpClient->request('GET', $url, ['api.themoviedb.org'], [
+                    'headers' => ['Authorization' => 'Bearer ' . $this->bearerToken, 'Accept' => 'application/json'],
+                    'timeout' => self::REQUEST_TIMEOUT,
+                ]);
+                $status = $response->getStatusCode();
+                $headers = $response->getHeaders(false);
+                $body = $response->getContent(false);
+            } catch (\Throwable) {
+                $this->logger->error('TMDB API request failed', ['service' => 'tmdb']);
 
-        $this->logger->debug('TMDB API request', ['endpoint' => $endpoint, 'params' => $params]);
+                return [];
+            } finally {
+                $response?->cancel();
+            }
+            if ($status === 429 && $attempt === 0) {
+                $wait = max(0.0, (float) ($headers['retry-after'][0] ?? 1));
+                $this->logger->info('TMDB rate limit hit, retrying', ['service' => 'tmdb', 'retry_after' => $wait]);
+                Async::sleep($wait);
+                continue;
+            }
+            if ($status >= 300) {
+                $this->logger->warning('TMDB API error response', ['service' => 'tmdb', 'status' => $status]);
 
-        $response = @file_get_contents($url, false, $context);
-        if ($response === false) {
-            $this->logger->error('TMDB API request failed', ['endpoint' => $endpoint]);
+                return [];
+            }
+            try {
+                $data = $this->jsonEncoder->decode($body, 'json');
 
-            return [];
-        }
+                return is_array($data) ? $data : [];
+            } catch (\Throwable) {
+                $this->logger->error('TMDB API JSON decode failed', ['service' => 'tmdb']);
 
-        $headers = http_get_last_response_headers() ?? [];
-        $statusCode = $this->extractStatusCode($headers);
-
-        if ($statusCode === 429) {
-            $retryAfter = $this->extractHeader($headers, 'Retry-After');
-            $sleepSeconds = $retryAfter !== null ? (float) $retryAfter : 1.0;
-            $this->logger->info('TMDB rate limit hit, retrying', ['retryAfter' => $sleepSeconds]);
-
-            Async::sleep($sleepSeconds);
-
-            $response = @file_get_contents($url, false, $context);
-            if ($response === false) {
                 return [];
             }
         }
 
-        if ($statusCode >= 400) {
-            $this->logger->warning('TMDB API error response', ['endpoint' => $endpoint, 'status' => $statusCode]);
-
-            return [];
-        }
-
-        try {
-            return $this->jsonEncoder->decode($response, 'json');
-        } catch (\Throwable $e) {
-            $this->logger->error('TMDB API JSON decode failed', ['error' => $e->getMessage()]);
-
-            return [];
-        }
+        return [];
     }
 
-    /**
-     * @param list<string> $headers
-     */
-    private function extractStatusCode(array $headers): int
-    {
-        foreach ($headers as $header) {
-            if (preg_match('#^HTTP/\d+\.\d+\s+(\d+)#', $header, $matches)) {
-                return (int) $matches[1];
-            }
-        }
-
-        return 0;
-    }
-
-    /**
-     * @param list<string> $headers
-     */
-    private function extractHeader(array $headers, string $name): ?string
-    {
-        foreach ($headers as $header) {
-            if (stripos($header, $name . ':') === 0) {
-                return trim(substr($header, strlen($name) + 1));
-            }
-        }
-
-        return null;
-    }
 }

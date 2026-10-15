@@ -10,23 +10,18 @@ use App\Metadata\Infrastructure\Api\MusicBrainz\MusicBrainzAdapter;
 use App\Metadata\Interface\Controller\MetadataBrowseController;
 use App\Metadata\Interface\Controller\MetadataSearchController;
 use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\Attributes\PreserveGlobalState;
-use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
+use App\Shared\Infrastructure\Http\PublicHttpClient;
+use App\Shared\Infrastructure\Http\PublicDestinationPolicy;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
 
-#[RunTestsInSeparateProcesses]
-#[PreserveGlobalState(false)]
 final class MetadataResponseTest extends TestCase
 {
     public static string|false $response = '{}';
-
-    protected function setUp(): void
-    {
-        require __DIR__ . '/Fixtures/http.php';
-    }
 
     /** @return iterable<string, array{string, string}> */
     public static function searches(): iterable
@@ -44,10 +39,11 @@ final class MetadataResponseTest extends TestCase
         self::$response = '{"count":7,"pagination":{"items":7},"results":[]}';
         $logger = new NullLogger();
         $encoder = new JsonEncoder();
+        $httpClient = new PublicHttpClient(new MockHttpClient(static fn(): MockResponse => new MockResponse(self::$response === false ? '' : self::$response)), new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1']));
         $controller = new MetadataSearchController(
-            new MusicBrainzAdapter($logger, $encoder),
-            new DiscogsAdapter('local-test-token', $logger, $encoder),
-            new LastFmAdapter('local-test-token', $logger, $encoder),
+            new MusicBrainzAdapter($logger, $encoder, $httpClient),
+            new DiscogsAdapter('local-test-token', $logger, $encoder, $httpClient),
+            new LastFmAdapter('local-test-token', $logger, $encoder, $httpClient),
         );
 
         $response = $controller->{$action}(new Request(['q' => 'track', 'source' => $source]));
@@ -63,9 +59,10 @@ final class MetadataResponseTest extends TestCase
         self::$response = '{"id":"release-id","title":"Album"}';
         $logger = new NullLogger();
         $encoder = new JsonEncoder();
+        $httpClient = new PublicHttpClient(new MockHttpClient(static fn(): MockResponse => new MockResponse(self::$response === false ? '' : self::$response)), new PublicDestinationPolicy(static fn(string $host): array => ['1.1.1.1']));
         $controller = new MetadataBrowseController(
-            new MusicBrainzAdapter($logger, $encoder),
-            new LastFmAdapter('local-test-token', $logger, $encoder),
+            new MusicBrainzAdapter($logger, $encoder, $httpClient),
+            new LastFmAdapter('local-test-token', $logger, $encoder, $httpClient),
         );
 
         $response = $controller->releaseGroup('release-id');

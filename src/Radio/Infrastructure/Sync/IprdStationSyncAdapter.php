@@ -6,7 +6,7 @@ namespace App\Radio\Infrastructure\Sync;
 
 use App\Radio\Application\Port\StationSyncPortInterface;
 use RuntimeException;
-use Symfony\Contracts\HttpClient\HttpClientInterface;
+use App\Shared\Infrastructure\Http\PublicHttpClient;
 
 final class IprdStationSyncAdapter implements StationSyncPortInterface
 {
@@ -101,21 +101,24 @@ final class IprdStationSyncAdapter implements StationSyncPortInterface
     private ?array $cachedCatalog = null;
 
     public function __construct(
-        private readonly HttpClientInterface $httpClient,
+        private readonly PublicHttpClient $httpClient,
     ) {
     }
 
     public function fetchCountries(): array
     {
-        $response = $this->httpClient->request('GET', self::SUMMARY_URL);
+        $response = $this->httpClient->request('GET', self::SUMMARY_URL, ['iprd-org.github.io'], ['timeout' => 30]);
 
-        if ($response->getStatusCode() !== 200) {
-            throw new RuntimeException(
-                sprintf('Failed to fetch IPRD summary: HTTP %d', $response->getStatusCode()),
-            );
+        try {
+            if ($response->getStatusCode() !== 200) {
+                throw new RuntimeException(
+                    sprintf('Failed to fetch IPRD summary: HTTP %d', $response->getStatusCode()),
+                );
+            }
+            $data = $response->toArray();
+        } finally {
+            $response->cancel();
         }
-
-        $data = $response->toArray();
 
         // summary.json: { total_stations, total_countries, countries: [{code, count}, ...] }
         $rawCountries = $data['countries'] ?? [];
@@ -179,15 +182,18 @@ final class IprdStationSyncAdapter implements StationSyncPortInterface
             return $this->cachedCatalog;
         }
 
-        $response = $this->httpClient->request('GET', self::CATALOG_URL);
+        $response = $this->httpClient->request('GET', self::CATALOG_URL, ['iprd-org.github.io'], ['timeout' => 30]);
 
-        if ($response->getStatusCode() !== 200) {
-            throw new RuntimeException(
-                sprintf('Failed to fetch IPRD catalog: HTTP %d', $response->getStatusCode()),
-            );
+        try {
+            if ($response->getStatusCode() !== 200) {
+                throw new RuntimeException(
+                    sprintf('Failed to fetch IPRD catalog: HTTP %d', $response->getStatusCode()),
+                );
+            }
+            $this->cachedCatalog = $response->toArray();
+        } finally {
+            $response->cancel();
         }
-
-        $this->cachedCatalog = $response->toArray();
 
         return $this->cachedCatalog;
     }

@@ -57,6 +57,15 @@ services:
             - '../src/**/Entity/'
             - '../src/**/ValueObject/'
 
+    baander.provider_http_transport:
+        class: Symfony\Component\HttpClient\CurlHttpClient
+        autowire: false
+        autoconfigure: false
+
+    App\Shared\Infrastructure\Http\PublicHttpClient:
+        arguments:
+            $httpClient: '@baander.provider_http_transport'
+
     App\Notification\Infrastructure\Webhook\WebhookDestinationPolicy:
         arguments:
             $lanAllowlist: '%env(csv:WEBHOOK_LAN_ALLOWLIST)%'
@@ -752,7 +761,12 @@ services:
     App\Notification\Infrastructure\Push\PushSubscriptionRepositoryInterface:
         alias: App\Notification\Infrastructure\Push\PushSubscriptionRepository
 
+    App\Notification\Infrastructure\Push\PushTransport:
+        arguments:
+            $allowedPushDomains: '%notification.push.allowed_domains%'
+
     Minishlink\WebPush\WebPush:
+        factory: ['@App\Notification\Infrastructure\Push\WebPushFactory', 'create']
         arguments:
             $auth:
                 VAPID:

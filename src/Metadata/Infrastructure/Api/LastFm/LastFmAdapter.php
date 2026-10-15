@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Metadata\Infrastructure\Api\LastFm;
 
+use App\Shared\Infrastructure\Http\PublicHttpClient;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
@@ -15,6 +16,7 @@ final readonly class LastFmAdapter
         private readonly string $apiKey,
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
+        private readonly PublicHttpClient $httpClient,
     ) {
     }
 
@@ -129,44 +131,29 @@ final readonly class LastFmAdapter
     {
         $params['api_key'] = $this->apiKey;
         $params['format'] = 'json';
-
         $url = self::BASE_URL . '?' . http_build_query($params);
+        $this->logger->debug('LastFm API request', ['service' => 'lastfm']);
+        $response = null;
+        try {
+            $response = $this->httpClient->request('GET', $url, ['ws.audioscrobbler.com'], [
+                'headers' => ['User-Agent' => 'Baander/1.0'], 'timeout' => 5,
+            ]);
+            if ($response->getStatusCode() >= 300) {
+                $this->logger->error('LastFm API request failed', ['service' => 'lastfm']);
 
-        $this->logger->debug('LastFm API request', [
-            'service' => 'lastfm',
-            'endpoint' => $url,
-            'method' => $params['method'] ?? null,
-        ]);
-
-        // Add timeout to prevent blocking workers on slow API responses
-        $context = stream_context_create([
-            'http' => [
-                'timeout' => 5.0,
-                'user_agent' => 'Baander/1.0',
-            ],
-            'ssl' => [
-                'verify_peer' => true,
-                'verify_peer_name' => true,
-            ],
-        ]);
-
-        $response = @file_get_contents($url, false, $context);
-
-        if ($response === false) {
-            $this->logger->error('LastFm API request failed', ['service' => 'lastfm', 'endpoint' => $url]);
+                return [];
+            }
+            $body = $response->getContent(false);
+        } catch (\Throwable) {
+            $this->logger->error('LastFm API request failed', ['service' => 'lastfm']);
 
             return [];
+        } finally {
+            $response?->cancel();
         }
-
-        $data = $this->jsonEncoder->decode($response, 'json');
-
-        if (isset($data['error'])) {
-            $this->logger->error('LastFm API returned error', [
-                'service' => 'lastfm',
-                'code' => $data['error'],
-                'message' => $data['message'] ?? '',
-                'method' => $params['method'] ?? null,
-            ]);
+        $data = $this->jsonEncoder->decode($body, 'json');
+        if (!is_array($data) || isset($data['error'])) {
+            $this->logger->error('LastFm API returned error', ['service' => 'lastfm']);
 
             return [];
         }

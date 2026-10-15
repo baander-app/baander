@@ -9,6 +9,7 @@ use App\Metadata\Infrastructure\Api\Discogs\DTO\DiscogsMasterDto;
 use App\Metadata\Infrastructure\Api\Discogs\DTO\DiscogsReleaseDto;
 use App\Metadata\Infrastructure\Api\Discogs\DTO\DiscogsSearchResultDto;
 use App\Shared\Infrastructure\Swoole\Async;
+use App\Shared\Infrastructure\Http\PublicHttpClient;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
@@ -27,6 +28,7 @@ final class DiscogsAdapter
         private readonly string $token,
         private readonly LoggerInterface $logger,
         private readonly JsonEncoder $jsonEncoder,
+        private readonly PublicHttpClient $httpClient,
     ) {
     }
 
@@ -185,114 +187,51 @@ final class DiscogsAdapter
     {
         $queryString = http_build_query($params, '', '&');
         $url = self::BASE_URL . $endpoint . ($queryString !== '' ? "?{$queryString}" : '');
-
-        $this->logger->debug('Discogs API request', [
-            'service' => 'discogs',
-            'endpoint' => $endpoint,
-            'params' => $params,
-        ]);
-
-        $headers = implode("\r\n", [
-            "Authorization: Discogs token={$this->token}",
-            'User-Agent: ' . self::USER_AGENT,
-            'Accept: application/json',
-        ]);
-
-        $context = stream_context_create([
-            'http' => [
-                'method' => 'GET',
-                'header' => $headers,
-                'ignore_errors' => true,
-                'timeout' => 10.0,
-            ],
-        ]);
-
-        $retryCount = 0;
-        $maxRetries = 1;
-
-        while (true) {
-            $response = @file_get_contents($url, false, $context);
-
-            if ($response === false) {
-                $error = error_get_last();
-                $this->logger->warning('Discogs API request failed', [
-                    'service' => 'discogs',
-                    'endpoint' => $endpoint,
-                    'error' => $error['message'] ?? 'unknown',
+        $this->logger->debug('Discogs API request', ['service' => 'discogs', 'endpoint' => $endpoint]);
+        for ($attempt = 0; $attempt < 2; ++$attempt) {
+            $response = null;
+            try {
+                $response = $this->httpClient->request('GET', $url, ['api.discogs.com'], [
+                    'headers' => [
+                        'Authorization' => 'Discogs token=' . $this->token,
+                        'User-Agent' => self::USER_AGENT,
+                        'Accept' => 'application/json',
+                    ],
+                    'timeout' => 10,
                 ]);
+                $status = $response->getStatusCode();
+                $headers = $response->getHeaders(false);
+                $body = $response->getContent(false);
+            } catch (\Throwable) {
+                $this->logger->warning('Discogs API request failed', ['service' => 'discogs']);
 
                 return [];
+            } finally {
+                $response?->cancel();
             }
-
-            $responseHeaders = http_get_last_response_headers() ?? [];
-            $statusCode = $this->extractStatusCode($responseHeaders);
-
-            if ($statusCode === 429) {
-                $retryAfter = $this->extractHeader('Retry-After', $responseHeaders);
-
-                if ($retryAfter !== null && $retryCount < $maxRetries) {
-                    $wait = (int) $retryAfter;
-                    $this->logger->info('Discogs rate limit hit, retrying', [
-                        'service' => 'discogs',
-                        'endpoint' => $endpoint,
-                        'retry_after' => $wait,
-                    ]);
+            if ($status === 429) {
+                $retryAfter = $headers['retry-after'][0] ?? null;
+                if ($retryAfter !== null && $attempt === 0) {
+                    $wait = max(0, (int) $retryAfter);
+                    $this->logger->info('Discogs rate limit hit, retrying', ['service' => 'discogs', 'retry_after' => $wait]);
                     Async::sleep($wait);
-                    $retryCount++;
                     continue;
                 }
-
-                $this->logger->warning('Discogs API rate limit exceeded', [
-                    'service' => 'discogs',
-                    'endpoint' => $endpoint,
-                    'retry_after' => $retryAfter,
-                ]);
+                $this->logger->warning('Discogs API rate limit exceeded', ['service' => 'discogs']);
 
                 return [];
             }
-
-            if ($statusCode >= 400) {
-                $this->logger->warning('Discogs API error response', [
-                    'service' => 'discogs',
-                    'endpoint' => $endpoint,
-                    'status_code' => $statusCode,
-                ]);
+            if ($status >= 300) {
+                $this->logger->warning('Discogs API error response', ['service' => 'discogs', 'status_code' => $status]);
 
                 return [];
             }
+            $data = $this->jsonEncoder->decode($body, 'json');
 
-            $decoded = $this->jsonEncoder->decode($response, 'json');
-
-            return is_array($decoded) ? $decoded : [];
+            return is_array($data) ? $data : [];
         }
 
+        return [];
     }
 
-    /** @param list<string> $headers */
-    private function extractStatusCode(array $headers): int
-    {
-        $status = 0;
-        foreach ($headers as $header) {
-            if (preg_match('#^HTTP/\S+\s+(\d{3})#', $header, $matches)) {
-                $status = (int) $matches[1];
-            }
-        }
-
-        return $status;
-    }
-
-    /** @param list<string> $headers */
-    private function extractHeader(string $name, array $headers): ?string
-    {
-        $value = null;
-        foreach ($headers as $header) {
-            if (str_starts_with($header, 'HTTP/')) {
-                $value = null;
-            } elseif (strncasecmp($header, "{$name}:", strlen($name) + 1) === 0) {
-                $value = trim(substr($header, strlen($name) + 1));
-            }
-        }
-
-        return $value;
-    }
 }
