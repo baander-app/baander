@@ -23,12 +23,12 @@ batches describe their own checkpoints; the current gate below takes precedence.
 Any harness can take over from this section; nothing below depends on a tool that
 only one agent host has.
 
-- **Branch.** `plan/parallel-test-execution` contains the ParaTest coordinator,
-  disposable test Compose stacks and local verification commits. The
-  [qualification checkpoint](#parallel-backend-verification)
-  records the test identities, coverage comparison, timing limitation and final
-  checks. These changes have not been pushed. The application-security baseline on
-  `master` remains recorded in its delivery checkpoint below.
+- **Branch.** `master` includes the ParaTest coordinator and disposable test Compose
+  stacks through `9f6b1ac0`, merged by fast-forward from
+  `plan/parallel-test-execution` on 2026-10-15. The user authorized publishing
+  `master` to `origin` and `baander-github`. The
+  [qualification checkpoint](#parallel-backend-verification) records the test
+  identities, coverage comparison, timing limitation and final checks.
 - **Previous baseline.** Item 8 was merged and pushed. `master` (eced16d6) holds its fifteen
   commits and the roadmap commit on top of 63466d0d by fast-forward, code-reviewed
   with both findings applied and every gate green (the item 8 checkpoint below).
@@ -1734,7 +1734,8 @@ The checkpoints below record qualification, corrections and final verification.
   `/tmp/baander-paratest-static-tnmhl7dt`. Final resource checks found no retained
   test containers, networks or volumes. Documentation passed prose-preservation
   review; changed limits, report paths and checkpoint counts are intentional.
-- Delivered locally on `plan/parallel-test-execution`; nothing has been pushed.
-  Remote CI has not run. Its runner image must be rebuilt with the Docker Compose
-  plugin before using the new workflow. The recorded wall-clock discrepancy is
+- Merged into `master` by fast-forward on 2026-10-15; the verified implementation
+  tree is unchanged. The user authorized publishing to both remotes. Remote CI was
+  not part of local verification. Its runner image must be rebuilt with the Docker
+  Compose plugin before using the new workflow. The recorded wall-clock discrepancy is
   the remaining timing limitation; exact test and coverage qualification passed.
