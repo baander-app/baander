@@ -117,7 +117,7 @@ Connection management and configuration for all Redis-backed features: caching, 
 
 | Component | Purpose |
 |-----------|---------|
-| `WsQueryTokenAuthenticator` | Authenticates WebSocket connections via query string token |
+| `WsTicketAuthenticator` | Redeems single-use WebSocket tickets through the Auth application port |
 
 ## Logging
 
@@ -205,9 +205,9 @@ Removing a language reverses the steps. A stored choice of the removed language 
 | `ConfigCheckController` | `/api/debug/config-check` | Configuration validation |
 | `RateLimiterMonitorController` | `/api/monitor/rate-limiters` | Rate limiter status and statistics |
 | `SpaController` | `/` | Single-page application entry point (catch-all) |
-| `WebSocketController` | `/ws` | WebSocket connection endpoint |
+| `WebSocketController` | `/api/ws` | WebSocket connection endpoint |
 
-The health probes, `/metrics` and `/ws` sit outside the `/api` routes covered by the default OpenAPI export. `/metrics` serves Prometheus text rather than an API resource envelope.
+The health probes and `/metrics` sit outside the `/api` routes covered by the default OpenAPI export. `/metrics` serves Prometheus text rather than an API resource envelope. Swoole handles the `/api/ws` upgrade directly; the Auth API exposes ticket issuance at `/api/ws/tickets`.
 
 ## DTOs
 
@@ -225,7 +225,7 @@ Shared response types used across contexts:
 
 | Direction | Context | Details |
 |-----------|---------|---------|
-| Depends on | — | Nothing — Shared is the foundation |
+| Depends on | Auth application contract | The raw WebSocket adapter redeems tickets through a narrow port |
 | Depended on by | All 21 bounded contexts | Types, infrastructure, and shared controllers |
 
 ## See Also

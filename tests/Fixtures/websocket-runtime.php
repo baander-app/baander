@@ -149,15 +149,15 @@ wsCheck($issued->status() === 200, 'Fresh proof did not issue a ticket.');
 wsCheck(str_contains((string) $issued->header('Cache-Control'), 'no-store'), 'Ticket response is cacheable.');
 wsRemember(json_decode($issued->body, true, flags: JSON_THROW_ON_ERROR)['data']['ticket']);
 wsCheck(wsHttp('POST', '/api/ws/tickets', $headers)->status() === 403, 'Replayed proof issued a ticket.');
-wsCheck(wsStatus('token=' . rawurlencode($jwt)) !== 101, 'Stolen raw access token opened a socket.');
+wsCheck(wsStatus('token=' . rawurlencode($jwt)) === 400, 'Stolen raw access token opened a socket.');
 
 $value = $ticket();
 foreach ([null, 'null', 'https://other.baander.app'] as $origin) {
     wsCheck(wsStatus('ticket=' . $value, $origin) === 403, 'Invalid Origin was accepted.');
 }
-wsCheck(wsStatus('ticket=' . $value, WS_ORIGIN, '/api/party/ws/session') !== 101, 'Wrong upgrade route was accepted.');
+wsCheck(wsStatus('ticket=' . $value, WS_ORIGIN, '/api/party/ws/session') === 400, 'Wrong upgrade route was accepted.');
 foreach (['ticket=' . $value . '&ticket=' . $value, '%74icket=' . $value, 'ticket[]=' . $value, 'ticket=' . $value . '&token=' . $jwt] as $query) {
-    wsCheck(wsStatus($query) !== 101, 'Ambiguous credential query was accepted.');
+    wsCheck(wsStatus($query) === 400, 'Ambiguous credential query was accepted.');
 }
 wsCheck(wsStatus('ticket=' . $value) === 101, 'Rejected requests consumed the legitimate ticket.');
 wsCheck(wsStatus('ticket=' . $value) === 401, 'Consumed ticket was reused.');

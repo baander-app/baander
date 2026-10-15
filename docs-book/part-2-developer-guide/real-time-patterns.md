@@ -70,7 +70,9 @@ Rate limiting is enforced per connection: 30 messages per second. Exceeding this
 
 ### Identity
 
-A connection's user is fixed at its handshake, which authenticates the access token (see [Authentication](#authentication)). No message changes it. A client whose connection drops opens a new one with a current access token.
+A connection's user is fixed at its handshake, which redeems a ticket bound to the
+user's access token (see [Authentication](#authentication)). No message changes it.
+A client whose connection drops obtains a fresh ticket before reconnecting.
 
 ## Delivery without a stream
 
@@ -152,11 +154,33 @@ When the host seeks, the flow is:
 
 ## Authentication
 
-A WebSocket connection authenticates with an OAuth 2.0 access token in the `token` query parameter, because the browser WebSocket API cannot set an `Authorization` header on the handshake.
+The browser WebSocket API cannot set an Authorization or DPoP header on an
+upgrade. The client first calls `POST /api/ws/tickets` through its authenticated,
+DPoP-aware HTTP client. The response contains `data.ticket` and `data.expiresAt`
+and is marked `Cache-Control: no-store`. The ticket authorizes one connection for
+at most thirty seconds, bounded by the authorizing token's expiry.
 
-### WsQueryTokenAuthenticator
+The client opens `/api/ws?ticket=<ticket>` on the API origin. Every reconnect needs
+a fresh ticket. Logout, unmount and replacement cancel pending issuance so a late
+response cannot open a socket. The embedded player takes a host-provided
+`getWebSocketTicket` callback; its existing party message vocabulary still differs
+from this server protocol and remains unqualified.
 
-Invoked during Swoole's `onHandshake` callback -- this is not a Symfony firewall authenticator. It builds a minimal Symfony `Request` from the Swoole request, injects the token as a `Bearer` header, and validates through the League OAuth2 `ResourceServer`. Returns the authenticated user's UUID string, or `null` on failure (which rejects the handshake).
+### WsTicketAuthenticator
+
+Swoole's upgrade handler checks GET `/api/ws`, WebSocket framing, an exact allowed
+Origin and a single canonical ticket query before calling `WsTicketAuthenticator`.
+The adapter calls the Auth ticket-redemption port. Redis atomically checks the
+Origin/path binding and consumes the ticket; a fresh database query checks token
+ownership, DPoP binding, expiry, revocation and enabled-user state. Successful
+redemption returns the user UUID and access-token ID to the connection registry.
+
+The Origin allowlist defaults to the serialized origin of `APP_URL`; an explicit
+empty list denies all upgrades. Ticket issuance uses the same policy. Missing or
+foreign Origins, raw OAuth query tokens, duplicate parameters and reused tickets
+are rejected. Unavailable ticket storage or authorization state returns 503 with
+Retry-After. A stolen unused ticket can still race its intended client; tickets do
+not provide proof possession for later messages.
 
 ---
 

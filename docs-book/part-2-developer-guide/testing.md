@@ -925,6 +925,45 @@ accept `BAANDER_TEST_IMAGE` and `BAANDER_TEST_POSTGRES_IMAGE`; CI sets
 `BAANDER_TEST_CHECKOUT_IN_IMAGE=1` to test the checkout already built into its image.
 Outbox, producer and web runners also enforce their own 180-second timeout.
 
+### WebSocket handshake security
+
+The security runtime runner starts production `app:serve` with disposable
+PostgreSQL, Redis and OAuth keys on an internal network:
+
+```bash
+BAANDER_TEST_IMAGE=baander-ci-prewarm:local bash scripts/test-security-runtime-container.sh
+```
+
+Its 360-second deadline covers malformed HTTP probes and WebSocket ticket checks.
+The WebSocket fixture obtains tickets through the real OAuth/DPoP firewall, then
+uses only a ticket query and Origin for the upgrade, as a browser does. It checks
+proof replay, Origin/path/query rejection without consumption, single-use and
+concurrent redemption, expiry, disabled users, logout closure and rejection of a
+pending ticket after logout. Paused and stopped Redis cases must return bounded
+503 responses; fresh issuance and upgrades must work after recovery. The runner
+checks application logs for the actual ticket and access-token values it used.
+
+The shutdown fixture also obtains a ticket before opening its socket. Both
+fixtures use `https://baander.app` as their configured browser Origin even though
+they connect to the disposable server over loopback. Neither fixture bypasses the
+Origin check for local addresses.
+
+`app.websocket.allowed_origins` defaults to the origin of `APP_URL`. An explicit
+empty list denies every upgrade; additional entries must be serialized HTTP or
+HTTPS origins and must agree with the API's CORS policy. External TLS proxies must
+omit credential queries from access logs and avoid raw-request error logging.
+The bundled nginx configurations apply that policy to exact `/api/ws` requests;
+pre-location parser errors and an operator's upstream proxy remain separate limits.
+The proxy drill validates all three configurations against a refused upstream and
+checks query/referrer redaction without disabling ordinary-route diagnostics:
+
+```bash
+docker build -f docker/nginx/Dockerfile.test -t baander-websocket-proxy-test:local docker/nginx
+bash scripts/test-websocket-proxy-logs.sh
+```
+
+Forgejo runs both security drills as blocking steps.
+
 ### Safari Playback of an Encoding Rendition (Manual)
 
 The web drill records the server's answers to Safari's opening requests as a

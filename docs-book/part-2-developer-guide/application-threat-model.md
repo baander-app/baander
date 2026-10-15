@@ -57,8 +57,10 @@ HTTP fixture; they do not run the production PHP issuer.
 
 Swoole parses wire HTTP before Symfony sees a request. The Symfony firewall checks
 ordinary API credentials and application ports enforce resource authority. The
-WebSocket handshake uses a separate query-token authenticator; its proof-possession
-limit is recorded below. Workers process jobs using application and infrastructure
+WebSocket handshake accepts a single-use ticket issued by `POST /api/ws/tickets`
+through the OAuth and DPoP firewall. The raw upgrade callback validates its route,
+framing and exact Origin, then atomically consumes the ticket and checks fresh
+user/token state. Workers process jobs using application and infrastructure
 services, with database and media privileges independent of the originating HTTP
 connection. Tests of a controller alone cannot establish Swoole parsing or a live
 WebSocket lifecycle.
@@ -93,9 +95,9 @@ counts and failures are recorded separately in the roadmap.
 | Threat and prerequisite | Impact | Implemented control and supporting evidence | Coverage limit or unresolved finding |
 | --- | --- | --- | --- |
 | Credential leakage through response or error handling: attacker can submit credentials or inspect their own profile response | Token or password disclosure | `Integration/OAuthFirewallAcceptanceTest.php` checks profile and replay-refusal responses and application logs; the runtime drill rejects malformed login input without reflecting a credential canary | Intentional login, refresh, personal-client, registration and webhook-secret responses return credentials. No exhaustive taint analysis of all logs or exporters was performed. |
-| Query credential leakage: a WebSocket URL reaches application logging | A log reader can reuse a live query token | `Unit/Shared/Infrastructure/Logging/StreamSignatureRedactionProcessorTest.php` reproduces the prior disclosure and checks token/signature query redaction, including encoded parameter names | Reverse-proxy logs, browser history and third-party observability require separate configuration. Redaction does not remove query credentials from the protocol. |
+| Query credential leakage: a WebSocket URL reaches application logging | A log reader can race the client to redeem an unused ticket | `Unit/Shared/Infrastructure/Logging/StreamSignatureRedactionProcessorTest.php` reproduces the prior disclosure and checks ticket/token/signature query redaction, including encoded parameter names | Bundled proxy access logs for exact `/api/ws` requests omit queries and referrers. WebSocket proxy error logging is suppressed because nginx includes raw requests. Pre-location parser errors, external proxies, browser history and third-party observability remain separate limits. Tickets remain short-lived bearer capabilities. |
 | Foreign-origin credential forwarding or stale browser credentials after logout | External-origin disclosure or use of a superseded session | `ui/web/tests/e2e/browser-auth/worker-auth.spec.ts` covers foreign paths, blocked redirects, worker restart, account switch, cross-tab logout and pending logout | Browser fixture responses model the issuer. Application-origin script compromise remains authoritative; CSP/XSS resistance is not established by these tests. |
-| Access-token or DPoP replay: attacker steals a token or proof | Impersonation | `Integration/OAuthFirewallAcceptanceTest.php` checks missing/wrong/replayed proof, method binding and revocation through the production firewall; `Integration/OAuthGrantPathAcceptanceTest.php` covers grant flows | WebSocket query tokens have the separate gap below. Logout/revoke deliberately permit skipping only replay-store availability checks during a DPoP store outage. |
+| Access-token or DPoP replay: attacker steals a token or proof | Impersonation | `Integration/OAuthFirewallAcceptanceTest.php` checks missing/wrong/replayed proof, method binding and revocation through the production firewall; `Integration/OAuthGrantPathAcceptanceTest.php` covers grant flows | The WebSocket runtime drill verifies ticket issuance and redemption separately. Logout/revoke deliberately permit skipping only replay-store availability checks during a DPoP store outage. |
 | Cross-user or cross-library access: a member guesses another resource identifier or changes request method | Unauthorized read, mutation or queued work | `Integration/CatalogReadFirewallTest.php`, `CatalogMutationFirewallTest.php`, `PlaylistReadFirewallTest.php`, `PlaylistMutationFirewallTest.php`, `ArtistMutationFirewallTest.php` and the extended OAuth firewall suite exercise membership, collaborator removal, owner/admin distinctions and alternate methods | These are production-kernel requests, not network penetration tests. Pairing functional tests and anonymous/revoked route probes do not prove every authenticated pairing race. Pairing sessions have no user ownership field; knowledge of the pairing code is part of their authority. |
 | Malformed JSON/types or oversized wire request: anonymous client sends hostile input | Server errors, unintended writes or loss of availability | `scripts/test-security-runtime-container.sh` runs real `app:serve`; `tests/Fixtures/security-runtime.php` checks bounded rejection, fresh-connection liveness and unchanged user/token counts. Login validation prevents decoding/type errors from escaping as 500 | The drill covers selected malformed framing and declared oversize; it does not establish resistance to slow clients, every request-smuggling ambiguity or sustained resource exhaustion. |
 | Forged forwarding headers: direct client chooses apparent address, scheme or host | Rate-limit evasion and incorrect DPoP request identity | `Unit/Shared/Infrastructure/Http/ProxyTrustTest.php` exercises direct and explicit proxy trust; both configuration layers now default to no trust | Correct proxy header replacement and network isolation are deployment assumptions. The tests do not emulate every proxy vendor or multi-hop topology. |
@@ -118,13 +120,15 @@ counts and failures are recorded separately in the roadmap.
 
 ## Open findings and qualification work
 
-1. **WebSocket proof possession.** The query-token authenticator validates the OAuth
-   JWT and user but does not require a DPoP proof or validate `Origin`. A party with
-   a live token can authenticate the handshake without its bound key. The extended
-   OAuth firewall test demonstrates acceptance before revocation and refusal after
-   revocation using the real resource server. Moving browser handshakes to a
-   separately scoped, short-lived credential needs a protocol/client design; query
-   redaction alone does not close this finding.
+1. **WebSocket residual limits.** Ticket issuance requires a valid DPoP proof and
+   allowed Origin; a raw access token no longer authenticates an upgrade. Tickets
+   expire within thirty seconds and are single use. A stolen, unused ticket can
+   still race the intended client. Revocation racing connection registration keeps
+   the existing reconciliation bound. Chained sessions close through the immediate
+   logout path; tokens without a refresh chain rely on reconciliation. The embedded
+   player's party message vocabulary remains different from the server protocol;
+   migrating its authentication does not qualify party synchronization. External
+   proxy logging and deferred native clients remain unqualified.
 2. **Rate-limit storage failure and concurrency.** Symfony cache storage treats
    failed writes as successful limiter consumption; Redis cache reads can degrade
    to misses. The installed application has no lock component, so read-modify-write
@@ -143,9 +147,9 @@ counts and failures are recorded separately in the roadmap.
    needed, especially where Cover Art Archive relies on redirects as part of its
    service contract.
 4. **Unqualified boundaries.** Sustained denial of service, complete HTTP parser
-   differential testing, authenticated pairing races, live foreign-origin WebSocket
-   upgrades, all external TLS transports, registry quorum downgrade and actual
-   regional deployments remain unqualified. Existing scanner tests do not close
+   differential testing, authenticated pairing races, all external TLS transports and
+   actual regional deployments remain unqualified. The registry model records its
+   separate local quorum qualification. Existing scanner tests do not close
    any of these findings.
 
 ## Reproduce the checkpoint
@@ -153,7 +157,8 @@ counts and failures are recorded separately in the roadmap.
 Use the CI image and disposable runners from [Testing](testing.md). The security
 runtime runner creates an internal Docker network and disposable PostgreSQL and
 Redis, generates test-only OAuth keys and removes its containers on exit. It has a
-240-second outer deadline and three-second socket deadlines. It does not reset the
+360-second outer deadline. Malformed-input sockets have three-second deadlines;
+WebSocket and outage probes use bounded request budgets of up to ten seconds. It does not reset the
 development database. The Forgejo workflow runs it as a blocking step.
 
 ```bash
@@ -164,6 +169,16 @@ BAANDER_TEST_IMAGE=baander-ci-prewarm:local BAANDER_FUNCTIONAL_TIMEOUT_ACTIVE=1 
 BAANDER_TEST_IMAGE=baander-ci-prewarm:local BAANDER_FUNCTIONAL_TIMEOUT_ACTIVE=1 \
   bash scripts/test-functional-container.sh tests/Integration
 ```
+
+
+The same runner exercises browser-compatible ticket issuance, missing/wrong/replayed
+proofs, Origin and route rejection, ambiguous query parameters, single-use and
+concurrent redemption, ticket expiry, account disable, logout closure and pending
+ticket revocation. It pauses and stops its disposable Redis instance to verify
+bounded 503 responses, then checks fresh issuance and upgrades after recovery.
+The client keeps its DPoP key in the window; the service worker gains no new signing
+permissions. Every reconnect requests a fresh ticket, and cancelled issuance cannot
+open a late socket.
 
 The full checkpoint also includes PHPStan, Deptrac, container lint and OpenAPI drift.
 A passing checkpoint supports the named cases and controls, not an assertion that

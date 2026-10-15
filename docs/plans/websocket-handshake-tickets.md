@@ -1,6 +1,6 @@
 ---
 title: WebSocket handshake tickets
-status: reviewed
+status: completed
 date: 2026-10-15
 ---
 
@@ -114,3 +114,12 @@ recorded before the roadmap marks this finding addressed.
 Independent review approved implementation on 2026-10-15 after clarifying fresh
 database reads, token ownership, atomic binding checks and strict raw query parsing.
 Proxy error logs are part of the leakage check.
+
+## Completion checkpoint
+
+Implemented and independently reviewed on 2026-10-15. The roadmap records the
+four-suite traversal, corrected-file reruns, static gates, web and embedded tests,
+production security/shutdown drills and nginx log qualification. No remaining
+blocking finding was reported. The bearer-ticket race, reconciliation boundary,
+embedded party protocol and external deployment limits remain explicit. Delivery
+is committed locally; publishing requires a separate request.

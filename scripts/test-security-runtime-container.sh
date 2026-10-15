@@ -18,6 +18,8 @@ cleanup() {
     docker network rm "$run_id" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 docker network create --internal "$run_id" >/dev/null
 docker run -d --name "$run_id-redis" --network "$run_id" --network-alias redis \
     -e REDIS_ARGS='--requirepass test-only' redis/redis-stack-server:edge >/dev/null

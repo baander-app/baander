@@ -135,7 +135,7 @@ League\OAuth2\Server\Repositories\RefreshTokenRepositoryInterface:
     alias: App\Auth\Infrastructure\Adapter\OAuth\RefreshTokenRepository
 ```
 
-`ResourceServerFactory` builds the `ResourceServer` with `DpopAwareBearerTokenValidator`, which also checks the token's audience. `OAuth2Authenticator` (API requests) and `WsQueryTokenAuthenticator` (WebSocket query tokens) call it. The revocation endpoint uses the two aliased repositories. The domain layer only knows about `App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface` — never the League class.
+`ResourceServerFactory` builds the `ResourceServer` with `DpopAwareBearerTokenValidator`, which also checks the token's audience. `OAuth2Authenticator` calls it for API requests, including WebSocket ticket issuance. The raw upgrade uses `WsTicketAuthenticator` and the Auth ticket-redemption port; it never accepts an OAuth query token. The revocation endpoint uses the two aliased repositories. The domain layer only knows about `App\Auth\Domain\Repository\OAuth\AccessTokenRepositoryInterface` — never the League class.
 
 ## Communication Between Contexts
 

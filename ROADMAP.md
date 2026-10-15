@@ -23,17 +23,16 @@ batches describe their own checkpoints; the current gate below takes precedence.
 Any harness can take over from this section; nothing below depends on a tool that
 only one agent host has.
 
-- **Branch.** `plan/completed-plan-cleanup` follows the locally committed registry
-  security delivery (`1c615b28`). Completed plans have been removed; their delivery
-  checkpoints remain in this roadmap. Six plans for open or deferred work remain
-  under `docs/plans/`. Registry qualification and this cleanup remain local until
-  publishing is requested.
-- **Previous baseline.** Item 8 was merged and pushed. `master` (eced16d6) holds its fifteen
-  commits and the roadmap commit on top of 63466d0d by fast-forward, code-reviewed
-  with both findings applied and every gate green (the item 8 checkpoint below).
-  `origin/master` and `baander-github/master` are at the same commit, the working
-  tree is clean, and nothing is unmerged or unpushed. The local branch
-  `plan/item8-catalog-authorization` points at the same commit and can be deleted.
+- **Branch.** `plan/websocket-handshake-tickets` starts from published `master`
+  (`0aa3d488`). It replaces raw OAuth WebSocket query tokens with single-use tickets
+  issued through the DPoP-protected API. Implementation and independent review are
+  complete, and the qualification checkpoint below records the results and limits.
+  Commits remain local until publishing is requested.
+- **Published baseline.** Registry security qualification and repository cleanup
+  were merged into `master` and pushed to both remotes. Completed plans, obsolete
+  repository analysis tooling, the standalone `cli/` tree and root `bun.lock` were
+  removed. Six older plans for open or deferred work remain alongside the current
+  WebSocket plan. Book pages describe current behavior without plan references.
 
 - **History.** On 2026-10-14 the `Claude-Session:` trailer was removed from the 25
   local commits that carried it with a message filter; every tree is unchanged, so
@@ -81,11 +80,10 @@ only one agent host has.
   under concurrent writers has no version check; sharing has no invitation step, so
   an owner can add any user unasked; removing a song is not judged by the actor's
   visibility; the visible-song count materialises rows. None blocks the item.
-- **Next.** Address WebSocket proof possession and origin validation from the
+- **Next.** Address rate-limit storage failure and concurrency from the
   [application threat model](docs-book/part-2-developer-guide/application-threat-model.md#open-findings-and-qualification-work).
-  The combined application/registry model and focused regressions are qualified;
-  their remaining security findings are still open. React Native and Android
-  remain deferred. The local dev database note at the end of this section stands.
+  Metadata/radio/push egress remains open. React Native and Android remain deferred.
+  The local dev database note at the end of this section stands.
 
 The backend release-gate package is complete (see the next two sections). Eight
 plans followed it, in this order, and all eight are delivered:
@@ -452,7 +450,69 @@ pairing endpoint that does not exist and needs a decision when that work resumes
 
 ## Current quality-gate checkpoint
 
-Last recorded on 2026-10-12, at the end of the ROADMAP item 4 drain work and its code
+### WebSocket tickets (2026-10-15)
+
+The raw upgrade accepts a single-use ticket from the DPoP-protected
+`POST /api/ws/tickets` endpoint. It requires GET `/api/ws`, valid framing, one
+canonical ticket parameter and an exact configured Origin before consumption.
+Redis atomically verifies bindings and consumes the ticket; fresh PostgreSQL
+scalar reads check its token owner, expiry, revocation, DPoP binding and enabled
+user. Tickets expire within thirty seconds and never outlive their access token.
+The Shared adapter now uses an Auth application contract; its foreign repository
+dependency and baseline entry are removed.
+
+The web and embedded transports obtain fresh tickets for reconnects and cancel
+pending issuance on disconnect or replacement. Application logs redact tickets;
+exact `/api/ws` proxy access logs omit queries and referrers, and its raw-request
+error logging is suppressed. Ordinary proxy diagnostics remain enabled. OpenAPI
+and generated web bindings describe the new endpoint. The manual plan, independent
+review and simplification workflow completed without a remaining code blocker.
+
+Verification uses `baander-ci-prewarm:local` (PHP 8.5.2 ZTS, Swoole 6.2.0,
+PHPUnit 13.1.11, ParaTest 7.22.4) and disposable services:
+
+- The four-suite run selected and executed **9,195 tests in 873 files** without
+  coverage, in **747.0 seconds**. Ordinary: 5,725; native: 642; service lanes: 1,006
+  and 1,822. It found two route-inventory failures and one disabled-user fixture
+  Origin error. Both affected files were corrected and rerun in the same image:
+  **6 tests, 116 assertions**, all passing in **54.5 seconds**. The full run is
+  recorded as failed; final acceptance includes these reruns of the corrected files.
+- PHPStan, Deptrac, Composer platform checks, container lint and OpenAPI drift
+  checks pass. PHPStan's initial seven test-annotation errors were corrected and
+  the static gates rerun successfully. API generation and the subsequent web
+  typecheck pass.
+- Web: **2,051 tests in 185 files**, **35.34 seconds**. Embedded player:
+  **167 tests in 12 files**, **3.01 seconds**. Both typechecks pass; web lint has
+  zero errors and seven standing warnings outside the changes.
+- The tracked nginx fixture, built from the production `nginx:alpine` base,
+  runs nginx **1.31.7**. All three configurations pass syntax and log checks:
+  twelve upstream-failure probes, eight redirects and three positive logging
+  controls in **2 seconds**, including duplicate and encoded query forms.
+  The probe is a blocking Forgejo step alongside the security runtime drill.
+- The production shutdown drill passes in **123.44 seconds**, including worker
+  reload with an open ticket-authenticated socket, close code 1012 during drain,
+  held streams, stopped workers/manager, unreachable PostgreSQL and process cleanup.
+- The final security runtime drill passes in **64.80 seconds**: fifteen malformed
+  HTTP cases, real-firewall proof rejection and replay checks, strict upgrade
+  rejection, atomic one-use/concurrent redemption, expiry, disable and logout,
+  paused/stopped Redis failures and recovery, and credential scanning in logs.
+  The logout fixture now seeds a normal refresh chain; tokens without a chain
+  retain the limitation below.
+- Disposable test, security, shutdown and proxy containers were removed. Local
+  development PostgreSQL and Redis were not reset. Documentation links, YAML,
+  shell syntax and whitespace checks pass. Prose audits cover the new protocol,
+  updated handoff and checkpoint; historical acceptance records are preserved.
+
+Limits: an unused stolen ticket can race its owner; it does not sign WebSocket
+messages. Revocation concurrent with registration retains the reconciliation bound,
+and tokens without refresh chains rely on reconciliation rather than immediate
+logout closure. The embedded party message vocabulary remains unqualified.
+Pre-location proxy errors, external TLS proxies and regional deployments are not
+qualified by the local checks. Native application work remains deferred.
+
+Historical checkpoints follow; their counts and coverage describe their own trees.
+
+Recorded on 2026-10-12, at the end of the ROADMAP item 4 drain work and its code
 review fixes (branch `plan/item4-web-shutdown`), all in a CI image built from the branch
 unless noted:
 

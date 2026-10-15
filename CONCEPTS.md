@@ -38,6 +38,15 @@ The state in which the Redis store behind the DPoP nonce and replay checks canno
 
 A logout the browser has recorded but the server has not yet confirmed. The tab ends its session locally at once; the record keeps the DPoP key pair and the tokens of the ended session so the logout can be signed and sent again on the next start or when the browser is back online, until the server answers that the chain is revoked or gone.
 
+### WebSocket handshake ticket
+
+A single-use credential obtained through an authenticated, DPoP-protected API
+request. It authorizes one upgrade at `/api/ws`, bound to the requesting user,
+access token and browser Origin. It expires within thirty seconds, or when the
+access token expires if that is sooner. Redemption consumes it atomically and
+checks current token and user state. A ticket is a bearer capability during that
+short window; it does not sign later WebSocket messages.
+
 ### Socket reconciliation
 
 The periodic check inside the web server that closes every WebSocket connection whose token chain is dead: every access token of the chain is revoked or expired, or the chain is gone from the database. The chain is the unit, not the handshake token, because a rotation revokes the token a socket was opened with while the session goes on; rotation alone never closes a socket. The close on logout, revoke and reuse verdicts is the fast path; the reconciliation is the backstop that ends a socket within a minute whatever ended its chain, including a console process in another container or an expiry nobody refreshed.
