@@ -182,6 +182,11 @@ jobs:
                     BAANDER_TEST_CHECKOUT_IN_IMAGE=1 \
                       bash scripts/test-security-runtime-container.sh
 
+            -   name: WebSocket proxy credential logging
+                run: |
+                    docker build -f docker/nginx/Dockerfile.test -t "${CI_IMAGE}-proxy" docker/nginx
+                    BAANDER_TEST_PROXY_IMAGE="${CI_IMAGE}-proxy" bash scripts/test-websocket-proxy-logs.sh
+
             -   name: Web server drain on stop (PID 1)
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \

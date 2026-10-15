@@ -41,6 +41,7 @@ final readonly class StreamClient
             $user,
             scopes: ['library'],
             expiresAt: new \DateTimeImmutable('+1 hour'),
+            chainId: new Uuid(),
         );
         $token->setDpopJkt($this->proof->thumbprint());
         $manager->persist($client);
@@ -49,10 +50,37 @@ final readonly class StreamClient
         $this->jwt = OAuthAccessTokenJwt::sign($privateKey, $token);
     }
 
-    /** The signed access token, for a WebSocket handshake's token query parameter. */
+    /** The signed access token, also used by negative authentication probes. */
     public function accessToken(): string
     {
         return $this->jwt;
+    }
+
+    /** @return list<string> */
+    public function proofHeaders(string $method, string $endpoint): array
+    {
+        return [
+            'Authorization: DPoP ' . $this->jwt,
+            'DPoP: ' . $this->proof->create($method, $endpoint, $this->jwt),
+        ];
+    }
+
+    public function webSocketTicket(string $endpoint, string $origin): string
+    {
+        $response = (new HttpExchange($endpoint, [
+            ...$this->proofHeaders('POST', $endpoint),
+            'Origin: ' . $origin,
+            'Accept: application/json',
+        ], 'POST'))->complete(10);
+        if ($response->status() !== 200) {
+            throw new RuntimeException('WebSocket ticket issuance answered ' . $response->status());
+        }
+        $ticket = json_decode($response->body, true, flags: JSON_THROW_ON_ERROR)['data']['ticket'] ?? null;
+        if (!is_string($ticket) || preg_match('/\A[a-f0-9]{64}\z/D', $ticket) !== 1) {
+            throw new RuntimeException('WebSocket ticket issuance returned an invalid response.');
+        }
+
+        return $ticket;
     }
 
     /** @param list<string> $headers */

@@ -108,11 +108,12 @@ $client = new StreamClient(
 );
 
 if ($mode === 'ws') {
-    $token = $client->accessToken();
-    run(static function () use ($token): void {
+    $ticket = $client->webSocketTicket('http://127.0.0.1:9501/api/ws/tickets', 'https://baander.app');
+    run(static function () use ($ticket): void {
         $ws = new Client('127.0.0.1', 9501);
         $ws->set(['timeout' => 5, 'open_websocket_close_frame' => true, 'open_websocket_pong_frame' => true]);
-        if (!$ws->upgrade('/api/ws?token=' . rawurlencode($token))) {
+        $ws->setHeaders(['Origin' => 'https://baander.app']);
+        if (!$ws->upgrade('/api/ws?ticket=' . $ticket)) {
             record('ws_upgrade_failed', sprintf('status=%d errno=%d', $ws->statusCode, $ws->errCode));
 
             return;

@@ -2,7 +2,7 @@
 # Bounded malformed-input drill against the production Swoole HTTP stack.
 set -euo pipefail
 if [ "${BAANDER_SECURITY_RUNTIME_TIMEOUT_ACTIVE:-0}" != 1 ]; then
-    exec env BAANDER_SECURITY_RUNTIME_TIMEOUT_ACTIVE=1 timeout 240s bash "$0" "$@"
+    exec env BAANDER_SECURITY_RUNTIME_TIMEOUT_ACTIVE=1 timeout 360s bash "$0" "$@"
 fi
 cd "$(dirname "$0")/.."
 run_id="baander-security-$(date +%s)-$$"
@@ -78,6 +78,22 @@ for attempt in $(seq 1 60); do
 done
 app curl -fsS -o /dev/null http://127.0.0.1:9501/live
 app php tests/Fixtures/security-runtime.php
+app php tests/Fixtures/websocket-runtime.php normal
+app php tests/Fixtures/websocket-runtime.php prepare-outage
+docker pause "$run_id-redis" >/dev/null
+app php tests/Fixtures/websocket-runtime.php outage
+docker unpause "$run_id-redis" >/dev/null
+app php tests/Fixtures/websocket-runtime.php recovered
+app php tests/Fixtures/websocket-runtime.php prepare-outage
+docker stop -t 1 "$run_id-redis" >/dev/null
+app php tests/Fixtures/websocket-runtime.php outage
+docker start "$run_id-redis" >/dev/null
+for attempt in $(seq 1 20); do
+    if docker exec -e REDISCLI_AUTH=test-only "$run_id-redis" redis-cli ping 2>/dev/null | grep -qx PONG; then break; fi
+    sleep 1
+done
+app php tests/Fixtures/websocket-runtime.php recovered
+app php tests/Fixtures/websocket-runtime.php logs
 if app sh -c 'grep -R -F "security-runtime-secret-canary" var/log /tmp/security-runtime-serve.log'; then
     echo 'A malformed request credential reached runtime logs.' >&2
     exit 1
