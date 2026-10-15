@@ -355,6 +355,34 @@ Baander runs behind Nginx in Docker Compose. By default:
 
 Review your `docker-compose.yml` and ensure only the Nginx ports are published to the host.
 
+### Outbound provider requests
+
+Metadata lookups, Spotify token acquisition, IPRD catalog downloads and browser-push
+delivery use approved HTTPS providers on port 443. Each request validates the host
+and every DNS answer, rejects non-public destinations, and pins one approved
+address while preserving hostname verification. Proxies and automatic redirects
+are disabled, and each request uses a fresh connection. No LAN exception applies.
+
+Cover Art Archive is the only redirect exception: it may follow at most three GET
+redirects within `coverartarchive.org`, `archive.org` or their label-boundary
+subdomains. Every hop repeats the destination checks and drops credentials and
+cookies when crossing origins. Other metadata and IPRD redirects are refused.
+
+Push delivery revalidates endpoints already stored in subscriptions, not just new
+subscription input. A 3xx is a failed delivery, while 404/410 retain the existing
+expired-subscription cleanup. Minishlink still encrypts the payload and signs VAPID;
+the transport does not automatically replay push requests. Delivery logs omit
+provider API-key query strings, endpoint credentials and raw transport failures.
+
+HTTP request budgets are capped at thirty seconds, with a shared budget for a CAA
+redirect chain. Existing provider retries can extend the overall operation, and
+native DNS resolution follows the system resolver timeout outside the HTTP
+budget's enforcement. DNS lookup is synchronous and can block a worker; these
+controls do not promise a hard total lookup deadline.
+Webhooks, operator-configured lyrics, mail, tracing and browser playback have
+separate destination policies. The [application threat model](../part-2-developer-guide/application-threat-model.md#provider-transport-boundaries)
+records the scope and qualification limits.
+
 ### File permissions
 
 - OAuth keys (`config/secrets/oauth/`) should be readable only by the app process

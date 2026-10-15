@@ -311,6 +311,52 @@ exception is covered by
 `tests/Unit/Auth/Infrastructure/Security/ApiRateLimitAvailabilityTest.php`.
 Current qualification results are recorded in the roadmap.
 
+## Provider destination policy
+
+The provider tests use injected DNS answers and disposable TLS peers; they never
+contact metadata, radio-catalog or push providers. Run the focused selection in the
+CI image through the existing unit coordinator:
+
+```bash
+bash scripts/test-unit-container.sh \
+  tests/Unit/Shared/Infrastructure/Http/PublicDestinationPolicyTest.php \
+  tests/Unit/Shared/Infrastructure/Http/PublicHttpClientTest.php \
+  tests/Unit/Shared/Infrastructure/Http/PublicHttpTransportTest.php \
+  tests/Unit/Metadata/Infrastructure/Api \
+  tests/Unit/Radio/Infrastructure/Sync/IprdStationSyncAdapterTest.php \
+  tests/Unit/Notification/Infrastructure/Push
+```
+
+Policy cases cover HTTPS port 443, exact and suffix host boundaries, every DNS
+answer, mixed public/forbidden answers, mapped IPv4 and IPv6 translation/transition
+ranges. Transport cases check connection pinning, forced peer/name verification,
+proxy exclusion, fresh HTTP/1.1 connections, protected options and sanitized errors.
+CAA redirect cases cover approved and relative locations, credential removal on
+cross-origin hops, changed DNS, downgrade/private/unapproved targets and the
+three-redirect bound. Other provider requests refuse redirects.
+
+Metadata adapter cases retain response mapping and failure behavior for all seven
+providers and Spotify token acquisition; IPRD cases cover summary/catalog requests.
+Push cases run the installed Minishlink/Guzzle path over persisted endpoints,
+preserve encrypted bodies and VAPID signing, reject 3xx as failure, retain 404/410
+expiry handling and prevent the installed cURL rewind path from replaying a push.
+Logs must exclude API-key query strings and endpoint credentials.
+
+`PublicHttpTransportTest` and `PushTransportTlsTest` route approved test names to
+local TLS peers only in test transport wrappers, after inspecting production
+pinning options. They check trusted success, untrusted certificates, hostname
+mismatch and blocked redirect destinations. Production policy has no test-domain
+or private-address exception. The historical `MetadataStreamRedirectTest` still
+reproduces raw PHP stream behavior; adapter tests establish the new boundary.
+
+The HTTP budget is capped at thirty seconds, shared by approved CAA redirect hops.
+System DNS lookup is synchronous, including inside a coroutine, and uses its own
+resolver timeout. It can block the worker and outlast that budget before control
+returns; existing provider retries can also extend the overall operation.
+These local checks do not certify live DNS, providers, external trust stores or a
+hard total DNS-plus-HTTP deadline. Current qualification status and results are
+recorded in the roadmap.
+
 ## Running Tests
 
 Use an application image that satisfies the current Composer lockfile. To build

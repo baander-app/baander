@@ -77,6 +77,16 @@ after an absent read or per-subject reset. Snapshots are writable for at most tw
 seconds, so a paused writer cannot mistake an expired state for the absence it
 previously read.
 
+## Provider requests
+
+### Public destination policy
+
+The destination check shared by metadata, IPRD catalog and push transports. It
+permits approved HTTPS hostnames on port 443 only when every resolved address is
+public, then pins an approved address while preserving TLS hostname verification.
+It has no LAN exception. Webhooks and operator-configured lyrics retain separate
+policies.
+
 ## Backend verification
 
 ### Test lane

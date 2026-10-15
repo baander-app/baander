@@ -96,3 +96,11 @@ Reviewed before implementation on 2026-10-15. The review required explicit handl
 of Minishlink redirect success, Guzzle rewind retries, connection reuse and IPv6
 translation ranges. These requirements are included above. No remaining plan
 blocker was identified.
+
+## Delivery checkpoint
+
+Implemented and independently reviewed on 2026-10-15. Focused image checks pass
+161 tests; all four backend suites pass 9,391 tests in 885 files. Platform,
+PHPStan, Deptrac, container and OpenAPI gates pass, as do both production runtime
+drills. ROADMAP.md records assertions, timings, corrected verification issues and
+remaining resolver/provider limits. Commits are local; publishing is separate.

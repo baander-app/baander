@@ -103,6 +103,7 @@ counts and failures are recorded separately in the roadmap.
 | Forged forwarding headers: direct client chooses apparent address, scheme or host | Rate-limit evasion and incorrect DPoP request identity | `Unit/Shared/Infrastructure/Http/ProxyTrustTest.php` exercises direct and explicit proxy trust; both configuration layers now default to no trust | Correct proxy header replacement and network isolation are deployment assumptions. The tests do not emulate every proxy vendor or multi-hop topology. |
 | Rate-counter outage or concurrent updates | Brute-force limits can admit more requests than configured | Configured factories execute Symfony policies on operation-local snapshots and commit through Redis compare-and-set. Store errors and exhausted conflict retries stop protected work with a generic 503. Named clears advance the same namespace generation used by consumption. `Integration/RateLimiterConcurrencyTest.php` and `RateLimiterHttpAvailabilityTest.php` target these boundaries; `Functional/Auth/AuthEndpointRateLimitTest.php` and `ApiRateLimitTest.php` retain ordinary exhaustion coverage | Local storage, HTTP and runtime checks pass; distributed load and Redis failover remain unqualified. The generic API limiter preserves the narrow logout/revoke availability exception; it still enforces confirmed exhaustion and every other authentication/proof check. |
 | Outbound SSRF through webhook URL or changed DNS | Access to internal services | `WebhookDestinationPolicy` checks every DNS answer, denies forbidden ranges and restricts optional LAN allowance; delivery pins the checked address, bypasses ambient proxies and refuses redirects. `Unit/Notification/Infrastructure/Webhook/` tests cover forbidden addresses, changing DNS and dispatch options | DNS tests are controlled resolver fixtures. Local TLS tests qualify transport certificate behavior separately; they do not certify public DNS or deployment trust stores. |
+| Metadata, radio-catalog or push destination changes through DNS or redirects | Internal-service access or provider credential disclosure | `PublicDestinationPolicy` requires an approved HTTPS hostname on port 443 and rejects the request if any DNS answer is not public. `PublicHttpClient` and `PushTransport` pin an approved address, verify TLS and disable proxies, automatic redirects and reused connections. `Unit/Shared/Infrastructure/Http/PublicDestinationPolicyTest.php`, `PublicHttpClientTest.php` and `Unit/Notification/Infrastructure/Push/PushTransportTest.php` cover these controls | Local adapter, destination-policy and TLS regressions pass in the CI image. System DNS lookup has its own timeout outside the HTTP deadline. Approved providers and application-origin script compromise remain separate trust boundaries. |
 | Outbound TLS failure or HTTPS downgrade | Interception or connection to an unintended endpoint | `Unit/Lyrics/Infrastructure/Api/LrclibTransportSecurityTest.php` uses a disposable CA/server to check trusted success, untrusted certificate, hostname mismatch and redirect rejection. The lyrics client disables redirects | Other outbound transports have separate limits below. Operator-configured base URLs remain trusted configuration. |
 
 ## Outbound inventory
@@ -111,12 +112,43 @@ counts and failures are recorded separately in the roadmap.
 | --- | --- |
 | `Notification/Infrastructure/Webhook/WebhookDeliveryService` | Administrator-configured URL; destination policy validates and pins addresses at delivery. HTTP is permitted service behavior, so webhook confidentiality requires choosing HTTPS. |
 | `Lyrics/Infrastructure/Api/LrclibClient` | Operator-configured base URL, encoded search input; redirects disabled after the reproduced downgrade. No claim that arbitrary operator configuration is safe. |
-| `Metadata/Infrastructure/Api/` | MusicBrainz, Cover Art Archive, Discogs, Last.fm, Spotify, TasteDive and TMDB use fixed HTTPS service URLs and PHP streams. Redirect and DNS behavior is not covered by the webhook policy. |
-| `Notification/Application/Handler/SendPushHandler` | Sends persisted subscriptions through Minishlink WebPush. Subscription input restricts HTTPS hosts to configured providers; delivery has no address-pinning policy. |
+| `Metadata/Infrastructure/Api/` | MusicBrainz, Cover Art Archive, Discogs, Last.fm, Spotify, TasteDive and TMDB, including Spotify token acquisition, use approved hosts through `PublicHttpClient`. Each request checks every DNS answer and pins a public address with TLS verification and proxies disabled. Only Cover Art Archive may follow approved redirects, as described below. |
+| `Notification/Application/Handler/SendPushHandler` | Minishlink retains encryption and VAPID signing. `PushTransport` revalidates the actual outgoing endpoint against the approved push domains, including previously persisted subscriptions, then pins a public address with TLS verification and proxies disabled. Every 3xx is a failed delivery; 404/410 retain subscription-expiry handling. |
 | Symfony Mailer and OpenTelemetry exporters | Operator-selected transport endpoints; mail and tracing intentionally cross the application boundary. Their TLS settings and credential handling were not qualified by this drill. |
-| `Radio/Infrastructure/Sync/IprdStationSyncAdapter` | Fetches fixed `iprd-org.github.io` catalog URLs with default HTTP-client redirects and DNS behavior; this is separate from client playback. |
+| `Radio/Infrastructure/Sync/IprdStationSyncAdapter` | Fetches the fixed `iprd-org.github.io` summary and catalog URLs through `PublicHttpClient`, with approved-host/public-address checks, pinning and no redirects. Client playback remains a separate boundary. |
 | Radio stream and artwork URLs | The inspected paths store or return URLs to clients. They do not establish a PHP server-side fetch. Browser connections have a different trust boundary. |
 | PHP Discovery registration/pairing | Local persistence and credential return, with no registry-service call in these handlers. |
+
+### Provider transport boundaries
+
+The provider policy accepts HTTPS on port 443 with an approved ASCII hostname,
+without user information or a fragment. Exact host allowlists and explicitly
+approved domain suffixes use label boundaries. Every A/AAAA answer must be public;
+empty, mixed public/private, mapped-private, multicast and IPv6 translation or
+transition answers are rejected. No LAN exception applies. The transport pins one
+approved address while retaining the hostname for TLS peer/name verification and
+uses a fresh HTTP/1.1 connection with proxies disabled. Caller options cannot
+replace these controls.
+
+Metadata and IPRD requests reject redirects by default. Cover Art Archive alone may
+follow at most three manual GET redirects within `coverartarchive.org`,
+`archive.org` or their label-boundary subdomains. Each hop repeats validation and
+pinning and cancels the previous response. Cross-origin hops retain only `Accept`, `Accept-Language` and `User-Agent`
+headers; credentials, cookies and request bodies are not forwarded. The
+redirect chain shares one HTTP budget.
+
+Public HTTP requests have a time budget capped at thirty seconds; existing provider
+retry policies can make the overall operation longer. Native DNS resolution uses
+the system resolver timeout, which cannot be interrupted by that HTTP budget.
+An over-budget lookup is rejected when control returns; this is not a hard total
+operation deadline. Push transport has a thirty-second request timeout and a
+five-second connection timeout, with the same DNS limitation. Transport-level replay of
+push requests and Spotify token POSTs is disabled; this does not make application
+delivery exactly once.
+
+Provider API-key queries, push endpoint credentials and transport exception chains
+are excluded from delivery logs. This protects the changed paths; it is not an
+exhaustive taint analysis of logging or external observability.
 
 ## Open findings and qualification work
 
@@ -151,17 +183,20 @@ counts and failures are recorded separately in the roadmap.
    generation fields still fail closed after a named clear until expiry or targeted
    repair. A valid old-generation hash, including extra fields, is replaced on read.
    DPoP outage handling is a separate mechanism.
-3. **Metadata, radio-catalog and push egress.** Fixed metadata/catalog origins and approved push providers
-   reduce URL choice but do not pin validated addresses or constrain every redirect.
-   Provider compromise, a malicious redirect or a changed DNS answer could cross
-   the intended destination boundary. `Unit/Metadata/Infrastructure/Api/MetadataStreamRedirectTest.php` reproduces
-   PHP stream defaults following an HTTPS redirect to loopback HTTP. The CI
-   image (PHP 8.5.2) forwards the Authorization header; host PHP 8.5.11 strips it. This is transport evidence, not a demonstrated exploit through
-   an application adapter or live provider. Provider-specific policy remains
-   needed, especially where Cover Art Archive relies on redirects as part of its
-   service contract.
+3. **Provider destination residual limits.** Metadata, radio-catalog and persisted
+   push endpoints now use the public destination controls above. Their adapter,
+   pinning, redirect and local TLS checks pass in the CI image; no live-provider or
+   deployment trust-store assessment is claimed. The historical
+   `Unit/Metadata/Infrastructure/Api/MetadataStreamRedirectTest.php` retains the raw
+   PHP stream reproduction: an HTTPS request follows a redirect to loopback HTTP;
+   CI PHP 8.5.2 also forwards Authorization while host PHP 8.5.11 strips it. That
+   fixture records the former transport's behavior, not a bypass of the new
+   adapters. Synchronous DNS can block a coroutine worker and outlast the HTTP budget;
+   bounded coroutine DNS needs separate qualification. Overall provider retries
+   and approved-provider compromise also remain limits. Webhooks, operator-configured lyrics, mail, tracing
+   and browser playback retain their separate policies.
 4. **Unqualified boundaries.** Sustained denial of service, complete HTTP parser
-   differential testing, authenticated pairing races, all external TLS transports and
+   differential testing, authenticated pairing races, live external TLS providers and
    actual regional deployments remain unqualified. The registry model records its
    separate local quorum qualification. Existing scanner tests do not close
    any of these findings.

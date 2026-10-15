@@ -23,17 +23,17 @@ batches describe their own checkpoints; the current gate below takes precedence.
 Any harness can take over from this section; nothing below depends on a tool that
 only one agent host has.
 
-- **Branch.** `plan/atomic-rate-limits` starts from published `master`
-  (`7b8df418`). It replaces cache-backed, unlocked rate limiting with conditional
-  Redis commits, strict storage failures and generation-based clears. The plan
-  passed independent review; implementation, simplification and qualification are
-  complete. The checkpoint below records the results and limits. Commits remain
-  local until publishing is requested.
-- **Published baseline.** WebSocket handshake tickets, registry security
-  qualification and repository cleanup were merged into `master` and pushed to
-  both remotes. Completed older plans, obsolete repository analysis tooling, the
-  standalone `cli/` tree and root `bun.lock` were removed. Six older plans for open
-  or deferred work remain alongside the WebSocket and atomic rate-limit plans.
+- **Branch.** `plan/provider-destination-policy` starts from published `master`
+  (`331b6ea1`). It secures metadata, IPRD catalog and persisted push destinations
+  with public-address validation, pinned TLS connections and explicit redirect
+  policy. Independent review, simplification and local qualification are complete;
+  the checkpoint below records their results and limits. Commits remain local
+  until publishing is requested.
+- **Published baseline.** Atomic rate limits, WebSocket handshake tickets,
+  registry security qualification and repository cleanup were merged into `master`
+  and pushed to both remotes. Completed older plans, obsolete repository analysis
+  tooling, the standalone `cli/` tree and root `bun.lock` were removed. Six older
+  plans for open or deferred work remain alongside the three recent security plans.
   Book pages describe current behavior without plan references.
 
 - **History.** On 2026-10-14 the `Claude-Session:` trailer was removed from the 25
@@ -82,11 +82,11 @@ only one agent host has.
   under concurrent writers has no version check; sharing has no invitation step, so
   an owner can add any user unasked; removing a song is not judged by the actor's
   visibility; the visible-song count materialises rows. None blocks the item.
-- **Next.** Address metadata, radio-catalog and push outbound destination policy
-  from the [application threat model](docs-book/part-2-developer-guide/application-threat-model.md#open-findings-and-qualification-work).
-  Rate-limit storage failure and concurrency are delivered at the checkpoint below.
-  React Native and Android remain deferred.
-  The local dev database note at the end of this section stands.
+- **Next.** Close the playlist concurrent-write findings listed above: duplicate
+  collaborator creation and reorder conflicts. Provider live qualification and
+  bounded coroutine DNS resolution remain separate acceptance work. React Native
+  and Android remain deferred. The local dev database note below stands.
+
 
 The backend release-gate package is complete (see the next two sections). Eight
 plans followed it, in this order, and all eight are delivered:
@@ -452,6 +452,71 @@ tests. React Native and Android remain deferred; Android's device login posts to
 pairing endpoint that does not exist and needs a decision when that work resumes.
 
 ## Current quality-gate checkpoint
+
+### Provider destination policy (2026-10-15)
+
+Seven metadata adapters, Spotify token acquisition, IPRD catalog requests and
+persisted web-push subscriptions now validate their approved HTTPS destinations
+before connecting. The shared policy requires port 443 and checks every returned
+A/AAAA address. Empty, mixed public/private, reserved, multicast and IPv6
+translation/transition answers fail closed. Connections pin one approved address
+while retaining hostname and certificate verification; ambient proxies and
+connection reuse are disabled.
+
+Ordinary provider redirects are rejected. Cover Art Archive alone may follow up
+to three GET redirects within its approved CAA/Internet Archive domains, validating
+and pinning each hop and removing credentials on cross-origin transitions. Push
+uses an explicit cURL handler, rejects 3xx reports and disables the installed
+Guzzle rewind-retry path; 404/410 subscription expiry remains intact. Provider
+payload mappings and existing 429 retries remain, with TMDB now checking the
+second response's status after a retry. Logs omit API-key queries, push capability
+URLs and raw provider/transport failure details.
+
+Verification uses `baander-ci-prewarm:local` (PHP 8.5.2 ZTS, Swoole 6.2.0,
+PHPUnit 13.1.11, ParaTest 7.22.4):
+
+- Focused checks pass: **161 tests in 11 files / 676 assertions**, **59.0 seconds**
+  including setup and cleanup. The ordinary lane ran 149 / 503; the Messenger
+  integration lane ran 12 / 173. Random seed: `660332318`.
+- The focused selection covers every provider adapter, DNS/host restrictions,
+  same-origin DNS changes, protected transport options, redirect bounds and
+  cleanup, Spotify token POSTs, credential-free logs, and persisted push endpoints.
+  Actual Symfony and Guzzle cURL requests use disposable TLS peers for trusted
+  success, untrusted certificates, hostname mismatch and redirect refusal.
+  Test wrappers inspect production pinning before routing to loopback; production
+  policy has no private-address exception. No live providers were contacted.
+- Composer platform checks, PHPStan, Deptrac, container lint and OpenAPI drift
+  checks pass. Independent plan/code review and simplification are complete.
+- All four backend suites pass: **9,391 tests in 885 files / 75,870 assertions**,
+  without coverage, in **779.4 seconds**. Ordinary: 5,899 / 22,641 assertions;
+  native: 642 / 7,952; service lanes: 1,018 / 17,461 and 1,832 / 27,816. Report
+  completeness checks and disposable-stack cleanup pass. Random seed: `1269042221`.
+- The production security drill passes in **65.26 seconds**, including fifteen
+  malformed-request cases, WebSocket proof/ticket/replay checks, Redis outage
+  recovery and credential-log scanning. The web-runtime drill passes in
+  **57.68 seconds**, including localized mail, progressive/ranged playback,
+  PostgreSQL outage/worker reload, and Redis outage/logout/recovery.
+- Disposable containers, networks and volumes were removed; development
+  PostgreSQL and Redis were not reset. Documentation links, prose audits and
+  whitespace checks pass. No frontend behavior changed; web tests were not rerun.
+
+The initial focused image run failed strict notice handling on Minishlink's known
+optional GMP/BCMath notice. The test helper now verifies that exact notice, source
+and expected count during construction, forwards all other errors, and restores
+PHPUnit's handler immediately. No production suppression or test-wide relaxation
+was added. Four PHPDoc annotations were corrected after the initial PHPStan run.
+Earlier host assertions were corrected to observe Symfony's wrapped responses and
+normalized headers rather than the unwrapped fixtures.
+
+Limits: native DNS lookup is synchronous and can block a coroutine worker beyond
+the HTTP deadline. The installed Swoole resolver [rejects AF_UNSPEC](https://github.com/swoole/swoole-src/blob/v6.2.0/ext-src/swoole_coroutine_system.cc#L154-L190)
+and [caps returned addresses](https://github.com/swoole/swoole-src/blob/v6.2.0/src/network/dns.cc#L778-L817),
+so replacing the combined A/AAAA lookup requires separate qualification.
+HTTP budgets are capped at thirty seconds; existing provider and Messenger retries
+can extend overall work and do not promise exactly-once push delivery. These local
+checks do not qualify live provider availability, deployment trust stores or
+regional operation. Webhook, operator-configured lyrics, mail, tracing and browser
+playback remain separate policies. No application API, schema or dependency changed.
 
 ### Atomic rate limits (2026-10-15)
 
@@ -1616,10 +1681,11 @@ upgrades, authenticated pairing races, exhaustive parser/DoS testing and all
 external transports remain unqualified. Regional qualification and mobile work
 retain their earlier pending/deferred status.
 
-The WebSocket and rate-limit findings above describe this historical checkpoint.
-They are superseded by [WebSocket tickets](#websocket-tickets-2026-10-15) and
-[atomic rate limits](#atomic-rate-limits-2026-10-15); outbound destination policy
-remains open.
+The WebSocket, rate-limit and provider destination findings above describe this
+historical checkpoint. They are superseded by [provider destination policy](#provider-destination-policy-2026-10-15),
+[WebSocket tickets](#websocket-tickets-2026-10-15) and
+[atomic rate limits](#atomic-rate-limits-2026-10-15). Their recorded qualification
+limits remain visible in the current checkpoints.
 
 Verification checkpoint: authoritative gates passed against
 `baander-ci-prewarm:local` (CI target, PHP 8.5.2 ZTS, Swoole 6.2.0,
