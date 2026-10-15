@@ -84,6 +84,7 @@ final class BackendTestRunner
         $configuration = 'phpunit.xml.dist';
         $arguments = [];
         $reports = [];
+        $noCoverage = false;
         $valueOptions = ['--filter', '--group', '--exclude-group', '--random-order-seed', '--order-by', '--coverage-filter'];
         $selectionOptions = ['--testsuite', '--exclude-testsuite'];
         $flags = ['--no-progress', '--display-all-issues', '--no-coverage', '--do-not-cache-result'];
@@ -107,7 +108,9 @@ final class BackendTestRunner
                     }
                 }
             } elseif (in_array($argument, $flags, true) || preg_match('/^--(?:do-not-)?fail-on-(?:warning|risky|deprecation|phpunit-deprecation|phpunit-notice|phpunit-warning|notice|skipped|incomplete|all-issues|empty-test-suite)$/', $argument)) {
-                if ($argument !== '--no-coverage') {
+                if ($argument === '--no-coverage') {
+                    $noCoverage = true;
+                } else {
                     $arguments[] = $argument;
                     $discoveryArguments[] = $argument;
                 }
@@ -116,6 +119,9 @@ final class BackendTestRunner
             } else {
                 throw new RuntimeException('Unsupported runner argument: ' . $argument);
             }
+        }
+        if ($noCoverage && $reports !== []) {
+            throw new RuntimeException('Cannot combine --no-coverage with coverage report options.');
         }
         $configuration = realpath($configuration) ?: throw new RuntimeException('Configuration does not exist.');
         $original = self::xml($configuration);
@@ -328,7 +334,9 @@ final class BackendTestRunner
                 } else {
                     $report->renderClover($temporary);
                 }
-                rename($temporary, $target);
+                if (!@rename($temporary, $target)) {
+                    throw new RuntimeException('Could not publish coverage report: ' . $target);
+                }
             }
         }
         self::writeJson($directory . '/finalize.json', ['status' => 0, 'count' => count($observed), 'files' => count($discovery['files']), 'runId' => $discovery['runId']]);

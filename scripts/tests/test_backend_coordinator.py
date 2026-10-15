@@ -350,7 +350,7 @@ class FinalStatusTest(unittest.TestCase):
 
         runtime.docker.side_effect = copy
         with tempfile.TemporaryDirectory() as directory, \
-                patch.dict(coordinator.os.environ, {"BAANDER_TEST_ARTIFACTS": directory, "BAANDER_TEST_PROCESSES": "2", "BAANDER_TEST_TIMEOUT": "3600", "BAANDER_TEST_REFERENCE": "0"}), \
+                patch.dict(coordinator.os.environ, {"BAANDER_TEST_ARTIFACTS": directory, "BAANDER_TEST_PROCESSES": "2", "BAANDER_TEST_TIMEOUT": "3600"}), \
                 patch.object(coordinator, "Runtime", return_value=runtime) as constructor, \
                 patch.object(coordinator.signal, "signal"), \
                 patch.object(coordinator.sys, "stdout", io.StringIO()):

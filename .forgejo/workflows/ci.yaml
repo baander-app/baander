@@ -13,10 +13,6 @@ env:
     POSTGRES_IMAGE: ${{ vars.REGISTRY_OWNER }}/baander-postgres
     COVERAGE_PACKAGE: coverage-backend
     BUILDKIT_CACHE_PACKAGE: buildkit-cache-backend
-    CI_NETWORK: baander-ci-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}
-    CI_DATABASE: baander-db-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}
-    CI_REDIS: baander-redis-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}
-    CI_TEST_CONTAINER: baander-tests-${{ forgejo.run_id }}-${{ forgejo.run_attempt }}
     CI_IMAGE: baander-ci:${{ forgejo.run_id }}-${{ forgejo.run_attempt }}
 
 jobs:
@@ -38,33 +34,6 @@ jobs:
 
             -   name: Pull PostgreSQL image
                 run: docker pull ${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE }}:latest
-
-            -   name: Create CI network
-                run: docker network create "$CI_NETWORK"
-
-            -   name: Start PostgreSQL
-                run: |
-                    docker run -d --name "$CI_DATABASE" --network "$CI_NETWORK" --network-alias database \
-                      -e POSTGRES_USER=baander \
-                      -e POSTGRES_PASSWORD=baander \
-                      -e POSTGRES_DB=baander \
-                      ${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE }}:latest
-
-            -   name: Start Redis
-                run: docker run -d --name "$CI_REDIS" --network "$CI_NETWORK" --network-alias redis -e REDIS_ARGS="--requirepass baander" redis/redis-stack-server:edge
-
-            -   name: Wait for services
-                run: |
-                    for i in $(seq 1 30); do
-                      docker exec "$CI_DATABASE" pg_isready -U baander && break
-                      sleep 1
-                    done
-                    docker exec "$CI_DATABASE" pg_isready -U baander || { echo "PostgreSQL readiness timed out" >&2; exit 1; }
-                    for i in $(seq 1 30); do
-                      docker exec -e REDISCLI_AUTH=baander "$CI_REDIS" redis-cli ping | grep -q PONG && break
-                      sleep 1
-                    done
-                    docker exec -e REDISCLI_AUTH=baander "$CI_REDIS" redis-cli ping | grep -qx PONG || { echo "Redis readiness timed out" >&2; exit 1; }
 
             -   name: Restore BuildKit cache
                 env:
@@ -108,7 +77,7 @@ jobs:
             -   name: Production worker lifecycle and dependencies
                 run: |
                     BAANDER_TEST_IMAGE="${CI_IMAGE}-worker" \
-                    BAANDER_TEST_POSTGRES_IMAGE="${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE }}:latest" \
+                    BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
                       bash scripts/test-worker-production-container.sh
 
             -   name: Composer platform requirements
@@ -129,33 +98,25 @@ jobs:
                 run: |
                     docker run --rm "$CI_IMAGE" vendor/bin/deptrac analyse --no-cache --no-progress
 
-            -   name: Doctrine migrations (test DB)
+            -   name: Docker Compose availability
+                run: docker compose version
+
+            -   name: Backend runner regressions
+                run: python3 -m unittest discover -s scripts/tests
+
+            -   name: Backend stack isolation
                 run: |
-                    docker exec "$CI_DATABASE" createdb -U baander baander_test
-                    docker run --rm --network "$CI_NETWORK" \
-                      -e DATABASE_URL="postgresql://baander:baander@database:5432/baander_test?serverVersion=18&charset=utf8" \
-                      "$CI_IMAGE" \
-                      php bin/console doctrine:migrations:migrate --no-interaction --env=test
+                    BAANDER_TEST_IMAGE="$CI_IMAGE" \
+                    BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
+                      python3 scripts/test-backend-stack-isolation.py --artifacts var/test-isolation
 
             -   name: PHPUnit with coverage
                 run: |
-                    mkdir -p coverage
-                    test_status=0
-                    # The application Swoole build uses io_uring for coroutine filesystem operations.
-                    docker run --name "$CI_TEST_CONTAINER" --privileged --network "$CI_NETWORK" \
-                      -e XDEBUG_MODE=coverage \
-                      -e DATABASE_URL="postgresql://baander:baander@database:5432/baander_test?serverVersion=18&charset=utf8" \
-                      -e MESSENGER_TEST_REDIS_DSN="redis://default:baander@redis:6379" \
-                      -e OUTBOX_TEST_DATABASE_URL="postgresql://baander:baander@database:5432/baander_test?serverVersion=18&charset=utf8" \
-                      -e REDIS_URL="redis://default:baander@redis:6379" \
-                      "$CI_IMAGE" \
-                      php -d memory_limit=512M scripts/run-phpunit-shards.php \
-                      -c phpunit.xml.dist --no-progress --fail-on-phpunit-notice \
-                      --coverage-text=coverage/report.txt --coverage-clover=coverage/clover.xml \
-                      || test_status=$?
-                    # Docker may run in a separate VM, so copy artifacts instead of mounting a host path.
-                    docker cp "$CI_TEST_CONTAINER:/var/www/html/coverage/." coverage/ || exit 1
-                    exit "$test_status"
+                    BAANDER_TEST_IMAGE="$CI_IMAGE" \
+                    BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
+                    BAANDER_TEST_CHECKOUT_IN_IMAGE=1 \
+                      bash scripts/test-backend-container.sh \
+                      --coverage-text=coverage/report.txt --coverage-clover=coverage/clover.xml
 
             -   name: Container startup contract
                 run: bash scripts/test-container-startup.sh
@@ -163,21 +124,21 @@ jobs:
             -   name: Legacy transport redelivery recovery
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
-                    BAANDER_TEST_POSTGRES_IMAGE="${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE }}:latest" \
+                    BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
                     BAANDER_TEST_CHECKOUT_IN_IMAGE=1 \
                       timeout 300 bash scripts/test-worker-runtime-container.sh
 
             -   name: Worker command lifecycle and delivery
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
-                    BAANDER_TEST_POSTGRES_IMAGE="${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE }}:latest" \
+                    BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
                     BAANDER_TEST_CHECKOUT_IN_IMAGE=1 \
                       bash scripts/test-worker-command-container.sh
 
             -   name: Worker deployment operator lifecycle
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
-                    BAANDER_TEST_POSTGRES_IMAGE="${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE }}:latest" \
+                    BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
                     BAANDER_TEST_CHECKOUT_IN_IMAGE=1 \
                     BAANDER_TEST_OPERATOR_IN_CONTAINER=1 \
                       bash scripts/test-worker-operator-container.sh
@@ -185,48 +146,52 @@ jobs:
             -   name: Outbox notification replay
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
-                    BAANDER_TEST_POSTGRES_IMAGE="${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE }}:latest" \
+                    BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
                     BAANDER_TEST_CHECKOUT_IN_IMAGE=1 \
                       timeout 180 bash scripts/test-outbox-runtime-container.sh
 
             -   name: Producer transaction rollback and recovery
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
-                    BAANDER_TEST_POSTGRES_IMAGE="${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE }}:latest" \
+                    BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
                     BAANDER_TEST_CHECKOUT_IN_IMAGE=1 \
                       timeout 180 bash scripts/test-producer-runtime-container.sh
 
             -   name: Web server mail language, audio streaming and health alerts
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
-                    BAANDER_TEST_POSTGRES_IMAGE="${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE }}:latest" \
+                    BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
                     BAANDER_TEST_CHECKOUT_IN_IMAGE=1 \
                       timeout 180 bash scripts/test-web-runtime-container.sh
 
             -   name: Application security runtime boundaries
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
-                    BAANDER_TEST_POSTGRES_IMAGE="${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE }}:latest" \
+                    BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
                     BAANDER_TEST_CHECKOUT_IN_IMAGE=1 \
                       bash scripts/test-security-runtime-container.sh
 
             -   name: Web server drain on stop (PID 1)
                 run: |
                     BAANDER_TEST_IMAGE="$CI_IMAGE" \
-                    BAANDER_TEST_POSTGRES_IMAGE="${{ env.REGISTRY }}/${{ env.POSTGRES_IMAGE }}:latest" \
+                    BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
                     BAANDER_TEST_CHECKOUT_IN_IMAGE=1 \
                       timeout 900 bash scripts/test-web-shutdown-container.sh
 
             -   name: Extract coverage metrics
-                continue-on-error: true
-                run: |
-                    LINE_PCT=$(grep -oP '^\s*Lines:\s+\K[0-9.]+' coverage/report.txt || echo '0.00')
-                    METHOD_PCT=$(grep -oP '^\s*Methods:\s+\K[0-9.]+' coverage/report.txt || echo '0.00')
-                    CLASS_PCT=$(grep -oP '^\s*Classes:\s+\K[0-9.]+' coverage/report.txt || echo '0.00')
-                    printf '{"lines":%s,"methods":%s,"classes":%s}' "$LINE_PCT" "$METHOD_PCT" "$CLASS_PCT" > coverage/metrics.json
-                    echo "Lines:   ${LINE_PCT}%"
-                    echo "Methods: ${METHOD_PCT}%"
-                    echo "Classes: ${CLASS_PCT}%"
+                run: python3 scripts/validate-backend-coverage.py coverage
+
+            -   name: Preserve backend verification artifacts
+                if: always()
+                uses: https://github.com/actions/upload-artifact@ff15f0306b3f739f7b6fd43fb5d26cd321bd4de5
+                with:
+                    name: backend-verification
+                    path: |
+                        var/test-runs/
+                        var/test-isolation/
+                        coverage/
+                    if-no-files-found: ignore
+                    retention-days: 14
 
             -   name: Store baseline (master only)
                 if: forgejo.ref == 'refs/heads/master'
@@ -319,11 +284,9 @@ jobs:
                       -d "{\"body\": $ESCAPED}")
                     echo "Posted backend coverage comment (HTTP $HTTP)"
 
-            -   name: Cleanup services
+            -   name: Cleanup images
                 if: always()
                 run: |
-                    docker rm -f "$CI_TEST_CONTAINER" "$CI_DATABASE" "$CI_REDIS" 2>/dev/null || true
-                    docker network rm "$CI_NETWORK" 2>/dev/null || true
                     docker image rm "$CI_IMAGE" "${CI_IMAGE}-worker" 2>/dev/null || true
 
     frontend-quality:

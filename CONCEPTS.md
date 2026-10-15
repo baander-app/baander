@@ -51,3 +51,14 @@ A video manifest or segment URL that carries an HMAC signature and an expiry ins
 ### Playlist collaborator
 
 A user the playlist's owner has named on a playlist. While the playlist is collaborative, a collaborator may view it and add, remove and reorder its songs, adding only songs their own library membership lets them see; when the owner turns collaboration off, collaborators keep viewing and lose editing. The owner alone changes the playlist's metadata, deletes it and names collaborators; a collaborator may leave; an administrator who is not the owner may view it and nothing more.
+
+## Backend verification
+
+### Test lane
+
+A disjoint set of selected test files that the backend coordinator runs in one
+container with its own result artifacts. Ordinary tests share a ParaTest worker
+pool; native tests run one fresh process per file without networking. Each
+functional/integration lane owns a disposable Compose project with separate
+PostgreSQL, Redis and application containers. Together, the lane manifests must
+contain every discovered test file exactly once.

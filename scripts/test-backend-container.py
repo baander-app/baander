@@ -214,12 +214,7 @@ class Runtime:
                     php -d memory_limit=512M bin/console doctrine:migrations:migrate --no-interaction --env=test
                     php -d memory_limit=512M bin/console doctrine:migrations:migrate --no-interaction --env=test
                 ''', log=log)
-            if spec.get('engine') == 'reference':
-                self.docker('exec', app, 'chown', '-R', 'www-data:www-data', RUN_DIRECTORY)
-                result = self.docker('exec', '--user', 'www-data', app, 'php', '-d', 'memory_limit=2G',
-                                     'scripts/backend-test-reference.php', RUN_DIRECTORY, lane, log=log, check=False)
-            else:
-                result = self.helper(app, 'run', RUN_DIRECTORY, lane, log=log, check=False)
+            result = self.helper(app, 'run', RUN_DIRECTORY, lane, log=log, check=False)
             print(f'{lane}: exit {result.returncode}, {time.monotonic() - started:.1f}s; {log}', flush=True)
             return result.returncode
         finally:
@@ -314,9 +309,6 @@ def main(arguments: list[str]) -> int:
         selected = json.loads((run / 'discovery.json').read_text())
         native = json.loads((ROOT / 'scripts/backend-native-tests.json').read_text())
         lanes = partition(list(selected['files']), native, workers)
-        if os.environ.get('BAANDER_TEST_REFERENCE') == '1':
-            lanes = {'reference': dict(files=list(selected['files']), processes=1, batch=25,
-                                       services=True, privileged=True, engine='reference')}
         for lane, spec in lanes.items():
             (run / (lane + '.json')).write_text(json.dumps(spec, indent=2) + '\n')
         print(f"Selected {sum(map(len, selected['files'].values()))} tests in {len(selected['files'])} files; "

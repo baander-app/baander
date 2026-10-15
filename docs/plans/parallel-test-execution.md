@@ -115,3 +115,18 @@ Independent review approved this addendum before implementation. Register projec
 before startup, keep names project-scoped, and verify removal of anonymous image
 volumes after partial startup as well as normal completion. The CI runner image
 must include the Docker Compose plugin and verify it during its build.
+
+## Delivery checkpoint
+
+Implemented and verified locally on 2026-10-15. Local scripts, Makefile test targets
+and Forgejo CI use the shared coordinator and disposable Compose stacks. The old
+sequential runner was removed after exact identity and coverage qualification.
+The qualification snapshot matched 9,098 test identities, 44,191 executable lines
+and 35,385 covered lines. Final verification after adopting the reviewed runner
+checks passed 9,103 tests / 74,465 assertions and all required static gates.
+
+The [roadmap](../../ROADMAP.md#parallel-backend-verification) records individual
+runs, isolation drills, corrected fixtures, timing evidence and the wall-clock
+discrepancy. Independent plan, implementation and integration reviews are complete.
+Changes are committed locally; remote CI and publishing the updated runner image
+remain outside this delivery.

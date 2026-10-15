@@ -262,6 +262,58 @@ PHP_SOURCE;
         self::assertSame([4 => 1, 8 => 1, 12 => 0], $counts);
     }
 
+    /** @return iterable<string, array{list<string>}> */
+    public static function conflictingCoverageOptions(): iterable
+    {
+        foreach (['--coverage-text', '--coverage-clover'] as $report) {
+            yield $report . ' before disabling' => [[$report . '=coverage/report', '--no-coverage']];
+            yield $report . ' after disabling' => [['--no-coverage', $report . '=coverage/report']];
+        }
+    }
+
+    /** @param list<string> $arguments */
+    #[DataProvider('conflictingCoverageOptions')]
+    public function testConflictingCoverageOptionsAreRejected(array $arguments): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Cannot combine --no-coverage with coverage report options.');
+        try {
+            \BackendTestRunner::discover($this->directory, $arguments);
+        } finally {
+            self::assertFileDoesNotExist($this->directory . '/discovery.json');
+        }
+    }
+
+    public function testFailedCoverageReportPublicationDoesNotFinalizeSuccessfully(): void
+    {
+        file_put_contents($this->directory . '/included.php', "<?php\nfunction covered(): int\n{\n    return 1;\n}\n");
+        $target = $this->directory . '/coverage/report.txt';
+        mkdir($target, 0700, true);
+        \BackendTestRunner::writeJson($this->directory . '/discovery.json', ['files' => ['/test.php' => ['A::test']], 'coverage' => true, 'runId' => 'current', 'reports' => ['--coverage-text' => $target]]);
+        \BackendTestRunner::writeJson($this->directory . '/ordinary.json', ['files' => ['/test.php'], 'processes' => 1, 'batch' => 1]);
+        $report = $this->directory . '/ordinary.junit.xml';
+        file_put_contents($report, '<testsuite><testcase classname="A" name="test"/></testsuite>');
+        $data = new \SebastianBergmann\CodeCoverage\Data\ProcessedCodeCoverageData();
+        $data->setLineCoverage(['included.php' => [4 => ['A::test']]]);
+        $serialized = [
+            'buildInformation' => ['timestamp' => 'fixture', 'runtime' => ['name' => 'PHP', 'version' => PHP_VERSION, 'vendorUrl' => 'https://baander.app'], 'phpCodeCoverage' => ['version' => \SebastianBergmann\CodeCoverage\Version::id(), 'serializationFormat' => 1, 'driverInformation' => ['name' => 'fixture', 'version' => '1']]],
+            'basePath' => $this->directory,
+            'codeCoverage' => $data,
+            'testResults' => ['A::test' => ['size' => 'small', 'status' => 'success', 'time' => 0.0]],
+        ];
+        $coverage = $this->directory . '/ordinary.cov';
+        file_put_contents($coverage, "<?php // phpunit/php-code-coverage serialization format 1\nreturn unserialize(base64_decode('" . base64_encode(serialize($serialized)) . "'));");
+        \BackendTestRunner::writeJson($this->directory . '/ordinary.result.json', ['status' => 0, 'runId' => 'current', 'hashes' => ['junit' => hash_file('sha256', $report), 'coverage' => hash_file('sha256', $coverage)]]);
+        $process = new Process([PHP_BINARY, dirname(__DIR__, 5) . '/scripts/backend-test-runner.php', 'finalize', $this->directory]);
+        $process->setTimeout(120);
+        $process->run();
+        self::assertNotSame(0, $process->getExitCode());
+        self::assertStringContainsString('Could not publish coverage report: ' . $target, $process->getErrorOutput());
+        self::assertDirectoryExists($target);
+        self::assertFileExists($target . '.tmp-current');
+        self::assertFileDoesNotExist($this->directory . '/finalize.json');
+    }
+
     /** @param list<string> $arguments */
     private function runHelper(array $arguments): void
     {

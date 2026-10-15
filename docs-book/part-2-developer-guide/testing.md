@@ -2,8 +2,8 @@
 
 Baander uses PHPUnit 13 with four test suites in the tracked `phpunit.xml.dist`.
 Disposable container runners exercise the application's PHP runtime without using
-the development database or Redis instance. The Makefile commands remain available
-for a configured development test environment.
+the development database or Redis instance. The Makefile test targets use the same
+disposable coordinator.
 
 ## Web audio graph
 
@@ -278,63 +278,73 @@ bash scripts/test-backend-container.sh tests/Integration/RefreshTokenGraceTest.p
 bash scripts/test-backend-container.sh --coverage-text=coverage/report.txt --coverage-clover=coverage/clover.xml
 ```
 
-It requires Python 3, Docker and the Docker Compose plugin on the host. `BAANDER_TEST_PROCESSES` defaults to
-`2` and accepts integers from `1` through `8`; `1` is the diagnostic setting.
-`BAANDER_TEST_TIMEOUT` bounds the complete run, including setup, and defaults to
-`3600` seconds. Cleanup has separate bounded attempts after interruption or timeout.
-`BAANDER_TEST_IMAGE` selects the application runtime, and
-`BAANDER_TEST_POSTGRES_IMAGE` selects the extension-capable database image. CI uses
-`BAANDER_TEST_CHECKOUT_IN_IMAGE=1` with its freshly built image; local runs copy the
-current source and installed dependencies into each container.
+It requires Python 3, Docker and the Docker Compose plugin on the host.
+`BAANDER_TEST_PROCESSES` defaults to `2` and accepts integers from `1` through
+`8`; `1` is the diagnostic setting. `BAANDER_TEST_TIMEOUT` bounds the complete
+run, including setup, and defaults to `3600` seconds. Cleanup has separate
+bounded attempts after interruption or timeout. `BAANDER_TEST_IMAGE` selects the
+application runtime, and `BAANDER_TEST_POSTGRES_IMAGE` selects the
+extension-capable database image. CI uses `BAANDER_TEST_CHECKOUT_IN_IMAGE=1`
+with its freshly built image; local runs copy the current source and installed
+dependencies into each container.
 
-The coordinator discovers the selection once, then runs three phases. Ordinary unit
-and rule tests use ParaTest workers recycled after 25 files. The explicit native
-manifest, `scripts/backend-native-tests.json`, assigns Swoole, fork, signal and
-fixed-resource tests to one worker in a privileged container with networking
-disabled; that worker starts afresh for every file. Add new native tests to this
-manifest. Functional and integration files are distributed round-robin across at
-most the requested number of independent app/PostgreSQL/Redis stacks declared in
-`compose.test.yaml`. Each stack uses a unique disposable Compose project and runs
-one worker with a fresh process for every file. Scheduling stays at class/file
-level; ParaTest's method-level `--functional` mode is not used.
+The coordinator discovers the selection once, then runs three phases. Ordinary
+unit and rule tests use ParaTest workers recycled after 25 files. The explicit
+native manifest, `scripts/backend-native-tests.json`, assigns Swoole, fork,
+signal and fixed-resource tests to one worker in a privileged container with
+networking disabled; that worker starts afresh for every file. Add new native
+tests to this manifest. Functional and integration files are distributed
+round-robin across at most the requested number of independent
+app/PostgreSQL/Redis stacks declared in `compose.test.yaml`. Each stack uses a
+unique disposable Compose project and runs one worker with a fresh process for
+every file. Scheduling stays at class/file level; ParaTest's method-level
+`--functional` mode is not used.
 
 Each stack owns its cache, temporary files, sockets, database, Redis server and
-OAuth keys. No writable host mounts or published ports are used. Database and Redis
-DSNs are exported so nested PHP processes reach the same stack. Each database runs
-migrations twice. Setup uses root inside the disposable container; tests run as
-`www-data`, preserving permission checks. Test worker PHP processes receive an
-explicit 512 MiB memory limit. Coordinator and reporting PHP processes receive
-2 GiB because full-suite serialized coverage needs more memory than individual
-test files.
+OAuth keys. No writable host mounts or published ports are used. Database and
+Redis DSNs are exported so nested PHP processes reach the same stack. Each
+database runs migrations twice. Setup uses root inside the disposable container;
+tests run as `www-data`, preserving permission checks. Test worker PHP processes
+receive an explicit 512 MiB memory limit. Coordinator and reporting PHP
+processes receive 2 GiB because full-suite serialized coverage needs more memory
+than individual test files.
 
-JUnit validation requires every discovered class, method and dataset label exactly
-once. Crashes, missing reports, unexpected identities and configured strict failures
-fail the run. Skipped or incomplete cases remain observed identities without
-suppressing PHPUnit's failure policy. The coordinator pins one random seed across
-lanes; use `--random-order-seed` to reproduce it. Custom configurations preserve
-relative paths and source filters, but suite-specific bootstraps are rejected.
+JUnit validation requires every discovered class, method and dataset label
+exactly once. Crashes, missing reports, unexpected identities and configured
+strict failures fail the run. Skipped or incomplete cases remain observed
+identities without suppressing PHPUnit's failure policy. The coordinator pins
+one random seed across lanes; use `--random-order-seed` to reproduce it. Custom
+configurations preserve relative paths and source filters, but suite-specific
+bootstraps are rejected.
 
 Logs, manifests, JUnit and serialized coverage remain under the printed
 `var/test-runs/<run>/` directory, including failed runs. Set
-`BAANDER_TEST_ARTIFACTS` to choose a different parent directory. Containers and
+`BAANDER_TEST_ARTIFACTS` to choose a different parent directory. Containers,
 networks and volumes are removed on completion, timeout or interruption, and
 cleanup failure fails the run. Service stacks use bounded
-`docker compose down --volumes --remove-orphans` after collecting diagnostics. Final coverage is published only after identity and artifact checks;
-merging retains uncovered executable lines and exclusions. Validate the standard
-reports with `python3 scripts/validate-backend-coverage.py coverage` before using
+`docker compose down --volumes --remove-orphans` after collecting diagnostics.
+Final coverage is published only after identity and artifact checks; merging
+retains uncovered executable lines and exclusions. Validate the standard reports
+with `python3 scripts/validate-backend-coverage.py coverage` before using
 `coverage/metrics.json`.
 
 Runner regressions use `python3 -m unittest discover -s scripts/tests` and the
 `BackendTestRunnerTest` PHPUnit file. The destructive isolation probe,
-`python3 scripts/test-backend-stack-isolation.py`, creates two disposable stacks to
-check database outages, Redis pause/flush, cache/socket separation and inherited
-DSNs. Runtime security drills remain separate serial commands.
+`python3 scripts/test-backend-stack-isolation.py`, creates two disposable stacks
+to check database outages, Redis pause/flush, cache/socket separation and
+inherited DSNs. Runtime security drills remain separate serial commands.
 
-For qualification, `python3 scripts/compare-backend-runs.py <reference> <candidate>`
-compares selected and completed identities, seed, timings, coverage denominators
-and exact executable/covered line sets. Coverage comparison requires host PHP and
+For qualification,
+`python3 scripts/compare-backend-runs.py <reference> <candidate>` compares
+selected and completed identities, seed, timings, coverage denominators and
+exact executable/covered line sets. Coverage comparison requires host PHP and
 the installed Composer dependencies to read serialized artifacts; the Python
 regression suite does not.
+
+Full coverage qualification matched 9,098 selected/completed test identities,
+44,191 executable lines and 35,385 covered lines between the sequential reference
+and ParaTest. Timings and subsequent verification are recorded in the
+[roadmap](../../ROADMAP.md#parallel-backend-verification).
 
 For strict unit and messaging checks, run from the checkout:
 
@@ -353,13 +363,20 @@ bash scripts/test-functional-container.sh tests/Integration/CoverlessAlbumKeyset
 bash scripts/test-functional-container.sh tests/Integration/WorkerDeploymentLeaseSchemaTest.php
 ```
 
-These require Docker and installed Composer dependencies. The unit runner uses
-the application image with networking disabled and explicitly selects
-`Unit,StaticAnalysisRules` from `phpunit.xml.dist`. That configuration randomizes
-test order within dependency constraints and treats unexpected output as risky.
-The unit runner sets a 256 MiB PHP memory limit so the combined unit and PHPStan-rule
-suite can compile its analysis container. This budget applies only to that isolated
-runner; it does not change the tracked PHPUnit configuration or deployment settings.
+Both unit and functional wrappers invoke the shared backend coordinator. They
+require Python 3, Docker, the Docker Compose plugin and installed Composer
+dependencies. The unit wrapper defaults to `Unit,StaticAnalysisRules`; filters keep
+that selection, a later explicit `--testsuite` overrides it, and file paths follow
+PHPUnit's selection rules. The functional wrapper defaults to `tests/Functional`
+only when called without arguments; otherwise it forwards the supplied selection,
+including integration paths.
+
+Both wrappers use 512 MiB test workers, 2 GiB coordinator/reporting PHP processes
+and the default 3600-second overall timeout. Ordinary and native unit lanes have
+networking disabled; functional and integration selections use disposable Compose
+stacks. `phpunit.xml.dist` randomizes test order within dependency constraints and
+treats unexpected output as risky.
+
 The operator runner requires Python 3 and Docker. Its default host mode also
 requires PHP with `posix` and `pdo_pgsql` (`BAANDER_TEST_PHP_BINARY` selects its
 executable) and a local Unix endpoint (`BAANDER_TEST_DOCKER_ENDPOINT`). The host
@@ -432,9 +449,10 @@ production Doctrine filtering and scored SQL against mapped PGroonga indexes;
 they require the project's extension-capable database image. Both runners fail on
 PHPUnit notices and skipped tests. Neither reads an
 ignored local `phpunit.xml` or runs the whole functional suite. The Makefile's
-`phpunit`, `paratest`, and `ci` targets also select
-`phpunit.xml.dist` explicitly. A configured development test environment can use
-`make exec`:
+`phpunit`, `paratest`, and `ci` test steps use the same coordinator and tracked
+configuration. `PHPUNIT_OPTIONS` and `PARATEST_OPTIONS` forward test selections;
+use `BAANDER_TEST_PROCESSES` to choose the worker count. Direct `make exec` commands
+require a separately configured development test environment:
 
 ```bash
 # Run all tests
@@ -583,11 +601,12 @@ and observes commits through a second connection. It injects a real flush failur
 then verifies that the worker's Swoole pool release and Symfony reset allow the
 same handler to retry successfully. Its exact expected pool-reset diagnostic is
 asserted; unexpected-output checks remain enabled.
-It uses a 512 MiB PHP limit and a 300-second overall timeout. Database and Redis
-values supplied through the environment override the tracked PHPUnit defaults.
+These selections use the shared coordinator's 512 MiB test workers, 2 GiB reporting
+processes and default 3600-second overall timeout. Each disposable Compose project
+supplies its own database and Redis DSNs, overriding the tracked PHPUnit defaults,
+and removes its containers, network and volumes after diagnostics are collected.
 The test firewall uses the test authenticator; this does not verify production
-bearer-token or DPoP authentication. The Favorites controller selection is verified;
-the runner's availability does not establish that the entire functional suite passes.
+bearer-token or DPoP authentication. The full-suite qualification checkpoint above records the verified selection.
 
 Migration ordering is configured through `MigrationVersionComparator`. It preserves
 legacy class identities while placing their table creation before dependent changes.
@@ -597,11 +616,11 @@ Existing irreversible migrations still prevent a general full downgrade.
 
 ## Coverage
 
-`make phpunit` runs with HTML, Clover, and JUnit report generation:
-
-- **HTML**: `reports/coverage/`
-- **Clover**: `reports/clover.xml`
-- **JUnit**: `reports/junit.xml`
+`make phpunit` runs the disposable coordinator with coverage and writes
+`coverage/report.txt` and `coverage/clover.xml`. Per-lane JUnit and serialized
+coverage remain under the printed `var/test-runs/<run>/` artifact directory.
+`make paratest` runs the same suites without coverage unless report options are
+supplied. `make ci` uses `make phpunit` for its backend test step.
 
 ## Unit Test Conventions
 

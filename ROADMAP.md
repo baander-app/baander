@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-10-14. This is the working delivery record for the remediation,
+Updated: 2026-10-15. This is the working delivery record for the remediation,
 registry, and web-state plans. Update it when scope changes or a stage is verified.
 Completed code is not proof of production or performance qualification.
 
@@ -18,16 +18,17 @@ roadmap records scope and acceptance; the linked design documents, current sourc
 and CI workflow are the executable detail. Measurements in later historical
 batches describe their own checkpoints; the current gate below takes precedence.
 
-### Handoff state on 2026-10-14
+### Handoff state on 2026-10-15
 
 Any harness can take over from this section; nothing below depends on a tool that
 only one agent host has.
 
-- **Branch.** `master` includes the five application-security commits through
-  `6ac28214`, merged by fast-forward from `plan/application-threat-model`. See the
-  [checkpoint](#application-threat-model-delivery-2026-10-14) for verification and
-  open findings. The user authorized delivery to `origin` and `baander-github`
-  on 2026-10-14.
+- **Branch.** `plan/parallel-test-execution` contains the ParaTest coordinator,
+  disposable test Compose stacks and local verification commits. The
+  [qualification checkpoint](#parallel-backend-verification)
+  records the test identities, coverage comparison, timing limitation and final
+  checks. These changes have not been pushed. The application-security baseline on
+  `master` remains recorded in its delivery checkpoint below.
 - **Previous baseline.** Item 8 was merged and pushed. `master` (eced16d6) holds its fifteen
   commits and the roadmap commit on top of 63466d0d by fast-forward, code-reviewed
   with both findings applied and every gate green (the item 8 checkpoint below).
@@ -48,12 +49,14 @@ only one agent host has.
   [testing guide](docs-book/part-2-developer-guide/testing.md#running-tests) and pass
   its tag as `BAANDER_TEST_IMAGE`; the checkpoints below used a local tag of that
   `ci` target named `baander-ci-prewarm:local`. The suite runners are
-  `scripts/test-unit-container.sh` and `scripts/test-functional-container.sh <path>`
-  (the latter for `tests/Functional`, `tests/Integration` or one file; set
-  `BAANDER_FUNCTIONAL_TIMEOUT_ACTIVE=1`; each run gets its own network and
-  container names, so runs may overlap). The static gates run inside the same image
-  with the checkout mounted read-only at `/var/www/html`: mount `src`, `tests`,
-  `config`, `migrations`, `bin`, `templates`, `translations`, `vendor`, `packages`
+  `scripts/test-unit-container.sh` and `scripts/test-functional-container.sh <path>`.
+  Both use `scripts/test-backend-container.sh`; invoke that coordinator without a
+  selection to run all four suites. It defaults to two workers and a 3,600-second
+  overall timeout, creates disposable Compose projects for service tests, and
+  removes their containers, networks and volumes after collecting diagnostics.
+  Use `BAANDER_TEST_PROCESSES=1` for diagnosis. The static gates run inside the same
+  image with the checkout mounted read-only at `/var/www/html`: mount `src`, `tests`,
+  `config`, `migrations`, `bin`, `scripts`, `templates`, `translations`, `vendor`, `packages`
   (required: `vendor` symlinks into it), `phpstan.dist.neon`, `deptrac.yaml`,
   `deptrac.baseline.yaml`, `composer.json`, `composer.lock`, `symfony.lock`, `.env`,
   `.env.test` and `openapi.json`, with `--security-opt label=disable` and
@@ -1591,13 +1594,13 @@ Keep independent changes reviewable and record checks without implying broader
 coverage. The complete programme is done only when blocking checks, security and
 workflow integrations, and registry consistency/resource/failover/restore gates pass.
 
-## Parallel backend verification — qualification in progress
+## Parallel backend verification
 
 Implementation follows [the ParaTest plan](docs/plans/parallel-test-execution.md)
 on `plan/parallel-test-execution`. The shared coordinator, explicit native manifest,
 identity checks, coverage merging and blocking report validator are implemented.
-The existing local wrappers and CI still use their previous runners; default
-adoption awaits complete equivalence and performance qualification.
+Local wrappers and CI use this coordinator with disposable Compose projects.
+The checkpoints below record qualification, corrections and final verification.
 
 - Runner regressions: 21 PHP tests / 53 assertions and 41 Python tests passed.
   A real CI-image coverage smoke preserved the uncovered denominator of 43,704
@@ -1694,6 +1697,44 @@ adoption awaits complete equivalence and performance qualification.
   passed; all 58 Python regressions remain green. Artifacts:
   `var/test-runs/20261014-221206-beb170cd`. Full comparison on this corrected
   checkout remains pending.
-- Remaining: full sequential/parallel identity and coverage comparisons, a second
-  successful parallel run, timing qualification, authoritative static gates,
-  wrapper/CI adoption, removal of the old sharder, final review and documentation.
+- Corrected full coverage qualification passed on the same checkout and seed:
+  9,098 tests / 74,434 assertions across 870 files. Both runners completed exactly
+  the discovered identities and matched all 44,191 executable and 35,385 covered
+  lines, with equal source denominators. Validated coverage: lines 80.07%, methods
+  76.10%, classes 60.41%. Reference artifacts:
+  `var/test-runs/20261014-221624-109eb426`; parallel artifacts:
+  `var/test-runs/20261014-225943-f1ae873c`. No test containers, networks or volumes
+  remained after either run.
+- The coordinator measured 2,534.4 seconds for the reference and 1,965.0 seconds for
+  parallel execution with its monotonic clock (1.29×). Wall time diverged by about
+  13 hours during the user interruption; available evidence cannot distinguish a
+  system suspend from a clock correction. Treat this ratio as monotonic execution
+  timing, not an uninterrupted wall-clock benchmark. The earlier uninterrupted
+  non-coverage comparison measured 752.3 versus 1,070.6 seconds with exact identity
+  parity (1.42×), and the earlier full coverage execution measured 1,952.8 versus
+  2,594.7 seconds before the deterministic health fixtures.
+- Local wrappers, Makefile test targets and Forgejo CI now use the shared coordinator. Coverage validation
+  blocks CI, failed-run logs are uploaded after metric extraction, and runtime
+  security drills remain serial. The old sequential sharder, its fixtures and the
+  temporary qualification adapter have been removed. The diagnostic runner uses
+  `BAANDER_TEST_PROCESSES=1`.
+- Final backend verification after adoption passed 9,103 tests / 74,465 assertions
+  across 869 files in 728.3 seconds, including setup, validation and cleanup. Suite
+  counts: Unit 6,276, StaticAnalysisRules 11, Functional 1,461, Integration 1,355.
+  This uninterrupted run used the same CI image and seed 3742. Artifacts:
+  `var/test-runs/20261015-124114-0735239d`. The runner regression file passed
+  26 tests / 70 assertions; publication workflow checks passed 25 tests / 208
+  assertions. All 58 Python checks and Docker context checks (35 excluded host
+  artifacts, 24 preserved markers) passed. Makefile filter, suite, path and image
+  forwarding passed three focused checks. Independent integration and simplification
+  reviews found no remaining issues.
+- Final static gates passed in the CI image: Composer platform requirements,
+  PHPStan, Deptrac (zero violations, warnings or errors; 495 existing baseline
+  skips), container lint and OpenAPI drift. Static artifacts:
+  `/tmp/baander-paratest-static-tnmhl7dt`. Final resource checks found no retained
+  test containers, networks or volumes. Documentation passed prose-preservation
+  review; changed limits, report paths and checkpoint counts are intentional.
+- Delivered locally on `plan/parallel-test-execution`; nothing has been pushed.
+  Remote CI has not run. Its runner image must be rebuilt with the Docker Compose
+  plugin before using the new workflow. The recorded wall-clock discrepancy is
+  the remaining timing limitation; exact test and coverage qualification passed.
