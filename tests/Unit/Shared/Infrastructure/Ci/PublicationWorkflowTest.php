@@ -199,6 +199,7 @@ SH;
             'backend unit' => ['quality-gate', 'PHPUnit with coverage', 'scripts/test-backend-container.sh'],
             'backend runner' => ['quality-gate', 'Backend runner regressions', 'python3 -m unittest discover -s scripts/tests'],
             'backend isolation' => ['quality-gate', 'Backend stack isolation', 'scripts/test-backend-stack-isolation.py'],
+            'Messenger without Swoole' => ['quality-gate', 'Messenger without Swoole', 'scripts/test-backend-container.sh'],
             'coverage integrity' => ['quality-gate', 'Extract coverage metrics', 'scripts/validate-backend-coverage.py'],
             'web unit' => ['frontend-quality', 'Web checks', 'yarn test'],
             'browser auth' => ['frontend-quality', 'Native browser authentication transport', 'yarn test:browser-auth'],

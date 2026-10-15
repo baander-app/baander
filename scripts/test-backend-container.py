@@ -19,6 +19,40 @@ import uuid
 ROOT = Path(__file__).resolve().parent.parent
 CONTAINER_ROOT = '/var/www/html'
 RUN_DIRECTORY = '/tmp/baander-run'
+SWOOLE_LOADER = '/usr/local/etc/php/conf.d/docker-php-ext-swoole.ini'
+RUNTIME_PROBE = r'''
+$loader = '/usr/local/etc/php/conf.d/docker-php-ext-swoole.ini';
+$scanned = array_values(array_filter(array_map('trim', explode(',', php_ini_scanned_files() ?: ''))));
+$configuration = [];
+foreach (array_merge([php_ini_loaded_file()], $scanned) as $file) {
+    if ($file !== false) {
+        $configuration[$file] = hash_file('sha256', $file);
+    }
+}
+$extensions = get_loaded_extensions();
+sort($extensions);
+$symbols = array_values(array_filter(
+    array_merge(get_declared_classes(), get_declared_interfaces(), get_declared_traits(),
+        get_defined_functions()['internal'], array_keys(get_defined_constants())),
+    static fn (string $name): bool => preg_match('/^(?:swoole(?:[\\\\_]|$)|co\\\\)/i', $name) === 1,
+));
+$evidence = ['php_version' => PHP_VERSION, 'binary' => PHP_BINARY, 'sapi' => PHP_SAPI,
+    'php_ini' => php_ini_loaded_file(), 'configuration' => $configuration,
+    'xdebug_mode' => ini_get('xdebug.mode'), 'xdebug_environment' => getenv('XDEBUG_MODE'),
+    'extensions' => $extensions, 'native_symbols' => $symbols,
+    'loader' => is_file($loader) ? file_get_contents($loader) : null,
+    'loader_symlink' => is_link($loader), 'autoload' => false];
+try {
+    if ($argv[1] === 'after') {
+        require '/var/www/html/vendor/autoload.php';
+        $evidence['autoload'] = true;
+    }
+} catch (Throwable $error) {
+    $evidence['error'] = $error->getMessage();
+}
+echo json_encode($evidence, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR), "\n";
+exit(isset($evidence['error']) ? 1 : 0);
+'''
 ARCHIVE_PATHS = [
     'vendor', 'src', 'tests', 'config', 'packages', 'migrations', 'bin', 'scripts',
     'docker', 'templates', 'public', 'phpunit.xml.dist', '.env', '.env.test',
@@ -77,6 +111,10 @@ class Runtime:
         self.project_containers: set[str] = set()
         self.project_networks: set[str] = set()
         self.environment = dict(os.environ)
+        disable_swoole = self.environment.get('BAANDER_TEST_DISABLE_SWOOLE', '0')
+        if disable_swoole not in ('0', '1'):
+            raise ValueError('BAANDER_TEST_DISABLE_SWOOLE must be 0 or 1')
+        self.disable_swoole = disable_swoole == '1'
         self.prefix = 'baander-tests-' + uuid.uuid4().hex[:12]
         self.image = os.environ.get('BAANDER_TEST_IMAGE', 'martinjuul/baander-app:latest')
         self.archive: Path | None = None
@@ -168,7 +206,52 @@ class Runtime:
             self.docker('exec', name, 'sh', '-ec',
                         'rm -rf /var/www/html; mkdir -p /var/www/html; tar -xf /tmp/checkout.tar -C /var/www/html; rm /tmp/checkout.tar; chown -R www-data:www-data /var/www/html')
         self.docker('exec', name, 'sh', '-ec', 'mkdir -p ' + RUN_DIRECTORY + '; chown www-data:www-data ' + RUN_DIRECTORY)
+        if self.disable_swoole:
+            self.qualify_without_swoole(name, lane)
         return name
+
+    def runtime_evidence(self, app: str, lane: str, phase: str) -> dict:
+        path = self.artifacts / (lane + '.runtime-' + phase + '.json')
+        self.docker('exec', '--user', 'www-data', app, 'php', '-r', RUNTIME_PROBE, phase, log=path)
+        return json.loads(path.read_text())
+
+    @staticmethod
+    def validate_swoole_runtime(before: dict, after: dict | None = None):
+        if (before['sapi'] != 'cli' or before['php_ini'] != '/usr/local/etc/php/php.ini'
+                or before['php_ini'] not in before['configuration']
+                or SWOOLE_LOADER not in before['configuration']
+                or before['loader_symlink'] or 'swoole' not in before['extensions']):
+            raise RuntimeError('Unexpected PHP runtime or missing dedicated Swoole loader')
+        directives = [line.strip() for line in before['loader'].splitlines()
+                      if line.strip() and not line.lstrip().startswith(';')]
+        if len(directives) != 1 or not re.fullmatch(r'extension\s*=\s*swoole(?:\.so)?', directives[0]):
+            raise RuntimeError('Unexpected dedicated Swoole loader contents')
+        if after is None:
+            return
+        configuration = {path: digest for path, digest in before['configuration'].items()
+                         if path != SWOOLE_LOADER}
+        extensions = sorted(extension for extension in before['extensions'] if extension != 'swoole')
+        if (after['configuration'] != configuration or after['extensions'] != extensions
+                or any(after[key] != before[key] for key in
+                       ('php_version', 'binary', 'sapi', 'php_ini', 'xdebug_mode', 'xdebug_environment'))
+                or after['loader'] is not None or after['loader_symlink']
+                or after['native_symbols'] or after['autoload'] is not True):
+            raise RuntimeError('Swoole removal changed an unexpected PHP runtime setting or autoload failed')
+
+    def qualify_without_swoole(self, app: str, lane: str):
+        log = self.artifacts / (lane + '.runtime.log')
+        try:
+            before = self.runtime_evidence(app, lane, 'before')
+            self.validate_swoole_runtime(before)
+            self.docker('exec', app, 'rm', '--', SWOOLE_LOADER, log=log)
+            after = self.runtime_evidence(app, lane, 'after')
+            self.validate_swoole_runtime(before, after)
+            with log.open('a') as output:
+                output.write('Qualified PHP without Swoole; other extensions and configuration preserved.\n')
+        except (RuntimeError, TimeoutError, OSError, ValueError, KeyError, TypeError) as error:
+            with log.open('a') as output:
+                output.write(str(error) + '\n')
+            raise
 
     def start_services(self, lane: str) -> str:
         project = self.prefix + '-' + lane

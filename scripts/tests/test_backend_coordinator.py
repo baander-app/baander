@@ -335,6 +335,97 @@ class LifecycleTest(unittest.TestCase):
                 self.runtime.run_lane("ordinary", spec, run, False)
 
 
+class WithoutSwooleTest(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.artifacts = Path(self.directory.name)
+        self.before = {
+            'php_version': '8.5.0', 'binary': '/usr/local/bin/php', 'sapi': 'cli',
+            'php_ini': '/usr/local/etc/php/php.ini',
+            'configuration': {'/usr/local/etc/php/php.ini': 'main',
+                              coordinator.SWOOLE_LOADER: 'loader',
+                              '/usr/local/etc/php/conf.d/redis.ini': 'redis'},
+            'extensions': ['Core', 'redis', 'swoole'], 'native_symbols': ['Swoole\\Process'],
+            'loader': 'extension=swoole\n', 'loader_symlink': False, 'autoload': False,
+            'xdebug_mode': 'coverage', 'xdebug_environment': 'coverage',
+        }
+        self.after = {**self.before, 'configuration': {
+            key: value for key, value in self.before['configuration'].items()
+            if key != coordinator.SWOOLE_LOADER},
+            'extensions': ['Core', 'redis'], 'native_symbols': [], 'loader': None, 'autoload': True}
+
+    def runtime(self, setting):
+        with patch.dict(coordinator.os.environ, {'BAANDER_TEST_DISABLE_SWOOLE': setting}):
+            return coordinator.Runtime(self.artifacts, 60)
+
+    def test_default_and_explicit_zero_leave_configuration_unchanged(self):
+        for setting in (None, '0'):
+            with self.subTest(setting=setting), patch.dict(coordinator.os.environ):
+                coordinator.os.environ.pop('BAANDER_TEST_DISABLE_SWOOLE', None)
+                runtime = coordinator.Runtime(self.artifacts, 60) if setting is None else self.runtime(setting)
+                with patch.object(runtime, 'docker'), patch.object(runtime, 'qualify_without_swoole') as qualify:
+                    runtime.create_app('discovery')
+                qualify.assert_not_called()
+
+    def test_invalid_opt_in_is_rejected_before_docker(self):
+        for setting in ('', 'true', 'yes', '2', '01'):
+            with self.subTest(setting=setting), self.assertRaisesRegex(ValueError, 'must be 0 or 1'):
+                self.runtime(setting)
+
+    def test_opt_in_qualifies_discovery_and_service_apps_before_returning(self):
+        runtime = self.runtime('1')
+        runtime.projects.append('stack')
+        runtime.project_environments['stack'] = {}
+        with patch.object(runtime, 'docker'), patch.object(runtime, 'compose'), \
+                patch.object(runtime, 'service_container', return_value='service-app'), \
+                patch.object(runtime, 'qualify_without_swoole') as qualify:
+            discovery = runtime.create_app('discovery')
+            service = runtime.create_app('stack-1', 'stack', services=True)
+        self.assertEqual([(discovery, 'discovery'), (service, 'stack-1')],
+                         [call.args for call in qualify.call_args_list])
+
+    def test_only_dedicated_loader_is_removed_and_evidence_is_retained(self):
+        runtime = self.runtime('1')
+
+        def execute(*args, **kwargs):
+            if args[0] == 'exec' and '-r' in args:
+                evidence = self.before if args[-1] == 'before' else self.after
+                kwargs['log'].write_text(json.dumps(evidence))
+            return subprocess.CompletedProcess(args, 0)
+
+        with patch.object(runtime, 'docker', side_effect=execute) as docker:
+            runtime.qualify_without_swoole('app', 'discovery')
+        self.assertEqual(('exec', 'app', 'rm', '--', coordinator.SWOOLE_LOADER),
+                         docker.call_args_list[1].args)
+        self.assertEqual(('exec', '--user', 'www-data', 'app'), docker.call_args_list[0].args[:4])
+        self.assertEqual(self.before, json.loads((self.artifacts / 'discovery.runtime-before.json').read_text()))
+        self.assertEqual(self.after, json.loads((self.artifacts / 'discovery.runtime-after.json').read_text()))
+        self.assertIn('Qualified', (self.artifacts / 'discovery.runtime.log').read_text())
+
+    def test_missing_or_unexpected_loader_is_rejected_before_removal(self):
+        for change in ({'loader': 'extension=swoole\nextension=redis'},
+                       {'loader': 'extension=other.so'}, {'loader_symlink': True},
+                       {'extensions': ['Core', 'redis']}, {'php_ini': False},
+                       {'configuration': {}}):
+            with self.subTest(change=change):
+                runtime = self.runtime('1')
+                with patch.object(runtime, 'runtime_evidence', return_value={**self.before, **change}), \
+                        patch.object(runtime, 'docker') as docker, self.assertRaises(RuntimeError):
+                    runtime.qualify_without_swoole('app', 'discovery')
+                docker.assert_not_called()
+                self.assertTrue((self.artifacts / 'discovery.runtime.log').is_file())
+
+    def test_other_extension_configuration_or_native_symbols_reject_qualification(self):
+        for change in ({'extensions': ['Core']}, {'extensions': ['Core', 'redis', 'swoole']},
+                       {'configuration': {}}, {'native_symbols': ['Swoole\\Process']},
+                       {'autoload': False}, {'php_version': '8.6.0'},
+                       {'xdebug_mode': 'off'}, {'xdebug_environment': 'off'},
+                       {'loader': 'extension=swoole'}):
+            with self.subTest(change=change), self.assertRaises(RuntimeError):
+                coordinator.Runtime.validate_swoole_runtime(self.before, {**self.after, **change})
+
+
 class FinalStatusTest(unittest.TestCase):
     def test_successful_suites_report_failure_when_cleanup_fails(self):
         selected = {"files": {"tests/Unit/OnlyTest.php": ["testCase"]}, "coverage": False, "reports": {}}

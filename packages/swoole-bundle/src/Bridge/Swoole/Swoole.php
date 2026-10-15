@@ -55,6 +55,7 @@ final class Swoole
      *
      * In thread mode: Thread::getId() * CONTEXT_KEY_MULTIPLIER + Coroutine::getCid()
      * In process mode: Coroutine::getCid() (unchanged behavior)
+     * Without the extension: -1, the synchronous execution context.
      *
      * This is the single source of truth for execution context identity.
      * All service pool keying, mutex ownership, and service release flow through this method.
@@ -65,6 +66,10 @@ final class Swoole
      */
     public function getCoroutineId(): int
     {
+        if (!extension_loaded('swoole')) {
+            return -1;
+        }
+
         $cId = Coroutine::getCid();
 
         if ($this->isThreadMode()) {
@@ -76,6 +81,7 @@ final class Swoole
 
     /**
      * Returns the raw Coroutine::getCid() without thread context.
+     * Returns -1 when the extension is unavailable.
      *
      * Use this when checking Swoole primitive state (e.g., "are we inside a coroutine?"),
      * NOT for pool keying or mutex ownership.
@@ -84,6 +90,10 @@ final class Swoole
      */
     public function getRawCoroutineId(): int
     {
+        if (!extension_loaded('swoole')) {
+            return -1;
+        }
+
         return Coroutine::getCid();
     }
 

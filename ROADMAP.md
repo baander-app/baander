@@ -23,12 +23,13 @@ batches describe their own checkpoints; the current gate below takes precedence.
 Any harness can take over from this section; nothing below depends on a tool that
 only one agent host has.
 
-- **Branch.** `master` includes the ParaTest coordinator and disposable test Compose
-  stacks through `9f6b1ac0`, merged by fast-forward from
-  `plan/parallel-test-execution` on 2026-10-15. The user authorized publishing
-  `master` to `origin` and `baander-github`. The
-  [qualification checkpoint](#parallel-backend-verification) records the test
-  identities, coverage comparison, timing limitation and final checks.
+- **Branch.** `plan/messenger-without-swoole` continues from published `master`
+  (`2cb17476`). It qualifies console/Messenger fallback with the native extension
+  removed from disposable test containers. The
+  [qualification checkpoint](#messenger-without-swoole) records its scope and checks.
+  The prior ParaTest delivery is merged and published to both remotes; its
+  [checkpoint](#parallel-backend-verification) remains the full-suite and coverage
+  baseline. This follow-up remains local until publishing is requested.
 - **Previous baseline.** Item 8 was merged and pushed. `master` (eced16d6) holds its fifteen
   commits and the roadmap commit on top of 63466d0d by fast-forward, code-reviewed
   with both findings applied and every gate green (the item 8 checkpoint below).
@@ -84,9 +85,9 @@ only one agent host has.
   visibility; the visible-song count materialises rows. None blocks the item.
 - **Next.** The first open lines of the
   [application security backlog](#application-security-and-reliability): the
-  Messenger/Redis fallback in a qualified runtime, the route, schema, client and
-  identifier reconciliation, and the threat model. The local dev database note at
-  the end of this section still stands.
+  route, schema, client and identifier reconciliation, and the remaining registry
+  threat-model work. Messenger/Redis fallback without Swoole is qualified below.
+  The local dev database note at the end of this section still stands.
 
 The backend release-gate package is complete (see the next two sections). Eight
 plans followed it, in this order, and all eight are delivered:
@@ -1346,9 +1347,10 @@ the agreed host budget.
   independent PostgreSQL connections, poison-event retry/dead-letter handling, and
   idempotent durable notification effects. External delivery remains at-least-once;
   uncertain outcomes are not represented as exactly-once.
-- [ ] Exercise the Messenger/Redis fallback in a qualified runtime without the
-  Swoole extension. The completed dispatch-failure test alone does not demonstrate
-  extension-unavailable operation.
+- [x] Exercise Messenger/Redis fallback with the Swoole extension unavailable.
+  The [runtime checkpoint](#messenger-without-swoole) covers console boot, real Redis
+  delivery, retry/dead-letter handling, handler registration and nested PHP absence.
+  The web server still requires Swoole.
 - [x] Finish supervised crash tests at the consumer acknowledgement boundary.
   Claim, mid-projection transaction, and Redis-send-before-delivery-ack crashes
   verify unchanged leases, rollback where needed, natural expiry, and recovery
@@ -1479,16 +1481,13 @@ verification checkpoint applies unchanged to the fast-forwarded implementation.
 
 ### Parallel test execution
 
-- [ ] Use the installed ParaTest 7.22.4 to shorten backend verification. It supports
-  the current PHPUnit 13.1.11. Qualify isolated unit/static-rule tests first and
-  measure runtime against the fresh-process shard runner. Keep native Swoole,
-  process and fixed-resource tests separate until their parallel behavior is
-  verified. Before parallel functional/integration runs, use `TEST_TOKEN` or
-  `UNIQUE_TEST_TOKEN` to isolate each worker's PostgreSQL database, Redis state,
-  Symfony cache, temporary files and native sockets/ports. Current fixtures include
-  whole-table cleanup, so sharing one database between workers is unsafe. Preserve
-  the authoritative suite counts, failure gates and coverage aggregation; do not
-  trade isolation or reproducibility for speed. Requested on 2026-10-14.
+- [x] Adopt ParaTest 7.22.4 with disposable Compose stacks for backend verification.
+  Unit/static-rule workers recycle after 25 files; native and service tests retain
+  fresh processes per file. Each service lane owns its PostgreSQL, Redis, cache,
+  temporary files and sockets. Identity and coverage comparisons, isolation drills
+  and timing evidence are recorded in the
+  [qualification checkpoint](#parallel-backend-verification). Delivered and merged
+  into `master` on 2026-10-15.
 
 ### Worker architecture and resource control
 
@@ -1593,6 +1592,49 @@ unindexed test callbacks, and commit by path.
 Keep independent changes reviewable and record checks without implying broader
 coverage. The complete programme is done only when blocking checks, security and
 workflow integrations, and registry consistency/resource/failover/restore gates pass.
+
+## Messenger without Swoole
+
+Implementation follows [the qualification plan](docs/plans/messenger-without-swoole.md).
+`BAANDER_TEST_DISABLE_SWOOLE=1` removes only the dedicated loader inside each
+disposable app container before PHP discovery or boot. The coordinator records
+PHP version, configuration hashes, extensions and native symbols before and after
+removal; every other extension and setting must remain unchanged. CI has a blocking
+selection for the absence fixture, handler registration and real Redis delivery.
+
+Qualification exposed unconditional coroutine identity queries during console
+boot, used by both the container mutex and service pools. The bundle bridge now
+returns the existing synchronous context ID `-1` when Swoole is absent. Native
+thread/coroutine identity behavior and kernel initialization remain unchanged.
+
+- The absence fixture failed before the bridge fix: 4 tests, 7 assertions and
+  3 errors at the native coroutine lookup. It now checks worker/child absence,
+  both identity methods, recursive mutex ownership and service pool reuse.
+- CI-image qualification passed 32 tests / 236 assertions in 65.2 seconds,
+  including setup, identity validation and cleanup. PHP 8.5.2 ran the same
+  checkout and dependencies as normal verification. Discovery and all three
+  lanes lost exactly the Swoole extension and retained the other configuration
+  hashes. Console cache clearing, fresh and repeat migrations, actual Redis
+  consumption, retry/dead-letter handling and transport registration passed.
+  Artifacts: `var/test-runs/20261015-172557-d06191de`.
+- The normal Swoole runtime passed 91 tests / 521 assertions in 68.9 seconds
+  across the eight affected runner, publication, kernel/container, pool release,
+  coroutine scheduling, handler registration and Redis delivery files. Artifacts:
+  `var/test-runs/20261015-172725-9df9f124`. Both successful runs removed their
+  disposable resources; the failed diagnostic runs did too.
+- All 64 Python runner regressions passed. Independent plan and code reviews,
+  including the shared execution-context correction, found no remaining issues.
+- Platform requirements, PHPStan, Deptrac (zero violations, warnings or errors;
+  495 existing baseline entries), container lint and OpenAPI drift passed in the
+  CI image. Static logs: `/tmp/baander-paratest-static-khhlniez`. Prose-fix and
+  whitespace checks passed; the stale GitNexus index was supplemented with source
+  and caller inspection.
+
+This qualifies the exercised console/Messenger paths with actual extension
+absence. The web server still requires Swoole; no dependency or API/schema changed.
+The full-suite coverage baseline remains the prior ParaTest checkpoint; this
+follow-up reran the affected selection and static gates. The blocking Forgejo step
+is configured, but no live Forgejo result is claimed.
 
 ## Parallel backend verification
 

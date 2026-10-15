@@ -346,6 +346,37 @@ Full coverage qualification matched 9,098 selected/completed test identities,
 and ParaTest. Timings and subsequent verification are recorded in the
 [roadmap](../../ROADMAP.md#parallel-backend-verification).
 
+### Messenger without Swoole
+
+To check Redis fallback with the Swoole extension unavailable, use the same CI
+image and disposable coordinator. Set `BAANDER_TEST_IMAGE` to the application CI
+image and `BAANDER_TEST_POSTGRES_IMAGE` to the project's PostgreSQL image before
+running:
+
+```bash
+BAANDER_TEST_DISABLE_SWOOLE=1 bash scripts/test-backend-container.sh \
+  tests/Fixtures/MessengerWithoutSwooleTest.php \
+  tests/Unit/Shared/Infrastructure/Messenger/SwooleFallbackHandlerRegistrationTest.php \
+  tests/Integration/MessengerJsonDeliveryTest.php
+```
+
+The coordinator removes the dedicated Swoole loader inside each disposable app
+container before discovery or console boot. It compares PHP configuration hashes
+and loaded extensions before and after removal, requiring every other extension
+and setting to remain unchanged. Runtime evidence stays beside the lane logs as
+`<lane>.runtime-before.json`, `<lane>.runtime-after.json` and `<lane>.runtime.log`.
+The option accepts `0` or `1` and defaults to `0`.
+
+The dedicated fixture verifies absence in the ParaTest worker and a nested PHP
+process, and checks synchronous execution identity, recursive locking and service
+pool reuse without the extension. It lives outside the default suites because it
+deliberately fails when Swoole is loaded. The selected tests exercise transport-restricted handler
+registration, real Redis delivery, retry and dead-letter handling. Service setup
+also clears the Symfony cache and runs migrations twice without Swoole. CI runs
+this selection as a blocking step. This qualifies the console and Messenger
+paths exercised here; the web server still requires Swoole, and the Composer
+extension requirement remains unchanged.
+
 For strict unit and messaging checks, run from the checkout:
 
 ```bash
