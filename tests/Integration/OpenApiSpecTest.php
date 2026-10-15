@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Catalog\Application\Port\SongSortField;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\DTO\ApiError;
 use App\Shared\Interface\DTO\CursorPaginatedResponse;
 use App\Shared\Interface\DTO\PaginatedResponse;
@@ -72,6 +73,84 @@ final class OpenApiSpecTest extends KernelTestCase
 
         self::assertSame(SongSortField::values(), $parameters['sort']['schema']['enum']);
         self::assertSame(['asc', 'desc'], $parameters['order']['schema']['enum']);
+    }
+
+    public function test_public_identifier_schemas_match_runtime_identifiers(): void
+    {
+        $spec = $this->getSpec();
+        $schemas = $spec['components']['schemas'];
+        foreach ([
+            'ActivityResource' => ['publicId'],
+            'RecentItemResource' => ['publicId', 'songPublicId', 'albumPublicId'],
+            'AdminUserResource' => ['publicId'],
+            'ClientResource' => ['publicId'],
+            'UserResource' => ['publicId'],
+            'ServerInstanceResource' => ['publicId'],
+            'PairingSessionResource' => ['publicId', 'serverPublicId'],
+            'CreatePairingCodeRequest' => ['serverPublicId'],
+            'CompletePairingRequest' => ['serverPublicId'],
+            'PartySessionResource' => ['publicId'],
+            'TranscodeMetricsResource' => ['publicId'],
+            'TranscodeSessionResource' => ['publicId'],
+            'ApplyLyricsRequest' => ['songPublicId'],
+        ] as $name => $fields) {
+            foreach ($fields as $field) {
+                $property = $schemas[$name]['properties'][$field];
+                $this->assertPublicIdentifierSchema($property);
+                self::assertSame($name === 'RecentItemResource' && $field !== 'publicId', $property['nullable'] ?? false);
+            }
+        }
+    }
+
+    public function test_discovery_inline_public_identifiers_match_runtime_identifiers(): void
+    {
+        $paths = $this->getSpec()['paths'];
+        foreach (['/api/discovery/pairing-code', '/api/discovery/complete-pairing'] as $path) {
+            $schema = $paths[$path]['post']['requestBody']['content']['application/json']['schema'];
+            $this->assertPublicIdentifierSchema($schema['properties']['serverPublicId']);
+        }
+        $parameters = array_column($paths['/api/discovery/qr-payload/{serverPublicId}']['get']['parameters'], null, 'name');
+        $this->assertPublicIdentifierSchema($parameters['serverPublicId']['schema']);
+    }
+
+    public function test_uuid_identifiers_keep_their_uuid_contract(): void
+    {
+        $spec = $this->getSpec();
+        foreach ([
+            'UserResource' => 'uuid',
+            'ActivityResource' => 'songId',
+            'CreateTranscodeSessionRequest' => 'videoId',
+            'TranscodeSessionResource' => 'videoId',
+            'PartySessionResource' => 'uuid',
+            'AddSongRequest' => 'songId',
+        ] as $name => $field) {
+            $property = $spec['components']['schemas'][$name]['properties'][$field];
+            self::assertSame('uuid', $property['format']);
+            self::assertArrayNotHasKey('pattern', $property);
+        }
+        $passkeys = $spec['paths']['/api/auth/passkey']['get']['responses']['200']['content']['application/json']['schema'];
+        $passkeyId = $passkeys['properties']['data']['items']['properties']['publicId'];
+        self::assertSame('uuid', $passkeyId['format']);
+        self::assertArrayNotHasKey('pattern', $passkeyId);
+        $reorder = $spec['components']['schemas']['ReorderSongsRequest']['properties']['songIds'];
+        self::assertSame('uuid', $reorder['items']['format']);
+        $inlineReorder = $spec['paths']['/api/playlists/{publicId}/reorder']['post']['requestBody']['content']['application/json']['schema'];
+        self::assertSame('uuid', $inlineReorder['properties']['songIds']['items']['format']);
+        $albumId = $spec['components']['schemas']['SongResource']['properties']['albumId'];
+        self::assertSame('string', $albumId['type']);
+        self::assertArrayNotHasKey('format', $albumId);
+        self::assertArrayNotHasKey('pattern', $albumId);
+    }
+
+    /** @param array<string, mixed> $schema */
+    private function assertPublicIdentifierSchema(array $schema): void
+    {
+        self::assertSame('string', $schema['type']);
+        self::assertArrayNotHasKey('format', $schema);
+        self::assertSame(21, $schema['minLength']);
+        self::assertSame(21, $schema['maxLength']);
+        self::assertSame('^[0-9a-zA-Z_-]{21}$', $schema['pattern']);
+        self::assertMatchesRegularExpression('~' . $schema['pattern'] . '~', (new PublicId())->toString());
     }
 
     public function test_configuration_object_defaults_match_their_schema_type(): void

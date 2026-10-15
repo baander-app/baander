@@ -6,8 +6,8 @@
 
 | Model | Purpose | Location |
 |-------|---------|----------|
-| `Uuid` | UUID v7 — used as all primary keys | `Domain/Model/Uuid.php` |
-| `PublicId` | Public-facing identifier, separate from internal UUID | `Domain/Model/PublicId.php` |
+| `Uuid` | UUID value object; generates v7 by default | `Domain/Model/Uuid.php` |
+| `PublicId` | 21-character NanoID, distinct from UUID identity | `Domain/Model/PublicId.php` |
 | `Email` | Typed email value object with validation | `Domain/Model/Email.php` |
 | `Cursor` | Cursor-based pagination token | `Domain/Model/Cursor.php` |
 | `CursorDirection` | Pagination direction (`asc` / `desc`) | `Domain/Model/CursorDirection.php` |
@@ -18,7 +18,7 @@
 
 ### UUID v7
 
-All primary keys use UUID v7 (time-ordered). Never use auto-incrementing integers. The `Uuid` class generates v7 UUIDs by default:
+The `Uuid` class generates time-ordered UUID v7 values by default for aggregate identity and also accepts existing UUIDs of other versions. Database keys are not uniformly UUIDs: internal integer keys, text settings keys and protocol identifiers have separate contracts. The default generation and parsing methods are:
 
 ```php
 $id = new Uuid();           // generates v7
@@ -28,11 +28,11 @@ $id = Uuid::fromString($existing);
 
 ### PublicId
 
-Each entity has both an internal `Uuid` and a public-facing `PublicId`. The public ID is what appears in API responses and URLs. This separation allows internal IDs to change without breaking external references.
+`PublicId` generates and validates 21-character NanoIDs matching `^[0-9a-zA-Z_-]{21}$`, for example `V1StGXR8_Z5jdHi6B-myT`. Many aggregates expose one alongside their UUID identity. Resources and routes may instead expose UUIDs, integer identifiers or protocol-specific identifiers; consult the endpoint contract. A parameter named `publicId` is not enough to establish its type: passkey deletion uses a UUID.
 
 ### Cursor Pagination
 
-Baander uses cursor-based pagination instead of offset-based. Cursors are opaque tokens that encode the position in the result set, providing consistent results even when data changes between requests.
+Baander supports cursor-based and offset-based pagination; the endpoint defines which it accepts. Cursors are opaque tokens that encode the position in the result set, providing consistent results even when data changes between requests.
 
 ## Search
 
@@ -98,10 +98,12 @@ The Shared kernel provides several shared controllers:
 | Controller | Path | Purpose |
 |-----------|------|---------|
 | `HealthCheckController` | `/health`, `/ready`, `/live` | Health and readiness probes |
-| `ServerStatsController` | `/api/debug/stats` | Server diagnostics |
+| `ServerStatsControllerWithCoroutines` | `/api/debug/stats` | Server diagnostics |
 | `JobMonitorController` | `/api/monitor/*` | Job status and management |
 | `PrometheusMetricsController` | `/metrics` | Prometheus metrics endpoint |
 | `WebSocketController` | `/ws` | WebSocket endpoint |
+
+The health probes, `/metrics` and `/ws` sit outside the `/api` routes covered by the default OpenAPI export. `/metrics` serves Prometheus text rather than an API resource envelope.
 
 ## DTOs
 

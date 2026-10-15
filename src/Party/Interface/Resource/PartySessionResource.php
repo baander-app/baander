@@ -12,7 +12,7 @@ use OpenApi\Attributes as OA;
     schema: 'PartySessionResource',
     properties: [
         new OA\Property(property: 'uuid', type: 'string', format: 'uuid', description: 'Session UUID'),
-        new OA\Property(property: 'publicId', type: 'string', format: 'uuid', description: 'Public identifier'),
+        new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
         new OA\Property(property: 'hostUserId', type: 'string', format: 'uuid', description: 'Host user UUID'),
         new OA\Property(property: 'videoId', type: 'string', format: 'uuid', description: 'Video UUID'),
         new OA\Property(property: 'transcodeJobId', type: 'string', format: 'uuid', nullable: true, description: 'Transcode job that the host\'s playback steers; null when none was named or the job has been deleted'),

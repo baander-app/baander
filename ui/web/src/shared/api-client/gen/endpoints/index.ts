@@ -497,12 +497,22 @@ export const CreatePairingCodeRequestMethod = {
 } as const;
 
 export interface CreatePairingCodeRequest {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   serverPublicId: string;
   method: CreatePairingCodeRequestMethod;
 }
 
 export interface CompletePairingRequest {
   pairingCode: string;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   serverPublicId: string;
 }
 
@@ -550,7 +560,12 @@ export interface SearchLyricsRequest {
 }
 
 export interface ApplyLyricsRequest {
-  /** Public ID of the song to apply lyrics to */
+  /**
+     * Public ID of the song to apply lyrics to
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   songPublicId: string;
 }
 
@@ -634,13 +649,13 @@ export interface UpdatePlaylistRequest {
 }
 
 export interface AddSongRequest {
-  /** Public ID of the song to add */
+  /** UUID of the song to add */
   songId: string;
 }
 
 export interface ReorderSongsRequest {
   /**
-     * Ordered array of song public IDs
+     * Ordered array of song UUIDs
      * @minItems 1
      */
   songIds: string[];
@@ -880,7 +895,12 @@ export interface ApiError {
 export interface ActivityResource {
   /** Activity UUID */
   uuid: string;
-  /** Public identifier */
+  /**
+     * Public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId: string;
   /** User UUID */
   userId: string;
@@ -955,7 +975,12 @@ export interface ValidationError {
 export type RecentItemResourceCoverImage = { [key: string]: unknown } | null;
 
 export interface RecentItemResource {
-  /** Public identifier */
+  /**
+     * Public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId: string;
   /** Type of activity */
   activityType: string;
@@ -965,8 +990,11 @@ export interface RecentItemResource {
      */
   songTitle?: string | null;
   /**
-     * Song public UUID
+     * Song public identifier
+     * @minLength 21
+     * @maxLength 21
      * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   songPublicId?: string | null;
   /**
@@ -975,8 +1003,11 @@ export interface RecentItemResource {
      */
   albumTitle?: string | null;
   /**
-     * Album public UUID
+     * Album public identifier
+     * @minLength 21
+     * @maxLength 21
      * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   albumPublicId?: string | null;
   /**
@@ -1064,7 +1095,12 @@ export interface AdminOAuthClientCredentialsResource {
 export interface AdminUserResource {
   /** Internal UUID */
   id: string;
-  /** Public-facing UUID */
+  /**
+     * Public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId: string;
   /** Display name */
   name: string;
@@ -1129,7 +1165,12 @@ export interface AdminUserSettingResource {
 export interface ClientResource {
   /** Internal UUID */
   uuid: string;
-  /** Public-facing UUID */
+  /**
+     * Public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId: string;
   /** Client name */
   name: string;
@@ -1307,7 +1348,12 @@ export interface TokenResource {
 export interface UserResource {
   /** Internal UUID */
   uuid: string;
-  /** Public-facing UUID */
+  /**
+     * Public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId: string;
   /** Display name */
   name: string;
@@ -1484,7 +1530,7 @@ export interface SongResource {
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   publicId: string;
-  /** Album UUID */
+  /** Album public identifier, or UUID when unavailable */
   albumId: string;
   /** Song title */
   title: string;
@@ -1778,7 +1824,12 @@ export const ServerInstanceResourceStatus = {
 export interface ServerInstanceResource {
   /** Server UUID */
   uuid: string;
-  /** Public identifier */
+  /**
+     * Public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId: string;
   /** Server base URL */
   serverUrl: string;
@@ -1812,9 +1863,19 @@ export const PairingSessionResourceMethod = {
 export interface PairingSessionResource {
   /** Pairing session UUID */
   uuid: string;
-  /** Public identifier */
+  /**
+     * Public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId: string;
-  /** Server public ID */
+  /**
+     * Server public ID
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   serverPublicId: string;
   /** Server base URL */
   serverUrl: string;
@@ -2099,7 +2160,12 @@ export const PartySessionResourcePlaybackState = {
 export interface PartySessionResource {
   /** Session UUID */
   uuid: string;
-  /** Public identifier */
+  /**
+     * Public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId: string;
   /** Host user UUID */
   hostUserId: string;
@@ -2446,7 +2512,12 @@ export interface FailedMessageResource {
 export interface TranscodeMetricsResource {
   /** Job UUID */
   uuid: string;
-  /** Public identifier */
+  /**
+     * Public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId: string;
   /** Video UUID */
   videoId: string;
@@ -2510,7 +2581,12 @@ export type TranscodeSessionResourceMetrics = { [key: string]: unknown } | null;
 export interface TranscodeSessionResource {
   /** Session UUID */
   uuid: string;
-  /** Public identifier */
+  /**
+     * Public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId: string;
   /** User UUID */
   userId: string;
@@ -4050,6 +4126,11 @@ export const PostDiscoveryPairingCodeBodyMethod = {
 } as const;
 
 export type PostDiscoveryPairingCodeBody = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   serverPublicId: string;
   method: PostDiscoveryPairingCodeBodyMethod;
 };
@@ -4065,6 +4146,11 @@ export type GetDiscoveryQrPayload200 = {
 
 export type PostDiscoveryCompletePairingBody = {
   pairingCode: string;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   serverPublicId: string;
 };
 
@@ -5135,6 +5221,7 @@ export type PostPlaylistAddSong201 = {
 };
 
 export type PostPlaylistReorderBody = {
+  /** Ordered array of song UUIDs */
   songIds: string[];
 };
 

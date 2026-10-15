@@ -89,7 +89,7 @@ final class DiscoveryController
                 schema: new OA\Schema(
                     required: ['serverPublicId', 'method'],
                     properties: [
-                        new OA\Property(property: 'serverPublicId', type: 'string', format: 'uuid'),
+                        new OA\Property(property: 'serverPublicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
                         new OA\Property(property: 'method', type: 'string', enum: ['qr_code', 'email_url', 'server_code']),
                     ],
                 ),
@@ -118,7 +118,7 @@ final class DiscoveryController
         path: '/api/discovery/qr-payload/{serverPublicId}',
         summary: 'Get QR payload for a pending pairing session',
         parameters: [
-            new OA\Parameter(name: 'serverPublicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'serverPublicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(properties: [
@@ -161,7 +161,7 @@ final class DiscoveryController
                     required: ['pairingCode', 'serverPublicId'],
                     properties: [
                         new OA\Property(property: 'pairingCode', type: 'string'),
-                        new OA\Property(property: 'serverPublicId', type: 'string', format: 'uuid'),
+                        new OA\Property(property: 'serverPublicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
                     ],
                 ),
             ),

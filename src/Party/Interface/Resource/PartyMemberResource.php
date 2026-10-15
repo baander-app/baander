@@ -12,7 +12,7 @@ use OpenApi\Attributes as OA;
     schema: 'PartyMemberResource',
     properties: [
         new OA\Property(property: 'uuid', type: 'string', format: 'uuid', description: 'Member UUID'),
-        new OA\Property(property: 'publicId', type: 'string', format: 'uuid', description: 'Public identifier'),
+        new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
         new OA\Property(property: 'userId', type: 'string', format: 'uuid', description: 'User UUID'),
         new OA\Property(property: 'sessionId', type: 'string', format: 'uuid', description: 'Session UUID'),
         new OA\Property(property: 'role', type: 'string', enum: ['host', 'member'], description: 'Member role'),

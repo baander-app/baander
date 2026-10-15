@@ -12,7 +12,7 @@ use OpenApi\Attributes as OA;
     schema: 'ClientResource',
     properties: [
         new OA\Property(property: 'uuid', type: 'string', format: 'uuid', description: 'Internal UUID'),
-        new OA\Property(property: 'publicId', type: 'string', format: 'uuid', description: 'Public-facing UUID'),
+        new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
         new OA\Property(property: 'name', type: 'string', description: 'Client name'),
         new OA\Property(property: 'redirect', type: 'string', description: 'JSON-encoded array of redirect URIs'),
         new OA\Property(property: 'personalAccessClient', type: 'boolean', description: 'Whether this is a personal access client'),

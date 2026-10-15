@@ -45,35 +45,40 @@ State value objects `SyncedPartySessionState` and `PartyMemberState` keep constr
 
 ## API Endpoints
 
-All endpoints are prefixed with `/api`.
+REST endpoints use `/api/party/sessions`. Session `{uuid}` parameters are UUIDs, not `PublicId` NanoIDs. Session resources expose both `uuid` and the separate 21-character `publicId`.
 
 ### Party Sessions
 
 | Method | Path | Controller | Purpose |
 |--------|------|------------|---------|
-| GET | `/api/parties` | `PartySessionController` | List parties |
-| POST | `/api/parties` | `PartySessionController` | Create a new party |
-| GET | `/api/parties/{uuid}` | `PartySessionController` | Get a single party session |
-| DELETE | `/api/parties/{uuid}` | `PartySessionController` | End a party session |
+| GET | `/api/party/sessions/` | `PartySessionController` | List parties |
+| POST | `/api/party/sessions/` | `PartySessionController` | Create a new party |
+| GET | `/api/party/sessions/{uuid}` | `PartySessionController` | Get a single party session |
+| DELETE | `/api/party/sessions/{uuid}` | `PartySessionController` | End a party session |
 
 ### Party Members
 
 | Method | Path | Controller | Purpose |
 |--------|------|------------|---------|
-| POST | `/api/parties/{uuid}/join` | `PartyMemberController` | Join a party |
-| POST | `/api/parties/{uuid}/leave` | `PartyMemberController` | Leave a party |
+| POST | `/api/party/sessions/{uuid}/join` | `PartySessionController` | Join a party |
+| POST | `/api/party/sessions/{uuid}/leave` | `PartySessionController` | Leave a party |
+| GET | `/api/party/sessions/{uuid}/members/` | `PartyMemberController` | List party members |
+| PATCH | `/api/party/sessions/{uuid}/members/me` | `PartyMemberController` | Update the current member's playback preferences |
+| POST | `/api/party/sessions/{uuid}/members/transfer-host` | `PartyMemberController` | Transfer the host role |
 
 ### Playback
 
 | Method | Path | Controller | Purpose |
 |--------|------|------------|---------|
-| POST | `/api/parties/{uuid}/sync` | `PartyMemberController` | Sync playback state |
+| POST | `/api/party/sessions/{uuid}/sync` | `PartySessionController` | Sync playback state |
 
 ### WebSocket
 
 | Path | Controller | Purpose |
 |------|------------|---------|
-| WebSocket endpoint | `PartyWebSocketController` | Real-time playback sync, state broadcasting |
+| `GET /ws/party/{sessionPublicId}/` | `PartyWebSocketController` | HTTP lookup of session details and WebSocket connection URL |
+
+The lookup takes the session's 21-character `PublicId`, rather than its UUID. It sits outside the default `/api` OpenAPI export. Playback messages and state broadcasts use the shared WebSocket runtime, not the HTTP lookup controller.
 
 ## Cross-Context Dependencies
 
@@ -106,4 +111,4 @@ The `Infrastructure/Playback/` directory contains the jitter compensation and sy
 
 ### WebSocket
 
-`PartyWebSocketController` handles real-time communication for playback state broadcasting between party members.
+`PartyWebSocketController` returns connection information. The shared `WebSocketController` dispatches playback commands and broadcasts events between party members.

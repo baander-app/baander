@@ -10,9 +10,11 @@ When you need a primitive type, async utility, or shared controller, look here f
 
 | Model | Purpose |
 |-------|---------|
-| `Uuid` | UUID v7 — used as all primary keys throughout the system |
-| `PublicId` | Public-facing opaque identifier, separate from internal UUID |
+| `Uuid` | UUID value object; generates v7 by default |
+| `PublicId` | 21-character NanoID, distinct from UUID identity |
 | `Email` | Typed email value object with validation |
+
+`PublicId` uses 21 characters matching `^[0-9a-zA-Z_-]{21}$`, for example `V1StGXR8_Z5jdHi6B-myT`. Identifier types remain endpoint-specific; see [PublicId](../shared-kernel.md#publicid) for UUID and protocol identifier exceptions.
 
 ### Pagination
 
@@ -195,15 +197,17 @@ Removing a language reverses the steps. A stored choice of the removed language 
 |-----------|------|---------|
 | `SystemSettingsController` | `/api/admin/settings` | Server settings and every setting definition (see [Settings](#settings)) |
 | `HealthCheckController` | `/health`, `/ready`, `/live` | Health and readiness probes |
-| `ServerStatsController` | `/api/stats` | Server diagnostics and statistics |
-| `JobMonitorController` | `/api/jobs` | Job status and management |
-| `JobAnalyticsController` | `/api/jobs/analytics` | Job analytics and metrics |
-| `PrometheusMetricsController` | `/api/metrics` | Prometheus metrics endpoint |
-| `TransportController` | `/api/transport` | Messenger transport status |
-| `ConfigCheckController` | `/api/config/check` | Configuration validation |
-| `RateLimiterMonitorController` | `/api/rate-limiter` | Rate limiter status and statistics |
+| `ServerStatsControllerWithCoroutines` | `/api/debug/stats` | Server diagnostics and statistics |
+| `JobMonitorController` | `/api/monitor/jobs` | Job status and management |
+| `JobAnalyticsController` | `/api/monitor/analytics/*` | Job analytics and metrics |
+| `PrometheusMetricsController` | `/metrics` | Prometheus metrics endpoint |
+| `TransportController` | `/api/monitor/transport/*` | Messenger transport status |
+| `ConfigCheckController` | `/api/debug/config-check` | Configuration validation |
+| `RateLimiterMonitorController` | `/api/monitor/rate-limiters` | Rate limiter status and statistics |
 | `SpaController` | `/` | Single-page application entry point (catch-all) |
 | `WebSocketController` | `/ws` | WebSocket connection endpoint |
+
+The health probes, `/metrics` and `/ws` sit outside the `/api` routes covered by the default OpenAPI export. `/metrics` serves Prometheus text rather than an API resource envelope.
 
 ## DTOs
 

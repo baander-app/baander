@@ -12,8 +12,8 @@ use OpenApi\Attributes as OA;
     schema: 'PairingSessionResource',
     properties: [
         new OA\Property(property: 'uuid', type: 'string', format: 'uuid', description: 'Pairing session UUID'),
-        new OA\Property(property: 'publicId', type: 'string', format: 'uuid', description: 'Public identifier'),
-        new OA\Property(property: 'serverPublicId', type: 'string', format: 'uuid', description: 'Server public ID'),
+        new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
+        new OA\Property(property: 'serverPublicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Server public ID'),
         new OA\Property(property: 'serverUrl', type: 'string', format: 'uri', description: 'Server base URL'),
         new OA\Property(property: 'serverName', type: 'string', description: 'Server display name'),
         new OA\Property(property: 'pairingCode', type: 'string', description: 'Human-readable pairing code'),

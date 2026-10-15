@@ -14,12 +14,12 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'RecentItemResource',
     properties: [
-        new OA\Property(property: 'publicId', type: 'string', description: 'Public identifier'),
+        new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
         new OA\Property(property: 'activityType', type: 'string', description: 'Type of activity'),
         new OA\Property(property: 'songTitle', type: 'string', nullable: true, description: 'Song title'),
-        new OA\Property(property: 'songPublicId', type: 'string', format: 'uuid', nullable: true, description: 'Song public UUID'),
+        new OA\Property(property: 'songPublicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, description: 'Song public identifier'),
         new OA\Property(property: 'albumTitle', type: 'string', nullable: true, description: 'Album title'),
-        new OA\Property(property: 'albumPublicId', type: 'string', format: 'uuid', nullable: true, description: 'Album public UUID'),
+        new OA\Property(property: 'albumPublicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, description: 'Album public identifier'),
         new OA\Property(property: 'artistName', type: 'string', nullable: true, description: 'Artist name'),
         new OA\Property(property: 'coverImage', type: 'object', nullable: true, description: 'Cover image with url and blurhash'),
         new OA\Property(property: 'lastPlayedAt', type: 'string', format: 'date-time', nullable: true, description: 'Last play timestamp'),

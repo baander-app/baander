@@ -12,7 +12,7 @@ use Symfony\Component\Validator\Constraints\Choice;
     schema: 'CreatePairingCodeRequest',
     required: ['serverPublicId', 'method'],
     properties: [
-        new OA\Property(property: 'serverPublicId', type: 'string', format: 'uuid'),
+        new OA\Property(property: 'serverPublicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
         new OA\Property(property: 'method', type: 'string', enum: ['qr_code', 'email_url', 'server_code']),
     ],
 )]

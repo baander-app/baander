@@ -559,7 +559,7 @@ final class PlaylistController
                 schema: new OA\Schema(
                     required: ['songIds'],
                     properties: [
-                        new OA\Property(property: 'songIds', type: 'array', items: new OA\Items(type: 'string')),
+                        new OA\Property(property: 'songIds', description: 'Ordered array of song UUIDs', type: 'array', items: new OA\Items(type: 'string', format: 'uuid')),
                     ],
                 ),
             ),

@@ -12,7 +12,7 @@ use OpenApi\Attributes as OA;
     schema: 'TranscodeSessionResource',
     properties: [
         new OA\Property(property: 'uuid', type: 'string', format: 'uuid', description: 'Session UUID'),
-        new OA\Property(property: 'publicId', type: 'string', format: 'uuid', description: 'Public identifier'),
+        new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
         new OA\Property(property: 'userId', type: 'string', format: 'uuid', description: 'User UUID'),
         new OA\Property(property: 'jobId', type: 'string', format: 'uuid', description: 'Transcode job UUID'),
         new OA\Property(property: 'videoId', type: 'string', format: 'uuid', description: 'Video UUID'),

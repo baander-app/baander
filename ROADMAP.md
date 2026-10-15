@@ -23,13 +23,13 @@ batches describe their own checkpoints; the current gate below takes precedence.
 Any harness can take over from this section; nothing below depends on a tool that
 only one agent host has.
 
-- **Branch.** `plan/messenger-without-swoole` continues from published `master`
-  (`2cb17476`). It qualifies console/Messenger fallback with the native extension
-  removed from disposable test containers. The
-  [qualification checkpoint](#messenger-without-swoole) records its scope and checks.
-  The prior ParaTest delivery is merged and published to both remotes; its
-  [checkpoint](#parallel-backend-verification) remains the full-suite and coverage
-  baseline. This follow-up remains local until publishing is requested.
+- **Branch.** `plan/api-contract-reconciliation` continues from published `master`
+  (`fa948313`). It reconciles API identifier schemas, the generated web client,
+  the embedded remix response and canonical reference guides. The
+  [checkpoint](#api-contract-reconciliation) records the current verification.
+  Messenger-without-Swoole was fast-forwarded into `master` and pushed to both
+  remotes at the user's request; its [checkpoint](#messenger-without-swoole) remains
+  valid. This follow-up remains local until publishing is requested.
 - **Previous baseline.** Item 8 was merged and pushed. `master` (eced16d6) holds its fifteen
   commits and the roadmap commit on top of 63466d0d by fast-forward, code-reviewed
   with both findings applied and every gate green (the item 8 checkpoint below).
@@ -83,11 +83,11 @@ only one agent host has.
   under concurrent writers has no version check; sharing has no invitation step, so
   an owner can add any user unasked; removing a song is not judged by the actor's
   visibility; the visible-song count materialises rows. None blocks the item.
-- **Next.** The first open lines of the
-  [application security backlog](#application-security-and-reliability): the
-  route, schema, client and identifier reconciliation, and the remaining registry
-  threat-model work. Messenger/Redis fallback without Swoole is qualified below.
-  The local dev database note at the end of this section still stands.
+- **Next.** The remaining registry threat-model work in the
+  [application security backlog](#application-security-and-reliability).
+  Messenger/Redis fallback and API contract reconciliation are qualified below.
+  React Native and Android remain deferred. The local dev database note at the
+  end of this section still stands.
 
 The backend release-gate package is complete (see the next two sections). Eight
 plans followed it, in this order, and all eight are delivered:
@@ -1373,9 +1373,12 @@ the agreed host budget.
   The seek broker retains the latest pending control signal per job under bursts.
   Track streams use the current media read scope on every request; a real-firewall
   test covers anonymous, unrelated, member, revoked member, and administrator access.
-- [ ] Reconcile documented routes, OpenAPI schemas, generated clients, and identifier
-  formats together. The initial review found 24 documented paths missing from the
-  checked-in specification; keep automated drift checks blocking thereafter.
+- [x] Reconcile documented API routes, identifier schemas, the generated web client
+  and the embedded creation-response consumer. The historical missing-route work
+  already delivered bidirectional coverage and blocking drift checks; the
+  [current checkpoint](#api-contract-reconciliation) records the remaining
+  semantic corrections and verifies 244 paths / 313 operations. Hand-written
+  React Native and Android clients remain deferred by the user's instruction.
 - [x] Eliminate the configured PHPStan diagnostics, including the old baseline,
   without new suppressions; verify the full scan and combined unit/rule suites.
 - [x] Eliminate remaining Deptrac boundary violations using application ports
@@ -1592,6 +1595,60 @@ unindexed test callbacks, and commit by path.
 Keep independent changes reviewable and record checks without implying broader
 coverage. The complete programme is done only when blocking checks, security and
 workflow integrations, and registry consistency/resource/failover/restore gates pass.
+
+## API contract reconciliation
+
+Implementation follows the [reviewed plan](docs/plans/api-contract-reconciliation.md).
+The old 24-path finding predates the delivered route-coverage and drift gates;
+current routing and the regenerated specification agree on 244 paths and 313
+operations. The specification still has 126 component schemas, with 16 corrected
+schemas and no added or removed operation.
+
+- NanoID declarations now match `PublicId`'s 21-character alphabet across Activity,
+  Auth, Discovery, Party, Transcode and lyrics application. Discovery's inline and
+  path schemas match its request DTOs. Recent-item nullability is preserved, and
+  unused PartyMember/TranscodeJob resource declarations have direct tests.
+- Genuine UUID contracts remain UUIDs, including passkeys whose field is named
+  `publicId`. Playlist add/reorder examples now use song UUIDs. Song `albumId`
+  documents its existing public-ID-or-UUID behavior; no runtime identifier,
+  routing, persistence or authentication policy changed.
+- `openapi.json` and the Orval web client were regenerated together. The embedded
+  remix consumer now reads the direct transcode creation resource. Its regression
+  failed before the fix and now checks the returned UUID, unchanged request and
+  HTTP-failure behavior.
+- Canonical API, glossary, shared-kernel, Party/Shared context and export-command
+  guides now describe the tracked specification, endpoint-specific identifier and
+  envelope contracts, current routes and export checking. Existing refresh grace
+  and logout/revocation semantics are documented from their implementation. An
+  invalid cursor example is replaced with an explicit opaque placeholder.
+
+Verification in `baander-ci-prewarm:local`, PHP 8.5.2:
+
+- The affected backend selection passed 124 tests / 2,279 assertions across nine
+  files in 104.9 seconds, including setup, report validation and cleanup. It covers
+  identifier schemas, the value object, export failures, bidirectional route
+  coverage, Discovery/Playlist/Lyrics controllers and publication drift gates.
+  Artifacts: `var/test-runs/20261015-174147-90abf5f2`.
+- Web tests passed 2,032 cases across 184 files; embedded tests passed 161 cases
+  across 11 files, including the two new remix regressions. Regeneration parity
+  passed against the regenerated artifact.
+- Web and embedded typechecks passed. Web lint passed with zero errors and the
+  seven standing warnings; the production build and Symfony/Vite manifest,
+  application-asset and auth-worker verification passed.
+- Platform requirements, PHPStan, Deptrac (zero violations, warnings or errors;
+  495 existing baseline entries), container lint and OpenAPI export parity passed.
+  Static logs: `/tmp/baander-paratest-static-qocqaf03`. All disposable containers,
+  networks and volumes were removed.
+- Independent plan/code review and simplification completed. The export-scope
+  and cursor-example findings were applied; prose-fix audits, JSON examples,
+  relative links and whitespace checks passed. GitNexus remains stale, so source
+  inspection supplied the missing impact evidence.
+
+React Native and Android remain deferred. Their hand-written clients still use
+obsolete album-track, playlist-method/song/reorder and session endpoints; this
+checkpoint does not qualify those clients. The current checks cover the corrected
+contracts and existing route inventory, not every response field or a live
+Forgejo run.
 
 ## Messenger without Swoole
 

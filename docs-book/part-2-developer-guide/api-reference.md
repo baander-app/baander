@@ -2,13 +2,17 @@
 
 ## OpenAPI Specification
 
-Baander generates its OpenAPI specification from source code using Nelmio ApiDoc. The spec is derived from attributes on controllers, request DTOs, and response resources, so it always reflects the current codebase.
+Baander generates its OpenAPI specification from source code using Nelmio ApiDoc. The spec is derived from attributes on controllers, request DTOs, and response resources. Route and schema tests check its coverage; export and client-generation checks detect drift in the checked-in artifacts.
 
-The interactive Swagger UI is available at `/api/doc` in development environments. There is no static copy of the spec committed to the repository -- it would go stale. Instead, export a fresh copy on demand:
+The JSON documentation route is `/api/doc.json`; the Swagger UI route at `/api/doc` is currently commented out in `config/routes/nelmio_api_doc.yaml`. The repository tracks `openapi.json`, which supplies the web Orval client. After changing an API contract, export the specification and regenerate the client:
 
 ```bash
 make exec cmd="php bin/console app:export-openapi-spec"
 ```
+
+Run `app:export-openapi-spec --check` to compare the tracked file with the current export without writing it. The web client has `yarn generate` and `yarn generate:check` scripts in `ui/web`; the latter regenerates the client and fails on a tracked diff.
+
+The default export covers application `/api` routes; the generated documentation endpoint `/api/doc.json` is excluded. Operational endpoints such as `/health` and `/metrics`, WebSocket paths and `/.well-known` discovery endpoints are outside that export.
 
 See the [export command documentation](../part-1-operator-guide/commands/app-export-openapi-spec.md) for full details.
 
@@ -16,17 +20,17 @@ See the [export command documentation](../part-1-operator-guide/commands/app-exp
 
 ### Resource-Based URLs
 
-Endpoints follow a resource-oriented pattern. Collections live under a plural noun; individual resources are addressed by their public ID.
+Endpoints follow a resource-oriented pattern. Collections live under a plural noun; the identifier for an individual resource is defined by that endpoint.
 
 | Pattern | Example |
 |---------|---------|
-| List collection | `GET /api/playlists` |
-| Create resource | `POST /api/playlists` |
+| List collection | `GET /api/playlists/` |
+| Create resource | `POST /api/playlists/` |
 | Read single resource | `GET /api/playlists/{publicId}` |
 | Update resource | `PATCH /api/playlists/{publicId}` |
 | Delete resource | `DELETE /api/playlists/{publicId}` |
 
-The `{publicId}` path parameter is a public-facing identifier, separate from the internal UUID v7 primary key. This prevents information leakage while keeping URLs short and opaque.
+Playlist `{publicId}` values use `PublicId`: a 21-character NanoID matching `^[0-9a-zA-Z_-]{21}$`, for example `V1StGXR8_Z5jdHi6B-myT`. They are distinct from UUIDs. Identifier names alone do not establish the type: Party session `{uuid}` parameters and passkey deletion `{publicId}` parameters are UUIDs, while failed-transport message `{id}` parameters are integer strings. OAuth token identifiers and WebAuthn credential identifiers have their own contracts. Read each parameter schema rather than applying one identifier format to every route.
 
 ### Pagination
 
@@ -50,30 +54,30 @@ Two pagination strategies are available depending on the endpoint.
 
 ### Single Resource
 
-A single resource is wrapped in a top-level `data` object:
+The envelope depends on the endpoint. `ApiResponsesTrait::successResponse()` wraps its payload in `data`; `created()` returns the payload directly with status `201`. For example, playlist updates return this excerpt inside `data`, while playlist and transcode-session creation return their resources directly:
 
 ```json
 {
   "data": {
-    "id": "p_abc123",
+    "publicId": "V1StGXR8_Z5jdHi6B-myT",
     "name": "Chill Vibes",
-    "created_at": "2025-06-15T12:00:00+00:00"
+    "createdAt": "2025-06-15T12:00:00+00:00"
   }
 }
 ```
 
 ### Cursor-Paginated Collection
 
-Returned as a `CursorPaginatedResponse`. The `meta` object contains navigation cursors and page metadata:
+Returned as a `CursorPaginatedResponse`. The `meta` object contains navigation cursors and page metadata. The cursor below is an illustrative placeholder; clients pass the server-provided cursor unchanged and treat its contents as opaque:
 
 ```json
 {
   "data": [
-    { "id": "p_abc123", "name": "Chill Vibes" },
-    { "id": "p_def456", "name": "Workout Mix" }
+    { "publicId": "V1StGXR8_Z5jdHi6B-myT", "name": "Chill Vibes" },
+    { "publicId": "0123456789abcdefghijk", "name": "Workout Mix" }
   ],
   "meta": {
-    "next_cursor": "eyJpZCI6InBfZGVmNDU2In0",
+    "next_cursor": "<opaque cursor from the server>",
     "prev_cursor": null,
     "has_next_page": true,
     "has_previous_page": false,
@@ -101,8 +105,8 @@ Returned as a `PaginatedResponse`. The `meta` object contains standard page meta
 ```json
 {
   "data": [
-    { "id": "p_abc123", "name": "Chill Vibes" },
-    { "id": "p_def456", "name": "Workout Mix" }
+    { "publicId": "V1StGXR8_Z5jdHi6B-myT", "name": "Chill Vibes" },
+    { "publicId": "0123456789abcdefghijk", "name": "Workout Mix" }
   ],
   "meta": {
     "current_page": 1,
@@ -122,7 +126,7 @@ Returned as a `PaginatedResponse`. The `meta` object contains standard page meta
 
 ### Error Responses
 
-All errors follow the `ApiError` format:
+Application errors generally follow the `ApiError` format. Protocol endpoints and DPoP nonce challenges can instead use OAuth-style `error` and `error_description` strings, as described under [Authentication](#authentication):
 
 ```json
 {
@@ -255,7 +259,9 @@ DPoP: <proof>
 {"refreshToken": "..."}
 ```
 
-The proof must be signed by the key the token pair was issued to. Each refresh token works once; the response contains a new pair with the same key binding. Reusing a consumed refresh token revokes its whole rotation chain. A refused refresh token answers `401`; sign in again. `503` with `Retry-After` means the server could not check the token, for example while its database restarts; keep the token and retry after the given delay.
+The proof must be signed by the key the token pair was issued to. Refresh consumes the token and returns a new pair with the same key binding. A lost response can be recovered within `auth.refresh.reuse_grace_seconds` (default and maximum 60 seconds; 0 disables recovery): a retry of the consumed token with the same proof key, while its live replacement remains unused, revokes that replacement pair and issues a fresh one. A retry outside the grace window or after a replacement was used revokes the whole rotation chain. A proof from another key is refused without revoking the chain.
+
+A refused refresh token answers `401`; sign in again. `503` with `Retry-After` means the server could not check the token, for example while its database or nonce store is unavailable; keep the token and retry after the given delay.
 
 ### Client Fingerprint Binding
 
@@ -435,21 +441,25 @@ Both take the `client_id` as `{clientId}`; an unknown one gets `404`. A first-pa
 
 ### Revocation
 
-`POST /api/auth/logout` revokes the current access token. `POST /api/oauth/revoke` (RFC 7009) requires an authenticated request, revokes an access or refresh token, and always returns `200`. Access tokens can be verified with the keys at `GET /.well-known/jwks.json`.
+`POST /api/auth/logout` revokes the presenting token's whole rotation chain, including its refresh tokens. `POST /api/oauth/revoke` (RFC 7009) requires authentication and revokes the chain of an access or refresh token held by the signed-in user. An unknown token or one held by another user gets the same `200` answer. Both operations close the chain's WebSocket connections after revocation commits; socket reconciliation retries closure when immediate closure fails. A revocation failure answers `503` with `Retry-After`; retry the request. Access tokens can be verified with the keys at `GET /.well-known/jwks.json`.
 
 ## Resource Pattern
 
-Controllers never serialize domain models directly. Instead, each context defines `AbstractResource` subclasses that transform domain models into API-safe response shapes. These resource classes expose a static `from()` method that accepts a domain model and returns the serialized array:
+Controllers never serialize domain models directly. Instead, each context defines `AbstractResource` subclasses that transform domain models into API-safe response shapes. These resource classes expose a static `from()` method that accepts a domain model or read view and returns the serialized array. This excerpt from `PlaylistResource` shows the public identifier and timestamp field names:
 
 ```php
 final class PlaylistResource extends AbstractResource
 {
-    public static function from(Playlist $playlist): array
+    public static function from(mixed $source): array
     {
+        assert($source instanceof PlaylistReadView);
+
         return [
-            'id' => $playlist->getPublicId()->toString(),
-            'name' => $playlist->getName(),
-            'created_at' => $playlist->getCreatedAt()->format(\DateTimeInterface::ATOM),
+            'uuid' => $source->getId()->toString(),
+            'publicId' => $source->getPublicId()->toString(),
+            'name' => $source->getName(),
+            // Other playlist fields omitted from this excerpt.
+            'createdAt' => $source->getCreatedAt()->format(\DateTimeInterface::ATOM),
         ];
     }
 }
