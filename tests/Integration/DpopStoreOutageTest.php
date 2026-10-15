@@ -55,6 +55,7 @@ final class DpopStoreOutageTest extends TestCase
     private string $databaseUrl;
     private RedisOutageOAuthKernel $kernel;
     private ?RedisOutageOAuthKernel $refusedKernel = null;
+    private ?RedisOutageOAuthKernel $isolatedRefusedKernel = null;
     private EntityManagerInterface $manager;
     private Connection $connection;
     private User $user;
@@ -88,7 +89,7 @@ final class DpopStoreOutageTest extends TestCase
             $details = openssl_pkey_get_details($key);
             self::assertIsArray($details);
             // Each kernel variant compiles into its own directory and reads the keys from it.
-            foreach (['working', 'refused'] as $variant) {
+            foreach (['working', 'refused', 'refused-isolated'] as $variant) {
                 $directory = self::$sharedDirectory . '/' . $variant;
                 self::assertTrue(mkdir($directory, 0700, true));
                 self::assertSame(strlen($privateKey), file_put_contents($directory . '/private.pem', $privateKey));
@@ -98,7 +99,7 @@ final class DpopStoreOutageTest extends TestCase
             }
         }
 
-        $this->kernel = new RedisOutageOAuthKernel(self::$sharedDirectory . '/working', $url);
+        $this->kernel = new RedisOutageOAuthKernel(self::$sharedDirectory . '/working', $url, isolateRateLimiters: true);
         $this->kernel->boot();
         $container = $this->kernel->getContainer();
         self::assertSame('prod', $container->getParameter('kernel.environment'));
@@ -151,6 +152,8 @@ final class DpopStoreOutageTest extends TestCase
         }
         $this->refusedKernel?->shutdown();
         $this->refusedKernel = null;
+        $this->isolatedRefusedKernel?->shutdown();
+        $this->isolatedRefusedKernel = null;
         parent::tearDown();
     }
 
@@ -280,8 +283,8 @@ final class DpopStoreOutageTest extends TestCase
 
     /**
      * A Redis that accepts connections but does not answer yields the 503 within the
-     * client's attempt timeout. The measured path includes the rate limiters and the
-     * Doctrine cache reads that precede the DPoP check, each bounded by its read timeout.
+     * client's attempt timeout. This fixture isolates limiter storage so the request
+     * reaches the real DPoP store rather than failing in an earlier throttle.
      */
     public function testAHungStoreAnswers503WithinTheClientsAttemptTimeoutAndTheSameKernelRefreshesAfterwards(): void
     {
@@ -388,9 +391,13 @@ final class DpopStoreOutageTest extends TestCase
         $key = new SignedDpopProof();
         $login = $this->login($key);
         $chainId = $this->refreshRow($login['refreshToken'])['chain_id'];
-        $refused = $this->refusedKernel();
+        $refused = $this->refusedKernel(false);
 
-        self::assertStoreUnavailable($this->me($login['accessToken'], $key, $refused));
+        $unavailableBudget = $this->me($login['accessToken'], $key, $refused);
+        self::assertStoreUnavailable($unavailableBudget, '1');
+        self::assertSame([
+            'error' => ['message' => 'Rate limiting is temporarily unavailable.', 'code' => 503],
+        ], json_decode((string) $unavailableBudget->getContent(), true, flags: JSON_THROW_ON_ERROR));
 
         $closeOffset = RecordingLiveConnections::size(self::$sharedDirectory . '/refused');
         $proof = $key->create('POST', self::ORIGIN . '/api/auth/logout', $login['accessToken']);
@@ -453,7 +460,7 @@ final class DpopStoreOutageTest extends TestCase
     {
         $key = new SignedDpopProof();
         $uri = self::ORIGIN . '/api/auth/logout';
-        $refused = $this->refusedKernel();
+        $refused = $this->refusedKernel(false);
 
         $first = $this->login($key);
         $proof = $key->create('POST', $uri, $first['accessToken']);
@@ -488,7 +495,7 @@ final class DpopStoreOutageTest extends TestCase
     {
         $key = new SignedDpopProof();
         $uri = self::ORIGIN . '/api/oauth/revoke';
-        $refused = $this->refusedKernel();
+        $refused = $this->refusedKernel(false);
         $caller = $this->login($key);
         $callerChainId = $this->refreshRow($caller['refreshToken'])['chain_id'];
         $other = $this->login($key);
@@ -614,10 +621,10 @@ final class DpopStoreOutageTest extends TestCase
         return $records;
     }
 
-    private static function assertStoreUnavailable(Response $response): void
+    private static function assertStoreUnavailable(Response $response, string $retryAfter = '5'): void
     {
         self::assertSame(503, $response->getStatusCode(), (string) $response->getContent());
-        self::assertSame('5', $response->headers->get('Retry-After'));
+        self::assertSame($retryAfter, $response->headers->get('Retry-After'));
         self::assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
         self::assertFalse($response->headers->has('DPoP-Nonce'));
         self::assertFalse($response->headers->has('WWW-Authenticate'));
@@ -626,8 +633,17 @@ final class DpopStoreOutageTest extends TestCase
         self::assertArrayNotHasKey('data', $body);
     }
 
-    private function refusedKernel(): RedisOutageOAuthKernel
+    private function refusedKernel(bool $isolateRateLimiters = true): RedisOutageOAuthKernel
     {
+        if ($isolateRateLimiters) {
+            if ($this->isolatedRefusedKernel === null) {
+                $this->isolatedRefusedKernel = new RedisOutageOAuthKernel(self::$sharedDirectory . '/refused-isolated', $this->databaseUrl, self::REFUSED_REDIS, isolateRateLimiters: true);
+                $this->isolatedRefusedKernel->boot();
+            }
+
+            return $this->isolatedRefusedKernel;
+        }
+
         if ($this->refusedKernel === null) {
             $this->refusedKernel = new RedisOutageOAuthKernel(self::$sharedDirectory . '/refused', $this->databaseUrl, self::REFUSED_REDIS);
             $this->refusedKernel->boot();

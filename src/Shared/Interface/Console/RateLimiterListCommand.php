@@ -32,13 +32,13 @@ final class RateLimiterListCommand extends Command
                 $limiter->policy,
                 $limiter->limit,
                 $limiter->interval ?? '',
-                $limiter->cachePool,
+                $limiter->storageNamespace,
                 $limiter->description ?? '',
             ];
         }
 
         (new SymfonyStyle($input, $output))->table(
-            ['Name', 'Policy', 'Limit', 'Interval', 'Cache pool', 'Description'],
+            ['Name', 'Policy', 'Limit', 'Interval', 'Storage namespace', 'Description'],
             $rows,
         );
 

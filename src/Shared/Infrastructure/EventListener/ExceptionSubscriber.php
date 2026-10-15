@@ -8,6 +8,7 @@ use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\HandlerFailure;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
+use App\Shared\Application\Exception\RateLimiterUnavailableException;
 use App\Shared\Application\Exception\ServiceUnavailableException;
 use App\Shared\Application\Http\RequestLocale;
 use App\Shared\Interface\DTO\ApiError;
@@ -103,7 +104,10 @@ final class ExceptionSubscriber
             ? $exception->trans($this->translator, $this->locale($event))
             : $exception->getMessage();
         $error = new ApiError($message, $status, $details);
-        $event->setResponse(new JsonResponse($error->toArray(), $status));
+        $headers = $exception instanceof RateLimiterUnavailableException
+            ? ['Retry-After' => '1', 'Cache-Control' => 'no-store']
+            : [];
+        $event->setResponse(new JsonResponse($error->toArray(), $status, $headers));
 
         return true;
     }

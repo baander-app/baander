@@ -16,7 +16,7 @@ final readonly class RateLimiterDefinition
         public int $limit,
         public ?string $interval,
         public ?string $description,
-        public string $cachePool,
+        public string $storageNamespace,
     ) {
     }
 }

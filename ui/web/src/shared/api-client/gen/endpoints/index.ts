@@ -6284,8 +6284,8 @@ export type GetMonitorRatelimitersList200DataLimiters = {[key: string]: {
   interval?: string | null;
   /** @nullable */
   description?: string | null;
-  /** Cache pool holding only this limiter's state */
-  cachePool?: string;
+  /** Redis namespace holding only this limiter's state */
+  storageNamespace?: string;
 }};
 
 export type GetMonitorRatelimitersList200Data = {

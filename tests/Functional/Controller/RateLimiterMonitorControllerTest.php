@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Controller;
 
+use App\Shared\Application\Exception\RateLimiterClearFailedException;
+use App\Shared\Application\Port\RateLimiterAdministrationInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use App\Tests\Functional\TestCase;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Yaml\Yaml;
@@ -26,8 +29,8 @@ final class RateLimiterMonitorControllerTest extends TestCase
         self::assertSame('fixed_window', $limiters['config_check']['policy']);
         self::assertSame('60 seconds', $limiters['discovery_endpoint_ip']['interval']);
 
-        $pools = array_column($limiters, 'cachePool');
-        self::assertCount(count($configured), array_unique($pools), 'Each limiter must have its own cache pool.');
+        $pools = array_column($limiters, 'storageNamespace');
+        self::assertCount(count($configured), array_unique($pools), 'Each limiter must have its own storage namespace.');
         foreach ($limiters as $name => $limiter) {
             self::assertNotEmpty($limiter['description'], sprintf('Limiter "%s" has no description.', $name));
         }
@@ -80,6 +83,27 @@ final class RateLimiterMonitorControllerTest extends TestCase
         );
 
         $this->assertJsonResponse($response, 404);
+    }
+
+    #[DataProvider('failedClearRoutes')]
+    public function testFailedClearReturnsAnUncacheableServiceFailure(string $route, string $method): void
+    {
+        $administration = $this->createMock(RateLimiterAdministrationInterface::class);
+        $administration->expects(self::once())->method($method)
+            ->willThrowException(RateLimiterClearFailedException::forLimiters(['config_check']));
+        static::getContainer()->set(RateLimiterAdministrationInterface::class, $administration);
+
+        $response = $this->authenticatedRequest('DELETE', $route . '?confirm=true', $this->createAdminUser());
+        $this->assertJsonResponse($response, 503);
+        self::assertSame('1', $response->headers->get('Retry-After'));
+        self::assertTrue($response->headers->hasCacheControlDirective('no-store'));
+    }
+
+    /** @return iterable<string, array{string, string}> */
+    public static function failedClearRoutes(): iterable
+    {
+        yield 'named clear' => ['/api/monitor/rate-limiters/config_check/clear', 'clear'];
+        yield 'clear all' => ['/api/monitor/rate-limiters/clear', 'clearAll'];
     }
 
     private function exhaust(string $name, string $key): void

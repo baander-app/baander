@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Infrastructure\Security;
 
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
+use App\Shared\Application\Exception\RateLimiterUnavailableException;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\Request;
@@ -105,7 +106,7 @@ final class ApiRateLimitListener
 
         try {
             $this->charge($event->getRequest());
-        } catch (TooManyRequestsHttpException $exception) {
+        } catch (TooManyRequestsHttpException|RateLimiterUnavailableException $exception) {
             $event->setThrowable($exception);
         }
     }
@@ -144,7 +145,16 @@ final class ApiRateLimitListener
 
     private function consume(RateLimiterFactoryInterface $factory, string $limiterName, string $key, Request $request): void
     {
-        $result = $factory->create($key)->consume(1);
+        try {
+            $result = $factory->create($key)->consume(1);
+        } catch (RateLimiterUnavailableException $exception) {
+            // Revocation remains available when only the generic budget store is down.
+            if (in_array($request->attributes->get('_route'), ['auth_logout', 'oauth_revoke'], true)) {
+                return;
+            }
+
+            throw $exception;
+        }
         if ($result->isAccepted()) {
             return;
         }

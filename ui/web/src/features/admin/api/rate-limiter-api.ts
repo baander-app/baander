@@ -7,7 +7,7 @@ export interface RateLimiterConfig {
   limit: number
   interval: string | null
   description: string | null
-  cachePool: string
+  storageNamespace: string
 }
 
 export interface RateLimitersResponse {

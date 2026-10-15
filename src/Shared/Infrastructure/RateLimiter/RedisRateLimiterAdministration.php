@@ -6,27 +6,19 @@ namespace App\Shared\Infrastructure\RateLimiter;
 
 use App\Shared\Application\DTO\RateLimiterDefinition;
 use App\Shared\Application\Exception\RateLimiterClearFailedException;
+use App\Shared\Application\Exception\RateLimiterUnavailableException;
 use App\Shared\Application\Exception\UnknownRateLimiterException;
 use App\Shared\Application\Port\RateLimiterAdministrationInterface;
-use Psr\Cache\CacheItemPoolInterface;
-use Psr\Container\ContainerInterface;
 
-/**
- * Clears limiter state by clearing the limiter's own cache pool.
- *
- * Symfony's CacheStorage keys state by a hash of limiter id and key, so state
- * cannot be enumerated per limiter inside a shared pool. Every limiter therefore
- * has a dedicated pool, which {@see RateLimiterCatalogPass} verifies and wires.
- */
-final readonly class CachePoolRateLimiterAdministration implements RateLimiterAdministrationInterface
+/** Resets the same Redis generations used by request consumption. */
+final readonly class RedisRateLimiterAdministration implements RateLimiterAdministrationInterface
 {
     /**
-     * @param array<string, array{policy: string, limit: int, interval: ?string, description: ?string, cachePool: string}> $limiters
-     * @param ContainerInterface $pools cache pools keyed by limiter name
+     * @param array<string, array{policy: string, limit: int, interval: ?string, description: ?string, storageNamespace: string}> $limiters
      */
     public function __construct(
         private array $limiters,
-        private ContainerInterface $pools,
+        private RedisRateLimiterStore $store,
     ) {
     }
 
@@ -40,7 +32,7 @@ final readonly class CachePoolRateLimiterAdministration implements RateLimiterAd
                 limit: $limiter['limit'],
                 interval: $limiter['interval'],
                 description: $limiter['description'],
-                cachePool: $limiter['cachePool'],
+                storageNamespace: $limiter['storageNamespace'],
             );
         }
 
@@ -53,7 +45,9 @@ final readonly class CachePoolRateLimiterAdministration implements RateLimiterAd
             throw UnknownRateLimiterException::named($name, array_keys($this->limiters));
         }
 
-        if (!$this->pool($name)->clear()) {
+        try {
+            $this->store->clear($name);
+        } catch (RateLimiterUnavailableException) {
             throw RateLimiterClearFailedException::forLimiters([$name]);
         }
     }
@@ -62,7 +56,9 @@ final readonly class CachePoolRateLimiterAdministration implements RateLimiterAd
     {
         $failed = [];
         foreach (array_keys($this->limiters) as $name) {
-            if (!$this->pool($name)->clear()) {
+            try {
+                $this->store->clear($name);
+            } catch (RateLimiterUnavailableException) {
                 $failed[] = $name;
             }
         }
@@ -72,13 +68,5 @@ final readonly class CachePoolRateLimiterAdministration implements RateLimiterAd
         }
 
         return array_keys($this->limiters);
-    }
-
-    private function pool(string $name): CacheItemPoolInterface
-    {
-        $pool = $this->pools->get($name);
-        \assert($pool instanceof CacheItemPoolInterface);
-
-        return $pool;
     }
 }

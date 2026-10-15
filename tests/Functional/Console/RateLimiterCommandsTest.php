@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Console;
 
+use App\Shared\Infrastructure\RateLimiter\RedisRateLimiterStore;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Console\Command\Command;
@@ -24,14 +25,14 @@ final class RateLimiterCommandsTest extends KernelTestCase
         parent::tearDown();
     }
 
-    public function testListShowsEveryConfiguredLimiterAndItsPool(): void
+    public function testListShowsEveryConfiguredLimiterAndItsNamespace(): void
     {
         $tester = $this->command('app:rate-limiter:list');
 
         self::assertSame(Command::SUCCESS, $tester->execute([]), $tester->getDisplay());
         foreach ($this->configuredLimiterNames() as $name) {
             self::assertStringContainsString($name, $tester->getDisplay());
-            self::assertStringContainsString('cache.rate_limiter.' . $name, $tester->getDisplay());
+            self::assertStringContainsString(RedisRateLimiterStore::namespace($name), $tester->getDisplay());
         }
     }
 

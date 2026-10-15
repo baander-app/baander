@@ -38,6 +38,7 @@ use App\Auth\Interface\Request\User\VerifyEmailRequest;
 use App\Auth\Interface\Resource\TokenResource;
 use App\Auth\Interface\Resource\UserResource;
 use App\Shared\Application\Exception\HandlerFailure;
+use App\Shared\Application\Exception\RateLimiterUnavailableException;
 use App\Shared\Application\Http\AcceptLanguageMatcher;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\Uuid;
@@ -319,6 +320,9 @@ final class AuthController
         try {
             $this->commandBus->dispatch($command);
         } catch (\Throwable $e) {
+            if (HandlerFailure::cause($e) instanceof RateLimiterUnavailableException) {
+                throw $e;
+            }
             // Always return 200 to avoid revealing whether the email exists.
             $this->logger->error('Password reset request failed.', [
                 'exception' => $e,
@@ -556,6 +560,9 @@ final class AuthController
         try {
             $this->commandBus->dispatch(new ResendEmailVerificationCommand($user->getId()->toString()));
         } catch (\Throwable $e) {
+            if (HandlerFailure::cause($e) instanceof RateLimiterUnavailableException) {
+                throw $e;
+            }
             // The answer stays the same; the user can ask again.
             $this->logger->error('Verification email resend failed.', [
                 'exception' => $e,

@@ -17086,10 +17086,10 @@
                                                                 "type": "string",
                                                                 "nullable": true
                                                             },
-                                                            "cachePool": {
-                                                                "description": "Cache pool holding only this limiter's state",
+                                                            "storageNamespace": {
+                                                                "description": "Redis namespace holding only this limiter's state",
                                                                 "type": "string",
-                                                                "example": "cache.rate_limiter.auth_login_ip"
+                                                                "example": "baander:rate-limiter:{61d020e0131329c31cff1092c253794a7b7e3468b31b7ce86c054e2c7a5d7bce}"
                                                             }
                                                         },
                                                         "type": "object"
@@ -17171,7 +17171,7 @@
                         }
                     },
                     "503": {
-                        "description": "A cache pool could not be cleared",
+                        "description": "Limiter state could not be cleared",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -17260,7 +17260,7 @@
                         }
                     },
                     "503": {
-                        "description": "Cache pool clear failed",
+                        "description": "Storage namespace clear failed",
                         "content": {
                             "application/json": {
                                 "schema": {

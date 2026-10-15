@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Shared\Infrastructure\EventListener;
 use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
+use App\Shared\Application\Exception\RateLimiterUnavailableException;
 use App\Shared\Application\Exception\ServiceUnavailableException;
 use App\Shared\Application\Http\RequestLocale;
 use App\Shared\Infrastructure\EventListener\ExceptionSubscriber;
@@ -130,6 +131,34 @@ final class UseCaseOutcomeMappingTest extends TestCase
         $this->assertSame('5', $response->headers->get('Retry-After'));
         $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
         $this->assertSame(['error' => ['message' => 'An unexpected error occurred.', 'code' => 503]], $this->body($response));
+    }
+
+    public function testARateLimiterOutageHasRetryAndNoStoreHeaders(): void
+    {
+        $response = $this->handle(static function (): never {
+            throw new RateLimiterUnavailableException();
+        });
+
+        $this->assertRateLimiterUnavailable($response);
+    }
+
+    public function testARateLimiterOutageWrappedByMessengerHasRetryAndNoStoreHeaders(): void
+    {
+        $response = $this->handle($this->dispatching($this->bus(static function (): never {
+            throw new RateLimiterUnavailableException();
+        })));
+
+        $this->assertRateLimiterUnavailable($response);
+    }
+
+    private function assertRateLimiterUnavailable(Response $response): void
+    {
+        $this->assertSame(503, $response->getStatusCode());
+        $this->assertSame('1', $response->headers->get('Retry-After'));
+        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
+        $this->assertSame([
+            'error' => ['message' => (new RateLimiterUnavailableException())->getMessage(), 'code' => 503],
+        ], $this->body($response));
     }
 
     public function testAnHttpExceptionFromAHandlerIsPassedOnUnwrappedForTheFrameworkToRender(): void

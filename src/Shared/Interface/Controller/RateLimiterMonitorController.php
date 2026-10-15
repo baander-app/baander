@@ -46,7 +46,7 @@ final class RateLimiterMonitorController
                                 new OA\Property(property: 'limit', type: 'integer'),
                                 new OA\Property(property: 'interval', type: 'string', example: '60 seconds', nullable: true),
                                 new OA\Property(property: 'description', type: 'string', nullable: true),
-                                new OA\Property(property: 'cachePool', description: 'Cache pool holding only this limiter\'s state', type: 'string', example: 'cache.rate_limiter.auth_login_ip'),
+                                new OA\Property(property: 'storageNamespace', description: 'Redis namespace holding only this limiter\'s state', type: 'string', example: 'baander:rate-limiter:{61d020e0131329c31cff1092c253794a7b7e3468b31b7ce86c054e2c7a5d7bce}'),
                             ], type: 'object'),
                         ),
                         new OA\Property(property: 'count', description: 'Total number of configured rate limiters', type: 'integer'),
@@ -67,7 +67,7 @@ final class RateLimiterMonitorController
                 'limit'       => $limiter->limit,
                 'interval'    => $limiter->interval,
                 'description' => $limiter->description,
-                'cachePool'   => $limiter->cachePool,
+                'storageNamespace'   => $limiter->storageNamespace,
             ];
         }
 
@@ -100,7 +100,7 @@ final class RateLimiterMonitorController
                 ),
             ),
             new OA\Response(response: '422', description: 'Missing confirm parameter', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
-            new OA\Response(response: '503', description: 'A cache pool could not be cleared', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '503', description: 'Limiter state could not be cleared', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/clear', name: 'clear_all', methods: ['DELETE'])]
@@ -114,7 +114,7 @@ final class RateLimiterMonitorController
         try {
             $cleared = $this->rateLimiters->clearAll();
         } catch (RateLimiterClearFailedException $e) {
-            return $this->errorResponse($e->getMessage(), Response::HTTP_SERVICE_UNAVAILABLE);
+            return $this->clearFailed($e);
         }
 
         return $this->successResponse([
@@ -146,7 +146,7 @@ final class RateLimiterMonitorController
             ),
             new OA\Response(response: '404', description: 'Unknown limiter name', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Missing confirm parameter', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
-            new OA\Response(response: '503', description: 'Cache pool clear failed', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '503', description: 'Storage namespace clear failed', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
     #[Route('/{name}/clear', name: 'clear', methods: ['DELETE'])]
@@ -162,13 +162,22 @@ final class RateLimiterMonitorController
         } catch (UnknownRateLimiterException $e) {
             return $this->errorResponse($e->getMessage(), Response::HTTP_NOT_FOUND);
         } catch (RateLimiterClearFailedException $e) {
-            return $this->errorResponse($e->getMessage(), Response::HTTP_SERVICE_UNAVAILABLE);
+            return $this->clearFailed($e);
         }
 
         return $this->successResponse([
             'cleared' => true,
             'limiter' => $name,
         ]);
+    }
+
+    private function clearFailed(RateLimiterClearFailedException $exception): JsonResponse
+    {
+        $response = $this->errorResponse($exception->getMessage(), Response::HTTP_SERVICE_UNAVAILABLE);
+        $response->headers->set('Retry-After', '1');
+        $response->headers->set('Cache-Control', 'no-store');
+
+        return $response;
     }
 
     private function isConfirmed(Request $request): bool
