@@ -13,6 +13,7 @@ use App\Auth\Application\Command\User\EnableUserCommand;
 use App\Auth\Application\DTO\AuthorizationResponseDTO;
 use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Application\Exception\OAuthProtocolException;
+use App\Auth\Application\Service\WebSocketOriginPolicy;
 use App\Auth\Application\Port\WebSocketTicketIssuerInterface;
 use App\Auth\Application\Port\WebSocketTicketRedeemerInterface;
 use App\Auth\Domain\Model\OAuth\Client;
@@ -47,6 +48,12 @@ final class DisabledUserAccessTest extends TestCase
 
     /** @var array<string, string> client UUIDs by public ID */
     private array $clientUuids = [];
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        static::getContainer()->set(WebSocketOriginPolicy::class, new WebSocketOriginPolicy('https://baander.app'));
+    }
 
     public function testDisablingEndsEverySessionWithinOneRequest(): void
     {

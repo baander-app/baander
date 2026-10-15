@@ -45,7 +45,10 @@ final class WsTicketAuthenticatorTest extends TestCase
         (new WsTicketAuthenticator($redeemer))->authenticate($this->request());
     }
 
-    /** @param array<string, mixed> $server @param array<string, mixed> $headers */
+    /**
+     * @param array<string, mixed> $server
+     * @param array<string, mixed> $headers
+     */
     #[DataProvider('invalidRequests')]
     public function testInvalidRequestsNeverReachTheRedeemer(array $server, array $headers): void
     {
@@ -79,7 +82,10 @@ final class WsTicketAuthenticatorTest extends TestCase
         yield 'null origin' => [[], ['origin' => 'null']];
     }
 
-    /** @param array<string, mixed> $server @param array<string, mixed> $headers */
+    /**
+     * @param array<string, mixed> $server
+     * @param array<string, mixed> $headers
+     */
     private function request(array $server = [], array $headers = []): Request
     {
         $request = new Request();

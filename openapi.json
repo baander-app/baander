@@ -4159,6 +4159,72 @@
                 "security": []
             }
         },
+        "/api/ws/tickets": {
+            "post": {
+                "tags": [
+                    "Auth"
+                ],
+                "summary": "Issue a single-use WebSocket handshake ticket",
+                "operationId": "post_auth_websocket_ticket",
+                "parameters": [
+                    {
+                        "name": "Origin",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "A ticket valid for at most thirty seconds",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/WebSocketTicketResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication required",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "DPoP proof or Origin refused",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "Ticket authorization or storage unavailable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/admin/albums/{publicId}/delete-preview": {
             "get": {
                 "tags": [
@@ -23762,6 +23828,25 @@
                         "example": "123456",
                         "nullable": true,
                         "default": null
+                    }
+                },
+                "type": "object"
+            },
+            "WebSocketTicketResource": {
+                "required": [
+                    "ticket",
+                    "expiresAt"
+                ],
+                "properties": {
+                    "ticket": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$",
+                        "maxLength": 64,
+                        "minLength": 64
+                    },
+                    "expiresAt": {
+                        "type": "string",
+                        "format": "date-time"
                     }
                 },
                 "type": "object"

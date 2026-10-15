@@ -30,7 +30,10 @@ final class WithWebSocketHandlerHandshakeTest extends TestCase
         self::assertSame('s3pPLMBiTxaQ9kYGzzhZRbK+xOo=', $reply['headers']['Sec-WebSocket-Accept']);
     }
 
-    /** @param array<string, mixed> $server @param array<string, mixed> $headers */
+    /**
+     * @param array<string, mixed> $server
+     * @param array<string, mixed> $headers
+     */
     #[DataProvider('invalidHandshakes')]
     public function testInvalidWireRequestsCannotConsumeTheTicket(array $server, array $headers): void
     {
@@ -76,7 +79,9 @@ final class WithWebSocketHandlerHandshakeTest extends TestCase
     public function testObjectAuthenticatorsRemainSupported(): void
     {
         $authenticator = new class(self::IDENTITY) {
+            /** @param array<string, string> $identity */
             public function __construct(private array $identity) {}
+            /** @return array<string, string> */
             public function authenticate(Request $request): array { return $this->identity; }
         };
         self::assertSame(101, $this->handshake($authenticator)['status']);
@@ -160,7 +165,7 @@ final class WithWebSocketHandlerHandshakeTest extends TestCase
      * @param array<string, mixed> $serverFields
      * @param array<string, mixed> $headers
      * @param list<string>|null $origins
-     * @return array{status: int|null, body: string|null, headers: array<string, array|string>, opened: list<array{int, string, string}>}
+     * @return array{status: int|null, body: string|null, headers: array<string, array<string>|string>, opened: list<array{int, string, string}>}
      */
     private function handshake(mixed $authenticator, array $serverFields = [], array $headers = [], ?array $origins = ['https://baander.app']): array
     {

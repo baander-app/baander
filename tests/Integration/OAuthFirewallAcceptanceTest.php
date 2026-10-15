@@ -358,7 +358,7 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         self::assertNull($store->consume($ticket, 'https://baander.app', '/api/ws'));
     }
 
-    /** @return iterable<string, array{string}> */
+    /** @return iterable<string, array{'revoked'|'disabled'|'expired'|'unbound'}> */
     public static function ticketAuthorizationChanges(): iterable
     {
         yield 'token revoked' => ['revoked'];
@@ -367,6 +367,7 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         yield 'proof binding removed' => ['unbound'];
     }
 
+    /** @param 'revoked'|'disabled'|'expired'|'unbound' $change */
     #[DataProvider('ticketAuthorizationChanges')]
     public function testTicketRedemptionReadsCommittedAuthorizationDespiteStaleManagedEntities(string $change): void
     {

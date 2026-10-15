@@ -1379,6 +1379,16 @@ export interface LoginRequest {
   totpCode?: string | null;
 }
 
+export interface WebSocketTicketResource {
+  /**
+     * @minLength 64
+     * @maxLength 64
+     * @pattern ^[0-9a-f]{64}$
+     */
+  ticket: string;
+  expiresAt: string;
+}
+
 export type FileDeletionPreviewResourceFilesItemVerdict = typeof FileDeletionPreviewResourceFilesItemVerdict[keyof typeof FileDeletionPreviewResourceFilesItemVerdict];
 
 
@@ -3611,6 +3621,10 @@ export type PutAuthMePassword200Data = {
 
 export type PutAuthMePassword200 = {
   data?: PutAuthMePassword200Data;
+};
+
+export type PostAuthWebsocketTicket200 = {
+  data?: WebSocketTicketResource;
 };
 
 export type GetAdminAlbumDeletePreviewParams = {
@@ -11934,6 +11948,76 @@ export const usePostAuthLoginLogin = <TError = ErrorType<ApiError>,
         TContext
       > => {
       return useMutation(getPostAuthLoginLoginMutationOptions(options), queryClient);
+    }
+
+export const getPostAuthWebsocketTicketUrl = () => {
+
+
+
+
+  return `/api/ws/tickets`
+}
+
+/**
+ * @summary Issue a single-use WebSocket handshake ticket
+ */
+export const postAuthWebsocketTicket = async ( options?: RequestInit): Promise<PostAuthWebsocketTicket200> => {
+
+  return customInstance<PostAuthWebsocketTicket200>(getPostAuthWebsocketTicketUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getPostAuthWebsocketTicketMutationOptions = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthWebsocketTicket>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAuthWebsocketTicket>>, TError,void, TContext> => {
+
+const mutationKey = ['postAuthWebsocketTicket'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAuthWebsocketTicket>>, void> = () => {
+
+
+          return  postAuthWebsocketTicket(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostAuthWebsocketTicketMutationResult = NonNullable<Awaited<ReturnType<typeof postAuthWebsocketTicket>>>
+
+    export type PostAuthWebsocketTicketMutationError = ErrorType<ApiError>
+
+    /**
+ * @summary Issue a single-use WebSocket handshake ticket
+ */
+export const usePostAuthWebsocketTicket = <TError = ErrorType<ApiError>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAuthWebsocketTicket>>, TError,void, TContext>, request?: SecondParameter<typeof customInstance>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof postAuthWebsocketTicket>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getPostAuthWebsocketTicketMutationOptions(options), queryClient);
     }
 
 export const getGetAdminAlbumDeletePreviewUrl = (publicId: string,
