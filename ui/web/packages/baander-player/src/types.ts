@@ -480,8 +480,8 @@ export const DEFAULT_FEATURE_FLAGS: FeatureFlags = {
 export interface PlayerConfig {
   /** Backend base URL (e.g. "https://baander.local"). */
   baseUrl: string;
-  /** Auth token for DPoP / Bearer header. */
-  authToken?: string;
+  /** Host-authenticated issuance of a fresh ticket before every WebSocket connection. */
+  getWebSocketTicket?: (signal: AbortSignal) => Promise<string>;
   /** Which manifest format to prefer. */
   preferredFormat: 'hls' | 'dash';
   /** Starting rendition by quality name (e.g. "720p"). */

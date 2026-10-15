@@ -398,10 +398,16 @@ export class BaanderPlayer {
   /** Join a co-watching party session. */
   async joinParty(sessionId: string, userId: string, displayName: string): Promise<void> {
     if (!this.config.features.party) return;
+    const getConnectionTicket = this.config.getWebSocketTicket;
+    if (!getConnectionTicket) throw new Error('A WebSocket ticket provider is required for parties');
+    this.partyBus?.leave();
+    const wsEndpoint = new URL('/api/ws', this.config.baseUrl || globalThis.location.origin);
+    wsEndpoint.protocol = wsEndpoint.protocol === 'https:' ? 'wss:' : 'ws:';
 
     this.partyBus = new PartySyncBus(
       {
-        wsEndpoint: `${this.config.baseUrl}/api/party/ws`,
+        wsEndpoint: wsEndpoint.href,
+        getConnectionTicket,
         syncToleranceMs: 500,
         broadcastIntervalMs: 1000,
         getPosition: () => this.videoElement?.currentTime ?? 0,

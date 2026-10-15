@@ -15,6 +15,7 @@ vi.mock('@/shared/crypto/dpop-store', () => ({
 }));
 vi.mock('@/shared/crypto/dpop-proof', () => ({ createDpopProof: crypto.proof }));
 import { AXIOS_INSTANCE, ensureFreshAccessToken, getAuthSession } from '@/shared/api-client/axios-instance';
+import { requestWebSocketTicket, webSocketEndpoint } from '@/shared/auth/websocket-ticket';
 import { schedulerAdminApi } from '@/features/admin/api/scheduler-admin-api';
 import { REFRESH_ATTEMPT_TIMEOUT_MS, REFRESH_BUDGET_MS } from '@/shared/auth/refresh-budget';
 import { FakeLockManager, installLocks } from '../auth/auth-fakes';
@@ -627,5 +628,58 @@ describe('a refresh shared between tabs', () => {
     expect(refresh.history.post).toHaveLength(0);
     expect(auth.adoptStoredAuth).not.toHaveBeenCalled();
     expectSessionKept();
+  });
+});
+
+describe('WebSocket ticket issuance', () => {
+  it('issues through the existing DPoP-authenticated HTTP client with cancellation', async () => {
+    const ticket = 'a'.repeat(64);
+    const controller = new AbortController();
+    api.onPost('/api/ws/tickets').reply(200, { data: { ticket, expiresAt: '2026-10-15T12:00:30Z' } });
+    await expect(requestWebSocketTicket(controller.signal)).resolves.toBe(ticket);
+    expect(api.history.post[0].headers?.Authorization).toBe('DPoP old-access');
+    expect(api.history.post[0].headers?.DPoP).toBe('proof');
+    expect(api.history.post[0].signal).toBe(controller.signal);
+    expect(crypto.proof).toHaveBeenCalledWith(crypto.key, 'post', 'https://api.baander.app/api/ws/tickets', {
+      accessToken: 'old-access', nonce: undefined,
+    });
+  });
+
+  it('refreshes an expired access token before issuing a connection ticket', async () => {
+    api.onPost('/api/ws/tickets').replyOnce(401).onPost('/api/ws/tickets')
+      .reply(200, { data: { ticket: 'b'.repeat(64), expiresAt: '2026-10-15T12:00:30Z' } });
+    refresh.onPost().reply(200, { accessToken: 'new-access', refreshToken: 'new-refresh' });
+    await expect(requestWebSocketTicket(new AbortController().signal)).resolves.toBe('b'.repeat(64));
+    expect(api.history.post.map(request => request.headers?.Authorization)).toEqual([
+      'DPoP old-access', 'DPoP new-access',
+    ]);
+    expect(refresh.history.post).toHaveLength(1);
+  });
+
+  it('signs a fresh proof when ticket issuance challenges the DPoP nonce', async () => {
+    api.onPost('/api/ws/tickets').replyOnce(400, { error: 'use_dpop_nonce' }, { 'dpop-nonce': 'ticket-nonce' })
+      .onPost('/api/ws/tickets').reply(200, { data: { ticket: 'c'.repeat(64), expiresAt: '2026-10-15T12:00:30Z' } });
+    await requestWebSocketTicket(new AbortController().signal);
+    expect(crypto.proof).toHaveBeenLastCalledWith(crypto.key, 'post', 'https://api.baander.app/api/ws/tickets', {
+      accessToken: 'old-access', nonce: 'ticket-nonce',
+    });
+    expect(api.history.post).toHaveLength(2);
+  });
+
+  it.each([
+    {},
+    { data: { ticket: 'raw-access-token', expiresAt: '2026-10-15T12:00:30Z' } },
+    { data: { ticket: 'A'.repeat(64), expiresAt: '2026-10-15T12:00:30Z' } },
+    { data: { ticket: 'a'.repeat(64) + '\n', expiresAt: '2026-10-15T12:00:30Z' } },
+    { data: { ticket: 'a'.repeat(64), expiresAt: 'invalid' } },
+  ])('rejects an invalid ticket receipt without exposing its contents', async body => {
+    api.onPost('/api/ws/tickets').reply(200, body);
+    await expect(requestWebSocketTicket(new AbortController().signal)).rejects.toThrow('Invalid WebSocket ticket response');
+  });
+
+  it('builds an exact upgrade path from the configured API origin', () => {
+    expect(webSocketEndpoint()).toBe('wss://api.baander.app/api/ws');
+    window.__BAANDER_API_URL__ = 'http://local.baander.app:8080/base';
+    expect(webSocketEndpoint()).toBe('ws://local.baander.app:8080/api/ws');
   });
 });

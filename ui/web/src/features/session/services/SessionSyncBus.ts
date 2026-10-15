@@ -5,8 +5,8 @@
 
 export interface SessionSyncConfig {
   wsEndpoint: string
-  /** Read on every connect, so a reconnect uses the token current at that moment. */
-  getAuthToken: () => string | null | undefined
+  /** Issue a fresh single-use ticket for each connection attempt. */
+  getConnectionTicket: (signal: AbortSignal) => Promise<string>
   deviceId: string
   getPosition: () => number
   getQueue: () => string[]
@@ -37,6 +37,8 @@ export class SessionSyncBus {
   private sessionArgs: { sessionId: string } | null = null
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private reconnectDelayMs = SessionSyncBus.RECONNECT_INITIAL_MS
+  private connectionGeneration = 0
+  private ticketRequest: AbortController | null = null
 
   constructor(config: SessionSyncConfig, events: SessionSyncEvents) {
     this.config = config
@@ -44,41 +46,56 @@ export class SessionSyncBus {
   }
 
   async connect(sessionId: string): Promise<void> {
+    this.disconnect()
     this.sessionArgs = { sessionId }
-    this.cancelReconnect()
+    const generation = this.connectionGeneration
+    const request = new AbortController()
+    this.ticketRequest = request
 
-    const url = this.buildWsUrl()
-    const ws = new WebSocket(url)
-    this.ws = ws
+    try {
+      const ticket = await this.config.getConnectionTicket(request.signal)
+      if (request.signal.aborted || generation !== this.connectionGeneration) return
+      if (ticket.length !== 64 || !/^[a-f0-9]{64}$/.test(ticket)) throw new Error('Invalid WebSocket ticket')
+      const url = new URL(this.config.wsEndpoint)
+      url.search = new URLSearchParams({ ticket }).toString()
+      const ws = new WebSocket(url.href)
+      this.ws = ws
 
-    // A socket this bus has replaced or released may still report events; only the current one counts.
-    ws.onopen = () => {
-      if (this.ws !== ws) return
-      this.send({
-        type: 'session.join',
-        deviceId: this.config.deviceId,
-      })
-      this.reconnectDelayMs = SessionSyncBus.RECONNECT_INITIAL_MS
-    }
+      // A socket this bus has replaced or released may still report events; only the current one counts.
+      ws.onopen = () => {
+        if (this.ws !== ws) return
+        this.send({
+          type: 'session.join',
+          deviceId: this.config.deviceId,
+        })
+        this.reconnectDelayMs = SessionSyncBus.RECONNECT_INITIAL_MS
+      }
 
-    ws.onmessage = (event) => {
-      if (this.ws !== ws) return
-      try {
-        const msg = JSON.parse(event.data as string)
-        if (msg.type === 'session.state' || msg.type === 'session.joined') {
-          this.events.onStateUpdate(msg.data ?? msg)
-        }
-      } catch { /* ignore malformed */ }
-    }
+      ws.onmessage = (event) => {
+        if (this.ws !== ws) return
+        try {
+          const msg = JSON.parse(event.data as string)
+          if (msg.type === 'session.state' || msg.type === 'session.joined') {
+            this.events.onStateUpdate(msg.data ?? msg)
+          }
+        } catch { /* ignore malformed */ }
+      }
 
-    ws.onerror = () => {
-      if (this.ws !== ws) return
-      this.events.onError(new Error('Session WebSocket error'))
-    }
+      ws.onerror = () => {
+        if (this.ws !== ws) return
+        this.events.onError(new Error('Session WebSocket error'))
+      }
 
-    ws.onclose = () => {
-      if (this.ws !== ws) return
+      ws.onclose = () => {
+        if (this.ws !== ws) return
+        this.scheduleReconnect()
+      }
+    } catch {
+      if (request.signal.aborted || generation !== this.connectionGeneration) return
+      this.events.onError(new Error('Unable to connect the session WebSocket'))
       this.scheduleReconnect()
+    } finally {
+      if (this.ticketRequest === request) this.ticketRequest = null
     }
   }
 
@@ -107,6 +124,9 @@ export class SessionSyncBus {
   }
 
   disconnect(): void {
+    this.connectionGeneration++
+    this.ticketRequest?.abort()
+    this.ticketRequest = null
     this.sessionArgs = null
     this.cancelReconnect()
     const ws = this.ws
@@ -121,14 +141,6 @@ export class SessionSyncBus {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN
   }
 
-  private buildWsUrl(): string {
-    const base = this.config.wsEndpoint
-    const sep = base.includes('?') ? '&' : '?'
-    const token = this.config.getAuthToken()
-    const auth = token ? `${sep}token=${encodeURIComponent(token)}` : ''
-    return `${base}${auth}`
-  }
-
   private scheduleReconnect(): void {
     if (!this.sessionArgs) return
     const delay = this.nextReconnectDelay()
@@ -138,7 +150,9 @@ export class SessionSyncBus {
       if (!this.sessionArgs) return
       try {
         await this.connect(this.sessionArgs.sessionId)
-      } catch { /* scheduleReconnect called by onclose */ }
+      } catch {
+        this.scheduleReconnect()
+      }
     }, delay)
   }
 

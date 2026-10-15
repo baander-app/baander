@@ -29,8 +29,8 @@ export interface PartySyncConfig {
   broadcastIntervalMs: number;
   /** WebSocket endpoint for party events. */
   wsEndpoint: string;
-  /** Auth token for WebSocket connection. */
-  authToken?: string;
+  /** Host-authenticated issuance of a fresh single-use connection ticket. */
+  getConnectionTicket: (signal: AbortSignal) => Promise<string>;
   /** Callback to read current playback position from the player. */
   getPosition: () => number;
 }
@@ -78,6 +78,8 @@ export class PartySyncBus {
   private joinArgs: { sessionId: string; userId: string; displayName: string } | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private reconnectDelayMs = PartySyncBus.RECONNECT_INITIAL_MS;
+  private connectionGeneration = 0;
+  private ticketRequest: AbortController | null = null;
 
   constructor(
     config: PartySyncConfig,
@@ -89,6 +91,7 @@ export class PartySyncBus {
 
   /** Join a co-watching session. */
   async join(sessionId: string, userId: string, displayName: string): Promise<void> {
+    this.leave();
     this.localParticipantId = userId;
 
     // Store join args for reconnection
@@ -105,53 +108,72 @@ export class PartySyncBus {
       syncOffsetMs: 0,
     };
 
-    const url = this.buildWsUrl(sessionId);
-    this.ws = new WebSocket(url);
+    const generation = this.connectionGeneration;
+    const request = new AbortController();
+    this.ticketRequest = request;
+    try {
+      const ticket = await this.config.getConnectionTicket(request.signal);
+      if (request.signal.aborted || generation !== this.connectionGeneration) return;
+      if (ticket.length !== 64 || !/^[a-f0-9]{64}$/.test(ticket)) throw new Error('Invalid WebSocket ticket');
+      const url = new URL(this.config.wsEndpoint);
+      url.search = new URLSearchParams({ ticket }).toString();
+      const ws = new WebSocket(url.href);
+      this.ws = ws;
 
-    this.ws.onopen = () => {
-      // Send join message
-      this.send({
-        type: 'participant-joined',
-        participant: { id: userId, displayName, position: 0, isHost: false },
-      });
+      ws.onopen = () => {
+        if (this.ws !== ws) return;
+        this.reconnectDelayMs = PartySyncBus.RECONNECT_INITIAL_MS;
+        this.send({
+          type: 'participant-joined',
+          participant: { id: userId, displayName, position: 0, isHost: false },
+        });
+        this.broadcastTimer = setInterval(() => {
+          this.broadcastCurrentPosition();
+        }, this.config.broadcastIntervalMs);
+      };
 
-      // Start position broadcasting
-      this.broadcastTimer = setInterval(() => {
-        this.broadcastCurrentPosition();
-      }, this.config.broadcastIntervalMs);
-    };
-
-    this.ws.onmessage = (event) => {
-      try {
-        const partyEvent = JSON.parse(event.data as string) as PartyEvent;
-        this.handleIncomingEvent(partyEvent);
-      } catch {
-        // Ignore malformed messages
-      }
-    };
-
-    this.ws.onerror = () => {
-      this.events.onError(new Error('Party WebSocket error'));
-    };
-
-    this.ws.onclose = () => {
-      this.stopBroadcast();
+      ws.onmessage = (event) => {
+        if (this.ws !== ws) return;
+        try {
+          const partyEvent = JSON.parse(event.data as string) as PartyEvent;
+          this.handleIncomingEvent(partyEvent);
+        } catch {
+          // Ignore malformed messages.
+        }
+      };
+      ws.onerror = () => {
+        if (this.ws !== ws) return;
+        this.events.onError(new Error('Party WebSocket error'));
+      };
+      ws.onclose = () => {
+        if (this.ws !== ws) return;
+        this.stopBroadcast();
+        this.scheduleReconnect();
+      };
+    } catch {
+      if (request.signal.aborted || generation !== this.connectionGeneration) return;
+      this.events.onError(new Error('Unable to connect the party WebSocket'));
       this.scheduleReconnect();
-    };
+    } finally {
+      if (this.ticketRequest === request) this.ticketRequest = null;
+    }
   }
 
   /** Leave the session. */
   leave(): void {
-    this.joinArgs = null; // Prevent reconnect
+    this.connectionGeneration++;
+    this.ticketRequest?.abort();
+    this.ticketRequest = null;
+    this.joinArgs = null;
     this.cancelReconnect();
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.send({
-        type: 'participant-left',
-        participantId: this.localParticipantId,
-      });
-      this.ws.close();
+    const ws = this.ws;
+    if (ws?.readyState === WebSocket.OPEN) {
+      this.send({ type: 'participant-left', participantId: this.localParticipantId });
     }
     this.ws = null;
+    if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) {
+      ws.close();
+    }
     this.stopBroadcast();
     this.state = null;
   }
@@ -279,16 +301,6 @@ export class PartySyncBus {
     }
   }
 
-  /** Build the WebSocket URL, appending auth token if available. */
-  private buildWsUrl(sessionId: string): string {
-    const base = `${this.config.wsEndpoint}/${sessionId}`;
-    if (this.config.authToken) {
-      const sep = base.includes('?') ? '&' : '?';
-      return `${base}${sep}token=${encodeURIComponent(this.config.authToken)}`;
-    }
-    return base;
-  }
-
   /** Schedule a reconnection attempt with exponential backoff. */
   private scheduleReconnect(): void {
     // Don't reconnect if the user explicitly left or state was cleared
@@ -307,10 +319,8 @@ export class PartySyncBus {
       if (!this.joinArgs) return; // leave() called during wait
       try {
         await this.join(this.joinArgs.sessionId, this.joinArgs.userId, this.joinArgs.displayName);
-        // Reconnect succeeded — reset backoff
-        this.reconnectDelayMs = PartySyncBus.RECONNECT_INITIAL_MS;
       } catch {
-        // join() threw — scheduleReconnect will be called by the onclose handler
+        this.scheduleReconnect();
       }
     }, delay);
   }

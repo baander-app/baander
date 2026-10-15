@@ -3,7 +3,7 @@ import { renderHook, act, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 
-vi.mock('@/shared/api-client/axios-instance', () => ({
+vi.mock('@/shared/api-client/axios-instance', () => ({ apiOrigin: () => 'https://api.baander.app',
   AXIOS_INSTANCE: {
     get: vi.fn(),
     put: vi.fn(),
@@ -55,8 +55,8 @@ vi.mock('@/features/auth/stores/auth-store', () => ({
 
 const { MockSessionSyncBus } = vi.hoisted(() => {
   class MockSessionSyncBus {
-    connect = vi.fn()
-    disconnect = vi.fn()
+    connect = vi.fn().mockResolvedValue(undefined)
+    disconnect = vi.fn().mockResolvedValue(undefined)
     sendSync = vi.fn()
     isConnected = vi.fn(() => false)
   }

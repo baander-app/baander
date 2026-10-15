@@ -9,7 +9,7 @@ import { mediator } from '@/shared/lib/mediator/bus'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
 import { useSession } from '../hooks/use-session'
 
-vi.mock('@/shared/api-client/axios-instance', () => ({ AXIOS_INSTANCE: {
+vi.mock('@/shared/api-client/axios-instance', () => ({ apiOrigin: () => 'https://api.baander.app', AXIOS_INSTANCE: {
   get: vi.fn(),
   post: vi.fn(() => Promise.resolve({ data: {} })),
   put: vi.fn(() => Promise.resolve({ data: {} })),
@@ -107,6 +107,12 @@ async function mountConnected(activeDeviceId: ActiveDevice) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  let issued = 0
+  vi.mocked(AXIOS_INSTANCE.post).mockImplementation(async (url) => ({
+    data: url === '/api/ws/tickets'
+      ? { data: { ticket: (++issued).toString(16).padStart(64, '0'), expiresAt: '2026-10-15T12:00:30Z' } }
+      : {},
+  }))
   FakeWebSocket.instances = []
   vi.stubGlobal('WebSocket', FakeWebSocket)
   useAuthStore.setState({ accessToken: 'token-at-connect', isAuthenticated: true })
@@ -122,19 +128,19 @@ afterEach(() => {
   clients.splice(0).forEach(client => client.clear())
 })
 
-it('reconnects the session socket with the token that was refreshed while it was connected', async () => {
+it('requests a new ticket after authentication refresh before reconnecting', async () => {
   const { hook, socket } = await mountConnected('local-device')
-  expect(socket.url).toBe('/api/ws?token=token-at-connect')
+  expect(socket.url).toBe(`wss://api.baander.app/api/ws?ticket=${'1'.padStart(64, '0')}`)
 
   useAuthStore.setState({ accessToken: 'token-after-refresh' })
   vi.useFakeTimers()
-  act(() => {
+  await act(async () => {
     socket.drop()
-    vi.advanceTimersToNextTimer()
+    await vi.advanceTimersToNextTimerAsync()
   })
 
   expect(FakeWebSocket.instances).toHaveLength(2)
-  expect(FakeWebSocket.instances[1].url).toBe('/api/ws?token=token-after-refresh')
+  expect(FakeWebSocket.instances[1].url).toBe(`wss://api.baander.app/api/ws?ticket=${'2'.padStart(64, '0')}`)
   hook.unmount()
 })
 
@@ -208,13 +214,36 @@ it('closes a session socket that is still connecting when the tab clears its cre
   hook.unmount()
 })
 
-it('reconnects with the token current after a new login', async () => {
+it('requests a fresh ticket after a new login', async () => {
   const { hook } = await mountConnected('local-device')
   act(() => { useAuthStore.getState().clearAuth() })
 
   act(() => { useAuthStore.setState({ accessToken: 'token-after-login', isAuthenticated: true }) })
 
   await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(2))
-  expect(FakeWebSocket.instances[1].url).toBe('/api/ws?token=token-after-login')
+  expect(FakeWebSocket.instances[1].url).toBe(`wss://api.baander.app/api/ws?ticket=${'2'.padStart(64, '0')}`)
+  hook.unmount()
+})
+
+
+it('does not open a socket when logout wins a pending ticket request', async () => {
+  let finish!: (value: unknown) => void
+  const pending = new Promise(done => { finish = done })
+  let signal: AbortSignal | undefined
+  vi.mocked(AXIOS_INSTANCE.post).mockImplementation((url, _body, config) => {
+    if (url !== '/api/ws/tickets') return Promise.resolve({ data: {} })
+    signal = config?.signal as AbortSignal
+    return pending as ReturnType<typeof AXIOS_INSTANCE.post>
+  })
+  vi.mocked(AXIOS_INSTANCE.get).mockResolvedValue({ data: { data: sessionFor('local-device', 15) } })
+  const hook = renderHook(() => useSession(), { wrapper })
+  await waitFor(() => expect(signal).toBeDefined())
+  act(() => { useAuthStore.getState().clearAuth() })
+  expect(signal?.aborted).toBe(true)
+  await act(async () => {
+    finish({ data: { data: { ticket: 'a'.repeat(64), expiresAt: '2026-10-15T12:00:30Z' } } })
+    await pending
+  })
+  expect(FakeWebSocket.instances).toHaveLength(0)
   hook.unmount()
 })

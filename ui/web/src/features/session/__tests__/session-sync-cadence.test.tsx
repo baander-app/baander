@@ -7,7 +7,7 @@ import { getCurrentTime, updateTime } from '@/features/player/stores/player-time
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { useSession } from '../hooks/use-session'
 
-vi.mock('@/shared/api-client/axios-instance', () => ({ AXIOS_INSTANCE: {
+vi.mock('@/shared/api-client/axios-instance', () => ({ apiOrigin: () => 'https://api.baander.app', AXIOS_INSTANCE: {
   get: vi.fn(), post: vi.fn(() => Promise.resolve({ data: {} })), put: vi.fn(() => Promise.resolve({ data: {} })),
 } }))
 vi.mock('@/features/player/services/audio-service', () => ({ audioService: { getProcessor: () => null } }))
@@ -22,8 +22,8 @@ vi.mock('@/shared/lib/mediator/bus', () => ({ mediator: { dispatch: vi.fn() } })
 const buses = vi.hoisted(() => ({ connected: false, instances: [] as { sendSync: ReturnType<typeof vi.fn>; disconnect: ReturnType<typeof vi.fn> }[] }))
 vi.mock('../services/SessionSyncBus', () => ({ SessionSyncBus: class {
   sendSync = vi.fn()
-  disconnect = vi.fn()
-  connect = vi.fn()
+  disconnect = vi.fn().mockResolvedValue(undefined)
+  connect = vi.fn().mockResolvedValue(undefined)
   isConnected = () => buses.connected
   constructor() { buses.instances.push(this) }
 } }))

@@ -8,6 +8,7 @@ import { PLAYER_ACTIONS } from '@/features/player/player-actions'
 import { getDeviceId, getDeviceName } from '../utils/device-id'
 import { SessionSyncBus } from '../services/SessionSyncBus'
 import { useAuthStore } from '@/features/auth/stores/auth-store'
+import { requestWebSocketTicket, webSocketEndpoint } from '@/shared/auth/websocket-ticket'
 import { createLogger } from '@/shared/lib/logger'
 
 const logger = createLogger('Session')
@@ -36,7 +37,7 @@ export function useSession() {
   const deviceRegistered = useRef(false)
 
   const [dismissedTransfer, setDismissedTransfer] = useState<{ sessionId: string; deviceId: string } | null>(null)
-  // The socket closes when this tab clears its credentials; a later login opens a new one with the current token.
+  // Clearing credentials closes the socket; a later login obtains a fresh connection ticket.
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
 
   const query = useQuery({
@@ -146,8 +147,8 @@ export function useSession() {
     if (!sessionId || !isAuthenticated) return
 
     const bus = new SessionSyncBus({
-      wsEndpoint: '/api/ws',
-      getAuthToken: () => useAuthStore.getState().accessToken,
+      wsEndpoint: webSocketEndpoint(),
+      getConnectionTicket: requestWebSocketTicket,
       deviceId,
       getPosition: getCurrentTime,
       getQueue: () => usePlayerStore.getState().queue.map(t => t.publicId),
@@ -221,7 +222,9 @@ export function useSession() {
     })
 
     sessionSyncBus.current = bus
-    bus.connect(sessionId)
+    bus.connect(sessionId).catch(() => {
+      logger.warn('[useSession] WebSocket connection failed')
+    })
 
     return () => {
       bus.disconnect()
