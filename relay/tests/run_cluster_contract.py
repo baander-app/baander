@@ -73,10 +73,14 @@ class Api:
         try:
             headers = {"Content-Type": "application/json"}
             if method == "POST" and target == "/api/servers/register" and enrollment:
-                headers["X-Baander-Enrollment"] = issue_token(
-                    self.cluster.enrollment_key,
-                    body,
-                    int(time.time() * 1000) + 60000,
+                headers["X-Baander-Enrollment"] = (
+                    enrollment
+                    if isinstance(enrollment, str)
+                    else issue_token(
+                        self.cluster.enrollment_key,
+                        body,
+                        int(time.time() * 1000) + 60000,
+                    )
                 )
 
             connection.request(
@@ -151,6 +155,65 @@ def verify(api, acknowledged):
         assert "credential_digest" not in body["data"] and "apiKey" not in body["data"]
 
 
+def verify_cross_api_ownership(first, second, cluster, voter):
+    owner = dict(registration("cross-api-owner"), apiKey="34" * 32)
+    target = "/api/servers/" + owner["publicId"]
+    status, claimed, _ = first.request("POST", "/api/servers/register", owner)
+    assert status == 200 and claimed["data"]["revision"] == 1
+
+    def stored_row():
+        status, result = cluster.request(
+            voter,
+            "/db/query?level=linearizable&associative",
+            [["SELECT * FROM registries WHERE public_id=?", owner["publicId"]]],
+        )
+        assert status == 200
+        rows = result["results"][0]["rows"]
+        assert len(rows) == 1
+        return rows[0]
+
+    before = stored_row()
+    status, lookup, _ = first.request("GET", target)
+    assert status == 200
+    before_public = lookup["data"]
+    takeover = dict(
+        owner,
+        apiKey="56" * 32,
+        url="https://cross-api-hostile.baander.app",
+        name="Hostile replacement",
+        version="99.0.0",
+    )
+    # The second claimant has valid enrollment for its own credential.
+    assert second.request("POST", "/api/servers/register", takeover)[0] == 403
+    assert stored_row() == before, "A cross-API takeover changed the stored owner row."
+    for api in (first, second):
+        status, lookup, _ = api.request("GET", target)
+        assert status == 200 and lookup["data"] == before_public
+
+    capability = issue_token(
+        cluster.enrollment_key, owner, int(time.time() * 1000) + 60000
+    )
+    different_identity = dict(owner, publicId="cross-api-other-identity")
+    assert second.request(
+        "POST", "/api/servers/register", different_identity, enrollment=capability
+    )[0] == 403
+    for api in (first, second):
+        assert api.request("GET", "/api/servers/" + different_identity["publicId"])[0] == 404
+    assert stored_row() == before
+
+    status, retried, _ = second.request(
+        "POST", "/api/servers/register", owner, enrollment=False
+    )
+    assert status == 200 and retried["data"]["revision"] == 2
+    for api in (first, second):
+        status, lookup, _ = api.request("GET", target)
+        assert status == 200 and lookup["data"]["revision"] == 2
+        for field in ("publicId", "url", "name", "version"):
+            assert lookup["data"][field] == owner[field]
+    assert stored_row()["credential_digest"] == before["credential_digest"]
+    print("PASS: distinct-owner cross-API claims, capability binding and owner retry", flush=True)
+
+
 def wait_converged(cluster, indices, acknowledged_index):
     until = time.monotonic() + 30
     while time.monotonic() < until:
@@ -211,6 +274,7 @@ def main():
                 [(index, cluster.http_ports[index]) for index in sorted(majority)],
             )
             apis.append(majority_api)
+            verify_cross_api_ownership(pinned, majority_api, cluster, initial_leader)
             acknowledged = {}
 
             def write(api, identifier):

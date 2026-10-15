@@ -28,4 +28,23 @@ TEST(JsonBoundary, RejectsBodyBeforeParsing) {
         EXPECT_EQ(failure.status, 413u);
     }
 }
+TEST(JsonBoundary, RejectsRawNulWithoutTruncatingInput) {
+    for (const auto &body : {std::string("{}\0", 3), std::string("{}\0{}", 5),
+                             std::string("{\"name\":\"a\0b\"}", 14)}) {
+        try {
+            parse_json_body(body, 8192, 8);
+            FAIL() << "Expected raw NUL rejection";
+        } catch (const Failure &failure) {
+            EXPECT_EQ(failure.status, 400u);
+        }
+    }
+    EXPECT_EQ(parse_json_body(R"({"name":"a\u0000b"})", 8192, 8)["name"],
+              std::string("a\0b", 3));
+    try {
+        parse_json_body(std::string(8193, '\0'), 8192, 8);
+        FAIL() << "Expected body size rejection before NUL validation";
+    } catch (const Failure &failure) {
+        EXPECT_EQ(failure.status, 413u);
+    }
+}
 } // namespace registry

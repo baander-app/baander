@@ -77,6 +77,21 @@ def main():
         db_port, raft_port, api_port = port(), port(), port()
         enrollment_key = b"native-contract-enrollment-key-32-bytes"
         (directory / "enrollment.key").write_bytes(enrollment_key)
+        secret_values = {
+            enrollment_key.decode("ascii"),
+            "disposable-test-secret",
+            base64.b64encode(b"registry:disposable-test-secret").decode("ascii"),
+        }
+        secrets_lock = threading.Lock()
+
+        def assert_no_secrets(value):
+            serialized = value if isinstance(value, str) else json.dumps(value)
+            with secrets_lock:
+                secrets = tuple(secret_values)
+            assert all(secret not in serialized for secret in secrets), (
+                "Registry exposed a credential, enrollment capability/key or credential digest."
+            )
+
         config = {
             "database": {
                 "endpoints": [
@@ -240,6 +255,20 @@ def main():
             )
             try:
                 headers = {"Content-Type": "application/json"}
+                if method == "POST" and target == "/api/servers/register":
+                    try:
+                        registration_body = json.loads(body)
+                        credential = (
+                            registration_body.get("apiKey")
+                            if isinstance(registration_body, dict) else None
+                        )
+                        if isinstance(credential, str) and len(credential) == 64:
+                            with secrets_lock:
+                                secret_values.update((
+                                    credential, hashlib.sha256(credential.encode()).hexdigest()
+                                ))
+                    except (ValueError, TypeError):
+                        pass
                 if method == "POST" and target == "/api/servers/register" and enrollment:
                     try:
                         registration_body = json.loads(body)
@@ -251,9 +280,16 @@ def main():
                         pass
                 if isinstance(enrollment, str):
                     headers["X-Baander-Enrollment"] = enrollment
+                if "X-Baander-Enrollment" in headers:
+                    with secrets_lock:
+                        secret_values.add(headers["X-Baander-Enrollment"])
                 connection.request(method, target, body, headers)
                 response = connection.getresponse()
-                return response.status, json.loads(response.read()), dict(response.getheaders())
+                payload = response.read()
+                response_headers = dict(response.getheaders())
+                assert_no_secrets(payload.decode("utf-8"))
+                assert_no_secrets(response_headers)
+                return response.status, json.loads(payload), response_headers
             finally:
                 connection.close()
 
@@ -268,7 +304,10 @@ def main():
                     response = http.client.HTTPResponse(connection)
                     response.begin()
                     status = response.status
-                    body = json.loads(response.read())
+                    payload = response.read()
+                    assert_no_secrets(payload.decode("utf-8"))
+                    assert_no_secrets(dict(response.getheaders()))
+                    body = json.loads(payload)
                     assert connection.recv(1) == b"", "Registry kept a raw request connection open."
                     return status, body
 
@@ -315,6 +354,8 @@ def main():
                 )[0] == 403
                 assert request("GET", "/api/servers/server-one")[0] == 404
             enrollment_token = issue_token(enrollment_key, registration, timestamp + 60000)
+            with secrets_lock:
+                secret_values.add(enrollment_token)
             duplicate_enrollment = (
                 "POST /api/servers/register HTTP/1.1\r\n"
                 "Host: api.registry.baander.app\r\n"
@@ -326,7 +367,9 @@ def main():
             ).encode()
             assert raw_request(duplicate_enrollment)[0] == 403
             assert request("GET", "/api/servers/server-one")[0] == 404
-            status, body, _ = request("POST", "/api/servers/register", encoded)
+            status, body, _ = request(
+                "POST", "/api/servers/register", encoded, enrollment=enrollment_token
+            )
             assert status == 200 and body["data"]["revision"] == 1
             assert registration["apiKey"] not in json.dumps(body)
             status, body, _ = request("POST", "/api/servers/register", encoded, enrollment=False)
@@ -334,6 +377,31 @@ def main():
             status, body, _ = request("GET", "/api/servers/server-one")
             assert status == 200 and body["data"]["url"] == registration["url"]
             assert registration["apiKey"] not in json.dumps(body)
+            before_owner_update = body["data"]
+            owner_update = dict(
+                owned_registration,
+                url="https://updated.baander.app",
+                name="Updated owner metadata",
+                version="2.0.0",
+            )
+            status, update_receipt, _ = request(
+                "POST", "/api/servers/register", json.dumps(owner_update), enrollment=False
+            )
+            assert status == 200 and update_receipt["data"]["revision"] == before_owner_update["revision"] + 1
+            status, updated, _ = request("GET", "/api/servers/server-one")
+            assert status == 200 and updated["data"]["revision"] == update_receipt["data"]["revision"]
+            for field in ("url", "name", "version"):
+                assert updated["data"][field] == owner_update[field]
+            status, replayed, _ = request(
+                "POST", "/api/servers/register", encoded, enrollment=enrollment_token
+            )
+            assert status == 200 and replayed["data"]["revision"] == updated["data"]["revision"] + 1
+            status, body, _ = request("GET", "/api/servers/server-one")
+            assert status == 200 and body["data"]["revision"] == replayed["data"]["revision"]
+            for field in ("url", "name", "version"):
+                assert body["data"][field] == owned_registration[field], (
+                    "An owner replay must retain the current last-write-wins metadata contract."
+                )
             registration.update(
                 apiKey="cd" * 32,
                 url="https://attacker.baander.app",
@@ -348,6 +416,30 @@ def main():
             assert request("POST", "/api/servers/register", "{}")[0] == 422
             assert request("POST", "/api/servers/register", "[" * 9 + "0" + "]" * 9)[0] == 400
             assert request("POST", "/api/servers/register", " " * 8193)[0] == 413
+            malformed_json = (
+                ("invalid UTF-8", b'{"name":"\xff"}', 400),
+                ("trailing NUL", encoded.encode() + b"\x00", 400),
+                ("embedded NUL", encoded.encode().replace(b"Baander", b"Baan\x00der"), 400),
+                ("trailing JSON value", encoded.encode() + b" {}", 400),
+                ("scalar", b"true", 422),
+                ("array", b"[]", 422),
+                ("wrong public ID type", json.dumps(dict(owned_registration, publicId=1)).encode(), 422),
+                ("wrong URL type", json.dumps(dict(owned_registration, url=[])).encode(), 422),
+                ("wrong name type", json.dumps(dict(owned_registration, name=None)).encode(), 422),
+                ("wrong version type", json.dumps(dict(owned_registration, version=False)).encode(), 422),
+                ("wrong credential type", json.dumps(dict(owned_registration, apiKey={})).encode(), 422),
+            )
+            for label, payload, expected_status in malformed_json:
+                status, _ = raw_request(
+                    b"POST /api/servers/register HTTP/1.1\r\n"
+                    b"Host: api.registry.baander.app\r\n"
+                    b"Content-Type: application/json\r\n"
+                    + f"Content-Length: {len(payload)}\r\n\r\n".encode()
+                    + payload
+                )
+                assert status == expected_status, label
+                assert request("GET", "/api/servers/server-one")[1]["data"] == before_hostile_update, label
+                assert request("GET", "/health")[0] == 200, label
             assert request("GET", "/db/query")[0] == 404
             assert request("GET", "/status")[0] == 404
             for target in ("/db/execute", "/db/request", "/db/load", "/db/backup", "/join"):
@@ -382,6 +474,8 @@ def main():
             pipelined_enrollment = issue_token(
                 enrollment_key, pipelined_claim, int(time.time() * 1000) + 60000
             )
+            with secrets_lock:
+                secret_values.add(pipelined_enrollment)
             status, body = raw_request(
                 b"GET /health HTTP/1.1\r\nHost: api.registry.baander.app\r\n\r\n"
                 + hostile_http
@@ -744,9 +838,6 @@ def main():
                 except (OSError, http.client.HTTPException):
                     pass
             gate["delay"] = 0
-            api_log.flush()
-            assert "disposable-test-secret" not in (directory / "api.log").read_text()
-            assert ("ab" * 32) not in (directory / "api.log").read_text()
             db.terminate()
             db.wait(timeout=5)
             status, body, headers = request("GET", "/api/servers/server-one")
@@ -766,8 +857,12 @@ def main():
             pending.settimeout(1)
             assert pending.recv(1) == b""
             pending.close()
+            api_log.flush()
+            db_log.flush()
+            assert_no_secrets((directory / "api.log").read_text())
+            assert_no_secrets((directory / "rqlite.log").read_text())
             print(
-                "PASS: native TLS API enrollment capability/anonymous denial/owner heartbeat/concurrent ownership, depth/body bounds, rate/pool limits, schema recovery, outage/readiness/liveness, overall deadlines, graceful commit drain and forced shutdown."
+                "PASS: native TLS API enrollment capability/anonymous denial/owner heartbeat/replayed metadata/concurrent ownership, malformed JSON/wire types and unchanged public snapshots, response/log secret exclusion, depth/body bounds, rate/pool limits, schema recovery, outage/readiness/liveness, overall deadlines, graceful commit drain and forced shutdown."
             )
         except Exception:
             db_log.flush()

@@ -28,6 +28,10 @@ Json parse_json_body(const std::string &body, std::size_t maximum_bytes, unsigne
     if (body.size() > maximum_bytes) {
         throw Failure(413, "JSON body is too large.");
     }
+    // The JSON lexer treats raw NUL as EOF, which would hide trailing bytes.
+    if (body.find('\0') != std::string::npos) {
+        throw Failure(400, "Malformed JSON body.");
+    }
     try {
         return Json::parse(body, [maximum_depth](int depth, Json::parse_event_t event, Json &) {
             if ((event == Json::parse_event_t::object_start ||

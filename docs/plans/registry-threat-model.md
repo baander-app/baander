@@ -31,8 +31,19 @@ semantics and deployment boundaries.
   deployment, S3 backup, resource-constrained soak and other existing findings open.
   Update ROADMAP.md with actual verification and the next actionable work.
 
-No protocol, application API, schema, dependencies or production C++ changes are
-planned. New failures require root-cause analysis and a reviewed scope adjustment.
+No protocol, application API, schema or dependency changes are planned.
+
+### Parser correction discovered during verification
+
+A minimal probe against pinned nlohmann/json 3.12.0 accepts a valid object followed
+by a raw NUL, including additional JSON after that byte. Its lexer treats NUL as
+end-of-input. Reject raw NUL bytes in the shared bounded JSON parser before DOM
+parsing, preserving the existing size-limit precedence and valid escaped Unicode.
+Add focused native tests for trailing/embedded NUL and hidden suffix bytes, plus
+an escaped-NUL positive control. The HTTP regression must reject the malformed
+owner update without changing its public snapshot. This correction also applies
+to database response parsing; malformed upstream JSON must fail closed.
+Independently review this bounded scope adjustment before production edits.
 Admission saturation and inbound legacy TLS probes are optional follow-up coverage;
 this delivery must not imply they have been qualified.
 
@@ -41,7 +52,8 @@ this delivery must not imply they have been qualified.
 Independently review this plan before implementation using the documented manual
 fallback for unavailable compound-engineering skills. Run syntax checks and the
 full optimized registry release and sanitizer recipes on this checkout, serially,
-using only temporary local processes and storage. Run the existing static gate;
+using only temporary local processes and storage. Run the existing static and
+parser-fuzz gates after the shared-parser correction;
 record toolchain limitations rather than silently substituting a weaker check.
 Existing quorum loss, redirect, TLS and rate-abuse contracts supply the other
 focused security evidence. Container startup guard results remain prior evidence
