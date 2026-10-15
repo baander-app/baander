@@ -51,7 +51,23 @@ The health check verifies five components:
 
 The web server runs these checks every 60 seconds and alerts administrators once per outage; see [Health alerts](notifications.md#health-alerts). A planned stop or restart of the web server sends no alert: once the server drains, its checks stop. An outage of a checked component while the server is not draining still alerts.
 
-While Redis is unreachable, the web server cannot check DPoP nonces and proof replays, so every request that needs them answers `503` with `Retry-After: 5` instead of refusing the token: API requests made with an access token, token refresh, login, passkey login and `/api/oauth/token`. Clients keep their sessions and retry after the delay; nobody is signed out. Every Redis connection has a 1 second connect and read timeout, so a Redis that hangs gets the same answer within that time. The Redis check alerts once for the outage and the alert is delivered at once, because it is a row in PostgreSQL; the background worker check reads not available meanwhile. The server logs the store failure, not every `503` it answers. A logout during the outage ends the session on the client only; see [Sessions, logout and a Redis outage](security.md#sessions-logout-and-a-redis-outage).
+While Redis is unreachable, requests that require rate-limit or DPoP state answer
+`503` instead of treating the failure as an empty bucket or an invalid credential.
+Rate-limit failures carry `Retry-After: 1`; DPoP store failures carry
+`Retry-After: 5`. Both carry `Cache-Control: no-store`. The first check that rejects
+the request determines its response. Each Redis connection has one-second connect
+and read timeouts. A request can make several Redis calls, so those timeouts do
+not promise a one-second response for the whole request.
+
+Clients keep their sessions and retry after the delay. Logout and token revocation
+retain a narrow availability exception: they can continue when the replay store or
+generic API budget is unavailable, but still require the other authentication and
+proof checks. A confirmed exhausted budget still applies. See
+[Sessions, logout and a Redis outage](security.md#sessions-logout-and-a-redis-outage).
+
+The Redis health check alerts once for the outage. The alert is delivered at once
+because it is a row in PostgreSQL; the background worker check reads not available
+meanwhile. The server logs the store failure, not every `503` it answers.
 
 ## Job Monitoring
 
@@ -262,7 +278,7 @@ Inspect and manage configured rate limiters. Requires `ROLE_ADMIN`.
 curl -s -H "Authorization: DPoP $TOKEN" https://baander.test/api/monitor/rate-limiters | jq .
 ```
 
-This returns every limiter configured under `framework.rate_limiter` in `config/packages/framework.yaml`, with its effective policy, limit, interval, description, and cache pool. The CLI equivalent is:
+This returns every limiter configured under `framework.rate_limiter` in `config/packages/framework.yaml`, with its effective policy, limit, interval, description, and Redis storage namespace (`storageNamespace`). The CLI equivalent is:
 
 ```bash
 make exec cmd="php bin/console app:rate-limiter:list"
@@ -277,7 +293,18 @@ curl -X DELETE -s -H "Authorization: DPoP $TOKEN" \
   "https://baander.test/api/monitor/rate-limiters/auth_login_ip/clear?confirm=true" | jq .
 ```
 
-Each limiter keeps its state in its own Redis-backed cache pool (`cache.rate_limiter.<name>`), so this clears only the named limiter. An unknown name returns 404. To clear every limiter, call `DELETE /api/monitor/rate-limiters/clear?confirm=true`, or use the **Clear All** button on the admin Rate Limits tab.
+Each limiter has its own Redis namespace. A clear advances its generation and
+resets every subject's budget without scanning keys. Old subject states expire or
+are replaced on the next read; an old writer must retry against the new generation.
+Other limiters keep their state. An unknown name returns 404.
+
+To clear every limiter, call `DELETE /api/monitor/rate-limiters/clear?confirm=true`,
+or use the **Clear All** button on the admin Rate Limits tab. Clear-all tries each
+namespace sequentially and reports failures; successful clears remain in effect.
+An unavailable or unacknowledged clear reports failure instead of claiming that
+clients were unblocked. A successful generation change does not repair every kind
+of corrupt subject record; see the
+[clear command's recovery limits](commands/app-rate-limiter-clear.md#details).
 
 The CLI equivalents call the same application service:
 
@@ -285,6 +312,20 @@ The CLI equivalents call the same application service:
 make exec cmd="php bin/console app:rate-limiter:clear auth_login_ip"
 make exec cmd="php bin/console app:rate-limiter:clear --all"
 ```
+
+### Rate-limit storage outages
+
+All 19 configured limiters use atomic Redis state while retaining their configured
+budgets and fixed/sliding-window policies. A protected request whose limiter state
+cannot be established receives a generic `503`, `Retry-After: 1` and
+`Cache-Control: no-store`; it does not receive a fresh budget from a cache miss.
+Ordinary exhaustion keeps the limiter's existing response and retry delay.
+
+The generic API limiter alone permits logout and token revocation to continue
+when its store is unavailable. It still enforces confirmed exhaustion, and the
+remaining authentication and DPoP checks still run. Media exemptions and the
+development bypass are unchanged. The list command reads configuration only;
+a successful listing does not prove that Redis accepts consumption or clear operations.
 
 ## Configuration Check
 

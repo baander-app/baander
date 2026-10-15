@@ -23,16 +23,18 @@ batches describe their own checkpoints; the current gate below takes precedence.
 Any harness can take over from this section; nothing below depends on a tool that
 only one agent host has.
 
-- **Branch.** `plan/websocket-handshake-tickets` starts from published `master`
-  (`0aa3d488`). It replaces raw OAuth WebSocket query tokens with single-use tickets
-  issued through the DPoP-protected API. Implementation and independent review are
-  complete, and the qualification checkpoint below records the results and limits.
-  Commits remain local until publishing is requested.
-- **Published baseline.** Registry security qualification and repository cleanup
-  were merged into `master` and pushed to both remotes. Completed plans, obsolete
-  repository analysis tooling, the standalone `cli/` tree and root `bun.lock` were
-  removed. Six older plans for open or deferred work remain alongside the current
-  WebSocket plan. Book pages describe current behavior without plan references.
+- **Branch.** `plan/atomic-rate-limits` starts from published `master`
+  (`7b8df418`). It replaces cache-backed, unlocked rate limiting with conditional
+  Redis commits, strict storage failures and generation-based clears. The plan
+  passed independent review; implementation, simplification and qualification are
+  complete. The checkpoint below records the results and limits. Commits remain
+  local until publishing is requested.
+- **Published baseline.** WebSocket handshake tickets, registry security
+  qualification and repository cleanup were merged into `master` and pushed to
+  both remotes. Completed older plans, obsolete repository analysis tooling, the
+  standalone `cli/` tree and root `bun.lock` were removed. Six older plans for open
+  or deferred work remain alongside the WebSocket and atomic rate-limit plans.
+  Book pages describe current behavior without plan references.
 
 - **History.** On 2026-10-14 the `Claude-Session:` trailer was removed from the 25
   local commits that carried it with a message filter; every tree is unchanged, so
@@ -80,9 +82,10 @@ only one agent host has.
   under concurrent writers has no version check; sharing has no invitation step, so
   an owner can add any user unasked; removing a song is not judged by the actor's
   visibility; the visible-song count materialises rows. None blocks the item.
-- **Next.** Address rate-limit storage failure and concurrency from the
-  [application threat model](docs-book/part-2-developer-guide/application-threat-model.md#open-findings-and-qualification-work).
-  Metadata/radio/push egress remains open. React Native and Android remain deferred.
+- **Next.** Address metadata, radio-catalog and push outbound destination policy
+  from the [application threat model](docs-book/part-2-developer-guide/application-threat-model.md#open-findings-and-qualification-work).
+  Rate-limit storage failure and concurrency are delivered at the checkpoint below.
+  React Native and Android remain deferred.
   The local dev database note at the end of this section stands.
 
 The backend release-gate package is complete (see the next two sections). Eight
@@ -449,6 +452,76 @@ tests. React Native and Android remain deferred; Android's device login posts to
 pairing endpoint that does not exist and needs a decision when that work resumes.
 
 ## Current quality-gate checkpoint
+
+### Atomic rate limits (2026-10-15)
+
+All 19 configured limiters retain Symfony's fixed/sliding-window calculations but
+commit state through Redis compare-and-set. Each operation owns its snapshot;
+generation and revision checks prevent concurrent requests spending the same last
+token or restoring state cleared by an administrator. Empty reads and subject
+resets leave ten-second revision markers; Redis rejects snapshots older than two
+seconds. Definite conflicts retry at most eight times within a two-second monotonic
+budget. Uncertain writes are not replayed, and an in-flight Redis call can finish
+after that budget expires.
+
+Unavailable or corrupt state stops protected work with a generic 503,
+`Retry-After: 1` and `Cache-Control: no-store`. Confirmed exhaustion, media
+exemptions and development bypasses retain their existing behavior. Logout and
+revocation alone bypass generic API limiter availability failures, preserving
+confirmed exhaustion and all remaining authentication/proof checks. Password-reset
+and verification-resend catch-all handlers now propagate this availability outcome.
+HTTP and CLI administration clear the consumed generations and report partial
+failures; the catalog and generated client expose `storageNamespace`. The dedicated
+limiter cache pools are removed.
+
+Verification against `baander-ci-prewarm:local` (PHP 8.5.2 ZTS, Swoole 6.2.0,
+PHPUnit 13.1.11, ParaTest 7.22.4):
+
+- The full four-suite run passed **9,271 tests in 879 files**, with **75,463
+  assertions**, without coverage, in **772.2 seconds**. Ordinary: 5,779 tests /
+  22,234 assertions; native: 642 / 7,952; service lanes: 1,018 / 17,461 and
+  1,832 / 27,816. The coordinator validated report completeness and removed its
+  disposable services. Random seed: `1823255201`.
+- The corrected focused Redis/DPoP run passed **23 tests / 1,589 assertions** in
+  **90.2 seconds** including setup and cleanup. Six independent PHP consumers
+  read the same final-token revision before release; exactly one succeeds for
+  each window policy. Tests cover fresh-process reset isolation, paused/refused
+  Redis, expired snapshots, corruption recovery, ordinary exhaustion and logout
+  during an outage. Consumer HTTP tests prevent token creation and dispatched
+  work on unavailable budgets; CLI failures keep success data off stdout.
+- Web API generation, typecheck and lint pass; lint retains **seven existing
+  warnings and zero errors**. Web tests pass: **2,051 tests in 185 files**,
+  **28.71 seconds**.
+- Composer platform checks, PHPStan, Deptrac, container lint and OpenAPI drift
+  checks pass on the final code and test tree.
+- The production security drill passes in **65.72 seconds**: fifteen malformed
+  HTTP cases, WebSocket proof/ticket/replay checks, paused and stopped Redis
+  failures, recovery and credential-log scanning.
+- The production web-runtime drill passes in **57.58 seconds**: localized
+  credential email, progressive/ranged playback, the Safari request baseline,
+  PostgreSQL outage and worker reload, and Redis outage/recovery. Protected
+  requests returned 503 with a one-second retry delay, logout returned 200 and
+  revoked its chain, and the other session refreshed after recovery. Health
+  alerts remained single-shot across both outages.
+- Disposable test containers, networks and volumes were removed; development
+  PostgreSQL and Redis were not reset. Documentation link checks, prose audits
+  and whitespace checks pass. Independent code review and simplification found
+  no remaining production-code blocker.
+
+The initial focused run found one outdated retry-delay assertion, corrected to
+identify the limiter's earlier rejection while retaining strict DPoP-specific
+checks. Independent review corrected unconditional security wiring, corruption
+recovery and the new recovery fixture's subject digest. One full run was stopped
+before qualification when that fixture defect was found; the complete successful
+run above follows its correction. Initial verification failures also included a PHPUnit helper-name collision
+and four PHPStan test typing/assertion issues.
+
+Limits: effective configuration changes start fresh budgets; different rolling
+configurations do not share one budget. A named clear cannot repair wrong-type
+subject keys or missing/invalid record generation fields; those remain unavailable
+until expiry or targeted repair. Redis failover, distributed load and regional
+qualification are not established by these local checks. Native application work
+remains deferred.
 
 ### WebSocket tickets (2026-10-15)
 
@@ -1542,6 +1615,11 @@ This is transport evidence, not an exploit against a live provider. Live socket
 upgrades, authenticated pairing races, exhaustive parser/DoS testing and all
 external transports remain unqualified. Regional qualification and mobile work
 retain their earlier pending/deferred status.
+
+The WebSocket and rate-limit findings above describe this historical checkpoint.
+They are superseded by [WebSocket tickets](#websocket-tickets-2026-10-15) and
+[atomic rate limits](#atomic-rate-limits-2026-10-15); outbound destination policy
+remains open.
 
 Verification checkpoint: authoritative gates passed against
 `baander-ci-prewarm:local` (CI target, PHP 8.5.2 ZTS, Swoole 6.2.0,

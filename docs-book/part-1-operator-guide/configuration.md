@@ -35,7 +35,16 @@ Redis is used for:
 - **Rate limiting** — limiter state for API requests, for login, passkey, registration, password reset and token refresh attempts, and for the OAuth authorization server endpoints
 - **DPoP stores** — the single-use nonces of the token endpoints and the proof identifiers seen on API requests (replay protection)
 
-Every Redis connection the web server opens, from its connection pool and from the cache pools behind the rate limiters and Doctrine's caches, has a connect timeout and a read timeout of 1 second, so a Redis that hangs is answered as unavailable within that time. While Redis is unreachable, requests that need the DPoP stores answer `503` with `Retry-After` and clients keep their sessions; see [Sessions and a Redis outage](security.md#sessions-logout-and-a-redis-outage).
+Redis connections from the application pool and Doctrine cache pools have
+one-second connect and read timeouts. A request can make several Redis calls, so
+these are per-connection bounds rather than a one-second total request deadline.
+Rate limiters use the pooled client directly, with atomic state in separate
+namespaces; they do not use cache pools. Unavailable rate-limit state answers
+`503` with `Retry-After: 1`; unavailable DPoP state answers `503` with
+`Retry-After: 5`. Both carry `Cache-Control: no-store`, and the first rejecting
+check determines the response. Clients keep their sessions. See
+[Sessions and a Redis outage](security.md#sessions-logout-and-a-redis-outage) for
+the narrow logout/revocation exceptions.
 
 ## Messenger
 
@@ -119,7 +128,14 @@ All API keys are optional — Baander works without them, but metadata enrichmen
 
 ### Rate limiting
 
-Limits are set in `config/packages/auth.yaml`. Each limit feeds a Symfony rate limiter in `config/packages/framework.yaml`, and each limiter has its own Redis pool, so the admin **Rate Limits** tab and `app:rate-limiter:clear` can reset one limiter without touching the others.
+Limits are set in `config/packages/auth.yaml`. They feed the Symfony policies in
+`config/packages/framework.yaml`; all 19 configured limiters consume state through
+atomic Redis compare-and-set. Each limiter has its own namespace, so the admin
+**Rate Limits** tab and `app:rate-limiter:clear` reset its generation without
+changing other limiters. The catalog reports `storageNamespace`, not a cache pool.
+Changing a limiter's effective configuration starts fresh subject budgets; it does
+not carry a shared budget across different configurations during a rolling change.
+See [Rate Limiter Monitor](monitoring.md#rate-limiter-monitor).
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -185,7 +201,14 @@ Media delivery routes are exempt from `anonymous_api` and `authenticated_api`, s
 
 With `APP_ENV=dev`, only the `config_check`, `auth_password_reset_email` and `auth_email_verification_user` limits apply; the others are skipped.
 
-Under Swoole, the application trusts `X-Forwarded-For` from the directly connected peer, normally the bundled nginx, and uses the last address in it as the client IP. If another proxy sits in front of nginx, every client shares that proxy's address and its anonymous budget unless nginx restores the real client address (`set_real_ip_from`). Do not expose the Swoole port directly: a client could then send its own `X-Forwarded-For` and evade every per-IP limit.
+Both HTTP layers read `TRUSTED_PROXIES`, a comma-separated list of trusted proxy
+addresses or CIDRs that defaults to empty. With that default, a direct client
+cannot select a rate-limit identity by supplying `X-Forwarded-For`. Behind nginx or another proxy,
+configure only its actual source addresses or deliberately restricted CIDRs and
+make that proxy replace incoming forwarding headers. Otherwise clients share the
+proxy's address and its anonymous budget. Do not enable broad subnet trust merely
+because the service runs in Docker. See
+[Request identity and proxy deployment](../part-2-developer-guide/application-threat-model.md#request-identity-and-proxy-deployment).
 
 ### Passkeys (WebAuthn)
 
@@ -433,4 +456,4 @@ Administrators read and change a user's settings through the admin API and the C
 - All env vars in `.env` can be overridden by setting real environment variables in your container runtime (Docker Compose, Kubernetes, etc.).
 - For production, generate a unique `APP_SECRET` with `php -r 'echo bin2hex(random_bytes(32));'`.
 - OAuth keys should be at least 2048-bit RSA. Generate with `openssl genrsa -out private.key 2048` and `openssl rsa -in private.key -pubout > public.key`.
-- Rate limiting uses Redis — if Redis is unavailable, rate limits are not enforced.
+- Rate limiting requires Redis. Unavailable state stops protected work with `503`; logout and revocation retain the narrow availability exceptions described above.

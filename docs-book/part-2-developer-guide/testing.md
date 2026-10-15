@@ -252,6 +252,65 @@ real membership), `ImageReadFirewallTest.php`, `PlaylistReadFirewallTest.php`,
 production OAuth and DPoP chain over the image, playlist, artist, catalog and library
 mutation, lyrics and push unsubscribe routes with PostgreSQL adapters).
 
+## Atomic rate-limit storage
+
+Configured rate limiters execute Symfony's installed fixed/sliding-window policies
+against operation-local snapshots and commit state through Redis compare-and-set.
+The focused regressions must distinguish an absent subject from failed or corrupt
+storage, preserve ordinary exhaustion responses, and refuse protected effects when
+state cannot be established. All 19 configured names and budgets remain in force.
+Container compilation rejects policies other than fixed and sliding windows.
+
+Storage cases cover policy parity, negative token counts, state identity and TTLs,
+conflicting writers, uncertain writes without replay, per-subject reset and named
+generation changes. Redis checks snapshot age against its own clock, accepting no
+negative age or age over two seconds. Empty reads and resets retain ten-second
+revision tombstones so expiry cannot make a paused writer's old snapshot writable
+again. Conflict retries stop after eight attempts or a two-second monotonic budget;
+an in-flight bounded Redis call can finish after that budget expires.
+
+Corruption cases distinguish recovery from a budget reset. Named clear replaces a
+valid old-generation hash on its next read, including extra fields, but wrong-type
+subject keys and missing/invalid hash generation fields still fail closed. They need
+expiry or targeted repair; the internal per-subject reset replaces the record.
+Configuration changes start fresh subject budgets because the effective
+configuration contributes to the subject digest. This proves configuration isolation,
+not a shared budget across a rolling configuration change.
+
+Concurrency checks need independent PHP processes and connections sharing a
+barrier on disposable Redis. Fixed and sliding windows must admit exactly the
+remaining budget; namespace, subject and effective-configuration isolation and
+fresh-process observations of resets need separate assertions. Refused and paused
+Redis cases must fail within a bound instead of treating the outage as an empty
+bucket. HTTP checks cover generic API and pre-auth limits, password-reset/resend,
+cover extraction, Discovery and configuration validation before their effects.
+
+Unavailable consumption answers a generic `503` with `Retry-After: 1` and
+`Cache-Control: no-store`; ordinary exhausted budgets keep their existing outcomes.
+Logout and token revocation keep the generic API limiter's narrow availability
+exception and all remaining authentication/proof checks. Administration checks
+exercise the actual consumed namespace through HTTP and CLI, including unknown
+names, unavailable clears and clear-all partial failure. Run these checks through
+the disposable backend coordinator described below; do not pause or flush the
+development Redis. The integration selection also observes resets through fresh
+processes; its paused-Redis fault affects only that lane's disposable service.
+
+```bash
+bash scripts/test-backend-container.sh \
+  tests/Integration/RateLimiterConcurrencyTest.php \
+  tests/Integration/RateLimiterHttpAvailabilityTest.php \
+  tests/Functional/Console/RateLimiterCommandsTest.php \
+  tests/Functional/Controller/RateLimiterMonitorControllerTest.php
+```
+
+The unit regressions under `tests/Unit/Shared/Infrastructure/RateLimiter/` cover
+failure semantics, installed-policy parity, state decoding and Redis protocol
+handling in `RateLimiterFailureSemanticsTest`, `RedisRateLimiterFactoryTest`,
+`RateLimiterStateCodecTest` and `RedisRateLimiterStoreTest`. The narrow revocation
+exception is covered by
+`tests/Unit/Auth/Infrastructure/Security/ApiRateLimitAvailabilityTest.php`.
+Current qualification results are recorded in the roadmap.
+
 ## Running Tests
 
 Use an application image that satisfies the current Composer lockfile. To build

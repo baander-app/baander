@@ -61,6 +61,22 @@ A video manifest or segment URL that carries an HMAC signature and an expiry ins
 
 A user the playlist's owner has named on a playlist. While the playlist is collaborative, a collaborator may view it and add, remove and reorder its songs, adding only songs their own library membership lets them see; when the owner turns collaboration off, collaborators keep viewing and lose editing. The owner alone changes the playlist's metadata, deletes it and names collaborators; a collaborator may leave; an administrator who is not the owner may view it and nothing more.
 
+## Rate limiting
+
+### Limiter generation
+
+The Redis token shared by every subject of one named limiter. Clearing the limiter
+replaces this token, making previously read state unwritable without scanning
+subject keys. Consumers retry against the new generation; other named limiters
+retain their own state.
+
+### Limiter revision tombstone
+
+An empty subject state with an opaque revision that Redis retains for ten seconds
+after an absent read or per-subject reset. Snapshots are writable for at most two
+seconds, so a paused writer cannot mistake an expired state for the absence it
+previously read.
+
 ## Backend verification
 
 ### Test lane

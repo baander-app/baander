@@ -270,7 +270,22 @@ VAPID_PRIVATE_KEY=<from app:generate-vapid-keys>
 
 Besides Baander's own apps, other clients can obtain tokens through the OAuth 2.0 authorization server: the authorization code grant with mandatory S256 PKCE, the device authorization grant for devices without a browser, and personal access clients that users create for their own tools. Administrators register device, public and confidential clients with the `app:oauth:client:*` commands or the admin API; see [OAuth Clients](user-management.md#oauth-clients).
 
-- **Token binding.** Every access token and refresh token, from any grant, is bound to the DPoP key that requested it. API requests with the token must carry a proof signed by that key, except signed stream delivery URLs and the current WebSocket query-token handshake, and refresh requires the same key. The handshake does not verify proof possession; see the open finding in the [threat model](../part-2-developer-guide/application-threat-model.md#open-findings-and-qualification-work). A token request that sends `X-Baander-Client-Fingerprint` also binds the access token to that fingerprint. Refresh tokens rotate, and reusing one revokes its whole chain, with one exception: a consumed token presented again with its own key within `auth.refresh.reuse_grace_seconds`, while the pair it was exchanged for is still unused, gets a fresh pair and that unused pair is revoked, so a client whose refresh answer was lost keeps its session. See [Token lifetimes](configuration.md#token-lifetimes).
+- **Token binding.** Every access token and refresh token, from any grant, is bound to the
+  DPoP key that requested it. API requests with the token must carry a proof signed by that
+  key, except signed stream delivery URLs, and refresh requires the same key. A WebSocket
+  upgrade accepts a single-use ticket issued through the authenticated, DPoP-protected
+  `POST /api/ws/tickets` endpoint. The ticket is bound to its user, access token, exact Origin and
+  `/api/ws`, expires within thirty seconds and no later than its access token. Redemption
+  consumes it atomically and checks current token/user state. A raw access token cannot
+  authenticate an upgrade. An unused stolen ticket can still race its owner; see the residual
+  limits in the [threat
+  model](../part-2-developer-guide/application-threat-model.md#open-findings-and-qualification-work).
+  A token request that sends `X-Baander-Client-Fingerprint` also binds the access token to
+  that fingerprint. Refresh tokens rotate, and reusing one revokes its whole chain, with one
+  exception: a consumed token presented again with its own key within
+  `auth.refresh.reuse_grace_seconds`, while the pair it was exchanged for is still unused,
+  gets a fresh pair and that unused pair is revoked, so a client whose refresh answer was lost
+  keeps its session. See [Token lifetimes](configuration.md#token-lifetimes).
 - **Client secrets.** A confidential client's secret is shown once, when it is generated, and stored only as a SHA-256 digest. Rotating it ends the old secret at once and leaves issued tokens valid.
 - **Cross-origin access.** The token endpoint and the device authorization endpoint accept requests from any origin, because their callers prove possession with DPoP instead of cookies. Revocation, device approval, the authorization endpoint `/api/oauth/authorize`, and all other API routes accept only the `APP_URL` origin. Third-party clients do not call the authorization endpoint; they send the user's browser to the web app's consent page, which calls it for the signed-in user. See [HTTP](configuration.md#http).
 - **Rate limits.** The authorization, token, and device authorization endpoints each have a per-IP limiter, and the token endpoint also counts requests per client. User code lookups and approvals share a per-IP limit that bounds code guessing. See [Rate limiting](configuration.md#rate-limiting).
@@ -283,7 +298,7 @@ Disabling a user, from the admin panel or with [app:user:disable](commands/app-u
 Two kinds of media access outlive the disable:
 
 - **A response already being sent.** A track file, or a transcode that is still encoding, keeps streaming until that one response ends. Every later request authenticates again and is refused.
-- **Signed video stream URLs.** HLS and DASH URLs carry an HMAC signature, not the user's token, so they keep working until they expire. A signed manifest URL lives at most 24 hours. Each manifest the player fetches signs the URLs it lists for another 24 hours. A player that keeps fetching can therefore stream that one video for up to 72 hours after the URL was signed with HLS, and up to 48 hours with DASH. To end every signed URL at once, for every user, set a new `STREAM_URL_HMAC_SECRET` and restart the web server. A signed URL is a bearer capability: it serves whoever holds it, with no session, until it expires, and a member of another library or a signed-out browser is served alike. A request that does present a token on a signed URL must present a valid one: an expired, revoked, foreign-audience or malformed token, or a fingerprint-bound token without its header, answers `401` even with a valid signature, because the firewall validates any token it is shown before the signature is read. The DPoP proof is not read on delivery routes, so no replay key is recorded there. The signature value is redacted from every log record, the access log included, so a logged URL cannot be replayed. A DPoP-bound token presented with the `Bearer` scheme instead of `DPoP` answers `401` on every route the API firewall authenticates; the WebSocket handshake, which takes its token from a query parameter, is unchanged.
+- **Signed video stream URLs.** HLS and DASH URLs carry an HMAC signature, not the user's token, so they keep working until they expire. A signed manifest URL lives at most 24 hours. Each manifest the player fetches signs the URLs it lists for another 24 hours. A player that keeps fetching can therefore stream that one video for up to 72 hours after the URL was signed with HLS, and up to 48 hours with DASH. To end every signed URL at once, for every user, set a new `STREAM_URL_HMAC_SECRET` and restart the web server. A signed URL is a bearer capability: it serves whoever holds it, with no session, until it expires, and a member of another library or a signed-out browser is served alike. A request that does present a token on a signed URL must present a valid one: an expired, revoked, foreign-audience or malformed token, or a fingerprint-bound token without its header, answers `401` even with a valid signature, because the firewall validates any token it is shown before the signature is read. The DPoP proof is not read on delivery routes, so no replay key is recorded there. The signature value is redacted from every log record, the access log included, so a logged URL cannot be replayed. A DPoP-bound token presented with the `Bearer` scheme instead of `DPoP` answers `401` on every route the API firewall authenticates; WebSocket upgrades accept only a single-use handshake ticket, not an access token.
 
 ### Who can change the catalog, and who can share a playlist
 
@@ -302,8 +317,32 @@ A session is a chain of token pairs: the pair a login issued and every pair a re
 - **Socket reconciliation.** Once a minute, the web server lists the access tokens behind its open WebSocket connections and closes every connection whose token chain is dead: every access token of the chain is revoked or expired, or the chain is no longer stored, whatever ended it. That covers a logout whose close failed, a password change, a client revocation, a user disabled from a console process in another container, and a session whose tokens expired without a refresh. The chain is the unit, not the token the socket was opened with: a refresh revokes that token while the session goes on, and rotation alone never closes a socket. A dead chain therefore keeps its sockets for at most one minute.
 - **`POST /api/oauth/revoke`.** Revokes a token of the signed-in user together with its chain and sockets, like logout. It answers a token of another user and an unknown token exactly alike (`200`, nothing revoked), so it cannot be used to find out whether a token exists.
 - **Reuse of a refresh token.** A consumed refresh token presented outside the lost-response grace (see the token binding rule under [OAuth clients and cross-origin access](#oauth-clients-and-cross-origin-access)) is treated as stolen: the chain is revoked and the web server closes its WebSocket connections, exactly as a logout does, before the `401` is answered.
-- **A Redis outage.** The DPoP nonce and replay stores live in Redis. While Redis is unreachable, every request that needs them answers `503` with `Retry-After: 5` and `Cache-Control: no-store`, and carries no `DPoP-Nonce` and no `WWW-Authenticate` header: every API request made with an access token, `/api/auth/refresh`, password and passkey login, and `/api/oauth/token`. Nothing is decided about the token. A refresh token presented during the outage is neither consumed nor revoked, and the same token refreshes once Redis answers. The web app keeps its session and retries after the delay. Each Redis connection has a 1 second connect and read timeout, so a Redis that hangs is answered the same way within that time (see [Redis](configuration.md#redis)). The health monitor sends administrators one alert per outage (see [Monitoring](monitoring.md#what-is-checked)).
-- **Logout during a Redis outage.** `POST /api/auth/logout` and `POST /api/oauth/revoke` are the one exception to the fail-closed rule: while the replay store cannot answer, the server still verifies the proof's signature, its method and URL, its age, the hash of the access token and the key binding, and skips only the replay check. A replayed logout proof can therefore only end the session its access token belongs to, and once that logout succeeded the revoked token is refused before any proof is read; a replayed revoke can also end another chain of the same user whose token id the replayer already holds, since the proof does not cover the request body. The server logs one warning per such request, naming the route, the key thumbprint and the user, never a token. The same warning appears when the Redis connection pool is exhausted, which triggers the same path. The logout revokes the chain in PostgreSQL and answers `200` during the outage.
+- **A Redis outage.** Rate-limit state and the DPoP nonce/replay stores live in
+  Redis. Requests that require unavailable state answer `503` with
+  `Cache-Control: no-store`: rate-limit failures carry `Retry-After: 1`, while
+  DPoP store failures carry `Retry-After: 5`. The first rejecting check determines
+  the response. A DPoP store failure carries no `DPoP-Nonce` or `WWW-Authenticate`
+  header and makes no decision that the token is invalid. A refresh refused for
+  unavailable state neither consumes nor revokes its token; the same token can
+  refresh once Redis answers. The web app keeps its session and retries after the
+  delay. Each Redis connection has one-second connect and read timeouts, but a
+  request can make several Redis calls, so this is not a one-second total request
+  deadline. See [Redis](configuration.md#redis). The health monitor sends
+  administrators one alert per outage; see [Monitoring](monitoring.md#what-is-checked).
+- **Logout during a Redis outage.** `POST /api/auth/logout` and
+  `POST /api/oauth/revoke` retain narrow availability exceptions. The generic API
+  limiter permits these routes when its state is unavailable, but still enforces a
+  confirmed exhausted budget. If the DPoP replay store cannot answer, the server
+  still verifies the proof's signature, method and URL, age, access-token hash and
+  key binding, and skips only the replay check. No other authentication or proof
+  check is bypassed. A replayed logout proof can therefore only end the session its
+  access token belongs to; after a successful logout, the revoked token is refused
+  before any proof is read. A replayed revoke can also end another chain of the same
+  user whose token ID the replayer already holds, since the proof does not cover the
+  request body. Skipping the replay check logs one warning with the route, key
+  thumbprint and user, never a token. Replay-store pool exhaustion takes that same
+  path. An authorized logout revokes the chain in PostgreSQL and answers `200`
+  during the outage.
 
 ### Network security
 

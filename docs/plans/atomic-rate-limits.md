@@ -23,12 +23,16 @@ Reject negative token counts. Only fixed and sliding windows are supported by th
 adapter; container compilation rejects other policies rather than silently weakening
 protection. No token-bucket limiter is currently configured.
 
-Each limiter has a persistent generation key and subject state keyed by a digest,
-with an opaque revision and expiring serialized policy state. Atomic snapshot reads
-return generation, revision, payload and Redis time. A read of an absent bucket
+Each limiter has a persistent generation key and subject state keyed by a digest
+of the effective configuration and subject. A configuration change starts a fresh
+budget; named clears cover every configuration of that limiter. Each subject record
+holds its generation, an opaque revision and expiring serialized policy state.
+Atomic snapshot reads return generation, revision, payload and Redis time. A read of an absent bucket
 creates an empty revision tombstone with a ten-second TTL. A per-subject reset
 writes a new empty revision tombstone with the same TTL, including when no bucket
-exists. Compare-and-set rejects snapshots older than two seconds using Redis time;
+exists. Reset replaces the entire subject record; reads replace obsolete-generation
+hash records with a valid generation before validating the current record shape.
+Compare-and-set rejects snapshots older than two seconds using Redis time;
 the tombstone outlives every writable snapshot, preventing absence/expiry ABA even
 if a process pauses before committing. Compare-and-set checks both generation and
 revision before writing with the policy's relative TTL. Absent state is distinct
@@ -93,3 +97,11 @@ Independent review approved the plan on 2026-10-15 after adding server-checked
 snapshot expiry and revision tombstones. Implementation must reject negative Redis
 snapshot ages as well as ages over two seconds, and test paused writers and expired
 tombstones explicitly.
+
+## Delivery checkpoint
+
+Implemented and independently reviewed on 2026-10-15. The full backend run passed
+9,271 tests in 879 files; web tests passed 2,051 cases. Static gates and both
+production runtime drills passed. ROADMAP.md records counts, timings, corrected
+verification defects and remaining limits. Changes are committed locally; no push
+is part of this delivery.

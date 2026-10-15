@@ -29,16 +29,39 @@ make exec cmd="php bin/console app:rate-limiter:clear auth_login_ip --json"
 
 ## Details
 
-Pass either a limiter name or `--all`, not both. Each limiter keeps its state in its own Redis-backed cache pool (`cache.rate_limiter.<name>`), so clearing one limiter leaves every other limiter's state intact. Clearing resets the counters of every client of that limiter at once; it cannot clear a single client.
+Pass either a limiter name or `--all`, not both. Each limiter has its own Redis
+storage namespace. Clearing advances that namespace's generation, so every client
+of the named limiter starts with a fresh budget. It leaves other limiters intact;
+the command cannot clear a single client.
+
+A clear does not scan or delete existing subject keys. They expire naturally or
+are replaced when that subject is next read. A consumer that read the previous
+generation cannot commit against the cleared state; it must retry against the new
+generation. Redis must acknowledge the generation change before the command
+reports success.
+
+A successful clear is a budget reset, not a general repair of corrupt Redis keys.
+A subject key of the wrong Redis type, or a subject hash with a missing or invalid
+generation field, can still cause `503` after a named clear. Such state needs its
+TTL to expire, if one exists, or targeted repair. A valid old-generation hash is
+replaced on its next read, including any extra fields. The internal per-subject
+reset also replaces the subject record; this command does not expose that operation.
+
+Changing a limiter's effective configuration starts fresh subject budgets because
+the configuration contributes to their storage identities. Named clear still
+reaches every configuration under that limiter name.
 
 The command clears immediately and does not ask for confirmation. The admin API requires `?confirm=true` instead.
 
-With `--all`, the command tries every pool and then reports the limiters it could not clear. On success it prints the names of the cleared limiters.
+With `--all`, the command tries every configured namespace sequentially, including
+after a failure, then reports any limiters it could not clear. Successful clears
+remain in effect when another limiter fails; the operation does not roll them
+back. On complete success it prints the names of the cleared limiters.
 
 ## Exit codes
 
 | Code | Meaning |
 |------|---------|
 | 0 | State cleared |
-| 1 | The limiter name is unknown, or a cache pool could not be cleared; the message says which |
+| 1 | The limiter name is unknown, or a storage namespace could not be cleared; the message says which |
 | 2 | Neither a name nor `--all` was given, or both were |

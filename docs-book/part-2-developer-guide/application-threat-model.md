@@ -22,7 +22,7 @@ A scanner canary establishes scanner operation, not resistance to hostile reques
 | Passwords, TOTP secrets, passkeys, OAuth signing keys and `APP_SECRET` | The application and its operator can use these; database, filesystem and process access are privileged boundaries. Password hashes are not plaintext passwords. |
 | Access tokens, refresh token chains and browser DPoP keys | The browser holds credentials; the API verifies the token and proof. A script running on the application origin can use browser credentials. Pending logout deliberately retains the ended session's key and tokens until revocation is confirmed. |
 | Libraries, playlists, media, user profiles and notification subscriptions | Membership, ownership and administrator checks control access. A signed delivery URL is a bearer capability until expiry; token revocation alone does not revoke it. |
-| Redis state and worker messages | Nonces, replay decisions, caches, rate counters and jobs cross the Redis boundary. Redis availability has different consequences for DPoP and rate limiting. |
+| Redis state and worker messages | Nonces, replay decisions, caches, rate counters and jobs cross the Redis boundary. DPoP and rate-limit stores refuse protected work when state cannot be established, with narrow availability exceptions for logout and revocation. |
 | Logs, mail, webhook payloads and external-service credentials | These can disclose activity or secrets to their recipients. Log redaction is a separate control from response filtering. |
 
 Actors include anonymous clients, members, playlist collaborators, administrators,
@@ -101,7 +101,7 @@ counts and failures are recorded separately in the roadmap.
 | Cross-user or cross-library access: a member guesses another resource identifier or changes request method | Unauthorized read, mutation or queued work | `Integration/CatalogReadFirewallTest.php`, `CatalogMutationFirewallTest.php`, `PlaylistReadFirewallTest.php`, `PlaylistMutationFirewallTest.php`, `ArtistMutationFirewallTest.php` and the extended OAuth firewall suite exercise membership, collaborator removal, owner/admin distinctions and alternate methods | These are production-kernel requests, not network penetration tests. Pairing functional tests and anonymous/revoked route probes do not prove every authenticated pairing race. Pairing sessions have no user ownership field; knowledge of the pairing code is part of their authority. |
 | Malformed JSON/types or oversized wire request: anonymous client sends hostile input | Server errors, unintended writes or loss of availability | `scripts/test-security-runtime-container.sh` runs real `app:serve`; `tests/Fixtures/security-runtime.php` checks bounded rejection, fresh-connection liveness and unchanged user/token counts. Login validation prevents decoding/type errors from escaping as 500 | The drill covers selected malformed framing and declared oversize; it does not establish resistance to slow clients, every request-smuggling ambiguity or sustained resource exhaustion. |
 | Forged forwarding headers: direct client chooses apparent address, scheme or host | Rate-limit evasion and incorrect DPoP request identity | `Unit/Shared/Infrastructure/Http/ProxyTrustTest.php` exercises direct and explicit proxy trust; both configuration layers now default to no trust | Correct proxy header replacement and network isolation are deployment assumptions. The tests do not emulate every proxy vendor or multi-hop topology. |
-| Rate-counter outage or concurrent updates | Brute-force limits can admit more requests than configured | Existing `Functional/Auth/AuthEndpointRateLimitTest.php` and `ApiRateLimitTest.php` exercise ordinary exhaustion; the storage findings below record the unclosed failure modes | Rate limiting is not currently a fail-closed security boundary during cache failure, and uncoordinated concurrent consumers can lose updates. |
+| Rate-counter outage or concurrent updates | Brute-force limits can admit more requests than configured | Configured factories execute Symfony policies on operation-local snapshots and commit through Redis compare-and-set. Store errors and exhausted conflict retries stop protected work with a generic 503. Named clears advance the same namespace generation used by consumption. `Integration/RateLimiterConcurrencyTest.php` and `RateLimiterHttpAvailabilityTest.php` target these boundaries; `Functional/Auth/AuthEndpointRateLimitTest.php` and `ApiRateLimitTest.php` retain ordinary exhaustion coverage | Local storage, HTTP and runtime checks pass; distributed load and Redis failover remain unqualified. The generic API limiter preserves the narrow logout/revoke availability exception; it still enforces confirmed exhaustion and every other authentication/proof check. |
 | Outbound SSRF through webhook URL or changed DNS | Access to internal services | `WebhookDestinationPolicy` checks every DNS answer, denies forbidden ranges and restricts optional LAN allowance; delivery pins the checked address, bypasses ambient proxies and refuses redirects. `Unit/Notification/Infrastructure/Webhook/` tests cover forbidden addresses, changing DNS and dispatch options | DNS tests are controlled resolver fixtures. Local TLS tests qualify transport certificate behavior separately; they do not certify public DNS or deployment trust stores. |
 | Outbound TLS failure or HTTPS downgrade | Interception or connection to an unintended endpoint | `Unit/Lyrics/Infrastructure/Api/LrclibTransportSecurityTest.php` uses a disposable CA/server to check trusted success, untrusted certificate, hostname mismatch and redirect rejection. The lyrics client disables redirects | Other outbound transports have separate limits below. Operator-configured base URLs remain trusted configuration. |
 
@@ -129,14 +129,28 @@ counts and failures are recorded separately in the roadmap.
    player's party message vocabulary remains different from the server protocol;
    migrating its authentication does not qualify party synchronization. External
    proxy logging and deferred native clients remain unqualified.
-2. **Rate-limit storage failure and concurrency.** Symfony cache storage treats
-   failed writes as successful limiter consumption; Redis cache reads can degrade
-   to misses. The installed application has no lock component, so read-modify-write
-   consumption is not serialized. `Unit/Shared/Infrastructure/RateLimiter/RateLimiterFailureSemanticsTest.php`
-   reproduces failed storage and a deterministic two-consumer interleaving. These
-   findings must remain visible until strict storage failure semantics and shared atomicity are
-   designed and verified. DPoP store outage handling is a different mechanism and
-   must not be used as evidence that rate limiting fails closed.
+2. **Rate-limit storage and residual limits.** The configured limiters use shared atomic Redis
+   storage rather than Symfony's cache storage. Each operation executes the installed
+   fixed/sliding-window policy against its own snapshot and compares both the
+   generation and opaque revision before writing. Redis rejects snapshots older than
+   two seconds or from a future server time. Empty reads and per-subject resets leave
+   ten-second revision tombstones, preventing a paused writer from confusing an
+   expired state with the absence it originally read. Definite conflicts retry
+   within a limit of eight total attempts and a two-second monotonic budget; an
+   in-flight bounded Redis call can finish after that deadline. Transport errors,
+   uncertain writes and corrupt state are not retried as fresh consumption. The 19 names, budgets, identity keys,
+   media exemptions and development bypass are unchanged. The full backend suites,
+   focused concurrency/outage checks and production runtime drills pass; the roadmap
+   records their counts and limits. The rewritten
+   `Unit/Shared/Infrastructure/RateLimiter/RateLimiterFailureSemanticsTest.php`
+   targets failed storage, conflict refetch, uncertain writes and the retry deadline.
+   The effective configuration contributes to the subject digest, so a configuration
+   change starts a fresh budget; this isolates configurations rather than enforcing
+   one shared budget across a rolling configuration change. Named clears reach all
+   configurations of the limiter. Wrong-type subject keys and missing/invalid
+   generation fields still fail closed after a named clear until expiry or targeted
+   repair. A valid old-generation hash, including extra fields, is replaced on read.
+   DPoP outage handling is a separate mechanism.
 3. **Metadata, radio-catalog and push egress.** Fixed metadata/catalog origins and approved push providers
    reduce URL choice but do not pin validated addresses or constrain every redirect.
    Provider compromise, a malicious redirect or a changed DNS answer could cross

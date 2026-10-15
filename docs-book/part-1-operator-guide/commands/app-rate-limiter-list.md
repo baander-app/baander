@@ -18,10 +18,16 @@ The command prints a table with one row per limiter configured under `framework.
 | Policy | The Symfony limiter policy, such as `fixed_window` or `sliding_window` |
 | Limit | Requests allowed per interval |
 | Interval | The window or refill interval, such as `60 seconds`, or empty when the policy has none |
-| Cache pool | The pool that holds only this limiter's state, such as `cache.rate_limiter.auth_login_ip` |
+| Storage namespace | The Redis namespace that holds this limiter's generation and subject states |
 | Description | What the limiter protects, or empty |
 
-The list shows configuration only. It does not show which clients are currently limited.
+The API names the storage field `storageNamespace`. Its format is
+`baander:rate-limiter:{<SHA-256 of the limiter name>}`; the digest separates limiter
+namespaces without exposing subject identities.
+
+The list reads compiled configuration, not Redis. It remains available to the CLI
+when Redis is down and does not show which clients are currently limited. An HTTP
+catalog request still passes through the API's authentication and rate-limit checks.
 
 ## Exit codes
 
