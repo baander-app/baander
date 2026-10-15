@@ -19,9 +19,10 @@ Read the relevant mode reference, rather than loading every mode:
 | Refresh or check PhpStorm scopes/navigation | [PhpStorm guidance](references/phpstorm.md) |
 | Update or check CLI command pages/index | [CLI reference maintenance](references/commands.md) |
 
-Derive facts from the actual code, configuration, and tests. Use GitNexus query
-and context for unfamiliar flows; do not infer runtime behavior solely from
-filenames, `use` statements, or a matching repository name. Rules are in
+Derive facts from the actual code, configuration, and tests. Trace unfamiliar flows
+through callers, contracts, and effective wiring with targeted source searches;
+do not infer runtime behavior solely from filenames, `use` statements, or a matching
+repository name. Rules are in
 `.agents/rules/` and AGENTS.md. Document an inherited mismatch honestly rather
 than rewriting application code to make the docs easier to generate.
 

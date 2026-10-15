@@ -1285,11 +1285,9 @@ adds only `occurrence_id`; payload overrides and invalid UUIDs are rejected.
 
 This is source inspection of routing, all application Bootable implementations,
 timer/coroutine creation sites, tagged CPU handlers, scheduler providers, private
-outbox wiring and deployment programs. GitNexus 1.6.12 query/context resolved the
-current CpuProcessPool and ExecuteScheduledJobHandler after the lead rebuilt the
-index; the index identified commit `48154b8` while HEAD `06a5de5` adds only the plan.
-Its scheduler context exposes test references rather than dynamic Messenger wiring;
-the handler attributes and actual DI/configuration were therefore verified directly.
+outbox wiring and deployment programs. Static references alone do not establish
+dynamic Messenger wiring; the handler attributes and actual DI/configuration were
+therefore verified directly.
 No production capacity, delivery latency, queue durability, extension availability,
 or process-parentage claim was validated by a runtime load test.
 

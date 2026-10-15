@@ -85,7 +85,6 @@ phpstan.neon
 public/assets/
 public/dsp/
 /public/.vite/
-bin/baander
 /.idea/prettier.xml
 .deptrac.cache
 

@@ -4,7 +4,6 @@
 # Agent indexes, sessions, profiling captures and editor state are host-only.
 .agents
 .codex
-.gitnexus
 .rpiv
 .reli
 **/.claude

@@ -25,7 +25,8 @@ data semantics. Keep parameterized SQL and the existing application port boundar
 Distinguish mapping intent, platform-generated DDL, migration history and the actual
 catalog. Doctrine defaults explain a finding; they do not automatically excuse it
 or authorize a mass rewrite. A clean ORM diff does not cover excluded objects.
-Run the repository-required GitNexus impact analysis before editing existing symbols.
+Before editing existing symbols, trace callers, persistence mappings, service wiring,
+and affected entrypoints through source. Check the final Git diff against that scope.
 
 Use targeted searches in the affected paths for candidate anti-patterns. For an
 authorized database, run the read-only [catalog audit](scripts/audit_schema.sql),

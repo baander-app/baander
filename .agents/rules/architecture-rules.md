@@ -35,8 +35,10 @@ broadening dependencies during an unrelated task.
 Radio, Scheduler, QoL, Session, Lyrics, and Filesystem are covered by collectors.
 External framework dependencies also require review beyond its internal layers.
 
-Use GitNexus as required by `AGENTS.md`; inspect actual contracts, imports, service
-resolution, and callers. Distinguish a naming heuristic from a proven violation.
+Use targeted source searches to inspect contracts, imports, service resolution,
+and callers. Before editing a symbol, trace affected entrypoints and dynamic
+registrations; unresolved callers are a coverage limit. Verify the final Git diff
+against the intended scope. Distinguish a naming heuristic from a proven violation.
 Do not assume every context has four layers or every port has an HTTP endpoint.
 
 ## Persistence and asynchronous work

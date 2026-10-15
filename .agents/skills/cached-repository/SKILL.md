@@ -7,7 +7,8 @@ description: Add or change a Baander repository cache decorator with explicit ke
 
 Read the complete repository contract, selected inner adapter, cache configuration,
 existing decorators, and consumers. Discover nested feature paths and effective
-service aliases. Run GitNexus impact before changing existing symbols.
+service aliases. Before changing existing symbols, trace their callers and affected
+entrypoints through source and wiring. Verify the final Git diff against that scope.
 
 Choose which operations benefit from caching and define freshness and failure
 semantics before implementation. Read [cache contract](references/cache-contract.md)

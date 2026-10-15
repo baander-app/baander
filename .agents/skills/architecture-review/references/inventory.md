@@ -3,7 +3,8 @@
 Identify the requested context directories from current source, including nested
 feature folders. Do not use a hardcoded context table or infer missing layers are
 errors. Shared has all four layers; utility contexts may intentionally have fewer.
-Use `rg --files` for a bounded inventory after GitNexus discovery.
+Use `rg --files` for a bounded inventory, then trace relevant contracts, callers,
+and service registrations with targeted searches.
 
 Classify current files by role: models/state/value types, repository contracts and
 implementations, ports, commands/handlers/messages, controllers/console entrypoints,

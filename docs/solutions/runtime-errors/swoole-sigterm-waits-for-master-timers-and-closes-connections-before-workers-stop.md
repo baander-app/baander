@@ -83,4 +83,4 @@ After SIGTERM, Swoole's master ends its event loop only when the loop has nothin
 
 - `docs/solutions/runtime-errors/swoole-callbacks-outside-the-bundle-leak-pooled-services.md`: the CPU pool health check is one of the master timers it lists; this doc explains why that timer also blocked SIGTERM. The drain's own master and worker ticks follow its `CoWrapper::defer()` rule.
 - `docs/solutions/runtime-errors/swoole-table-default-conflict-proportion-drops-keys.md`: the drain state table follows its sizing rule (conflict proportion 1.0, checked `set()`).
-- Plan: `docs/plans/2026-10-11-1121-fix-web-server-drain-plan.md` (ROADMAP item 4).
+- [Stopping and restarting the web server](../../../docs-book/part-1-operator-guide/upgrading.md#stopping-and-restarting-the-web-server) documents the drain window, stop routes and restart procedure for operators.

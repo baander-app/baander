@@ -961,9 +961,8 @@ For each format:
    encode, and whether the seek landed.
 
 If, for any recorded Safari version and format, playback does not start, stops
-early, or cannot seek after the encode has finished, open the deferred follow-up
-from the [item 1 open-items plan](../../docs/plans/2026-10-10-1312-fix-item1-open-items-plan.md):
-change the in-progress rendition's answer to Safari's byte-range probe.
+early, or cannot seek after the encode has finished, open a follow-up to change
+the in-progress rendition's answer to Safari's byte-range probe.
 
 ### Safari Resume After a Server Restart (Manual)
 

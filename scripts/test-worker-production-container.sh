@@ -35,7 +35,7 @@ if (!is_file("vendor/autoload_runtime.php")
     || Composer\InstalledVersions::isInstalled("phpunit/phpunit")
     || Composer\InstalledVersions::isInstalled("symfony/web-profiler-bundle")
     || is_dir("config/secrets") || is_file("docker/dev/juul.localdomain.key")
-    || is_dir(".gitnexus") || is_dir(".reli")) {
+    || is_dir(".reli")) {
     fwrite(STDERR, "Production image contains development artifacts or lacks the runtime autoloader.\n");
     exit(1);
 }

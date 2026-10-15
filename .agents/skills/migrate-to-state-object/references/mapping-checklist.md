@@ -25,10 +25,11 @@ may remain the synchronization interface; introducing `getState()` does not requ
 rewriting every repository helper. Preserve entity identity, nulls, collection order,
 and immutable fields in both directions.
 
-Update every changed reconstitution caller and relevant test fixtures. Use GitNexus
-for semantic renames rather than find-and-replace. Search for direct aggregate field
-access and serialization assumptions; moving private fields can affect reflection or
-serialized caches even when ordinary getters are unchanged.
+Update every changed reconstitution caller and relevant test fixtures. For symbol
+renames, resolve each reference from its namespace, imports, and runtime registration;
+verify the resulting diff rather than relying on textual replacement. Search for
+direct aggregate field access and serialization assumptions; moving private fields
+can affect reflection or serialized caches even when ordinary getters are unchanged.
 
 Verify creation invariants, semantic factories, mutation transitions, collection
 behavior, and rehydration with representative null/default/identity values. Run

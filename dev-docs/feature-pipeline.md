@@ -13,9 +13,10 @@ Use an isolated worktree or checkout when parallel tasks need separate branches.
 A dirty tree or a branch other than the default branch is not by itself a reason
 to discard work or stop an otherwise authorized local task.
 
-Use GitNexus to understand unfamiliar flows and analyze impact before changing
-symbols. Keep a plan proportional to the work, with concrete implementation units,
-relevant checks, and any unresolved product decisions. A plan is not authorization
+Inspect source contracts, callers and service wiring to understand unfamiliar
+flows and analyze impact before changing symbols. Keep a plan proportional to the
+work, with concrete implementation units, relevant checks, and any unresolved
+product decisions. A plan is not authorization
 to create remote issues, send comments, publish, or merge.
 
 ## Implementation and delegation
@@ -42,8 +43,8 @@ Yarn scripts. Report limitations and unresolved failures explicitly.
 Delegate a focused independent review when the change warrants it. Correct
 supported findings, then rerun the affected checks. A review or CI failure remains
 an unresolved failure until repaired or explicitly accepted within the user's
-scope; this guide provides no CI-bypass flag. Use GitNexus change detection before
-an authorized commit.
+scope; this guide provides no CI-bypass flag. Review the Git diff and working-tree
+status for the intended scope before an authorized commit.
 
 ## Forgejo and remote actions
 

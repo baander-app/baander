@@ -42,17 +42,6 @@ to `.agents/skills`; detailed procedures are loaded only when relevant.
 | test-fix | Retire; preserve project details in testing guide | Generic loop duplicates debugging guidance; changed-file bookkeeping was incorrect. |
 | test-scaffold | Retire; preserve project details in testing guide | Generic recipes and confirmation gates add little; retain real fixture contracts. |
 | playwright-skill | Retire; retain project E2E guidance in testing guide | Use maintained browser tooling and project Playwright; old runner raced, installed dependencies, and swallowed failures. |
-| gitnexus-guide | Merge into gitnexus references | Preserve tool/schema guidance and actual CLI alternatives. |
-| gitnexus-cli | Merge into gitnexus references | Refresh must use index-only mode. |
-| gitnexus-exploring | Merge into gitnexus references | Preserve repository binding and incomplete-index caveats. |
-| gitnexus-debugging | Merge into gitnexus references | Preserve evidence-led flow tracing. |
-| gitnexus-impact-analysis | Merge into gitnexus references | Preserve UNKNOWN/partial-result handling and required impact reporting. |
-| gitnexus-refactoring | Merge into gitnexus references | Preserve semantic rename and change-scope review. |
-| gitnexus/gitnexus-cli | Retire duplicate | Older than top-level source. |
-| gitnexus/gitnexus-exploring | Retire duplicate | Older than top-level source. |
-| gitnexus/gitnexus-debugging | Retire duplicate | Older than top-level source. |
-| gitnexus/gitnexus-impact-analysis | Retire duplicate | Older than top-level source. |
-| gitnexus/gitnexus-refactoring | Retire duplicate | Older than top-level source. |
 
 The six coding-rule documents now live in `.agents/rules`. `AGENTS.md` supplies
 explicit loading pointers; directory placement does not imply automatic loading.
@@ -263,18 +252,14 @@ Migration verification completed:
 - Documentation check mode reported the missing outbox command page without changing
   reviewed command documentation. Concurrent documentation edits by another worker
   were accounted for rather than claiming the entire working tree was unchanged.
-- Index-only GitNexus analysis passed in a disposable fixture checkout without
-  recreating retired files or changing maintained instructions and a sentinel skill.
 
 Validate skill frontmatter and relative references, then run realistic independent
 trials against representative code. Skill reviews must distinguish an intentional
 exception from a defect, and report incomplete evidence rather than manufacture a
 passing result. Syntax validation alone is not behavioral verification.
 
-Refresh GitNexus with `analyze --index-only`. Verify in a disposable checkout that
-it neither recreates the retired Claude files nor overwrites maintained skills or
-instructions. Keep ignore entries for retired local artifacts; they are defensive
-exclusions, not runtime dependencies.
+Keep ignore entries for retired local artifacts; they are defensive exclusions,
+not runtime dependencies.
 
 Use the [testing guide](../docs-book/part-2-developer-guide/testing.md),
 [architecture rules](../.agents/rules/architecture-rules.md), and

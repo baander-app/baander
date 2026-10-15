@@ -12,9 +12,10 @@ backlog is authoritative.
 
 Read [domain rules](../../rules/ddd-domain-models.md),
 [repository rules](../../rules/ddd-repositories.md), and
-[mapping checklist](references/mapping-checklist.md). Run GitNexus context and
-upstream impact for changed constructors, factories, reconstitution, and mutations
-before edits. Coordinate caller ownership when multiple workers are involved.
+[mapping checklist](references/mapping-checklist.md). Before edits, trace all callers
+of changed constructors, factories, reconstitution, and mutations through source,
+including fixtures and dynamic registrations. Coordinate caller ownership when
+multiple workers are involved, and verify the final Git diff against that scope.
 
 Preserve behavior, semantic factory names, identity values, defaults, invariant
 checks, and named-argument compatibility of unchanged public methods. The deliberate

@@ -13,8 +13,9 @@ has established a report destination.
 
 Read [frontend conventions](../../rules/frontend.md) and the relevant sections
 of `ui/DESIGN.md`. Inspect `package.json`, `vite.config.ts`, ESLint/TypeScript
-configuration, and nearby tests before assuming what is enforced. Use GitNexus
-for unfamiliar execution flows when available, then targeted file reads.
+configuration, and nearby tests before assuming what is enforced. Trace unfamiliar
+flows through imports, callers, state ownership, and API wiring with targeted source
+searches and file reads. Compare reviewed changes with the actual Git diff.
 
 ## Review scope
 

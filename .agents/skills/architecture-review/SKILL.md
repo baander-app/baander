@@ -10,9 +10,10 @@ repository-wide audit, or an inventory. Review is read-only unless fixes are
 explicitly requested. Do not add an unrelated full audit to a narrow task.
 
 Read [architecture rules](../../rules/architecture-rules.md) and the companion rules
-for affected models, repositories, ports, or handlers. Use the repository's required
-GitNexus query/context/impact workflow. Check index freshness and coordinate refreshes
-with the lead; do not treat unresolved graph callers as proof of no impact.
+for affected models, repositories, ports, or handlers. Use targeted source searches
+to trace contracts, callers, entrypoints, and dynamic registrations. Before editing,
+identify affected behavior and focused checks; unresolved callers remain a coverage
+limit. Compare the final Git diff with the agreed scope and other workers' changes.
 
 Read only the relevant reference:
 

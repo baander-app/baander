@@ -8,7 +8,9 @@ description: Create or extend Baander backend aggregate/repository stacks and AP
 Discover the target context's current code before generating files. Reuse existing
 models, ports, handlers, resources, and wiring where they fit. Read the relevant
 [architecture rules](../../rules/architecture-rules.md) and companion rules.
-Run required GitNexus impact analysis before changing existing symbols.
+Before changing existing symbols, trace callers, service wiring, and affected
+entrypoints with targeted source searches. Check the final Git diff against the
+requested scope.
 
 Choose the relevant recipe; a complete feature may need both:
 

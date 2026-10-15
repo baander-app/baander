@@ -57,9 +57,9 @@ proposal described:
 | Image conversion and learning persistence start background coroutines from web | [ImageController](../../src/Media/Interface/Controller/ImageController.php), [LearningEngineSubscriber](../../src/QoL/Infrastructure/Swoole/LearningEngineSubscriber.php) | Queue background work; preserve current response/fallback behavior |
 | Sampling and governor timers depend on HTTP-worker boot | [CpuGpuSampler](../../src/QoL/Infrastructure/Swoole/CpuGpuSampler.php), [SwooleWorkerEventSubscriber](../../src/Shared/Infrastructure/Swoole/SwooleWorkerEventSubscriber.php) | Worker owns device sampling/reservations; web reads shared admission state |
 
-This is a source baseline, not production capacity certification. GitNexus returned
-malformed metadata during review; source inspection supplied the evidence. Repair
-and refresh the index before implementation symbol impact analysis.
+This is a source baseline, not production capacity certification. Source inspection
+supplied the review evidence. Before implementation, trace affected callers,
+service wiring and execution paths to assess the impact of symbol changes.
 
 ## Runtime ownership
 

@@ -23,12 +23,11 @@ batches describe their own checkpoints; the current gate below takes precedence.
 Any harness can take over from this section; nothing below depends on a tool that
 only one agent host has.
 
-- **Branch.** `plan/registry-threat-model` continues from published `master`
-  (`bb6bdc3c`). API contract reconciliation was fast-forwarded into `master` and
-  pushed to both remotes at the user's request. This branch completes the registry
-  threat model and focused security regressions; its checkpoint below records
-  verification and remaining risks. This follow-up remains local until publishing
-  is requested.
+- **Branch.** `plan/completed-plan-cleanup` follows the locally committed registry
+  security delivery (`1c615b28`). Completed plans have been removed; their delivery
+  checkpoints remain in this roadmap. Six plans for open or deferred work remain
+  under `docs/plans/`. Registry qualification and this cleanup remain local until
+  publishing is requested.
 - **Previous baseline.** Item 8 was merged and pushed. `master` (eced16d6) holds its fifteen
   commits and the roadmap commit on top of 63466d0d by fast-forward, code-reviewed
   with both findings applied and every gate green (the item 8 checkpoint below).
@@ -91,10 +90,10 @@ only one agent host has.
 The backend release-gate package is complete (see the next two sections). Eight
 plans followed it, in this order, and all eight are delivered:
 
-1. [General settings and email language](docs/plans/2026-10-07-1736-feat-general-settings-email-language-plan.md):
+1. General settings and email language:
    one definition-driven settings mechanism, the per-user email language, and the
    features behind the existing admin toggles. Delivered on 2026-10-08. The
-   [open-items follow-up](docs/plans/2026-10-10-1312-fix-item1-open-items-plan.md)
+   open-items follow-up
    closed the rest on 2026-10-10.
 
    Closed on 2026-10-10: the web server raises health alerts, from HTTP worker 0 every
@@ -112,7 +111,7 @@ plans followed it, in this order, and all eight are delivered:
    the server's answers to Safari's opening requests. Safari playback of a still-encoding
    rendition is a documented manual check in the
    [testing guide](docs-book/part-2-developer-guide/testing.md#safari-playback-of-an-encoding-rendition-manual).
-2. [Admin/CLI parity](docs/plans/2026-10-08-1627-feat-admin-cli-parity-plan.md):
+2. Admin/CLI parity:
    every action on the admin pages has a console command that reaches the same
    Application use case as its controller. `AdminCliParityTest` fails on an admin route
    with neither `#[CliCounterpart]` nor `#[CliParityExemption]`, and
@@ -120,7 +119,7 @@ plans followed it, in this order, and all eight are delivered:
    also added the server control channel for diagnostics and QoL, cooperative job
    cancellation, admin-only library rename, delete and scan with a leased scan claim,
    and it ends a disabled user's tokens and WebSocket connections. Delivered on
-   2026-10-09. The [follow-up](docs/plans/2026-10-09-1728-feat-deferred-cli-parity-plan.md),
+   2026-10-09. The follow-up,
    also delivered on 2026-10-09, gave commands to the routes it had deferred: the
    catalog and player admin actions (metadata editing, per-song lyrics fetch and apply,
    cover upload and delete, artist create and credits, album, song, movie and artist
@@ -128,7 +127,7 @@ plans followed it, in this order, and all eight are delivered:
    exemption remains, and the parity test fails on an exemption that defers its
    command. The admin notification bell needs no command: it reads the
    administrator's own inbox. The
-   [open-items follow-up](docs/plans/2026-10-10-1012-fix-item2-open-items-plan.md)
+   open-items follow-up
    closed the rest on 2026-10-10 (see below). Still open:
    - `ui/rn` feature drift: the test setup loads again, but `tsc` reports 84 errors and
      25 Jest tests fail, from missing `ui/shared` exports (`TVStatusCard`,
@@ -154,7 +153,7 @@ plans followed it, in this order, and all eight are delivered:
    SSE docs are gone; the WebSocket registry, reconnection tokens and CPU pool tables
    hold the rows they promise; the Swoole timers that log release pooled services;
    `room.join` no longer lets any user join another party's room.
-3. [Timestamp convention](docs/plans/2026-10-10-1752-refactor-timestamp-convention-plan.md):
+3. Timestamp convention:
    every instant column is `timestamptz` at microsecond precision, written and read in
    UTC. Delivered on 2026-10-10. `InstantType` replaces Doctrine's `datetime_immutable`
    and `datetimetz_immutable`, and every PostgreSQL connection sets its session time
@@ -175,7 +174,7 @@ plans followed it, in this order, and all eight are delivered:
    directory lacks, where Doctrine would have rerun them. Accepted limits: a `since`
    filter at whole-second API precision can return a row from its own second again,
    and a cursor issued before the change may repeat one row.
-4. [Web server drain on container stop](docs/plans/2026-10-11-1121-fix-web-server-drain-plan.md):
+4. Web server drain on container stop:
    stopping or restarting the web container no longer interrupts listeners. Delivered on
    2026-10-11 (branch `plan/item4-web-shutdown`). `docker stop` used to end in SIGKILL:
    the CPU pool's health timer kept Swoole's master running after SIGTERM, and shutdown
@@ -233,7 +232,7 @@ plans followed it, in this order, and all eight are delivered:
      two-minute budget runs out, and the cost of Swoole's heartbeat scan, now every
      second, with many idle WebSockets is unmeasured.
 
-5. [Browser credential and session qualification](docs/plans/2026-10-12-1748-fix-browser-credential-session-qualification-plan.md):
+5. Browser credential and session qualification:
    a signed-in listener stays signed in through a refresh whose answer never arrived, a
    second tab of the same account, a Redis outage, a service worker the browser restarted
    and a server restart, and logout ends the session everywhere it was in use. Delivered
@@ -307,7 +306,7 @@ plans followed it, in this order, and all eight are delivered:
      sockets; the socket reconciliation now ends them within a minute.
    - The main e2e suite still uses `baander.test` fixtures and does not run in CI.
 
-6. [Queued server-side logout](docs/plans/2026-10-13-1841-feat-queued-server-side-logout-plan.md):
+6. Queued server-side logout:
    a logout ends the session on the server even when it happens during a Redis outage,
    while the browser is offline, or when the web server could not close the session's
    sockets. Delivered on 2026-10-13 (branch `plan/item6-queued-logout`, on top of the
@@ -352,7 +351,7 @@ plans followed it, in this order, and all eight are delivered:
    - A socket of a revoked chain stays open for up to one tick when the hot-path close
      failed.
 
-7. [Video delivery authorization matrix](docs/plans/2026-10-14-1319-test-video-delivery-authorization-matrix-plan.md):
+7. Video delivery authorization matrix:
    the seven signed delivery routes, the signing endpoint and the quality ladder are
    exercised through the real firewall against PostgreSQL and Redis, for anonymous,
    owner, library member, unrelated user and administrator under every credential
@@ -393,7 +392,7 @@ plans followed it, in this order, and all eight are delivered:
    `HEAD` requests, the audio, catalog and image suites (their own real-firewall
    tests stand), and the WebSocket handshake's query-token authenticator.
 
-8. [Catalog authorization matrix and playlist collaborators](docs/plans/2026-10-14-1532-feat-catalog-authorization-matrix-plan.md):
+8. Catalog authorization matrix and playlist collaborators:
    every catalog, library and playlist mutation and the library-scoped reads the read
    suite skipped are proven through the real firewall against PostgreSQL and Redis, the
    playlist's unused collaborator table became a working feature with sharing controls
@@ -506,7 +505,6 @@ errors; PHPStan clean; Deptrac 0; container lint and the OpenAPI check passing.
 
 ## Backend release-gate package (2026-10-06 to 2026-10-07)
 
-Plan: [backend release gates](docs/plans/2026-10-06-1612-refactor-backend-release-gates-plan.md).
 The package removed every Deptrac violation and ran the whole suite in the final CI
 image. It also fixed the defects found on the way, which the user chose to fix
 rather than defer.
@@ -1396,7 +1394,6 @@ the agreed host budget.
 
 ### Registry threat-model delivery (2026-10-15)
 
-Implementation follows the [reviewed plan](docs/plans/registry-threat-model.md).
 The [registry threat model](docs-book/part-2-developer-guide/registry-threat-model.md)
 records the standalone C++ service's assets, credential ownership, replay,
 parsing, egress, TLS and quorum boundaries. The registry has no application tenant
@@ -1450,10 +1447,9 @@ findings also remain open.
 
 ### Application threat-model delivery (2026-10-14)
 
-Branch `plan/application-threat-model` implements the reviewed
-[plan](docs/plans/application-threat-model.md). The
-[application threat model](docs-book/part-2-developer-guide/application-threat-model.md)
-records assets, trust boundaries, source/test evidence and open findings. PHP
+Branch `plan/application-threat-model` delivered the
+[application threat model](docs-book/part-2-developer-guide/application-threat-model.md),
+which records assets, trust boundaries, source/test evidence and open findings. PHP
 Discovery registration/pairing is local persistence. Registry internals and quorum
 downgrade were pending at that checkpoint; the registry delivery above now completes
 the combined model/regression item while retaining its open security findings.
@@ -1530,8 +1526,8 @@ containers.
 The unavailable compound-engineering skills were replaced by the documented
 manual sequence: saved plan, independent plan review before implementation,
 simplification and independent code review, including the runtime-discovered
-proxy configuration correction. GitNexus was stale (indexed commit `2503505`).
-Source and caller inspection and Git diff supplied the edit evidence. Prose-fix
+proxy configuration correction. Source and caller inspection and Git diff supplied
+the edit evidence. Prose-fix
 preserves the evidence limits in the guide and model. No API schema change or
 generated-client update is required. The delivery is merged into `master`; the
 verification checkpoint applies unchanged to the fast-forwarded implementation.
@@ -1642,8 +1638,8 @@ contracts; neither old prose nor the current branch name establishes completion.
 
 ## Completion and next updates
 
-Before edits, assess symbol impact with whatever index the harness has (GitNexus
-where it is connected, otherwise the search tools and the test suites). Before
+Before edits, assess symbol impact through source searches, caller inspection
+and the relevant test suites. Before
 commits, inspect the actual scope with `git status` and `git diff --stat`, including
 unindexed test callbacks, and commit by path.
 Keep independent changes reviewable and record checks without implying broader
@@ -1652,7 +1648,6 @@ workflow integrations, and registry consistency/resource/failover/restore gates 
 
 ## API contract reconciliation
 
-Implementation follows the [reviewed plan](docs/plans/api-contract-reconciliation.md).
 The old 24-path finding predates the delivered route-coverage and drift gates;
 current routing and the regenerated specification agree on 244 paths and 313
 operations. The specification still has 126 component schemas, with 16 corrected
@@ -1695,8 +1690,8 @@ Verification in `baander-ci-prewarm:local`, PHP 8.5.2:
   networks and volumes were removed.
 - Independent plan/code review and simplification completed. The export-scope
   and cursor-example findings were applied; prose-fix audits, JSON examples,
-  relative links and whitespace checks passed. GitNexus remains stale, so source
-  inspection supplied the missing impact evidence.
+  relative links and whitespace checks passed. Source inspection supplied the
+  impact evidence.
 
 React Native and Android remain deferred. Their hand-written clients still use
 obsolete album-track, playlist-method/song/reorder and session endpoints; this
@@ -1706,7 +1701,6 @@ Forgejo run.
 
 ## Messenger without Swoole
 
-Implementation follows [the qualification plan](docs/plans/messenger-without-swoole.md).
 `BAANDER_TEST_DISABLE_SWOOLE=1` removes only the dedicated loader inside each
 disposable app container before PHP discovery or boot. The coordinator records
 PHP version, configuration hashes, extensions and native symbols before and after
@@ -1738,8 +1732,7 @@ thread/coroutine identity behavior and kernel initialization remain unchanged.
 - Platform requirements, PHPStan, Deptrac (zero violations, warnings or errors;
   495 existing baseline entries), container lint and OpenAPI drift passed in the
   CI image. Static logs: `/tmp/baander-paratest-static-khhlniez`. Prose-fix and
-  whitespace checks passed; the stale GitNexus index was supplemented with source
-  and caller inspection.
+  whitespace checks passed; source and caller inspection established edit impact.
 
 This qualifies the exercised console/Messenger paths with actual extension
 absence. The web server still requires Swoole; no dependency or API/schema changed.
@@ -1749,9 +1742,8 @@ is configured, but no live Forgejo result is claimed.
 
 ## Parallel backend verification
 
-Implementation follows [the ParaTest plan](docs/plans/parallel-test-execution.md)
-on `plan/parallel-test-execution`. The shared coordinator, explicit native manifest,
-identity checks, coverage merging and blocking report validator are implemented.
+Branch `plan/parallel-test-execution` delivered the shared coordinator, explicit
+native manifest, identity checks, coverage merging and blocking report validator.
 Local wrappers and CI use this coordinator with disposable Compose projects.
 The checkpoints below record qualification, corrections and final verification.
 
@@ -1892,3 +1884,30 @@ The checkpoints below record qualification, corrections and final verification.
   not part of local verification. Its runner image must be rebuilt with the Docker
   Compose plugin before using the new workflow. The recorded wall-clock discrepancy is
   the remaining timing limitation; exact test and coverage qualification passed.
+
+## Repository cleanup (2026-10-15)
+
+Removed 17 completed planning documents from `docs/plans/`. Their delivered scope,
+verification checkpoints and remaining findings remain in this roadmap; the
+original documents remain in Git history. The temporary cleanup plan was also
+removed after review and implementation. Six July plans remain because the worker,
+media/DSP and React Native work still has open or deferred acceptance.
+
+References to deleted plans were removed from the roadmap and solution records.
+The testing guide now states the Safari follow-up directly; `docs-book/` contains
+no plan-document references. Independent classification and final review, deleted
+filename/reference checks, prose-preservation audits and whitespace checks verify
+the documentation cleanup.
+
+Removed the retired graph-index skill and generated local cache. Maintained rules
+and skills now require source/caller inspection and Git diff review directly.
+Obsolete packaging and API-documentation exclusions and their fixture assertions
+were removed; the other artifact checks remain. The standalone development CLI,
+root Bun lockfile, dedicated build/publish workflow and generated-binary ignore
+entry were also removed. PHP console commands remain available.
+
+Verification: the synthetic Docker-context check passed with 34 excluded artifacts
+and 24 preserved source/asset/license markers. Shell syntax, embedded PHP syntax,
+XML and remaining workflow YAML validation passed. Repository scans found no
+retired index-tool references, deleted-plan references or development-CLI consumers.
+No backend application suite was rerun for these tooling and documentation removals.

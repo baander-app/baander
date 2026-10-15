@@ -21,7 +21,6 @@
                 <path>**/.agents/**/*</path>
                 <path>**/.codex/**/*</path>
                 <path>**/.git/**/*</path>
-                <path>**/.gitnexus/**/*</path>
                 <path>**/.idea/**/*</path>
                 <path>**/.phpdoc/**/*</path>
                 <path>**/.reli/**/*</path>

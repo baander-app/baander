@@ -4,9 +4,10 @@ Use this recipe only for requested abstraction or boundary work. The previous
 ApplicationService migration backlog is completed; discover current concrete
 services and their consumers rather than assuming named classes remain to migrate.
 
-Read the full service, callers, existing contracts, and effective wiring. Run
-GitNexus impact before changing symbols. Identify whether the abstraction is an
-inbound use case or an outbound dependency, and place its interface in the relevant
+Read the full service, callers, existing contracts, and effective wiring. Before
+changing symbols, trace affected entrypoints and runtime registrations through
+source. Identify whether the abstraction is an inbound use case or an outbound
+dependency, and place its interface in the relevant
 Application contract area. Do not move business orchestration to Infrastructure
 simply because it is called a service.
 
@@ -18,7 +19,8 @@ with its responsibility and context.
 
 Verify all consumers, aliases, decorators, routes/handler registrations, and focused
 behavior tests. Remove the old class only after confirming all references and
-runtime registrations have moved. Do not use textual find-and-replace for symbol
-renames; follow GitNexus rename/refactoring requirements. Missing behavioral intent
-may need clarification; an authorized extraction does not require a blanket
+runtime registrations have moved. For symbol renames, resolve references through
+namespaces, imports, and configuration, then inspect the Git diff for missed or
+unrelated changes. Missing behavioral intent may need clarification; an authorized
+extraction does not require a blanket
 confirmation checkpoint before reversible local edits.
