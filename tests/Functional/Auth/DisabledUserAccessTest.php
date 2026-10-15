@@ -13,13 +13,15 @@ use App\Auth\Application\Command\User\EnableUserCommand;
 use App\Auth\Application\DTO\AuthorizationResponseDTO;
 use App\Auth\Application\DTO\TokenResponseDTO;
 use App\Auth\Application\Exception\OAuthProtocolException;
+use App\Auth\Application\Port\WebSocketTicketIssuerInterface;
+use App\Auth\Application\Port\WebSocketTicketRedeemerInterface;
 use App\Auth\Domain\Model\OAuth\Client;
 use App\Auth\Domain\Model\User;
 use App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Infrastructure\Security\OAuth\OAuth2Authenticator;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Infrastructure\Security\WsQueryTokenAuthenticator;
+use App\Shared\Infrastructure\Security\WsTicketAuthenticator;
 use App\Tests\Fixtures\Auth\AuthenticationFailureMessages;
 use App\Tests\Functional\TestCase;
 use League\OAuth2\Server\ResourceServer;
@@ -53,12 +55,14 @@ final class DisabledUserAccessTest extends TestCase
         $tokens = $this->refresh($clientPublicId, $this->issueTokens($user, $clientPublicId)->getRefreshToken());
 
         self::assertSame(Response::HTTP_OK, $this->accessTokenStatus($tokens->getAccessToken()));
-        self::assertSame($user->getId()->toString(), $this->webSocketUserId($tokens->getAccessToken()));
+        $ticket = $this->webSocketTicket($user, $tokens->getAccessToken());
+        self::assertSame($user->getId()->toString(), $this->webSocketUserId($ticket));
+        $pendingTicket = $this->webSocketTicket($user, $tokens->getAccessToken());
 
         $this->bus()->dispatch(new DisableUserCommand($user->getEmail()));
 
         self::assertSame(Response::HTTP_UNAUTHORIZED, $this->accessTokenStatus($tokens->getAccessToken()));
-        self::assertNull($this->webSocketUserId($tokens->getAccessToken()));
+        self::assertNull($this->webSocketUserId($pendingTicket), 'Disabling the account invalidates a ticket issued before the disable.');
         self::assertSame('invalid_grant', $this->refreshError($clientPublicId, $tokens->getRefreshToken()));
         self::assertSame(['access' => 0, 'refresh' => 0], $this->activeTokenCounts($user));
     }
@@ -150,17 +154,24 @@ final class DisabledUserAccessTest extends TestCase
         return Response::HTTP_OK;
     }
 
-    private function webSocketUserId(string $accessToken): ?string
+    private function webSocketTicket(User $user, string $accessToken): string
     {
-        $authenticator = new WsQueryTokenAuthenticator(
-            $this->service(ResourceServer::class),
-            $this->userRepository,
-            $this->service(HttpMessageFactoryInterface::class),
-        );
+        $payload = explode('.', $accessToken)[1];
+        $claims = json_decode((string) base64_decode(strtr($payload, '-_', '+/'), true), true, flags: JSON_THROW_ON_ERROR);
+        self::assertIsString($claims['jti']);
+
+        return $this->service(WebSocketTicketIssuerInterface::class)->issue(
+            $user->getId()->toString(), $claims['jti'], 'https://baander.app',
+        )->ticket;
+    }
+
+    private function webSocketUserId(string $ticket): ?string
+    {
+        $authenticator = new WsTicketAuthenticator($this->service(WebSocketTicketRedeemerInterface::class));
 
         $request = new \Swoole\Http\Request();
-        $request->get = ['token' => $accessToken];
-        $request->server = ['request_uri' => '/api/ws'];
+        $request->header = ['origin' => 'https://baander.app'];
+        $request->server = ['request_method' => 'GET', 'request_uri' => '/api/ws', 'query_string' => 'ticket=' . $ticket];
 
         return $authenticator->authenticate($request)['user_id'] ?? null;
     }

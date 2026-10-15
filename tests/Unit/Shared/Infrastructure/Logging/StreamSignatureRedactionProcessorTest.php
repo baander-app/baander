@@ -67,17 +67,39 @@ final class StreamSignatureRedactionProcessorTest extends TestCase
         self::assertStringNotContainsString($token, json_encode($redacted->toArray(), JSON_THROW_ON_ERROR));
     }
 
+    public function testWebSocketTicketsAreRemovedFromMessagesAndNestedRequestData(): void
+    {
+        $ticket = 'opaque-websocket-handshake-ticket';
+        $url = '/api/ws?ticket=' . $ticket . '&channel=notifications&ticket=' . $ticket;
+        $record = new LogRecord(
+            new \DateTimeImmutable(),
+            'swoole.access_log',
+            Level::Info,
+            '"GET ' . $url . ' HTTP/1.1" 101',
+            ['request' => ['uri' => 'https://baander.app' . $url]],
+            ['url' => $url],
+        );
+
+        $redacted = (new StreamSignatureRedactionProcessor())($record);
+
+        $expected = '/api/ws?ticket=[redacted]&channel=notifications&ticket=[redacted]';
+        self::assertSame('"GET ' . $expected . ' HTTP/1.1" 101', $redacted->message);
+        self::assertSame(['request' => ['uri' => 'https://baander.app' . $expected]], $redacted->context);
+        self::assertSame(['url' => $expected], $redacted->extra);
+        self::assertStringNotContainsString($ticket, json_encode($redacted->toArray(), JSON_THROW_ON_ERROR));
+    }
+
     public function testPercentEncodedCredentialNamesAreRedactedWithoutChangingOtherQueryParameters(): void
     {
         $record = new LogRecord(
             new \DateTimeImmutable(),
             'swoole.access_log',
             Level::Info,
-            'GET /api/ws?%74o%6ben=secret%2Ejwt&Token=display&token_hint=visible&%73ig=signature&exp=42',
+            'GET /api/ws?%74o%6ben=secret%2Ejwt&Token=display&token_hint=visible&%73ig=signature&ticket=opaque-ticket&%74ick%65t=encoded-ticket&Ticket=display&ticket_hint=visible&exp=42',
         );
 
         $redacted = (new StreamSignatureRedactionProcessor())($record);
 
-        self::assertSame('GET /api/ws?%74o%6ben=[redacted]&Token=display&token_hint=visible&%73ig=[redacted]&exp=42', $redacted->message);
+        self::assertSame('GET /api/ws?%74o%6ben=[redacted]&Token=display&token_hint=visible&%73ig=[redacted]&ticket=[redacted]&%74ick%65t=[redacted]&Ticket=display&ticket_hint=visible&exp=42', $redacted->message);
     }
 }

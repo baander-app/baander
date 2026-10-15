@@ -26,7 +26,7 @@
   "tests/Unit/Shared/Infrastructure/Messenger/WorkerHeartbeatSubscriberTest.php": "native shared table/channel/process-pool wrapper",
   "tests/Unit/Shared/Infrastructure/Messenger/WorkerServicePoolResetSubscriberTest.php": "native coroutine/reactor/server",
   "tests/Unit/Shared/Infrastructure/OpenTelemetry/SpanBufferProbeTest.php": "nested native Swoole probe",
-  "tests/Unit/Shared/Infrastructure/Security/WsQueryTokenAuthenticatorTest.php": "native coroutine/reactor/server",
+  "tests/Unit/Shared/Infrastructure/Security/WsTicketAuthenticatorTest.php": "native coroutine/reactor/server",
   "tests/Unit/Shared/Infrastructure/Swoole/CoWrapperSchedulingTest.php": "native coroutine/reactor/server",
   "tests/Unit/Shared/Infrastructure/Swoole/Control/ControlChannelProbeTest.php": "nested native Swoole probe",
   "tests/Unit/Shared/Infrastructure/Swoole/Control/Operation/WebSocketAccessTokenDisconnectOperationTest.php": "native shared table/channel/process-pool wrapper",

@@ -8,11 +8,11 @@ use Monolog\LogRecord;
 use Monolog\Processor\ProcessorInterface;
 
 /**
- * Removes signed delivery signatures and WebSocket query tokens from every log record.
+ * Removes signed delivery signatures and WebSocket query credentials from every log record.
  *
  * The signature is a bearer capability for the media until the URL expires, and a request
  * URL reaches the log through the web processor's `url` field, the access log line and any
- * message or context value that quotes a request. The `sig` and `token` query values are
+ * message or context value that quotes a request. The `sig`, `token` and `ticket` query values are
  * replaced wherever they appear, including percent-encoded parameter names; the rest of
  * the URL, including `exp`, is kept. Runs after the web processor.
  */
@@ -59,7 +59,7 @@ final class StreamSignatureRedactionProcessor implements ProcessorInterface
 
         return preg_replace_callback(self::PATTERN, static function (array $match): string {
             $name = rawurldecode($match[2]);
-            if ($name !== 'sig' && $name !== 'token') {
+            if ($name !== 'sig' && $name !== 'token' && $name !== 'ticket') {
                 return $match[0];
             }
 

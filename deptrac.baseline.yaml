@@ -263,8 +263,6 @@ deptrac:
       - App\Notification\Domain\ValueObject\NotificationCategory
     App\Shared\Infrastructure\Messenger\Stamp\PartyMemberResultStamp:
       - App\Party\Domain\Model\PartyMember
-    App\Shared\Infrastructure\Security\WsQueryTokenAuthenticator:
-      - App\Auth\Domain\Repository\UserRepositoryInterface
     App\Shared\Interface\Controller\WebSocketController:
       - App\Party\Application\Command\JoinPartySessionCommand
       - App\Party\Application\Command\LeavePartySessionCommand

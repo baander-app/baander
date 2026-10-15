@@ -17,7 +17,7 @@ parameters:
     # drain window and Swoole's max_wait_time from it). Orchestrators must allow D + 5 seconds
     # before they kill the container.
     env(WEB_DRAIN_SECONDS): '30'
-    app.websocket.allowed_origins: [ ]
+    app.websocket.allowed_origins: null
     notification.push.allowed_domains:
         - fcm.googleapis.com
         - updates.push.services.mozilla.com
@@ -110,9 +110,24 @@ services:
         arguments:
             $controller: '@App\Shared\Interface\Controller\WebSocketController'
             $coWrapper: '@SwooleBundle\SwooleBundle\Bridge\Symfony\Container\CoWrapper'
-            $authenticator: '@App\Shared\Infrastructure\Security\WsQueryTokenAuthenticator'
+            $authenticator: '@App\Shared\Infrastructure\Security\WsTicketAuthenticator'
+            $allowedOrigins: '@=service("App\\Auth\\Application\\Service\\WebSocketOriginPolicy").allowedOrigins()'
         tags:
             - { name: 'swoole_bundle.server_configurator' }
+
+    App\Auth\Application\Service\WebSocketOriginPolicy:
+        arguments:
+            $applicationUrl: '%env(APP_URL)%'
+            $allowedOrigins: '%app.websocket.allowed_origins%'
+
+    App\Auth\Application\Port\WebSocketTicketIssuerInterface:
+        alias: App\Auth\Application\Service\WebSocketTickets
+    App\Auth\Application\Port\WebSocketTicketRedeemerInterface:
+        alias: App\Auth\Application\Service\WebSocketTickets
+    App\Auth\Application\Port\WebSocketTicketStoreInterface:
+        alias: App\Auth\Infrastructure\Cache\RedisWebSocketTicketStore
+    App\Auth\Application\Port\WebSocketTokenStatusInterface:
+        alias: App\Auth\Infrastructure\Security\DoctrineWebSocketTokenStatus
 
     # --- Server control channel ---
     # A unix-socket listener in the web server; console commands reach every HTTP

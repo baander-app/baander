@@ -52,6 +52,7 @@ final class MutationRouteInventoryTest extends TestCase
             'admin_login_blocks_delete', 'admin_login_blocks_delete_all',
             'admin_oauth_clients_create', 'admin_oauth_clients_revoke', 'admin_oauth_clients_rotate_secret',
         ],
+        'WebSocket ticket issuance, OAuthFirewallAcceptanceTest' => ['auth_websocket_ticket'],
         'authentication and OAuth' => [
             'auth_login_login', 'auth_logout', 'auth_refresh', 'auth_register', 'auth_email_verify',
             'auth_me_update', 'auth_me_email', 'auth_me_email_verification', 'auth_me_password',

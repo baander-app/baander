@@ -16,7 +16,15 @@ use App\Tests\Fixtures\Auth\SignedDpopProof;
 use App\Tests\Fixtures\Auth\LeadingZeroDpopKey;
 use App\Tests\Fixtures\Auth\ProductionOAuthKernel;
 use App\Tests\Fixtures\Auth\SecuritySurfaceOAuthKernel;
-use App\Shared\Infrastructure\Security\WsQueryTokenAuthenticator;
+use App\Auth\Application\DTO\StoredWebSocketTicket;
+use App\Auth\Application\DTO\WebSocketIdentity;
+use App\Auth\Application\Exception\WebSocketTicketUnavailableException;
+use App\Auth\Application\Port\WebSocketTicketRedeemerInterface;
+use App\Auth\Application\Port\WebSocketTicketStoreInterface;
+use App\Auth\Application\Port\WebSocketTokenStatusInterface;
+use App\Auth\Infrastructure\Cache\RedisWebSocketTicketStore;
+use App\Shared\Infrastructure\Redis\RedisClientFactory;
+use Doctrine\DBAL\DriverManager;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -294,22 +302,144 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         self::assertTrue($markerRecorded, 'The production auth logger must write to the inspected files.');
     }
 
-    public function testARevokedQueryTokenCannotAuthenticateAWebSocketHandshake(): void
+    public function testTicketIssuanceRequiresProofPossessionAndRejectsAReplayedProof(): void
     {
-        $authenticator = $this->kernel->getContainer()->get('oauth.acceptance.websocket');
-        self::assertInstanceOf(WsQueryTokenAuthenticator::class, $authenticator);
-        $request = new \Swoole\Http\Request();
-        $request->get = ['token' => $this->accessJwt()];
-        $request->server = ['request_uri' => '/api/ws'];
-        self::assertSame([
-            'user_id' => $this->user->getId()->toString(),
-            'access_token_id' => $this->token->getTokenId(),
-        ], $authenticator->authenticate($request));
+        $jwt = $this->accessJwt();
+        $uri = 'https://baander.app/api/ws/tickets';
+        self::assertSame(403, $this->request($jwt, null, $uri, 'POST', 'https://baander.app')->getStatusCode());
+        $wrongKey = new SignedDpopProof();
+        self::assertSame(403, $this->request($jwt, $wrongKey->create('POST', $uri, $jwt), $uri, 'POST', 'https://baander.app')->getStatusCode());
+        $proof = $this->proof->create('POST', $uri, $jwt);
+        $response = $this->request($jwt, $proof, $uri, 'POST', 'https://baander.app');
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+        self::assertTrue($response->headers->hasCacheControlDirective('no-store'));
+        $data = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
+        self::assertMatchesRegularExpression('/\A[0-9a-f]{64}\z/', $data['ticket']);
+        $expiry = new \DateTimeImmutable($data['expiresAt']);
+        self::assertGreaterThan(time(), $expiry->getTimestamp());
+        self::assertLessThanOrEqual(time() + 30, $expiry->getTimestamp());
+        self::assertSame(403, $this->request($jwt, $proof, $uri, 'POST', 'https://baander.app')->getStatusCode());
+    }
 
-        $this->token->revoke();
+    public function testTicketIssuanceRejectsMissingNullAndForeignOrigins(): void
+    {
+        $jwt = $this->accessJwt();
+        $uri = 'https://baander.app/api/ws/tickets';
+        foreach ([null, 'null', 'https://foreign.baander.app', 'https://baander.app/'] as $origin) {
+            $response = $this->request($jwt, $this->proof->create('POST', $uri, $jwt), $uri, 'POST', $origin);
+            self::assertSame(403, $response->getStatusCode(), (string) $response->getContent());
+        }
+    }
+
+    public function testActualRedisPreservesBindingMismatchAndConsumesATicketOnlyOnce(): void
+    {
+        $ticket = $this->issueTicket();
+        $store = $this->kernel->getContainer()->get('oauth.acceptance.websocket_store');
+        self::assertInstanceOf(WebSocketTicketStoreInterface::class, $store);
+        // Exercise the adapter itself: policy rejection alone would not prove Lua preserves the record.
+        self::assertNull($store->consume($ticket, 'https://foreign.baander.app', '/api/ws'));
+        self::assertNull($store->consume($ticket, 'https://baander.app', '/api/other'));
+        $identity = $this->redeemer()->redeem($ticket, 'https://baander.app', '/api/ws');
+        self::assertNotNull($identity);
+        self::assertSame($this->user->getId()->toString(), $identity->userId);
+        self::assertSame($this->token->getTokenId(), $identity->accessTokenId);
+        self::assertNull($this->redeemer()->redeem($ticket, 'https://baander.app', '/api/ws'));
+    }
+
+    public function testActualRedisExpiresTheTicketIndependentlyOfTheApplicationClock(): void
+    {
+        $ticket = bin2hex(random_bytes(32));
+        $store = $this->kernel->getContainer()->get('oauth.acceptance.websocket_store');
+        self::assertInstanceOf(WebSocketTicketStoreInterface::class, $store);
+        $store->put($ticket, new StoredWebSocketTicket(
+            new WebSocketIdentity($this->user->getId()->toString(), $this->token->getTokenId()),
+            'https://baander.app', '/api/ws', new \DateTimeImmutable('-1 second'),
+        ));
+        self::assertNull($store->consume($ticket, 'https://baander.app', '/api/ws'));
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function ticketAuthorizationChanges(): iterable
+    {
+        yield 'token revoked' => ['revoked'];
+        yield 'user disabled' => ['disabled'];
+        yield 'token expired' => ['expired'];
+        yield 'proof binding removed' => ['unbound'];
+    }
+
+    #[DataProvider('ticketAuthorizationChanges')]
+    public function testTicketRedemptionReadsCommittedAuthorizationDespiteStaleManagedEntities(string $change): void
+    {
+        $ticket = $this->issueTicket();
+        $user = $this->manager->find(UserEntity::class, $this->user->getId());
+        self::assertInstanceOf(UserEntity::class, $user);
+        self::assertFalse($this->token->isRevoked());
+        self::assertFalse($user->isDisabled());
+        $external = DriverManager::getConnection($this->manager->getConnection()->getParams());
+        try {
+            match ($change) {
+                'revoked' => $external->executeStatement('UPDATE oauth_access_tokens SET revoked=true WHERE token_id=?', [$this->token->getTokenId()]),
+                'disabled' => $external->executeStatement('UPDATE users SET disabled=true WHERE id=?', [$this->user->getId()->toString()]),
+                'expired' => $external->executeStatement("UPDATE oauth_access_tokens SET expires_at=clock_timestamp() - INTERVAL '1 second' WHERE token_id=?", [$this->token->getTokenId()]),
+                'unbound' => $external->executeStatement('UPDATE oauth_access_tokens SET dpop_jkt=NULL WHERE token_id=?', [$this->token->getTokenId()]),
+            };
+            self::assertFalse($this->token->isRevoked(), 'The identity map must retain its stale token for this regression.');
+            self::assertFalse($user->isDisabled(), 'The identity map must retain its stale account for this regression.');
+            self::assertNull($this->redeemer()->redeem($ticket, 'https://baander.app', '/api/ws'));
+        } finally {
+            $external->close();
+        }
+    }
+
+    public function testTicketAuthorizationRequiresTheTokenOwnerAndCapsExpiry(): void
+    {
+        $status = $this->kernel->getContainer()->get('oauth.acceptance.websocket_status');
+        self::assertInstanceOf(WebSocketTokenStatusInterface::class, $status);
+        self::assertNull($status->expiresAt(Uuid::v7()->toString(), $this->token->getTokenId()));
+        $this->token->setExpiryDateTime(new \DateTimeImmutable('+8 seconds'));
         $this->manager->flush();
+        $jwt = $this->accessJwt();
+        $uri = 'https://baander.app/api/ws/tickets';
+        $response = $this->request($jwt, $this->proof->create('POST', $uri, $jwt), $uri, 'POST', 'https://baander.app');
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+        $data = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
+        self::assertLessThanOrEqual($this->token->getExpiryDateTime()->getTimestamp(), (new \DateTimeImmutable($data['expiresAt']))->getTimestamp());
+    }
 
-        self::assertNull($authenticator->authenticate($request));
+    public function testUnavailableActualRedisCannotRedeemAnIdentity(): void
+    {
+        $listener = stream_socket_server('tcp://127.0.0.1:0', $errorCode, $errorMessage);
+        self::assertIsResource($listener);
+        $address = stream_socket_get_name($listener, false);
+        self::assertIsString($address);
+        $port = substr($address, strrpos($address, ':') + 1);
+        fclose($listener);
+        $store = new RedisWebSocketTicketStore(new RedisClientFactory('redis://127.0.0.1:' . $port));
+        $started = microtime(true);
+        try {
+            $store->consume(str_repeat('a', 64), 'https://baander.app', '/api/ws');
+            self::fail('Unavailable Redis must not supply a ticket identity.');
+        } catch (WebSocketTicketUnavailableException) {
+            self::assertLessThan(5.0, microtime(true) - $started);
+        }
+    }
+
+    private function issueTicket(): string
+    {
+        $jwt = $this->accessJwt();
+        $uri = 'https://baander.app/api/ws/tickets';
+        $response = $this->request($jwt, $this->proof->create('POST', $uri, $jwt), $uri, 'POST', 'https://baander.app');
+        self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
+
+        return json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR)['data']['ticket'];
+    }
+
+    private function redeemer(): WebSocketTicketRedeemerInterface
+    {
+        $redeemer = $this->kernel->getContainer()->get('oauth.acceptance.websocket_redeemer');
+        self::assertInstanceOf(WebSocketTicketRedeemerInterface::class, $redeemer);
+
+        return $redeemer;
     }
 
     private function accessJwt(string $audience = 'https://baander.app'): string
@@ -332,10 +462,13 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         return $body . '.' . SignedDpopProof::encode($signature);
     }
 
-    private function request(string $jwt, ?string $proof, string $uri = 'https://baander.app/api/auth/me', string $method = 'GET'): Response
+    private function request(string $jwt, ?string $proof, string $uri = 'https://baander.app/api/auth/me', string $method = 'GET', ?string $origin = null): Response
     {
         $request = Request::create($uri, $method, server: ['CONTENT_TYPE' => 'application/json'], content: '{"name":"Changed by request"}');
         $request->headers->set('Authorization', 'DPoP ' . $jwt);
+        if ($origin !== null) {
+            $request->headers->set('Origin', $origin);
+        }
         if ($proof !== null) {
             $request->headers->set('DPoP', $proof);
         }

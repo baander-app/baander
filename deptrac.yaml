@@ -30,7 +30,7 @@ deptrac:
       groups:
         Shared: ['Shared Domain', 'Shared Application', 'Shared Infrastructure', 'Shared Interface']
         Activity: ['Activity Domain', 'Activity Application', 'Activity Infrastructure', 'Activity Resources', 'Activity Interface']
-        Auth: ['Auth Domain', 'Auth Identity Contract', 'Auth User Identifier Contract', 'Auth Device Approval Event Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
+        Auth: ['Auth Domain', 'Auth Identity Contract', 'Auth User Identifier Contract', 'Auth Device Approval Event Contract', 'Auth WebSocket Contract', 'Auth Application', 'Auth Infrastructure', 'Auth Resources', 'Auth Interface']
         Catalog: ['Catalog Song Lookup Contract', 'Catalog Domain', 'Catalog Application', 'Catalog Infrastructure', 'Catalog Resources', 'Catalog Interface']
         Filesystem: ['Filesystem Infrastructure', 'Filesystem Application', 'Filesystem Command', 'Filesystem Mime', 'Filesystem Watcher']
         Library: ['Library Read Scope Contract', 'Library Content Stats Contract', 'Library Files Discovered Contract', 'Library Provisioning Contract', 'Library Media Files Contract', 'Library Domain', 'Library Application', 'Library Infrastructure', 'Library Resources', 'Library Interface']
@@ -140,6 +140,12 @@ deptrac:
         - type: classLike
           value: '^App\\Auth\\Application\\Port\\UserIdentifierResolverInterface$'
 
+    # Ticket redemption is the sole Auth capability exposed to the raw upgrade adapter.
+    - name: 'Auth WebSocket Contract'
+      collectors:
+        - type: classLike
+          value: '^App\\Auth\\Application\\(Port\\WebSocketTicketRedeemerInterface|DTO\\WebSocketIdentity|Exception\\WebSocketTicketUnavailableException)$'
+
     - name: 'Auth Application'
       collectors:
         - type: bool
@@ -151,6 +157,8 @@ deptrac:
               value: '^App\\Auth\\Application\\Port\\AuthenticatedUserIdentityInterface$'
             - type: classLike
               value: '^App\\Auth\\Application\\Port\\UserIdentifierResolverInterface$'
+            - type: classLike
+              value: '^App\\Auth\\Application\\(Port\\WebSocketTicketRedeemerInterface|DTO\\WebSocketIdentity|Exception\\WebSocketTicketUnavailableException)$'
 
     - name: 'Auth Infrastructure'
       collectors:
@@ -946,6 +954,7 @@ deptrac:
     'Shared Application':
       - 'Shared Domain'
     'Shared Infrastructure':
+      - 'Auth WebSocket Contract'
       - 'Shared Domain'
       - 'Shared Application'
     'Shared Interface':
@@ -981,6 +990,7 @@ deptrac:
       - 'Shared Interface'
 
     # --- Auth ---
+    'Auth WebSocket Contract': []
     'Auth Identity Contract': []
     'Auth User Identifier Contract':
       - 'Shared Domain'
@@ -990,6 +1000,7 @@ deptrac:
     'Auth Domain':
       - 'Shared Domain'
     'Auth Application':
+      - 'Auth WebSocket Contract'
       - 'UserPreference Settings Contract'
       - 'Auth Identity Contract'
       - 'Auth User Identifier Contract'
@@ -999,6 +1010,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Application'
     'Auth Infrastructure':
+      - 'Auth WebSocket Contract'
       - 'UserPreference Settings Contract'
       - 'Shared Application'
       - 'Auth Identity Contract'
@@ -1014,6 +1026,7 @@ deptrac:
       - 'Shared Domain'
       - 'Shared Interface'
     'Auth Interface':
+      - 'Auth WebSocket Contract'
       - 'UserPreference Settings Contract'
       - 'Auth Resources'
       - 'Auth Identity Contract'
