@@ -41,11 +41,23 @@ final class NativeDnsResolverTest extends TestCase
         $this->resolver()->resolve($hostname, hrtime(true) / 1e9 + 2);
     }
 
+    /** @return iterable<array{string}> */
     public static function failedReplies(): iterable
     {
         yield ['malformed.baander.app'];
         yield ['nonzero.baander.app'];
-        yield ['oversized.baander.app'];
+    }
+
+    public function testOversizedCompleteReplyIsRefusedAndReleasesCapacity(): void
+    {
+        try {
+            $this->resolver()->resolve('oversized.baander.app', hrtime(true) / 1e9 + 2);
+            self::fail('An oversized address list must fail.');
+        } catch (\RuntimeException $failure) {
+            self::assertSame('DNS lookup reply exceeded its limit.', $failure->getMessage());
+        }
+        self::assertSame('', trim(file_get_contents('/proc/self/task/' . getmypid() . '/children')));
+        self::assertCount(3, $this->resolver()->resolve('complete.baander.app', hrtime(true) / 1e9 + 2));
     }
 
     #[DataProvider('hookModes')]
@@ -56,9 +68,9 @@ final class NativeDnsResolverTest extends TestCase
         try {
             \Swoole\Coroutine\run(function (): void {
                 $heartbeats = 0;
-                $finished = false;
-                \Swoole\Coroutine::create(static function () use (&$heartbeats, &$finished): void {
-                    while (!$finished) {
+                $state = new class { public bool $finished = false; };
+                \Swoole\Coroutine::create(static function () use (&$heartbeats, $state): void {
+                    while (!$state->finished) {
                         ++$heartbeats;
                         \Swoole\Coroutine::sleep(0.005);
                     }
@@ -69,7 +81,7 @@ final class NativeDnsResolverTest extends TestCase
                 } catch (\RuntimeException $failure) {
                     self::assertSame('DNS lookup deadline exceeded.', $failure->getMessage());
                 } finally {
-                    $finished = true;
+                    $state->finished = true;
                 }
                 self::assertGreaterThan(3, $heartbeats);
                 self::assertCount(3, $this->resolver()->resolve('complete.baander.app', hrtime(true) / 1e9 + 2));
@@ -79,6 +91,7 @@ final class NativeDnsResolverTest extends TestCase
         }
     }
 
+    /** @return iterable<string, array{bool}> */
     public static function hookModes(): iterable
     {
         yield 'off' => [false];
