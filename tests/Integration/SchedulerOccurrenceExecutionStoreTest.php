@@ -17,11 +17,9 @@ use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Exception\DriverException;
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Tools\DsnParser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 /** Native PostgreSQL commits and independent observers; never dispatches or executes job effects. */
 final class SchedulerOccurrenceExecutionStoreTest extends TestCase
@@ -47,22 +45,13 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
         $this->schema = 'scheduler_execution_test_' . bin2hex(random_bytes(8));
         $this->first->executeStatement('CREATE SCHEMA ' . $this->schema);
         foreach ([$this->first, $this->second] as $connection) {
-            $connection->executeStatement('SET search_path TO ' . $this->schema);
+            $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261002210000.php';
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261002230000.php';
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261003010000.php';
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261003020000.php';
-        foreach ([new \DoctrineMigrations\Version20261002210000($this->first, new NullLogger()), new \DoctrineMigrations\Version20261002230000($this->first, new NullLogger()), new \DoctrineMigrations\Version20261003010000($this->first, new NullLogger()), new \DoctrineMigrations\Version20261003020000($this->first, new NullLogger())] as $migration) {
-            $migration->up(new Schema());
-            foreach ($migration->getSql() as $query) {
-                $this->first->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-        }
+        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
+        $this->first->executeStatement('DELETE FROM scheduled_jobs');
         $authority = (new DoctrineDeploymentLease($this->first))->acquire('baander.app:scheduler-test', str_repeat('a', 32), 3600);
         self::assertNotNull($authority);
         $this->authority = $authority;
-        \App\Tests\Fixtures\Scheduler\PublicIdentitySchema::upgrade($this->first);
     }
 
     public function testOneCommittedWinnerReturnsAuthoritativeTypedSnapshotAndEveryDuplicateIsDenied(): void
@@ -224,7 +213,7 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
         self::assertLessThan(2.0, (hrtime(true) - $start) / 1e9);
         self::assertFalse($this->first->isConnected());
         $this->second->commit();
-        $this->first->executeStatement('SET search_path TO ' . $this->schema);
+        $this->first->executeStatement('SET search_path TO ' . $this->schema . ', public');
         self::assertNull((new DoctrineSchedulerOccurrenceExecutionStore($this->first, $this->authority))->begin($occurrence->id, Uuid::v7()));
         self::assertSame($winner->toString(), $this->second->fetchOne('SELECT attempt_id FROM scheduler_occurrence_executions'));
     }
@@ -523,7 +512,7 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
         self::assertLessThan(2.0, (hrtime(true) - $started) / 1e9);
         self::assertFalse($this->first->isConnected());
         $this->second->rollBack();
-        $this->first->executeStatement('SET search_path TO ' . $this->schema);
+        $this->first->executeStatement('SET search_path TO ' . $this->schema . ', public');
         self::assertNotNull((new DoctrineSchedulerOccurrenceExecutionStore($this->first, $otherAuthority))->begin($pending->id, Uuid::v7()));
         self::assertSame(1, (int) $this->first->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions'));
     }
@@ -637,7 +626,7 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
         }
         // The dedicated store discards failed-operation connections. Reapply only this fixture's schema on reconnect.
         if (!$this->second->isConnected()) {
-            $this->second->executeStatement('SET search_path TO ' . $this->schema);
+            $this->second->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
     }
 
@@ -655,7 +644,7 @@ final class SchedulerOccurrenceExecutionStoreTest extends TestCase
         $connection = DriverManager::getConnection($params);
         self::assertInstanceOf(ExecutionCommitFailureConnection::class, $connection);
         $this->extras[] = $connection;
-        $connection->executeStatement('SET search_path TO ' . $this->schema);
+        $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         $connection->failure = $after ? 'after' : 'before';
         return $connection;
     }

@@ -11,11 +11,8 @@ use Doctrine\DBAL\Configuration;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Exception\DriverException;
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Tools\DsnParser;
-use DoctrineMigrations\Version20261007110000;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 /**
  * The DBAL system settings store on the migrated disposable PostgreSQL database.
@@ -191,73 +188,6 @@ final class SystemSettingRepositoryTest extends TestCase
             ),
         );
         $this->assertSchemaComparisonIsClean(['system_settings']);
-    }
-
-    public function testTheMigrationKeepsValuesAndReadsOldInstantsAsUtc(): void
-    {
-        $connection = $this->manager->getConnection();
-        $this->migrate('down');
-        self::assertSame('timestamp without time zone', $this->updatedAtType());
-
-        // PHP and the database session wrote UTC wall-clock times. A session zone far from UTC
-        // shows that the conversion names the zone instead of using the session's.
-        $connection->executeStatement("SET LOCAL TIME ZONE 'Pacific/Kiritimati'");
-        $connection->executeStatement(
-            "INSERT INTO system_settings (key, value, updated_at) VALUES
-                ('test.bitrate', '192', '2026-10-07 23:59:59.999999'),
-                ('test.enabled', 'true', '2026-10-07 10:00:00'),
-                ('test.language', '\"da\"', '2026-10-07 10:00:00.5')",
-        );
-
-        $this->migrate('up');
-
-        self::assertSame('timestamp with time zone', $this->updatedAtType());
-        $connection->executeStatement("SET LOCAL TIME ZONE 'UTC'");
-        self::assertSame([
-            'test.bitrate' => ['value' => '192', 'updated_at' => '2026-10-07 23:59:59.999999+00'],
-            'test.enabled' => ['value' => 'true', 'updated_at' => '2026-10-07 10:00:00+00'],
-            'test.language' => ['value' => '"da"', 'updated_at' => '2026-10-07 10:00:00.5+00'],
-        ], $connection->fetchAllAssociativeIndexed(
-            "SELECT key, value::text AS value, updated_at::text AS updated_at FROM system_settings WHERE key LIKE 'test.%' ORDER BY key",
-        ));
-        self::assertSame(['test.bitrate' => 192, 'test.enabled' => true, 'test.language' => 'da'], array_filter(
-            $this->store->all(),
-            static fn (string $key): bool => str_starts_with($key, 'test.'),
-            ARRAY_FILTER_USE_KEY,
-        ));
-
-        $this->migrate('down');
-
-        self::assertSame(
-            ['test.bitrate' => '2026-10-07 23:59:59.999999', 'test.enabled' => '2026-10-07 10:00:00', 'test.language' => '2026-10-07 10:00:00.5'],
-            $connection->fetchAllKeyValue("SELECT key, updated_at::text FROM system_settings WHERE key LIKE 'test.%' ORDER BY key"),
-        );
-
-        $this->migrate('up');
-
-        $this->assertSchemaComparisonIsClean(['system_settings']);
-    }
-
-    private function updatedAtType(): string
-    {
-        $type = $this->manager->getConnection()->fetchOne(
-            "SELECT data_type FROM information_schema.columns
-             WHERE table_schema = current_schema() AND table_name = 'system_settings' AND column_name = 'updated_at'",
-        );
-        self::assertIsString($type);
-
-        return $type;
-    }
-
-    private function migrate(string $direction): void
-    {
-        $connection = $this->manager->getConnection();
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261007110000.php';
-        $migration = new Version20261007110000($connection, new NullLogger());
-        $migration->{$direction}(new Schema());
-        foreach ($migration->getSql() as $query) {
-            $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-        }
     }
 
     private function independentConnection(): Connection

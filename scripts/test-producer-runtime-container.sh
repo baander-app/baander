@@ -17,14 +17,16 @@ docker run -d --name "$run_id-postgres" --network "$run_id" --network-alias post
     -e POSTGRES_USER=baander -e POSTGRES_PASSWORD=test-only -e POSTGRES_DB=producer_test \
     "${BAANDER_TEST_POSTGRES_IMAGE:-baander-database:latest}" >/dev/null
 for attempt in $(seq 1 30); do
-    if docker exec "$run_id-postgres" pg_isready -U baander -d producer_test >/dev/null 2>&1 &&
+    if docker exec "$run_id-postgres" pg_isready -h 127.0.0.1 -U baander -d producer_test >/dev/null 2>&1 &&
         docker exec -e REDISCLI_AUTH=test-only "$run_id-redis" redis-cli ping | grep -qx PONG; then
         break
     fi
     sleep 1
 done
-docker exec "$run_id-postgres" pg_isready -U baander -d producer_test >/dev/null
+docker exec "$run_id-postgres" pg_isready -h 127.0.0.1 -U baander -d producer_test >/dev/null
 docker exec -e REDISCLI_AUTH=test-only "$run_id-redis" redis-cli ping | grep -qx PONG
+
+docker exec -i "$run_id-postgres" psql -X -v ON_ERROR_STOP=1 -U baander -d producer_test < tests/Fixtures/postgres-extensions.sql
 
 archive_paths=(vendor src tests config packages migrations bin docker/general templates public phpunit.xml.dist
     .env .env.test composer.json composer.lock translations)

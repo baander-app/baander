@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
-use Doctrine\DBAL\Schema\Schema;
-use DoctrineMigrations\Version20261006240000;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 final class SidebarConfigIndexPersistenceTest extends TestCase
 {
@@ -40,15 +37,6 @@ final class SidebarConfigIndexPersistenceTest extends TestCase
         ));
         self::assertStringContainsString(self::UNIQUE_INDEX, $plan);
 
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261006240000.php';
-        foreach (['down', 'up'] as $direction) {
-            $migration = new Version20261006240000($connection, new NullLogger());
-            $migration->{$direction}(new Schema());
-            foreach ($migration->getSql() as $query) {
-                $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-            self::assertSame($direction === 'down', array_key_exists('idx_user_sidebar_configs_user_id', $indexes()), $direction);
-            self::assertArrayHasKey(self::UNIQUE_INDEX, $indexes(), $direction);
-        }
+
     }
 }

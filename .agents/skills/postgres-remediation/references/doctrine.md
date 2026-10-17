@@ -63,15 +63,15 @@ generated SQL and round-trip fractions/timezones before choosing a scoped fix.
 
 PostgreSQL rejects `ALTER COLUMN … TYPE` on a column that a generated column
 reads: drop and re-add the generated column in the same migration (verified on
-PG 18.4 with `job_monitors.duration_microseconds`, Version20261006340000).
+PG 18.4 with `job_monitors.duration_microseconds` before consolidation).
 Relaxing `timestamptz(0)` to `timestamptz` keeps stored values without a rewrite;
 re-adding a STORED column rewrites the table. On PostgreSQL 18, `ALTER COLUMN …
 TYPE` still rebuilds a partial index whose predicate reads the altered column
 when the table itself is not rewritten (the three `domain_event_outbox` partial
-indexes in Version20261010180000), and converting a zone-less column with
+indexes observed before consolidation), and converting a zone-less column with
 `USING … AT TIME ZONE 'UTC'` rewrites the table and all its indexes. Every such
-ALTER takes ACCESS EXCLUSIVE; that migration sets `lock_timeout` so it fails
-rather than queueing behind a running process.
+ALTER takes ACCESS EXCLUSIVE; set a bounded `lock_timeout` when making such
+a change so it fails rather than queueing behind a running process.
 
 `mapping_types: timestamptz: datetime_immutable` introspects every timestamptz
 column as `datetime_immutable`, so schema comparison cannot see timestamptz
@@ -126,19 +126,20 @@ the generation expression; compare it in the catalog directly.
 
 ## Migrations and disposable verification
 
-[MigrationVersionComparator](../../../../src/Shared/Infrastructure/Doctrine/MigrationVersionComparator.php)
-and [doctrine_migrations.yaml](../../../../config/packages/doctrine_migrations.yaml)
-order legacy numbered classes before later timestamped migrations. Filenames are
-not necessarily migration class identities. Preserve executed FQCN metadata;
-changing sort order must not rename/reexecute applied migrations. Check current,
-latest and reverse plans; unknown formats require an ordering decision.
-Migrations 3.9.7 only warns about executed migrations the directory lacks, and
-`--no-interaction` proceeds, which would rerun migrations applied under former
-class names; [UnknownExecutedMigrationGuard](../../../../src/Shared/Infrastructure/Doctrine/EventListener/UnknownExecutedMigrationGuard.php)
-makes `doctrine:migrations:migrate` refuse instead. Reconcile such a history with
-`doctrine:migrations:version` before migrating. Some
-historical down migrations are irreversible or destructive: a reverse plan
-alone does not prove rollback safety.
+[Version20261017000000](../../../../migrations/Version20261017000000.php)
+creates the complete application schema transactionally. New migrations use normal
+timestamp ordering from [doctrine_migrations.yaml](../../../../config/packages/doctrine_migrations.yaml).
+[InitialSchemaGuard](../../../../src/Shared/Infrastructure/Doctrine/InitialSchemaGuard.php)
+refuses a non-empty target before initialization. Extension-owned objects and an
+empty Doctrine metadata table are allowed. The guard applies while the initial
+migration is pending; subsequent no-op runs and incremental migrations remain usable.
+
+Migrations 3.9.7 ordinarily only warns about executed migrations absent from the
+directory. [UnknownExecutedMigrationGuard](../../../../src/Shared/Infrastructure/Doctrine/EventListener/UnknownExecutedMigrationGuard.php)
+refuses that history, including with `--no-interaction`. A database with the former
+migration chain requires its owner's explicit approval for a separate manual reset.
+Do not mark the new initial migration as executed over an existing schema. Its
+`down()` is irreversible and refuses before emitting SQL.
 
 After explicitly selecting an authorized/disposable database, useful commands are:
 
@@ -156,7 +157,7 @@ touch caches or metadata; use a disposable DB for strict no-mutation work.
 `doctrine:migrations:diff` writes a candidate PHP file; review every statement.
 Never use `schema:update --force` as a deployment shortcut. Test all migrations
 on a fresh extension-capable instance, repeat to prove no pending reexecution,
-and test upgrading representative populated data. SchemaTool can create focused
+and test refusal of existing objects and data. SchemaTool can create focused
 fixtures but does not test migration order, extension setup or hand-written SQL.
 
 ## Unit of Work, transactions and proxies

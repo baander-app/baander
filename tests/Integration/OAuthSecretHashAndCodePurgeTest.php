@@ -11,13 +11,11 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use Doctrine\DBAL\Exception\DriverException;
-use Doctrine\DBAL\Schema\Schema;
-use DoctrineMigrations\Version20261007100000;
+use DoctrineMigrations\Version20261017000000;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 /**
- * Client secret digests, device code decisions and the expired-code purge (Version20261007100000),
+ * Client secret digests, device code decisions and the expired-code purge,
  * on the fully migrated disposable PostgreSQL inside one rolled-back transaction.
  */
 final class OAuthSecretHashAndCodePurgeTest extends TestCase
@@ -62,56 +60,6 @@ final class OAuthSecretHashAndCodePurgeTest extends TestCase
         $this->assertRejected(fn () => $this->insertDeviceCode($client, ['consumed_at' => '2026-10-07 12:00:00+00']));
     }
 
-    public function testMigrationHashesSecretsRevokesUnusableClientsAndDropsInvalidDeviceCodes(): void
-    {
-        $clientChecks = $this->checks('oauth_clients');
-        $deviceChecks = $this->checks('oauth_device_codes');
-        $this->runMigration('down');
-        self::assertSame([], $this->checks('oauth_clients'));
-        self::assertSame([], $this->checks('oauth_device_codes'));
-        self::assertFalse($this->scheduledPurge());
-
-        $confidential = $this->insertLegacyClient(confidential: true, secret: 'plain-secret');
-        $unicode = $this->insertLegacyClient(confidential: true, secret: 'sécret-🎧');
-        $public = $this->insertLegacyClient(confidential: false, secret: 'stray-secret');
-        $missing = $this->insertLegacyClient(confidential: true, secret: null);
-        $empty = $this->insertLegacyClient(confidential: true, secret: '');
-        $user = $this->createUser();
-        [$accessToken, $refreshToken] = $this->insertTokenPair($missing, $user);
-
-        $pending = $this->insertDeviceCode($public);
-        $orphanApproval = $this->insertDeviceCode($public, ['approved' => 'true']);
-        $doubleDecision = $this->insertDeviceCode($public, ['approved' => 'true', 'denied' => 'true', 'user_id' => $user->toString()]);
-        $unapprovedUse = $this->insertDeviceCode($public, ['consumed_at' => '2026-10-07 12:00:00+00']);
-
-        $this->runMigration('up');
-
-        self::assertSame($clientChecks, $this->checks('oauth_clients'));
-        self::assertSame($deviceChecks, $this->checks('oauth_device_codes'));
-        self::assertSame(['secret_hash' => hash('sha256', 'plain-secret'), 'revoked' => false], $this->client($confidential));
-        self::assertSame(['secret_hash' => hash('sha256', 'sécret-🎧'), 'revoked' => false], $this->client($unicode));
-        self::assertSame(['secret_hash' => null, 'revoked' => false], $this->client($public));
-        foreach ([$missing, $empty] as $unusable) {
-            $row = $this->client($unusable);
-            self::assertTrue($row['revoked']);
-            self::assertMatchesRegularExpression('/^[0-9a-f]{64}$/', (string) $row['secret_hash']);
-            self::assertNotSame(hash('sha256', ''), $row['secret_hash']);
-        }
-        self::assertNotSame($this->client($missing)['secret_hash'], $this->client($empty)['secret_hash']);
-        $connection = $this->manager->getConnection();
-        self::assertTrue((bool) $connection->fetchOne('SELECT revoked FROM oauth_access_tokens WHERE id = ?', [$accessToken->toString()]));
-        self::assertTrue((bool) $connection->fetchOne('SELECT revoked FROM oauth_refresh_tokens WHERE id = ?', [$refreshToken->toString()]));
-
-        self::assertSame(
-            [$pending->toString()],
-            array_values(array_intersect(
-                $connection->fetchFirstColumn('SELECT id::text FROM oauth_device_codes'),
-                [$pending->toString(), $orphanApproval->toString(), $doubleDecision->toString(), $unapprovedUse->toString()],
-            )),
-        );
-        self::assertNotFalse($this->scheduledPurge());
-    }
-
     public function testDailyPurgeIsScheduledForTheRegisteredCommand(): void
     {
         self::loadMigration();
@@ -121,19 +69,19 @@ final class OAuthSecretHashAndCodePurgeTest extends TestCase
             'name' => 'Purge expired OAuth codes',
             'expression' => '30 3 * * *',
             'job_type' => 'messenger',
-            'command' => Version20261007100000::PURGE_COMMAND,
+            'command' => Version20261017000000::PURGE_COMMAND,
             'status' => 'active',
             'parameters' => '[]',
             'evaluated_through' => null,
         ], array_intersect_key($job, array_flip(['name', 'expression', 'job_type', 'command', 'status', 'parameters', 'evaluated_through'])));
         self::assertTrue((bool) $this->manager->getConnection()->fetchOne(
             "SELECT next_run_at > clock_timestamp() - INTERVAL '1 day' AND to_char(next_run_at AT TIME ZONE 'UTC', 'HH24:MI:SS') = '03:30:00' FROM scheduled_jobs WHERE id = ?",
-            [Version20261007100000::PURGE_JOB_ID],
+            [Version20261017000000::PURGE_JOB_ID],
         ));
 
         $registry = $this->kernel->getContainer()->get('test.service_container')->get(SchedulerRegistry::class);
         self::assertInstanceOf(SchedulerRegistry::class, $registry);
-        self::assertTrue($registry->isMessengerCommandAllowed(Version20261007100000::PURGE_COMMAND));
+        self::assertTrue($registry->isMessengerCommandAllowed(Version20261017000000::PURGE_COMMAND));
     }
 
     public function testPurgeDeletesOnlyCodesExpiredBeforeTheCutoff(): void
@@ -219,49 +167,6 @@ final class OAuthSecretHashAndCodePurgeTest extends TestCase
         return $id;
     }
 
-    /** A client row in the shape before Version20261007100000, with its plain-text secret column. */
-    private function insertLegacyClient(bool $confidential, ?string $secret): Uuid
-    {
-        $id = Uuid::generate();
-        $this->manager->getConnection()->insert('oauth_clients', [
-            'id' => $id->toString(),
-            'public_id' => (new PublicId())->toString(),
-            'name' => 'Legacy client',
-            'redirect' => '["https://app.baander.app/callback"]',
-            'confidential' => $confidential ? 'true' : 'false',
-            'secret' => $secret,
-            'created_at' => '2026-10-07 12:00:00+00',
-            'updated_at' => '2026-10-07 12:00:00+00',
-        ]);
-
-        return $id;
-    }
-
-    /** @return array{Uuid, Uuid} access token ID, refresh token ID */
-    private function insertTokenPair(Uuid $client, Uuid $user): array
-    {
-        $connection = $this->manager->getConnection();
-        $access = Uuid::generate();
-        $refresh = Uuid::generate();
-        $connection->insert('oauth_access_tokens', [
-            'id' => $access->toString(),
-            'token_id' => bin2hex(random_bytes(16)),
-            'user_id' => $user->toString(),
-            'client_id' => $client->toString(),
-            'created_at' => '2026-10-07 12:00:00+00',
-            'updated_at' => '2026-10-07 12:00:00+00',
-        ]);
-        $connection->insert('oauth_refresh_tokens', [
-            'id' => $refresh->toString(),
-            'token_id' => bin2hex(random_bytes(16)),
-            'access_token_id' => $access->toString(),
-            'created_at' => '2026-10-07 12:00:00+00',
-            'updated_at' => '2026-10-07 12:00:00+00',
-        ]);
-
-        return [$access, $refresh];
-    }
-
     private function insertAuthCode(Uuid $client, Uuid $user, ?string $expiresAt, bool $revoked = false): Uuid
     {
         $id = Uuid::generate();
@@ -301,50 +206,19 @@ final class OAuthSecretHashAndCodePurgeTest extends TestCase
         return $id;
     }
 
-    /** @return array{secret_hash: string|null, revoked: bool} */
-    private function client(Uuid $id): array
-    {
-        $row = $this->manager->getConnection()->fetchAssociative('SELECT secret_hash, revoked FROM oauth_clients WHERE id = ?', [$id->toString()]);
-        self::assertIsArray($row);
-
-        return ['secret_hash' => $row['secret_hash'] === null ? null : (string) $row['secret_hash'], 'revoked' => (bool) $row['revoked']];
-    }
-
     /** @return array<string, mixed>|false */
     private function scheduledPurge(): array|false
     {
         return $this->manager->getConnection()->fetchAssociative(
             'SELECT name, expression, job_type, command, status, parameters::text AS parameters, evaluated_through FROM scheduled_jobs WHERE id = ?',
-            [Version20261007100000::PURGE_JOB_ID],
+            [Version20261017000000::PURGE_JOB_ID],
         );
     }
 
     /** Migration classes are not autoloaded. */
     private static function loadMigration(): void
     {
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261007100000.php';
-    }
-
-    private function runMigration(string $direction): void
-    {
-        self::loadMigration();
-        $connection = $this->manager->getConnection();
-        if ($direction === 'up') {
-            // The historical migration seeds a schedule before public identities
-            // existed. Reproduce that boundary inside this rolled-back fixture.
-            $connection->executeStatement('ALTER TABLE scheduled_jobs ALTER COLUMN public_id DROP NOT NULL');
-        }
-        $migration = new Version20261007100000($connection, new NullLogger());
-        $migration->{$direction}(new Schema());
-        foreach ($migration->getSql() as $query) {
-            $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-        }
-        if ($direction === 'up') {
-            foreach ($connection->fetchFirstColumn('SELECT id FROM scheduled_jobs WHERE public_id IS NULL') as $id) {
-                $connection->update('scheduled_jobs', ['public_id' => (new PublicId())->toString()], ['id' => $id]);
-            }
-            $connection->executeStatement('ALTER TABLE scheduled_jobs ALTER COLUMN public_id SET NOT NULL');
-        }
+        require_once dirname(__DIR__, 2) . '/migrations/Version20261017000000.php';
     }
 
     /** @return array<string, string> CHECK constraint name => definition */

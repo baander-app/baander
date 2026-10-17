@@ -103,14 +103,6 @@ application secret stable and protected. Creation and rotation return the origin
 webhook secret once. Rotation takes effect after the database flush succeeds:
 configure the receiver with the new secret before sending subsequent notifications.
 
-Before upgrading a local database past migration `Version20261004010000`, use the
-previous application to rotate any webhook whose `encrypted_secret` is absent,
-and configure its receiver with the returned secret. Export or back up your local
-configuration first. The migration refuses to change the schema while such rows
-exist, because the original secret cannot be recovered from a hash. It preserves
-existing encrypted secrets and webhook identifiers; it does not generate replacement
-secrets or delete records. Fresh installations need no preparation.
-
 ### Delivery behavior
 
 - **Retries:** Failed deliveries (server errors, timeouts) are retried up to 3 times with exponential backoff (1s, 2s, 4s). Client errors (4xx) are not retried.

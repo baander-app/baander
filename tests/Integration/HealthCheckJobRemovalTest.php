@@ -7,60 +7,20 @@ namespace App\Tests\Integration;
 use App\Scheduler\Application\Port\ScheduledJobPortInterface;
 use App\Scheduler\Domain\Service\SchedulerRegistry;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Domain\Model\PublicId;
-use Doctrine\DBAL\Schema\Schema;
-use Doctrine\Migrations\AbstractMigration;
-use Doctrine\Migrations\Exception\IrreversibleMigration;
-use DoctrineMigrations\Version20261007140000;
-use DoctrineMigrations\Version20261010110000;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
-/**
- * Version20261010110000 removes the five-minute health check seeded by Version20261007140000,
- * on the fully migrated disposable PostgreSQL inside one rolled-back transaction.
- */
+/** The retired health check is absent from the database and scheduler registry. */
 final class HealthCheckJobRemovalTest extends TestCase
 {
     use OwnershipPersistenceHarness;
 
-
-    /** Migration classes are not autoloaded. */
-    public static function setUpBeforeClass(): void
-    {
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261007140000.php';
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261010110000.php';
-    }
-
     public function testFullyMigratedDatabaseHasNoHealthCheckJob(): void
     {
-        self::assertSame(1, (int) $this->manager->getConnection()->fetchOne(
-            'SELECT count(*) FROM doctrine_migration_versions WHERE version = ?',
-            ['DoctrineMigrations\\Version20261010110000'],
-        ));
         self::assertFalse($this->healthCheckJobExists());
 
         $jobs = $this->kernel->getContainer()->get('test.service_container')->get(ScheduledJobPortInterface::class);
         self::assertInstanceOf(ScheduledJobPortInterface::class, $jobs);
-        self::assertNull($jobs->getById(Uuid::fromString(Version20261007140000::HEALTH_CHECK_JOB_ID)));
-    }
-
-    public function testMigrationRemovesTheSeededJobAndNoOtherSchedule(): void
-    {
-        $otherJobs = $this->otherJobIds();
-        $this->runMigration(new Version20261007140000($this->manager->getConnection(), new NullLogger()), 'up');
-        self::assertTrue($this->healthCheckJobExists());
-
-        $this->runMigration(new Version20261010110000($this->manager->getConnection(), new NullLogger()), 'up');
-
-        self::assertFalse($this->healthCheckJobExists());
-        self::assertSame($otherJobs, $this->otherJobIds());
-    }
-
-    public function testMigrationCannotBeReverted(): void
-    {
-        $this->expectException(IrreversibleMigration::class);
-        $this->runMigration(new Version20261010110000($this->manager->getConnection(), new NullLogger()), 'down');
+        self::assertNull($jobs->getById(Uuid::fromString('0199bf3c-8a00-7000-8000-0a07c0de9e03')));
     }
 
     public function testSchedulerNoLongerOffersTheHealthCheckCommand(): void
@@ -74,36 +34,7 @@ final class HealthCheckJobRemovalTest extends TestCase
     {
         return $this->manager->getConnection()->fetchOne(
             'SELECT 1 FROM scheduled_jobs WHERE id = ?',
-            [Version20261007140000::HEALTH_CHECK_JOB_ID],
+            ['0199bf3c-8a00-7000-8000-0a07c0de9e03'],
         ) !== false;
-    }
-
-    /** @return list<string> */
-    private function otherJobIds(): array
-    {
-        return array_map(
-            static fn (mixed $id): string => (string) $id,
-            $this->manager->getConnection()->fetchFirstColumn(
-                'SELECT id FROM scheduled_jobs WHERE id <> ? ORDER BY id',
-                [Version20261007140000::HEALTH_CHECK_JOB_ID],
-            ),
-        );
-    }
-
-    private function runMigration(AbstractMigration $migration, string $direction): void
-    {
-        $connection = $this->manager->getConnection();
-        $migration->{$direction}(new Schema());
-        foreach ($migration->getSql() as $query) {
-            $sql = $query->getStatement();
-            $parameters = $query->getParameters();
-            if (str_contains($sql, 'INSERT INTO scheduled_jobs (id,')) {
-                // Supply the later identity column when replaying this historical seed.
-                $sql = str_replace('scheduled_jobs (id,', 'scheduled_jobs (public_id, id,', $sql);
-                $sql = str_replace('VALUES (:id,', 'VALUES (:public_id, :id,', $sql);
-                $parameters['public_id'] = (new PublicId())->toString();
-            }
-            $connection->executeStatement($sql, $parameters, $query->getTypes());
-        }
     }
 }

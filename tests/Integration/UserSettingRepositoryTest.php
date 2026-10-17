@@ -17,11 +17,8 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Exception\DriverException;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Tools\DsnParser;
-use DoctrineMigrations\Version20261007120000;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 /**
  * The DBAL user settings store on the migrated disposable PostgreSQL database.
@@ -245,22 +242,6 @@ final class UserSettingRepositoryTest extends TestCase
         self::assertSame([], $this->store->findAll($user));
     }
 
-    public function testTheMigrationRoundTrips(): void
-    {
-        $connection = $this->manager->getConnection();
-        $user = $this->createUser();
-        $this->store->save($user, 'test.language', 'da');
-
-        $this->migrate('down');
-        self::assertNull($connection->fetchOne("SELECT to_regclass('user_settings')"));
-
-        $this->migrate('up');
-        self::assertSame([], $this->store->findAll($user));
-        $this->store->save($user, 'test.language', 'en');
-        self::assertSame(['test.language' => 'en'], $this->store->findAll($user));
-        $this->assertSchemaComparisonIsClean(['user_settings']);
-    }
-
     private function registerUser(Uuid $id): void
     {
         $this->manager->persist(new UserEntity(
@@ -277,17 +258,6 @@ final class UserSettingRepositoryTest extends TestCase
     private function observedChoices(Connection $observer, Uuid $user): int
     {
         return (int) $observer->fetchOne('SELECT count(*) FROM user_settings WHERE user_id = :user_id', ['user_id' => $user->toString()]);
-    }
-
-    private function migrate(string $direction): void
-    {
-        $connection = $this->manager->getConnection();
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261007120000.php';
-        $migration = new Version20261007120000($connection, new NullLogger());
-        $migration->{$direction}(new Schema());
-        foreach ($migration->getSql() as $query) {
-            $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-        }
     }
 
     private function independentConnection(): Connection

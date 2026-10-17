@@ -10,13 +10,10 @@ use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Cache\CacheTags;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Tools\DsnParser;
-use Doctrine\Migrations\AbstractMigration;
 use LogicException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use RuntimeException;
 use Symfony\Contracts\Cache\TagAwareCacheInterface;
 
@@ -40,34 +37,12 @@ final class OAuthTokenInvalidationTest extends TestCase
         unset($params['wrapperClass']);
         $this->observer = DriverManager::getConnection($params);
         self::assertStringStartsWith('18.', (string) $this->writer->fetchOne('SHOW server_version'));
-        $this->writer->executeStatement('CREATE EXTENSION IF NOT EXISTS citext');
         $this->schema = 'oauth_invalidation_test_' . bin2hex(random_bytes(8));
         $this->writer->executeStatement('CREATE SCHEMA ' . $this->schema);
         foreach ([$this->writer, $this->observer] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        // Apply the affected SQL from the real migrations, preserving its types,
-        // indexes and FKs rather than inventing a relaxed test-only schema.
-        foreach (['Version001_InitialSchema', 'Version20260716235039'] as $version) {
-            require_once dirname(__DIR__, 2) . '/migrations/' . $version . '.php';
-            $class = 'DoctrineMigrations\\' . $version;
-            if (!class_exists($class)) {
-                throw new LogicException('The migration fixture class was not loaded.');
-            }
-            $migration = new $class($this->writer, new NullLogger());
-            self::assertInstanceOf(AbstractMigration::class, $migration);
-            $migration->up(new Schema());
-            foreach ($migration->getSql() as $query) {
-                $sql = $query->getStatement();
-                if (preg_match('/\ACREATE TABLE (?:oauth_[a-z_]+|users)\b/', $sql) === 1
-                    || preg_match('/\AALTER TABLE oauth_[a-z_]+\b/', $sql) === 1
-                    || preg_match('/\ACREATE (?:UNIQUE )?INDEX [a-z_]+ ON oauth_[a-z_]+\b/', $sql) === 1
-                    || $sql === 'DROP INDEX idx_oauth_device_codes_user_code'
-                ) {
-                    $this->writer->executeStatement($sql, $query->getParameters(), $query->getTypes());
-                }
-            }
-        }
+        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->writer);
         $this->seed();
     }
 
@@ -230,7 +205,8 @@ final class OAuthTokenInvalidationTest extends TestCase
         $this->writer->insert('oauth_refresh_tokens', ['id' => Uuid::generate()->toString(), 'token_id' => 'rotation-refresh-successor',
             'access_token_id' => $access, 'previous_refresh_token_id' => $refresh, ...$times]);
         $this->writer->insert('oauth_auth_codes', ['id' => Uuid::generate()->toString(), 'code_id' => 'rotation-auth-code',
-            'client_id' => $client, 'user_id' => $user, ...$times]);
+            'client_id' => $client, 'user_id' => $user, 'code_challenge' => str_repeat('a', 43),
+            'code_challenge_method' => 'S256', 'redirect_uri' => 'https://baander.app/callback', ...$times]);
         foreach (['pending', 'approved'] as $phase) {
             $this->writer->insert('oauth_device_codes', ['id' => Uuid::generate()->toString(), 'device_code' => 'rotation-device-' . $phase,
                 'user_code' => 'rotation-user-' . $phase, 'client_id' => $client, 'user_id' => $user,

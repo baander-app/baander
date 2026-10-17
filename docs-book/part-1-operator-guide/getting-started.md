@@ -44,7 +44,15 @@ make composer-install
 make migrate
 ```
 
-This creates the database schema and runs any pending migrations on both the main and test databases.
+This initializes both the main and test databases with `Version20261017000000`,
+which creates the current 80-table schema and two daily schedules: OAuth code
+purging at 03:30 UTC and recommendation generation at 04:00 UTC. Each target must
+be empty; preinstalled extensions and an empty Doctrine migration metadata table
+are allowed. Existing user objects, even an empty table, cause initialization to
+stop before application schema changes.
+
+For the main database alone, use `make migrate-no-test`. For an existing database
+with an older migration history, follow the [manual reset procedure](upgrading.md#manual-reset-of-an-existing-database).
 
 ### 3. Create an admin user
 

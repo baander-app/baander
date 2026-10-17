@@ -12,10 +12,8 @@ use App\Shared\Infrastructure\Worker\DoctrineDeploymentRetirement;
 use App\Shared\Infrastructure\Worker\RegisteredDeploymentRecovery;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Tools\DsnParser;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 /** Committed PostgreSQL registration and lease state; Docker frames are controlled fixtures. */
 final class RegisteredDeploymentRecoveryTest extends TestCase
@@ -36,17 +34,9 @@ final class RegisteredDeploymentRecoveryTest extends TestCase
         $this->schema = 'registered_recovery_test_' . bin2hex(random_bytes(8));
         $this->first->executeStatement('CREATE SCHEMA ' . $this->schema);
         foreach ([$this->first, $this->second] as $connection) {
-            $connection->executeStatement('SET search_path TO ' . $this->schema);
+            $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        foreach (['Version20261002210000', 'Version20261002220000', 'Version20261003020000'] as $version) {
-            require_once dirname(__DIR__, 2) . '/migrations/' . $version . '.php';
-            $class = 'DoctrineMigrations\\' . $version;
-            $migration = new $class($this->first, new NullLogger());
-            $migration->up(new Schema());
-            foreach ($migration->getSql() as $query) {
-                $this->first->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-        }
+        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
     }
 
     public function testMissingBindingNeverCallsDocker(): void

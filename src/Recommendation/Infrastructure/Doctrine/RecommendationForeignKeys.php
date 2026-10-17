@@ -7,7 +7,7 @@ namespace App\Recommendation\Infrastructure\Doctrine;
 use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclaration;
 use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclarationProviderInterface;
 
-/** Constraints from Version20261006280000 on recommendation job columns mapped as scalar IDs. */
+/** Constraints on recommendation job columns mapped as scalar IDs. */
 final class RecommendationForeignKeys implements ForeignKeyDeclarationProviderInterface
 {
     public function foreignKeys(): iterable

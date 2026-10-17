@@ -31,6 +31,7 @@ if [ "$ready" != true ]; then
     echo 'Disposable PostgreSQL failed to become ready.' >&2
     exit 1
 fi
+docker exec -i "$pg_id" psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" < tests/Fixtures/postgres-extensions.sql
 port_mapping=$(docker port "$pg_id" 5432/tcp)
 WORKER_RECOVERY_PG_PORT=${port_mapping##*:}
 [[ "$port_mapping" == 127.0.0.1:* && "$WORKER_RECOVERY_PG_PORT" =~ ^[0-9]+$ ]] || { echo 'Unexpected PostgreSQL port mapping.' >&2; exit 1; }

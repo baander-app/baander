@@ -11,12 +11,9 @@ use App\Library\Infrastructure\Doctrine\Entity\UserLibraryAccessEntity;
 use App\Library\Infrastructure\Doctrine\Repository\LibraryAccessRepository;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
-use DoctrineMigrations\Version20261006181000;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 /** Production mapping, migrated constraints and repository, on disposable PostgreSQL only. */
 final class LibraryAccessOwnershipPersistenceTest extends TestCase
@@ -152,84 +149,6 @@ final class LibraryAccessOwnershipPersistenceTest extends TestCase
         $connection->executeStatement('DELETE FROM libraries WHERE id = :id', ['id' => $libraries[0]->toString()]);
         self::assertSame(0, $this->rowCount('library_id = :id', $libraries[0]));
         self::assertSame([$libraries[1]->toString()], $this->repository->getUserLibraryIds($users[1]));
-    }
-
-    public function testGrantedAtMigrationPreservesExistingInstants(): void
-    {
-        $connection = $this->manager->getConnection();
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261006181000.php';
-        $column = static fn (): array => $connection->fetchAssociative(
-            "SELECT format_type(a.atttypid, a.atttypmod) AS type, pg_get_expr(d.adbin, d.adrelid) AS default
-             FROM pg_attribute a LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
-             WHERE a.attrelid = 'user_library_access'::regclass AND a.attname = 'granted_at'",
-        ) ?: [];
-        $run = static function (string $direction) use ($connection): void {
-            // A migration instance accumulates planned SQL, so each direction gets its own.
-            $migration = new Version20261006181000($connection, new NullLogger());
-            $migration->{$direction}(new Schema());
-            foreach ($migration->getSql() as $query) {
-                $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-        };
-
-        self::assertSame(['type' => 'timestamp with time zone', 'default' => 'now()'], $column());
-
-        // Recreate the pre-migration column, then write rows the way existing ones were written.
-        $run('down');
-        self::assertSame(['type' => 'timestamp(0) without time zone', 'default' => 'now()'], $column());
-        $connection->executeStatement("SET LOCAL TimeZone = 'UTC'");
-        $owner = $this->createUser();
-        $written = $this->createLibrary();
-        $this->repository->grant($owner, $written);
-        $writtenText = (string) $connection->fetchOne(
-            'SELECT granted_at::text FROM user_library_access WHERE library_id = :id',
-            ['id' => $written->toString()],
-        );
-        $defaulted = $this->createLibrary();
-        $connection->executeStatement(
-            'INSERT INTO user_library_access (user_id, library_id) VALUES (:user, :library)',
-            ['user' => $owner->toString(), 'library' => $defaulted->toString()],
-        );
-        $transactionStart = (int) $connection->fetchOne('SELECT round(extract(epoch FROM now()))::bigint');
-        // In Copenhagen, 02:30 does not exist on 2026-03-29 and occurs twice on 2026-10-25;
-        // a conversion through the session zone would shift or guess these instants.
-        $boundaries = ['2026-03-29 02:30:00' => $this->createLibrary(), '2026-10-25 02:30:00' => $this->createLibrary()];
-        foreach ($boundaries as $wallClock => $libraryId) {
-            $connection->executeStatement(
-                'INSERT INTO user_library_access (user_id, library_id, granted_at) VALUES (:user, :library, CAST(:at AS timestamp))',
-                ['user' => $owner->toString(), 'library' => $libraryId->toString(), 'at' => $wallClock],
-            );
-        }
-
-        $connection->executeStatement("SET LOCAL TimeZone = 'Europe/Copenhagen'");
-        $run('up');
-        $connection->executeStatement("SET LOCAL TimeZone = 'UTC'");
-        self::assertSame(['type' => 'timestamp with time zone', 'default' => 'now()'], $column());
-
-        $epoch = static fn (Uuid $libraryId): int => (int) $connection->fetchOne(
-            'SELECT extract(epoch FROM granted_at)::bigint FROM user_library_access WHERE library_id = :id',
-            ['id' => $libraryId->toString()],
-        );
-        $utc = new \DateTimeZone('UTC');
-        $writtenInstant = (new \DateTimeImmutable($writtenText, $utc))->getTimestamp();
-        self::assertSame($writtenInstant, $epoch($written));
-        self::assertSame($transactionStart, $epoch($defaulted));
-        foreach ($boundaries as $wallClock => $libraryId) {
-            self::assertSame((new \DateTimeImmutable($wallClock, $utc))->getTimestamp(), $epoch($libraryId), $wallClock);
-        }
-
-        $this->manager->clear();
-        $hydrated = $this->manager->getRepository(UserLibraryAccessEntity::class)->findOneBy(['userId' => $owner, 'library' => $written]);
-        self::assertInstanceOf(UserLibraryAccessEntity::class, $hydrated);
-        self::assertSame($writtenInstant, $hydrated->getGrantedAt()->getTimestamp());
-
-        // A new grant without an explicit time records the current instant, fractions included.
-        $connection->executeStatement("SET LOCAL TimeZone = 'Europe/Copenhagen'");
-        $fresh = $this->createLibrary();
-        self::assertTrue((bool) $connection->fetchOne(
-            'INSERT INTO user_library_access (user_id, library_id) VALUES (:user, :library) RETURNING granted_at = now()',
-            ['user' => $owner->toString(), 'library' => $fresh->toString()],
-        ));
     }
 
     private function rowCount(string $predicate, Uuid $id): int

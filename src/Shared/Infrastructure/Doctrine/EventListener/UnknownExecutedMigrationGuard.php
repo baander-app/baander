@@ -17,7 +17,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  *
  * Doctrine Migrations only asks for confirmation then, and `--no-interaction` answers yes: it would
  * run every migration it does not find in the history, including ones already applied under
- * another name. Reconcile the history (doctrine:migrations:version) first.
+ * another name. A separate, explicitly approved manual reset is required.
  */
 #[AsDoctrineListener(event: Events::onMigrationsMigrating)]
 final class UnknownExecutedMigrationGuard
@@ -36,7 +36,8 @@ final class UnknownExecutedMigrationGuard
         }
 
         throw new \RuntimeException(sprintf(
-            'The database records %d executed migrations that the migration directory does not have: %s. Reconcile its migration history before migrating.',
+            'Database "%s" records %d executed migrations that the migration directory does not have: %s. Migration refused. Overwriting requires explicit approval for this specific target and a separate manual reset. Do not mark the initial migration as executed.',
+            (string) $event->getConnection()->fetchOne('SELECT current_database()'),
             count($unknown),
             implode(', ', array_map(static fn (ExecutedMigration $migration): string => (string) $migration->getVersion(), $unknown->getItems())),
         ));

@@ -7,12 +7,7 @@ namespace App\Tests\Integration;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\ArrayParameterType;
-use Doctrine\DBAL\Schema\Schema;
-use Doctrine\Migrations\DependencyFactory;
-use Doctrine\Migrations\Version\Version;
-use DoctrineMigrations\Version20261006210000;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 /** Application string columns are TEXT; length rules live in application code. */
 final class TextColumnMigrationTest extends TestCase
@@ -46,31 +41,10 @@ final class TextColumnMigrationTest extends TestCase
         $this->assertSchemaComparisonIsClean(['movies', 'movie_collections', 'job_monitors', 'oauth_auth_codes']);
     }
 
-    public function testMigrationKeepsStoredValuesAndRemovesTheLengthLimits(): void
+    public function testTextColumnsKeepStoredValuesWithoutFormerLengthLimits(): void
     {
         $connection = $this->manager->getConnection();
-        $migrations = $this->kernel->getContainer()->get('test.service_container')->get('doctrine.migrations.dependency_factory');
-        self::assertInstanceOf(DependencyFactory::class, $migrations);
-        self::assertTrue($migrations->getMetadataStorage()->getExecutedMigrations()->hasMigration(
-            new Version(Version20261006210000::class),
-        ));
-        self::assertCount(0, $migrations->getMigrationStatusCalculator()->getNewMigrations());
-
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261006210000.php';
-        $run = static function (string $direction) use ($connection): void {
-            $migration = new Version20261006210000($connection, new NullLogger());
-            $migration->{$direction}(new Schema());
-            foreach ($migration->getSql() as $query) {
-                $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-        };
-
-        // Recreate the VARCHAR columns and store values that fit their former limits.
-        $run('down');
-        self::assertSame('character varying', $this->columnTypes()['movies.tagline']);
         $rows = $this->insertRows();
-
-        $run('up');
 
         self::assertSame(array_fill_keys($this->convertedColumns(), 'text'), $this->columnTypes());
         self::assertSame([], $this->varcharDefaults());

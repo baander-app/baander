@@ -9,10 +9,8 @@ use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Exception\DriverException;
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Tools\DsnParser;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 /** Real committed lease state and independent PostgreSQL contenders; no process-containment claim. */
 final class WorkerDeploymentLeaseTest extends TestCase
@@ -37,17 +35,9 @@ final class WorkerDeploymentLeaseTest extends TestCase
         $this->schema = 'worker_lease_test_' . bin2hex(random_bytes(8));
         $this->first->executeStatement('CREATE SCHEMA ' . $this->schema);
         foreach ([$this->first, $this->second] as $connection) {
-            $connection->executeStatement('SET search_path TO ' . $this->schema);
+            $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        foreach (['Version20261002210000', 'Version20261003020000'] as $version) {
-            require_once dirname(__DIR__, 2) . '/migrations/' . $version . '.php';
-            $class = 'DoctrineMigrations\\' . $version;
-            $migration = new $class($this->first, new NullLogger());
-            $migration->up(new Schema());
-            foreach ($migration->getSql() as $query) {
-                $this->first->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-        }
+        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
     }
 
     public function testOnlyOneOwnerCanClaimAndRenewCommittedNamespace(): void
@@ -111,7 +101,7 @@ final class WorkerDeploymentLeaseTest extends TestCase
         self::assertSame(0, $this->first->getTransactionNestingLevel());
         self::assertFalse($this->first->isConnected(), 'A failed operation discards the dedicated connection.');
         // Reapply this fixture's session configuration after reconnecting.
-        $this->first->executeStatement('SET search_path TO ' . $this->schema);
+        $this->first->executeStatement('SET search_path TO ' . $this->schema . ', public');
         self::assertEquals($lease, $first->findForContainment('deployment'));
         self::assertTrue($first->renew($lease, 60), 'A timed-out operation rolls back and leaves the dedicated connection usable.');
     }
@@ -128,7 +118,7 @@ final class WorkerDeploymentLeaseTest extends TestCase
 require $argv[1];
 $params = (new \Doctrine\DBAL\Tools\DsnParser(['postgresql' => 'pdo_pgsql']))->parse(getenv('OUTBOX_TEST_DATABASE_URL'));
 $connection = \Doctrine\DBAL\DriverManager::getConnection($params);
-$connection->executeStatement('SET search_path TO ' . $argv[2]);
+$connection->executeStatement('SET search_path TO ' . $argv[2] . ', public');
 $connection->beginTransaction();
 $connection->executeQuery('SELECT namespace FROM worker_deployment_leases FOR UPDATE')->free();
 file_put_contents($argv[3], 'locked');
@@ -204,7 +194,7 @@ PHP;
         $connection = DriverManager::getConnection($params);
         self::assertInstanceOf(CommitThenThrowLeaseConnection::class, $connection);
         $this->extras[] = $connection;
-        $connection->executeStatement('SET search_path TO ' . $this->schema);
+        $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         $connection->throwAfterCommit = true;
         $acknowledged = null;
         try {

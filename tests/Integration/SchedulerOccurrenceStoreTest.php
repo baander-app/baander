@@ -13,11 +13,9 @@ use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Exception\DriverException;
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Tools\DsnParser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 /** Actual migration, native independent connections and committed immutable intents; no dispatch/execution. */
 final class SchedulerOccurrenceStoreTest extends TestCase
@@ -42,15 +40,10 @@ final class SchedulerOccurrenceStoreTest extends TestCase
         $this->schema = 'scheduler_occurrence_test_' . bin2hex(random_bytes(8));
         $this->first->executeStatement('CREATE SCHEMA ' . $this->schema);
         foreach ([$this->first, $this->second] as $connection) {
-            $connection->executeStatement('SET search_path TO ' . $this->schema);
+            $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261002230000.php';
-        $migration = new \DoctrineMigrations\Version20261002230000($this->first, new NullLogger());
-        $migration->up(new Schema());
-        foreach ($migration->getSql() as $query) {
-            $this->first->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-        }
-        \App\Tests\Fixtures\Scheduler\PublicIdentitySchema::upgrade($this->first);
+        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
+        $this->first->executeStatement('DELETE FROM scheduled_jobs');
     }
 
     public function testCommittedRoundTripAfterReconnectPreservesTypedOrderedSnapshot(): void
@@ -61,7 +54,7 @@ final class SchedulerOccurrenceStoreTest extends TestCase
         self::assertTrue($store->record($occurrence));
         self::assertSame(0, $this->first->getTransactionNestingLevel());
         $this->first->close();
-        $this->first->executeStatement('SET search_path TO ' . $this->schema);
+        $this->first->executeStatement('SET search_path TO ' . $this->schema . ', public');
         $found = $store->find($occurrence->jobId, $occurrence->scheduledFor);
         self::assertNotNull($found);
         self::assertTrue($found->id->equals($occurrence->id));
@@ -153,7 +146,7 @@ final class SchedulerOccurrenceStoreTest extends TestCase
         $connection = DriverManager::getConnection($params);
         self::assertInstanceOf(OccurrenceCommitFailureConnection::class, $connection);
         $this->extras[] = $connection;
-        $connection->executeStatement('SET search_path TO ' . $this->schema);
+        $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         $connection->failure = $afterCommit ? 'after' : 'before';
         $occurrence = $this->occurrence();
         try {
@@ -197,7 +190,7 @@ final class SchedulerOccurrenceStoreTest extends TestCase
         self::assertLessThan(2.0, (hrtime(true) - $started) / 1e9);
         self::assertFalse($this->first->isConnected());
         $this->second->commit();
-        $this->first->executeStatement('SET search_path TO ' . $this->schema);
+        $this->first->executeStatement('SET search_path TO ' . $this->schema . ', public');
         self::assertFalse((new DoctrineSchedulerOccurrenceStore($this->first))->record($this->occurrence(id: Uuid::v7())));
         self::assertSame(1, (int) $this->second->fetchOne('SELECT count(*) FROM scheduler_occurrences'));
     }
@@ -381,7 +374,7 @@ final class SchedulerOccurrenceStoreTest extends TestCase
         $connection = DriverManager::getConnection($params);
         self::assertInstanceOf(OccurrenceCommitFailureConnection::class, $connection);
         $this->extras[] = $connection;
-        $connection->executeStatement('SET search_path TO ' . $this->schema);
+        $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         $connection->failure = $afterCommit ? 'after' : 'before';
         $base = $this->occurrence();
         $manual = new SchedulerOccurrence($base->id, $base->jobId, $base->scheduledFor, $base->jobType, $base->command, $base->parameters, origin: SchedulerOccurrenceOrigin::Manual, jobPublicId: new \App\Shared\Domain\Model\PublicId());

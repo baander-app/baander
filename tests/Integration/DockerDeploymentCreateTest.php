@@ -12,11 +12,9 @@ use App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory;
 use App\Shared\Infrastructure\Worker\RegisteredDeploymentStart;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Tools\DsnParser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 /** Real committed PostgreSQL admission; controlled Docker frames do not prove actual containment. */
 final class DockerDeploymentCreateTest extends TestCase
@@ -43,17 +41,9 @@ final class DockerDeploymentCreateTest extends TestCase
         $this->schema = 'docker_create_test_' . bin2hex(random_bytes(8));
         $this->first->executeStatement('CREATE SCHEMA ' . $this->schema);
         foreach ([$this->first, $this->second] as $connection) {
-            $connection->executeStatement('SET search_path TO ' . $this->schema);
+            $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        foreach (['Version20261002220000', 'Version20261003020000'] as $version) {
-            require_once dirname(__DIR__, 2) . '/migrations/' . $version . '.php';
-            $class = 'DoctrineMigrations\\' . $version;
-            $migration = new $class($this->first, new NullLogger());
-            $migration->up(new Schema());
-            foreach ($migration->getSql() as $query) {
-                $this->first->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-        }
+        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
     }
 
     public function testCreateCommitsIntentBeforeDockerAndBindingBeforeReturning(): void
@@ -217,7 +207,7 @@ final class DockerDeploymentCreateTest extends TestCase
         $uncertain = DriverManager::getConnection($params);
         self::assertInstanceOf(DockerCreateCommitThenThrowConnection::class, $uncertain);
         $this->extras[] = $uncertain;
-        $uncertain->executeStatement('SET search_path TO ' . $this->schema);
+        $uncertain->executeStatement('SET search_path TO ' . $this->schema . ', public');
         $uncertain->throwOnCommit = 3; // find, durable create intent, then registration.
         $recipe = $this->recipe();
         $creator = new DockerDeploymentCreate(new DoctrineDeploymentInventory($uncertain), $this->executor($recipe));

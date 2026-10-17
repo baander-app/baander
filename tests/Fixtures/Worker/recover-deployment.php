@@ -7,9 +7,7 @@ $argv = $_SERVER['argv'] ?? [];
 // Disposable host-side controller acceptance; the contained worker fixture does
 // not run LeasedWorkerRuntime or consult this database's lease.
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
-require dirname(__DIR__, 3) . '/migrations/Version20261002210000.php';
-require dirname(__DIR__, 3) . '/migrations/Version20261002220000.php';
-require dirname(__DIR__, 3) . '/migrations/Version20261003020000.php';
+require_once dirname(__DIR__, 2) . '/Support/FinalSchemaBootstrap.php';
 
 use App\Shared\Infrastructure\Worker\DeploymentContainmentController;
 use App\Shared\Infrastructure\Worker\DeploymentContainer;
@@ -21,11 +19,6 @@ use App\Shared\Infrastructure\Worker\DoctrineDeploymentRetirement;
 use App\Shared\Infrastructure\Worker\DockerWorkerCommand;
 use App\Shared\Infrastructure\Worker\DockerWorkerContainment;
 use Doctrine\DBAL\DriverManager;
-use Doctrine\DBAL\Schema\Schema;
-use DoctrineMigrations\Version20261002210000;
-use DoctrineMigrations\Version20261002220000;
-use DoctrineMigrations\Version20261003020000;
-use Psr\Log\NullLogger;
 
 $connectionParameters = [
     'driver' => 'pdo_pgsql', 'host' => '127.0.0.1', 'port' => (int) getenv('WORKER_RECOVERY_PG_PORT'),
@@ -36,14 +29,8 @@ $observer = DriverManager::getConnection($connectionParameters);
 $schema = 'worker_recovery_' . bin2hex(random_bytes(8));
 $connection->executeStatement('CREATE SCHEMA ' . $schema);
 try {
-    $connection->executeStatement('SET search_path TO ' . $schema);
-    foreach ([Version20261002210000::class, Version20261002220000::class, Version20261003020000::class] as $migrationClass) {
-        $migration = new $migrationClass($connection, new NullLogger());
-        $migration->up(new Schema());
-        foreach ($migration->getSql() as $query) {
-            $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-        }
-    }
+    $connection->executeStatement('SET search_path TO ' . $schema . ', public');
+    \App\Tests\Support\FinalSchemaBootstrap::bootstrap($connection);
     $leases = new DoctrineDeploymentLease($connection);
     $command = new DockerWorkerCommand($argv[1], $argv[2]);
     $containment = new DockerWorkerContainment($command->execute(...));
@@ -53,7 +40,7 @@ try {
     $replacementBoot = str_repeat('b', 32);
     $inventory = new DoctrineDeploymentInventory($connection);
     $daemonId = trim($command->execute(['info', '--format', '{{.ID}}']));
-    $observer->executeStatement('SET search_path TO ' . $schema);
+    $observer->executeStatement('SET search_path TO ' . $schema . ', public');
     $binding = new DeploymentContainer($namespace, $boot, $daemonId, $argv[3]);
     $state = json_decode($command->execute(['container', 'inspect', '--format', '{"status":{{json .State.Status}},"pid":{{json .State.Pid}}}', $binding->containerId]), true, flags: JSON_THROW_ON_ERROR);
     if ($state !== ['status' => 'created', 'pid' => 0]) {

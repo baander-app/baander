@@ -7,7 +7,7 @@ namespace App\Favorites\Infrastructure\Doctrine;
 use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclaration;
 use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclarationProviderInterface;
 
-/** Owner constraint from Version20261006280000 for favorites mapped with scalar user IDs. */
+/** Owner constraint for favorites mapped with scalar user IDs. */
 final class FavoritesForeignKeys implements ForeignKeyDeclarationProviderInterface
 {
     public function foreignKeys(): iterable

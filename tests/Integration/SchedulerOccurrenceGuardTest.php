@@ -28,7 +28,6 @@ use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Tools\DsnParser;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -78,21 +77,13 @@ final class SchedulerOccurrenceGuardTest extends TestCase
         $this->schema = 'scheduler_guard_test_' . bin2hex(random_bytes(8));
         $this->writer->executeStatement('CREATE SCHEMA ' . $this->schema);
         foreach ([$this->writer, $this->observer] as $connection) {
-            $connection->executeStatement('SET search_path TO ' . $this->schema);
+            $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        foreach (['Version20261002210000', 'Version20261002230000', 'Version20261003010000', 'Version20261003020000'] as $version) {
-            require_once dirname(__DIR__, 2) . '/migrations/' . $version . '.php';
-            $class = 'DoctrineMigrations\\' . $version;
-            $migration = new $class($this->writer, new NullLogger());
-            $migration->up(new Schema());
-            foreach ($migration->getSql() as $query) {
-                $this->writer->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-        }
+        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->writer);
+        $this->writer->executeStatement('DELETE FROM scheduled_jobs');
         $authority = (new DoctrineDeploymentLease($this->writer))->acquire('baander.app:scheduler-guard', str_repeat('a', 32), 300);
         self::assertInstanceOf(DeploymentLease::class, $authority);
         $this->authority = $authority;
-        \App\Tests\Fixtures\Scheduler\PublicIdentitySchema::upgrade($this->writer);
     }
 
     public function testCommittedClaimPrecedesEffectAndRepeatedCommandDoesNotExecuteAgain(): void
@@ -275,7 +266,7 @@ final class SchedulerOccurrenceGuardTest extends TestCase
         // Admission closes its dedicated connection on failures. Restore only this
         // fixture's isolated schema on reconnect; production uses its normal schema.
         $invoke = function (ExecuteScheduledOccurrenceCommand $command) use ($guard): void {
-            $this->writer->executeStatement('SET search_path TO ' . $this->schema);
+            $this->writer->executeStatement('SET search_path TO ' . $this->schema . ', public');
             $guard($command);
         };
         $bus = new MessageBus([

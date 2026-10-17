@@ -10,11 +10,9 @@ use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
 use App\Shared\Infrastructure\Worker\DoctrineDeploymentRetirement;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Tools\DsnParser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 final class WorkerDeploymentRetirementTest extends TestCase
 {
@@ -37,17 +35,9 @@ final class WorkerDeploymentRetirementTest extends TestCase
         $this->schema = 'worker_retirement_test_' . bin2hex(random_bytes(8));
         $this->connection->executeStatement('CREATE SCHEMA ' . $this->schema);
         foreach ([$this->connection, $this->writer] as $connection) {
-            $connection->executeStatement('SET search_path TO ' . $this->schema);
+            $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        foreach (['Version20261002210000', 'Version20261002220000', 'Version20261003020000'] as $version) {
-            require_once dirname(__DIR__, 2) . '/migrations/' . $version . '.php';
-            $class = '\\DoctrineMigrations\\' . $version;
-            $migration = new $class($this->connection, new NullLogger());
-            $migration->up(new Schema());
-            foreach ($migration->getSql() as $query) {
-                $this->connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-        }
+        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->connection);
         self::assertTrue((new DoctrineDeploymentInventory($this->connection))->register($this->binding()));
     }
 
@@ -202,7 +192,7 @@ final class WorkerDeploymentRetirementTest extends TestCase
 require $argv[1];
 $params = (new \Doctrine\DBAL\Tools\DsnParser(['postgresql' => 'pdo_pgsql']))->parse(getenv('OUTBOX_TEST_DATABASE_URL'));
 $c = \Doctrine\DBAL\DriverManager::getConnection($params);
-$c->executeStatement('SET search_path TO ' . $argv[2]);
+$c->executeStatement('SET search_path TO ' . $argv[2] . ', public');
 // Prove operation explicitly uses READ COMMITTED despite a stronger session default.
 $c->executeStatement('SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL REPEATABLE READ');
 file_put_contents($argv[3], (string) $c->fetchOne('SELECT pg_backend_pid()'));

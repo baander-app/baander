@@ -8,11 +8,9 @@ use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
 use App\Shared\Infrastructure\Worker\LeaseAgentProcess;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Tools\DsnParser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 final class WorkerLeaseAgentTest extends TestCase
 {
@@ -34,17 +32,9 @@ final class WorkerLeaseAgentTest extends TestCase
         $this->connection = DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url));
         $this->schema = 'lease_agent_test_' . bin2hex(random_bytes(8));
         $this->connection->executeStatement('CREATE SCHEMA ' . $this->schema);
-        $this->connection->executeStatement('SET search_path TO ' . $this->schema);
-        foreach (['Version20261002210000', 'Version20261003020000'] as $version) {
-            require_once dirname(__DIR__, 2) . '/migrations/' . $version . '.php';
-            $class = 'DoctrineMigrations\\' . $version;
-            $migration = new $class($this->connection, new NullLogger());
-            $migration->up(new Schema());
-            foreach ($migration->getSql() as $query) {
-                $this->connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-        }
-        $this->environment = [...getenv(), 'DATABASE_URL' => $url, 'PGOPTIONS' => '-c search_path=' . $this->schema];
+        $this->connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
+        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->connection);
+        $this->environment = [...getenv(), 'DATABASE_URL' => $url, 'PGOPTIONS' => '-c search_path=' . $this->schema . ',public'];
     }
 
     public function testRealHelperAcquiresAndRenewsWithBoundSequenceAndIdentity(): void

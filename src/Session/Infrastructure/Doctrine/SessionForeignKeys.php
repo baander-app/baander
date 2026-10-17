@@ -7,7 +7,7 @@ namespace App\Session\Infrastructure\Doctrine;
 use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclaration;
 use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclarationProviderInterface;
 
-/** Owner constraints from Version001_InitialSchema for device and listening-session tables mapped with scalar user IDs. */
+/** Owner constraints for device and listening-session tables mapped with scalar user IDs. */
 final class SessionForeignKeys implements ForeignKeyDeclarationProviderInterface
 {
     public function foreignKeys(): iterable

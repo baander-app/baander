@@ -9,11 +9,9 @@ use App\Shared\Infrastructure\Worker\DeploymentLease;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Exception\DriverException;
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Tools\DsnParser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 /** Committed PostgreSQL lease preflight; never runs scheduler effects or claims containment. */
 final class SchedulerWorkerAuthorityTest extends TestCase
@@ -41,17 +39,10 @@ final class SchedulerWorkerAuthorityTest extends TestCase
         $this->schema = 'scheduler_authority_test_' . bin2hex(random_bytes(8));
         $this->first->executeStatement('CREATE SCHEMA ' . $this->schema);
         foreach ([$this->first, $this->second] as $connection) {
-            $connection->executeStatement('SET search_path TO ' . $this->schema);
+            $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        foreach (['Version20261002210000', 'Version20261003020000'] as $version) {
-            require_once dirname(__DIR__, 2) . '/migrations/' . $version . '.php';
-            $class = 'DoctrineMigrations\\' . $version;
-            $migration = new $class($this->first, new NullLogger());
-            $migration->up(new Schema());
-            foreach ($migration->getSql() as $query) {
-                $this->first->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-        }
+        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
+        $this->first->executeStatement('DELETE FROM scheduled_jobs');
         $this->lease = new DeploymentLease('baander.app:scheduler-authority-test', str_repeat('a', 32), 1);
         $this->first->executeStatement("INSERT INTO worker_deployment_leases (namespace, owner_boot_id, epoch, state, expires_at) VALUES (:namespace, :boot, :epoch, 'active', clock_timestamp() + interval '1 hour')", ['namespace' => $this->lease->namespace, 'boot' => $this->lease->bootId, 'epoch' => $this->lease->epoch]);
         foreach (['BAANDER_WORKER_ID', 'BAANDER_WORKER_NAMESPACE', 'BAANDER_WORKER_BOOT_ID', 'BAANDER_WORKER_LEASE_EPOCH', 'PGOPTIONS'] as $name) {
@@ -177,6 +168,8 @@ final class SchedulerWorkerAuthorityTest extends TestCase
 
     public function testDatabaseFailureClosesTheDedicatedConnectionAndDeniesAuthority(): void
     {
+        // The missing fixture table must not resolve to the main schema's lease table.
+        $this->first->executeStatement('SET search_path TO ' . $this->schema);
         $this->second->executeStatement('DROP TABLE worker_deployment_leases');
         try {
             (new DoctrineSchedulerWorkerAuthority($this->first, $this->lease))->assertActive();

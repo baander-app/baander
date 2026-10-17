@@ -42,7 +42,7 @@ Each domain service implements one recommendation algorithm:
 
 ## Scheduled Generation
 
-`GenerateRecommendationsCommand` implements the Scheduler's `SchedulableCommandInterface`, with the scheduler parameters `mode` (`full` or `incremental`) and `automatic`. Migration `Version20261007130000` seeds an active scheduled job, **Generate recommendations**, that dispatches it daily at 04:00 UTC with `{"mode":"incremental","automatic":true}`.
+`GenerateRecommendationsCommand` implements the Scheduler's `SchedulableCommandInterface`, with the scheduler parameters `mode` (`full` or `incremental`) and `automatic`. The initial migration seeds an active scheduled job, **Generate recommendations**, that dispatches it daily at 04:00 UTC with `{"mode":"incremental","automatic":true}`.
 
 The handler reads the system setting `recommendations.auto_generate` (off by default, contributed by `RecommendationSettingDefinitions`) when a command with `automatic: true` arrives. While the setting is off, the handler logs at info level and returns `skipped: recommendations.auto_generate is off`, which the scheduler records as the job's last result. Commands without `automatic`, from `app:recommendation:generate`, the admin action or a schedule an administrator creates, always generate. An unknown mode throws instead of falling back to incremental.
 

@@ -52,7 +52,7 @@ framework:
 
             # Failure transport — a PostgreSQL table, because only a listable receiver
             # supports messenger:failed:show|retry|remove by id and the admin
-            # endpoints. Migration Version20261006250000 owns the table.
+            # endpoints. The initial migration owns the table.
             # LISTEN/NOTIFY stays off: nothing consumes this transport continuously,
             # and LISTEN would hold the shared DBAL connection.
             failed:

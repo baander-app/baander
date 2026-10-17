@@ -12,11 +12,9 @@ use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceStore;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Tools\DsnParser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 /** Independent PostgreSQL observers prove committed reservations, not job execution or broker acceptance. */
 final class SchedulerOccurrenceDispatchStoreTest extends TestCase
@@ -41,17 +39,10 @@ final class SchedulerOccurrenceDispatchStoreTest extends TestCase
         $this->schema = 'scheduler_dispatch_test_' . bin2hex(random_bytes(8));
         $this->first->executeStatement('CREATE SCHEMA ' . $this->schema);
         foreach ([$this->first, $this->second] as $connection) {
-            $connection->executeStatement('SET search_path TO ' . $this->schema);
+            $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261002230000.php';
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261003010000.php';
-        foreach ([new \DoctrineMigrations\Version20261002230000($this->first, new NullLogger()), new \DoctrineMigrations\Version20261003010000($this->first, new NullLogger())] as $migration) {
-            $migration->up(new Schema());
-            foreach ($migration->getSql() as $query) {
-                $this->first->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-        }
-        \App\Tests\Fixtures\Scheduler\PublicIdentitySchema::upgrade($this->first);
+        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
+        $this->first->executeStatement('DELETE FROM scheduled_jobs');
     }
 
     public function testCommittedReservationRetryReplacementAndStableReceipt(): void
@@ -244,7 +235,7 @@ final class SchedulerOccurrenceDispatchStoreTest extends TestCase
             }
         };
         $connection->committed = $committed;
-        $connection->executeStatement('SET search_path TO ' . $this->schema);
+        $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         $this->extras[] = $connection;
         return $connection;
     }

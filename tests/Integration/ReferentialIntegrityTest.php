@@ -11,12 +11,7 @@ use App\Party\Infrastructure\Doctrine\Repository\SyncedPartySessionRepository;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\ArrayParameterType;
-use Doctrine\DBAL\Schema\Schema;
-use DoctrineMigrations\Version20261006280000;
-use DoctrineMigrations\Version20261006300000;
-use DoctrineMigrations\Version20261007100000;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 /**
  * Every column that refers to another row has a foreign key and an index that leads with it.
@@ -61,7 +56,7 @@ final class ReferentialIntegrityTest extends TestCase
         'recommendations.target_id' => 'polymorphic with target_type',
         'scheduler_occurrence_executions.attempt_id' => 'the attempt\'s own identifier',
         'scheduler_occurrence_executions.deployment_boot_id' => 'worker boot identifier with no table',
-        'scheduler_occurrences.job_id' => 'occurrences keep their history after the schedule is deleted (Version20261002230000)',
+        'scheduler_occurrences.job_id' => 'occurrences keep their history after the schedule is deleted',
         'scheduler_occurrences.job_public_id' => 'immutable public job identity snapshot retained after schedule deletion',
         'songs.discogs_id' => 'external Discogs identifier',
         'songs.spotify_id' => 'external Spotify identifier',
@@ -83,7 +78,7 @@ final class ReferentialIntegrityTest extends TestCase
         'fk_scheduler_occurrence_executions_occurrence_id_job_id' => 'the primary key on occurrence_id finds the single referencing row',
     ];
 
-    /** ON DELETE rules chosen by the referential integrity audit (Version20261006280000). */
+    /** ON DELETE rules chosen by the referential integrity audit. */
     private const RULES = [
         'fk_oauth_clients_user_id' => 'CASCADE',
         'fk_pairing_sessions_server_id' => 'CASCADE',
@@ -99,25 +94,25 @@ final class ReferentialIntegrityTest extends TestCase
         'fk_user_theme_moods_user_id' => 'CASCADE',
     ];
 
-    /** Deleting a user deletes their OAuth tokens and codes (Version001_InitialSchema, Version20261006300000). */
+    /** Deleting a user deletes their OAuth tokens and codes. */
     private const OAUTH_RULES = [
         'fk_oauth_access_tokens_user_id' => 'CASCADE',
         'fk_oauth_auth_codes_user_id' => 'CASCADE',
         'fk_oauth_device_codes_user_id' => 'CASCADE',
     ];
 
-    /** ON DELETE rules for a party's video and transcode job (Version20261006310000). */
+    /** ON DELETE rules for a party's video and transcode job. */
     private const PARTY_MEDIA_RULES = [
         'fk_party_sessions_transcode_job_id' => 'SET NULL',
         'fk_party_sessions_video_id' => 'CASCADE',
     ];
 
-    /** A reset token ends with its user (Version20261006320000). */
+    /** A reset token ends with its user. */
     private const PASSWORD_RESET_RULES = [
         'fk_password_reset_tokens_user_id' => 'CASCADE',
     ];
 
-    /** A verification token ends with its user (Version20261006360000). */
+    /** A verification token ends with its user. */
     private const EMAIL_VERIFICATION_RULES = [
         'fk_email_verification_tokens_user_id' => 'CASCADE',
     ];
@@ -278,55 +273,6 @@ final class ReferentialIntegrityTest extends TestCase
         }
     }
 
-    public function testOAuthOwnerMigrationRemovesRowsWithoutTheirUserAndRoundTrips(): void
-    {
-        $connection = $this->manager->getConnection();
-        $latest = $this->constraintsAndIndexes();
-
-        // Version20261007100000 requires an approved device code to keep its user, which the
-        // earlier SET NULL rule breaks; step back past it first.
-        $this->runMigration('down', Version20261007100000::class);
-        $this->runMigration('down', Version20261006300000::class);
-        $restored = $this->constraintsAndIndexes();
-        foreach (['fk_oauth_access_tokens_user_id', 'fk_oauth_device_codes_user_id'] as $name) {
-            self::assertStringEndsWith('ON DELETE SET NULL', $restored[$name], $name);
-        }
-
-        // Rows the earlier rules left behind when their user was deleted.
-        $client = $this->createClient();
-        $kept = $this->createUser();
-        $keptToken = $this->createAccessToken($client, $kept);
-        $keptCode = $this->createDeviceCode($client, $kept);
-        $deleted = $this->createUser();
-        $orphanToken = $this->createAccessToken($client, $deleted);
-        $orphanCode = $this->createDeviceCode($client, $deleted);
-        $pending = $this->createDeviceCode($client);
-        $denied = $this->createDeviceCode($client, denied: true);
-        $this->deleteUser($deleted);
-        self::assertSame(
-            [['user_id' => null]],
-            $connection->fetchAllAssociative('SELECT user_id FROM oauth_access_tokens WHERE id = :id', ['id' => $orphanToken->toString()]),
-        );
-        self::assertSame(
-            [['user_id' => null, 'approved' => true]],
-            $connection->fetchAllAssociative('SELECT user_id, approved FROM oauth_device_codes WHERE id = :id', ['id' => $orphanCode->toString()]),
-        );
-
-        $this->runMigration('up', Version20261006300000::class);
-        $this->runMigration('up', Version20261007100000::class);
-
-        self::assertSame($latest, $this->constraintsAndIndexes());
-        self::assertSame(0, $this->countOwnedRows('oauth_access_tokens', 'id', $orphanToken));
-        self::assertSame(0, $this->countOwnedRows('oauth_refresh_tokens', 'access_token_id', $orphanToken));
-        self::assertSame(0, $this->countOwnedRows('oauth_token_metadata', 'token_id', $orphanToken));
-        self::assertSame(0, $this->countOwnedRows('oauth_device_codes', 'id', $orphanCode));
-        self::assertSame(1, $this->countOwnedRows('oauth_access_tokens', 'id', $keptToken));
-        self::assertSame(1, $this->countOwnedRows('oauth_refresh_tokens', 'access_token_id', $keptToken));
-        foreach ([$keptCode, $pending, $denied] as $code) {
-            self::assertSame(1, $this->countOwnedRows('oauth_device_codes', 'id', $code));
-        }
-    }
-
     public function testDeletingAVideoRemovesItsTranscodeJobsAndTheirSessions(): void
     {
         $viewer = $this->createUser();
@@ -450,102 +396,6 @@ final class ReferentialIntegrityTest extends TestCase
             [['user_id' => $listener->toString(), 'active_station_id' => null]],
             $connection->fetchAllAssociative('SELECT user_id, active_station_id FROM radio_sessions WHERE id = :id', ['id' => $session->toString()]),
         );
-    }
-
-    public function testMigrationRemovesOrphansBeforeConstrainingAndRoundTrips(): void
-    {
-        $connection = $this->manager->getConnection();
-        $latest = $this->constraintsAndIndexes();
-
-        $this->runMigration('down');
-        $restored = $this->constraintsAndIndexes();
-        foreach (array_keys(self::RULES) as $name) {
-            if (in_array($name, ['fk_radio_sessions_active_station_id', 'fk_starred_stations_station_id'], true)) {
-                self::assertStringNotContainsString('ON DELETE', $restored[$name], $name);
-            } else {
-                self::assertArrayNotHasKey($name, $restored);
-            }
-        }
-        self::assertArrayNotHasKey('idx_starred_stations_station_id', $restored);
-
-        // Rows the earlier schema allowed: references to rows that no longer exist.
-        $owner = $this->createUser();
-        $missing = Uuid::generate()->toString();
-        $favorite = static fn (string $user): array => [
-            'user_id' => $user,
-            'public_id' => (new PublicId())->toString(),
-            'entity_type' => 'album',
-            'entity_public_id' => (new PublicId())->toString(),
-            'created_at' => '2026-10-06 12:00:00+00',
-            'updated_at' => '2026-10-06 12:00:00+00',
-        ];
-        $keptFavorite = $this->insert('user_favorites', $favorite($owner->toString()));
-        $orphanFavorite = $this->insert('user_favorites', $favorite($missing));
-        $orphanJob = $this->insert('transcode_jobs', [
-            'video_id' => $missing,
-            'public_id' => (new PublicId())->toString(),
-            'quality_tier_name' => '1080p',
-            'created_at' => '2026-10-06 12:00:00+00',
-            'updated_at' => '2026-10-06 12:00:00+00',
-        ]);
-        $requeued = $this->insert('recommendation_jobs', [
-            'user_id' => $missing,
-            'original_job_id' => $missing,
-            'public_id' => (new PublicId())->toString(),
-            'is_full' => 'true',
-            'status' => 'failed',
-            'created_at' => '2026-10-06 12:00:00',
-            'updated_at' => '2026-10-06 12:00:00',
-        ]);
-
-        $this->runMigration('up');
-
-        self::assertSame($latest, $this->constraintsAndIndexes());
-        self::assertSame(
-            [$keptFavorite->toString()],
-            $connection->fetchFirstColumn('SELECT id FROM user_favorites WHERE id IN (:kept, :orphan)', [
-                'kept' => $keptFavorite->toString(),
-                'orphan' => $orphanFavorite->toString(),
-            ]),
-        );
-        self::assertSame(0, $this->countOwnedRows('transcode_jobs', 'id', $orphanJob));
-        self::assertSame(
-            [['user_id' => null, 'original_job_id' => null]],
-            $connection->fetchAllAssociative('SELECT user_id, original_job_id FROM recommendation_jobs WHERE id = :id', ['id' => $requeued->toString()]),
-        );
-    }
-
-    /** @param class-string<Version20261006280000|Version20261006300000|Version20261007100000> $class */
-    private function runMigration(string $direction, string $class = Version20261006280000::class): void
-    {
-        require_once dirname(__DIR__, 2) . '/migrations/' . substr($class, strrpos($class, '\\') + 1) . '.php';
-        $connection = $this->manager->getConnection();
-        $migration = new $class($connection, new NullLogger());
-        $migration->{$direction}(new Schema());
-        foreach ($migration->getSql() as $query) {
-            $sql = $query->getStatement();
-            $parameters = $query->getParameters();
-            if (str_contains($sql, 'INSERT INTO scheduled_jobs (id,')) {
-                // Supply the later identity column when replaying this historical seed.
-                $sql = str_replace('scheduled_jobs (id,', 'scheduled_jobs (public_id, id,', $sql);
-                $sql = str_replace('VALUES (:id,', 'VALUES (:public_id, :id,', $sql);
-                $parameters['public_id'] = (new PublicId())->toString();
-            }
-            $connection->executeStatement($sql, $parameters, $query->getTypes());
-        }
-    }
-
-    /** @return array<string, string> foreign key or index name => definition */
-    private function constraintsAndIndexes(): array
-    {
-        return $this->manager->getConnection()->fetchAllKeyValue(<<<'SQL'
-            SELECT c.conname, pg_get_constraintdef(c.oid)
-              FROM pg_constraint c JOIN pg_class t ON t.oid = c.conrelid
-             WHERE c.contype = 'f' AND t.relnamespace = current_schema()::regnamespace
-            UNION ALL
-            SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = current_schema()
-             ORDER BY 1
-            SQL);
     }
 
     /** @param array<string, string> $columns */

@@ -9,13 +9,11 @@ use App\Auth\Infrastructure\Repository\OAuth\ClientRepository;
 use App\Shared\Infrastructure\Doctrine\Type\CustomTypesRegistrar;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Tools\DsnParser;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Mapping\UnderscoreNamingStrategy;
 use Doctrine\ORM\ORMSetup;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 /** OAuth client persistence against the migration's oauth tables in an isolated schema. */
@@ -35,35 +33,12 @@ final class OAuthClientPersistenceTest extends TestCase
         $params = (new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url);
         $this->writer = DriverManager::getConnection($params);
         $this->observer = DriverManager::getConnection($params);
-        $this->writer->executeStatement('CREATE EXTENSION IF NOT EXISTS citext');
         $this->schema = 'oauth_client_test_' . bin2hex(random_bytes(8));
         $this->writer->executeStatement('CREATE SCHEMA ' . $this->schema);
         foreach ([$this->writer, $this->observer] as $connection) {
             $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        require_once dirname(__DIR__, 2) . '/migrations/Version001_InitialSchema.php';
-        $migration = new \DoctrineMigrations\Version001_InitialSchema($this->writer, new NullLogger());
-        $migration->up(new Schema());
-        foreach ($migration->getSql() as $query) {
-            $sql = $query->getStatement();
-            if (preg_match('/\ACREATE TABLE (?:oauth_[a-z_]+|users)\b/', $sql) === 1
-                || preg_match('/\AALTER TABLE oauth_[a-z_]+\b/', $sql) === 1
-                || preg_match('/\ACREATE (?:UNIQUE )?INDEX [a-z_]+ ON oauth_[a-z_]+\b/', $sql) === 1) {
-                // The trigram indexes are unrelated to client persistence and require pg_trgm.
-                if (!str_contains($sql, 'gin_trgm_ops')) {
-                    $this->writer->executeStatement($sql, $query->getParameters(), $query->getTypes());
-                }
-            }
-        }
-        // The client secret digest column and its checks (Version20261007100000).
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261007100000.php';
-        $migration = new \DoctrineMigrations\Version20261007100000($this->writer, new NullLogger());
-        $migration->up(new Schema());
-        foreach ($migration->getSql() as $query) {
-            if (preg_match('/\AALTER TABLE oauth_clients\b/', $query->getStatement()) === 1) {
-                $this->writer->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-        }
+        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->writer);
         CustomTypesRegistrar::register();
         $configuration = ORMSetup::createAttributeMetadataConfig([
             dirname(__DIR__, 2) . '/src/Auth/Infrastructure/Doctrine/Entity',

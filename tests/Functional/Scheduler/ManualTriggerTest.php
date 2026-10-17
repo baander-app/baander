@@ -12,9 +12,7 @@ use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Tools\DsnParser;
-use Psr\Log\NullLogger;
 use Symfony\Component\HttpFoundation\Response;
 
 /** Real admin firewall and durable requests, with committed scheduler data in an isolated schema. */
@@ -38,30 +36,17 @@ final class ManualTriggerTest extends TestCase
         $this->scheduler = DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url));
         $this->schema = 'scheduler_trigger_test_' . bin2hex(random_bytes(8));
         $this->scheduler->executeStatement('CREATE SCHEMA ' . $this->schema);
-        $this->scheduler->executeStatement('SET search_path TO ' . $this->schema);
+        $this->scheduler->executeStatement('SET search_path TO ' . $this->schema . ', public');
         // Recorder failures close its connection; fixture observations retain their own schema session.
         $this->observer = DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url));
-        $this->observer->executeStatement('SET search_path TO ' . $this->schema);
+        $this->observer->executeStatement('SET search_path TO ' . $this->schema . ', public');
 
-        require_once dirname(__DIR__, 3) . '/migrations/Version_60000000_20260619CreateMissingEntityTables.php';
-        $jobs = new \DoctrineMigrations\Version620260619CreateMissingEntityTables($this->scheduler, new NullLogger());
-        $jobs->up(new Schema());
-        foreach ($jobs->getSql() as $query) {
-            if (str_contains($query->getStatement(), 'scheduled_jobs')) {
-                $this->scheduler->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-        }
-        require_once dirname(__DIR__, 3) . '/migrations/Version20261002230000.php';
-        $occurrences = new \DoctrineMigrations\Version20261002230000($this->scheduler, new NullLogger());
-        $occurrences->up(new Schema());
-        foreach ($occurrences->getSql() as $query) {
-            $this->scheduler->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-        }
+        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->scheduler);
+        $this->scheduler->executeStatement('DELETE FROM scheduled_jobs');
 
         $recorder = new DoctrineSchedulerManualOccurrenceRecorder($this->scheduler);
         static::getContainer()->set(DoctrineSchedulerManualOccurrenceRecorder::class, $recorder);
         self::assertSame($recorder, static::getContainer()->get(SchedulerManualOccurrenceRecorderInterface::class));
-        \App\Tests\Fixtures\Scheduler\PublicIdentitySchema::upgrade($this->scheduler);
     }
 
     protected function tearDown(): void

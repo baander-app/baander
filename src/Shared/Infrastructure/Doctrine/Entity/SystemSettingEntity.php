@@ -22,7 +22,7 @@ class SystemSettingEntity
     #[ORM\Column(type: 'jsonb')]
     private mixed $value;
 
-    // timestamptz since Version20261007110000; the project maps timestamptz as datetime_immutable.
+    // Stored as timestamptz; the project maps timestamptz as datetime_immutable.
     #[ORM\Column(type: 'datetime_immutable', options: ['default' => 'now()'])]
     private DateTimeImmutable $updatedAt;
 

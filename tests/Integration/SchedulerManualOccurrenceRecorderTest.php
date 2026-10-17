@@ -17,11 +17,9 @@ use DateTimeZone;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Exception\DriverException;
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Tools\DsnParser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 /** Real migrations, independently committed manual captures and retained retry identities. */
 #[SkipDatabaseRollback]
@@ -47,23 +45,10 @@ final class SchedulerManualOccurrenceRecorderTest extends TestCase
         $this->schema = 'scheduler_manual_test_' . bin2hex(random_bytes(8));
         $this->first->executeStatement('CREATE SCHEMA ' . $this->schema);
         foreach ([$this->first, $this->second] as $connection) {
-            $connection->executeStatement('SET search_path TO ' . $this->schema);
+            $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        require_once dirname(__DIR__, 2) . '/migrations/Version_60000000_20260619CreateMissingEntityTables.php';
-        $jobs = new \DoctrineMigrations\Version620260619CreateMissingEntityTables($this->first, new NullLogger());
-        $jobs->up(new Schema());
-        foreach ($jobs->getSql() as $query) {
-            if (str_contains($query->getStatement(), 'scheduled_jobs')) {
-                $this->first->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-        }
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261002230000.php';
-        $occurrences = new \DoctrineMigrations\Version20261002230000($this->first, new NullLogger());
-        $occurrences->up(new Schema());
-        foreach ($occurrences->getSql() as $query) {
-            $this->first->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-        }
-        \App\Tests\Fixtures\Scheduler\PublicIdentitySchema::upgrade($this->first);
+        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
+        $this->first->executeStatement('DELETE FROM scheduled_jobs');
     }
 
     public function testDistinctManualRequestsCaptureDatabaseUtcMinuteAndExactOrderedSnapshot(): void
@@ -303,7 +288,7 @@ final class SchedulerManualOccurrenceRecorderTest extends TestCase
             }
         };
         $this->extras[] = $connection;
-        $connection->executeStatement('SET search_path TO ' . $this->schema);
+        $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         $connection->afterCommit = $afterCommit;
         try {
             (new DoctrineSchedulerManualOccurrenceRecorder($connection))->record($job, $request);
@@ -332,7 +317,7 @@ final class SchedulerManualOccurrenceRecorderTest extends TestCase
 require $argv[1];
 $params = (new \Doctrine\DBAL\Tools\DsnParser(['postgresql' => 'pdo_pgsql']))->parse(getenv('OUTBOX_TEST_DATABASE_URL'));
 $connection = \Doctrine\DBAL\DriverManager::getConnection($params);
-$connection->executeStatement('SET search_path TO ' . $argv[2]);
+$connection->executeStatement('SET search_path TO ' . $argv[2] . ', public');
 file_put_contents($argv[3] . '.ready', 'ready');
 $deadline = microtime(true) + 5;
 while (!is_file($argv[4])) { if (microtime(true) > $deadline) { exit(2); } usleep(1000); }
@@ -403,7 +388,7 @@ CHILD;
 require $argv[1];
 $params = (new \Doctrine\DBAL\Tools\DsnParser(['postgresql' => 'pdo_pgsql']))->parse(getenv('OUTBOX_TEST_DATABASE_URL'));
 $connection = \Doctrine\DBAL\DriverManager::getConnection($params);
-$connection->executeStatement('SET search_path TO ' . $argv[2]);
+$connection->executeStatement('SET search_path TO ' . $argv[2] . ', public');
 $connection->executeQuery("SELECT set_config('application_name', :application, false)", ['application' => $argv[3]])->free();
 $connection->executeStatement('SET SESSION CHARACTERISTICS AS TRANSACTION ISOLATION LEVEL REPEATABLE READ');
 $occurrence = (new \App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerManualOccurrenceRecorder($connection, 5000, 4000))
@@ -488,7 +473,7 @@ CHILD;
             self::assertTrue($dedicated->isAutoCommit());
             self::assertSame(0, $dedicated->getTransactionNestingLevel());
             self::assertSame($this->second->fetchOne('SELECT current_database()'), $dedicated->fetchOne('SELECT current_database()'));
-            $dedicated->executeStatement('SET search_path TO ' . $this->schema);
+            $dedicated->executeStatement('SET search_path TO ' . $this->schema . ', public');
             $job = $this->job();
             $shared->beginTransaction();
             try {

@@ -4,13 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
-use Doctrine\DBAL\Schema\Schema;
-use DoctrineMigrations\Version20261006260000;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 /**
- * Version20261006260000 drops twelve B-tree indexes whose columns lead a wider index on the same table.
+ * Wider indexes cover lookups on their leading columns.
  */
 final class CoveredIndexPersistenceTest extends TestCase
 {
@@ -32,22 +29,6 @@ final class CoveredIndexPersistenceTest extends TestCase
         'idx_starred_stations_user_id' => ['starred_stations', 'user_id = :id', 'uniq_starred_stations_user_id_station_id'],
         'idx_transcode_jobs_video_id' => ['transcode_jobs', 'video_id = :id', 'uniq_transcode_jobs_video_id_quality_tier_name'],
         'idx_user_favorites_user_id' => ['user_favorites', 'user_id = :id', 'uniq_user_favorites_user_id_entity_type_entity_public_id'],
-    ];
-
-    /** The definitions Version20261006260000::down() must restore. */
-    private const DROPPED_DEFINITIONS = [
-        'idx_artist_album_artist_id' => 'CREATE INDEX idx_artist_album_artist_id ON public.artist_album USING btree (artist_id)',
-        'idx_artist_song_artist_id' => 'CREATE INDEX idx_artist_song_artist_id ON public.artist_song USING btree (artist_id)',
-        'idx_genre_album_genre_id' => 'CREATE INDEX idx_genre_album_genre_id ON public.genre_album USING btree (genre_id)',
-        'idx_genre_movie_genre_id' => 'CREATE INDEX idx_genre_movie_genre_id ON public.genre_movie USING btree (genre_id)',
-        'idx_job_monitors_status' => 'CREATE INDEX idx_job_monitors_status ON public.job_monitors USING btree (status)',
-        'idx_party_members_user_id' => 'CREATE INDEX idx_party_members_user_id ON public.party_members USING btree (user_id)',
-        'idx_playlist_song_playlist_id' => 'CREATE INDEX idx_playlist_song_playlist_id ON public.playlist_song USING btree (playlist_id)',
-        'idx_recommendations_source_type_source_id' => 'CREATE INDEX idx_recommendations_source_type_source_id ON public.recommendations USING btree (source_type, source_id)',
-        'idx_songs_title' => 'CREATE INDEX idx_songs_title ON public.songs USING btree (title)',
-        'idx_starred_stations_user_id' => 'CREATE INDEX idx_starred_stations_user_id ON public.starred_stations USING btree (user_id)',
-        'idx_transcode_jobs_video_id' => 'CREATE INDEX idx_transcode_jobs_video_id ON public.transcode_jobs USING btree (video_id)',
-        'idx_user_favorites_user_id' => 'CREATE INDEX idx_user_favorites_user_id ON public.user_favorites USING btree (user_id)',
     ];
 
     public function testSchemaComparisonIsCleanForTheAffectedTables(): void
@@ -87,25 +68,6 @@ final class CoveredIndexPersistenceTest extends TestCase
             ));
             self::assertStringContainsString('Index Scan using ' . $covering . ' on ' . $table, $plan, $dropped);
             self::assertStringContainsString('Index Cond:', $plan, $dropped);
-        }
-    }
-
-    public function testMigrationRoundTripRestoresTheIdenticalDefinitions(): void
-    {
-        $connection = $this->manager->getConnection();
-        $latest = $this->indexes();
-
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261006260000.php';
-        foreach (['down', 'up'] as $direction) {
-            $migration = new Version20261006260000($connection, new NullLogger());
-            $migration->{$direction}(new Schema());
-            foreach ($migration->getSql() as $query) {
-                $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-
-            $expected = $direction === 'down' ? array_merge($latest, self::DROPPED_DEFINITIONS) : $latest;
-            ksort($expected);
-            self::assertSame($expected, $this->indexes(), $direction);
         }
     }
 

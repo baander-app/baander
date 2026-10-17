@@ -67,6 +67,10 @@ make composer-install
 make migrate
 ```
 
+The initial migration creates the current schema on an empty database. Existing
+databases with older migration histories require a separately approved manual
+reset; see [Database migrations](docs-book/part-1-operator-guide/upgrading.md#database-migrations).
+
 Then visit `http://localhost`.
 
 ## Message delivery and upgrades
@@ -110,14 +114,6 @@ The existing health endpoints check the Redis consumer; they do not yet check
 the outbox worker. Operator user creation, user registration, and email
 verification now commit their domain writes and event capture in one transaction.
 Other event producers still need transaction boundaries reviewed.
-
-Before applying migration `Version20261002120000`, stop producers and relay
-workers and let in-flight legacy tasks finish. Back up the database. Earlier
-pending events may already have created notifications through live listeners.
-The migration preserves these rows, marks `legacy_review_required`, and places
-them in dead-letter state for operator review. It clears their leases but does
-not mark them delivered. Reconcile these rows against existing notifications
-before deciding which to replay; do not bulk-clear their dead-letter flags.
 
 Before upgrading an instance that has older queued messages, stop producers and
 use the previous release to drain Redis and Swoole work. Resolve or export failed

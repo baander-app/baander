@@ -7,12 +7,9 @@ namespace App\Tests\Integration;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Exception\DriverException;
-use Doctrine\DBAL\Schema\Schema;
-use DoctrineMigrations\Version20261006350000;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
-/** Authorization codes carry their redirect URI and an S256 PKCE challenge (Version20261006350000). */
+/** Authorization codes carry their redirect URI and an S256 PKCE challenge. */
 final class AuthCodePkceMigrationTest extends TestCase
 {
     use OwnershipPersistenceHarness;
@@ -41,33 +38,6 @@ final class AuthCodePkceMigrationTest extends TestCase
         foreach (['redirect_uri', 'code_challenge', 'code_challenge_method'] as $column) {
             $this->assertRejected('23502', fn () => $this->insertAuthCode($client, $user, [$column => null]));
         }
-    }
-
-    public function testMigrationDeletesUnboundCodesAndRoundTrips(): void
-    {
-        $columns = $this->columns();
-        $checks = $this->checks();
-
-        $this->runMigration('down');
-        self::assertSame(['code_challenge' => 'YES', 'code_challenge_method' => 'YES'], $this->columns());
-        self::assertSame([], $this->checks());
-
-        // A code in the earlier shape: no redirect URI and no challenge.
-        $user = $this->createUser();
-        $this->manager->getConnection()->insert('oauth_auth_codes', [
-            'id' => Uuid::generate()->toString(),
-            'code_id' => bin2hex(random_bytes(16)),
-            'client_id' => $this->createClient()->toString(),
-            'user_id' => $user->toString(),
-            'created_at' => '2026-10-07 12:00:00+00',
-            'updated_at' => '2026-10-07 12:00:00+00',
-        ]);
-
-        $this->runMigration('up');
-
-        self::assertSame($columns, $this->columns());
-        self::assertSame($checks, $this->checks());
-        self::assertSame(0, $this->countOwnedRows('oauth_auth_codes', 'user_id', $user));
     }
 
     /** Runs $write in a savepoint and expects PostgreSQL to reject it with $sqlState. */
@@ -115,17 +85,6 @@ final class AuthCodePkceMigrationTest extends TestCase
         ]);
 
         return $id;
-    }
-
-    private function runMigration(string $direction): void
-    {
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261006350000.php';
-        $connection = $this->manager->getConnection();
-        $migration = new Version20261006350000($connection, new NullLogger());
-        $migration->{$direction}(new Schema());
-        foreach ($migration->getSql() as $query) {
-            $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-        }
     }
 
     /** @return array<string, string> column => is_nullable, for the redirect URI and PKCE columns */

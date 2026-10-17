@@ -14,14 +14,8 @@ use App\Library\Infrastructure\Doctrine\Repository\LibraryRepository;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\FilesystemType;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
-use Doctrine\DBAL\Schema\Schema;
-use Doctrine\Migrations\DependencyFactory;
-use Doctrine\Migrations\Version\Version;
 use Doctrine\ORM\Tools\SchemaTool;
-use DoctrineMigrations\Version20261006190000;
-use DoctrineMigrations\Version20261006201000;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use Symfony\Component\Clock\NativeClock;
 
 final class LibraryFileIndexPersistenceTest extends TestCase
@@ -133,58 +127,6 @@ final class LibraryFileIndexPersistenceTest extends TestCase
         $this->index(null, '/media/u15/orphan.flac');
     }
 
-    public function testMigrationRemovesOrphanedRowsBeforeAddingTheForeignKeyAndIsRecorded(): void
-    {
-        $connection = $this->manager->getConnection();
-        $migrations = $this->kernel->getContainer()->get('test.service_container')->get('doctrine.migrations.dependency_factory');
-        self::assertInstanceOf(DependencyFactory::class, $migrations);
-        // The runner has already migrated twice; this migration is recorded and nothing remains to run.
-        self::assertTrue($migrations->getMetadataStorage()->getExecutedMigrations()->hasMigration(
-            new Version(Version20261006190000::class),
-        ));
-        self::assertCount(0, $migrations->getMigrationStatusCalculator()->getNewMigrations());
-
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261006190000.php';
-        $run = static function (string $direction) use ($connection): void {
-            // A migration instance accumulates planned SQL, so each direction gets its own.
-            $migration = new Version20261006190000($connection, new NullLogger());
-            $migration->{$direction}(new Schema());
-            foreach ($migration->getSql() as $query) {
-                $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-        };
-        $constraint = static fn (): string|false => $connection->fetchOne(
-            'SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid = \'library_file_index\'::regclass AND conname = :name',
-            ['name' => self::FOREIGN_KEY],
-        );
-
-        // Recreate the pre-migration table state: no constraint, orphans left by earlier library deletions.
-        $run('down');
-        self::assertFalse($constraint());
-        $library = $this->createLibrary();
-        $this->index($library, '/media/u15/kept.flac');
-        $orphan = Uuid::generate();
-        foreach (['/media/u15/orphan-1.flac', '/media/u15/orphan-2.flac'] as $path) {
-            $connection->insert('library_file_index', [
-                'id' => Uuid::generate()->toString(),
-                'library_id' => $orphan->toString(),
-                'path' => $path,
-                'hash' => 'hash',
-                'size' => 1,
-                'extension' => 'flac',
-                'modified_at' => 0,
-                'discovered_at' => '2026-10-06 12:00:00+00',
-            ]);
-        }
-        self::assertSame(2, $this->countIndexRows($orphan));
-
-        $run('up');
-
-        self::assertSame(0, $this->countIndexRows($orphan));
-        self::assertSame(1, $this->countIndexRows($library->getId()));
-        self::assertSame('FOREIGN KEY (library_id) REFERENCES libraries(id) ON DELETE CASCADE', $constraint());
-    }
-
     public function testTheUniquePathIndexAloneCoversLibraryLookups(): void
     {
         $connection = $this->manager->getConnection();
@@ -197,16 +139,7 @@ final class LibraryFileIndexPersistenceTest extends TestCase
             'uniq_library_file_index_library_id_path' => 'CREATE UNIQUE INDEX uniq_library_file_index_library_id_path ON public.library_file_index USING btree (library_id, path)',
         ], $indexes());
 
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261006201000.php';
-        foreach (['down', 'up'] as $direction) {
-            $migration = new Version20261006201000($connection, new NullLogger());
-            $migration->{$direction}(new Schema());
-            foreach ($migration->getSql() as $query) {
-                $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-            self::assertSame($direction === 'down', array_key_exists('idx_library_file_index_library_id', $indexes()), $direction);
-            self::assertArrayHasKey('uniq_library_file_index_library_id_path', $indexes(), $direction);
-        }
+
     }
 
     private function createLibrary(): Library

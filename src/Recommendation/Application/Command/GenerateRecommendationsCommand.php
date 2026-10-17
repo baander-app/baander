@@ -10,7 +10,7 @@ use App\Shared\Domain\Model\Uuid;
 /**
  * Regenerates recommendation snapshots as a recommendation job.
  *
- * Migration Version20261007130000 schedules it daily with `automatic: true`, so that run
+ * The initial schema schedules it daily with `automatic: true`, so that run
  * generates only while `recommendations.auto_generate` is on. `app:recommendation:generate`,
  * the admin action and admin-created schedules leave `automatic` false and always generate.
  *

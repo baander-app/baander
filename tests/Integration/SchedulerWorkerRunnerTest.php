@@ -14,10 +14,8 @@ use App\Shared\Infrastructure\Worker\DoctrineDeploymentLease;
 use App\Shared\Infrastructure\Worker\WorkerChildProcess;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Tools\DsnParser;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Bridge\Redis\Transport\Connection as RedisConnection;
 use Symfony\Component\Messenger\Bridge\Redis\Transport\RedisTransport;
@@ -48,31 +46,16 @@ final class SchedulerWorkerRunnerTest extends TestCase
         $this->database = DriverManager::getConnection((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($url));
         $this->schema = 'scheduler_loop_' . bin2hex(random_bytes(8));
         $this->database->executeStatement('CREATE SCHEMA ' . $this->schema);
-        $this->database->executeStatement('SET search_path TO ' . $this->schema);
-        require_once dirname(__DIR__, 2) . '/migrations/Version_60000000_20260619CreateMissingEntityTables.php';
-        $base = new \DoctrineMigrations\Version620260619CreateMissingEntityTables($this->database, new NullLogger());
-        $base->up(new Schema());
-        foreach ($base->getSql() as $query) {
-            if (str_contains($query->getStatement(), 'scheduled_jobs')) {
-                $this->database->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-        }
-        foreach (['Version20261002210000', 'Version20261002230000', 'Version20261003010000', 'Version20261003020000'] as $version) {
-            require_once dirname(__DIR__, 2) . '/migrations/' . $version . '.php';
-            $class = 'DoctrineMigrations\\' . $version;
-            $migration = new $class($this->database, new NullLogger());
-            $migration->up(new Schema());
-            foreach ($migration->getSql() as $query) {
-                $this->database->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-        }
+        $this->database->executeStatement('SET search_path TO ' . $this->schema . ', public');
+        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->database);
+        $this->database->executeStatement('DELETE FROM scheduled_jobs');
         $lease = (new DoctrineDeploymentLease($this->database))->acquire('scheduler.baander.app', str_repeat('a', 32), 300);
         self::assertNotNull($lease);
         $stream = 'scheduler_loop_' . bin2hex(random_bytes(8));
         $this->redis = RedisConnection::fromDsn($redis, ['stream' => $stream, 'group' => 'test', 'consumer' => 'test']);
         $this->transport = new RedisTransport($this->redis, new JsonTransportSerializer(MessageCodecFactory::create()));
         $this->transport->setup();
-        $this->environment = [...getenv(), 'DATABASE_URL' => $url, 'PGOPTIONS' => '-c search_path=' . $this->schema,
+        $this->environment = [...getenv(), 'DATABASE_URL' => $url, 'PGOPTIONS' => '-c search_path=' . $this->schema . ',public',
             'PGAPPNAME' => $this->schema, 'BAANDER_TEST_SCHEDULER_STREAM' => $stream,
             'BAANDER_WORKER_NAMESPACE' => $lease->namespace, 'BAANDER_WORKER_BOOT_ID' => $lease->bootId,
             'BAANDER_WORKER_LEASE_EPOCH' => (string) $lease->epoch, 'BAANDER_WORKER_ID' => 'scheduler'];
@@ -80,7 +63,6 @@ final class SchedulerWorkerRunnerTest extends TestCase
         $this->stderr = tmpfile();
         self::assertIsResource($this->stdout);
         self::assertIsResource($this->stderr);
-        \App\Tests\Fixtures\Scheduler\PublicIdentitySchema::upgrade($this->database);
     }
 
     public function testRealLoopPublishesHealthyIntentDespitePoisonAndStopsOnTerm(): void

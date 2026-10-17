@@ -66,7 +66,11 @@ make migrate        # Run database migrations
 |---------|-------------|
 | `make migrate` | Run pending migrations (main + test DB) |
 | `make migrate-no-test` | Run migrations on main DB only |
-| `make drop-migrate` | Drop and recreate both databases, then migrate |
+| `make drop-migrate` | Destructive: drops both main and test databases; not the single-target reset procedure |
+
+The initial migration requires empty targets. Databases with the former migration
+history require an owner-approved, separate manual reset for each affected target;
+see [Database migrations](../part-1-operator-guide/upgrading.md#database-migrations).
 
 ### Testing & Analysis
 

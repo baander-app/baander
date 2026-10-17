@@ -7,7 +7,7 @@ namespace App\Radio\Infrastructure\Doctrine;
 use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclaration;
 use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclarationProviderInterface;
 
-/** Owner constraints from Version001_InitialSchema for radio tables mapped with scalar user IDs. */
+/** Owner constraints for radio tables mapped with scalar user IDs. */
 final class RadioForeignKeys implements ForeignKeyDeclarationProviderInterface
 {
     public function foreignKeys(): iterable

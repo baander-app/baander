@@ -6,15 +6,9 @@ namespace App\Tests\Integration;
 
 use Doctrine\DBAL\Exception\DriverException;
 use Doctrine\DBAL\ParameterType;
-use Doctrine\DBAL\Schema\Schema;
-use DoctrineMigrations\Version20261006330000;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
-/**
- * Version20261006330000 merges the job_monitors rows that retries duplicated, then makes
- * job_id unique and forbids a finish before the start.
- */
+/** Job monitors have unique job identities and valid finish times. */
 final class JobMonitorJobIdentityMigrationTest extends TestCase
 {
     use OwnershipPersistenceHarness {
@@ -31,65 +25,6 @@ final class JobMonitorJobIdentityMigrationTest extends TestCase
     public function testSchemaComparisonIsCleanForJobMonitors(): void
     {
         $this->assertSchemaComparisonIsClean(['job_monitors']);
-    }
-
-    public function testUpgradeMergesDuplicatedJobsIntoTheirNewestRow(): void
-    {
-        $connection = $this->manager->getConnection();
-        $this->migrate('down');
-
-        // retried-job: received from async, failed, and retried from the failure transport, which
-        // is still running. Status updates by job_id rewrote both rows alike. A manual retry
-        // marked the older row. Its newest row keeps its id.
-        $this->insert('00000000-0000-7000-8000-000000000001', 'retried-job', 'async', 'running', '2026-10-01 10:00:00', '2026-10-01 10:05:00', '2026-10-01 10:01:00', retried: true, auditLog: '[{"action":"retry"}]');
-        $this->insert('00000000-0000-7000-8000-000000000002', 'retried-job', 'failed', 'running', '2026-10-01 10:02:00', '2026-10-01 10:05:00', '2026-10-01 10:01:00');
-        // finished-job: three deliveries; the last one finished after its start.
-        foreach (['3', '4', '5'] as $minute) {
-            $this->insert('00000000-0000-7000-8000-00000000000' . $minute, 'finished-job', 'async', 'finished', '2026-10-01 11:0' . $minute . ':00', '2026-10-01 11:06:00', '2026-10-01 11:07:00');
-        }
-        $this->insert('00000000-0000-7000-8000-000000000006', 'single-job', 'swoole_task', 'finished', '2026-10-01 12:00:00', '2026-10-01 12:00:00', '2026-10-01 12:00:30');
-        $this->insert('00000000-0000-7000-8000-000000000007', 'queued-job', 'async', 'queued', '2026-10-01 13:00:00', null, null);
-
-        $this->migrate('up');
-
-        $rows = $connection->fetchAllAssociativeIndexed(
-            "SELECT job_id, id, queue, status, created_at, queued_at, started_at, finished_at, duration_microseconds,
-                    attempt, retried, audit_log
-             FROM job_monitors WHERE job_id LIKE '%-job' ORDER BY job_id",
-        );
-        self::assertSame(['finished-job', 'queued-job', 'retried-job', 'single-job'], array_keys($rows));
-        self::assertSame([
-            'id' => '00000000-0000-7000-8000-000000000002',
-            'queue' => 'async',
-            'status' => 'running',
-            'created_at' => '2026-10-01 10:00:00+00',
-            'queued_at' => '2026-10-01 10:00:00+00',
-            'started_at' => '2026-10-01 10:05:00+00',
-            'finished_at' => null,
-            'duration_microseconds' => null,
-            'attempt' => 2,
-            'retried' => true,
-            'audit_log' => '[{"action":"retry"}]',
-        ], $rows['retried-job']);
-        self::assertSame(['00000000-0000-7000-8000-000000000005', 'finished', '2026-10-01 11:03:00+00', 60_000_000, 3, false], [
-            $rows['finished-job']['id'], $rows['finished-job']['status'], $rows['finished-job']['created_at'],
-            $rows['finished-job']['duration_microseconds'], $rows['finished-job']['attempt'], $rows['finished-job']['retried'],
-        ]);
-        self::assertSame([30_000_000, 1], [$rows['single-job']['duration_microseconds'], $rows['single-job']['attempt']]);
-        self::assertSame([null, 0], [$rows['queued-job']['started_at'], $rows['queued-job']['attempt']]);
-    }
-
-    public function testUpgradeClampsAFinishedRowThatFinishedBeforeItStarted(): void
-    {
-        $this->migrate('down');
-        $this->insert('00000000-0000-7000-8000-000000000008', 'skewed-job', 'async', 'failed', '2026-10-01 14:00:00', '2026-10-01 14:00:10', '2026-10-01 14:00:05');
-
-        $this->migrate('up');
-
-        self::assertSame(
-            ['finished_at' => '2026-10-01 14:00:10+00', 'duration_microseconds' => 0],
-            $this->manager->getConnection()->fetchAssociative("SELECT finished_at, duration_microseconds FROM job_monitors WHERE job_id = 'skewed-job'"),
-        );
     }
 
     public function testTheCatalogRejectsADuplicateJobAndAFinishBeforeTheStart(): void
@@ -122,17 +57,6 @@ final class JobMonitorJobIdentityMigrationTest extends TestCase
             }
         }
         self::assertSame(['23505', '23514'], $violations);
-    }
-
-    private function migrate(string $direction): void
-    {
-        $connection = $this->manager->getConnection();
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261006330000.php';
-        $migration = new Version20261006330000($connection, new NullLogger());
-        $migration->{$direction}(new Schema());
-        foreach ($migration->getSql() as $query) {
-            $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-        }
     }
 
     private function insert(

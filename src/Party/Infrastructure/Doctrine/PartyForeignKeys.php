@@ -7,11 +7,7 @@ namespace App\Party\Infrastructure\Doctrine;
 use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclaration;
 use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclarationProviderInterface;
 
-/**
- * Constraints on party columns mapped as scalar IDs: the owners from Version001_InitialSchema,
- * the event session and actor from Version20261006280000, and the session's video and transcode
- * job from Version20261006310000.
- */
+/** Constraints on party columns mapped as scalar IDs: owners, event sessions and actors, videos and transcode jobs. */
 final class PartyForeignKeys implements ForeignKeyDeclarationProviderInterface
 {
     public function foreignKeys(): iterable

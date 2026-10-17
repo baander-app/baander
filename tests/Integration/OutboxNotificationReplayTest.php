@@ -57,18 +57,11 @@ final class OutboxNotificationReplayTest extends TestCase
         $this->schema = 'outbox_replay_' . bin2hex(random_bytes(8));
         $this->first->executeStatement('CREATE SCHEMA ' . $this->schema);
         foreach ([$this->first, $this->second] as $connection) {
-            $connection->executeStatement('SET search_path TO ' . $this->schema);
+            $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        $this->first->executeStatement('CREATE TABLE domain_event_outbox (id BIGSERIAL PRIMARY KEY,
-            relayed_at TIMESTAMPTZ, dead_lettered_at TIMESTAMPTZ, lease_token TEXT, lease_until TIMESTAMPTZ)');
-        $this->first->executeStatement('INSERT INTO domain_event_outbox DEFAULT VALUES');
+        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
+        $this->first->executeStatement("INSERT INTO domain_event_outbox (event_class, event_name, payload, created_at) VALUES ('Event', 'test', '{}'::jsonb, now())");
         $this->first->executeStatement('CREATE TABLE replay_notifications (id TEXT PRIMARY KEY, kind TEXT NOT NULL)');
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261002120000.php';
-        $migration = new \DoctrineMigrations\Version20261002120000($this->first, new NullLogger());
-        $migration->up(new \Doctrine\DBAL\Schema\Schema());
-        foreach ($migration->getSql() as $query) {
-            $this->first->executeStatement($query->getStatement());
-        }
     }
 
     protected function tearDown(): void
@@ -167,61 +160,6 @@ final class OutboxNotificationReplayTest extends TestCase
         $this->first->executeStatement('ALTER TABLE domain_event_outbox_delivery DROP CONSTRAINT reject_test_webhook');
         $replayer->dispatch($event, 1);
         $this->assertCounts($this->second, 2, 3, 1);
-    }
-
-    public function testMigrationQuarantinesOnlyPendingLegacyEventsAndPreservesThemOnRollback(): void
-    {
-        $migrationSchema = 'outbox_legacy_' . bin2hex(random_bytes(8));
-        $this->first->executeStatement('CREATE SCHEMA ' . $migrationSchema);
-        $this->first->executeStatement('SET search_path TO ' . $migrationSchema);
-        try {
-            $this->first->executeStatement('CREATE TABLE domain_event_outbox (
-                id BIGSERIAL PRIMARY KEY, payload TEXT NOT NULL, relayed_at TIMESTAMPTZ,
-                dead_lettered_at TIMESTAMPTZ, lease_token TEXT, lease_until TIMESTAMPTZ
-            )');
-            $timestamp = '2026-01-01T00:00:00+00:00';
-            foreach (['pending', 'relayed', 'deadletter'] as $status) {
-                $this->first->insert('domain_event_outbox', [
-                    'payload' => json_encode(['legacy_status' => $status], JSON_THROW_ON_ERROR),
-                    'relayed_at' => $status === 'relayed' ? $timestamp : null,
-                    'dead_lettered_at' => $status === 'deadletter' ? $timestamp : null,
-                    'lease_token' => 'legacy-' . $status,
-                    'lease_until' => $timestamp,
-                ]);
-            }
-            $originalRows = $this->first->fetchAllAssociative('SELECT * FROM domain_event_outbox ORDER BY id');
-            $migration = new \DoctrineMigrations\Version20261002120000($this->first, new NullLogger());
-            $migration->up(new \Doctrine\DBAL\Schema\Schema());
-            foreach ($migration->getSql() as $query) {
-                $this->first->executeStatement($query->getStatement());
-            }
-
-            self::assertSame(1, (int) $this->first->fetchOne('SELECT COUNT(*) FROM domain_event_outbox WHERE legacy_review_required'));
-            $quarantined = $this->first->fetchAssociative('SELECT * FROM domain_event_outbox WHERE id = 1');
-            self::assertNotFalse($quarantined);
-            self::assertSame($originalRows[0]['payload'], $quarantined['payload']);
-            self::assertNull($quarantined['relayed_at']);
-            self::assertNotNull($quarantined['dead_lettered_at']);
-            self::assertNull($quarantined['lease_token']);
-            self::assertNull($quarantined['lease_until']);
-            $preservedRows = $this->first->fetchAllAssociative('SELECT id, payload, relayed_at, dead_lettered_at, lease_token, lease_until FROM domain_event_outbox WHERE id > 1 ORDER BY id');
-            self::assertSame(array_slice($originalRows, 1), $preservedRows);
-
-            $rollback = new \DoctrineMigrations\Version20261002120000($this->first, new NullLogger());
-            $rollback->down(new \Doctrine\DBAL\Schema\Schema());
-            foreach ($rollback->getSql() as $query) {
-                $this->first->executeStatement($query->getStatement());
-            }
-            self::assertSame(3, (int) $this->first->fetchOne('SELECT COUNT(*) FROM domain_event_outbox'));
-            self::assertSame($originalRows[0]['payload'], $this->first->fetchOne('SELECT payload FROM domain_event_outbox WHERE id = 1'));
-            self::assertNull($this->first->fetchOne('SELECT relayed_at FROM domain_event_outbox WHERE id = 1'));
-            self::assertNotNull($this->first->fetchOne('SELECT dead_lettered_at FROM domain_event_outbox WHERE id = 1'));
-            self::assertNull($this->first->fetchOne("SELECT to_regclass('domain_event_outbox_delivery')"));
-            self::assertNull($this->first->fetchOne("SELECT to_regclass('domain_event_outbox_receipt')"));
-        } finally {
-            $this->first->executeStatement('SET search_path TO ' . $this->schema);
-            $this->first->executeStatement('DROP SCHEMA ' . $migrationSchema . ' CASCADE');
-        }
     }
 
     private function notificationListeners(Connection $connection): EventDispatcher

@@ -7,10 +7,7 @@ namespace App\Transcode\Infrastructure\Doctrine;
 use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclaration;
 use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclarationProviderInterface;
 
-/**
- * Constraints on transcode columns mapped as scalar IDs: the session owner from
- * Version001_InitialSchema and the source video from Version20261006280000.
- */
+/** Constraints on transcode columns mapped as scalar IDs: the session owner and source video. */
 final class TranscodeForeignKeys implements ForeignKeyDeclarationProviderInterface
 {
     public function foreignKeys(): iterable

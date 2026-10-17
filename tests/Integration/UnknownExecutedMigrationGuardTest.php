@@ -30,6 +30,8 @@ final class UnknownExecutedMigrationGuardTest extends TestCase
             "INSERT INTO doctrine_migration_versions (version, executed_at, execution_time) VALUES ('DoctrineMigrations\\Version20260701000000Renamed', '2026-07-01 00:00:00', 1)",
         );
 
+        $history = $connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions ORDER BY version');
+        $jobs = $connection->fetchAllAssociative('SELECT * FROM scheduled_jobs ORDER BY id');
         $failure = null;
         try {
             $this->migrate();
@@ -39,6 +41,12 @@ final class UnknownExecutedMigrationGuardTest extends TestCase
 
         self::assertNotNull($failure, 'migrations:migrate must not run with an unknown executed version.');
         self::assertStringContainsString('DoctrineMigrations\\Version20260701000000Renamed', $failure);
+        self::assertStringContainsString((string) $connection->fetchOne('SELECT current_database()'), $failure);
+        self::assertStringContainsString('explicit approval', $failure);
+        self::assertStringContainsString('separate manual reset', $failure);
+        self::assertStringContainsString('Do not mark the initial migration as executed', $failure);
+        self::assertSame($history, $connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions ORDER BY version'));
+        self::assertSame($jobs, $connection->fetchAllAssociative('SELECT * FROM scheduled_jobs ORDER BY id'));
         self::assertSame(0, (int) $connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions WHERE version = ?', [$latest]));
     }
 

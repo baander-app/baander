@@ -5,9 +5,7 @@ declare(strict_types=1);
 // Disposable host controller drill. The created PHP sleeper has no application
 // handlers or lease runtime; this covers real create/start/recovery protocols only.
 require dirname(__DIR__, 3) . '/vendor/autoload.php';
-require dirname(__DIR__, 3) . '/migrations/Version20261002210000.php';
-require dirname(__DIR__, 3) . '/migrations/Version20261002220000.php';
-require dirname(__DIR__, 3) . '/migrations/Version20261003020000.php';
+require_once dirname(__DIR__, 2) . '/Support/FinalSchemaBootstrap.php';
 
 use App\Shared\Infrastructure\Worker\DeploymentContainerRecipe;
 use App\Shared\Infrastructure\Worker\DeploymentRuntimeEnvironment;
@@ -19,11 +17,6 @@ use App\Shared\Infrastructure\Worker\DoctrineDeploymentRetirement;
 use App\Shared\Infrastructure\Worker\RegisteredDeploymentRecovery;
 use App\Shared\Infrastructure\Worker\RegisteredDeploymentStart;
 use Doctrine\DBAL\DriverManager;
-use Doctrine\DBAL\Schema\Schema;
-use DoctrineMigrations\Version20261002210000;
-use DoctrineMigrations\Version20261002220000;
-use DoctrineMigrations\Version20261003020000;
-use Psr\Log\NullLogger;
 
 if (PHP_SAPI !== 'cli' || !isset($argv) || count($argv) !== 4) {
     throw new InvalidArgumentException('Expected Docker executable, local endpoint and immutable image arguments.');
@@ -44,15 +37,9 @@ $preleaseName = null;
 $connection->executeStatement('CREATE SCHEMA ' . $schema);
 try {
     foreach ([$connection, $observer] as $session) {
-        $session->executeStatement('SET search_path TO ' . $schema);
+        $session->executeStatement('SET search_path TO ' . $schema . ', public');
     }
-    foreach ([Version20261002210000::class, Version20261002220000::class, Version20261003020000::class] as $migrationClass) {
-        $migration = new $migrationClass($connection, new NullLogger());
-        $migration->up(new Schema());
-        foreach ($migration->getSql() as $query) {
-            $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-        }
-    }
+    \App\Tests\Support\FinalSchemaBootstrap::bootstrap($connection);
     $daemon = trim($command->execute(['info', '--format', '{{.ID}}']));
     $runtime = new DeploymentRuntimeEnvironment(['APP_ENV' => 'prod', 'APP_DEBUG' => '0',
         'APP_SECRET' => 'test-only-literal $HOME `ignored` = ' . bin2hex(random_bytes(16)),

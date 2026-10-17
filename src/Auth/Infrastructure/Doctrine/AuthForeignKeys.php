@@ -7,7 +7,7 @@ namespace App\Auth\Infrastructure\Doctrine;
 use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclaration;
 use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclarationProviderInterface;
 
-/** Constraint from Version20261006280000 on the OAuth client owner, mapped as a scalar user ID. */
+/** Constraint on the OAuth client owner, mapped as a scalar user ID. */
 final class AuthForeignKeys implements ForeignKeyDeclarationProviderInterface
 {
     public function foreignKeys(): iterable

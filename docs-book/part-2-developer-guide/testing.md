@@ -667,9 +667,13 @@ The functional `Console/ServeCommandTest` verifies that `app:serve` and the lega
 server name resolve to the same real command and preserve its options.
 
 The functional runner creates an isolated PostgreSQL/Redis network, extracts the
-checkout into a fresh directory, and runs all migrations twice before executing the
-requested PHPUnit paths or options. With no arguments it selects `tests/Functional`.
-The second migration run checks that the recorded history produces no pending work.
+checkout into a fresh directory, and runs Doctrine migrations twice before
+executing the requested PHPUnit paths or options. With no arguments it selects `tests/Functional`.
+The fresh database executes only `Version20261017000000`; the second run checks
+that its recorded history produces no pending work. Integration tests and runtime
+fixtures use `tests/Support/FinalSchemaBootstrap.php` to create the same final
+schema. Isolated-schema fixtures require their own schema to be empty and reuse
+extensions already provisioned in the database.
 
 Scheduler occurrence persistence can be checked with:
 
@@ -688,9 +692,8 @@ lost commit acknowledgments and wrong-owner return markers cannot grant executio
 Admission also rejects absent, malformed, expired or replaced deployment authority
 without consuming an attempt. Tests cover lease-row contention, authority lost
 during insertion with transaction rollback, and exact historical-owner receipts
-after expiry or replacement. The existing fresh-install execution migration
-requires the deployment tuple; this rewrites undeployed history and does not
-upgrade or reset an existing local database.
+after expiry or replacement. The initial schema requires the deployment tuple;
+initializing it does not upgrade or reset an existing local database.
 Dispatch tests exercise committed reservations, skipped locked rows, token replacement
 and idempotent acceptance receipts on PostgreSQL. Real Redis tests send through the
 explicit JSON serializer and reproduce acceptance followed by a lost acknowledgment;
@@ -744,11 +747,13 @@ and removes its containers, network and volumes after diagnostics are collected.
 The test firewall uses the test authenticator; this does not verify production
 bearer-token or DPoP authentication. The full-suite qualification checkpoint above records the verified selection.
 
-Migration ordering is configured through `MigrationVersionComparator`. It preserves
-legacy class identities while placing their table creation before dependent changes.
-New migrations use `VersionYYYYMMDDHHMMSS`; unfamiliar naming formats need an
-explicit ordering review. Do not rename applied migrations to change their order.
-Existing irreversible migrations still prevent a general full downgrade.
+New migrations use `VersionYYYYMMDDHHMMSS` and normal timestamp ordering after
+`Version20261017000000`. The initial migration is irreversible. Its empty-target
+guard rejects existing user objects while initialization is pending, and the
+unknown-history guard rejects records from the former chain. Neither ordinary
+confirmation nor `--no-interaction` bypasses these checks. See the
+[manual reset procedure](../part-1-operator-guide/upgrading.md#manual-reset-of-an-existing-database)
+for an existing database; a reset needs explicit owner approval for that target.
 
 ## Coverage
 

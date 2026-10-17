@@ -12,7 +12,7 @@ PostgreSQL contrib. These are build intentions, not proof of the running image,
 database extension version or enabled tokenizer. Do not substitute a stock
 PostgreSQL container for extension-dependent migration/search verification.
 
-[Version001_InitialSchema](../../../../migrations/Version001_InitialSchema.php)
+[Version20261017000000](../../../../migrations/Version20261017000000.php)
 creates `citext`, `ltree`, `pg_stat_statements`, `pg_trgm`, `pgcrypto`, `pgroonga`
 and `uuid-ossp`. Installation in the image, availability to CREATE EXTENSION,
 and installation in the selected database are distinct. Creation alone does
@@ -104,51 +104,24 @@ PostgreSQL 18.4 (disposable `baander-database:latest`, 100k rows) and by
 which asserts index scans through `pg_stat_get_xact_numscans`
 (`pg_stat_xact_user_indexes` does not exist).
 `users.email` is the only CITEXT column in application tables
-(`password_reset_tokens.email` was dropped by Version20261006320000; verified
-2026-10-07 on disposable `baander-database:latest` via `information_schema.columns`).
-Reset and verification tokens and OAuth client secrets are hashed with SHA-256 in PHP. Version20261007100000 converted existing plain-text client secrets with core `sha256()` (PostgreSQL 11+, not pgcrypto), and calls pgcrypto `gen_random_bytes(32)` once to give a revoked, secretless confidential client the digest of no known secret. Verified 2026-10-07 by applying the migration and running OAuthSecretHashAndCodePurgeTest on disposable `baander-database:latest`; the pgcrypto extension version was not checked.
+(verified in the consolidated schema on disposable PostgreSQL 18.4 on 2026-10-17).
+Reset and verification tokens and OAuth client secrets are hashed with SHA-256 in PHP.
+The initial migration seeds two schedules with independent public IDs generated
+from pgcrypto's [random bytes](https://www.postgresql.org/docs/18/pgcrypto.html#PGCRYPTO-RANDOM-DATA-FUNCS):
+it takes 21 base64 symbols from `gen_random_bytes(16)` and translates the alphabet
+for 126 random bits. Application writers supply non-null, unique public IDs;
+these text columns have no database defaults. Scheduler occurrences retain their
+job's public ID. Internal UUID keys remain separate from public IDs.
 
-[Version20261015120000](../../../../migrations/Version20261015120000.php) uses
-[pgcrypto random bytes](https://www.postgresql.org/docs/18/pgcrypto.html#PGCRYPTO-RANDOM-DATA-FUNCS)
-to populate public identity columns on 14 tables. It takes the first 21 base64 symbols
-from `gen_random_bytes(16)` and translates the alphabet to produce independent
-PublicIds with 126 random bits; internal UUID keys remain unchanged. Scheduler
-occurrences retain their live job's public ID. For deleted jobs, a materialized
-query generates one public identity per orphan job UUID and shares it across
-that job's occurrences. Missing active-session devices are registered per owner
-and browser token, retaining existing registrations and tokens. Their internal
-keys use PostgreSQL 18's core
-[`uuidv7()`](https://www.postgresql.org/docs/18/functions-uuid.html), which does
-not require a UUID extension. New public IDs have unique, non-null text columns
-without database defaults; application writers must supply them.
-
-Existing passkeys are removed so users can enroll credentials with public user
-handles. The migration acquires an `ACCESS EXCLUSIVE` lock on passkeys before
-deleting them and retains it through commit, closing the insertion window before
-the later column changes. Lock acquisition uses a five-second timeout. Accounts,
-passwords and OAuth tokens are retained; there is no legacy UUID-handle fallback.
-
-On 2026-10-15, [PublicIdentityMigrationTest](../../../../tests/Integration/PublicIdentityMigrationTest.php)
-passed 6 tests and 201 assertions in 0.516 seconds on disposable
-`baander-database:latest` through `baander-ci-prewarm:local`. Fresh stacks applied
-the latest migrations before the tests; populated upgrade fixtures verified
-identity and credential preservation, orphan grouping, device recovery,
-constraints and rollback. This checkpoint preceded the approved passkey
-invalidation and its upfront table lock.
-
-On 2026-10-17, the same test passed 7 tests and 203 assertions in 0.547643
-seconds after passkey invalidation and the upfront lock were added. The fixtures
-verified passkey deletion, account/password/OAuth-token preservation, re-enrollment
-with public user handles and restoration of deleted credentials on migration
-failure. The focused CI run passed 159 tests and 2,516 assertions in 98.0 seconds
-on fresh disposable stacks; its JUnit report is
-`var/test-runs/20261017-110836-5c088ef2/run/stack-1.junit.xml`.
-Lock contention was not tested with a second connection.
-
-These runs establish successful use of pgcrypto's random-byte function in those
-test databases. Exact server and extension versions were not queried; the image
-targets PostgreSQL 18. These checks do not establish the extension state of
-development or deployed databases.
+On 2026-10-17, the captured 53-migration chain and consolidated initial migration
+were run in separate databases on disposable `baander-database:latest`.
+The server reported PostgreSQL 18.4 with `citext` 1.8, `ltree` 1.3,
+`pg_stat_statements` 1.12, `pg_trgm` 1.6, `pgcrypto` 1.4, `pgroonga` 4.0.5 and
+`uuid-ossp` 1.1. Both catalogs contained 80 application tables, five PGroonga
+indexes with the same tokenizer, normalizer and stem-filter options, and nine
+trigram indexes. These observations establish enablement in those disposable
+databases; they do not establish development or deployed database state, usable
+`pg_stat_statements` statistics, or search performance.
 
 ## Diff and performance checks
 

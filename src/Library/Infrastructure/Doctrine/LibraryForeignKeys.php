@@ -7,10 +7,7 @@ namespace App\Library\Infrastructure\Doctrine;
 use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclaration;
 use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclarationProviderInterface;
 
-/**
- * Library constraints on columns mapped as scalar IDs: the access owner from
- * Version001_InitialSchema and the file index library from Version20261006190000.
- */
+/** Library constraints on columns mapped as scalar IDs: the access owner and file index library. */
 final class LibraryForeignKeys implements ForeignKeyDeclarationProviderInterface
 {
     public function foreignKeys(): iterable

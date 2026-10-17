@@ -20,12 +20,9 @@ use App\Notification\Infrastructure\Push\PushSubscriptionRepository;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\DBAL\Exception\ForeignKeyConstraintViolationException;
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
-use DoctrineMigrations\Version20261006170000;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 /** Production mappings, migrated constraints and repositories, on disposable PostgreSQL only. */
 final class NotificationOwnershipPersistenceTest extends TestCase
@@ -241,64 +238,6 @@ final class NotificationOwnershipPersistenceTest extends TestCase
         self::assertSame(2, $repository->countUnread($second));
         self::assertSame([], $repository->findByUserId($first, unreadOnly: true));
         self::assertSame(['b2', 'b1'], $titles($repository->findByUserId($second, unreadOnly: true)));
-    }
-
-    public function testCreatedAtMigrationPreservesExistingInstants(): void
-    {
-        $connection = $this->manager->getConnection();
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261006170000.php';
-        $type = static fn (): string => (string) $connection->fetchOne(
-            "SELECT format_type(atttypid, atttypmod) FROM pg_attribute WHERE attrelid = 'push_subscriptions'::regclass AND attname = 'created_at'",
-        );
-        $run = static function (string $direction) use ($connection): void {
-            // A migration instance accumulates planned SQL, so each direction gets its own.
-            $migration = new Version20261006170000($connection, new NullLogger());
-            $migration->{$direction}(new Schema());
-            foreach ($migration->getSql() as $query) {
-                $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-        };
-
-        self::assertSame('timestamp with time zone', $type());
-
-        // Recreate the pre-migration column, then write rows through the production path.
-        $run('down');
-        self::assertSame('timestamp(0) without time zone', $type());
-        $owner = $this->createUser();
-        $subscriptions = new PushSubscriptionRepository($this->manager);
-        $subscriptions->registerForUser($owner, new PushSubscriptionRegistration('https://push.baander.app/written', 'pk', 'ak', 'aes128gcm'));
-        $written = (string) $connection->fetchOne(
-            'SELECT created_at::text FROM push_subscriptions WHERE endpoint = :endpoint',
-            ['endpoint' => 'https://push.baander.app/written'],
-        );
-        $subscriptions->registerForUser($owner, new PushSubscriptionRegistration('https://push.baander.app/boundary', 'pk', 'ak', 'aes128gcm'));
-        // 02:30 does not exist in Copenhagen on this date; a session-zone conversion would shift it.
-        $connection->executeStatement(
-            "UPDATE push_subscriptions SET created_at = TIMESTAMP '2026-03-29 02:30:00' WHERE endpoint = 'https://push.baander.app/boundary'",
-        );
-
-        $connection->executeStatement("SET LOCAL TimeZone = 'Europe/Copenhagen'");
-        $run('up');
-        $connection->executeStatement("SET LOCAL TimeZone = 'UTC'");
-        self::assertSame('timestamp with time zone', $type());
-
-        $epoch = static fn (string $endpoint): int => (int) $connection->fetchOne(
-            'SELECT extract(epoch FROM created_at)::bigint FROM push_subscriptions WHERE endpoint = :endpoint',
-            ['endpoint' => $endpoint],
-        );
-        $writtenUtc = new \DateTimeImmutable($written, new \DateTimeZone('UTC'));
-        self::assertSame($writtenUtc->getTimestamp(), $epoch('https://push.baander.app/written'));
-        self::assertSame(
-            (new \DateTimeImmutable('2026-03-29 02:30:00', new \DateTimeZone('UTC')))->getTimestamp(),
-            $epoch('https://push.baander.app/boundary'),
-        );
-
-        $this->manager->clear();
-        $hydrated = [];
-        foreach ($subscriptions->findByUser($owner) as $subscription) {
-            $hydrated[$subscription->getEndpoint()] = $subscription->getCreatedAt()->getTimestamp();
-        }
-        self::assertSame($writtenUtc->getTimestamp(), $hydrated['https://push.baander.app/written']);
     }
 
     private function notification(Uuid $userId, string $title): Notification

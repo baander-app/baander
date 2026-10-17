@@ -228,13 +228,13 @@ App\Playlist\Application\Port\FavoriteAlbumPortInterface:
 Create a Doctrine migration for the new table. Migrations live in `migrations/` and are named `VersionYYYYMMDDHHMMSS`. Name every index and constraint as [Database Naming](database-naming.md) describes, with the same names as the entity mapping.
 
 ```php
-// migrations/Version20261007120000.php
+// migrations/Version20261018000000.php
 namespace DoctrineMigrations;
 
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
-final class Version20261007120000 extends AbstractMigration
+final class Version20261018000000 extends AbstractMigration
 {
     public function getDescription(): string
     {

@@ -10,11 +10,9 @@ use App\Shared\Infrastructure\Worker\DoctrineDeploymentInventory;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Exception\DriverException;
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Tools\DsnParser;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 /** Actual PostgreSQL inventory registration before any worker lease/container start. */
 final class WorkerDeploymentInventoryTest extends TestCase
@@ -53,17 +51,9 @@ final class WorkerDeploymentInventoryTest extends TestCase
         $this->schema = 'deployment_inventory_test_' . bin2hex(random_bytes(8));
         $this->first->executeStatement('CREATE SCHEMA ' . $this->schema);
         foreach ([$this->first, $this->second] as $connection) {
-            $connection->executeStatement('SET search_path TO ' . $this->schema);
+            $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        foreach (['Version20261002220000', 'Version20261003020000'] as $version) {
-            require_once dirname(__DIR__, 2) . '/migrations/' . $version . '.php';
-            $class = 'DoctrineMigrations\\' . $version;
-            $migration = new $class($this->first, new NullLogger());
-            $migration->up(new Schema());
-            foreach ($migration->getSql() as $query) {
-                $this->first->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-        }
+        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
     }
 
     public function testCommittedRegistrationAndExactRetryPreserveOriginalBindingAndTimestamp(): void
@@ -120,7 +110,7 @@ final class WorkerDeploymentInventoryTest extends TestCase
         $connection = DriverManager::getConnection($params);
         self::assertInstanceOf(InventoryCommitThenThrowConnection::class, $connection);
         $this->extras[] = $connection;
-        $connection->executeStatement('SET search_path TO ' . $this->schema);
+        $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         $connection->throwAfterCommit = true;
         try {
             (new DoctrineDeploymentInventory($connection))->claimCreate($this->recipe());
@@ -177,7 +167,7 @@ final class WorkerDeploymentInventoryTest extends TestCase
         $connection = DriverManager::getConnection($params);
         self::assertInstanceOf(InventoryCommitThenThrowConnection::class, $connection);
         $this->extras[] = $connection;
-        $connection->executeStatement('SET search_path TO ' . $this->schema);
+        $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         $connection->throwAfterCommit = true;
         try {
             (new DoctrineDeploymentInventory($connection))->claimStart($this->binding());
@@ -214,7 +204,7 @@ final class WorkerDeploymentInventoryTest extends TestCase
 require $argv[1];
 $params = (new \Doctrine\DBAL\Tools\DsnParser(['postgresql' => 'pdo_pgsql']))->parse(getenv('OUTBOX_TEST_DATABASE_URL'));
 $connection = \Doctrine\DBAL\DriverManager::getConnection($params);
-$connection->executeStatement('SET search_path TO ' . $argv[2]);
+$connection->executeStatement('SET search_path TO ' . $argv[2] . ', public');
 file_put_contents($argv[3].'.ready', 'ready');
 $deadline = microtime(true) + 3;
 while (!is_file($argv[4])) { if (microtime(true) > $deadline) { exit(2); } usleep(1000); }
@@ -317,7 +307,7 @@ PHP;
         } else {
             $this->second->rollBack();
         }
-        $this->first->executeStatement('SET search_path TO ' . $this->schema);
+        $this->first->executeStatement('SET search_path TO ' . $this->schema . ', public');
         self::assertSame(!$commit, $inventory->register($this->binding()));
         self::assertEquals($commit ? $winner : $this->binding(), $inventory->find($winner->namespace, $winner->bootId));
     }
@@ -336,7 +326,7 @@ PHP;
         $connection = DriverManager::getConnection($params);
         self::assertInstanceOf(InventoryCommitThenThrowConnection::class, $connection);
         $this->extras[] = $connection;
-        $connection->executeStatement('SET search_path TO ' . $this->schema);
+        $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         $connection->throwAfterCommit = true;
         try {
             (new DoctrineDeploymentInventory($connection))->register($this->binding());

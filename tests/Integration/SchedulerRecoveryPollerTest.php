@@ -17,14 +17,12 @@ use App\Shared\Domain\Model\Uuid;
 use DAMA\DoctrineTestBundle\PHPUnit\SkipDatabaseRollback;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\DBAL\Tools\DsnParser;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 /** Real durable fairness and PostgreSQL commit outcomes, in a schema containing only owned schedules. */
 #[SkipDatabaseRollback]
@@ -55,30 +53,10 @@ final class SchedulerRecoveryPollerTest extends TestCase
         $this->schema = 'scheduler_recovery_test_' . bin2hex(random_bytes(8));
         $this->writer->executeStatement('CREATE SCHEMA ' . $this->schema);
         foreach ([$this->writer, $this->observer] as $connection) {
-            $connection->executeStatement('SET search_path TO ' . $this->schema);
+            $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        require_once dirname(__DIR__, 2) . '/migrations/Version_60000000_20260619CreateMissingEntityTables.php';
-        $migration = new \DoctrineMigrations\Version620260619CreateMissingEntityTables($this->writer, new NullLogger());
-        $migration->up(new Schema());
-        foreach ($migration->getSql() as $query) {
-            // Use the actual standalone schedule table/index DDL, without fabricating a fixture schema or unrelated tables.
-            if (str_contains($query->getStatement(), 'scheduled_jobs')) {
-                $this->writer->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-        }
-        foreach (['Version20261002230000', 'Version20261003010000', 'Version20261006230000'] as $version) {
-            require_once dirname(__DIR__, 2) . '/migrations/' . $version . '.php';
-            $class = 'DoctrineMigrations\\' . $version;
-            $migration = new $class($this->writer, new NullLogger());
-            $migration->up(new Schema());
-            foreach ($migration->getSql() as $query) {
-                // The naming migration renames objects across the schema; this fixture has only scheduled_jobs.
-                if ($version === 'Version20261006230000' && !str_contains($query->getStatement(), 'scheduled_jobs')) {
-                    continue;
-                }
-                $this->writer->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-            }
-        }
+        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->writer);
+        $this->writer->executeStatement('DELETE FROM scheduled_jobs');
         $this->kernel = new Kernel('test', false);
         $this->kernel->boot();
         $configured = $this->kernel->getContainer()->get('test.service_container')->get('doctrine')->getManager();
@@ -87,7 +65,6 @@ final class SchedulerRecoveryPollerTest extends TestCase
         $this->configuredManager = $configured;
         $this->manager = new EntityManager($this->writer, $configured->getConfiguration(), $configured->getEventManager());
         $this->jobs = new ScheduledJobRepository($this->manager);
-        \App\Tests\Fixtures\Scheduler\PublicIdentitySchema::upgrade($this->writer);
     }
 
     public function testPoisonScheduleIsDeferredAndHealthyScheduleProgressesAfterPollerRestart(): void
@@ -212,7 +189,7 @@ final class SchedulerRecoveryPollerTest extends TestCase
             }
         };
         $connection->committed = $committed;
-        $connection->executeStatement('SET search_path TO ' . $this->schema);
+        $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         $this->extraConnections[] = $connection;
         $materializer = $this->createMock(SchedulerOccurrenceMaterializerInterface::class);
         $materializer->expects(self::never())->method('materialize');
@@ -333,7 +310,7 @@ final class SchedulerRecoveryPollerTest extends TestCase
             public function materialize(Uuid $jobId, int $minuteLimit = 60): int
             {
                 // A failed real adapter discards its connection. Restore only this fixture's session isolation on reconnect.
-                $this->connection->executeStatement('SET search_path TO ' . $this->schema);
+                $this->connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
                 return $this->materializer->materialize($jobId, $minuteLimit);
             }
         };
@@ -343,7 +320,7 @@ final class SchedulerRecoveryPollerTest extends TestCase
     private function connection(): Connection
     {
         $connection = DriverManager::getConnection($this->parameters);
-        $connection->executeStatement('SET search_path TO ' . $this->schema);
+        $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         $this->extraConnections[] = $connection;
         return $connection;
     }

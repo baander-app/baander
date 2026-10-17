@@ -8,7 +8,7 @@ use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\Mapping as ORM;
 
 /**
- * Schema mapping for user_settings (Version20261007120000). Reads and writes belong to the
+ * Schema mapping for user_settings. Reads and writes belong to the
  * DBAL UserSettingRepository, never a managed-entity flush. The owner is a scalar user ID;
  * UserPreferenceForeignKeys declares its foreign key.
  */

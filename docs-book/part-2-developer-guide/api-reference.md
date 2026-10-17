@@ -265,8 +265,6 @@ DPoP: <proof>
 
 To register a passkey, an authenticated user calls `POST /api/auth/passkey/options` and passes the browser's credential to `POST /api/auth/passkey/register`. Registration options encode the user's public ID as the WebAuthn user handle. Authentication and account signals use the same public identity; there is no UUID-handle fallback.
 
-Existing passkeys enrolled with UUID user handles are invalidated by the identity migration and must be enrolled again. Account records, public IDs and passwords remain unchanged. Sign in with the account password, using password reset if needed, and register a replacement passkey. The old credential retained by the authenticator no longer authenticates.
-
 ### Refresh
 
 ```

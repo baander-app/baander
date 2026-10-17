@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Shared\Infrastructure\Doctrine\Platform\UnmanagedCustomIndex;
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\ORM\Tools\SchemaTool;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 /**
  * Index and constraint names follow docs-book/part-2-developer-guide/database-naming.md.
@@ -84,67 +82,6 @@ final class DatabaseNamingConventionTest extends TestCase
             (new SchemaTool($this->manager))->getUpdateSchemaSql($metadata),
             static fn (string $sql): bool => $sql !== 'DROP TABLE doctrine_migration_versions',
         )));
-    }
-
-    public function testRenameMigrationRoundTripChangesOnlyNames(): void
-    {
-        $latest = array_column($this->objects(), 'name');
-        // Later migrations dropped some of the renamed indexes and tables; restore them so the rename can be reversed.
-        $this->runMigration('Version20261009120000', 'down');
-        $this->runMigration('Version20261006360000', 'down');
-        $this->runMigration('Version20261006260000', 'down');
-        $this->runMigration('Version20261006240000', 'down');
-        $before = $this->objects();
-        $definitions = $this->definitions($before);
-
-        $this->runMigration('Version20261006230000', 'down');
-        $restored = $this->objects();
-        self::assertSame($definitions, $this->definitions($restored));
-        $restoredNames = array_column($restored, 'name');
-        foreach (['_fkpush_subscriptions_user_id', 'fk_57514dd4613fecdf', 'library_file_path_unique', 'idx_35d5e9c7a76ed395', 'users_email_unique'] as $legacy) {
-            self::assertContains($legacy, $restoredNames);
-        }
-
-        $this->runMigration('Version20261006230000', 'up');
-        $after = $this->objects();
-        self::assertSame($definitions, $this->definitions($after));
-        self::assertSame(array_column($before, 'name'), array_column($after, 'name'));
-
-        $this->runMigration('Version20261006240000', 'up');
-        $this->runMigration('Version20261006260000', 'up');
-        $this->runMigration('Version20261006360000', 'up');
-        $this->runMigration('Version20261009120000', 'up');
-        self::assertSame($latest, array_column($this->objects(), 'name'));
-    }
-
-    private function runMigration(string $version, string $direction): void
-    {
-        require_once dirname(__DIR__, 2) . '/migrations/' . $version . '.php';
-        $class = 'DoctrineMigrations\\' . $version;
-        $connection = $this->manager->getConnection();
-        $migration = new $class($connection, new NullLogger());
-        $migration->{$direction}(new Schema());
-        foreach ($migration->getSql() as $query) {
-            $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-        }
-    }
-
-    /**
-     * Definitions without names, so a rename leaves them unchanged.
-     *
-     * @param list<array{name: string, table: string, definition: string}> $objects
-     *
-     * @return list<string>
-     */
-    private function definitions(array $objects): array
-    {
-        $definitions = array_map(
-            static fn (array $object): string => $object['table'] . ': ' . str_replace(' ' . $object['name'] . ' ON ', ' ON ', $object['definition']),
-            $objects,
-        );
-        sort($definitions);
-
-        return $definitions;
     }
 
     /**

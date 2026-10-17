@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
+require_once dirname(__DIR__) . '/Support/FinalSchemaBootstrap.php';
 require_once __DIR__ . '/Messaging/MessageCodecFactory.php';
 (new Symfony\Component\Dotenv\Dotenv())->bootEnv(dirname(__DIR__, 2) . '/.env');
 
@@ -49,19 +50,7 @@ $em = $kernel->getContainer()->get('doctrine')->getManager();
 $db = $em->getConnection();
 
 if ($mode === 'prepare') {
-    (new Doctrine\ORM\Tools\SchemaTool($em))->createSchema([$em->getClassMetadata(App\Shared\Infrastructure\Doctrine\Entity\JobMonitorEntity::class)]);
-    $db->executeStatement('CREATE TABLE domain_event_outbox (
-        id BIGSERIAL PRIMARY KEY, event_class TEXT NOT NULL, event_name TEXT NOT NULL,
-        payload JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL, relayed_at TIMESTAMPTZ,
-        attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at TIMESTAMPTZ, dead_lettered_at TIMESTAMPTZ,
-        lease_token TEXT, lease_until TIMESTAMPTZ
-    )');
-    require_once dirname(__DIR__, 2) . '/migrations/Version20261002120000.php';
-    $migration = new DoctrineMigrations\Version20261002120000($db, new Psr\Log\NullLogger());
-    $migration->up(new Doctrine\DBAL\Schema\Schema());
-    foreach ($migration->getSql() as $query) {
-        $db->executeStatement($query->getStatement());
-    }
+    App\Tests\Support\FinalSchemaBootstrap::bootstrap($db);
 } elseif ($mode === 'hold-lock') {
     $db->beginTransaction();
     try {

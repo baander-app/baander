@@ -20,13 +20,10 @@ use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Tests\Fixtures\Library\LibraryScanClaimRace;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\DriverException;
-use Doctrine\DBAL\Schema\Schema;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
-use DoctrineMigrations\Version20261010100000;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 
 /**
  * A scan or a delete with files claims its library with one statement and holds it as a lease.
@@ -416,61 +413,6 @@ final class LibraryScanClaimTest extends TestCase
             );
         } finally {
             $connection->rollBack();
-        }
-    }
-
-    /** The migration keeps a scan claim held when it runs, and going back drops only delete claims. */
-    public function testTheMigrationKindsHeldClaimsAsScansAndItsReversalDropsDeleteClaims(): void
-    {
-        $this->kernel = new Kernel('test', false);
-        $this->kernel->boot();
-        $manager = $this->kernel->getContainer()->get('test.service_container')->get('doctrine')->getManager();
-        self::assertInstanceOf(EntityManagerInterface::class, $manager);
-        $connection = $manager->getConnection();
-
-        $connection->beginTransaction();
-        try {
-            $scanned = $this->insertLibrary($connection);
-            $deleting = $this->insertLibrary($connection);
-            $scanClaim = (new Uuid())->toString();
-            $connection->executeStatement(
-                "UPDATE libraries SET scan_status = 'scanning', claim_id = ?, claim_kind = 'scan', claim_expires_at = now() + interval '1 minute' WHERE id = ?",
-                [$scanClaim, $scanned],
-            );
-            $connection->executeStatement(
-                "UPDATE libraries SET scan_status = 'completed', claim_id = gen_random_uuid(), claim_kind = 'delete', claim_expires_at = now() WHERE id = ?",
-                [$deleting],
-            );
-
-            $this->runMigration($connection, 'down');
-            self::assertSame(
-                [['id' => $scanned, 'scan_status' => 'scanning', 'scan_claim_id' => $scanClaim], ['id' => $deleting, 'scan_status' => 'completed', 'scan_claim_id' => null]],
-                $connection->fetchAllAssociative(
-                    'SELECT id, scan_status, scan_claim_id FROM libraries WHERE id IN (?, ?) ORDER BY id = ? DESC',
-                    [$scanned, $deleting, $scanned],
-                ),
-            );
-
-            $this->runMigration($connection, 'up');
-            self::assertSame(
-                [['claim_id' => $scanClaim, 'claim_kind' => 'scan'], ['claim_id' => null, 'claim_kind' => null]],
-                $connection->fetchAllAssociative(
-                    'SELECT claim_id, claim_kind FROM libraries WHERE id IN (?, ?) ORDER BY id = ? DESC',
-                    [$scanned, $deleting, $scanned],
-                ),
-            );
-        } finally {
-            $connection->rollBack();
-        }
-    }
-
-    private function runMigration(Connection $connection, string $direction): void
-    {
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261010100000.php';
-        $migration = new Version20261010100000($connection, new NullLogger());
-        $migration->{$direction}(new Schema());
-        foreach ($migration->getSql() as $query) {
-            $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
         }
     }
 

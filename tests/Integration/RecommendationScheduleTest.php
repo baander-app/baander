@@ -17,16 +17,14 @@ use App\Scheduler\Domain\ValueObject\JobType;
 use App\Shared\Application\Port\SystemSettingStoreInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use Doctrine\DBAL\Schema\Schema;
-use DoctrineMigrations\Version20261007130000;
+use DoctrineMigrations\Version20261017000000;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\NullLogger;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 
 /**
- * The daily recommendation generation seeded by Version20261007130000, run through the
+ * The daily recommendation schedule runs through the
  * scheduler's occurrence path on the fully migrated disposable PostgreSQL inside one
  * rolled-back transaction.
  */
@@ -41,7 +39,7 @@ final class RecommendationScheduleTest extends TestCase
             'name' => 'Generate recommendations',
             'expression' => '0 4 * * *',
             'job_type' => 'messenger',
-            'command' => Version20261007130000::GENERATION_COMMAND,
+            'command' => Version20261017000000::GENERATION_COMMAND,
             'status' => 'active',
             'parameters' => '{"mode":"incremental","automatic":true}',
             'evaluated_through' => null,
@@ -50,26 +48,22 @@ final class RecommendationScheduleTest extends TestCase
 
         $registry = $this->kernel->getContainer()->get('test.service_container')->get(SchedulerRegistry::class);
         self::assertInstanceOf(SchedulerRegistry::class, $registry);
-        self::assertTrue($registry->isMessengerCommandAllowed(Version20261007130000::GENERATION_COMMAND));
+        self::assertTrue($registry->isMessengerCommandAllowed(Version20261017000000::GENERATION_COMMAND));
         self::assertSame(
             ['mode' => 'string', 'automatic' => 'bool'],
             array_map(
                 static fn (array $definition): string => $definition['type'],
-                $registry->getMessengerParameterSchema(Version20261007130000::GENERATION_COMMAND),
+                $registry->getMessengerParameterSchema(Version20261017000000::GENERATION_COMMAND),
             ),
         );
 
-        $this->runMigration('down');
-        self::assertFalse($this->scheduledGeneration());
-        $this->runMigration('up');
-        self::assertIsArray($this->scheduledGeneration());
         $publicId = $this->manager->getConnection()->fetchOne(
             'SELECT public_id FROM scheduled_jobs WHERE id = ?',
-            [Version20261007130000::GENERATION_JOB_ID],
+            [Version20261017000000::GENERATION_JOB_ID],
         );
         self::assertIsString($publicId);
         self::assertSame($publicId, PublicId::fromString($publicId)->toString());
-        self::assertNotSame(Version20261007130000::GENERATION_JOB_ID, $publicId);
+        self::assertNotSame(Version20261017000000::GENERATION_JOB_ID, $publicId);
     }
 
     public function testScheduledOccurrenceGeneratesWhileTheToggleIsOn(): void
@@ -133,7 +127,7 @@ final class RecommendationScheduleTest extends TestCase
         self::assertInstanceOf(ScheduledJobPortInterface::class, $jobs);
         self::assertInstanceOf(ExecuteScheduledJobHandler::class, $handler);
 
-        $job = $jobs->getById(Uuid::fromString(Version20261007130000::GENERATION_JOB_ID));
+        $job = $jobs->getById(Uuid::fromString(Version20261017000000::GENERATION_JOB_ID));
         self::assertNotNull($job);
         $handler->executeOccurrence(new SchedulerOccurrence(
             Uuid::generate(),
@@ -161,7 +155,7 @@ final class RecommendationScheduleTest extends TestCase
         self::loadMigration();
         $result = $this->manager->getConnection()->fetchOne(
             'SELECT last_result FROM scheduled_jobs WHERE id = ?',
-            [Version20261007130000::GENERATION_JOB_ID],
+            [Version20261017000000::GENERATION_JOB_ID],
         );
 
         return $result === null ? null : (string) $result;
@@ -177,32 +171,13 @@ final class RecommendationScheduleTest extends TestCase
                            AND to_char(next_run_at AT TIME ZONE 'UTC', 'HH24:MI:SS') = '04:00:00' AS next_run_is_a_0400_utc
                 FROM scheduled_jobs WHERE id = ?
                 SQL,
-            [Version20261007130000::GENERATION_JOB_ID],
+            [Version20261017000000::GENERATION_JOB_ID],
         );
     }
 
     /** Migration classes are not autoloaded. */
     private static function loadMigration(): void
     {
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261007130000.php';
-    }
-
-    private function runMigration(string $direction): void
-    {
-        self::loadMigration();
-        $connection = $this->manager->getConnection();
-        $migration = new Version20261007130000($connection, new NullLogger());
-        $migration->{$direction}(new Schema());
-        foreach ($migration->getSql() as $query) {
-            $sql = $query->getStatement();
-            $parameters = $query->getParameters();
-            if ($direction === 'up') {
-                // Replay this historical seed against the current schema, where identity has no default.
-                $sql = str_replace('scheduled_jobs (id,', 'scheduled_jobs (public_id, id,', $sql);
-                $sql = str_replace('VALUES (:id,', 'VALUES (:public_id, :id,', $sql);
-                $parameters['public_id'] = (new PublicId())->toString();
-            }
-            $connection->executeStatement($sql, $parameters, $query->getTypes());
-        }
+        require_once dirname(__DIR__, 2) . '/migrations/Version20261017000000.php';
     }
 }

@@ -30,9 +30,44 @@ git log --oneline <current-tag>..HEAD
 
 If you only need to migrate the main database (for example, on a production server without a test database), use `make migrate-no-test` instead.
 
-`Version20261010180000` converts every timestamp column to microsecond `timestamptz`, which changes column types on busy tables, so it sets a 5-second lock timeout. If a running request or job holds one of those tables, the migration fails with a lock timeout and applies nothing, rather than stalling every query queued behind it. Run `make migrate` again with the web server and the worker stopped or idle.
+Fresh databases start with the single transactional migration
+`Version20261017000000`. It creates the current schema, including microsecond
+`timestamptz` columns, and cannot be downgraded. Future migrations run in timestamp
+order. An already initialized database supports repeat migration runs and future
+incremental migrations.
 
-`make migrate` refuses to run when the database records executed migrations that the `migrations/` directory does not have, such as a database migrated under former migration class names. Doctrine would otherwise rerun migrations already applied under the old names. Reconcile the recorded history with `php bin/console doctrine:migrations:version` first, or reset a database whose data you do not need.
+While the initial migration is pending, Doctrine refuses a target containing user
+tables, views, sequences, types or routines. A table counts even without rows.
+System objects, extension-owned objects and an empty Doctrine migration metadata
+table are excluded. The refusal identifies the database without printing
+credentials and occurs before application DDL. Non-interactive execution and
+Doctrine's ordinary migration confirmation do not bypass this check.
+
+Executed migrations absent from `migrations/`, including the former migration
+chain, also cause refusal. Do not mark the new initial migration as executed or
+edit migration metadata to bypass either guard.
+
+### Manual reset of an existing database
+
+The consolidated migration provides no automatic upgrade from the former chain.
+Resetting an existing database requires its owner's explicit approval for that
+specific target and a separate manual operation outside Doctrine migrations.
+
+1. **Identify the target and obtain approval.** Confirm the database and server
+   without exposing connection credentials. Agree which data must be exported or
+   backed up before the owner approves deleting that database.
+2. **Stop its writers.** Record which application services are running and stop
+   the processes that can write to the approved target.
+3. **Recreate only the approved database manually.** Preserve its database creation
+   settings. Leave other databases, PostgreSQL volumes, Redis, registry storage
+   and media files untouched. Do not use `make drop-migrate`: it drops both the
+   main and test databases.
+4. **Initialize and verify.** Run Doctrine migrations against that empty target,
+   then run them again and verify there is no pending work. For the configured
+   main database alone, use `make migrate-no-test` on both runs.
+5. **Restore service state.** Restart the services recorded in step 2 and complete
+   the [initial setup](getting-started.md#initial-setup) required by the empty
+   application database.
 
 ## When to Rebuild Docker Images
 
@@ -149,7 +184,12 @@ To revert to a previous version:
    make composer-install
    ```
 
-Database migrations are forward-only. If the newer version added migrations, those tables or columns will still exist in your database. Doctrine will ignore them, but they take up space. If you need a clean rollback, inspect the migration files from the newer version and write manual `ALTER TABLE` statements to drop or revert the changes. Always back up your database before running manual schema changes.
+Changing the code does not revert the database schema. The initial migration is
+irreversible, and older code with the former migration chain cannot migrate a
+database initialized by it. Restore a backup compatible with the selected code
+when a database rollback is required. Any replacement of an existing database
+requires its owner's explicit approval for that target; preserve the backup and
+follow the [manual reset precautions](#manual-reset-of-an-existing-database).
 
 ## Tracking Changes
 

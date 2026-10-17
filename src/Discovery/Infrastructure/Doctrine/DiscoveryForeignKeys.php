@@ -7,7 +7,7 @@ namespace App\Discovery\Infrastructure\Doctrine;
 use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclaration;
 use App\Shared\Infrastructure\Doctrine\EventListener\ForeignKeyDeclarationProviderInterface;
 
-/** Constraint from Version20261006280000 on the pairing session server, mapped as a scalar ID. */
+/** Constraint on the pairing session server, mapped as a scalar ID. */
 final class DiscoveryForeignKeys implements ForeignKeyDeclarationProviderInterface
 {
     public function foreignKeys(): iterable

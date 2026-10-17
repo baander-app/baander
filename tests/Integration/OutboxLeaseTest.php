@@ -31,19 +31,9 @@ final class OutboxLeaseTest extends TestCase
         $this->schema = 'outbox_test_' . bin2hex(random_bytes(8));
         $this->first->executeStatement('CREATE SCHEMA ' . $this->schema);
         foreach ([$this->first, $this->second] as $connection) {
-            $connection->executeStatement('SET search_path TO ' . $this->schema);
+            $connection->executeStatement('SET search_path TO ' . $this->schema . ', public');
         }
-        $this->first->executeStatement('CREATE TABLE domain_event_outbox (
-            id BIGSERIAL PRIMARY KEY, event_class TEXT NOT NULL, event_name TEXT NOT NULL,
-            payload JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL, relayed_at TIMESTAMPTZ,
-            attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at TIMESTAMPTZ, dead_lettered_at TIMESTAMPTZ
-        )');
-        require_once dirname(__DIR__, 2) . '/migrations/Version20261001171000.php';
-        $migration = new \DoctrineMigrations\Version20261001171000($this->first, new \Psr\Log\NullLogger());
-        $migration->up(new \Doctrine\DBAL\Schema\Schema());
-        foreach ($migration->getSql() as $query) {
-            $this->first->executeStatement($query->getStatement());
-        }
+        \App\Tests\Support\FinalSchemaBootstrap::bootstrap($this->first);
     }
 
     protected function tearDown(): void

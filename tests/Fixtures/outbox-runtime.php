@@ -4,15 +4,11 @@ declare(strict_types=1);
 
 use App\Auth\Domain\Event\UserRegistered;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
-use App\Notification\Infrastructure\Doctrine\Entity\NotificationEntity;
 use App\Shared\Domain\Model\Email;
 use App\Shared\Domain\Model\PublicId;
-use App\Shared\Infrastructure\Doctrine\Entity\JobMonitorEntity;
-use Doctrine\DBAL\Schema\Schema;
-use Doctrine\ORM\Tools\SchemaTool;
-use Psr\Log\NullLogger;
 
 require dirname(__DIR__, 2) . '/vendor/autoload.php';
+require_once dirname(__DIR__) . '/Support/FinalSchemaBootstrap.php';
 (new Symfony\Component\Dotenv\Dotenv())->bootEnv(dirname(__DIR__, 2) . '/.env');
 
 $kernel = new App\Kernel('prod', false);
@@ -29,22 +25,7 @@ $assertCount = static function (string $sql, int $expected) use ($db): void {
 };
 
 if ($mode === 'prepare') {
-    $db->executeStatement('CREATE EXTENSION IF NOT EXISTS citext');
-    (new SchemaTool($em))->createSchema(array_map($em->getClassMetadata(...), [
-        UserEntity::class, NotificationEntity::class, JobMonitorEntity::class,
-    ]));
-    $db->executeStatement('CREATE TABLE domain_event_outbox (
-        id BIGSERIAL PRIMARY KEY, event_class TEXT NOT NULL, event_name TEXT NOT NULL,
-        payload JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL, relayed_at TIMESTAMPTZ,
-        attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at TIMESTAMPTZ, dead_lettered_at TIMESTAMPTZ,
-        lease_token TEXT, lease_until TIMESTAMPTZ
-    )');
-    require_once dirname(__DIR__, 2) . '/migrations/Version20261002120000.php';
-    $migration = new DoctrineMigrations\Version20261002120000($db, new NullLogger());
-    $migration->up(new Schema());
-    foreach ($migration->getSql() as $query) {
-        $db->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
-    }
+    App\Tests\Support\FinalSchemaBootstrap::bootstrap($db);
 
     $user = new UserEntity(new PublicId(), 'Outbox User', 'outbox-user@baander.app', 'unused-password', '');
     $user->markEmailAsVerified();
