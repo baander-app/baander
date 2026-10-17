@@ -117,6 +117,20 @@ public, then pins an approved address while preserving TLS hostname verification
 It has no LAN exception. Webhooks and operator-configured lyrics retain separate
 policies.
 
+## Media execution
+
+### Transcode execution generation
+
+The identity of one admitted encoding attempt and its output directory. A seek or
+restarted attempt advances the generation so stale output cannot be delivered as
+current output. This identity is distinct from a worker deployment's boot generation.
+
+### Transcode control revision
+
+The monotonically increasing order of committed desired-state changes for a video
+job. The worker applies the latest revision, preserving paused state across a seek
+and treating cancellation as terminal.
+
 ## Backend verification
 
 ### Test lane
