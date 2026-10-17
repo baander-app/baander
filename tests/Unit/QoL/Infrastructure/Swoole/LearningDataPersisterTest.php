@@ -45,10 +45,11 @@ final class LearningDataPersisterTest extends TestCase
         $persister->persist();
 
         $saved = json_decode((string) file_get_contents($this->directory . '/governor_state.json'), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame(['encoder_profile', 'governor'], array_keys($saved));
+        self::assertSame(['encoder_profile', 'revision', 'governor'], array_keys($saved));
+        self::assertIsString($saved['revision']);
         self::assertSame(['state', 'model'], array_keys($saved['governor']));
         self::assertSame($saved, $persister->load());
-        self::assertSame(['governor_state.json'], array_map('basename', glob($this->directory . '/*') ?: []));
+        self::assertSame(['governor_state.json', 'governor_state.lock'], array_map('basename', glob($this->directory . '/*') ?: []));
     }
 
     private function persister(StreamGovernor $governor): LearningDataPersister

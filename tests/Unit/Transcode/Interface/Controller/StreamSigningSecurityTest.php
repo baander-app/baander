@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Transcode\Interface\Controller;
 
 use App\Catalog\Domain\Model\Video;
+use App\Shared\Domain\Model\PublicId;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
 use App\Transcode\Application\Port\PlaybackPortInterface;
 use App\Transcode\Application\Port\StreamAuthPortInterface;
@@ -65,8 +66,9 @@ final class StreamSigningSecurityTest extends TestCase
         $path = '/api/transcode/'.$video->getPublicId().'/master.m3u8';
         $playback = $this->createMock(PlaybackPortInterface::class);
         $playback->expects($this->once())->method('start')->with($this->equalTo($id));
+        $playback->method('findSessions')->willReturn(['0123456789abABCD_-xyz' => new PublicId()]);
         $auth = $this->createMock(StreamAuthPortInterface::class);
-        $auth->expects($this->once())->method('signUrl')->with($path.'?generation=3&job=0123456789abABCD_-xyz', 86400)
+        $auth->expects($this->once())->method('signUrl')->with($path.'?set=0123456789abABCD_-xyz.3', 86400)
             ->willReturn(['url' => $path.'?sig=s&exp=1', 'sig' => 's', 'exp' => 1]);
         $controller = new StreamSigningController($auth, $playback, $this->videos($video), $this->streaming());
         self::assertSame(200, $controller->sign(Request::create('/', 'POST', content: json_encode(['path' => $path], JSON_THROW_ON_ERROR)))->getStatusCode());
@@ -77,6 +79,7 @@ final class StreamSigningSecurityTest extends TestCase
         $playback = $this->createMock(PlaybackPortInterface::class);
         $playback->expects($this->never())->method('start');
         $playback->expects($this->once())->method('assertAccess')->with($video->getId());
+        $playback->method('findSessions')->willReturn(['0123456789abABCD_-xyz' => new PublicId()]);
         $auth = $this->createStub(StreamAuthPortInterface::class);
         $auth->method('signUrl')->willReturn(['url' => '/signed', 'sig' => 's', 'exp' => 1]);
         $controller = new StreamSigningController($auth, $playback, $this->videos($video), $this->streaming());
@@ -87,10 +90,24 @@ final class StreamSigningSecurityTest extends TestCase
         self::assertSame('paused', $body['status']);
     }
 
+    public function testMissingOwnedAttachmentDoesNotReadOrReturnAnyRuntimeState(): void
+    {
+        $video = Video::create('/video.mp4', 'hash');
+        $streaming = $this->createMock(TranscodeStreamingPortInterface::class);
+        $streaming->expects(self::never())->method('getPlaybackState');
+        $playback = $this->createStub(PlaybackPortInterface::class);
+        $playback->method('findSessions')->willReturn([]);
+        $controller = new StreamSigningController($this->createStub(StreamAuthPortInterface::class), $playback, $this->videos($video), $streaming);
+        $response = $controller->sign(Request::create('/', 'POST', content: json_encode(['path' => '/api/transcode/'.$video->getPublicId().'/master.m3u8', 'refresh' => true], JSON_THROW_ON_ERROR)));
+        self::assertSame(503, $response->getStatusCode());
+        $body = json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        foreach (['position', 'status', 'sessionId', 'jobId'] as $field) { self::assertArrayNotHasKey($field, $body); }
+    }
+
     private function streaming(): TranscodeStreamingPortInterface
     {
         $streaming = $this->createStub(TranscodeStreamingPortInterface::class);
-        $streaming->method('getPlaybackState')->willReturn(['generation' => 3, 'jobId' => '0123456789abABCD_-xyz', 'sessionId' => 'session', 'revision' => 5, 'ready' => true, 'status' => 'paused', 'position' => 24.0]);
+        $streaming->method('getPlaybackState')->willReturn(['generation' => 3, 'jobId' => '0123456789abABCD_-xyz', 'sessionId' => 'session', 'revision' => 5, 'ready' => true, 'status' => 'paused', 'position' => 24.0, 'startTime' => 0.0, 'duration' => 100.0, 'renditionSet' => '0123456789abABCD_-xyz.3']);
         return $streaming;
     }
 

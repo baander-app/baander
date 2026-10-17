@@ -282,7 +282,7 @@ final class TranscodeSessionController
                     properties: [
                         new OA\Property(property: 'position', type: 'number', format: 'float'),
                         new OA\Property(property: 'action', type: 'string', enum: ['seek', 'pause', 'resume', 'progress']),
-                        new OA\Property(property: 'generation', type: 'integer', minimum: 1, description: 'Required for progress; generation currently attached by the player'),
+                        new OA\Property(property: 'generation', type: 'integer', minimum: 1, description: 'Required for progress; optional for seek to fence native events to the attached generation'),
                         new OA\Property(property: 'revision', type: 'integer', minimum: 1, description: 'Required for progress; desired revision currently attached by the player'),
                     ],
                 ),
@@ -315,6 +315,9 @@ final class TranscodeSessionController
             || !in_array($action, ['seek', 'pause', 'resume', 'progress'], true)) {
             return $this->errorResponse('Position must be a nonnegative number and action must be seek, pause, resume, or progress.', 422);
         }
+        if ($action === 'seek' && array_key_exists('generation', $payload) && (!is_int($generation) || $generation < 1)) {
+            return $this->errorResponse('Seek generation must be a positive integer when provided.', 422);
+        }
         if ($action === 'progress' && (!is_int($generation) || $generation < 1 || !is_int($revision) || $revision < 1)) {
             return $this->errorResponse('Progress requires the current positive generation and revision.', 422);
         }
@@ -324,7 +327,7 @@ final class TranscodeSessionController
             sessionId: $sessionId,
             position: $position,
             action: $action,
-            expectedGeneration: $action === 'progress' ? $generation : null,
+            expectedGeneration: in_array($action, ['seek', 'progress'], true) ? $generation : null,
             expectedRevision: $action === 'progress' ? $revision : null,
         ));
 

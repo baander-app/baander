@@ -11,8 +11,9 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity]
 #[ORM\Table(name: 'transcode_jobs')]
 #[ORM\UniqueConstraint(name: 'uniq_transcode_jobs_public_id', columns: ['public_id'])]
-#[ORM\UniqueConstraint(name: 'uniq_transcode_jobs_video_id_quality_tier_name', columns: ['video_id', 'quality_tier_name'])]
+#[ORM\UniqueConstraint(name: 'uniq_transcode_jobs_owner_user_id_video_id_quality_tier_name', columns: ['owner_user_id', 'video_id', 'quality_tier_name'])]
 #[ORM\Index(name: 'idx_transcode_jobs_status', columns: ['status'])]
+#[ORM\Index(name: 'idx_transcode_jobs_video_id', columns: ['video_id'])]
 class TranscodeJobEntity
 {
     #[ORM\Id]
@@ -25,6 +26,9 @@ class TranscodeJobEntity
 
     #[ORM\Column(type: 'uuid')]
     private Uuid $videoId;
+
+    #[ORM\Column(name: 'owner_user_id', type: 'uuid', nullable: true)]
+    private ?Uuid $ownerUserId;
 
     #[ORM\Column(type: 'text')]
     private string $qualityTierName;
@@ -111,12 +115,14 @@ class TranscodeJobEntity
         PublicId $publicId,
         Uuid $videoId,
         string $qualityTierName,
+        ?Uuid $ownerUserId,
         string $status = 'pending',
         ?Uuid $id = null,
     ) {
         $this->id = $id ?? new Uuid();
         $this->publicId = $publicId;
         $this->videoId = $videoId;
+        $this->ownerUserId = $ownerUserId;
         $this->qualityTierName = $qualityTierName;
         $this->status = $status;
         $this->referenceCount = 0;
@@ -143,6 +149,7 @@ class TranscodeJobEntity
 
     public function getId(): Uuid { return $this->id; }
     public function getPublicId(): PublicId { return $this->publicId; }
+    public function getOwnerUserId(): ?Uuid { return $this->ownerUserId; }
     public function getVideoId(): Uuid { return $this->videoId; }
     public function getQualityTierName(): string { return $this->qualityTierName; }
     public function getStatus(): string { return $this->status; }

@@ -50,8 +50,7 @@ final class QoLWorkerStartupSubscriberTest extends TestCase
     protected function tearDown(): void
     {
         Timer::clearAll();
-        $file = $this->directory . '/governor_state.json';
-        if (is_file($file)) {
+        foreach (glob($this->directory . '/*') ?: [] as $file) {
             unlink($file);
         }
         rmdir($this->directory);

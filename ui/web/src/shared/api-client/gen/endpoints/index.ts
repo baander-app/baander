@@ -7044,10 +7044,9 @@ export type GetDebugWorkers200 = { [key: string]: unknown };
 
 export type GetStreamMasterManifestParams = {
 /**
- * Pinned media execution generation
- * @minimum 1
+ * Canonical signed set of admitted job and generation pairs
  */
-generation: number;
+set: string;
 };
 
 export type GetStreamMediaManifestParams = {
@@ -7060,10 +7059,9 @@ generation: number;
 
 export type GetStreamDashManifestParams = {
 /**
- * Pinned media execution generation
- * @minimum 1
+ * Canonical signed set of admitted job and generation pairs
  */
-generation: number;
+set: string;
 };
 
 export type GetStreamQualityLadder200DataItem = {
@@ -7148,7 +7146,8 @@ export type PostStreamSigningSignBody = {
 };
 
 export type PostStreamSigningSign200 = {
-  url?: string;
+  /** @nullable */
+  url?: string | null;
   sig?: string;
   exp?: number;
   generation?: number;
@@ -7163,6 +7162,7 @@ export type PostStreamSigningSign200 = {
   startTime?: number | null;
   /** @nullable */
   duration?: number | null;
+  renditionSet?: string;
 };
 
 export type GetTranscodeJobIndex200DataItem = {
@@ -7305,7 +7305,7 @@ export type PostTranscodeSessionPositionBody = {
   position?: number;
   action?: PostTranscodeSessionPositionBodyAction;
   /**
-     * Required for progress; generation currently attached by the player
+     * Required for progress; optional for seek to fence native events to the attached generation
      * @minimum 1
      */
   generation?: number;

@@ -36,14 +36,14 @@ final class MidStreamMonitor
     }
 
     /**
-     * Start monitoring. Must be called from worker 0's onWorkerStarted.
+     * Start monitoring in the process that owns stream execution.
      */
     public function startMonitoring(): void
     {
         if ($this->timerId !== null) {
             return;
         }
-        $this->logger->info('MidStreamMonitor starting on worker 0');
+        $this->logger->info('MidStreamMonitor starting in the execution process');
 
         $timerId = Timer::tick(self::CHECK_INTERVAL_MS, function (): void {
             $this->check();

@@ -18405,13 +18405,12 @@
                 "operationId": "get_stream_master_manifest",
                 "parameters": [
                     {
-                        "name": "generation",
+                        "name": "set",
                         "in": "query",
-                        "description": "Pinned media execution generation",
+                        "description": "Canonical signed set of admitted job and generation pairs",
                         "required": true,
                         "schema": {
-                            "type": "integer",
-                            "minimum": 1
+                            "type": "string"
                         }
                     },
                     {
@@ -18484,13 +18483,12 @@
                 "operationId": "get_stream_dash_manifest",
                 "parameters": [
                     {
-                        "name": "generation",
+                        "name": "set",
                         "in": "query",
-                        "description": "Pinned media execution generation",
+                        "description": "Canonical signed set of admitted job and generation pairs",
                         "required": true,
                         "schema": {
-                            "type": "integer",
-                            "minimum": 1
+                            "type": "string"
                         }
                     },
                     {
@@ -18933,7 +18931,8 @@
                                 "schema": {
                                     "properties": {
                                         "url": {
-                                            "type": "string"
+                                            "type": "string",
+                                            "nullable": true
                                         },
                                         "sig": {
                                             "type": "string"
@@ -18970,6 +18969,9 @@
                                         "duration": {
                                             "type": "number",
                                             "nullable": true
+                                        },
+                                        "renditionSet": {
+                                            "type": "string"
                                         }
                                     },
                                     "type": "object"
@@ -19649,7 +19651,7 @@
                                         ]
                                     },
                                     "generation": {
-                                        "description": "Required for progress; generation currently attached by the player",
+                                        "description": "Required for progress; optional for seek to fence native events to the attached generation",
                                         "type": "integer",
                                         "minimum": 1
                                     },

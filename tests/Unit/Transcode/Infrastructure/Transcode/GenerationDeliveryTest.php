@@ -34,8 +34,8 @@ final class GenerationDeliveryTest extends TestCase
     protected function setUp(): void
     {
         $this->root = sys_get_temp_dir().'/baander-generation-'.bin2hex(random_bytes(6));
-        $this->job = TranscodeJob::create(Uuid::generate(), QualityTier::p720(), $this->root);
-        $this->directory = $this->root.'/'.$this->job->getVideoId().'/720p/generation-3';
+        $this->job = TranscodeJob::create(Uuid::generate(), QualityTier::p720(), $this->root, Uuid::generate());
+        $this->directory = $this->root.'/'.$this->job->getVideoId().'/720p/job-'.$this->job->getId().'/generation-3';
         mkdir($this->directory, 0700, true);
         file_put_contents($this->directory.'/generation.json', json_encode([
             'schemaVersion' => 1, 'generation' => 3, 'videoCodec' => 'h264', 'videoEncoder' => 'libx264',
@@ -68,7 +68,7 @@ final class GenerationDeliveryTest extends TestCase
 
     public function testManifestsPinGenerationBeforeSigningAndUsePublishedEncoder(): void
     {
-        $master = $this->service->getMasterManifest($this->job->getVideoId(), 3);
+        $master = $this->service->getMasterManifest($this->job->getVideoId(), [['jobId' => $this->job->getPublicId()->toString(), 'generation' => 3]]);
         self::assertStringContainsString('avc1.', $master);
         self::assertStringNotContainsString('hvc1.', $master);
         self::assertStringContainsString('generation=3', $master);
@@ -141,7 +141,7 @@ final class GenerationDeliveryTest extends TestCase
         self::assertStringNotContainsString('segment?index=0&', $manifest);
         self::assertStringContainsString('segment?index=27&', $manifest);
         self::assertNull($this->service->getSegmentPath($this->job->getPublicId(), 0, 3));
-        $state = $this->service->getPlaybackState($this->job->getVideoId());
+        $state = $this->service->getPlaybackState($this->job->getVideoId(), [$this->job->getPublicId()->toString()]);
         self::assertSame(162.0, $state['startTime']);
         self::assertSame(600.0, $state['duration']);
     }

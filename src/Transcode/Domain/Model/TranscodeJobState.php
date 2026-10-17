@@ -43,6 +43,7 @@ final class TranscodeJobState
         public array $audioTrackLanguages = [],
         /** @var array<string, array{path: string, size: int, duration: float}> Audio segment map keyed by "{language}:{index}" */
         public array $audioSegmentMap = [],
+        public readonly ?Uuid $ownerUserId = null,
     ) {
     }
 }

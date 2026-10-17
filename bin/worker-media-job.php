@@ -38,6 +38,8 @@ try {
     ) {
         throw new RuntimeException('Media job requires inherited kernel configuration.');
     }
+    // Cap the file-I/O thread fallback before the helper forks or a reactor starts.
+    swoole_async_set(['aio_core_worker_num' => 1, 'aio_worker_num' => 1]);
     if ($kind === 'video') {
         // Fork the one helper before opening any kernel, Doctrine or Redis connection.
         $pool = new \App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool(
@@ -107,8 +109,17 @@ try {
                 if (!$executor instanceof \App\Transcode\Application\Port\TranscodeLoopStarterInterface) {
                     throw new RuntimeException('Media video executor is not configured.');
                 }
-                \Swoole\Coroutine\run(static function () use ($executor, $claim, $stopRequested): void {
-                    $executor->run($claim, $stopRequested);
+                $qol = $container->get('worker.media.qol_lifecycle');
+                if (!$qol instanceof \App\QoL\Infrastructure\Worker\WorkerQoLLifecycle) {
+                    throw new RuntimeException('Media worker QoL lifecycle is not configured.');
+                }
+                \Swoole\Coroutine\run(static function () use ($executor, $claim, $stopRequested, $qol): void {
+                    $qol->start();
+                    try {
+                        $executor->run($claim, $stopRequested);
+                    } finally {
+                        $qol->stop();
+                    }
                 });
             }
         } else {

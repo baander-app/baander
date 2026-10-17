@@ -214,6 +214,8 @@ RUN set -xe && \
 
 # Match the exact native API required by Composer and the Swoole bundle stubs.
 # Install Swoole from source with custom flags.
+# Keep the async thread file backend: io_uring requires syscalls denied by the
+# deployment container's default seccomp profile and has no runtime fallback.
 # --mount=type=cache persists pie's download and build cache.
 RUN --mount=type=cache,target=/root/.cache/pie \
     set -xe && \
@@ -224,7 +226,6 @@ RUN --mount=type=cache,target=/root/.cache/pie \
         --enable-cares \
         --enable-swoole-pgsql \
         --enable-swoole-sqlite \
-        --enable-iouring \
         --enable-zstd && \
     # Ensure extension= directive exists — pie generates it but keep as safety net
     { grep -q 'extension=swoole' /usr/local/etc/php/conf.d/docker-php-ext-swoole.ini || \

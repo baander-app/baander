@@ -9,10 +9,14 @@ use App\Shared\Domain\Model\Uuid;
 
 interface TranscodeStreamingPortInterface
 {
-    /** @return array{jobId: string, generation: int, revision: int, ready: bool, position: float, status: string, startTime: ?float, duration: ?float}|null */
-    public function getPlaybackState(Uuid $videoId, ?string $jobPublicId = null): ?array;
+    /**
+     * @param list<string> $allowedJobPublicIds
+     * @return array{jobId: string, generation: int, revision: int, ready: bool, position: float, status: string, startTime: ?float, duration: ?float, renditionSet: string}|null
+     */
+    public function getPlaybackState(Uuid $videoId, array $allowedJobPublicIds): ?array;
 
-    public function getMasterManifest(Uuid $videoId, int $generation, ?string $jobPublicId = null): string;
+    /** @param list<array{jobId: string, generation: int}> $renditions */
+    public function getMasterManifest(Uuid $videoId, array $renditions): string;
 
     public function getMediaManifest(PublicId $jobPublicId, string $audioProfileName, int $generation): string;
 
@@ -35,12 +39,14 @@ interface TranscodeStreamingPortInterface
 
     public function getInitSegmentPath(PublicId $jobPublicId, int $generation): ?string;
 
-    public function getDashManifest(Uuid $videoId, int $generation, ?string $jobPublicId = null): string;
+    /** @param list<array{jobId: string, generation: int}> $renditions */
+    public function getDashManifest(Uuid $videoId, array $renditions): string;
 
     /**
+     * @param list<string> $allowedJobPublicIds
      * @return list<array{name: string, height: int, width: int, bitrate: int, codec: string}>
      */
-    public function getQualityLadderForVideo(Uuid $videoId): array;
+    public function getQualityLadderForVideo(Uuid $videoId, array $allowedJobPublicIds): array;
 
     // --- Subtitle Delivery ---
 

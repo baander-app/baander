@@ -16,8 +16,29 @@ vi.mock('@/shared/crypto/dpop-proof', () => ({
   createDpopProof: vi.fn(),
 }));
 
-import { customInstance, AXIOS_INSTANCE } from '../axios-instance';
+import { buildHtu, customInstance, AXIOS_INSTANCE } from '../axios-instance';
 import MockAdapter from 'axios-mock-adapter';
+
+describe('DPoP request URI', () => {
+  it.each([
+    ['http://baander.app:49153/api/auth/login', 'http://baander.app:49153/api/auth/login'],
+    ['https://baander.app:8443/api/auth/login', 'https://baander.app:8443/api/auth/login'],
+    ['http://baander.app:49153/api/images/cover/file?preset=thumb#preview', 'http://baander.app:49153/api/images/cover/file'],
+    ['https://baander.app:8443/api/images/cover/file?preset=thumb#preview', 'https://baander.app:8443/api/images/cover/file'],
+  ])('binds %s to its actual scheme, authority and path', (requestUrl, expectedHtu) => {
+    expect(buildHtu(requestUrl)).toBe(expectedHtu);
+  });
+
+  it('resolves relative requests against the configured API origin', () => {
+    const previousApiUrl = window.__BAANDER_API_URL__;
+    window.__BAANDER_API_URL__ = 'http://api.baander.app:49153';
+    try {
+      expect(buildHtu('/api/auth/login?redirect=movies#form')).toBe('http://api.baander.app:49153/api/auth/login');
+    } finally {
+      window.__BAANDER_API_URL__ = previousApiUrl;
+    }
+  });
+});
 
 describe('customInstance', () => {
   let mock: MockAdapter;

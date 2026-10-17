@@ -21,6 +21,7 @@ final class TranscodeStorageBoundaryTest extends TestCase
     private string $root;
     private string $outside;
     private Uuid $videoId;
+    private Uuid $jobId;
     private SegmentFileResolver $resolver;
     private TranscodeFileStorage $storage;
 
@@ -33,6 +34,7 @@ final class TranscodeStorageBoundaryTest extends TestCase
         mkdir($this->outside, 0700);
         file_put_contents($this->outside . '/sentinel', 'outside sentinel');
         $this->videoId = Uuid::generate();
+        $this->jobId = Uuid::generate();
         $this->resolver = new SegmentFileResolver($this->root);
         $this->storage = new TranscodeFileStorage($this->resolver);
     }
@@ -45,8 +47,8 @@ final class TranscodeStorageBoundaryTest extends TestCase
     public function testGenerationScopeContainsAllVideoOutputsAndLeavesBaseUnchanged(): void
     {
         $tier = QualityTier::p720();
-        $scoped = $this->storage->forGeneration($this->videoId, $tier, 7);
-        $directory = $this->root . '/' . $this->videoId->toString() . '/' . $tier->name . '/generation-7';
+        $scoped = $this->storage->forGeneration($this->videoId, $tier, 7, $this->jobId);
+        $directory = $this->root . '/' . $this->videoId->toString() . '/' . $tier->name . '/job-' . $this->jobId->toString() . '/generation-7';
         self::assertSame($directory, $scoped->resolveJobDirectory($this->videoId, $tier));
         self::assertSame($directory . '/init.mp4', $scoped->resolveInitSegmentPath($this->videoId, $tier));
         self::assertStringStartsWith($directory . '/', $scoped->resolveAudioSegmentPath($this->videoId, 'en', 2));
@@ -57,17 +59,27 @@ final class TranscodeStorageBoundaryTest extends TestCase
 
     public function testGenerationScopeRejectsAnotherVideoIdentity(): void
     {
-        $scoped = $this->storage->forGeneration($this->videoId, QualityTier::p720(), 1);
+        $scoped = $this->storage->forGeneration($this->videoId, QualityTier::p720(), 1, $this->jobId);
         $this->expectException(InvalidArgumentException::class);
         $scoped->resolveAudioDirectory(Uuid::generate(), 'en');
     }
 
     public function testGenerationScopeRejectsDirectAccessToRetiredFiles(): void
     {
-        $scoped = new TranscodeFileStorage($this->resolver->forGeneration($this->videoId, QualityTier::p720(), 2));
+        $scoped = new TranscodeFileStorage($this->resolver->forGeneration($this->videoId, QualityTier::p720(), 2, $this->jobId));
         $old = $this->storage->resolveJobDirectory($this->videoId, QualityTier::p720()) . '/generation-1/init.mp4';
         $this->expectException(InvalidArgumentException::class);
         $scoped->exists($old);
+    }
+
+    public function testIndependentJobsCannotPublishIntoEachOthersGeneration(): void
+    {
+        $tier = QualityTier::p720();
+        $first = $this->storage->forGeneration($this->videoId, $tier, 1, $this->jobId);
+        $second = $this->storage->forGeneration($this->videoId, $tier, 1, Uuid::generate());
+        self::assertNotSame($first->resolveJobDirectory($this->videoId, $tier), $second->resolveJobDirectory($this->videoId, $tier));
+        $this->expectException(InvalidArgumentException::class);
+        $first->exists($second->resolveInitSegmentPath($this->videoId, $tier));
     }
 
     /** @return iterable<string, array{string, string}> */

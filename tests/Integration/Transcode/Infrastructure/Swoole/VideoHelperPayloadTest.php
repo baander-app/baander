@@ -24,7 +24,7 @@ final class VideoHelperPayloadTest extends TestCase
             $messages[$key] = json_decode($payload, true, 512, JSON_THROW_ON_ERROR);
         });
         $facade = new TranscodeProcessPool($pool, new NullLogger(), new JsonEncoder());
-        $job = TranscodeJob::create(Uuid::generate(), QualityTier::p720(), '/cache');
+        $job = TranscodeJob::create(Uuid::generate(), QualityTier::p720(), '/cache', \App\Shared\Domain\Model\Uuid::generate());
         $first = $facade->probeVideo($job, '/media/source.mkv', 1);
         $replacement = $facade->probeVideo($job, '/media/source.mkv', 2);
         $subtitle = $facade->extractSubtitles($job, '/media/source.mkv', 'en', '/cache/generation-2/full.vtt', 2);

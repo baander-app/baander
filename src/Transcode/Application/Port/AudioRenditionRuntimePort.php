@@ -29,6 +29,8 @@ interface AudioRenditionRuntimePort
      */
     public function withOwnership(AudioRenditionClaim $claim, callable $operation): bool;
     public function complete(AudioRenditionClaim $claim): bool;
+    /** Reopen the observed completed generation after the caller verifies its accepted file is absent. */
+    public function resetCompleted(string $key, int $generation): bool;
     public function fail(AudioRenditionClaim $claim, string $error): bool;
     public function defer(AudioRenditionClaim $claim): bool;
 }

@@ -32,11 +32,11 @@ final class TranscodePublicViewTest extends TestCase
         ])->willReturn(['user_id' => $user->toString(), 'job_id' => $job->toString(), 'video_id' => $video->toString()]);
 
         $streaming = $this->createStub(TranscodeStreamingPortInterface::class);
-        $streaming->method('getPlaybackState')->willReturn(['jobId' => $job->toString(), 'generation' => 8, 'revision' => 4, 'ready' => true, 'position' => 42.0, 'status' => 'paused']);
+        $streaming->method('getPlaybackState')->willReturn(['jobId' => $job->toString(), 'generation' => 8, 'revision' => 4, 'ready' => true, 'position' => 42.0, 'status' => 'paused', 'renditionSet' => $job->toString().'.8', 'startTime' => 0.0, 'duration' => 100.0]);
         $view = (new TranscodePublicView($connection, $streaming, new HmacStreamAuthAdapter('test-secret')))->session($session)->toArray();
         self::assertSame(8, $view['playback']['generation']);
         self::assertSame('paused', $view['playback']['status']);
-        self::assertStringContainsString('generation=8', $view['playback']['manifestUrl']);
+        self::assertStringContainsString('set='.$job->toString().'.8', $view['playback']['manifestUrl']);
 
         self::assertSame($session->getPublicId()->toString(), $view['publicId']);
         self::assertSame($user->toString(), $view['userId']);
@@ -50,7 +50,7 @@ final class TranscodePublicViewTest extends TestCase
 
     public function testJobProjectionDoesNotExposeInternalFilesystemCoordinates(): void
     {
-        $job = TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/private-transcode');
+        $job = TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/private-transcode', \App\Shared\Domain\Model\Uuid::generate());
         $job->markFailed('Could not encode video ' . $job->getVideoId()->toString());
         $video = new PublicId();
         $connection = $this->createMock(Connection::class);

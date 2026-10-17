@@ -26,6 +26,49 @@ final class TranscodeControlRevisionTest extends TestCase
         self::assertSame(45.5, $replayed->desired->position);
     }
 
+    public function testOlderPauseReplayCannotUndoALaterResume(): void
+    {
+        $this->admit();
+        $this->runtime->control($this->jobId, $this->sessionId, 'pause-a', status: 'paused');
+        $resumed = $this->runtime->control($this->jobId, $this->sessionId, 'resume-b', status: 'running');
+        $replayed = $this->runtimeFor($this->second)->control($this->jobId, $this->sessionId, 'pause-a', status: 'paused');
+        self::assertSame('running', $replayed->desired->status);
+        self::assertSame($resumed->desiredRevision, $replayed->desiredRevision);
+        self::assertSame($resumed->generation, $replayed->generation);
+    }
+
+    public function testOlderSeekReplayCannotReplaceALaterSeek(): void
+    {
+        $this->admit();
+        $this->runtime->control($this->jobId, $this->sessionId, 'seek-a', position: 10);
+        $latest = $this->runtime->control($this->jobId, $this->sessionId, 'seek-b', position: 60);
+        $replayed = $this->runtimeFor($this->second)->control($this->jobId, $this->sessionId, 'seek-a', position: 10);
+        self::assertSame(60.0, $replayed->desired->position);
+        self::assertSame($latest->desiredRevision, $replayed->desiredRevision);
+        self::assertSame($latest->generation, $replayed->generation);
+    }
+
+    public function testInitiallyUnchangedControlIsStillRememberedAfterLaterChanges(): void
+    {
+        $this->admit();
+        $this->runtime->control($this->jobId, $this->sessionId, 'resume-a', status: 'running');
+        $paused = $this->runtime->control($this->jobId, $this->sessionId, 'pause-b', status: 'paused');
+        $replayed = $this->runtimeFor($this->second)->control($this->jobId, $this->sessionId, 'resume-a', status: 'running');
+        self::assertSame('paused', $replayed->desired->status);
+        self::assertSame($paused->desiredRevision, $replayed->desiredRevision);
+    }
+
+    public function testRolledBackControlDoesNotLeaveARequestReceipt(): void
+    {
+        $initial = $this->admit();
+        $this->first->beginTransaction();
+        $this->runtime->control($this->jobId, $this->sessionId, 'pause-rolled-back', status: 'paused');
+        $this->first->rollBack();
+        $retry = $this->runtimeFor($this->second)->control($this->jobId, $this->sessionId, 'pause-rolled-back', status: 'paused');
+        self::assertSame('paused', $retry->desired->status);
+        self::assertSame($initial->desiredRevision + 1, $retry->desiredRevision);
+    }
+
     public function testCancelledPendingExecutionCannotBeClaimedOrResumed(): void
     {
         $this->admit();

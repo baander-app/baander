@@ -27,6 +27,7 @@ final class TranscodeJob
         Uuid $videoId,
         QualityTier $qualityTier,
         string $outputDirectory,
+        Uuid $ownerUserId,
         array $audioTrackLanguages = [],
     ): self
     {
@@ -38,6 +39,7 @@ final class TranscodeJob
             id: new Uuid(),
             publicId: new PublicId(),
             videoId: $videoId,
+            ownerUserId: $ownerUserId,
             qualityTierName: $qualityTier->name,
             status: TranscodeStatus::Pending,
             referenceCount: 0,
@@ -201,6 +203,12 @@ final class TranscodeJob
     public function getPublicId(): PublicId
     {
         return $this->state->publicId;
+    }
+
+    /** Historical jobs without an established owner remain unowned. */
+    public function getOwnerUserId(): ?Uuid
+    {
+        return $this->state->ownerUserId;
     }
 
     public function getVideoId(): Uuid

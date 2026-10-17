@@ -7,6 +7,7 @@ namespace App\Transcode\Infrastructure\Transcode;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\DTO\TranscodeRuntimeSnapshot;
+use App\Transcode\Application\DTO\TranscodeRenditionSet;
 use App\Transcode\Application\Port\StreamAuthPortInterface;
 use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
@@ -20,7 +21,7 @@ use App\Transcode\Infrastructure\HLS\ManifestGenerator;
 use App\Transcode\Infrastructure\HLS\QualityLadderRenderer;
 
 /**
- * @phpstan-type GenerationMetadata array{videoCodec: 'h264'|'hevc'|'av1', audioCodec: string, segmentDuration: int|float, totalSegments: int, duration: float, startSegment: int, startTime: float}
+ * @phpstan-type GenerationMetadata array{videoCodec: 'h264'|'hevc'|'av1', audioCodec: string, audioProfile: array<string, mixed>, segmentDuration: int|float, totalSegments: int, duration: float, startSegment: int, startTime: float}
  */
 final class TranscodeStreamingService implements TranscodeStreamingPortInterface
 {
@@ -34,48 +35,52 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         private readonly TranscodeExecutionOwnershipPort $ownership,
     ) {}
 
-    public function getPlaybackState(Uuid $videoId, ?string $jobPublicId = null): ?array
+    public function getPlaybackState(Uuid $videoId, array $allowedJobPublicIds): ?array
     {
-        $pending = null;
-        foreach ($this->jobRepository->findActiveByVideo($videoId) as $job) {
-            if ($jobPublicId !== null && $job->getPublicId()->toString() !== $jobPublicId) {
-                continue;
-            }
-            $runtime = $this->ownership->find($job->getId());
-            if ($runtime === null) {
-                continue;
-            }
-            $context = $this->context($job, $runtime->generation);
-            $ready = $context !== null;
-            $state = [
-                'jobId' => $job->getPublicId()->toString(),
-                'generation' => $runtime->generation,
-                'revision' => $runtime->desiredRevision,
-                'ready' => $ready,
-                'position' => $runtime->desired->position,
-                'status' => $runtime->desired->status,
-                'startTime' => $context['metadata']['startTime'] ?? null,
-                'duration' => $context['metadata']['duration'] ?? null,
-            ];
-            if ($ready) {
-                return $state;
-            }
-            $pending ??= $state;
+        $jobs = $this->allowedJobs($videoId, $allowedJobPublicIds);
+        if ($jobs === []) {
+            return null;
         }
-        return $pending;
+        $primary = $jobs[0];
+        $runtime = $this->ownership->find($primary->getId());
+        if ($runtime === null) {
+            return null;
+        }
+        $pairs = [];
+        $timeline = null;
+        foreach ($jobs as $job) {
+            $current = $this->ownership->find($job->getId());
+            if ($current === null || !$this->samePlayback($runtime, $current)) {
+                continue;
+            }
+            $context = $this->context($job, $current->generation);
+            if ($context === null || ($timeline !== null && !$this->sameTimeline($timeline, $context['metadata']))) {
+                continue;
+            }
+            $timeline ??= $context['metadata'];
+            $pairs[] = ['jobId' => $job->getPublicId()->toString(), 'generation' => $current->generation];
+        }
+        return [
+            'jobId' => $primary->getPublicId()->toString(),
+            'generation' => $runtime->generation,
+            'revision' => $runtime->desiredRevision,
+            'ready' => $pairs !== [],
+            'position' => $runtime->desired->position,
+            'status' => $runtime->desired->status,
+            'startTime' => $timeline['startTime'] ?? null,
+            'duration' => $timeline['duration'] ?? null,
+            'renditionSet' => $pairs === [] ? '' : TranscodeRenditionSet::encode($pairs),
+        ];
     }
 
-    public function getMasterManifest(Uuid $videoId, int $generation, ?string $jobPublicId = null): string
+    public function getMasterManifest(Uuid $videoId, array $renditions): string
     {
+        $contexts = $this->renditions($videoId, $renditions);
         $urls = $codecs = $subtitles = [];
-        foreach ($this->jobRepository->findActiveByVideo($videoId) as $job) {
-            if ($jobPublicId !== null && $job->getPublicId()->toString() !== $jobPublicId) {
-                continue;
-            }
-            $context = $this->context($job, $generation);
-            if ($context === null) {
-                continue;
-            }
+        foreach ($contexts ?? [] as $entry) {
+            $job = $entry['job'];
+            $context = $entry['context'];
+            $generation = $context['runtime']->generation;
             $tier = QualityTier::fromString($job->getQualityTierName());
             $urls[$tier->name] = $this->signed('/api/transcode/'.$job->getPublicId().'/media.m3u8', $generation, ['tier' => $tier->name]);
             $codecs[$tier->name] = $this->videoCodec($context['metadata'], $tier).','.$this->audioCodecToRfc6381($context['metadata']['audioCodec']);
@@ -168,36 +173,32 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         }
     }
 
-    public function getDashManifest(Uuid $videoId, int $generation, ?string $jobPublicId = null): string
+    public function getDashManifest(Uuid $videoId, array $renditions): string
     {
-        $renditions = []; $duration = 0.0;
-        foreach ($this->jobRepository->findActiveByVideo($videoId) as $job) {
-            if ($jobPublicId !== null && $job->getPublicId()->toString() !== $jobPublicId) {
-                continue;
-            }
-            $context = $this->context($job, $generation);
-            if ($context === null) {
-                continue;
-            }
+        $contexts = $this->renditions($videoId, $renditions);
+        $representations = []; $duration = 0.0;
+        foreach ($contexts ?? [] as $entry) {
+            $job = $entry['job']; $context = $entry['context'];
+            $generation = $context['runtime']->generation;
             $tier = QualityTier::fromString($job->getQualityTierName());
             $metadata = $context['metadata'];
-            $renditions[$tier->name] = [
+            $representations[$tier->name] = [
                 'public_id' => $job->getPublicId()->toString(), 'quality_tier' => $tier,
                 'init_url' => $this->signed('/api/transcode/'.$job->getPublicId().'/init', $generation),
                 'segment_map' => $this->segments($job, $metadata, $generation),
-                'total_duration' => $metadata['duration'],
+                'total_duration' => $metadata['duration'] - $metadata['startTime'],
                 'video_codec_rfc6381' => $this->videoCodec($metadata, $tier).','.$this->audioCodecToRfc6381($metadata['audioCodec']),
                 'audio_codec_rfc6381' => $this->audioCodecToRfc6381($metadata['audioCodec']),
             ];
-            $duration = max($duration, $metadata['duration']);
+            $duration = max($duration, $metadata['duration'] - $metadata['startTime']);
         }
-        return $this->dashManifestGenerator->generate($renditions, [], $duration);
+        return $this->dashManifestGenerator->generate($representations, [], $duration);
     }
 
-    public function getQualityLadderForVideo(Uuid $videoId): array
+    public function getQualityLadderForVideo(Uuid $videoId, array $allowedJobPublicIds): array
     {
         $tiers = [];
-        foreach ($this->jobRepository->findActiveByVideo($videoId) as $job) {
+        foreach ($this->allowedJobs($videoId, $allowedJobPublicIds) as $job) {
             $runtime = $this->ownership->find($job->getId());
             $context = $runtime === null ? null : $this->context($job, $runtime->generation);
             if ($context !== null) {
@@ -271,7 +272,7 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
             && ($runtime->outcome === 'complete' || $runtime->ownershipLive);
     }
 
-    /** @return array{storage: TranscodeStoragePortInterface, directory: string, metadata: GenerationMetadata}|null */
+    /** @return array{runtime: TranscodeRuntimeSnapshot, storage: TranscodeStoragePortInterface, directory: string, metadata: GenerationMetadata}|null */
     private function context(TranscodeJob $job, int $generation): ?array
     {
         if ($generation < 1) {
@@ -283,7 +284,7 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         }
         try {
             $tier = QualityTier::fromString($job->getQualityTierName());
-            $storage = $this->storage->forGeneration($job->getVideoId(), $tier, $generation);
+            $storage = $this->storage->forGeneration($job->getVideoId(), $tier, $generation, $job->getId());
             $directory = $storage->resolveJobDirectory($job->getVideoId(), $tier);
             if (!$this->readable($runtime, $generation, $directory)) {
                 return null;
@@ -296,7 +297,7 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
             if (!is_array($metadata) || ($metadata['schemaVersion'] ?? null) !== 1 || ($metadata['generation'] ?? null) !== $generation
                 || !in_array($metadata['videoCodec'] ?? null, ['h264', 'hevc', 'av1'], true)
                 || !is_string($metadata['videoEncoder'] ?? null) || !is_string($metadata['audioCodec'] ?? null)
-                || !is_array($metadata['audioProfile'] ?? null)
+                || !is_array($metadata['audioProfile'] ?? null) || json_encode($metadata['audioProfile'], JSON_THROW_ON_ERROR) !== json_encode($runtime->desired->audioProfile->jsonSerialize(), JSON_THROW_ON_ERROR)
                 || (!is_int($metadata['segmentDuration'] ?? null) && !is_float($metadata['segmentDuration'] ?? null)) || $metadata['segmentDuration'] <= 0
                 || !is_int($metadata['totalSegments'] ?? null) || $metadata['totalSegments'] < 1
                 || !is_int($metadata['startSegment'] ?? null) || $metadata['startSegment'] < 0 || $metadata['startSegment'] >= $metadata['totalSegments']
@@ -305,9 +306,10 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
                 || (!is_int($metadata['duration'] ?? null) && !is_float($metadata['duration'] ?? null)) || $metadata['duration'] <= 0) {
                 return null;
             }
-            return ['storage' => $storage, 'directory' => $directory, 'metadata' => [
+            return ['runtime' => $runtime, 'storage' => $storage, 'directory' => $directory, 'metadata' => [
                 'videoCodec' => $metadata['videoCodec'],
                 'audioCodec' => $metadata['audioCodec'],
+                'audioProfile' => $metadata['audioProfile'],
                 'segmentDuration' => $metadata['segmentDuration'],
                 'totalSegments' => $metadata['totalSegments'],
                 'duration' => (float) $metadata['duration'],
@@ -317,6 +319,73 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         } catch (\InvalidArgumentException|\JsonException) {
             return null;
         }
+    }
+
+    /**
+     * @param list<string> $allowedJobPublicIds
+     * @return list<TranscodeJob>
+     */
+    private function allowedJobs(Uuid $videoId, array $allowedJobPublicIds): array
+    {
+        if ($allowedJobPublicIds === [] || count($allowedJobPublicIds) > 3 || count(array_unique($allowedJobPublicIds)) !== count($allowedJobPublicIds)) {
+            return [];
+        }
+        $jobs = [];
+        $owner = null;
+        foreach ($allowedJobPublicIds as $publicId) {
+            $job = $this->jobRepository->findByPublicId(PublicId::fromString($publicId));
+            if ($job === null || !$job->getVideoId()->equals($videoId) || $job->getOwnerUserId() === null) {
+                return [];
+            }
+            $owner ??= $job->getOwnerUserId();
+            if (!$job->getOwnerUserId()->equals($owner)) {
+                return [];
+            }
+            $jobs[] = $job;
+        }
+        usort($jobs, static fn (TranscodeJob $left, TranscodeJob $right): int => QualityTier::fromString($left->getQualityTierName())->height <=> QualityTier::fromString($right->getQualityTierName())->height);
+        return $jobs;
+    }
+
+    /**
+     * @param list<array{jobId: string, generation: int}> $pairs
+     * @return list<array{job: TranscodeJob, context: array{runtime: TranscodeRuntimeSnapshot, storage: TranscodeStoragePortInterface, directory: string, metadata: GenerationMetadata}}>|null
+     */
+    private function renditions(Uuid $videoId, array $pairs): ?array
+    {
+        TranscodeRenditionSet::encode($pairs);
+        $jobs = $this->allowedJobs($videoId, array_column($pairs, 'jobId'));
+        if (count($jobs) !== count($pairs)) {
+            return null;
+        }
+        $generations = array_column($pairs, 'generation', 'jobId');
+        $entries = [];
+        $first = null;
+        foreach ($jobs as $job) {
+            $context = $this->context($job, $generations[$job->getPublicId()->toString()]);
+            if ($context === null || ($first !== null && (!$this->samePlayback($first['runtime'], $context['runtime']) || !$this->sameTimeline($first['metadata'], $context['metadata'])))) {
+                return null;
+            }
+            $first ??= $context;
+            $entries[] = ['job' => $job, 'context' => $context];
+        }
+        return $entries;
+    }
+
+    private function samePlayback(TranscodeRuntimeSnapshot $left, TranscodeRuntimeSnapshot $right): bool
+    {
+        return $left->desired->position === $right->desired->position && $left->desired->status === $right->desired->status
+            && $left->desired->audioProfile->jsonSerialize() === $right->desired->audioProfile->jsonSerialize();
+    }
+
+    /**
+     * @param GenerationMetadata $left
+     * @param GenerationMetadata $right
+     */
+    private function sameTimeline(array $left, array $right): bool
+    {
+        return $left['startTime'] === $right['startTime'] && $left['duration'] === $right['duration']
+            && $left['segmentDuration'] === $right['segmentDuration'] && $left['totalSegments'] === $right['totalSegments'];
     }
 
     /** @param array<string, int|string> $query */

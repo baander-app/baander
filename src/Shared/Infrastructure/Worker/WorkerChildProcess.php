@@ -57,7 +57,15 @@ final class WorkerChildProcess
             }
         }
 
-        $process = proc_open($command, [0 => ['file', '/dev/null', 'r'], 1 => $stdout, 2 => $stderr], $pipes, $directory, $environment);
+        $environmentPairs = null;
+        if ($environment !== null) {
+            $environmentPairs = [];
+            foreach ($environment as $name => $value) {
+                // Associative proc_open environments discard explicitly empty values.
+                $environmentPairs[] = $name . '=' . $value;
+            }
+        }
+        $process = proc_open($command, [0 => ['file', '/dev/null', 'r'], 1 => $stdout, 2 => $stderr], $pipes, $directory, $environmentPairs);
         if (!is_resource($process)) {
             throw new \RuntimeException('Could not start worker child.');
         }

@@ -108,7 +108,10 @@ final class TranscodeSessionAuthorizationTest extends TestCase
         $bus->expects($status === 200 ? $this->once() : $this->never())->method('dispatch')
             ->willReturnCallback(static function (UpdateTranscodePositionCommand $command) use ($json): Envelope {
                 self::assertSame(12.5, $command->position);
-                self::assertSame(json_decode($json, true)['action'], $command->action);
+                $payload = json_decode($json, true);
+                self::assertSame($payload['action'] ?? 'seek', $command->action);
+                self::assertSame($payload['generation'] ?? null, $command->expectedGeneration);
+                self::assertSame($command->action === 'progress' ? 5 : null, $command->expectedRevision);
                 if ($command->action === 'progress') {
                     self::assertSame(3, $command->expectedGeneration);
                     self::assertSame(5, $command->expectedRevision);
@@ -124,6 +127,11 @@ final class TranscodeSessionAuthorizationTest extends TestCase
     public static function positions(): iterable
     {
         yield ['{"position":12.5,"action":"seek"}', 200];
+        yield ['{"position":12.5}', 200];
+        yield ['{"position":12.5,"action":"seek","generation":3,"revision":99}', 200];
+        foreach (['null', '0', '-1', '"3"', '3.5', 'true'] as $generation) {
+            yield ['{"position":12.5,"action":"seek","generation":' . $generation . '}', 422];
+        }
         yield ['{"position":12.5,"action":"progress","generation":3,"revision":5}', 200];
         yield ['{"position":12.5,"action":"progress"}', 422];
         yield ['{"position":12.5,"action":"progress","generation":0,"revision":5}', 422];

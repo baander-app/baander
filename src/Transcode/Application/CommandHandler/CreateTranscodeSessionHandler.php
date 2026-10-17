@@ -36,7 +36,7 @@ final readonly class CreateTranscodeSessionHandler
         $outputDirectory = $this->storagePort->resolveJobDirectory($command->getVideoId(), $command->getQualityTier());
         $session = $this->transaction->run(function () use ($command, $outputDirectory): TranscodeSession {
             $this->ownership->lockAdmission($command->getVideoId());
-            $job = $this->jobPort->getOrCreateJob($command->getVideoId(), $command->getQualityTier(), $outputDirectory, $command->getAudioLanguages());
+            $job = $this->jobPort->getOrCreateJob($command->getVideoId(), $command->getQualityTier(), $outputDirectory, $command->getUserId(), $command->getAudioLanguages());
             $runtime = $this->ownership->find($job->getId());
             if ($runtime !== null) {
                 $this->ownership->lockSession($runtime->sessionId);
@@ -45,7 +45,7 @@ final readonly class CreateTranscodeSessionHandler
             }
             if ($runtime !== null && ($runtime->requestId === $command->requestId || in_array($runtime->outcome, ['pending', 'accepted', 'ready', 'complete'], true))) {
                 $existing = $this->sessionPort->findByUuid($runtime->sessionId);
-                if ($existing !== null) {
+                if ($existing !== null && $existing->getUserId()->equals($command->getUserId())) {
                     return $existing;
                 }
             }

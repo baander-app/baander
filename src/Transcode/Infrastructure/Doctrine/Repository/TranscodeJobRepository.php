@@ -68,11 +68,11 @@ final class TranscodeJobRepository implements TranscodeJobRepositoryInterface
         return $entity !== null ? $this->toDomain($entity) : null;
     }
 
-    public function findByVideoAndQuality(Uuid $videoId, string $qualityTierName): ?TranscodeJob
+    public function findByOwnerVideoAndQuality(Uuid $ownerUserId, Uuid $videoId, string $qualityTierName): ?TranscodeJob
     {
         $entity = $this->entityManager
             ->getRepository(TranscodeJobEntity::class)
-            ->findOneBy(['videoId' => $videoId, 'qualityTierName' => $qualityTierName]);
+            ->findOneBy(['ownerUserId' => $ownerUserId, 'videoId' => $videoId, 'qualityTierName' => $qualityTierName]);
 
         if ($entity !== null) {
             $this->entityManager->refresh($entity);
@@ -81,6 +81,23 @@ final class TranscodeJobRepository implements TranscodeJobRepositoryInterface
     }
 
     /** @return TranscodeJob[] */
+    public function findActiveByOwnerAndVideo(Uuid $ownerUserId, Uuid $videoId): array
+    {
+        $entities = $this->entityManager->createQueryBuilder()
+            ->select('j')
+            ->from(TranscodeJobEntity::class, 'j')
+            ->where('j.ownerUserId = :owner')
+            ->andWhere('j.videoId = :video')
+            ->andWhere('j.status IN (:statuses)')
+            ->setParameter('owner', $ownerUserId)
+            ->setParameter('video', $videoId)
+            ->setParameter('statuses', [TranscodeStatus::Pending->value, TranscodeStatus::InProgress->value, TranscodeStatus::Completed->value])
+            ->getQuery()
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getResult();
+        return array_map(fn(TranscodeJobEntity $entity): TranscodeJob => $this->toDomain($entity), $entities);
+    }
+
     public function findActiveByVideo(Uuid $videoId): array
     {
         // HINT_REFRESH forces re-hydration from the database even when the
@@ -156,6 +173,7 @@ final class TranscodeJobRepository implements TranscodeJobRepositoryInterface
             $job->getPublicId(),
             $job->getVideoId(),
             $job->getQualityTierName(),
+            $job->getOwnerUserId(),
             $job->getStatus()->value,
             id: $job->getId(),
         );
@@ -167,6 +185,7 @@ final class TranscodeJobRepository implements TranscodeJobRepositoryInterface
             id: $entity->getId(),
             publicId: $entity->getPublicId(),
             videoId: $entity->getVideoId(),
+            ownerUserId: $entity->getOwnerUserId(),
             qualityTierName: $entity->getQualityTierName(),
             status: TranscodeStatus::from($entity->getStatus()),
             referenceCount: $entity->getReferenceCount(),

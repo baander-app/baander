@@ -17,9 +17,9 @@ final class TranscodeFileStorage implements TranscodeStoragePortInterface
     ) {
     }
 
-    public function forGeneration(Uuid $videoId, QualityTier $qualityTier, int $generation): self
+    public function forGeneration(Uuid $videoId, QualityTier $qualityTier, int $generation, Uuid $jobId): self
     {
-        return new self($this->resolver->forGeneration($videoId, $qualityTier, $generation));
+        return new self($this->resolver->forGeneration($videoId, $qualityTier, $generation, $jobId));
     }
 
     public function resolveJobDirectory(Uuid $videoId, QualityTier $qualityTier): string
@@ -176,15 +176,27 @@ final class TranscodeFileStorage implements TranscodeStoragePortInterface
             return false;
         }
 
-        foreach (scandir($directory) ?: [] as $entry) {
-            $path = $directory . '/' . $entry;
-            if (!str_ends_with($entry, SegmentFileResolver::PARTIAL_SUFFIX) || is_link($path) || !is_file($path)) {
+        foreach (scandir($directory) ?: [] as $signature) {
+            $rendition = $directory . '/' . $signature;
+            if (preg_match('/^(opus|aac|mp3)-[0-9]+k-[a-f0-9]{16}\\.\\1$/D', $signature) !== 1
+                || is_link($rendition) || !is_dir($rendition)
+            ) {
                 continue;
             }
-            clearstatcache(true, $path);
-            $modified = @filemtime($path);
-            if ($modified !== false && $modified >= $since->getTimestamp()) {
-                return true;
+            foreach (scandir($rendition) ?: [] as $generation) {
+                $attempt = $rendition . '/' . $generation;
+                if (preg_match('/^generation-[1-9][0-9]*$/D', $generation) !== 1 || is_link($attempt) || !is_dir($attempt)) {
+                    continue;
+                }
+                $partial = $attempt . '/' . $signature . SegmentFileResolver::PARTIAL_SUFFIX;
+                clearstatcache(true, $partial);
+                if (is_link($partial) || !is_file($partial)) {
+                    continue;
+                }
+                $modified = @filemtime($partial);
+                if ($modified !== false && $modified >= $since->getTimestamp()) {
+                    return true;
+                }
             }
         }
 

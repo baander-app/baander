@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Transcode\Interface\Controller;
 
 use App\Shared\Domain\Model\PublicId;
+use App\Transcode\Application\DTO\TranscodeRenditionSet;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
@@ -35,7 +37,7 @@ final class StreamManifestController
         path: '/api/transcode/{videoId}/master.m3u8',
         summary: 'Get HLS master playlist',
         parameters: [
-            new OA\Parameter(name: 'generation', description: 'Pinned media execution generation', in: 'query', required: true, schema: new OA\Schema(type: 'integer', minimum: 1)),
+            new OA\Parameter(name: 'set', description: 'Canonical signed set of admitted job and generation pairs', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'videoId', description: 'Video public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
@@ -48,7 +50,7 @@ final class StreamManifestController
         $this->signedRequest->validate($request);
         $videoUuid = $this->requireVideo($videoId);
 
-        $manifest = $this->streamingService->getMasterManifest($videoUuid, $request->query->getInt('generation'), $request->query->get('job'));
+        $manifest = $this->streamingService->getMasterManifest($videoUuid, $this->renditionSet($request));
 
         return new StreamedResponse(static fn() => print $manifest, $this->available($manifest) ? 200 : 503, [
             'Cache-Control' => 'no-store',
@@ -87,7 +89,7 @@ final class StreamManifestController
         path: '/api/transcode/{videoId}/manifest.mpd',
         summary: 'Get DASH manifest for a video',
         parameters: [
-            new OA\Parameter(name: 'generation', description: 'Pinned media execution generation', in: 'query', required: true, schema: new OA\Schema(type: 'integer', minimum: 1)),
+            new OA\Parameter(name: 'set', description: 'Canonical signed set of admitted job and generation pairs', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'videoId', description: 'Video public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
@@ -98,7 +100,7 @@ final class StreamManifestController
     public function dashManifest(string $videoId, Request $request): StreamedResponse
     {
         $this->signedRequest->validate($request);
-        $manifest = $this->streamingService->getDashManifest($this->requireVideo($videoId), $request->query->getInt('generation'), $request->query->get('job'));
+        $manifest = $this->streamingService->getDashManifest($this->requireVideo($videoId), $this->renditionSet($request));
 
         return new StreamedResponse(static fn() => print $manifest, $this->available($manifest) ? 200 : 503, [
             'Cache-Control' => 'no-store',
@@ -122,7 +124,7 @@ final class StreamManifestController
     {
         $video = $this->requireVideo($videoId);
         $this->playback->assertAccess($video);
-        $tiers = $this->streamingService->getQualityLadderForVideo($video);
+        $tiers = $this->streamingService->getQualityLadderForVideo($video, array_keys($this->playback->findSessions($video)));
 
         return $this->successResponse($tiers);
     }
@@ -150,6 +152,20 @@ final class StreamManifestController
             'Retry-After' => '2',
             'Content-Type' => 'application/vnd.apple.mpegurl',
         ]);
+    }
+
+    /** @return list<array{jobId: string, generation: int}> */
+    private function renditionSet(Request $request): array
+    {
+        $encoded = $request->query->get('set');
+        if (!is_string($encoded)) {
+            throw new BadRequestHttpException('A signed rendition set is required.');
+        }
+        try {
+            return TranscodeRenditionSet::parse($encoded);
+        } catch (\InvalidArgumentException) {
+            throw new BadRequestHttpException('Invalid signed rendition set.');
+        }
     }
 
     private function available(string $manifest): bool

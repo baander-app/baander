@@ -26,6 +26,7 @@ final class CpuGpuSampler implements Bootable
     private const int TABLE_SIZE = 2; // latest + fallback
     private const string KEY_LATEST = '__latest';
 
+    private bool $gpuSubprocessAllowed = true;
     private bool $booted = false;
     private ?Table $table = null;
     private ?int $timerId = null;
@@ -51,7 +52,15 @@ final class CpuGpuSampler implements Bootable
         $this->table->column('timestamp', Table::TYPE_INT);
         $this->table->create();
 
-        $this->logger->info('CpuGpuSampler booted — Table created before fork');
+        $this->logger->info('CpuGpuSampler utilization table created');
+    }
+
+    /** The admitted worker uses filesystem metrics without adding a GPU subprocess. */
+    public function startWorkerSampling(): void
+    {
+        $this->gpuSubprocessAllowed = false;
+        $this->boot();
+        $this->startSampling();
     }
 
     /**
@@ -64,7 +73,7 @@ final class CpuGpuSampler implements Bootable
             return;
         }
 
-        $this->logger->info('CpuGpuSampler starting sampling on worker 0');
+        $this->logger->info('CpuGpuSampler starting sampling in the execution process');
 
         // Seed initial CPU reading
         $this->readCpuUsage();
@@ -180,7 +189,7 @@ final class CpuGpuSampler implements Bootable
     private function readGpuUsage(): float
     {
         // Try nvidia-smi (NVIDIA GPUs)
-        $nvidia = $this->readNvidiaGpu();
+        $nvidia = $this->gpuSubprocessAllowed ? $this->readNvidiaGpu() : null;
         if ($nvidia !== null) {
             return $nvidia;
         }

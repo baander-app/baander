@@ -51,7 +51,7 @@ trait MediaRuntimePersistenceHarness
         $this->userId = Uuid::generate();
         $this->first->executeStatement("INSERT INTO users (id, public_id, name, email, password, created_at, updated_at) VALUES (?, ?, 'Media listener', 'media@baander.app', 'hash', clock_timestamp(), clock_timestamp())", [$this->userId->toString(), (new PublicId())->toString()]);
         $this->first->executeStatement("INSERT INTO videos (id, public_id, path, hash, created_at, updated_at) VALUES (?, ?, '/fixture/video.mp4', 'fixture', clock_timestamp(), clock_timestamp())", [$this->videoId->toString(), (new PublicId())->toString()]);
-        $this->first->executeStatement("INSERT INTO transcode_jobs (id, public_id, video_id, quality_tier_name, created_at, updated_at) VALUES (?, ?, ?, '1080p', clock_timestamp(), clock_timestamp())", [$this->jobId->toString(), (new PublicId())->toString(), $this->videoId->toString()]);
+        $this->first->executeStatement("INSERT INTO transcode_jobs (id, public_id, video_id, owner_user_id, quality_tier_name, created_at, updated_at) VALUES (?, ?, ?, ?, '1080p', clock_timestamp(), clock_timestamp())", [$this->jobId->toString(), (new PublicId())->toString(), $this->videoId->toString(), $this->userId->toString()]);
     }
 
     protected function tearDown(): void

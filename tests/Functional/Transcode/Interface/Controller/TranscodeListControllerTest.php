@@ -45,7 +45,7 @@ final class TranscodeListControllerTest extends TestCase
         $this->entityManager->persist($movie);
         $this->entityManager->persist(new MovieVideoEntity($movie, $video));
         $this->entityManager->persist(new UserLibraryAccessEntity($this->user->getId(), $library, new \DateTimeImmutable()));
-        $this->job = new TranscodeJobEntity(new PublicId(), $video->getId(), '1080p');
+        $this->job = new TranscodeJobEntity(new PublicId(), $video->getId(), '1080p', $this->user->getId());
         $this->entityManager->persist($this->job);
         $now = new \DateTimeImmutable();
         $this->session = new TranscodeSessionEntity(

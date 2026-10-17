@@ -108,10 +108,10 @@ final class InitialSchemaMigrationTest extends TestCase
         }
         $factory = $this->factory();
         $factory->getMetadataStorage()->ensureInitialized();
-        self::assertCount(3, $factory->getMigrationRepository()->getMigrations());
+        self::assertCount(5, $factory->getMigrationRepository()->getMigrations());
         self::assertSame(0, $this->migrate($factory));
-        self::assertSame(['DoctrineMigrations\\Version20261017000000', 'DoctrineMigrations\\Version20261017130000', 'DoctrineMigrations\\Version20261017150000'], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
-        self::assertSame(82, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
+        self::assertSame(['DoctrineMigrations\\Version20261017000000', 'DoctrineMigrations\\Version20261017130000', 'DoctrineMigrations\\Version20261017150000', 'DoctrineMigrations\\Version20261017160000', 'DoctrineMigrations\\Version20261017170000'], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
+        self::assertSame(83, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
         $this->assertSchedules();
         $this->assertIdentitiesAllocate();
         $catalog = $this->catalog('public');
@@ -129,8 +129,71 @@ final class InitialSchemaMigrationTest extends TestCase
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         self::assertSame(0, $this->migrate($this->factory(true)));
-        self::assertSame(4, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
+        self::assertSame(6, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
         self::assertSame('future_migration_probe', $this->connection->fetchOne("SELECT to_regclass('future_migration_probe')::text"));
+    }
+
+    public function testMediaUpgradeKeepsKnownReceiptsAndDerivesOnlyEstablishedJobOwners(): void
+    {
+        self::assertSame(0, $this->migrate($this->factory(), 'DoctrineMigrations\\Version20261017150000'));
+        $users = [Uuid::generate()->toString(), Uuid::generate()->toString()];
+        foreach ($users as $index => $user) {
+            $this->connection->executeStatement("INSERT INTO users (id, public_id, name, email, password, created_at, updated_at) VALUES (?, ?, 'Media upgrade', ?, 'hash', clock_timestamp(), clock_timestamp())", [$user, (new PublicId())->toString(), 'media-upgrade-' . $index . '@baander.app']);
+        }
+        $jobs = [];
+        $videos = [];
+        foreach (range(0, 3) as $index) {
+            $video = Uuid::generate()->toString();
+            $job = Uuid::generate()->toString();
+            $videos[] = $video;
+            $jobs[] = $job;
+            $this->connection->executeStatement("INSERT INTO videos (id, public_id, path, hash, created_at, updated_at) VALUES (?, ?, ?, ?, clock_timestamp(), clock_timestamp())", [$video, (new PublicId())->toString(), '/media-upgrade/' . $index . '.mp4', $video]);
+            $this->connection->executeStatement("INSERT INTO transcode_jobs (id, public_id, video_id, quality_tier_name, created_at, updated_at) VALUES (?, ?, ?, '720p', clock_timestamp(), clock_timestamp())", [$job, (new PublicId())->toString(), $video]);
+        }
+        $runtimeSession = null;
+        foreach ([[$users[0], $users[1]], [$users[0], $users[0]], [$users[0], $users[1]]] as $index => $owners) {
+            foreach ($owners as $ownerIndex => $owner) {
+                $session = Uuid::generate()->toString();
+                $this->connection->executeStatement('INSERT INTO transcode_sessions (id, public_id, user_id, job_id, video_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, clock_timestamp(), clock_timestamp())', [$session, (new PublicId())->toString(), $owner, $jobs[$index], $videos[$index]]);
+                if ($index === 0 && $ownerIndex === 0) {
+                    $runtimeSession = $session;
+                }
+            }
+        }
+        $this->connection->executeStatement("UPDATE transcode_jobs SET status = 'completed', reference_count = 2, total_segments = 2, completed_segments = 2 WHERE id = ?", [$jobs[0]]);
+        $this->connection->executeStatement("UPDATE transcode_sessions SET state = 'active' WHERE id = ?", [$runtimeSession]);
+        $desired = json_encode(['status' => 'paused', 'position' => 10.0, 'segmentIndex' => 0, 'audioLanguages' => ['en'], 'audioProfile' => \App\Transcode\Domain\ValueObject\AudioProfile::streamingStereo()->jsonSerialize()], JSON_THROW_ON_ERROR);
+        $this->connection->executeStatement(<<<'SQL'
+INSERT INTO transcode_runtime_state (job_id, session_id, request_id, last_control_request_id, desired, desired_revision, observed_revision, generation, outcome, output_directory, admission_deadline, worker_namespace, worker_boot_id, worker_id, worker_launch_generation, worker_lease_epoch, claim_token, lease_expires_at, updated_at)
+VALUES (?, ?, 'start-upgrade', 'seek-upgrade', CAST(? AS jsonb), 2, 2, 7, 'complete', '/old-output/generation-7', clock_timestamp() - interval '1 second', 'baander.app:workers', ?, 'media', 1, 1, 'old-claim', clock_timestamp() + interval '1 hour', clock_timestamp())
+SQL, [$jobs[0], $runtimeSession, $desired, str_repeat('a', 32)]);
+
+        self::assertSame(0, $this->migrate($this->factory()));
+
+        $owners = $this->connection->fetchAllKeyValue('SELECT id::text, owner_user_id::text FROM transcode_jobs');
+        self::assertSame($users[0], $owners[$jobs[0]], 'The runtime session establishes an owner even when older attachments have other users.');
+        self::assertSame($users[0], $owners[$jobs[1]], 'One distinct session owner establishes ownership without a runtime.');
+        self::assertNull($owners[$jobs[2]], 'Ambiguous history must remain unowned.');
+        self::assertNull($owners[$jobs[3]], 'A job without sessions must remain unowned.');
+        self::assertSame(4, (int) $this->connection->fetchOne('SELECT count(*) FROM transcode_jobs'));
+        self::assertSame(6, (int) $this->connection->fetchOne('SELECT count(*) FROM transcode_sessions'));
+        self::assertSame('completed', $this->connection->fetchOne('SELECT status FROM transcode_jobs WHERE id = ?', [$jobs[0]]));
+        self::assertSame(2, (int) $this->connection->fetchOne('SELECT reference_count FROM transcode_jobs WHERE id = ?', [$jobs[0]]));
+        self::assertSame('seek-upgrade', $this->connection->fetchOne('SELECT request_id FROM transcode_control_receipts WHERE session_id = ?', [$runtimeSession]));
+        self::assertSame(0, (int) $this->connection->fetchOne("SELECT count(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'transcode_runtime_state' AND column_name = 'last_control_request_id'"));
+        $runtime = $this->connection->fetchAssociative('SELECT * FROM transcode_runtime_state WHERE job_id = ?', [$jobs[0]]);
+        self::assertIsArray($runtime);
+        self::assertSame('accepted', $runtime['outcome']);
+        self::assertSame(8, $runtime['generation']);
+        self::assertSame(0, $runtime['observed_revision']);
+        self::assertSame(2, $runtime['desired_revision']);
+        self::assertEquals(json_decode($desired, true, 512, JSON_THROW_ON_ERROR), json_decode($runtime['desired'], true, 512, JSON_THROW_ON_ERROR));
+        self::assertNull($runtime['output_directory']);
+        self::assertNull($runtime['claim_token']);
+        self::assertNull($runtime['worker_boot_id']);
+        self::assertNull($runtime['lease_expires_at']);
+        $this->connection->executeStatement("INSERT INTO transcode_jobs (id, public_id, video_id, owner_user_id, quality_tier_name, created_at, updated_at) VALUES (?, ?, ?, ?, '720p', clock_timestamp(), clock_timestamp())", [Uuid::generate()->toString(), (new PublicId())->toString(), $videos[0], $users[1]]);
+        self::assertSame(5, (int) $this->connection->fetchOne('SELECT count(*) FROM transcode_jobs'));
     }
 
     public function testPopulatedPlaylistUpgradePreservesMetadataMembershipsAndIdentities(): void
@@ -193,7 +256,7 @@ final class InitialSchemaMigrationTest extends TestCase
         $before = $snapshot();
 
         self::assertSame(0, $this->migrate($this->factory()));
-        self::assertSame(3, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
+        self::assertSame(5, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
         $after = $snapshot();
         self::assertSame(0, (int) $after['playlists'][0]['persistence_version']);
         $withoutVersion = $after;

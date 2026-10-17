@@ -30,15 +30,18 @@ final class TranscodeJobService implements TranscodeJobPortInterface
         Uuid $videoId,
         QualityTier $qualityTier,
         string $outputDirectory,
+        Uuid $ownerUserId,
         array $audioTrackLanguages = [],
     ): TranscodeJob {
-        $existing = $this->jobRepository->findByVideoAndQuality($videoId, $qualityTier->name);
+        $existing = $this->jobRepository->findByOwnerVideoAndQuality($ownerUserId, $videoId, $qualityTier->name);
 
         if ($existing !== null) {
             return $existing;
         }
 
-        $job = TranscodeJob::create($videoId, $qualityTier, $outputDirectory, $audioTrackLanguages);
+        $job = TranscodeJob::create($videoId, $qualityTier, $outputDirectory, $ownerUserId, $audioTrackLanguages);
+        // Cleanup before the first claim must stay inside this job's namespace.
+        $job->getState()->outputDirectory = dirname($this->storage->forGeneration($videoId, $qualityTier, 1, $job->getId())->resolveJobDirectory($videoId, $qualityTier));
         $this->jobRepository->save($job);
 
         $this->eventDispatcher->dispatch(new TranscodeJobCreated(
@@ -68,6 +71,11 @@ final class TranscodeJobService implements TranscodeJobPortInterface
     public function findInProgressJobs(): array
     {
         return $this->jobRepository->findInProgressJobs();
+    }
+
+    public function findActiveByOwnerAndVideo(Uuid $ownerUserId, Uuid $videoId): array
+    {
+        return $this->jobRepository->findActiveByOwnerAndVideo($ownerUserId, $videoId);
     }
 
     public function findActiveByVideo(Uuid $videoId): array

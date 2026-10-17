@@ -263,6 +263,8 @@ final readonly class Configuration implements ConfigurationInterface
                                 ->scalarNode('reactor_count')
                                     ->defaultValue(1)
                                 ->end()
+                                ->integerNode('aio_core_worker_num')->min(1)->defaultNull()->end()
+                                ->integerNode('aio_worker_num')->min(1)->defaultNull()->end()
                                 ->scalarNode('worker_max_request')
                                     ->defaultValue(0)
                                 ->end()

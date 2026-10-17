@@ -22,7 +22,7 @@ final class PartyPublicIdentityTest extends TestCase
     {
         $user = User::register(Email::fromString('host@baander.app'), 'hash', 'Host');
         $video = Video::create('/media/party.mp4', 'video-hash');
-        $job = TranscodeJob::create($video->getId(), QualityTier::p720(), '/tmp/baander-party-identity');
+        $job = TranscodeJob::create($video->getId(), QualityTier::p720(), '/tmp/baander-party-identity', $user->getId());
         $session = SyncedPartySession::create($user->getId(), $video->getId(), $job->getId());
         $member = PartyMember::create($user->getId(), $session->getId());
         $connection = $this->createMock(\Doctrine\DBAL\Connection::class);

@@ -25,20 +25,21 @@ final class SegmentFileResolver
         private readonly ?string $videoIdentity = null,
         private readonly ?string $tierIdentity = null,
         private readonly ?int $generation = null,
+        private readonly ?string $jobIdentity = null,
     ) {
     }
 
-    public function forGeneration(Uuid $videoId, QualityTier $qualityTier, int $generation): self
+    public function forGeneration(Uuid $videoId, QualityTier $qualityTier, int $generation, Uuid $jobId): self
     {
         self::assertComponent($qualityTier->name);
         if ($generation < 1) {
             throw new InvalidArgumentException('Execution generations must be positive.');
         }
         if ($this->generation !== null && ($this->videoIdentity !== $videoId->toString()
-            || $this->tierIdentity !== $qualityTier->name || $this->generation !== $generation)) {
+            || $this->tierIdentity !== $qualityTier->name || $this->generation !== $generation || $this->jobIdentity !== $jobId->toString())) {
             throw new InvalidArgumentException('A generation resolver cannot change execution identity.');
         }
-        return new self($this->basePath, $videoId->toString(), $qualityTier->name, $generation);
+        return new self($this->basePath, $videoId->toString(), $qualityTier->name, $generation, $jobId->toString());
     }
 
     /**
@@ -200,7 +201,7 @@ final class SegmentFileResolver
         StoragePathBoundary::resolve($this->basePath, $path);
         $this->assertGenerationPath($path);
         if ($this->generation !== null) {
-            $scope = rtrim($this->basePath, '/') . '/' . $this->videoIdentity . '/' . $this->tierIdentity . '/generation-' . $this->generation;
+            $scope = rtrim($this->basePath, '/') . '/' . $this->videoIdentity . '/' . $this->tierIdentity . '/job-' . $this->jobIdentity . '/generation-' . $this->generation;
             StoragePathBoundary::resolve($scope, $path);
         }
 
@@ -214,7 +215,7 @@ final class SegmentFileResolver
         if ($this->generation === null) {
             return;
         }
-        $scope = rtrim($this->basePath, '/') . '/' . $this->videoIdentity . '/' . $this->tierIdentity . '/generation-' . $this->generation;
+        $scope = rtrim($this->basePath, '/') . '/' . $this->videoIdentity . '/' . $this->tierIdentity . '/job-' . $this->jobIdentity . '/generation-' . $this->generation;
         if ($path !== $scope && !str_starts_with($path, $scope . '/')) {
             throw new InvalidArgumentException('Path belongs to another execution generation.');
         }
@@ -226,7 +227,7 @@ final class SegmentFileResolver
             if ($videoId->toString() !== $this->videoIdentity || ($tier !== null && $tier->name !== $this->tierIdentity)) {
                 throw new InvalidArgumentException('Output identity does not match the execution generation.');
             }
-            return $this->buildPath($videoId->toString(), $this->tierIdentity ?? '', 'generation-' . $this->generation, ...$components);
+            return $this->buildPath($videoId->toString(), $this->tierIdentity ?? '', 'job-' . $this->jobIdentity, 'generation-' . $this->generation, ...$components);
         }
         return $tier === null
             ? $this->buildPath($videoId->toString(), ...$components)

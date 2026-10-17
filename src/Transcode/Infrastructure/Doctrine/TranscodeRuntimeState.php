@@ -60,9 +60,9 @@ final class TranscodeRuntimeState implements TranscodeExecutionOwnershipPort
         $generation = $row === null ? 1 : (int) $row['generation'] + 1;
         $revision = $row === null ? 1 : (int) $row['desired_revision'] + 1;
         $this->connection->executeStatement(<<<'SQL'
-INSERT INTO transcode_runtime_state (job_id, session_id, request_id, last_control_request_id, desired, desired_revision, observed_revision, generation, outcome, admission_deadline, updated_at)
-VALUES (:job, :session, :request, NULL, CAST(:desired AS jsonb), :revision, 0, :generation, 'pending', clock_timestamp() + :deadline * interval '1 second', clock_timestamp())
-ON CONFLICT (job_id) DO UPDATE SET session_id = EXCLUDED.session_id, request_id = EXCLUDED.request_id, last_control_request_id = NULL, desired = EXCLUDED.desired, desired_revision = EXCLUDED.desired_revision, observed_revision = 0, generation = EXCLUDED.generation, outcome = 'pending', admission_deadline = EXCLUDED.admission_deadline, output_directory = NULL, error = NULL, worker_namespace = NULL, worker_boot_id = NULL, worker_id = NULL, worker_launch_generation = NULL, worker_lease_epoch = NULL, claim_token = NULL, lease_expires_at = NULL, updated_at = clock_timestamp()
+INSERT INTO transcode_runtime_state (job_id, session_id, request_id, desired, desired_revision, observed_revision, generation, outcome, admission_deadline, updated_at)
+VALUES (:job, :session, :request, CAST(:desired AS jsonb), :revision, 0, :generation, 'pending', clock_timestamp() + :deadline * interval '1 second', clock_timestamp())
+ON CONFLICT (job_id) DO UPDATE SET session_id = EXCLUDED.session_id, request_id = EXCLUDED.request_id, desired = EXCLUDED.desired, desired_revision = EXCLUDED.desired_revision, observed_revision = 0, generation = EXCLUDED.generation, outcome = 'pending', admission_deadline = EXCLUDED.admission_deadline, output_directory = NULL, error = NULL, worker_namespace = NULL, worker_boot_id = NULL, worker_id = NULL, worker_launch_generation = NULL, worker_lease_epoch = NULL, claim_token = NULL, lease_expires_at = NULL, updated_at = clock_timestamp()
 SQL, ['job' => $jobId->toString(), 'session' => $sessionId->toString(), 'request' => $requestId, 'desired' => $this->encodeDesired($desired), 'revision' => $revision, 'generation' => $generation, 'deadline' => $deadlineSeconds]);
         return $this->find($jobId) ?? throw new \LogicException('Admitted runtime disappeared.');
     }
@@ -75,7 +75,11 @@ SQL, ['job' => $jobId->toString(), 'session' => $sessionId->toString(), 'request
             if ($row === null || $row['session_id'] !== $sessionId->toString()) {
                 throw new \LogicException('Control does not address the current runtime session.');
             }
-            if ($row['last_control_request_id'] === $requestId || in_array($row['outcome'], ['failed', 'cancelled', 'refused'], true)) {
+            $recorded = $this->connection->executeStatement(
+                'INSERT INTO transcode_control_receipts (session_id, request_id, created_at) VALUES (?, ?, clock_timestamp()) ON CONFLICT (session_id, request_id) DO NOTHING',
+                [$sessionId->toString(), $requestId],
+            );
+            if ($recorded === 0 || in_array($row['outcome'], ['failed', 'cancelled', 'refused'], true)) {
                 return $this->snapshot($row);
             }
             $previous = $this->snapshot($row)->desired;
@@ -93,8 +97,8 @@ SQL, ['job' => $jobId->toString(), 'session' => $sessionId->toString(), 'request
             $outcome = $cancelled ? 'cancelled' : ($reactivated ? 'accepted' : $row['outcome']);
             $ownerReset = $reactivated ? ', ' . $this->clearOwnerSql() : '';
             $this->connection->executeStatement(
-                'UPDATE transcode_runtime_state SET desired = CAST(:desired AS jsonb), last_control_request_id = :request, desired_revision = desired_revision + 1, generation = :generation, outcome = :outcome, output_directory = CASE WHEN generation = :generation THEN output_directory ELSE NULL END, updated_at = clock_timestamp()' . $ownerReset . ' WHERE job_id = :job',
-                ['desired' => $this->encodeDesired($desired), 'request' => $requestId, 'generation' => $generation, 'outcome' => $outcome, 'job' => $jobId->toString()],
+                'UPDATE transcode_runtime_state SET desired = CAST(:desired AS jsonb), desired_revision = desired_revision + 1, generation = :generation, outcome = :outcome, output_directory = CASE WHEN generation = :generation THEN output_directory ELSE NULL END, updated_at = clock_timestamp()' . $ownerReset . ' WHERE job_id = :job',
+                ['desired' => $this->encodeDesired($desired), 'generation' => $generation, 'outcome' => $outcome, 'job' => $jobId->toString()],
             );
             return $this->find($jobId) ?? throw new \LogicException('Controlled runtime disappeared.');
         });

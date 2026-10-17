@@ -26,7 +26,7 @@ class TranscodeJobTest extends TestCase
 
     public function testCreateGeneratesIdAndPublicId(): void
     {
-        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv');
+        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv', \App\Shared\Domain\Model\Uuid::generate());
 
         $this->assertNotEmpty($job->getId()->toString());
         $this->assertNotEmpty($job->getPublicId()->toString());
@@ -37,7 +37,7 @@ class TranscodeJobTest extends TestCase
 
     public function testAttachSessionIncrementsReferenceCount(): void
     {
-        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv');
+        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv', \App\Shared\Domain\Model\Uuid::generate());
 
         $job->attachSession();
         $this->assertSame(1, $job->getReferenceCount());
@@ -48,7 +48,7 @@ class TranscodeJobTest extends TestCase
 
     public function testDetachSessionDecrementsAndReturnsTrueAtZero(): void
     {
-        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv');
+        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv', \App\Shared\Domain\Model\Uuid::generate());
         $job->attachSession();
 
         $result = $job->detachSession();
@@ -58,7 +58,7 @@ class TranscodeJobTest extends TestCase
 
     public function testDetachSessionAtZeroDoesNotGoNegative(): void
     {
-        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv');
+        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv', \App\Shared\Domain\Model\Uuid::generate());
 
         $result = $job->detachSession();
         $this->assertFalse($result);
@@ -67,7 +67,7 @@ class TranscodeJobTest extends TestCase
 
     public function testMarkSegmentCompleted(): void
     {
-        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv');
+        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv', \App\Shared\Domain\Model\Uuid::generate());
         $job->setTotalSegments(10);
 
         $job->markSegmentCompleted(0, '/seg/seg_000000.m4s', 500_000, 2.0);
@@ -81,13 +81,13 @@ class TranscodeJobTest extends TestCase
 
     public function testGetProgressReturnsZeroForNewJob(): void
     {
-        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv');
+        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv', \App\Shared\Domain\Model\Uuid::generate());
         $this->assertSame(0.0, $job->getProgress());
     }
 
     public function testGetProgressReturnsHundredWhenComplete(): void
     {
-        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv');
+        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv', \App\Shared\Domain\Model\Uuid::generate());
         $job->setTotalSegments(5);
 
         for ($i = 0; $i < 5; $i++) {
@@ -99,7 +99,7 @@ class TranscodeJobTest extends TestCase
 
     public function testMarkInProgressFromPending(): void
     {
-        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv');
+        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv', \App\Shared\Domain\Model\Uuid::generate());
         $job->markInProgress();
 
         $this->assertSame(TranscodeStatus::InProgress, $job->getStatus());
@@ -107,7 +107,7 @@ class TranscodeJobTest extends TestCase
 
     public function testMarkCompletedFromInProgress(): void
     {
-        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv');
+        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv', \App\Shared\Domain\Model\Uuid::generate());
         $job->markInProgress();
         $job->markCompleted();
 
@@ -116,7 +116,7 @@ class TranscodeJobTest extends TestCase
 
     public function testMarkFailedWhenAlreadyCompletedIsIdempotent(): void
     {
-        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv');
+        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv', \App\Shared\Domain\Model\Uuid::generate());
         $job->markInProgress();
         $job->markCompleted();
         $job->markFailed('test');
@@ -126,7 +126,7 @@ class TranscodeJobTest extends TestCase
 
     public function testMarkFailedFromInProgress(): void
     {
-        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv');
+        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv', \App\Shared\Domain\Model\Uuid::generate());
         $job->markInProgress();
         $job->markFailed('encoder error');
 
@@ -135,7 +135,7 @@ class TranscodeJobTest extends TestCase
 
     public function testMarkCancelled(): void
     {
-        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv');
+        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv', \App\Shared\Domain\Model\Uuid::generate());
         $job->markCancelled();
 
         $this->assertSame(TranscodeStatus::Cancelled, $job->getStatus());
@@ -143,7 +143,7 @@ class TranscodeJobTest extends TestCase
 
     public function testUpdateProbeData(): void
     {
-        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv');
+        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv', \App\Shared\Domain\Model\Uuid::generate());
         $probe = ['duration' => 100.0, 'width' => 1920];
 
         $job->updateProbeData($probe);
@@ -154,12 +154,12 @@ class TranscodeJobTest extends TestCase
     {
         $this->expectException(\InvalidArgumentException::class);
 
-        TranscodeJob::create($this->videoId, QualityTier::p1080(), '');
+        TranscodeJob::create($this->videoId, QualityTier::p1080(), '', \App\Shared\Domain\Model\Uuid::generate());
     }
 
     public function testMarkAudioSegmentCompletedStoresEntry(): void
     {
-        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv');
+        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv', \App\Shared\Domain\Model\Uuid::generate());
 
         $job->markAudioSegmentCompleted('en', 0, '/audio/en/seg_0.m4s', 50_000, 5.98);
 
@@ -172,7 +172,7 @@ class TranscodeJobTest extends TestCase
 
     public function testMarkAudioSegmentCompletedKeysByLanguageAndIndex(): void
     {
-        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv');
+        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv', \App\Shared\Domain\Model\Uuid::generate());
 
         $job->markAudioSegmentCompleted('en', 0, '/audio/en/seg_0.m4s', 50_000, 6.0);
         $job->markAudioSegmentCompleted('en', 1, '/audio/en/seg_1.m4s', 48_000, 6.0);
@@ -187,7 +187,7 @@ class TranscodeJobTest extends TestCase
 
     public function testMarkAudioSegmentCompletedOverwritesDuplicateKey(): void
     {
-        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv');
+        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv', \App\Shared\Domain\Model\Uuid::generate());
 
         $job->markAudioSegmentCompleted('en', 0, '/old.m4s', 10, 5.0);
         $job->markAudioSegmentCompleted('en', 0, '/new.m4s', 20, 6.0);
@@ -199,14 +199,14 @@ class TranscodeJobTest extends TestCase
 
     public function testGetAudioSegmentMapReturnsEmptyArrayForNewJob(): void
     {
-        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv');
+        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv', \App\Shared\Domain\Model\Uuid::generate());
 
         $this->assertSame([], $job->getAudioSegmentMap());
     }
 
     public function testSetAudioTrackLanguages(): void
     {
-        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv');
+        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv', \App\Shared\Domain\Model\Uuid::generate());
 
         $job->setAudioTrackLanguages(['en', 'fr', 'es']);
 
@@ -215,7 +215,7 @@ class TranscodeJobTest extends TestCase
 
     public function testSetMeasuredLoudness(): void
     {
-        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv');
+        $job = TranscodeJob::create($this->videoId, QualityTier::p1080(), '/storage/conv', \App\Shared\Domain\Model\Uuid::generate());
 
         $loudness = ['input_i' => -18.5, 'input_tp' => -1.2];
         $job->setMeasuredLoudness($loudness);

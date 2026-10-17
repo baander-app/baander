@@ -18,6 +18,7 @@ interface TranscodeJobPortInterface
         Uuid $videoId,
         QualityTier $qualityTier,
         string $outputDirectory,
+        Uuid $ownerUserId,
         array $audioTrackLanguages = [],
     ): TranscodeJob;
 
@@ -30,6 +31,9 @@ interface TranscodeJobPortInterface
 
     /** @return TranscodeJob[] */
     public function findInProgressJobs(): array;
+
+    /** @return TranscodeJob[] */
+    public function findActiveByOwnerAndVideo(Uuid $ownerUserId, Uuid $videoId): array;
 
     /** @return TranscodeJob[] */
     public function findActiveByVideo(Uuid $videoId): array;

@@ -7,6 +7,7 @@ namespace App\Tests\Functional\QoL;
 use App\QoL\Application\Port\EncoderProfileFingerprintPortInterface;
 use App\QoL\Infrastructure\Swoole\LearningDataPersister;
 use App\QoL\Infrastructure\Swoole\QoLWorkerStartupSubscriber;
+use App\QoL\Infrastructure\Worker\WorkerQoLLifecycle;
 use App\Shared\Infrastructure\Swoole\SwooleWorkerEventSubscriber;
 use App\Transcode\Infrastructure\FFmpeg\EncoderProfileFingerprintAdapter;
 use PHPUnit\Framework\Attributes\PreserveGlobalState;
@@ -19,7 +20,7 @@ use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerStartedEvent;
 #[PreserveGlobalState(false)]
 final class QoLWorkerStartupWiringTest extends KernelTestCase
 {
-    public function testCompiledContainerRegistersIndependentStartupSubscribersAndFingerprintAdapter(): void
+    public function testCompiledContainerKeepsQoLExecutionInTheMediaWorker(): void
     {
         self::bootKernel();
         $container = self::getContainer();
@@ -32,7 +33,8 @@ final class QoLWorkerStartupWiringTest extends KernelTestCase
             }
         }
 
-        self::assertContains(QoLWorkerStartupSubscriber::class, $listenerClasses);
+        self::assertNotContains(QoLWorkerStartupSubscriber::class, $listenerClasses);
+        self::assertInstanceOf(WorkerQoLLifecycle::class, $container->get('worker.media.qol_lifecycle'));
         self::assertContains(SwooleWorkerEventSubscriber::class, $listenerClasses);
         $fingerprint = $container->get(EncoderProfileFingerprintPortInterface::class);
         self::assertInstanceOf(EncoderProfileFingerprintAdapter::class, $fingerprint);

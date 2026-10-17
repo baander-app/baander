@@ -129,6 +129,35 @@ final class TranscodeFileStorageDeletionTest extends TestCase
         $this->assertBoundaryPreserved();
     }
 
+    public function testAudioActivityTraversalIgnoresLinksAtEachGenerationPathLevel(): void
+    {
+        $signature = 'mp3-192k-0123456789abcdef.mp3';
+        $track = $this->root . '/audio-renditions/track';
+        $outsideGeneration = $this->outside . '/generation-1';
+        mkdir($track, 0700, true);
+        mkdir($outsideGeneration);
+        file_put_contents($outsideGeneration . '/' . $signature . '.part', 'outside partial');
+        $cutoff = new \DateTimeImmutable('-1 minute');
+
+        symlink($this->outside, $track . '/' . $signature);
+        self::assertFalse($this->storage->isAudioRenditionEncodingSince('track', $cutoff));
+        unlink($track . '/' . $signature);
+        mkdir($track . '/' . $signature);
+        $generation = $track . '/' . $signature . '/generation-1';
+        symlink($outsideGeneration, $generation);
+        self::assertFalse($this->storage->isAudioRenditionEncodingSince('track', $cutoff));
+        unlink($generation);
+        mkdir($generation);
+        $partial = $generation . '/' . $signature . '.part';
+        symlink($outsideGeneration . '/' . $signature . '.part', $partial);
+        self::assertFalse($this->storage->isAudioRenditionEncodingSince('track', $cutoff));
+        unlink($partial);
+        file_put_contents($partial, 'real generation partial');
+        self::assertTrue($this->storage->isAudioRenditionEncodingSince('track', $cutoff));
+        touch($partial, time() - 120);
+        self::assertFalse($this->storage->isAudioRenditionEncodingSince('track', $cutoff));
+    }
+
     /** @return iterable<string, array{string}> */
     public static function linkTargets(): iterable
     {

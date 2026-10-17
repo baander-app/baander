@@ -54,10 +54,11 @@ final class AudioRenditionCache implements AudioRenditionPortInterface
             }
             if ($current->state === 'complete') {
                 $this->validatePaths($current);
-                if (!is_file((string) $current->finalPath)) {
-                    $this->fail('the completed rendition is missing');
+                clearstatcache(true, (string) $current->finalPath);
+                if (is_file((string) $current->finalPath)) {
+                    return AudioRendition::complete($format, (string) $current->finalPath);
                 }
-                return AudioRendition::complete($format, (string) $current->finalPath);
+                $this->runtime->resetCompleted($current->key, $current->generation);
             }
             if ($current->state === 'running') {
                 if (!$current->ownershipLive) {

@@ -113,6 +113,20 @@ final class TranscodeSessionRepository implements TranscodeSessionRepositoryInte
     }
 
     /** @return TranscodeSession[] */
+    public function findActiveByUserAndVideo(Uuid $userId, Uuid $videoId): array
+    {
+        $entities = $this->entityManager
+            ->getRepository(TranscodeSessionEntity::class)
+            ->findBy([
+                'userId' => $userId,
+                'videoId' => $videoId,
+                'state' => self::ACTIVE_STATES,
+            ]);
+
+        return array_map(fn(TranscodeSessionEntity $e) => $this->toDomain($e), $entities);
+    }
+
+    /** @return TranscodeSession[] */
     public function findAllActiveSessions(): array
     {
         $entities = $this->entityManager

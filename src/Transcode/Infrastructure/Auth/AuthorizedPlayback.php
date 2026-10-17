@@ -52,19 +52,25 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         return is_string($videoId) ? Uuid::fromString($videoId) : null;
     }
 
-    public function findSession(Uuid $videoId, PublicId $jobId): ?PublicId
+    public function findSessions(Uuid $videoId): array
     {
         $user = $this->security->getUser();
         if ($user === null || !method_exists($user, 'getId')) {
             throw new AccessDeniedException('Authentication required.');
         }
-        $value = $this->connection->fetchOne(
-            'SELECT s.public_id FROM transcode_sessions s JOIN transcode_jobs j ON j.id = s.job_id'
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT j.public_id AS job_id, s.public_id AS session_id FROM transcode_sessions s'
+            .' JOIN transcode_jobs j ON j.id = s.job_id'
             .' JOIN transcode_runtime_state r ON r.session_id = s.id AND r.job_id = j.id'
-            .' WHERE s.user_id = :user AND s.video_id = :video AND j.public_id = :job',
-            ['user' => $user->getId(), 'video' => $videoId->toString(), 'job' => $jobId->toString()],
+            .' WHERE s.user_id = :user AND j.owner_user_id = :user AND s.video_id = :video AND j.video_id = :video'
+            ." AND j.status IN ('pending', 'in_progress', 'completed') ORDER BY j.height, j.public_id LIMIT 3",
+            ['user' => $user->getId(), 'video' => $videoId->toString()],
         );
-        return is_string($value) ? PublicId::fromString($value) : null;
+        $sessions = [];
+        foreach ($rows as $row) {
+            $sessions[$row['job_id']] = PublicId::fromString($row['session_id']);
+        }
+        return $sessions;
     }
 
     public function start(Uuid $videoId): void

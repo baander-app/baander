@@ -132,17 +132,18 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                         $this->ownership->observe($active, 'cancelled');
                         return;
                     }
+                    $playbackSegment = min(max(0, $total - 1), (int) floor($latest->runtime->desired->position / SegmentEncoder::getSegmentDuration()));
                     if ($generation !== $latest->runtime->generation) {
                         // Reap the captured process before advancing the write fence.
                         $this->streamManager->stopStream($jobId);
                         $active = $latest;
-                        $scoped = $this->storage->forGeneration($job->getVideoId(), $tier, $active->runtime->generation);
+                        $scoped = $this->storage->forGeneration($job->getVideoId(), $tier, $active->runtime->generation, $job->getId());
                         $output = $scoped->resolveJobDirectory($job->getVideoId(), $tier);
                         $this->assertCurrent($active, $local, $stopRequested);
                         if (!is_dir($output) && !mkdir($output, 0755, true) && !is_dir($output)) {
                             throw new RuntimeException('Unable to create generation directory.');
                         }
-                        $start = max(0, (int) floor($active->runtime->desired->position / SegmentEncoder::getSegmentDuration()) - 3);
+                        $start = max(0, $playbackSegment - 3);
                         $this->writeMetadata($output, $active, $probe, $total, $start);
                         $this->persist($active, function (TranscodeJob $fresh) use ($output, $probe, $total): void {
                             $state = $fresh->getState();
@@ -172,7 +173,7 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                         $active = $latest;
                     }
                     $desiredPaused = $active->runtime->desired->status === 'paused';
-                    $mustPause = ($desiredPaused && $ready) || $throttled;
+                    $mustPause = ($desiredPaused && $ready && isset($seen[$playbackSegment])) || $throttled;
                     if ($mustPause !== $paused && !$finished) {
                         if ($mustPause) {
                             $this->streamManager->pauseStream($jobId);
@@ -213,7 +214,8 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                             $seen[$index] = true;
                         }
                     }
-                    if ((!$ready || $appliedRevision !== $active->runtime->desiredRevision) && $seen !== [] && $this->completeInit($init)) {
+                    if ((!$ready || $appliedRevision !== $active->runtime->desiredRevision)
+                        && isset($seen[$playbackSegment]) && $this->completeInit($init)) {
                         if ($desiredPaused && !$paused && !$finished) {
                             $this->streamManager->pauseStream($jobId);
                             $paused = true;
@@ -243,7 +245,6 @@ final class TranscodeSessionSubscriber implements TranscodeLoopStarterInterface
                         }
                         continue;
                     }
-                    $playbackSegment = (int) floor($active->runtime->desired->position / SegmentEncoder::getSegmentDuration());
                     $ahead = $highest - $playbackSegment;
                     if ($ahead >= 12) {
                         $throttled = true;

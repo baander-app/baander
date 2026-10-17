@@ -35,13 +35,13 @@ final class QualityFilteringStreamingDecoratorTest extends TestCase
 
         self::assertSame(
             "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=2800000,RESOLUTION=1280x720\n/api/stream/abc/media.m3u8?tier=720p\n",
-            $decorator->getMasterManifest($videoId, 3),
+            $decorator->getMasterManifest($videoId, [['jobId' => (new PublicId())->toString(), 'generation' => 3]]),
         );
         self::assertSame(
             '<MPD><Period><AdaptationSet>'
             . '<Representation id="720p" bandwidth="2800000"><BaseURL>a</BaseURL></Representation>'
             . '</AdaptationSet></Period></MPD>',
-            $decorator->getDashManifest($videoId, 3),
+            $decorator->getDashManifest($videoId, [['jobId' => (new PublicId())->toString(), 'generation' => 3]]),
         );
     }
 
@@ -52,8 +52,8 @@ final class QualityFilteringStreamingDecoratorTest extends TestCase
         $inner->method('getDashManifest')->willReturn(self::DASH);
         $decorator = $this->decorator($inner, restricted: false);
 
-        self::assertSame(self::HLS, $decorator->getMasterManifest(Uuid::generate(), 3));
-        self::assertSame(self::DASH, $decorator->getDashManifest(Uuid::generate(), 3));
+        self::assertSame(self::HLS, $decorator->getMasterManifest(Uuid::generate(), [['jobId' => (new PublicId())->toString(), 'generation' => 3]]));
+        self::assertSame(self::DASH, $decorator->getDashManifest(Uuid::generate(), [['jobId' => (new PublicId())->toString(), 'generation' => 3]]));
     }
 
     public function testStreamReadsPassThroughUnchanged(): void

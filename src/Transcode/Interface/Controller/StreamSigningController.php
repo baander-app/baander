@@ -48,7 +48,7 @@ final class StreamSigningController
             ),
         ),
         responses: [
-            new OA\Response(response: '200', description: 'Signed URL generated', content: new OA\JsonContent(properties: [new OA\Property(property: 'url', type: 'string'), new OA\Property(property: 'sig', type: 'string'), new OA\Property(property: 'exp', type: 'integer'), new OA\Property(property: 'generation', type: 'integer'), new OA\Property(property: 'jobId', type: 'string'), new OA\Property(property: 'sessionId', type: 'string', nullable: true), new OA\Property(property: 'revision', type: 'integer'), new OA\Property(property: 'ready', type: 'boolean'), new OA\Property(property: 'position', type: 'number'), new OA\Property(property: 'status', type: 'string'), new OA\Property(property: 'startTime', type: 'number', nullable: true), new OA\Property(property: 'duration', type: 'number', nullable: true)])),
+            new OA\Response(response: '200', description: 'Signed URL generated', content: new OA\JsonContent(properties: [new OA\Property(property: 'url', type: 'string', nullable: true), new OA\Property(property: 'sig', type: 'string'), new OA\Property(property: 'exp', type: 'integer'), new OA\Property(property: 'generation', type: 'integer'), new OA\Property(property: 'jobId', type: 'string'), new OA\Property(property: 'sessionId', type: 'string', nullable: true), new OA\Property(property: 'revision', type: 'integer'), new OA\Property(property: 'ready', type: 'boolean'), new OA\Property(property: 'position', type: 'number'), new OA\Property(property: 'status', type: 'string'), new OA\Property(property: 'startTime', type: 'number', nullable: true), new OA\Property(property: 'duration', type: 'number', nullable: true), new OA\Property(property: 'renditionSet', type: 'string')])),
             new OA\Response(response: '400', description: 'Invalid request'),
             new OA\Response(response: '503', description: 'Transcode startup is temporarily unavailable', headers: [
                 new OA\Header(header: 'Retry-After', schema: new OA\Schema(type: 'integer', example: 2)),
@@ -82,14 +82,20 @@ final class StreamSigningController
         } else {
             $this->playback->start($videoId);
         }
-        $state = $this->streaming->getPlaybackState($videoId);
-        if ($state === null) {
+        $sessions = $this->playback->findSessions($videoId);
+        if ($sessions === []) {
+            return new JsonResponse(['error' => 'Owned media execution is unavailable'], 503, ['Retry-After' => '2']);
+        }
+        $state = $this->streaming->getPlaybackState($videoId, array_keys($sessions));
+        if ($state === null || !isset($sessions[$state['jobId']])) {
             return new JsonResponse(['error' => 'Media execution is unavailable'], 503, ['Retry-After' => '2']);
         }
-        $state['sessionId'] = $this->playback->findSession($videoId, PublicId::fromString($state['jobId']))?->toString();
-        $path .= '?'.http_build_query(['generation' => $state['generation'], 'job' => $state['jobId']]);
-
-        $result = $this->streamAuth->signUrl($path, $expiresInSeconds);
+        $state['sessionId'] = $sessions[$state['jobId']]->toString();
+        $result = ['url' => null];
+        if ($state['ready']) {
+            $path .= '?'.http_build_query(['set' => $state['renditionSet']]);
+            $result = $this->streamAuth->signUrl($path, $expiresInSeconds);
+        }
 
         return new JsonResponse($result + $state, headers: ['Cache-Control' => 'no-store']);
     }

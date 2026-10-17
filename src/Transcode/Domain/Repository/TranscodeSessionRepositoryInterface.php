@@ -29,6 +29,9 @@ interface TranscodeSessionRepositoryInterface
     /** @return TranscodeSession[] */
     public function findActiveSessions(Uuid $userId): array;
 
+    /** @return TranscodeSession[] */
+    public function findActiveByUserAndVideo(Uuid $userId, Uuid $videoId): array;
+
     /**
      * The pending, preparing, active and paused sessions of every user, oldest first.
      *

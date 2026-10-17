@@ -44,6 +44,21 @@ final class WorkerChildProcessTest extends TestCase
         self::assertNotSame(getmypid(), $child->pid());
     }
 
+    public function testExplicitEmptyEnvironmentSurvivesFreshExecutionAndInheritance(): void
+    {
+        $literal = "value=with=equals\n\$(literal)";
+        $child = $this->start(
+            'echo json_encode([getenv("BAANDER_EMPTY_CHILD"), getenv("BAANDER_LITERAL_CHILD")], JSON_THROW_ON_ERROR);'
+            . ' $nested = proc_open([PHP_BINARY, "-r", \'echo json_encode(getenv("BAANDER_EMPTY_CHILD"), JSON_THROW_ON_ERROR);\'], [0 => ["file", "/dev/null", "r"], 1 => STDERR, 2 => STDERR], $pipes); exit(proc_close($nested));',
+            environment: ['BAANDER_EMPTY_CHILD' => '', 'BAANDER_LITERAL_CHILD' => $literal],
+        );
+        $this->awaitExit($child);
+
+        self::assertSame(json_encode(['', $literal], JSON_THROW_ON_ERROR), file_get_contents(stream_get_meta_data($this->stdout)['uri']));
+        self::assertSame('""', file_get_contents(stream_get_meta_data($this->stderr)['uri']));
+        self::assertSame(0, $child->exitCode());
+    }
+
     public function testCooperativeChildDrainsOnTerm(): void
     {
         $child = $this->start('pcntl_async_signals(true); pcntl_signal(SIGTERM, static function () { exit(0); }); echo "ready"; while (true) { usleep(10000); }');

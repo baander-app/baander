@@ -104,6 +104,17 @@ SQL, [$input->key(), $input->trackKey, $input->sourceSignature, $input->sourcePa
         return $this->mutate($claim, "state = 'complete'", [], true);
     }
 
+    public function resetCompleted(string $key, int $generation): bool
+    {
+        return $this->connection->transactional(function () use ($key, $generation): bool {
+            $row = $this->locked('audio_rendition_runtime', 'rendition_key', $key);
+            if ($row === null || $row['state'] !== 'complete' || (int) $row['generation'] !== $generation) {
+                return false;
+            }
+            return $this->connection->executeStatement("UPDATE audio_rendition_runtime SET state = 'pending', partial_path = NULL, final_path = NULL, error = NULL, " . $this->clearOwnerSql() . ', updated_at = clock_timestamp() WHERE rendition_key = ?', [$key]) === 1;
+        });
+    }
+
     public function fail(AudioRenditionClaim $claim, string $error): bool
     {
         return $this->mutate($claim, "state = 'failed', error = :error", ['error' => $error]);

@@ -12,6 +12,24 @@ use PHPUnit\Framework\TestCase;
 
 final class DeploymentOperatorManifestTest extends TestCase
 {
+    public function testConfiguredSourceRootMustBelongToAnAdmittedSourceVolume(): void
+    {
+        $manifest = DeploymentOperatorManifest::fromJson($this->json());
+        $recipe = $manifest->recipe(new DeploymentRuntimeEnvironment(['MEDIA_STORAGE_PATH' => '/media/library/audio']));
+        self::assertSame('/media/library/audio', $recipe->runtimeEnvironment->variables['MEDIA_STORAGE_PATH']);
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('source storage');
+        $manifest->recipe(new DeploymentRuntimeEnvironment(['MEDIA_STORAGE_PATH' => '/var/www/html/storage/media']));
+    }
+
+    public function testConfiguredSourceRootCannotEscapeItsVolume(): void
+    {
+        $manifest = DeploymentOperatorManifest::fromJson($this->json());
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('canonical absolute');
+        $manifest->recipe(new DeploymentRuntimeEnvironment(['MEDIA_STORAGE_PATH' => '/media/library/../private']));
+    }
+
     public function testRecipeBindsIdentityBudgetsAndFixedWorkerCommand(): void
     {
         $manifest = DeploymentOperatorManifest::fromJson($this->json());

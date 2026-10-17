@@ -1,0 +1,21 @@
+<?php
+
+namespace App\Shared\Infrastructure\Worker;
+
+/**
+ * Analysis-only signature for the unqualified native call in this namespace.
+ * PHPStan cannot override its own global proc_open stub. This file is scanned,
+ * never autoloaded; PHP resolves the runtime call to the global native function.
+ *
+ * PHP accepts numeric environment entries containing the complete NAME=value pair.
+ * Unlike associative empty values, NAME= entries preserve an explicitly empty value.
+ *
+ * @param string|list<string> $command
+ * @param array<int, mixed> $descriptor_spec
+ * @param array<int, resource>|null $pipes
+ * @param-out array<int, resource> $pipes
+ * @param array<string, mixed>|list<string>|null $env_vars
+ * @param array<string, mixed>|null $options
+ * @return resource|false
+ */
+function proc_open(array|string $command, array $descriptor_spec, &$pipes, ?string $cwd = null, ?array $env_vars = null, ?array $options = null) {}

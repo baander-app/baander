@@ -110,7 +110,7 @@ final class SweepTranscodeCacheHandlerTest extends TestCase
         $dir = $this->cacheRoot . '/' . $videoId->toString();
         $this->writeSegment($dir . '/p1080', 'v0_a0_p1080_0.m4s', "data", 3600 * 26);
 
-        $job = TranscodeJob::create($videoId, QualityTier::p1080(), $dir);
+        $job = TranscodeJob::create($videoId, QualityTier::p1080(), $dir, Uuid::v7());
         $job->markInProgress(); // still encoding -> active
         $this->jobsByVideo[$videoId->toString()] = [$job];
 
@@ -129,7 +129,7 @@ final class SweepTranscodeCacheHandlerTest extends TestCase
         $this->writeSegment($dir . '/p1080', 'v0_a0_p1080_0.m4s', "data", 3600 * 26);
 
         // Completed job (not encoding) but a viewer is actively watching.
-        $job = TranscodeJob::create($videoId, QualityTier::p1080(), $dir);
+        $job = TranscodeJob::create($videoId, QualityTier::p1080(), $dir, Uuid::v7());
         $job->markInProgress();
         $job->markCompleted();
         $session = TranscodeSession::create(
@@ -199,7 +199,7 @@ final class SweepTranscodeCacheHandlerTest extends TestCase
         $this->writeSegment($this->cacheRoot . '/' . $active->toString() . '/p1080', 'a.m4s', "activedata", 60);
         $this->writeSegment($this->cacheRoot . '/' . $idle->toString() . '/p1080', 'a.m4s', "idle", 600);
 
-        $job = TranscodeJob::create($active, QualityTier::p1080(), $this->cacheRoot . '/' . $active->toString());
+        $job = TranscodeJob::create($active, QualityTier::p1080(), $this->cacheRoot . '/' . $active->toString(), Uuid::v7());
         $job->markInProgress();
         $this->jobsByVideo[$active->toString()] = [$job];
 
@@ -228,8 +228,8 @@ final class SweepTranscodeCacheHandlerTest extends TestCase
     {
         $idle = $this->cacheRoot . '/audio-renditions/idleTrackPublicId001';
         $recent = $this->cacheRoot . '/audio-renditions/recentTrackPublicId01';
-        $this->writeSegment($idle, 'mp3-192k-0123456789abcdef.mp3', 'idle', 3600 * 26);
-        $this->writeSegment($recent, 'opus-128k-0123456789abcdef.opus', 'recent', 60);
+        $this->writeSegment($idle . '/mp3-192k-0123456789abcdef.mp3/generation-1', 'mp3-192k-0123456789abcdef.mp3', 'idle', 3600 * 26);
+        $this->writeSegment($recent . '/opus-128k-0123456789abcdef.opus/generation-2', 'opus-128k-0123456789abcdef.opus', 'recent', 60);
 
         $result = $this->buildHandler()->sweep(['ttl_hours' => 24]);
 
@@ -245,10 +245,10 @@ final class SweepTranscodeCacheHandlerTest extends TestCase
     {
         $encoding = $this->cacheRoot . '/audio-renditions/encodingTrackId000001';
         $abandoned = $this->cacheRoot . '/audio-renditions/abandonedTrackId00001';
-        $this->writeSegment($encoding, 'mp3-320k-0123456789abcdef.mp3', 'old rendition', 3600 * 26);
-        $this->writeSegment($encoding, 'aac-192k-0123456789abcdef.aac.part', 'growing', 5);
+        $this->writeSegment($encoding . '/mp3-320k-0123456789abcdef.mp3/generation-1', 'mp3-320k-0123456789abcdef.mp3', 'old rendition', 3600 * 26);
+        $this->writeSegment($encoding . '/aac-192k-0123456789abcdef.aac/generation-2', 'aac-192k-0123456789abcdef.aac.part', 'growing', 5);
         // A partial file nobody has written to for longer than the active window.
-        $this->writeSegment($abandoned, 'aac-192k-0123456789abcdef.aac.part', 'stale', 3600 * 2);
+        $this->writeSegment($abandoned . '/aac-192k-0123456789abcdef.aac/generation-1', 'aac-192k-0123456789abcdef.aac.part', 'stale', 3600 * 2);
 
         $result = $this->buildHandler()->sweep(['ttl_hours' => 24, 'max_gb' => 0.0]);
 
@@ -256,6 +256,20 @@ final class SweepTranscodeCacheHandlerTest extends TestCase
         self::assertSame(['audio-renditions/abandonedTrackId00001'], $result->deletedDirectories);
         self::assertDirectoryExists($encoding);
         self::assertDirectoryDoesNotExist($abandoned);
+    }
+
+    public function testCompletedNestedAudioBecomesEvictableAfterItsPartialIsPublished(): void
+    {
+        $track = $this->cacheRoot . '/audio-renditions/encodingTrackId000001';
+        $signature = 'mp3-192k-0123456789abcdef.mp3';
+        $directory = $track . '/' . $signature . '/generation-1';
+        $this->writeSegment($directory, $signature . '.part', 'encoded', 5);
+        $handler = $this->buildHandler();
+        self::assertSame(['audio-renditions/encodingTrackId000001'], $handler->sweep(['max_gb' => 0.0])->skippedActive);
+        rename($directory . '/' . $signature . '.part', $directory . '/' . $signature);
+        $result = $handler->sweep(['max_gb' => 0.0]);
+        self::assertSame(['audio-renditions/encodingTrackId000001'], $result->deletedDirectories);
+        self::assertDirectoryDoesNotExist($track);
     }
 
     // --- helpers -----------------------------------------------------------

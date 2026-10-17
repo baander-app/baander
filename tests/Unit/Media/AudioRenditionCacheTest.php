@@ -140,12 +140,49 @@ final class AudioRenditionCacheTest extends TestCase
         $this->cache()->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
     }
 
-    public function testMissingCompletedFileFailsInsteadOfReturningAnEmptySuccess(): void
+    #[\PHPUnit\Framework\Attributes\DataProvider('evictionResetResults')]
+    public function testEvictedCompletedRenditionIsRebuiltWithoutChangingTheSource(bool $resetWon): void
     {
-        $this->runtime->method('find')->willReturnCallback(fn (): AudioRenditionRuntimeSnapshot => $this->snapshot('complete'));
-        $this->expectException(AudioRenditionFailedException::class);
-        $this->expectExceptionMessage('completed rendition is missing');
-        $this->cache()->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
+        $generation = 1;
+        $runtime = $this->createMock(AudioRenditionRuntimePort::class);
+        $runtime->method('admit')->willReturnCallback(function (AudioRenditionInput $input): AudioRenditionRuntimeSnapshot {
+            $this->input = $input;
+            return $this->snapshot('complete');
+        });
+        $runtime->method('find')->willReturnCallback(function () use (&$generation): AudioRenditionRuntimeSnapshot {
+            return $this->snapshot('complete', $generation);
+        });
+        $runtime->expects(self::once())->method('resetCompleted')->willReturnCallback(function (string $key, int $observedGeneration) use (&$generation, $resetWon): bool {
+            self::assertSame($this->input->key(), $key);
+            self::assertSame(1, $observedGeneration);
+            $generation = 2;
+            mkdir(dirname($this->path(2)), 0700, true);
+            file_put_contents($this->path(2), 'rebuilt');
+            return $resetWon;
+        });
+        $this->runtime = $runtime;
+        // Establish the canonical source identity without starting a local encoder.
+        $modified = filemtime($this->source);
+        $size = filesize($this->source);
+        self::assertIsInt($modified);
+        self::assertIsInt($size);
+        $signature = AudioRenditionFormat::Mp3->sourceSignature(192000, $modified, $size);
+        $this->input = new AudioRenditionInput('track', $signature, $this->source, AudioRenditionFormat::Mp3, 192000, $this->root . '/audio-renditions/track/' . $signature);
+        $this->write('original');
+        $cache = $this->cache();
+        $first = $cache->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
+        self::assertSame('original', file_get_contents($first->path));
+        (new \App\Transcode\Infrastructure\Storage\TranscodeFileStorage(new SegmentFileResolver($this->root)))->deleteDirectory($this->root . '/audio-renditions/track');
+        $rebuilt = $cache->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
+        self::assertSame('rebuilt', file_get_contents($rebuilt->path));
+        self::assertStringContainsString('/generation-2/', $rebuilt->path);
+    }
+
+    /** @return iterable<string, array{bool}> */
+    public static function evictionResetResults(): iterable
+    {
+        yield 'this request resets the completed generation' => [true];
+        yield 'another request already reset and rebuilt it' => [false];
     }
 
     private function cache(): AudioRenditionCache

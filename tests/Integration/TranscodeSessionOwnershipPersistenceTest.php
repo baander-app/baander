@@ -45,6 +45,27 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         $this->assertSchemaComparisonIsClean(['transcode_runtime_state', 'audio_rendition_runtime']);
     }
 
+    public function testJobsForTheSameVideoAndTierRemainScopedToTheirOwner(): void
+    {
+        $alice = $this->createUser();
+        $bob = $this->createUser();
+        $video = $this->createVideo();
+        $tier = \App\Transcode\Domain\ValueObject\QualityTier::p720();
+        $first = \App\Transcode\Domain\Model\TranscodeJob::create($video, $tier, '/fixture/alice', $alice);
+        $second = \App\Transcode\Domain\Model\TranscodeJob::create($video, $tier, '/fixture/bob', $bob);
+        $repository = new \App\Transcode\Infrastructure\Doctrine\Repository\TranscodeJobRepository($this->manager);
+        $repository->save($first);
+        $repository->save($second);
+        $unowned = new TranscodeJobEntity(new PublicId(), $video, $tier->name, ownerUserId: null);
+        $this->manager->persist($unowned);
+        $this->manager->flush();
+        $this->manager->clear();
+        self::assertTrue($repository->findByOwnerVideoAndQuality($alice, $video, $tier->name)?->getId()->equals($first->getId()));
+        self::assertTrue($repository->findByOwnerVideoAndQuality($bob, $video, $tier->name)?->getId()->equals($second->getId()));
+        self::assertSame([$first->getId()->toString()], array_map(static fn(\App\Transcode\Domain\Model\TranscodeJob $job): string => $job->getId()->toString(), $repository->findActiveByOwnerAndVideo($alice, $video)));
+        self::assertNull($repository->findByUuid($unowned->getId())?->getOwnerUserId());
+    }
+
     public function testLookupsByUserAndByJobStayOwnerScoped(): void
     {
         $first = $this->createUser();
@@ -186,7 +207,7 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
 
     private function createJob(): Uuid
     {
-        $job = new TranscodeJobEntity(new PublicId(), $this->createVideo(), '1080p');
+        $job = new TranscodeJobEntity(new PublicId(), $this->createVideo(), '1080p', ownerUserId: null);
         $this->manager->persist($job);
         $this->manager->flush();
 

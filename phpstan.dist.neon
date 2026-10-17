@@ -19,9 +19,13 @@ parameters:
 
   scanFiles:
     - scripts/backend-test-runner.php
+    - phpstan/proc-open.stub
 
   bootstrapFiles:
     - vendor/autoload.php
+
+  stubFiles:
+    - phpstan/proc-open.stub
 
   # Universal object crates — classes that accept any property access
   universalObjectCratesClasses:

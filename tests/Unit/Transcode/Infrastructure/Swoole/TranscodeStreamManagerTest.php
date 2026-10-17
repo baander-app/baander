@@ -433,11 +433,7 @@ final class TranscodeStreamManagerTest extends TestCase
 
     private function makeJob(): TranscodeJob
     {
-        return TranscodeJob::create(
-            videoId: Uuid::v4(),
-            qualityTier: QualityTier::p720(),
-            outputDirectory: '/tmp/test-job',
-        );
+        return TranscodeJob::create(videoId: Uuid::v4(), qualityTier: QualityTier::p720(), outputDirectory: '/tmp/test-job', ownerUserId: \App\Shared\Domain\Model\Uuid::generate());
     }
 }
 

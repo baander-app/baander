@@ -9,8 +9,8 @@ use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(readOnly: true)]
 #[ORM\Table(name: 'transcode_runtime_state')]
-#[ORM\Index(name: 'idx_transcode_runtime_pending', columns: ['updated_at', 'job_id'], options: ['where' => "(outcome = ANY (ARRAY['pending'::text, 'accepted'::text, 'ready'::text]))"])]
-#[ORM\Index(name: 'idx_transcode_runtime_session', columns: ['session_id'])]
+#[ORM\Index(name: 'idx_transcode_runtime_state_pending', columns: ['updated_at', 'job_id'], options: ['where' => "(outcome = ANY (ARRAY['pending'::text, 'accepted'::text, 'ready'::text]))"])]
+#[ORM\Index(name: 'idx_transcode_runtime_state_session_id', columns: ['session_id'])]
 final class TranscodeRuntimeEntity
 {
     #[ORM\Id]
@@ -22,9 +22,6 @@ final class TranscodeRuntimeEntity
 
     #[ORM\Column(name: 'request_id', type: 'text')]
     private string $requestId;
-
-    #[ORM\Column(name: 'last_control_request_id', type: 'text', nullable: true)]
-    private ?string $lastControlRequestId;
 
     /** @var array<string, mixed> */
     #[ORM\Column(name: 'desired', type: 'json', options: ['jsonb' => true])]

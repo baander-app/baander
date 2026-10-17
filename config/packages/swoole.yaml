@@ -59,6 +59,9 @@ swoole:
             # enabled, 4 workers give enough headroom for concurrent SSE + API traffic.
             worker_count: 4
             reactor_count: 2
+            # Bound async file I/O threads independently of the host CPU count.
+            aio_core_worker_num: 1
+            aio_worker_num: 4
             # Connection workers retain long-lived WebSocket and SSE sessions.
             worker_max_request: 0
             # Grace period unused when recycling is disabled.

@@ -27,13 +27,12 @@ final class CoveredIndexPersistenceTest extends TestCase
         'idx_recommendations_source_type_source_id' => ['recommendations', 'source_type = :text AND source_id = :text', 'uniq_recommendations_source_target_name_user_id'],
         'idx_songs_title' => ['songs', 'title = :text', 'idx_songs_title_id'],
         'idx_starred_stations_user_id' => ['starred_stations', 'user_id = :id', 'uniq_starred_stations_user_id_station_id'],
-        'idx_transcode_jobs_video_id' => ['transcode_jobs', 'video_id = :id', 'uniq_transcode_jobs_video_id_quality_tier_name'],
         'idx_user_favorites_user_id' => ['user_favorites', 'user_id = :id', 'uniq_user_favorites_user_id_entity_type_entity_public_id'],
     ];
 
     public function testSchemaComparisonIsCleanForTheAffectedTables(): void
     {
-        $this->assertSchemaComparisonIsClean(array_values(array_unique(array_column(self::COVERED, 0))));
+        $this->assertSchemaComparisonIsClean(array_values(array_unique([...array_column(self::COVERED, 0), 'transcode_jobs'])));
     }
 
     public function testTheWiderIndexesAloneServeTheDroppedIndexLookups(): void
@@ -68,6 +67,33 @@ final class CoveredIndexPersistenceTest extends TestCase
             ));
             self::assertStringContainsString('Index Scan using ' . $covering . ' on ' . $table, $plan, $dropped);
             self::assertStringContainsString('Index Cond:', $plan, $dropped);
+        }
+    }
+
+    public function testVideoJobLookupsUseIndexesLeadingWithOwnerAndVideo(): void
+    {
+        $connection = $this->manager->getConnection();
+        $table = $connection->createSchemaManager()->introspectTable('transcode_jobs');
+        $owned = 'uniq_transcode_jobs_owner_user_id_video_id_quality_tier_name';
+        $video = 'idx_transcode_jobs_video_id';
+        self::assertFalse($table->hasIndex('uniq_transcode_jobs_video_id_quality_tier_name'));
+        self::assertSame(['owner_user_id', 'video_id', 'quality_tier_name'], $table->getIndex($owned)->getColumns());
+        self::assertSame(['video_id'], $table->getIndex($video)->getColumns());
+
+        $connection->executeStatement('ANALYZE transcode_jobs');
+        $connection->executeStatement('SET LOCAL enable_seqscan = off');
+        $connection->executeStatement('SET LOCAL enable_bitmapscan = off');
+        $connection->executeStatement('SET LOCAL enable_indexonlyscan = off');
+        foreach ([
+            ['owner_user_id = :id', $owned],
+            ['video_id = :id', $video],
+        ] as [$predicate, $index]) {
+            $plan = implode("\n", $connection->fetchFirstColumn(
+                'EXPLAIN (COSTS OFF) SELECT 1 FROM transcode_jobs WHERE ' . $predicate,
+                ['id' => self::ID],
+            ));
+            self::assertStringContainsString('Index Scan using ' . $index . ' on transcode_jobs', $plan, $predicate);
+            self::assertStringContainsString('Index Cond:', $plan, $predicate);
         }
     }
 

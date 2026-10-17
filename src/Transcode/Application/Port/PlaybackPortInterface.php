@@ -9,7 +9,8 @@ use App\Shared\Domain\Model\PublicId;
 
 interface PlaybackPortInterface extends PlaybackAccessInterface
 {
-    public function findSession(Uuid $videoId, PublicId $jobId): ?PublicId;
+    /** @return array<string, PublicId> Owned job public IDs mapped to their current session public IDs. */
+    public function findSessions(Uuid $videoId): array;
 
     public function start(Uuid $videoId): void;
 }

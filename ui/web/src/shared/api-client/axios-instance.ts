@@ -48,13 +48,12 @@ export function apiOrigin(): string {
 
 /**
  * Build the htu (HTTP URI) for a DPoP proof.
- * Strips query and fragment, normalizes to https scheme.
+ * Preserves the request origin and path, excluding query and fragment.
  */
 export function buildHtu(url: string): string {
   try {
     const parsed = new URL(url, apiOrigin());
-    // Normalize http/https to https per RFC 9449 §4.3
-    return `https://${parsed.host}${parsed.pathname}`;
+    return `${parsed.origin}${parsed.pathname}`;
   } catch {
     return url;
   }

@@ -154,6 +154,35 @@ final class AudioRenditionRuntimeLeaseTest extends TestCase
         self::assertSame(0, $this->first->getTransactionNestingLevel());
     }
 
+    public function testEvictedCompletedOutputCanBeResetOnlyForTheObservedGeneration(): void
+    {
+        $runtime = new AudioRenditionRuntime($this->first);
+        $other = new AudioRenditionRuntime($this->second);
+        $row = $runtime->admit($this->input());
+        $old = $runtime->claim($row->key, $this->worker());
+        self::assertNotNull($old);
+        $directory = $old->runtime->generationDirectory();
+        self::assertTrue($runtime->start($old, $directory . '/audio.partial', $directory . '/audio.opus'));
+        self::assertTrue($runtime->complete($old));
+        self::assertFalse($other->resetCompleted($row->key, $old->runtime->generation + 1));
+        self::assertTrue($other->resetCompleted($row->key, $old->runtime->generation));
+        $pending = $runtime->find($row->key);
+        self::assertNotNull($pending);
+        self::assertSame('pending', $pending->state);
+        self::assertSame($old->runtime->generation, $pending->generation);
+        self::assertNull($pending->partialPath);
+        self::assertNull($pending->finalPath);
+        self::assertNull($pending->error);
+        self::assertFalse($pending->ownershipLive);
+        self::assertFalse($runtime->resetCompleted($row->key, $old->runtime->generation));
+        $next = $runtime->claim($row->key, $this->worker('b'));
+        self::assertNotNull($next);
+        self::assertGreaterThan($old->runtime->generation, $next->runtime->generation);
+        self::assertFalse($other->resetCompleted($row->key, $old->runtime->generation));
+        self::assertFalse($runtime->complete($old));
+        self::assertTrue($runtime->renew($next));
+    }
+
     public function testPublicationOutsideTheGenerationDirectoryIsRejected(): void
     {
         $runtime = new AudioRenditionRuntime($this->first);

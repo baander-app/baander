@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Transcode\Application\Exception\AudioRenditionFailedException;
+use App\Transcode\Application\CommandHandler\SweepTranscodeCacheHandler;
+use App\Transcode\Application\Port\TranscodeJobPortInterface;
+use App\Transcode\Application\Port\TranscodeSessionPortInterface;
+use App\Transcode\Infrastructure\Storage\TranscodeFileStorage;
 use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Transcode\Infrastructure\Doctrine\AudioRenditionRuntime;
 use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
@@ -92,6 +96,31 @@ final class AudioRenditionWorkerHandoffTest extends TestCase
         self::assertSame('first-second', implode('', iterator_to_array($recovered->chunks(), false)));
         self::assertSame(0, $this->workerProcess->wait(), $this->workerProcess->getErrorOutput());
         self::assertSame(2, (int) $this->first->fetchOne('SELECT generation FROM audio_rendition_runtime'));
+    }
+
+    public function testEvictedCompletedAudioRebuildsFromTheSameSourceInANewWorkerGeneration(): void
+    {
+        $cache = $this->cache();
+        $this->startWorker(.1);
+        $original = $cache->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
+        self::assertSame('first-second', $original->isComplete() ? file_get_contents($original->path) : implode('', iterator_to_array($original->chunks(), false)));
+        self::assertSame(0, $this->workerProcess->wait(), $this->workerProcess->getErrorOutput());
+        $key = $this->first->fetchOne('SELECT rendition_key FROM audio_rendition_runtime');
+        $final = $this->first->fetchOne('SELECT final_path FROM audio_rendition_runtime');
+        self::assertIsString($final);
+        $storage = new TranscodeFileStorage(new SegmentFileResolver($this->root . '/cache'));
+        $sweep = new SweepTranscodeCacheHandler($storage, $this->createStub(TranscodeJobPortInterface::class), $this->createStub(TranscodeSessionPortInterface::class));
+        self::assertSame(['audio-renditions/track'], $sweep->sweep(['max_gb' => 0.0])->deletedDirectories);
+        self::assertFileDoesNotExist($final);
+
+        $this->startWorker(.1);
+        $rebuilt = $cache->open('track', $this->source, AudioRenditionFormat::Mp3, 192000);
+        self::assertSame('first-second', $rebuilt->isComplete() ? file_get_contents($rebuilt->path) : implode('', iterator_to_array($rebuilt->chunks(), false)));
+        self::assertSame(0, $this->workerProcess->wait(), $this->workerProcess->getErrorOutput());
+        self::assertSame($key, $this->first->fetchOne('SELECT rendition_key FROM audio_rendition_runtime'));
+        self::assertSame(2, (int) $this->first->fetchOne('SELECT generation FROM audio_rendition_runtime'));
+        self::assertSame(1, (int) $this->first->fetchOne('SELECT count(*) FROM audio_rendition_runtime'));
+        self::assertSame('complete', $this->first->fetchOne('SELECT state FROM audio_rendition_runtime'));
     }
 
     private function cache(): AudioRenditionCache

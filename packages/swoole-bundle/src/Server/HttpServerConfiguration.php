@@ -16,6 +16,8 @@ use SwooleBundle\SwooleBundle\Server\Config\Sockets;
  *   max_coroutine: int,
  *   reactor_count: int,
  *   worker_count: int,
+ *   aio_core_worker_num?: int,
+ *   aio_worker_num?: int,
  *   task_worker_count?: int,
  *   serve_static: string,
  *   public_dir: string,

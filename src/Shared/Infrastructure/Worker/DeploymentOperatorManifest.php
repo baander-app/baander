@@ -113,26 +113,29 @@ final readonly class DeploymentOperatorManifest
         if (!in_array('source', array_column($recipe->mediaMounts, 'role'), true)) {
             throw new InvalidArgumentException('Operator media topology requires an explicitly authorized source volume.');
         }
-        $paths = ['/var/www/html/storage', '/var/www/html/var/transcode_state'];
-        if (isset($environment->variables['CONVERT_STORAGE_PATH'])) {
-            $conversionPath = $environment->variables['CONVERT_STORAGE_PATH'];
-            if (strlen($conversionPath) > 4096
-                || preg_match('~\A/(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\z~D', $conversionPath) !== 1
-                || preg_match('~(?:^|/)\.\.?(?:/|$)~', $conversionPath) !== 0) {
-                throw new InvalidArgumentException('Conversion storage requires a canonical absolute shared-media path.');
+        $paths = [['/var/www/html/storage', 'derived'], ['/var/www/html/var/transcode_state', 'derived']];
+        foreach (['CONVERT_STORAGE_PATH' => 'derived', 'MEDIA_STORAGE_PATH' => 'source'] as $key => $role) {
+            if (!isset($environment->variables[$key])) {
+                continue;
             }
-            $paths[] = $conversionPath;
+            $path = $environment->variables[$key];
+            if (strlen($path) > 4096
+                || preg_match('~\A/(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\z~D', $path) !== 1
+                || preg_match('~(?:^|/)\.\.?(?:/|$)~', $path) !== 0) {
+                throw new InvalidArgumentException('Media storage requires a canonical absolute shared-media path.');
+            }
+            $paths[] = [$path, $role];
         }
-        foreach ($paths as $path) {
+        foreach ($paths as [$path, $role]) {
             $covered = false;
             foreach ($recipe->mediaMounts as $mount) {
-                if ($mount['role'] === 'derived' && ($path === $mount['target'] || str_starts_with($path, $mount['target'] . '/'))) {
+                if ($mount['role'] === $role && ($path === $mount['target'] || str_starts_with($path, $mount['target'] . '/'))) {
                     $covered = true;
                     break;
                 }
             }
             if (!$covered) {
-                throw new InvalidArgumentException('Operator media topology does not cover required writable storage: ' . $path);
+                throw new InvalidArgumentException('Operator media topology does not cover required ' . ($role === 'source' ? 'source' : 'writable') . ' storage: ' . $path);
             }
         }
         return $recipe;

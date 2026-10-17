@@ -15,8 +15,8 @@ use Psr\Log\LoggerInterface;
 /**
  * Backs stream admission and completion with the in-memory StreamGovernor.
  *
- * Admission performs no I/O, so the synchronous veto never blocks the HTTP
- * worker. Completion records a learning sample, releases the allocation and
+ * Admission performs no I/O, so the synchronous veto never blocks the
+ * video child. Completion records a learning sample, releases the allocation and
  * persists learning state when the persister's threshold is reached.
  */
 final class StreamAdmissionService implements StreamAdmissionPortInterface

@@ -41,10 +41,11 @@ final readonly class TranscodePublicView implements TranscodePublicViewInterface
             throw new NotFoundException('Session relationship not found.');
         }
 
-        $playback = $this->streaming->getPlaybackState($session->getVideoId(), $row['job_id']);
+        $playback = $this->streaming->getPlaybackState($session->getVideoId(), [$row['job_id']]);
         if ($playback !== null) {
-            $path = '/api/transcode/'.$row['video_id'].'/master.m3u8?'.http_build_query(['generation' => $playback['generation'], 'job' => $playback['jobId']]);
-            $playback['manifestUrl'] = $this->streamAuth->signUrl($path)['url'];
+            $playback['manifestUrl'] = $playback['ready']
+                ? $this->streamAuth->signUrl('/api/transcode/'.$row['video_id'].'/master.m3u8?'.http_build_query(['set' => $playback['renditionSet']]))['url']
+                : null;
         }
         return TranscodeSessionDto::fromModel($session, PublicId::fromString($row['user_id']), PublicId::fromString($row['job_id']), PublicId::fromString($row['video_id']), $playback);
     }

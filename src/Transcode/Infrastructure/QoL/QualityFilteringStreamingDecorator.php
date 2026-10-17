@@ -30,14 +30,14 @@ final readonly class QualityFilteringStreamingDecorator implements TranscodeStre
     {
     }
 
-    public function getPlaybackState(Uuid $videoId, ?string $jobPublicId = null): ?array
+    public function getPlaybackState(Uuid $videoId, array $allowedJobPublicIds): ?array
     {
-        return $this->inner->getPlaybackState($videoId, $jobPublicId);
+        return $this->inner->getPlaybackState($videoId, $allowedJobPublicIds);
     }
 
-    public function getMasterManifest(Uuid $videoId, int $generation, ?string $jobPublicId = null): string
+    public function getMasterManifest(Uuid $videoId, array $renditions): string
     {
-        $manifest = $this->inner->getMasterManifest($videoId, $generation, $jobPublicId);
+        $manifest = $this->inner->getMasterManifest($videoId, $renditions);
 
         return $this->filterHlsManifest($manifest);
     }
@@ -127,9 +127,9 @@ final readonly class QualityFilteringStreamingDecorator implements TranscodeStre
         return $this->inner->getInitSegmentPath($jobPublicId, $generation);
     }
 
-    public function getDashManifest(Uuid $videoId, int $generation, ?string $jobPublicId = null): string
+    public function getDashManifest(Uuid $videoId, array $renditions): string
     {
-        $manifest = $this->inner->getDashManifest($videoId, $generation, $jobPublicId);
+        $manifest = $this->inner->getDashManifest($videoId, $renditions);
 
         return $this->filterDashManifest($manifest);
     }
@@ -186,9 +186,9 @@ final readonly class QualityFilteringStreamingDecorator implements TranscodeStre
     /**
      * @return list<array{name: string, height: int, width: int, bitrate: int, codec: string}>
      */
-    public function getQualityLadderForVideo(Uuid $videoId): array
+    public function getQualityLadderForVideo(Uuid $videoId, array $allowedJobPublicIds): array
     {
-        return $this->inner->getQualityLadderForVideo($videoId);
+        return $this->inner->getQualityLadderForVideo($videoId, $allowedJobPublicIds);
     }
 
     public function getSubtitleManifest(PublicId $jobPublicId, string $language, int $generation): string

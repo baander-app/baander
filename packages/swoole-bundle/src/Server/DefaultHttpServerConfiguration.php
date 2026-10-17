@@ -18,6 +18,8 @@ use SwooleBundle\SwooleBundle\Server\Config\Sockets;
  *   max_coroutine?: int,
  *   reactor_count?: int,
  *   worker_count?: int,
+ *   aio_core_worker_num?: int,
+ *   aio_worker_num?: int,
  *   task_worker_count?: int|string,
  *   serve_static?: string,
  *   public_dir?: string,
@@ -46,6 +48,8 @@ use SwooleBundle\SwooleBundle\Server\Config\Sockets;
  *    max_coroutine?: int,
  *    reactor_count: int,
  *    worker_count: int,
+ *    aio_core_worker_num?: int,
+ *    aio_worker_num?: int,
  *    task_worker_count?: int,
  *    serve_static: string,
  *    public_dir: string,
@@ -154,6 +158,8 @@ final class DefaultHttpServerConfiguration implements HttpServerConfiguration
      * @see https://github.com/swoole/swoole-docs/blob/master/modules/swoole-http-server/configuration.md
      */
     private const array SWOOLE_HTTP_SERVER_CONFIGURATION = [
+        'aio_core_worker_num' => 'aio_core_worker_num',
+        'aio_worker_num' => 'aio_worker_num',
         self::SWOOLE_HTTP_SERVER_CONFIG_BUFFER_OUTPUT_SIZE => 'buffer_output_size',
         self::SWOOLE_HTTP_SERVER_CONFIG_COROUTINE_HOOK_FLAGS => 'hook_flags',
         self::SWOOLE_HTTP_SERVER_CONFIG_DAEMONIZE => 'daemonize',
@@ -470,7 +476,6 @@ final class DefaultHttpServerConfiguration implements HttpServerConfiguration
         $swooleSettings = [];
 
         foreach ($this->settings as $key => $setting) {
-            /** @phpstan-ignore-next-line */
             $swooleSettingKey = self::SWOOLE_HTTP_SERVER_CONFIGURATION[$key];
             $swooleGetter = sprintf('getSwoole%s', str_replace('_', '', $swooleSettingKey));
             if (method_exists($this, $swooleGetter)) {
@@ -484,7 +489,7 @@ final class DefaultHttpServerConfiguration implements HttpServerConfiguration
             $swooleSettings[$swooleSettingKey] = $setting;
         }
 
-        return $swooleSettings; // @phpstan-ignore-line
+        return $swooleSettings;
     }
 
     /**
@@ -631,7 +636,7 @@ final class DefaultHttpServerConfiguration implements HttpServerConfiguration
             }
 
             $this->validateSetting($name, $value);
-            $this->settings[$name] = $value; // @phpstan-ignore-line
+            $this->settings[$name] = $value;
         }
 
         Assertion::false($this->isDaemon() && !$this->hasPidFile(), 'Pid file is required when using daemon mode');
@@ -722,6 +727,8 @@ final class DefaultHttpServerConfiguration implements HttpServerConfiguration
                 break;
             case self::SWOOLE_HTTP_SERVER_CONFIG_REACTOR_COUNT:
             case self::SWOOLE_HTTP_SERVER_CONFIG_WORKER_COUNT:
+            case 'aio_core_worker_num':
+            case 'aio_worker_num':
                 Assertion::integer($value, sprintf('Setting "%s" must be an integer.', $key));
                 Assertion::greaterThan($value, 0, 'Count value cannot be negative, "%s" provided.');
 

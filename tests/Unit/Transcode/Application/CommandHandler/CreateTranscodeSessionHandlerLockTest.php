@@ -42,7 +42,7 @@ final class CreateTranscodeSessionHandlerLockTest extends TestCase
         $user = Uuid::generate();
         $profile = AudioProfile::streamingStereo();
         $tier = QualityTier::p720();
-        $this->job = TranscodeJob::create($video, $tier, '/fixture/video');
+        $this->job = TranscodeJob::create($video, $tier, '/fixture/video', $user);
         $this->session = TranscodeSession::create($user, $this->job->getId(), $video, $profile);
         $this->command = new CreateTranscodeSessionCommand($user, $video, $tier, $profile);
         $this->jobs = $this->createMock(TranscodeJobPortInterface::class);

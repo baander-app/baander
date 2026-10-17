@@ -95,7 +95,7 @@ final class DeploymentRuntimeEnvironmentTest extends TestCase
             'REDIS_URL' => 'redis://redis.baander.app/0', 'REDIS_PASSWORD' => '', 'APP_SECRET' => 'secret',
             'MESSENGER_TRANSPORT_DSN' => 'redis://redis.baander.app/messages', 'MAILER_DSN' => 'smtp://mail.baander.app',
             'MAIL_FROM_ADDRESS' => 'noreply@baander.app', 'MAIL_FROM_NAME' => 'Bånder',
-            'CONVERT_STORAGE_PATH' => '/var/www/html/storage/conversions'];
+            'CONVERT_STORAGE_PATH' => '/var/www/html/storage/conversions', 'MEDIA_STORAGE_PATH' => '/media/library'];
         ksort($variables);
         self::assertSame($variables, new DeploymentRuntimeEnvironment($variables)->variables);
     }

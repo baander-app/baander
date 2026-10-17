@@ -23,6 +23,12 @@ use App\Tests\Fixtures\Auth\ProductionOAuthKernel;
 use App\Tests\Fixtures\Auth\SignedDpopProof;
 use App\Tests\Fixtures\Shared\SignedDeliveryRoutes;
 use App\Transcode\Application\Port\SegmentAvailabilityInterface;
+use App\Transcode\Application\DTO\DesiredTranscodeState;
+use App\Transcode\Domain\ValueObject\AudioProfile;
+use App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState;
+use App\Transcode\Infrastructure\Doctrine\Entity\TranscodeJobEntity;
+use App\Transcode\Infrastructure\Doctrine\Entity\TranscodeSessionEntity;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
 use App\Transcode\Infrastructure\Auth\HmacStreamAuthAdapter;
 use Doctrine\ORM\EntityManagerInterface;
@@ -154,7 +160,7 @@ final class SignedDeliveryFirewallTest extends TestCase
             'jobId' => new Uuid(), 'tierKey' => '720p', 'path' => self::$directory . '/segment.mp4',
         ]);
         $this->streaming->method('getQualityLadderForVideo')->willReturn([]);
-        $this->streaming->method('getPlaybackState')->willReturnCallback(fn () => ['jobId' => $this->jobId->toString(), 'generation' => 3, 'revision' => 1, 'ready' => true, 'position' => 0.0, 'status' => 'running']);
+        $this->streaming->method('getPlaybackState')->willReturnCallback(static fn (Uuid $video, array $allowed) => ['jobId' => $allowed[0], 'generation' => 3, 'revision' => 1, 'ready' => true, 'position' => 0.0, 'status' => 'running', 'startTime' => 0.0, 'duration' => 10.0, 'renditionSet' => $allowed[0].'.3']);
         $availability = $this->createStub(SegmentAvailabilityInterface::class);
         $availability->method('isReady')->willReturn(self::$directory . '/segment.mp4');
         $this->bus = $this->createMock(MessageBusInterface::class);
@@ -648,6 +654,17 @@ final class SignedDeliveryFirewallTest extends TestCase
             $this->persist($this->membership);
         }
         $this->manager->flush();
+        if (isset($this->actor)) {
+            $now = new \DateTimeImmutable();
+            $job = new TranscodeJobEntity(new PublicId(), $video->getId(), '720p', $this->actor->getId());
+            $session = new TranscodeSessionEntity(new PublicId(), $this->actor->getId(), $job, $video->getId(), 'pending', 'normal', AudioProfile::streamingStereo()->jsonSerialize(), $now, $now);
+            $this->persist($job);
+            $this->persist($session);
+            $this->manager->flush();
+            $connection = $this->manager->getConnection();
+            $runtime = new TranscodeRuntimeState($connection, $this->createStub(TransactionPortInterface::class));
+            $connection->transactional(fn () => $runtime->admit($job->getId(), $session->getId(), Uuid::generate()->toString(), new DesiredTranscodeState(AudioProfile::streamingStereo())));
+        }
 
         return $video;
     }
@@ -671,7 +688,7 @@ final class SignedDeliveryFirewallTest extends TestCase
     /** Signs a delivery path and records the signature for the credential scan. */
     private function signedUrl(string $path, int $expiresInSeconds = 86400, ?HmacStreamAuthAdapter $signer = null): string
     {
-        $path .= (str_contains($path, '?') ? '&' : '?').'generation=3';
+        $path .= (str_contains($path, '?') ? '&' : '?').(str_ends_with($path, 'master.m3u8') || str_ends_with($path, 'manifest.mpd') ? 'set='.$this->jobId.'.3' : 'generation=3');
         $signed = ($signer ?? $this->signer)->signUrl($path, $expiresInSeconds);
         $this->signatures[] = $signed['sig'];
 

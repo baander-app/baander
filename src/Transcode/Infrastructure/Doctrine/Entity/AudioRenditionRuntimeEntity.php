@@ -9,7 +9,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity(readOnly: true)]
 #[ORM\Table(name: 'audio_rendition_runtime')]
 #[ORM\Index(name: 'idx_audio_rendition_runtime_pending', columns: ['updated_at', 'rendition_key'], options: ['where' => "(state = ANY (ARRAY['pending'::text, 'running'::text]))"])]
-#[ORM\UniqueConstraint(name: 'uniq_audio_rendition_canonical', columns: ['track_key', 'source_signature', 'format', 'bitrate'])]
+#[ORM\UniqueConstraint(name: 'uniq_audio_rendition_runtime_canonical', columns: ['track_key', 'source_signature', 'format', 'bitrate'])]
 final class AudioRenditionRuntimeEntity
 {
     #[ORM\Id]

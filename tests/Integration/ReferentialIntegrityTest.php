@@ -25,6 +25,8 @@ final class ReferentialIntegrityTest extends TestCase
 
     /** Reference-like columns without a foreign key, and why. */
     private const UNCONSTRAINED = [
+        'audio_rendition_runtime.worker_boot_id' => 'validated supervisor boot token; mutable deployment leases do not model individual worker launches',
+        'audio_rendition_runtime.worker_id' => 'worker role label within a launch, not a row identifier',
         'albums.discogs_id' => 'external Discogs identifier',
         'albums.spotify_id' => 'external Spotify identifier',
         'artists.discogs_id' => 'external Discogs identifier',
@@ -60,6 +62,10 @@ final class ReferentialIntegrityTest extends TestCase
         'scheduler_occurrences.job_public_id' => 'immutable public job identity snapshot retained after schedule deletion',
         'songs.discogs_id' => 'external Discogs identifier',
         'songs.spotify_id' => 'external Spotify identifier',
+        'transcode_control_receipts.request_id' => 'caller-generated control replay identity scoped to its playback session',
+        'transcode_runtime_state.request_id' => 'caller-generated admission replay identity, not a referenced row',
+        'transcode_runtime_state.worker_boot_id' => 'validated supervisor boot token; mutable deployment leases do not model individual worker launches',
+        'transcode_runtime_state.worker_id' => 'worker role label within a launch, not a row identifier',
         'user_favorites.entity_public_id' => 'polymorphic with entity_type',
         'webhook_delivery_logs.notification_id' => 'delivery history that outlives the notification',
         'worker_deployment_containers.boot_id' => 'worker boot identifier with no table',
@@ -89,6 +95,8 @@ final class ReferentialIntegrityTest extends TestCase
         'fk_recommendation_jobs_user_id' => 'SET NULL',
         'fk_starred_stations_station_id' => 'CASCADE',
         'fk_transcode_jobs_video_id' => 'CASCADE',
+        'fk_transcode_jobs_owner_user_id' => 'CASCADE',
+        'fk_transcode_control_receipts_session_id' => 'CASCADE',
         'fk_transcode_sessions_video_id' => 'CASCADE',
         'fk_user_favorites_user_id' => 'CASCADE',
         'fk_user_theme_moods_user_id' => 'CASCADE',

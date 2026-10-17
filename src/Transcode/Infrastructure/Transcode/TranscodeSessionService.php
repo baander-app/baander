@@ -59,6 +59,11 @@ final class TranscodeSessionService implements TranscodeSessionPortInterface
         return $this->sessionRepository->findActiveSessions($userId);
     }
 
+    public function findActiveByUserAndVideo(Uuid $userId, Uuid $videoId): array
+    {
+        return $this->sessionRepository->findActiveByUserAndVideo($userId, $videoId);
+    }
+
     public function findActive(): array
     {
         return $this->sessionRepository->findAllActiveSessions();

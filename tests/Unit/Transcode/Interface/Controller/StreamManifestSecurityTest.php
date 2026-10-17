@@ -27,8 +27,8 @@ final class StreamManifestSecurityTest extends TestCase
         $videoId = $video->getPublicId()->toString();
         $jobId = (new PublicId())->toString();
         $path = match ($method) {
-            'masterManifest' => "/api/transcode/$videoId/master.m3u8",
-            'dashManifest' => "/api/transcode/$videoId/manifest.mpd",
+            'masterManifest' => "/api/transcode/$videoId/master.m3u8?set=$jobId.3",
+            'dashManifest' => "/api/transcode/$videoId/manifest.mpd?set=$jobId.3",
             'mediaManifest' => "/api/transcode/$jobId/media.m3u8?tier=720p",
             default => "/api/transcode/$jobId/subtitles/en/media.m3u8",
         };

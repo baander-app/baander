@@ -38,7 +38,7 @@ final class TranscodeJobAuthorizationTest extends TestCase
     #[DataProvider('jobReads')]
     public function testIndividualJobReadsCheckLibraryAccessBeforePublicProjection(string $method, bool $allowed): void
     {
-        $job = TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/transcode');
+        $job = TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/transcode', \App\Shared\Domain\Model\Uuid::generate());
         $jobs = $this->createMock(TranscodeJobPortInterface::class);
         $jobs->expects(self::once())->method('findByPublicId')->with($job->getPublicId())->willReturn($job);
         $playback = $this->createMock(PlaybackAccessInterface::class);
@@ -66,9 +66,9 @@ final class TranscodeJobAuthorizationTest extends TestCase
     public function testOrphanCollectionFiltersInaccessibleJobsBeforeProjectionAndPreservesOrder(): void
     {
         $jobs = [
-            TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/first'),
-            TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/denied'),
-            TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/last'),
+            TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/first', \App\Shared\Domain\Model\Uuid::generate()),
+            TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/denied', \App\Shared\Domain\Model\Uuid::generate()),
+            TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/last', \App\Shared\Domain\Model\Uuid::generate()),
         ];
         $port = $this->createMock(TranscodeJobPortInterface::class);
         $port->expects(self::once())->method('findOrphanedJobs')->willReturn($jobs);
@@ -96,7 +96,7 @@ final class TranscodeJobAuthorizationTest extends TestCase
     public function testUserJobHistoryRechecksCurrentLibraryAccess(): void
     {
         $owner = new Uuid();
-        $job = TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/revoked');
+        $job = TranscodeJob::create(new Uuid(), QualityTier::p720(), '/tmp/revoked', \App\Shared\Domain\Model\Uuid::generate());
         $videoPublicId = new PublicId();
         $query = $this->createMock(TranscodeJobQueryPort::class);
         $query->expects(self::once())->method('findByUser')->with($owner)->willReturn([TranscodeJobDto::fromModel($job, $videoPublicId)]);

@@ -73,7 +73,7 @@ final class TranscodeStreamManagerOwnershipTest extends TestCase
             $callback?->__invoke();
         });
         $this->manager = new TranscodeStreamManager($availability, $storage, $encoder, new NullLogger(), $spawner);
-        $this->job = TranscodeJob::create(Uuid::generate(), QualityTier::p720(), $this->directory);
+        $this->job = TranscodeJob::create(Uuid::generate(), QualityTier::p720(), $this->directory, \App\Shared\Domain\Model\Uuid::generate());
         $this->start();
     }
 

@@ -70,23 +70,23 @@ final class AuthorizedPlaybackTest extends TestCase
     public function testControlsExposeOnlyTheActorsCurrentRuntimeSession(): void
     {
         $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
-        $connection->executeStatement('CREATE TABLE transcode_jobs (id TEXT PRIMARY KEY, public_id TEXT)');
+        $connection->executeStatement('CREATE TABLE transcode_jobs (id TEXT PRIMARY KEY, public_id TEXT, owner_user_id TEXT, video_id TEXT, height INTEGER, status TEXT)');
         $connection->executeStatement('CREATE TABLE transcode_sessions (id TEXT PRIMARY KEY, public_id TEXT, user_id TEXT, video_id TEXT, job_id TEXT)');
         $connection->executeStatement('CREATE TABLE transcode_runtime_state (job_id TEXT PRIMARY KEY, session_id TEXT)');
         $actor = new Uuid(); $video = new Uuid(); $job = new PublicId(); $session = new PublicId();
         $security = $this->createStub(Security::class);
         $security->method('getUser')->willReturn(new SecurityUser($actor->toString(), 'viewer@baander.app', ''));
-        $connection->insert('transcode_jobs', ['id' => 'job', 'public_id' => $job->toString()]);
+        $connection->insert('transcode_jobs', ['id' => 'job', 'public_id' => $job->toString(), 'owner_user_id' => $actor->toString(), 'video_id' => $video->toString(), 'height' => 720, 'status' => 'in_progress']);
         $connection->insert('transcode_sessions', ['id' => 'session', 'public_id' => $session->toString(), 'user_id' => $actor->toString(), 'video_id' => $video->toString(), 'job_id' => 'job']);
         $connection->insert('transcode_runtime_state', ['job_id' => 'job', 'session_id' => 'session']);
         $playback = new AuthorizedPlayback($security, $connection, $this->createStub(MessageBusInterface::class));
         try {
-            self::assertSame($session->toString(), $playback->findSession($video, $job)?->toString());
+            self::assertSame($session->toString(), $playback->findSessions($video)[$job->toString()]->toString());
             $connection->update('transcode_sessions', ['user_id' => (new Uuid())->toString()], ['id' => 'session']);
-            self::assertNull($playback->findSession($video, $job));
+            self::assertSame([], $playback->findSessions($video));
             $connection->update('transcode_sessions', ['user_id' => $actor->toString()], ['id' => 'session']);
             $connection->update('transcode_runtime_state', ['session_id' => 'retired-session'], ['job_id' => 'job']);
-            self::assertNull($playback->findSession($video, $job));
+            self::assertSame([], $playback->findSessions($video));
         } finally {
             $connection->close();
         }
