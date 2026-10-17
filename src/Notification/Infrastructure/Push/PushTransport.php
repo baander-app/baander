@@ -34,7 +34,12 @@ final class PushTransport
     public function __invoke(RequestInterface $request, array $options): PromiseInterface
     {
         try {
-            $safe = $this->destinations->resolve((string) $request->getUri(), [], $this->allowedPushDomains);
+            $deadline = hrtime(true) / 1e9 + 30;
+            $safe = $this->destinations->resolve((string) $request->getUri(), [], $this->allowedPushDomains, $deadline);
+            $remaining = $deadline - hrtime(true) / 1e9;
+            if ($remaining <= 0) {
+                throw new \RuntimeException('Push request timed out.');
+            }
             $ip = $safe['ips'][0];
             $address = str_contains($ip, ':') ? '[' . $ip . ']' : $ip;
             $options['curl'] = [
@@ -53,8 +58,8 @@ final class PushTransport
             $options['proxy'] = '';
             $options['allow_redirects'] = false;
             $options['verify'] = true;
-            $options['timeout'] = 30;
-            $options['connect_timeout'] = 5;
+            $options['timeout'] = $remaining;
+            $options['connect_timeout'] = min(5.0, $remaining);
             // CurlFactory's installed rewind path rejects at 2, before calling its handler.
             $options['_curl_retries'] = 2;
             $options['debug'] = false;

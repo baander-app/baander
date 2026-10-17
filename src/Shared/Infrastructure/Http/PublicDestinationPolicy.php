@@ -8,9 +8,11 @@ use Symfony\Component\HttpFoundation\IpUtils;
 
 final class PublicDestinationPolicy
 {
-    /** @param ?\Closure(string): list<string> $dnsResolver */
-    public function __construct(private readonly ?\Closure $dnsResolver = null)
-    {
+    /** @param ?\Closure(string, float): list<string> $dnsResolver */
+    public function __construct(
+        private readonly ?\Closure $dnsResolver = null,
+        private readonly NativeDnsResolver $nativeResolver = new NativeDnsResolver(),
+    ) {
     }
 
     /**
@@ -18,7 +20,7 @@ final class PublicDestinationPolicy
      * @param list<string> $allowedDomainSuffixes Domains including their subdomains
      * @return array{host: string, ips: non-empty-list<string>}
      */
-    public function resolve(string $url, array $allowedHosts, array $allowedDomainSuffixes = []): array
+    public function resolve(string $url, array $allowedHosts, array $allowedDomainSuffixes = [], ?float $deadline = null): array
     {
         $parts = parse_url($url);
         if ($parts === false || filter_var($url, FILTER_VALIDATE_URL) === false ||
@@ -34,12 +36,18 @@ final class PublicDestinationPolicy
             throw new UnsafeDestinationException();
         }
 
+        $deadline ??= hrtime(true) / 1e9 + 30;
+        if (!is_finite($deadline) || $deadline <= hrtime(true) / 1e9) {
+            throw new UnsafeDestinationException();
+        }
         try {
-            $ips = $this->dnsResolver !== null ? ($this->dnsResolver)($host) : $this->lookup($host);
+            $ips = $this->dnsResolver !== null
+                ? ($this->dnsResolver)($host, $deadline)
+                : $this->nativeResolver->resolve($host, $deadline);
         } catch (\Throwable) {
             throw new UnsafeDestinationException();
         }
-        if ($ips === []) {
+        if ($ips === [] || hrtime(true) / 1e9 >= $deadline) {
             throw new UnsafeDestinationException();
         }
         $approved = [];
@@ -77,23 +85,5 @@ final class PublicDestinationPolicy
             }
         }
         return false;
-    }
-
-    /** @return list<string> */
-    private function lookup(string $host): array
-    {
-        $records = @dns_get_record($host, DNS_A | DNS_AAAA);
-        if ($records === false) {
-            return [];
-        }
-        $ips = [];
-        foreach ($records as $record) {
-            if (isset($record['ip'])) {
-                $ips[] = $record['ip'];
-            } elseif (isset($record['ipv6'])) {
-                $ips[] = $record['ipv6'];
-            }
-        }
-        return $ips;
     }
 }

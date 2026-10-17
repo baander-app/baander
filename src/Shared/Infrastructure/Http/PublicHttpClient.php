@@ -40,7 +40,7 @@ final class PublicHttpClient
 
         try {
             for ($hop = 0; ; ++$hop) {
-                $destination = $this->destinations->resolve($url, $hop === 0 ? $allowedHosts : [], $hop === 0 ? [] : $redirectDomains);
+                $destination = $this->destinations->resolve($url, $hop === 0 ? $allowedHosts : [], $hop === 0 ? [] : $redirectDomains, $deadline);
                 $remaining = $deadline - hrtime(true) / 1e9;
                 if ($remaining <= 0) {
                     throw new \RuntimeException('Provider request timed out.');

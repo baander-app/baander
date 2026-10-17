@@ -172,6 +172,28 @@ final class PushTransportTest extends TestCase
         ])->wait();
     }
 
+    public function testDnsConsumesPartOfThePushSendBudget(): void
+    {
+        $started = hrtime(true) / 1e9;
+        $observedDeadline = null;
+        $observedOptions = null;
+        $policy = new PublicDestinationPolicy(static function (string $host, float $deadline) use (&$observedDeadline): array {
+            $observedDeadline = $deadline;
+            usleep(20_000);
+            return ['1.1.1.1'];
+        });
+        $transport = new PushTransport($policy, ['push.baander.app'], static function (RequestInterface $request, array $options) use (&$observedOptions): PromiseInterface {
+            $observedOptions = $options;
+            return new FulfilledPromise(new Response(201));
+        });
+        self::assertSame(201, $transport(new Request('POST', self::ENDPOINT), [])->wait()->getStatusCode());
+        self::assertGreaterThanOrEqual($started + 30, $observedDeadline);
+        self::assertLessThan(hrtime(true) / 1e9 + 30, $observedDeadline);
+        self::assertLessThan(29.99, $observedOptions['timeout']);
+        self::assertGreaterThan(0, $observedOptions['timeout']);
+        self::assertLessThanOrEqual(5.0, $observedOptions['connect_timeout']);
+    }
+
     /** @return iterable<string, array{int}> */
     public static function replayConditions(): iterable
     {

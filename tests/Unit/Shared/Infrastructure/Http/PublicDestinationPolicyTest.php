@@ -33,11 +33,17 @@ final class PublicDestinationPolicyTest extends TestCase
     #[DataProvider('forbiddenUrls')]
     public function testUnsafeUrlNeverResolvesDns(string $url): void
     {
-        $policy = new PublicDestinationPolicy(static function (): array {
-            self::fail('Rejected URL reached DNS.');
+        $lookups = 0;
+        $policy = new PublicDestinationPolicy(static function () use (&$lookups): array {
+            ++$lookups;
+            return ['1.1.1.1'];
         });
-        $this->expectException(UnsafeDestinationException::class);
-        $policy->resolve($url, ['api.baander.app']);
+        try {
+            $policy->resolve($url, ['api.baander.app']);
+            self::fail('Unsafe URL was accepted.');
+        } catch (UnsafeDestinationException) {
+            self::assertSame(0, $lookups);
+        }
     }
 
     /** @return iterable<string, array{string}> */
@@ -75,6 +81,43 @@ final class PublicDestinationPolicyTest extends TestCase
         self::assertSame(['1.1.1.1'], $policy->resolve('https://api.baander.app/x', ['api.baander.app'])['ips']);
         $this->expectException(UnsafeDestinationException::class);
         $policy->resolve('https://api.baander.app/x', ['api.baander.app']);
+    }
+
+    public function testCallerDeadlineReachesResolverUnchanged(): void
+    {
+        $deadline = hrtime(true) / 1e9 + 1;
+        $observed = null;
+        $policy = new PublicDestinationPolicy(static function (string $host, float $lookupDeadline) use (&$observed): array {
+            $observed = [$host, $lookupDeadline];
+            return ['1.1.1.1'];
+        });
+        self::assertSame(['1.1.1.1'], $policy->resolve('https://api.baander.app/x', ['api.baander.app'], [], $deadline)['ips']);
+        self::assertSame(['api.baander.app', $deadline], $observed);
+    }
+
+    public function testExpiredDeadlineRefusesBeforeLookup(): void
+    {
+        $lookups = 0;
+        $policy = new PublicDestinationPolicy(static function () use (&$lookups): array {
+            ++$lookups;
+            return ['1.1.1.1'];
+        });
+        try {
+            $policy->resolve('https://api.baander.app/x', ['api.baander.app'], [], hrtime(true) / 1e9 - 1);
+            self::fail('Expired destination lookup was accepted.');
+        } catch (UnsafeDestinationException) {
+            self::assertSame(0, $lookups);
+        }
+    }
+
+    public function testLateLookupResultIsRefused(): void
+    {
+        $policy = new PublicDestinationPolicy(static function (): array {
+            usleep(20_000);
+            return ['1.1.1.1'];
+        });
+        $this->expectException(UnsafeDestinationException::class);
+        $policy->resolve('https://api.baander.app/x', ['api.baander.app'], [], hrtime(true) / 1e9 + 0.005);
     }
 
     #[DataProvider('dnsFailures')]

@@ -164,6 +164,30 @@ final class PublicHttpClientTest extends TestCase
         (new PublicHttpClient($transport, $policy))->request('GET', 'https://api.baander.app/x', ['api.baander.app'], ['max_duration' => 0.001]);
     }
 
+    public function testRedirectLookupsShareOneDeadlineAndReduceTransportBudget(): void
+    {
+        $deadlines = [];
+        $budgets = [];
+        $policy = new PublicDestinationPolicy(static function (string $host, float $deadline) use (&$deadlines): array {
+            $deadlines[] = $deadline;
+            usleep(20_000);
+            return ['1.1.1.1'];
+        });
+        $transport = new MockHttpClient(static function (string $method, string $url, array $options) use (&$budgets): MockResponse {
+            $budgets[] = $options['max_duration'];
+            return count($budgets) === 1
+                ? new MockResponse('', ['http_code' => 302, 'response_headers' => ['location: /next']])
+                : new MockResponse('complete');
+        });
+        $response = (new PublicHttpClient($transport, $policy))->request('GET', 'https://api.baander.app/x', ['api.baander.app'], ['max_duration' => 1], ['baander.app']);
+        self::assertSame('complete', $response->getContent());
+        self::assertCount(2, $deadlines);
+        self::assertSame($deadlines[0], $deadlines[1]);
+        self::assertLessThan(0.99, $budgets[0]);
+        self::assertLessThan($budgets[0] - 0.01, $budgets[1]);
+        self::assertGreaterThan(0, $budgets[1]);
+    }
+
     public function testTokenPostCannotOptIntoRedirects(): void
     {
         $transport = $this->createMock(HttpClientInterface::class);
