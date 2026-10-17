@@ -12,7 +12,7 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 final readonly class RegisteredDeploymentStart
 {
     /** @param Closure(list<string>): string $dockerExecutor Fixed trusted daemon endpoint; bounded I/O; failures throw. */
-    public function __construct(private DoctrineDeploymentInventory $inventory, private Closure $dockerExecutor)
+    public function __construct(private DoctrineDeploymentInventory $inventory, private Closure $dockerExecutor, private ?DeploymentContainerRecipe $recipe = null)
     {
     }
 
@@ -31,6 +31,11 @@ final readonly class RegisteredDeploymentStart
      */
     public function start(DeploymentContainer $binding): bool
     {
+        if ($this->recipe !== null && ($this->recipe->namespace !== $binding->namespace
+            || $this->recipe->bootId !== $binding->bootId || $this->recipe->daemonId !== $binding->daemonId
+            || !$this->inventory->matchesCreate($this->recipe))) {
+            throw new \RuntimeException('Startup recipe does not match committed deployment creation.');
+        }
         $execute = function (array $arguments) use ($binding): string {
             $daemon = ($this->dockerExecutor)(['info', '--format', '{{.ID}}']);
             if (strlen($daemon) > 256 || trim($daemon) !== $binding->daemonId) {
@@ -38,7 +43,7 @@ final readonly class RegisteredDeploymentStart
             }
             return ($this->dockerExecutor)($arguments);
         };
-        $containment = new DockerWorkerContainment($execute);
+        $containment = new DockerWorkerContainment($execute, $this->recipe);
         $containment->verifyIsolation($binding->containerId, $binding->namespace, $binding->bootId);
         $this->verifyCreated($binding, $execute);
         if (!$this->inventory->register($binding) || !$this->inventory->claimStart($binding)) {

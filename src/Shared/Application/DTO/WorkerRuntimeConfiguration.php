@@ -21,6 +21,8 @@ final readonly class WorkerRuntimeConfiguration
         public string $lockDirectory,
         public int $scheduledConsoleReservationBytes,
         public int $schedulerReservationBytes,
+        public int $mediaReservationBytes,
+        public int $mediaDescendantPids,
     ) {
         if (preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}\z/D', $namespace) !== 1
             || preg_match('/\A[0-9a-f]{32}\z/D', $bootId) !== 1
@@ -32,12 +34,15 @@ final readonly class WorkerRuntimeConfiguration
             || $relayReservationBytes > $memoryLimitBytes - $managementReservationBytes - $consumerReservationBytes
             || $schedulerReservationBytes < 320 * 1024 * 1024
             || $schedulerReservationBytes > $memoryLimitBytes - $managementReservationBytes - $consumerReservationBytes - $relayReservationBytes
+            || $mediaDescendantPids < 1 || $mediaDescendantPids > 4088
+            || $mediaReservationBytes < (320 + 64 * $mediaDescendantPids) * 1024 * 1024
+            || $mediaReservationBytes > $memoryLimitBytes - $managementReservationBytes - $consumerReservationBytes - $relayReservationBytes - $schedulerReservationBytes
             || $scheduledConsoleReservationBytes < 0
             || ($scheduledConsoleReservationBytes !== 0 && $scheduledConsoleReservationBytes < 192 * 1024 * 1024)
-            || $scheduledConsoleReservationBytes > $memoryLimitBytes - $managementReservationBytes - $consumerReservationBytes - $relayReservationBytes - $schedulerReservationBytes
+            || $scheduledConsoleReservationBytes > $memoryLimitBytes - $managementReservationBytes - $consumerReservationBytes - $relayReservationBytes - $schedulerReservationBytes - $mediaReservationBytes
             || !str_starts_with($lockDirectory, '/') || strlen($lockDirectory) > 4096 || str_contains($lockDirectory, "\0")
         ) {
-            throw new InvalidArgumentException('Worker runtime requires bounded identity, an absolute lock directory, management reservation at least 128 MiB, consumer, relay and scheduler reservations at least 320 MiB, and scheduled console reservation either disabled or at least 192 MiB, all fitting its memory ceiling.');
+            throw new InvalidArgumentException('Worker runtime requires bounded identity, an absolute lock directory, management reservation at least 128 MiB, consumer, relay and scheduler reservations at least 320 MiB, media reservation at least 320 MiB plus 64 MiB per admitted descendant, and scheduled console reservation either disabled or at least 192 MiB, all fitting its memory ceiling.');
         }
     }
 }

@@ -7,14 +7,20 @@ namespace App\Shared\Infrastructure\Worker;
 use InvalidArgumentException;
 use Symfony\Component\DependencyInjection\Attribute\Exclude;
 
-/** Initial strict containment recipe; not a production deployment configuration. */
+/** Immutable host-authorized execution and shared-media topology. */
 #[Exclude]
 final readonly class DeploymentContainerRecipe
 {
     /** @var list<string> */
     public array $command;
 
-    /** @param array<array-key, mixed> $command Validated argv, never a shell command. */
+    /** @var list<array{volume:string,target:string,readOnly:bool,role:string}> */
+    public array $mediaMounts;
+
+    /**
+     * @param array<array-key, mixed> $command Validated argv, never a shell command.
+     * @param array<array-key, mixed> $mediaMounts
+     */
     public function __construct(
         public string $namespace,
         public string $bootId,
@@ -26,6 +32,7 @@ final readonly class DeploymentContainerRecipe
         public int $nanoCpus,
         public int $pidsLimit,
         public DeploymentRuntimeEnvironment $runtimeEnvironment = new DeploymentRuntimeEnvironment(),
+        array $mediaMounts = [],
     ) {
         DeploymentLease::validateIdentity($namespace, $bootId);
         if (preg_match('/\A[A-Za-z0-9_.:-]{1,128}\z/D', $daemonId) !== 1
@@ -54,6 +61,7 @@ final readonly class DeploymentContainerRecipe
             throw new InvalidArgumentException('Deployment command requires an absolute executable and at most 16 KiB of argument bytes.');
         }
         $this->command = $validatedCommand;
+        $this->mediaMounts = self::validateMounts($mediaMounts);
     }
 
     /** Stable create-intent identity; every admitted configuration field participates. */
@@ -63,7 +71,7 @@ final readonly class DeploymentContainerRecipe
             'namespace' => $this->namespace, 'bootId' => $this->bootId, 'daemonId' => $this->daemonId,
             'imageId' => $this->imageId, 'command' => $this->command, 'network' => $this->network,
             'memoryBytes' => $this->memoryBytes, 'nanoCpus' => $this->nanoCpus, 'pidsLimit' => $this->pidsLimit,
-            'runtimeEnvironment' => $this->runtimeEnvironment->variables,
+            'runtimeEnvironment' => $this->runtimeEnvironment->variables, 'mediaMounts' => $this->mediaMounts,
         ], JSON_THROW_ON_ERROR));
     }
 
@@ -87,7 +95,69 @@ final readonly class DeploymentContainerRecipe
             '--label', 'app.baander.worker.boot-id=' . $this->bootId, '--label', 'app.baander.worker.role=deployment',
             '--env', 'BAANDER_WORKER_NAMESPACE=' . $this->namespace, '--env', 'BAANDER_WORKER_BOOT_ID=' . $this->bootId,
             ...($environmentFile === null ? [] : ['--env-file', $environmentFile]),
+            ...$this->mountArguments(),
             '--entrypoint', $this->command[0], $this->imageId, ...array_slice($this->command, 1),
         ];
     }
+    /** @return list<string> */
+    private function mountArguments(): array
+    {
+        $arguments = [];
+        foreach ($this->mediaMounts as $mount) {
+            $arguments[] = '--mount';
+            $arguments[] = 'type=volume,src=' . $mount['volume'] . ',dst=' . $mount['target']
+                . ($mount['readOnly'] ? ',readonly' : '') . ',volume-nocopy';
+        }
+        return $arguments;
+    }
+
+    /**
+     * @param array<array-key,mixed> $mounts
+     * @return list<array{volume:string,target:string,readOnly:bool,role:string}>
+     */
+    private static function validateMounts(array $mounts): array
+    {
+        if (!array_is_list($mounts) || count($mounts) > 64) {
+            throw new InvalidArgumentException('Media mounts require at most 64 ordered named-volume declarations.');
+        }
+        $validated = [];
+        foreach ($mounts as $mount) {
+            if (!is_array($mount) || count($mount) !== 4
+                || !is_string($mount['volume'] ?? null)
+                || preg_match('/\A[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\z/D', $mount['volume']) !== 1
+                || !is_string($mount['target'] ?? null) || strlen($mount['target']) > 4096
+                || preg_match('~\A/(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\z~D', $mount['target']) !== 1
+                || preg_match('~(?:^|/)\.\.?(?:/|$)~', $mount['target']) !== 0
+                || !in_array($mount['role'] ?? null, ['source', 'derived'], true)
+                || !is_bool($mount['readOnly'] ?? null)
+                || $mount['readOnly'] !== ($mount['role'] === 'source')
+            ) {
+                throw new InvalidArgumentException('Media mounts require named volumes, canonical targets and read-only source or writable derived access.');
+            }
+            $target = $mount['target'];
+            foreach (['/bin', '/sbin', '/usr', '/etc', '/dev', '/proc', '/sys', '/run', '/var/run', '/tmp', '/root', '/home'] as $forbidden) {
+                if ($target === $forbidden || str_starts_with($target, $forbidden . '/') || str_starts_with($forbidden, $target . '/')) {
+                    throw new InvalidArgumentException('Media mounts cannot expose operating-system or private worker paths.');
+                }
+            }
+            if (($target === '/var' || $target === '/var/www' || $target === '/var/www/html'
+                || str_starts_with($target, '/var/www/html/'))
+                && $target !== '/var/www/html/var/transcode_state'
+                && $target !== '/var/www/html/storage'
+                && !str_starts_with($target, '/var/www/html/storage/')) {
+                throw new InvalidArgumentException('Media mounts cannot replace application code.');
+            }
+            foreach ($validated as $existing) {
+                if ($target === $existing['target'] || str_starts_with($target, $existing['target'] . '/')
+                    || str_starts_with($existing['target'], $target . '/')
+                    || ($mount['volume'] === $existing['volume'] && $mount['role'] !== $existing['role'])) {
+                    throw new InvalidArgumentException('Media targets cannot overlap or alias a source volume with writable access.');
+                }
+            }
+            $validated[] = ['volume' => $mount['volume'], 'target' => $target, 'readOnly' => $mount['readOnly'], 'role' => $mount['role']];
+        }
+        usort($validated, static fn (array $left, array $right): int => strcmp($left['target'], $right['target']));
+        return $validated;
+    }
+
 }

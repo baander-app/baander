@@ -24,6 +24,7 @@ final readonly class DeploymentRuntimeEnvironment implements JsonSerializable
     private const array ALLOWED_KEYS = [
         'APP_ENV', 'APP_DEBUG', 'APP_SECRET', 'DATABASE_URL', 'REDIS_URL',
         'REDIS_PASSWORD', 'MESSENGER_TRANSPORT_DSN', 'MAILER_DSN',
+        'CONVERT_STORAGE_PATH',
         // config/packages/mailer.yaml builds every email's From header from these; without
         // them a worker's notification email would fall back to noreply@localhost.
         'MAIL_FROM_ADDRESS', 'MAIL_FROM_NAME',

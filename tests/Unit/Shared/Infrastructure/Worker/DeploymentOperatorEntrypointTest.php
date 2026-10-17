@@ -134,15 +134,20 @@ final class DeploymentOperatorEntrypointTest extends TestCase
         return $path;
     }
 
-    /** @return array<string,int|string> */
+    /** @return array<string,mixed> */
     private static function manifest(): array
     {
         return [
-            'version' => 1, 'namespace' => 'operator.baander.app', 'bootId' => str_repeat('a', 32),
+            'version' => 2, 'namespace' => 'operator.baander.app', 'bootId' => str_repeat('a', 32),
             'daemonId' => 'docker-daemon', 'imageId' => 'sha256:' . str_repeat('b', 64), 'network' => 'none',
             'dockerBinary' => '/bin/true', 'dockerEndpoint' => 'unix:///var/run/docker.sock',
-            'memoryMiB' => 1280, 'managementMiB' => 128, 'consumerMiB' => 320, 'relayMiB' => 320,
-            'schedulerMiB' => 320, 'scheduledConsoleMiB' => 192, 'nanoCpus' => 1000000000, 'pidsLimit' => 64,
+            'memoryMiB' => 1728, 'managementMiB' => 128, 'consumerMiB' => 320, 'relayMiB' => 320,
+            'schedulerMiB' => 320, 'scheduledConsoleMiB' => 192, 'mediaMiB' => 448, 'mediaDescendantPids' => 2,
+            'mediaMounts' => [
+                ['volume' => 'baander-source', 'target' => '/media', 'role' => 'source', 'readOnly' => true],
+                ['volume' => 'baander-derived', 'target' => '/var/www/html/storage', 'role' => 'derived', 'readOnly' => false],
+                ['volume' => 'baander-state', 'target' => '/var/www/html/var/transcode_state', 'role' => 'derived', 'readOnly' => false],
+            ], 'nanoCpus' => 1000000000, 'pidsLimit' => 64,
         ];
     }
 }

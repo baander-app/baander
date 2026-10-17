@@ -18,12 +18,12 @@ final readonly class DockerWorkerContainment
 FORMAT;
 
     /** @param Closure(list<string>): string $execute Successful commands return stdout; every command failure throws. */
-    public function __construct(private Closure $execute)
+    public function __construct(private Closure $execute, private ?DeploymentContainerRecipe $recipe = null)
     {
     }
 
     /**
-     * Only the private PID/cgroup namespace policy is accepted, with no mounts,
+     * Only the private PID/cgroup namespace policy is accepted, with only admitted media mounts,
      * devices or added capabilities, all capabilities dropped, and no-new-privileges.
      * The trusted controller creates one deployment container per fresh boot and
      * records its immutable ID and labels before starting it. These labels do not
@@ -95,9 +95,52 @@ FORMAT;
         ) {
             throw new RuntimeException('Container identity or isolation policy does not match containment requirements.');
         }
-        foreach (['mounts', 'binds', 'tmpfs', 'devices', 'deviceRequests', 'capAdd'] as $field) {
+        if (!array_key_exists('mounts', $inspection)) {
+            throw new RuntimeException('Container inspection does not identify its mounts.');
+        }
+        $this->verifyMounts($inspection['mounts']);
+        foreach (['binds', 'tmpfs', 'devices', 'deviceRequests', 'capAdd'] as $field) {
             if (!array_key_exists($field, $inspection) || !in_array($inspection[$field], [null, []], true)) {
                 throw new RuntimeException('Container resources do not match containment requirements.');
+            }
+        }
+    }
+
+    private function verifyMounts(mixed $mounts): void
+    {
+        $expected = $this->recipe?->mediaMounts ?? [];
+        if ($expected === [] && in_array($mounts, [null, []], true)) {
+            return;
+        }
+        if (!is_array($mounts) || !array_is_list($mounts) || count($mounts) !== count($expected)) {
+            throw new RuntimeException('Container mounts do not match the admitted media topology.');
+        }
+        $byTarget = [];
+        foreach ($mounts as $mount) {
+            if (!is_array($mount) || !is_string($mount['Destination'] ?? null)
+                || isset($byTarget[$mount['Destination']])) {
+                throw new RuntimeException('Container media mounts require unique destinations.');
+            }
+            $byTarget[$mount['Destination']] = $mount;
+        }
+        foreach ($expected as $declaration) {
+            $actual = $byTarget[$declaration['target']] ?? [];
+            if (($actual['Type'] ?? null) !== 'volume' || ($actual['Name'] ?? null) !== $declaration['volume']
+                || ($actual['Driver'] ?? null) !== 'local' || ($actual['RW'] ?? null) !== !$declaration['readOnly']) {
+                throw new RuntimeException('Container media volume identity or access mode differs from admission.');
+            }
+            $format = '{"name":{{json .Name}},"driver":{{json .Driver}},"options":{{json .Options}},"scope":{{json .Scope}},"mountpoint":{{json .Mountpoint}}}';
+            try {
+                $volume = json_decode(($this->execute)(['volume', 'inspect', '--format', $format, $declaration['volume']]), true, 8, JSON_THROW_ON_ERROR);
+            } catch (\JsonException $error) {
+                throw new RuntimeException('Media volume inspection is not valid admission evidence.', 0, $error);
+            }
+            if (!is_array($volume) || ($volume['name'] ?? null) !== $declaration['volume']
+                || ($volume['driver'] ?? null) !== 'local' || ($volume['scope'] ?? null) !== 'local'
+                || !array_key_exists('options', $volume) || !in_array($volume['options'], [null, []], true)
+                || !is_string($volume['mountpoint'] ?? null) || !str_starts_with($volume['mountpoint'], '/')
+                || ($actual['Source'] ?? null) !== $volume['mountpoint']) {
+                throw new RuntimeException('Media storage requires the admitted local volume without driver options.');
             }
         }
     }

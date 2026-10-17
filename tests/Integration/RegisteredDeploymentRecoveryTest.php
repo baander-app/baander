@@ -51,6 +51,24 @@ final class RegisteredDeploymentRecoveryTest extends TestCase
         self::assertEquals($old, (new DoctrineDeploymentLease($this->second))->findForContainment($binding->namespace));
     }
 
+    public function testChangedRecipeCannotRetireRegisteredContainer(): void
+    {
+        $binding = $this->binding();
+        $inventory = new DoctrineDeploymentInventory($this->first);
+        self::assertTrue($inventory->register($binding));
+        $recipe = new \App\Shared\Infrastructure\Worker\DeploymentContainerRecipe(
+            $binding->namespace, $binding->bootId, $binding->daemonId, 'sha256:' . str_repeat('a', 64),
+            ['/usr/local/bin/php', '/var/www/html/bin/console', 'app:worker'],
+            'baander.app-workers', 2048 * 1024 * 1024, 1_000_000_000, 16,
+        );
+        $recovery = new RegisteredDeploymentRecovery($inventory, new DoctrineDeploymentRetirement($this->first), static function (): string {
+            self::fail('A recipe without matching committed creation must not reach Docker.');
+        }, $recipe);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Recovery recipe does not match committed deployment creation.');
+        $recovery->recover($binding->namespace, $binding->bootId);
+    }
+
     public function testNumericallyEquivalentImmutableIdsCannotRebindPendingRetirement(): void
     {
         $binding = new DeploymentContainer('baander.app:workers', str_repeat('a', 32), 'baander.app-daemon', '0e' . str_repeat('0', 62));

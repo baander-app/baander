@@ -13,7 +13,7 @@ use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
-#[AsCommand(name: 'app:worker', description: 'Run the container worker supervisor for Redis async delivery, outbox relay and scheduler polling.')]
+#[AsCommand(name: 'app:worker', description: 'Run the container worker supervisor for background jobs, media execution, outbox relay and scheduler polling.')]
 final class WorkerCommand extends Command
 {
     public function __construct(private readonly WorkerSupervisorRunnerInterface $runner)
@@ -30,9 +30,11 @@ final class WorkerCommand extends Command
             ->addOption('consumer-mib', null, InputOption::VALUE_REQUIRED, 'Required Redis consumer reservation in MiB (at least 320).')
             ->addOption('relay-mib', null, InputOption::VALUE_REQUIRED, 'Required outbox relay reservation in MiB (at least 320).')
             ->addOption('scheduler-mib', null, InputOption::VALUE_REQUIRED, 'Required scheduler reservation in MiB (at least 320).')
+            ->addOption('media-mib', null, InputOption::VALUE_REQUIRED, 'Required media role and encoder reservation in MiB (at least 320 plus 64 per descendant).')
+            ->addOption('media-descendant-pids', null, InputOption::VALUE_REQUIRED, 'Required maximum concurrent media child processes.')
             ->addOption('scheduled-console-mib', null, InputOption::VALUE_REQUIRED, 'Reservation for one synchronous scheduled console child in MiB (0 disables, otherwise at least 192).', '0')
             ->addOption('lock-dir', null, InputOption::VALUE_REQUIRED, 'Private local lock directory.', '/tmp/baander-worker-locks');
-        $this->setHelp('This initial fixed-set supervisor requires container PID 1. Child exit or lost authority drains the deployment. Scheduled console execution is disabled unless explicitly reserved; its child reservation is additional to the consumer budget. Media ownership and autoscaling are not yet part of this command. Reservations are admission limits, not measured capacity or OS enforcement.');
+        $this->setHelp('This initial fixed-set supervisor requires container PID 1. Child exit or lost authority drains the deployment. Scheduled console execution is disabled unless explicitly reserved; its child reservation is additional to the consumer budget. The media role owns encoders within its explicit descendant reservation. Autoscaling is not part of this command. Reservations are admission limits, not measured capacity or OS enforcement.');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -47,6 +49,8 @@ final class WorkerCommand extends Command
                 $this->stringOption($input, 'lock-dir'),
                 $input->getOption('scheduled-console-mib') === '0' ? 0 : $this->bytes($input, 'scheduled-console-mib'),
                 $this->bytes($input, 'scheduler-mib'),
+                $this->bytes($input, 'media-mib'),
+                $this->descendantPids($input),
             );
         } catch (\InvalidArgumentException $error) {
             $io->error($error->getMessage());
@@ -59,6 +63,15 @@ final class WorkerCommand extends Command
             $io->error('Worker supervisor failed; the deployment must be reconciled before replacement.');
             return Command::FAILURE;
         }
+    }
+
+    private function descendantPids(InputInterface $input): int
+    {
+        $value = $this->stringOption($input, 'media-descendant-pids');
+        if (preg_match('/\A[1-9][0-9]{0,3}\z/D', $value) !== 1 || (int) $value > 4088) {
+            throw new \InvalidArgumentException('Media descendant capacity must be an integer between 1 and 4088.');
+        }
+        return (int) $value;
     }
 
     private function identity(InputInterface $input, string $option, string $environment): string

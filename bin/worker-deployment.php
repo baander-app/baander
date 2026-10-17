@@ -82,7 +82,7 @@ try {
                 || $binding->daemonId !== $checked->daemonId || $binding->containerId !== $checked->containerId) {
                 throw new RuntimeException('Immutable binding changed.');
             }
-            $success = (new \App\Shared\Infrastructure\Worker\RegisteredDeploymentStart($inventory, $docker->execute(...)))->start($binding);
+            $success = (new \App\Shared\Infrastructure\Worker\RegisteredDeploymentStart($inventory, $docker->execute(...), $recipe))->start($binding);
             $result = ['state' => $success ? 'start_confirmed' : 'start_denied', 'readiness' => 'not_checked'];
             break;
         case 'recover':
@@ -90,7 +90,7 @@ try {
             if ($binding !== null && $binding->daemonId !== $recipe->daemonId) {
                 throw new RuntimeException('Manifest and inventory daemon differ.');
             }
-            $success = (new \App\Shared\Infrastructure\Worker\RegisteredDeploymentRecovery($inventory, $retirements, $docker->execute(...)))
+            $success = (new \App\Shared\Infrastructure\Worker\RegisteredDeploymentRecovery($inventory, $retirements, $docker->execute(...), $recipe))
                 ->recover($recipe->namespace, $recipe->bootId);
             $result = ['state' => $success ? 'retired' : 'unregistered'];
             break;

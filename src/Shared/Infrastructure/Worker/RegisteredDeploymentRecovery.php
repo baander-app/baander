@@ -19,6 +19,7 @@ final readonly class RegisteredDeploymentRecovery
         private DoctrineDeploymentInventory $inventory,
         private DoctrineDeploymentRetirement $retirements,
         private Closure $dockerExecutor,
+        private ?DeploymentContainerRecipe $recipe = null,
     ) {
     }
 
@@ -32,6 +33,11 @@ final readonly class RegisteredDeploymentRecovery
         $binding = $this->inventory->find($namespace, $expectedBootId);
         if ($binding === null) {
             return false;
+        }
+        if ($this->recipe !== null && ($this->recipe->namespace !== $namespace
+            || $this->recipe->bootId !== $expectedBootId || $this->recipe->daemonId !== $binding->daemonId
+            || !$this->inventory->matchesCreate($this->recipe))) {
+            throw new \RuntimeException('Recovery recipe does not match committed deployment creation.');
         }
         $retirement = $this->retirements->find($namespace, $expectedBootId);
         if ($retirement !== null && ($retirement->binding->namespace !== $binding->namespace
@@ -51,7 +57,7 @@ final readonly class RegisteredDeploymentRecovery
                 throw new \RuntimeException('Docker daemon does not match the registered deployment.');
             }
             return ($this->dockerExecutor)($arguments);
-        });
+        }, $this->recipe);
         if ($retirement === null) {
             // Absence without a committed, previously verified binding supplies
             // no containment evidence. Never interpret an inspect error as absence.

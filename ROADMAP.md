@@ -2142,6 +2142,19 @@ The detailed design is [Web and worker runtime redesign](docs/plans/2026-07-17-0
 Its historical baseline is not a current completion report; reconcile against source
 and passing integration gates as each item is closed.
 
+Interim checkpoint on 2026-10-17: U1 of the
+[reviewed two-command deployment plan](docs/plans/2026-10-17-1430-refactor-two-command-deployment-plan.md)
+implements the storage admission foundation. Manifest version 2 admits named source
+volumes read-only and derived volumes read-write, verifies immutable volume identity
+and access mode, and requires explicit media memory and PID budgets.
+
+The authoritative shared unit selection passes **378 tests / 886 assertions** in
+an **8.0-second** lane, including worker CLI, configuration, mount and containment
+suites. Host creation, start and recovery checks pass **57 tests / 564 assertions**
+in **80.1 seconds**. U2, U3 and U4–U8 remain pending acceptance. Full static and
+backend gates and production runtime drills remain pending; every worker checkbox
+below remains unchecked.
+
 - [ ] Verify the two-command deployment contract end to end: web owns delivery and
   client connections; worker owns consumers, scheduler, outbox relay, media execution,
   control services, and child cleanup. No competing supervisor or hidden web pool.

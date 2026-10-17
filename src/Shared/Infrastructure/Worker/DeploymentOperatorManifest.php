@@ -15,7 +15,7 @@ use Symfony\Component\DependencyInjection\Attribute\Exclude;
 final readonly class DeploymentOperatorManifest
 {
     private const array STRING_FIELDS = ['namespace', 'bootId', 'daemonId', 'imageId', 'network', 'dockerBinary', 'dockerEndpoint'];
-    private const array INTEGER_FIELDS = ['version', 'memoryMiB', 'managementMiB', 'consumerMiB', 'relayMiB', 'schedulerMiB', 'scheduledConsoleMiB', 'nanoCpus', 'pidsLimit'];
+    private const array INTEGER_FIELDS = ['version', 'memoryMiB', 'managementMiB', 'consumerMiB', 'relayMiB', 'schedulerMiB', 'scheduledConsoleMiB', 'mediaMiB', 'mediaDescendantPids', 'nanoCpus', 'pidsLimit'];
     private const int MIB = 1024 * 1024;
 
     private function __construct(
@@ -27,6 +27,8 @@ final readonly class DeploymentOperatorManifest
         public string $dockerEndpoint,
         public int $nanoCpus,
         public int $pidsLimit,
+        /** @var list<array{volume:string,target:string,readOnly:bool,role:string}> */
+        public array $mediaMounts,
     ) {
         if (!str_starts_with($dockerBinary, '/') || strlen($dockerBinary) > 4096
             || preg_match('/[\x00-\x1f\x7f]/', $dockerBinary) !== 0
@@ -53,31 +55,44 @@ final readonly class DeploymentOperatorManifest
             throw new InvalidArgumentException('Operator manifest must be a JSON object.');
         }
         $fields = get_object_vars($decoded);
-        $expected = [...self::STRING_FIELDS, ...self::INTEGER_FIELDS];
+        $expected = [...self::STRING_FIELDS, ...self::INTEGER_FIELDS, 'mediaMounts'];
         if (array_diff(array_keys($fields), $expected) !== [] || array_diff($expected, array_keys($fields)) !== []) {
             throw new InvalidArgumentException('Operator manifest has unknown or missing fields.');
         }
-        if (self::integer($fields, 'version') !== 1) {
-            throw new InvalidArgumentException('Operator manifest version must be 1.');
+        if (self::integer($fields, 'version') !== 2) {
+            throw new InvalidArgumentException('Operator manifest version must be 2.');
         }
         $configuration = new WorkerRuntimeConfiguration(
             self::string($fields, 'namespace'), self::string($fields, 'bootId'),
             self::bytes($fields, 'memoryMiB'), self::bytes($fields, 'managementMiB'),
             self::bytes($fields, 'consumerMiB'), self::bytes($fields, 'relayMiB'),
             '/tmp/baander-worker-locks', self::bytes($fields, 'scheduledConsoleMiB'),
-            self::bytes($fields, 'schedulerMiB'),
+            self::bytes($fields, 'schedulerMiB'), self::bytes($fields, 'mediaMiB'), self::integer($fields, 'mediaDescendantPids'),
         );
+        if (!is_array($fields['mediaMounts']) || !array_is_list($fields['mediaMounts'])) {
+            throw new InvalidArgumentException('Operator media mounts require an ordered list.');
+        }
+        $mounts = [];
+        foreach ($fields['mediaMounts'] as $mount) {
+            if (!$mount instanceof stdClass) {
+                throw new InvalidArgumentException('Operator media mounts require objects.');
+            }
+            $mounts[] = get_object_vars($mount);
+        }
+        if (self::integer($fields, 'pidsLimit') < 8 + $configuration->mediaDescendantPids) {
+            throw new InvalidArgumentException('Worker PID ceiling must reserve management, four roles, scheduled console and admitted media descendants.');
+        }
         return new self(
             $configuration, self::string($fields, 'daemonId'), self::string($fields, 'imageId'),
             self::string($fields, 'network'), self::string($fields, 'dockerBinary'), self::string($fields, 'dockerEndpoint'),
-            self::integer($fields, 'nanoCpus'), self::integer($fields, 'pidsLimit'),
+            self::integer($fields, 'nanoCpus'), self::integer($fields, 'pidsLimit'), $mounts,
         );
     }
 
     public function recipe(DeploymentRuntimeEnvironment $environment): DeploymentContainerRecipe
     {
         $configuration = $this->configuration;
-        return new DeploymentContainerRecipe(
+        $recipe = new DeploymentContainerRecipe(
             $configuration->namespace, $configuration->bootId, $this->daemonId, $this->imageId,
             [
                 '/usr/local/bin/php', '-d', 'memory_limit=' . intdiv($configuration->managementReservationBytes, self::MIB) . 'M',
@@ -89,10 +104,38 @@ final readonly class DeploymentOperatorManifest
                 '--relay-mib=' . intdiv($configuration->relayReservationBytes, self::MIB),
                 '--scheduler-mib=' . intdiv($configuration->schedulerReservationBytes, self::MIB),
                 '--scheduled-console-mib=' . intdiv($configuration->scheduledConsoleReservationBytes, self::MIB),
+                '--media-mib=' . intdiv($configuration->mediaReservationBytes, self::MIB),
+                '--media-descendant-pids=' . $configuration->mediaDescendantPids,
                 '--lock-dir=' . $configuration->lockDirectory,
             ],
-            $this->network, $configuration->memoryLimitBytes, $this->nanoCpus, $this->pidsLimit, $environment,
+            $this->network, $configuration->memoryLimitBytes, $this->nanoCpus, $this->pidsLimit, $environment, $this->mediaMounts,
         );
+        if (!in_array('source', array_column($recipe->mediaMounts, 'role'), true)) {
+            throw new InvalidArgumentException('Operator media topology requires an explicitly authorized source volume.');
+        }
+        $paths = ['/var/www/html/storage', '/var/www/html/var/transcode_state'];
+        if (isset($environment->variables['CONVERT_STORAGE_PATH'])) {
+            $conversionPath = $environment->variables['CONVERT_STORAGE_PATH'];
+            if (strlen($conversionPath) > 4096
+                || preg_match('~\A/(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\z~D', $conversionPath) !== 1
+                || preg_match('~(?:^|/)\.\.?(?:/|$)~', $conversionPath) !== 0) {
+                throw new InvalidArgumentException('Conversion storage requires a canonical absolute shared-media path.');
+            }
+            $paths[] = $conversionPath;
+        }
+        foreach ($paths as $path) {
+            $covered = false;
+            foreach ($recipe->mediaMounts as $mount) {
+                if ($mount['role'] === 'derived' && ($path === $mount['target'] || str_starts_with($path, $mount['target'] . '/'))) {
+                    $covered = true;
+                    break;
+                }
+            }
+            if (!$covered) {
+                throw new InvalidArgumentException('Operator media topology does not cover required writable storage: ' . $path);
+            }
+        }
+        return $recipe;
     }
 
     /** @param array<string,mixed> $fields */
