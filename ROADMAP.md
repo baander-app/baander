@@ -27,7 +27,8 @@ only one agent host has.
   `plan/playlist-concurrent-writes` closes duplicate collaborator creation and
   stale reorder overwrites. Backend, static, web and runtime qualification pass,
   generated-client repeat generation is unchanged, and independent code review
-  found no issues. See the
+  found no issues. The user authorized merging through `b57b965e` into `master`
+  and pushing to both remotes on 2026-10-17. See the
   [verification checkpoint](#playlist-concurrent-writes-2026-10-17).
 
 - **Migration consolidation.** Implementation `78165f61` on
@@ -581,8 +582,8 @@ until the outer commit. An outer rollback does not rewind its in-memory snapshot
 callers must discard it and reload before another write. Direct SQL writers and
 other writers that bypass this repository remain outside the concurrency contract.
 Invitation flow, remove-song visibility, visible-count materialization, live
-provider qualification and mobile work remain deferred. No merge or push has
-been performed.
+provider qualification and mobile work remain deferred. The user authorized
+merging through `b57b965e` into `master` and pushing to both remotes on 2026-10-17.
 
 ### Public API identities (2026-10-17)
 
