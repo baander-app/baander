@@ -374,11 +374,15 @@ expired-subscription cleanup. Minishlink still encrypts the payload and signs VA
 the transport does not automatically replay push requests. Delivery logs omit
 provider API-key query strings, endpoint credentials and raw transport failures.
 
-HTTP request budgets are capped at thirty seconds, with a shared budget for a CAA
-redirect chain. Existing provider retries can extend the overall operation, and
-native DNS resolution follows the system resolver timeout outside the HTTP
-budget's enforcement. DNS lookup is synchronous and can block a worker; these
-controls do not promise a hard total lookup deadline.
+DNS resolution and HTTP share one monotonic request budget, capped at thirty
+seconds, across a CAA redirect chain. Push delivery likewise spends one
+thirty-second budget on DNS and sending, with connection time capped at five
+seconds or the remaining budget. A fresh PHP helper performs the complete native
+A/AAAA lookup while the calling coroutine waits without blocking its worker.
+Timeout, cancellation, invalid replies and exhausted helper capacity stop delivery.
+Cleanup and operating-system scheduling can extend the observed return time;
+existing provider retries can also extend the overall operation. These controls
+do not promise a hard real-time or whole-operation deadline.
 Webhooks, operator-configured lyrics, mail, tracing and browser playback have
 separate destination policies. The [application threat model](../part-2-developer-guide/application-threat-model.md#provider-transport-boundaries)
 records the scope and qualification limits.

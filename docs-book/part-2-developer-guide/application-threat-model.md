@@ -103,7 +103,7 @@ counts and failures are recorded separately in the roadmap.
 | Forged forwarding headers: direct client chooses apparent address, scheme or host | Rate-limit evasion and incorrect DPoP request identity | `Unit/Shared/Infrastructure/Http/ProxyTrustTest.php` exercises direct and explicit proxy trust; both configuration layers now default to no trust | Correct proxy header replacement and network isolation are deployment assumptions. The tests do not emulate every proxy vendor or multi-hop topology. |
 | Rate-counter outage or concurrent updates | Brute-force limits can admit more requests than configured | Configured factories execute Symfony policies on operation-local snapshots and commit through Redis compare-and-set. Store errors and exhausted conflict retries stop protected work with a generic 503. Named clears advance the same namespace generation used by consumption. `Integration/RateLimiterConcurrencyTest.php` and `RateLimiterHttpAvailabilityTest.php` target these boundaries; `Functional/Auth/AuthEndpointRateLimitTest.php` and `ApiRateLimitTest.php` retain ordinary exhaustion coverage | Local storage, HTTP and runtime checks pass; distributed load and Redis failover remain unqualified. The generic API limiter preserves the narrow logout/revoke availability exception; it still enforces confirmed exhaustion and every other authentication/proof check. |
 | Outbound SSRF through webhook URL or changed DNS | Access to internal services | `WebhookDestinationPolicy` checks every DNS answer, denies forbidden ranges and restricts optional LAN allowance; delivery pins the checked address, bypasses ambient proxies and refuses redirects. `Unit/Notification/Infrastructure/Webhook/` tests cover forbidden addresses, changing DNS and dispatch options | DNS tests are controlled resolver fixtures. Local TLS tests qualify transport certificate behavior separately; they do not certify public DNS or deployment trust stores. |
-| Metadata, radio-catalog or push destination changes through DNS or redirects | Internal-service access or provider credential disclosure | `PublicDestinationPolicy` requires an approved HTTPS hostname on port 443 and rejects the request if any DNS answer is not public. `PublicHttpClient` and `PushTransport` pin an approved address, verify TLS and disable proxies, automatic redirects and reused connections. `Unit/Shared/Infrastructure/Http/PublicDestinationPolicyTest.php`, `PublicHttpClientTest.php` and `Unit/Notification/Infrastructure/Push/PushTransportTest.php` cover these controls | Local adapter, destination-policy and TLS regressions pass in the CI image. System DNS lookup has its own timeout outside the HTTP deadline. Approved providers and application-origin script compromise remain separate trust boundaries. |
+| Metadata, radio-catalog or push destination changes through DNS or redirects | Internal-service access or provider credential disclosure | `PublicDestinationPolicy` requires an approved HTTPS hostname on port 443 and rejects the request if any DNS answer is not public. `PublicHttpClient` and `PushTransport` pin an approved address, verify TLS and disable proxies, automatic redirects and reused connections. `Unit/Shared/Infrastructure/Http/PublicDestinationPolicyTest.php`, `PublicHttpClientTest.php` and `Unit/Notification/Infrastructure/Push/PushTransportTest.php` cover these controls | Local adapter, destination-policy and TLS regressions pass in the CI image. Complete native DNS runs in a bounded helper within the caller deadline; helper admission, cleanup and scheduling limits are described below. Approved providers and application-origin script compromise remain separate trust boundaries. |
 | Outbound TLS failure or HTTPS downgrade | Interception or connection to an unintended endpoint | `Unit/Lyrics/Infrastructure/Api/LrclibTransportSecurityTest.php` uses a disposable CA/server to check trusted success, untrusted certificate, hostname mismatch and redirect rejection. The lyrics client disables redirects | Other outbound transports have separate limits below. Operator-configured base URLs remain trusted configuration. |
 
 ## Outbound inventory
@@ -137,14 +137,29 @@ pinning and cancels the previous response. Cross-origin hops retain only `Accept
 headers; credentials, cookies and request bodies are not forwarded. The
 redirect chain shares one HTTP budget.
 
-Public HTTP requests have a time budget capped at thirty seconds; existing provider
-retry policies can make the overall operation longer. Native DNS resolution uses
-the system resolver timeout, which cannot be interrupted by that HTTP budget.
-An over-budget lookup is rejected when control returns; this is not a hard total
-operation deadline. Push transport has a thirty-second request timeout and a
-five-second connection timeout, with the same DNS limitation. Transport-level replay of
-push requests and Spotify token POSTs is disabled; this does not make application
-delivery exactly once.
+Public HTTP requests carry one monotonic deadline through DNS and every approved
+redirect hop, capped at thirty seconds. Push transport shares a thirty-second
+budget between DNS and sending; its connection timeout is the smaller of five
+seconds and the remaining budget. Direct destination-policy calls without a
+caller deadline use a thirty-second budget.
+
+`NativeDnsResolver` starts a fresh PHP helper for the system resolver's complete
+A/AAAA lookup. It retains native family-error semantics and rejects incomplete or
+invalid output rather than accepting one successful family after the other fails.
+The caller polls without blocking its coroutine worker. Admission permits at most
+eight owned children per PHP process, including children still awaiting reaping;
+independent resolver instances share that bound. Replies are limited to 64 KiB.
+Polling sleeps for at most five milliseconds, with a one-millisecond minimum near
+the deadline. Timeout and cancellation kill the direct helper; cleanup polls for
+up to 250 milliseconds, and an unreaped child retains its admission slot. The
+helper also arms an alarm rounded up to the remaining whole second, capped at
+thirty seconds, so abrupt parent exit does not leave a normal lookup unbounded.
+
+Process launch, cleanup and operating-system scheduling prevent a hard real-time
+return guarantee. Existing provider and Messenger retries can extend the overall
+operation. Transport-level replay of push requests and Spotify token POSTs stays
+disabled; delivery is not exactly once. Webhook resolution retains its separate
+implementation and policy.
 
 Provider API-key queries, push endpoint credentials and transport exception chains
 are excluded from delivery logs. This protects the changed paths; it is not an
@@ -191,9 +206,13 @@ exhaustive taint analysis of logging or external observability.
    PHP stream reproduction: an HTTPS request follows a redirect to loopback HTTP;
    CI PHP 8.5.2 also forwards Authorization while host PHP 8.5.11 strips it. That
    fixture records the former transport's behavior, not a bypass of the new
-   adapters. Synchronous DNS can block a coroutine worker and outlast the HTTP budget;
-   bounded coroutine DNS needs separate qualification. Overall provider retries
-   and approved-provider compromise also remain limits. Webhooks, operator-configured lyrics, mail, tracing
+   adapters. Bounded helper execution removes native DNS from the coroutine
+   worker and includes lookup in the caller's request budget. The dedicated
+   network-isolated DNS drill and native lifecycle tests cover complete answers,
+   stalled lookups, cancellation and cleanup; current results are in the roadmap.
+   Per-process helper capacity, cleanup/scheduling tolerance, overall provider
+   retries and approved-provider compromise remain limits. Webhooks,
+   operator-configured lyrics, mail, tracing
    and browser playback retain their separate policies.
 4. **Unqualified boundaries.** Sustained denial of service, complete HTTP parser
    differential testing, authenticated pairing races, live external TLS providers and

@@ -18,6 +18,7 @@
   "tests/Unit/Shared/Infrastructure/Health/HealthMonitorSubscriberTest.php": "native coroutine/reactor/server; native shared table/channel/process-pool wrapper",
   "tests/Unit/Shared/Infrastructure/Health/HealthMonitorTimerProbeTest.php": "native coroutine/reactor/server",
   "tests/Unit/Shared/Infrastructure/Health/MessengerWorkerHealthTest.php": "native shared table/channel/process-pool wrapper",
+  "tests/Unit/Shared/Infrastructure/Http/NativeDnsResolverRuntimeTest.php": "native DNS helper cancellation, descriptors and fork ownership",
   "tests/Unit/Shared/Infrastructure/Http/NativeDnsResolverTest.php": "native coroutine and owned DNS helper process lifecycle",
   "tests/Unit/Shared/Infrastructure/Http/StreamedResponseProcessorTest.php": "native coroutine/reactor/server; nested native Swoole probe",
   "tests/Unit/Shared/Infrastructure/Http/SwooleBinaryFileResponseTransportTest.php": "nested native Swoole probe",

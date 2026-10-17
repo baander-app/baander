@@ -349,13 +349,59 @@ mismatch and blocked redirect destinations. Production policy has no test-domain
 or private-address exception. The historical `MetadataStreamRedirectTest` still
 reproduces raw PHP stream behavior; adapter tests establish the new boundary.
 
-The HTTP budget is capped at thirty seconds, shared by approved CAA redirect hops.
-System DNS lookup is synchronous, including inside a coroutine, and uses its own
-resolver timeout. It can block the worker and outlast that budget before control
-returns; existing provider retries can also extend the overall operation.
-These local checks do not certify live DNS, providers, external trust stores or a
-hard total DNS-plus-HTTP deadline. Current qualification status and results are
-recorded in the roadmap.
+DNS and HTTP share one absolute monotonic budget, capped at thirty seconds,
+through approved CAA redirect hops. Push shares its thirty-second budget between
+DNS and sending, with the connection timeout reduced to the remaining budget when
+that is less than five seconds. Adapter tests inspect the deadline and transport
+options after DNS, including exhausted budgets that must make no HTTP call.
+Existing provider retries can extend the overall operation.
+
+### Bounded native DNS
+
+`NativeDnsResolver` runs the complete native A/AAAA lookup in a fresh PHP helper.
+The caller waits through coroutine-aware polling; success still requires the
+whole reply and the destination policy still classifies every address. The native
+semantics distinguish definitive no-data from a failed family; a failed family
+cannot turn the other family's public result into success.
+
+Run helper lifecycle tests through the native lane and real system-resolver checks
+through their dedicated disposable container:
+
+```bash
+bash scripts/test-unit-container.sh \
+  tests/Unit/Shared/Infrastructure/Http/NativeDnsResolverTest.php \
+  tests/Unit/Shared/Infrastructure/Http/NativeDnsResolverRuntimeTest.php
+BAANDER_TEST_IMAGE=baander-ci-prewarm:local bash scripts/test-dns-runtime-container.sh
+```
+
+Both PHPUnit files belong to `scripts/backend-native-tests.json` because they
+execute real process and signal lifecycles. They check malformed/oversized output,
+nonzero exits, capacity shared across instances, timeout and cancellation cleanup,
+repeated descriptor/capacity recovery, inherited process accounting and closed
+parent descriptors. The fresh native lane runs as `www-data` with networking
+disabled.
+
+The DNS drill uses a privileged container, as the native lane does, with a
+180-second outer timeout. Root changes only that disposable container's
+`/etc/resolv.conf` and starts a loopback DNS fixture on port 53; probes
+and production helpers run as `www-data`. The container has `--network none` and
+is removed on exit. No host resolver, production DNS or development database is
+used. The fixture covers both-family success, definitive AAAA no-data, family
+SERVFAIL, a private answer beyond Swoole's address limit with native TCP fallback,
+and stalled DNS with process hooks enabled and disabled. A heartbeat must advance
+while lookup waits, no HTTP request may start after budget exhaustion, and cleanup
+must leave no owned child. A subreaper fixture kills a lookup's parent and observes
+the orphaned helper's finite lifetime.
+
+The implementation admits at most eight owned children per PHP process, including
+unreaped children, and accepts at most 64 KiB of output. It polls at five
+milliseconds, shortening the sleep near the deadline with a one-millisecond
+minimum. Timeout/cancellation kills the helper and allows up to 250 milliseconds
+for cleanup; operating-system scheduling adds tolerance, and an unreaped child
+keeps its slot. The helper alarm rounds remaining time up to whole seconds and
+caps it at thirty seconds. These local checks do not certify live providers,
+external trust stores, a hard real-time return bound or an overall retry deadline.
+Current qualification results are recorded in the roadmap.
 
 ## Running Tests
 

@@ -23,6 +23,12 @@ batches describe their own checkpoints; the current gate below takes precedence.
 Any harness can take over from this section; nothing below depends on a tool that
 only one agent host has.
 
+- **Bounded coroutine DNS.** Implementation on `plan/bounded-coroutine-dns`
+  moves complete native lookup into bounded helpers and shares caller budgets
+  across DNS and transport. Backend, static, native DNS, isolation and affected
+  runtime checks pass; independent review's test finding is resolved. See the
+  [verification checkpoint](#bounded-coroutine-dns-2026-10-17).
+
 - **Playlist concurrent writes.** Implementation on
   `plan/playlist-concurrent-writes` closes duplicate collaborator creation and
   stale reorder overwrites. Backend, static, web and runtime qualification pass,
@@ -99,8 +105,10 @@ only one agent host has.
   visibility; the visible-song count materialises rows. These remain deferred.
   The duplicate collaborator and unguarded reorder findings are closed by the
   [playlist implementation](#playlist-concurrent-writes-2026-10-17).
-- **Next.** Address bounded coroutine DNS resolution. Provider live qualification
-  remains separate acceptance work.
+- **Next.** Reconcile and qualify the current two-command web/worker deployment
+  contract end to end, starting with the first unchecked
+  [worker architecture item](#worker-architecture-and-resource-control).
+  Provider live qualification and regional acceptance remain separate work.
   React Native and Android remain deferred. The local dev database note below
   stands.
 
@@ -470,6 +478,133 @@ tests. React Native and Android remain deferred; Android's device login posts to
 pairing endpoint that does not exist and needs a decision when that work resumes.
 
 ## Current quality-gate checkpoint
+
+### Bounded coroutine DNS (2026-10-17)
+
+Implementation on `plan/bounded-coroutine-dns` follows the
+[reviewed plan](docs/plans/2026-10-17-1325-fix-bounded-coroutine-dns-plan.md).
+Backend, static, native DNS, isolation and affected runtime checks pass.
+Independent review's test-coverage finding is resolved and its stronger native
+regressions pass.
+
+`NativeDnsResolver` runs the system resolver's complete native A/AAAA lookup in a
+fresh PHP helper, preserving both-family and native error semantics. The calling
+coroutine polls while other work can advance. No capped Swoole address list
+substitutes for the complete reply; one forbidden answer still refuses the target.
+The existing approved-host, public-address, TLS, pinning, proxy and redirect
+controls remain in force.
+
+`PublicHttpClient` carries one absolute monotonic deadline through DNS and every
+approved redirect hop. `PushTransport` spends one thirty-second budget on DNS and
+sending, reducing its five-second connection timeout to the remaining budget.
+Direct destination-policy calls without a caller deadline use thirty seconds.
+Exhausted lookup budgets and helper capacity stop before transport dispatch.
+
+Admission is shared across resolver instances and admits at most eight owned
+children per PHP process, including unreaped children. Replies are limited to
+64 KiB. Polling uses five-millisecond sleeps, shortened near the deadline with a
+one-millisecond minimum. Timeout and cancellation kill the direct helper; cleanup
+polls for up to 250 milliseconds, and an unreaped child keeps its slot. Inherited
+process accounting is discarded after fork without signaling the parent's
+children. The helper closes inherited descriptors, starts without application
+bootstrap or inherited environment credentials, and arms an alarm rounded up to
+the remaining second, capped at thirty seconds.
+
+Verification in `baander-ci-prewarm:local`:
+
+- Before deadline integration, the HTTP/push selection ran **88 tests / 214
+  assertions** with **three errors and two failures** in **17.4 seconds**.
+  Deadline callbacks were absent and expired or late resolutions were accepted.
+  This failed run establishes the regressions before the fix. Artifacts:
+  `var/test-runs/20261017-133735-6e90bf86`.
+- Initial native lifecycle qualification passed **11 tests / 31 assertions** in
+  **19.1 seconds**. The added runtime fixture retains 48 timeout/cancellation
+  outcomes across both hook modes, capacity recovery and unchanged descriptor
+  counts; its final result is included in the full native lane below.
+- All **64 Python runner regressions** passed in **0.200 seconds**. The new
+  container runner passes shell syntax checks. Log:
+  `/tmp/baander-dns-runner-regressions.log`.
+- The dedicated DNS drill passed with both-family success, definitive AAAA no-data,
+  family SERVFAIL and **101 addresses** through native TCP fallback, including a
+  late private answer refused by the policy. Stalled lookups took **0.1555** and
+  **0.1551 seconds** with hooks disabled and enabled; the heartbeat advanced
+  **32** and **31** times, respectively, and no HTTP request was dispatched. The
+  parent-SIGKILL fixture observed helper SIGALRM and reaped the orphan. Log:
+  `/tmp/baander-dns-runtime.log`.
+- Final Composer platform requirements, PHPStan, Deptrac, container lint and
+  OpenAPI drift gates passed in **72.10 seconds**. Deptrac reports **zero
+  violations, warnings and errors**, with **489 existing baseline skips**.
+  Artifacts: `var/test-runs/dns-static-_ovbwblm`. Log:
+  `/tmp/baander-dns-final-static.log`.
+- The full backend run passed **9,560 tests / 79,002 assertions in 911 files**
+  with zero failures, errors or skips, in **767.0 seconds** including coordination
+  (**767.03 seconds** wall time). Ordinary: **6,029 / 23,383**, **59.1 seconds**;
+  native: **659 / 8,127**, **102.4 seconds**; service lanes: **1,533 / 32,225**,
+  **550.9 seconds**, and **1,339 / 15,267**, **572.1 seconds**. This adds **20 tests**
+  to the prior 9,540-test playlist checkpoint, with no removals. Artifacts:
+  `var/test-runs/20261017-134855-162a970a`.
+- Independent code review completed across eight lenses. Its one P2 finding
+  concerned a test: the oversized fixture's invalid JSON could fail without
+  proving the output cap. The fixture now emits a valid **100,001-byte** IP list,
+  and the regression requires the specific overflow error, no retained child and
+  a successful next lookup. Focused post-review native validation passed
+  **15 tests / 128 assertions** in **10.098 seconds** of PHPUnit execution,
+  **16.8 seconds** in the native lane
+  and **27.6 seconds** including coordination (**27.71 seconds** wall time).
+  These are the same fifteen native cases with two stronger assertions. Artifacts:
+  `var/test-runs/20261017-140501-6033a407`; log:
+  `/tmp/baander-dns-review-native.log`. No review findings remain unresolved.
+  The passing full run above precedes this test strengthening and excludes its
+  stronger assertions. Review receipt:
+  `/tmp/compound-engineering-1000/ce-code-review/20261017-135610-dns/`.
+- Both implementation simplification passes found no changes needed.
+- All **20 runner-isolation checks** passed in **43.67 seconds**, covering
+  independent database, Redis and filesystem state. Log:
+  `/tmp/baander-dns-final-isolation.log`; artifacts:
+  `/tmp/baander-stack-isolation-zw1h76rs`.
+- The production security runtime drill passed **15 malformed-request rejection
+  cases** and its WebSocket/Redis-outage checks in **64.64 seconds**, with unchanged
+  user/credential counts. Log: `/tmp/baander-dns-final-security-runtime.log`.
+- The production web-runtime drill passed in **54.34 seconds**, including the
+  Safari response baseline, PostgreSQL outage alerts without duplicates, and Redis
+  outage/recovery/logout. Log: `/tmp/baander-dns-final-web-runtime.log`.
+- Post-review scoped PHPStan passed in **17.69 seconds**. Artifacts:
+  `var/test-runs/dns-review-static-38idtit2`; log:
+  `/tmp/baander-dns-review-phpstan.log`. The full static run above passed before
+  the test strengthening.
+- Final container and network inventories contain no backend-test, DNS, security,
+  web-runtime or isolation resources. Disposable infrastructure was removed.
+- The security guide, threat model, testing guide and this roadmap passed
+  prose-preservation audits, relative-link checks and whitespace checks.
+
+Initial runtime qualification is recorded as failed. The dedicated DNS container
+first inherited its image's `www-data` user and could not configure its disposable
+resolver; setup now explicitly uses root while application probes remain
+`www-data`. The cancellation fixture also initially assumed every
+`Coroutine::cancel()` call must return true. In Swoole 6.2, an asynchronous
+io_uring cancel can return false when the target's short sleep completes during
+the cancellation operation, even while the target coroutine remains alive. The
+fixture now requests cancellation within a bound, yielding between attempts, then
+still requires all four cancellation outcomes and four deadline outcomes per
+round. Increasing deadlines did not establish the cause and is not treated as a
+fix. No production cancellation retry was added. Initial static attempts found
+fixture typing issues and, in a **72.75-second** run, one redundant resource-type
+assertion. The fixture retains the actual write that verifies the parent handle
+remains usable; the final static run above passes.
+
+No frontend behavior or API contract changed, so web suites and client generation
+were not repeated. Worker lifecycle code was untouched, so worker drills were not
+repeated; the affected production security and web-runtime drills ran instead.
+
+Limits: process launch, cleanup and operating-system scheduling prevent a hard
+real-time return guarantee. Existing provider and Messenger retries can extend the
+overall operation, and push delivery is not exactly once. The per-process helper
+bound scales with configured workers; no cross-worker admission service is added.
+Webhook, operator-configured lyrics, mail, tracing and browser playback retain
+separate policies. Live-provider, deployment trust-store and regional qualification
+remain pending; React Native and Android remain deferred. No application API,
+schema, dependency or frontend behavior changed. No local application database was
+migrated or reset. The work is committed locally; no merge or push is included.
 
 ### Playlist concurrent writes (2026-10-17)
 
