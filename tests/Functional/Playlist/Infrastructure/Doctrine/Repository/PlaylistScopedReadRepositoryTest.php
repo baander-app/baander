@@ -15,6 +15,7 @@ use App\Playlist\Domain\Repository\PlaylistRepositoryInterface;
 use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistEntity;
 use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistSongEntity;
 use App\Playlist\Infrastructure\Doctrine\Repository\PlaylistRepository;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
@@ -115,7 +116,7 @@ final class PlaylistScopedReadRepositoryTest extends TestCase
                 return $this->inner->visibleSongIds($songIds, $scope);
             }
         };
-        $repository = new PlaylistRepository($this->entityManager, $lookup);
+        $repository = new PlaylistRepository($this->entityManager, $lookup, static::getContainer()->get(TransactionPortInterface::class));
 
         $this->assertSame([2, 0, 1], array_map(static fn ($view) => $view->getSongCount(), $repository->findReadByUser($this->owner->getId(), LibraryReadScope::unrestricted())));
         $this->assertSame([0, 0, 0], array_map(static fn ($view) => $view->getSongCount(), $repository->findReadByUser($this->owner->getId(), LibraryReadScope::none())));

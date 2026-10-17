@@ -6,17 +6,21 @@ namespace App\Playlist\Infrastructure\Doctrine\Repository;
 
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Catalog\Application\Port\SongLookupInterface;
+use App\Playlist\Application\Exception\PlaylistWriteConflictException;
 use App\Playlist\Domain\Model\Playlist;
+use App\Playlist\Domain\Model\PlaylistPersistenceSnapshot;
 use App\Playlist\Domain\Model\PlaylistSong;
 use App\Playlist\Domain\ReadModel\PlaylistReadView;
 use App\Playlist\Domain\Repository\PlaylistRepositoryInterface;
 use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistCollaboratorEntity;
 use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistEntity;
 use App\Playlist\Infrastructure\Doctrine\Entity\PlaylistSongEntity;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
 
 final class PlaylistRepository implements PlaylistRepositoryInterface
@@ -24,26 +28,46 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly SongLookupInterface $songs,
+        private readonly TransactionPortInterface $transaction,
     ) {
     }
 
     public function save(Playlist $playlist): void
     {
-        $entity = $this->findEntityOrCreate($playlist);
-        $isNew = !$this->entityManager->contains($entity);
-        $this->syncToEntity($playlist, $entity);
-        $this->syncSongsToEntity($playlist, $entity);
-        $this->syncCollaboratorsToEntity($playlist, $entity, $isNew);
+        if (!$playlist->hasCompleteSnapshot()) {
+            throw new \LogicException('A metadata-only playlist cannot be saved. Load the complete playlist first.');
+        }
 
-        $this->entityManager->persist($entity);
-        $this->entityManager->flush();
+        $version = $this->transaction->run(function () use ($playlist): int {
+            $isNew = $playlist->isNew();
+            if (!$isNew) {
+                $this->guardExistingWrite($playlist);
+            }
+
+            $entity = $this->findEntityOrCreate($playlist);
+            $this->syncToEntity($playlist, $entity);
+            $this->syncSongsToEntity($playlist, $entity);
+            $this->syncCollaboratorsToEntity($playlist, $entity, $isNew);
+            $this->entityManager->persist($entity);
+            $this->entityManager->flush();
+
+            return $entity->getPersistenceVersion();
+        });
+
+        // An enclosing transaction still owns its final commit; after rollback callers reload.
+        $playlist->markPersisted($version);
     }
 
     public function findByUuid(Uuid $uuid): ?Playlist
     {
         $entity = $this->entityManager
             ->getRepository(PlaylistEntity::class)
-            ->find($uuid);
+            ->createQueryBuilder('p')
+            ->where('p.id = :id')
+            ->setParameter('id', $uuid, 'uuid')
+            ->getQuery()
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getOneOrNullResult();
 
         return $entity !== null ? $this->toDomain($entity, $this->loadSongs($entity), $this->loadCollaboratorIds($entity)) : null;
     }
@@ -52,7 +76,12 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
     {
         $entity = $this->entityManager
             ->getRepository(PlaylistEntity::class)
-            ->findOneBy(['publicId' => $publicId]);
+            ->createQueryBuilder('p')
+            ->where('p.publicId = :publicId')
+            ->setParameter('publicId', $publicId, 'public_id')
+            ->getQuery()
+            ->setHint(Query::HINT_REFRESH, true)
+            ->getOneOrNullResult();
 
         return $entity !== null ? $this->toDomain($entity, $this->loadSongs($entity), $this->loadCollaboratorIds($entity)) : null;
     }
@@ -72,7 +101,7 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
         $collaborators = $this->loadCollaboratorIdsByPlaylist($entities);
 
         return array_map(
-            fn(PlaylistEntity $entity) => $this->toDomain($entity, [], $collaborators[$entity->getId()->toString()] ?? []),
+            fn(PlaylistEntity $entity) => $this->toDomain($entity, [], $collaborators[$entity->getId()->toString()] ?? [], complete: false),
             $entities,
         );
     }
@@ -276,39 +305,82 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
 
     public function delete(Playlist $playlist): void
     {
-        $entity = $this->entityManager
-            ->getRepository(PlaylistEntity::class)
-            ->find($playlist->getId());
-
-        if ($entity !== null) {
-            // Remove playlist_song entries first
-            $songEntities = $this->entityManager
-                ->getRepository(PlaylistSongEntity::class)
-                ->createQueryBuilder('ps')
-                ->innerJoin('ps.playlist', 'p')
-                ->where('p.id = :playlistId')
-                ->setParameter('playlistId', $playlist->getId())
-                ->getQuery()
-                ->getResult();
-
-            foreach ($songEntities as $songEntity) {
-                $this->entityManager->remove($songEntity);
+        $this->transaction->run(function () use ($playlist): void {
+            $id = $playlist->getId()->toString();
+            $found = $this->entityManager->getConnection()->fetchOne(
+                'SELECT id FROM playlists WHERE id = :id FOR UPDATE',
+                ['id' => $id],
+            );
+            if ($found === false) {
+                return;
             }
 
+            $entity = $this->entityManager->find(PlaylistEntity::class, $playlist->getId());
+            if ($entity === null) {
+                throw new PlaylistWriteConflictException();
+            }
+
+            // The parent lock precedes the database's membership cascades, as it does in save.
             $this->entityManager->remove($entity);
             $this->entityManager->flush();
-        }
+        });
     }
 
     // --- Internal ---
 
+    private function guardExistingWrite(Playlist $playlist): void
+    {
+        $original = $playlist->getPersistenceSnapshot();
+        if ($original === null) {
+            throw new \LogicException('A persisted playlist needs its original complete snapshot.');
+        }
+
+        $connection = $this->entityManager->getConnection();
+        $id = $playlist->getId()->toString();
+        $updated = $connection->executeStatement(
+            'UPDATE playlists SET persistence_version = persistence_version + 1 WHERE id = :id AND persistence_version = :version',
+            ['id' => $id, 'version' => $original->version],
+        );
+        if ($updated !== 1) {
+            throw new PlaylistWriteConflictException();
+        }
+
+        // Scalars bypass managed children that may still reflect an earlier query.
+        // Lock the ORIGINAL memberships before scheduling any desired child changes.
+        /** @var list<array{song_id: string, position: int|string}> $songRows */
+        $songRows = $connection->fetchAllAssociative(
+            'SELECT song_id, position FROM playlist_song WHERE playlist_id = :id ORDER BY position, song_id FOR UPDATE',
+            ['id' => $id],
+        );
+        /** @var list<string> $collaboratorRows */
+        $collaboratorRows = $connection->fetchFirstColumn(
+            'SELECT user_id FROM playlist_collaborators WHERE playlist_id = :id ORDER BY user_id FOR UPDATE',
+            ['id' => $id],
+        );
+        $positions = [];
+        foreach ($songRows as $row) {
+            $positions[$row['song_id']] = (int) $row['position'];
+        }
+        $current = PlaylistPersistenceSnapshot::fromMembership(
+            $original->version,
+            $positions,
+            $collaboratorRows,
+        );
+        if (!$original->hasSameMembership($current)) {
+            throw new PlaylistWriteConflictException();
+        }
+    }
+
     private function findEntityOrCreate(Playlist $playlist): PlaylistEntity
     {
-        $existing = $this->entityManager
-            ->getRepository(PlaylistEntity::class)
-            ->find($playlist->getId());
+        if (!$playlist->isNew()) {
+            $existing = $this->entityManager->find(PlaylistEntity::class, $playlist->getId());
+            if ($existing === null) {
+                throw new PlaylistWriteConflictException();
+            }
+            // Refresh both the native CAS version and ORM original data before metadata writes.
+            $this->entityManager->refresh($existing);
 
-        if ($existing !== null) {
             return $existing;
         }
 
@@ -334,7 +406,7 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
      * @param PlaylistSong[] $songs
      * @param list<Uuid>     $collaboratorIds
      */
-    private function toDomain(PlaylistEntity $entity, array $songs, array $collaboratorIds): Playlist
+    private function toDomain(PlaylistEntity $entity, array $songs, array $collaboratorIds, bool $complete = true): Playlist
     {
         return Playlist::reconstitute(
             $entity->getId(),
@@ -350,6 +422,8 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
             $entity->getUpdatedAt(),
             $songs,
             $collaboratorIds,
+            $entity->getPersistenceVersion(),
+            $complete,
         );
     }
 
@@ -414,18 +488,15 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
      */
     private function loadSongs(PlaylistEntity $entity): array
     {
-        $songEntities = $this->entityManager
-            ->getRepository(PlaylistSongEntity::class)
-            ->createQueryBuilder('ps')
-            ->where('ps.playlist = :playlist')
-            ->setParameter('playlist', $entity)
-            ->orderBy('ps.position', 'ASC')
-            ->getQuery()
-            ->getResult();
+        /** @var list<array{song_id: string, position: int|string}> $rows */
+        $rows = $this->entityManager->getConnection()->fetchAllAssociative(
+            'SELECT song_id, position FROM playlist_song WHERE playlist_id = :id ORDER BY position, song_id',
+            ['id' => $entity->getId()->toString()],
+        );
 
         return array_map(
-            static fn(PlaylistSongEntity $ps): PlaylistSong => new PlaylistSong($ps->getSongId(), $ps->getPosition()),
-            $songEntities,
+            static fn (array $row): PlaylistSong => new PlaylistSong(Uuid::fromString($row['song_id']), (int) $row['position']),
+            $rows,
         );
     }
 
@@ -461,6 +532,7 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
             ->where('p.id = :playlistId')
             ->setParameter('playlistId', $playlist->getId())
             ->getQuery()
+            ->setHint(Query::HINT_REFRESH, true)
             ->getResult();
 
         /** @var array<string, PlaylistSongEntity> $existingBySong */
@@ -505,6 +577,7 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
             ->where('p.id = :playlistId')
             ->setParameter('playlistId', $playlist->getId())
             ->getQuery()
+            ->setHint(Query::HINT_REFRESH, true)
             ->getResult();
 
         $existingByUser = [];

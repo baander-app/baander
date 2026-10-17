@@ -450,8 +450,59 @@ final class PlaylistTest extends TestCase
         $this->assertSame([$second], $playlist->collaboratorIds());
     }
 
+    public function testOriginalPersistenceSnapshotSurvivesUnsavedMutations(): void
+    {
+        $collaborator = Uuid::v4();
+        $playlist = $this->reconstituteWithCollaborators([$collaborator]);
+        $original = $playlist->getPersistenceSnapshot();
+        $revision = $playlist->getRevision();
+
+        $playlist->addSong(Uuid::v4(), 0);
+        $playlist->removeCollaborator($collaborator);
+
+        $this->assertSame($original, $playlist->getPersistenceSnapshot());
+        $this->assertSame($revision, $playlist->getRevision());
+        $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/D', $revision);
+        $this->assertFalse($playlist->isNew());
+    }
+
+    public function testSuccessfulPersistenceChangesRevisionWithoutMembershipChanges(): void
+    {
+        $playlist = $this->reconstituteWithCollaborators([]);
+        $revision = $playlist->getRevision();
+        $playlist->updateMetadata('Renamed', null, false, true);
+        $playlist->markPersisted(1);
+
+        $this->assertNotSame($revision, $playlist->getRevision());
+        $this->assertSame(1, $playlist->getPersistenceSnapshot()?->version);
+    }
+
+    public function testCreationIsDistinctFromReconstitution(): void
+    {
+        $playlist = Playlist::create('New playlist', $this->userId);
+        $this->assertTrue($playlist->isNew());
+        $this->assertTrue($playlist->hasCompleteSnapshot());
+        $this->assertNull($playlist->getPersistenceSnapshot());
+
+        $playlist->markPersisted(0);
+
+        $this->assertFalse($playlist->isNew());
+        $this->assertSame(0, $playlist->getPersistenceSnapshot()?->version);
+    }
+
+    public function testMetadataProjectionCannotExposeACompleteRevision(): void
+    {
+        $playlist = $this->reconstituteWithCollaborators([], complete: false);
+
+        $this->assertFalse($playlist->isNew());
+        $this->assertFalse($playlist->hasCompleteSnapshot());
+        $this->assertNull($playlist->getPersistenceSnapshot());
+        $this->expectException(\LogicException::class);
+        $playlist->getRevision();
+    }
+
     /** @param list<Uuid> $collaboratorIds */
-    private function reconstituteWithCollaborators(array $collaboratorIds): Playlist
+    private function reconstituteWithCollaborators(array $collaboratorIds, bool $complete = true): Playlist
     {
         return Playlist::reconstitute(
             id: Uuid::v4(),
@@ -467,6 +518,7 @@ final class PlaylistTest extends TestCase
             updatedAt: new DateTimeImmutable('2025-03-15 00:00:00'),
             songs: [],
             collaboratorIds: $collaboratorIds,
+            complete: $complete,
         );
     }
 }

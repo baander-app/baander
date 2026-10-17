@@ -17,6 +17,10 @@ final class Playlist
     /** @var array<string, Uuid> collaborator user id string => id */
     private array $collaboratorIds = [];
 
+    private ?PlaylistPersistenceSnapshot $persistenceSnapshot = null;
+
+    private bool $completeSnapshot = true;
+
     /**
      * @param array<array-key, mixed> $smartRules
      */
@@ -90,6 +94,8 @@ final class Playlist
         DateTimeImmutable $updatedAt,
         array $songs = [],
         array $collaboratorIds = [],
+        int $persistenceVersion = 0,
+        bool $complete = true,
     ): self {
         $playlist = new self(
             $id,
@@ -109,7 +115,46 @@ final class Playlist
             $playlist->collaboratorIds[$collaboratorId->toString()] = $collaboratorId;
         }
 
+        $playlist->completeSnapshot = $complete;
+        if ($complete) {
+            $playlist->markPersisted($persistenceVersion);
+        }
+
         return $playlist;
+    }
+
+    public function isNew(): bool
+    {
+        return $this->completeSnapshot && $this->persistenceSnapshot === null;
+    }
+
+    public function hasCompleteSnapshot(): bool
+    {
+        return $this->completeSnapshot;
+    }
+
+    public function getPersistenceSnapshot(): ?PlaylistPersistenceSnapshot
+    {
+        return $this->persistenceSnapshot;
+    }
+
+    public function markPersisted(int $version): void
+    {
+        if (!$this->completeSnapshot) {
+            throw new \LogicException('A metadata-only playlist has no complete persistence snapshot.');
+        }
+
+        $this->persistenceSnapshot = PlaylistPersistenceSnapshot::capture($version, $this->songs, $this->collaboratorIds());
+    }
+
+    public function getRevision(): string
+    {
+        if (!$this->completeSnapshot) {
+            throw new \LogicException('A metadata-only playlist has no revision.');
+        }
+
+        return ($this->persistenceSnapshot
+            ?? PlaylistPersistenceSnapshot::capture(0, $this->songs, $this->collaboratorIds()))->revision();
     }
 
     /**

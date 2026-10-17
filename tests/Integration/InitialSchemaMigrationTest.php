@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Integration;
 
 use App\Shared\Infrastructure\Doctrine\Platform\BaanderDriverMiddleware;
+use App\Shared\Domain\Model\PublicId;
+use App\Shared\Domain\Model\Uuid;
+use Doctrine\DBAL\Exception\DriverException;
 use DoctrineMigrations\Version20990101000000;
 use App\Tests\Support\FinalSchemaBootstrap;
 use Doctrine\DBAL\Configuration;
@@ -105,9 +108,9 @@ final class InitialSchemaMigrationTest extends TestCase
         }
         $factory = $this->factory();
         $factory->getMetadataStorage()->ensureInitialized();
-        self::assertCount(1, $factory->getMigrationRepository()->getMigrations());
+        self::assertCount(2, $factory->getMigrationRepository()->getMigrations());
         self::assertSame(0, $this->migrate($factory));
-        self::assertSame(['DoctrineMigrations\\Version20261017000000'], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions'));
+        self::assertSame(['DoctrineMigrations\\Version20261017000000', 'DoctrineMigrations\\Version20261017130000'], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
         self::assertSame(80, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
         $this->assertSchedules();
         $this->assertIdentitiesAllocate();
@@ -126,8 +129,94 @@ final class InitialSchemaMigrationTest extends TestCase
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         self::assertSame(0, $this->migrate($this->factory(true)));
-        self::assertSame(2, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
+        self::assertSame(3, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
         self::assertSame('future_migration_probe', $this->connection->fetchOne("SELECT to_regclass('future_migration_probe')::text"));
+    }
+
+    public function testPopulatedPlaylistUpgradePreservesMetadataMembershipsAndIdentities(): void
+    {
+        self::assertSame(0, $this->migrate($this->factory(), 'DoctrineMigrations\\Version20261017000000'));
+        self::assertSame(1, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
+        $ownerId = (new Uuid())->toString();
+        $collaboratorId = (new Uuid())->toString();
+        $libraryId = (new Uuid())->toString();
+        $albumId = (new Uuid())->toString();
+        $playlistId = (new Uuid())->toString();
+        foreach ([$ownerId => 'owner', $collaboratorId => 'collaborator'] as $id => $name) {
+            $this->connection->executeStatement(
+                "INSERT INTO users (id, public_id, name, email, password, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, 'hash', '2026-10-01 10:00:00+00', '2026-10-02 11:00:00+00')",
+                [$id, (new PublicId())->toString(), $name, $name . '@baander.app'],
+            );
+        }
+        $this->connection->executeStatement(
+            "INSERT INTO libraries (id, public_id, name, slug, path, type, created_at, updated_at)
+             VALUES (?, ?, 'Upgrade library', 'upgrade', '/upgrade', 'music', '2026-10-01 10:00:00+00', '2026-10-02 11:00:00+00')",
+            [$libraryId, (new PublicId())->toString()],
+        );
+        $this->connection->executeStatement(
+            "INSERT INTO albums (id, public_id, library_id, title, type, created_at, updated_at)
+             VALUES (?, ?, ?, 'Upgrade album', 'album', '2026-10-01 10:00:00+00', '2026-10-02 11:00:00+00')",
+            [$albumId, (new PublicId())->toString(), $libraryId],
+        );
+        $this->connection->executeStatement(
+            "INSERT INTO playlists (id, public_id, user_id, name, description, is_public, is_collaborative, is_smart, smart_rules, created_at, updated_at)
+             VALUES (?, ?, ?, 'Kept playlist', 'Kept description', true, true, false, '{\"limit\":17}', '2026-10-01 10:00:00+00', '2026-10-02 11:00:00+00')",
+            [$playlistId, (new PublicId())->toString(), $ownerId],
+        );
+        foreach ([3, 9] as $position) {
+            $songId = (new Uuid())->toString();
+            $this->connection->executeStatement(
+                "INSERT INTO songs (id, public_id, album_id, title, path, size, mime_type, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?, 512, 'audio/flac', '2026-10-01 10:00:00+00', '2026-10-02 11:00:00+00')",
+                [$songId, (new PublicId())->toString(), $albumId, 'Song ' . $position, '/upgrade/' . $position . '.flac'],
+            );
+            $this->connection->executeStatement(
+                "INSERT INTO playlist_song (id, playlist_id, song_id, position, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, '2026-10-03 12:00:00+00', '2026-10-04 13:00:00+00')",
+                [(new Uuid())->toString(), $playlistId, $songId, $position],
+            );
+        }
+        $this->connection->executeStatement(
+            "INSERT INTO playlist_collaborators (id, playlist_id, user_id, role, created_at, updated_at)
+             VALUES (?, ?, ?, 'editor', '2026-10-05 14:00:00+00', '2026-10-06 15:00:00+00')",
+            [(new Uuid())->toString(), $playlistId, $collaboratorId],
+        );
+        $snapshot = function (): array {
+            $rows = [];
+            foreach (['users', 'libraries', 'albums', 'songs', 'playlists', 'playlist_song', 'playlist_collaborators'] as $table) {
+                $rows[$table] = $this->connection->fetchAllAssociative('SELECT * FROM ' . $table . ' ORDER BY id');
+            }
+
+            return $rows;
+        };
+        $before = $snapshot();
+
+        self::assertSame(0, $this->migrate($this->factory()));
+        self::assertSame(2, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
+        $after = $snapshot();
+        self::assertSame(0, (int) $after['playlists'][0]['persistence_version']);
+        $withoutVersion = $after;
+        unset($withoutVersion['playlists'][0]['persistence_version']);
+        self::assertSame($before, $withoutVersion, 'The forward migration preserves complete rows, including child identities, positions and timestamps.');
+        $history = $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions ORDER BY version');
+        self::assertSame(0, $this->migrate($this->factory()));
+        self::assertSame($after, $snapshot());
+        self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions ORDER BY version'));
+
+        $this->connection->beginTransaction();
+        try {
+            try {
+                $this->connection->executeStatement('UPDATE playlists SET persistence_version = -1 WHERE id = ?', [$playlistId]);
+                self::fail('Playlist persistence versions must be non-negative.');
+            } catch (DriverException $error) {
+                self::assertSame('23514', $error->getSQLState());
+                self::assertStringContainsString('chk_playlists_persistence_version', $error->getMessage());
+            }
+        } finally {
+            $this->connection->rollBack();
+        }
+        self::assertSame($after, $snapshot());
     }
 
     public function testFreshDatabaseInitializesWithoutPreprovisionedExtensions(): void

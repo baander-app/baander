@@ -20,6 +20,9 @@ class PlaylistEntity
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
 
+    #[ORM\Column(type: 'integer', options: ['default' => 0])]
+    private int $persistenceVersion = 0;
+
     #[ORM\Column(type: 'public_id')]
     private PublicId $publicId;
 
@@ -69,6 +72,11 @@ class PlaylistEntity
     public function getId(): Uuid
     {
         return $this->id;
+    }
+
+    public function getPersistenceVersion(): int
+    {
+        return $this->persistenceVersion;
     }
 
     public function getPublicId(): PublicId
