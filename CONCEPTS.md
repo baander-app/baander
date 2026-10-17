@@ -87,6 +87,10 @@ A video manifest or segment URL that carries an HMAC signature and an expiry ins
 
 A user the playlist's owner has named on a playlist. While the playlist is collaborative, a collaborator may view it and add, remove and reorder its songs, adding only songs their own library membership lets them see; when the owner turns collaboration off, collaborators keep viewing and lose editing. The owner alone changes the playlist's metadata, deletes it and names collaborators; a collaborator may leave; an administrator who is not the owner may view it and nothing more.
 
+### Playlist revision
+
+An opaque marker of the complete playlist state returned with its displayed song order. A reorder must present that revision; if the playlist changed, the caller reloads it before choosing an order again. Hidden songs affect the revision without exposing their identifiers.
+
 ## Rate limiting
 
 ### Limiter generation
