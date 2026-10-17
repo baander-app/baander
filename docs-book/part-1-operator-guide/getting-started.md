@@ -45,11 +45,17 @@ make migrate
 ```
 
 This initializes both the main and test databases with `Version20261017000000`,
-which creates the current 80-table schema and two daily schedules: OAuth code
-purging at 03:30 UTC and recommendation generation at 04:00 UTC. Each target must
-be empty; preinstalled extensions and an empty Doctrine migration metadata table
-are allowed. Existing user objects, even an empty table, cause initialization to
-stop before application schema changes.
+then applies `Version20261017130000`. The initial migration creates the 80-table
+schema and two daily schedules: OAuth code purging at 03:30 UTC and recommendation
+generation at 04:00 UTC. The incremental migration adds the nonnegative playlist
+persistence version used to detect concurrent writes. Running migrations again
+leaves no pending work.
+
+Each target must be empty before the initial migration; preinstalled extensions
+and an empty Doctrine migration metadata table are allowed. Existing user objects,
+even an empty table, cause initialization to stop before application schema changes.
+A database already initialized with `Version20261017000000` applies the incremental
+migration normally, preserving its data.
 
 For the main database alone, use `make migrate-no-test`. For an existing database
 with an older migration history, follow the [manual reset procedure](upgrading.md#manual-reset-of-an-existing-database).

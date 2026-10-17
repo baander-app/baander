@@ -6,8 +6,14 @@ namespace App\Tests\Fixtures\Playlist;
 
 use App\Catalog\Application\Port\SongLookupInterface;
 use App\Catalog\Application\Port\SongLyricSignature;
+use App\Playlist\Application\Command\AddCollaboratorCommand;
+use App\Playlist\Application\Command\ReorderSongsCommand;
+use App\Playlist\Application\CommandHandler\AddCollaboratorHandler;
+use App\Playlist\Application\CommandHandler\ReorderSongsHandler;
+use App\Playlist\Application\Port\PlaylistCollaboratorResolverInterface;
 use App\Playlist\Infrastructure\Doctrine\Repository\PlaylistRepository;
 use App\Shared\Application\Exception\ConflictException;
+use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
@@ -27,6 +33,27 @@ require_once dirname(__DIR__, 3) . '/vendor/autoload.php';
 /** Independent sessions share configuration, not an ORM identity map. */
 final class PlaylistWriteRace
 {
+    public static function collaboratorHandler(PlaylistRepository $repository, Connection $connection): AddCollaboratorHandler
+    {
+        $users = new class ($connection) implements PlaylistCollaboratorResolverInterface {
+            public function __construct(private readonly Connection $connection)
+            {
+            }
+
+            public function userId(PublicId $publicId): Uuid
+            {
+                $id = $this->connection->fetchOne('SELECT id FROM users WHERE public_id = ?', [$publicId->toString()]);
+                if (!is_string($id)) {
+                    throw new NotFoundException('The collaborator does not exist.');
+                }
+
+                return Uuid::fromString($id);
+            }
+        };
+
+        return new AddCollaboratorHandler($repository, $users);
+    }
+
     public static function connect(string $schema, ?string $application = null): Connection
     {
         $url = getenv('OUTBOX_TEST_DATABASE_URL');
@@ -110,6 +137,7 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
     if ($playlist === null) {
         throw new \LogicException('Race playlist must exist before the child starts.');
     }
+    $expectedRevision = $playlist->getRevision();
     fwrite(STDOUT, "ready\n");
     fflush(STDOUT);
     if (trim((string) fgets(STDIN)) !== 'go') {
@@ -117,6 +145,8 @@ if (realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
     }
     try {
         match ($action) {
+            'handler-collaborator' => PlaylistWriteRace::collaboratorHandler($repository, $connection)(new AddCollaboratorCommand($playlist->getId(), PublicId::fromString($target), $playlist->getUserId())),
+            'handler-reorder' => (new ReorderSongsHandler($repository))(new ReorderSongsCommand($playlist->getId(), $playlist->getUserId(), array_map(Uuid::fromString(...), explode(',', $target)), $expectedRevision)),
             'delete' => $repository->delete($playlist),
             'cascade-song' => $connection->executeStatement('DELETE FROM songs WHERE id = ?', [$target]),
             'cascade-user' => $connection->executeStatement('DELETE FROM users WHERE id = ?', [$target]),

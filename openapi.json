@@ -12260,6 +12260,13 @@
                                                     "type": "string",
                                                     "format": "date-time"
                                                 },
+                                                "revision": {
+                                                    "description": "Revision of the snapshot used to return songs",
+                                                    "type": "string",
+                                                    "pattern": "^[a-f0-9]{64}$",
+                                                    "maxLength": 64,
+                                                    "minLength": 64
+                                                },
                                                 "songs": {
                                                     "type": "array",
                                                     "items": {
@@ -12783,6 +12790,16 @@
                             }
                         }
                     },
+                    "409": {
+                        "description": "The playlist kept changing during the addition",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
                     "422": {
                         "description": "The owner named themself",
                         "content": {
@@ -12892,9 +12909,17 @@
                         "application/json": {
                             "schema": {
                                 "required": [
-                                    "songIds"
+                                    "songIds",
+                                    "expectedRevision"
                                 ],
                                 "properties": {
+                                    "expectedRevision": {
+                                        "description": "Revision returned with the displayed playlist order",
+                                        "type": "string",
+                                        "pattern": "^[a-f0-9]{64}$",
+                                        "maxLength": 64,
+                                        "minLength": 64
+                                    },
                                     "songIds": {
                                         "description": "Ordered array of song public IDs",
                                         "type": "array",
@@ -12920,6 +12945,12 @@
                                     "properties": {
                                         "data": {
                                             "properties": {
+                                                "revision": {
+                                                    "type": "string",
+                                                    "pattern": "^[a-f0-9]{64}$",
+                                                    "maxLength": 64,
+                                                    "minLength": 64
+                                                },
                                                 "message": {
                                                     "type": "string",
                                                     "example": "Songs reordered successfully."
@@ -12955,6 +12986,16 @@
                     },
                     "404": {
                         "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiError"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The playlist changed; refresh it before reordering",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -22835,9 +22876,18 @@
             },
             "ReorderSongsRequest": {
                 "required": [
+                    "expectedRevision",
                     "songIds"
                 ],
                 "properties": {
+                    "expectedRevision": {
+                        "description": "Revision returned with the displayed playlist order",
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$",
+                        "default": "",
+                        "maxLength": 64,
+                        "minLength": 64
+                    },
                     "songIds": {
                         "description": "Ordered array of song public IDs",
                         "type": "array",

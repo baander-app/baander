@@ -145,6 +145,28 @@ final class OpenApiSpecTest extends KernelTestCase
         $this->assertPublicIdentifierSchema($inlineReorder['properties']['songIds']['items']);
     }
 
+    public function test_playlist_reorder_requires_the_displayed_revision_and_documents_conflicts(): void
+    {
+        $spec = $this->getSpec();
+        $operation = $spec['paths']['/api/playlists/{publicId}/reorder']['post'];
+        $inline = $operation['requestBody']['content']['application/json']['schema'];
+        foreach ([$spec['components']['schemas']['ReorderSongsRequest'], $inline] as $schema) {
+            self::assertContains('expectedRevision', $schema['required']);
+            $revision = $schema['properties']['expectedRevision'];
+            self::assertSame('string', $revision['type']);
+            self::assertSame('^[a-f0-9]{64}$', $revision['pattern']);
+            self::assertSame(64, $revision['minLength']);
+            self::assertSame(64, $revision['maxLength']);
+        }
+        self::assertArrayHasKey('409', $operation['responses']);
+        $result = $operation['responses']['200']['content']['application/json']['schema']['properties']['data'];
+        self::assertArrayHasKey('revision', $result['properties']);
+        $detail = $spec['paths']['/api/playlists/{publicId}']['get']['responses']['200']['content']['application/json']['schema']['properties']['data'];
+        self::assertArrayHasKey('revision', $detail['properties']);
+        self::assertArrayNotHasKey('revision', $spec['components']['schemas']['PlaylistResource']['properties']);
+        self::assertArrayHasKey('409', $spec['paths']['/api/playlists/{publicId}/collaborators/{userPublicId}']['put']['responses']);
+    }
+
     /** @param array<string, mixed> $schema */
     private function assertPublicIdentifierSchema(array $schema): void
     {

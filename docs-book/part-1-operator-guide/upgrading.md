@@ -30,11 +30,16 @@ git log --oneline <current-tag>..HEAD
 
 If you only need to migrate the main database (for example, on a production server without a test database), use `make migrate-no-test` instead.
 
-Fresh databases start with the single transactional migration
-`Version20261017000000`. It creates the current schema, including microsecond
-`timestamptz` columns, and cannot be downgraded. Future migrations run in timestamp
-order. An already initialized database supports repeat migration runs and future
-incremental migrations.
+Fresh databases start with the transactional migration `Version20261017000000`,
+then apply `Version20261017130000`. The initial migration creates the schema,
+including microsecond `timestamptz` columns, and cannot be downgraded. The
+incremental migration adds a nonnegative `persistence_version` to playlists,
+starting existing rows at zero and preserving their identities, songs and
+collaborators.
+
+A database already initialized with `Version20261017000000` applies the incremental
+migration through the normal update commands; no database reset is required.
+Migrations run in timestamp order, and a repeat run leaves no pending work.
 
 While the initial migration is pending, Doctrine refuses a target containing user
 tables, views, sequences, types or routines. A table counts even without rows.

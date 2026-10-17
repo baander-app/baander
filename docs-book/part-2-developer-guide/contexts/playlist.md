@@ -25,6 +25,7 @@ The Playlist context manages user-created playlists (manual song collections) an
 | `UpdatePlaylistCommand` | `UpdatePlaylistHandler` | Update playlist metadata |
 | `AddSongCommand` | `AddSongHandler` | Add a song to a playlist |
 | `RemoveSongCommand` | `RemoveSongHandler` | Remove a song from a playlist |
+| `ReorderSongsCommand` | `ReorderSongsHandler` | Reorder songs against the displayed playlist revision |
 | `AddCollaboratorCommand` | `AddCollaboratorHandler` | Name a collaborator on a playlist |
 | `RemoveCollaboratorCommand` | `RemoveCollaboratorHandler` | Remove a collaborator, or let one leave |
 
@@ -59,6 +60,29 @@ A playlist belongs to its owner and may be shared with named collaborators. The 
 
 `PlaylistVoter` decides every route on the aggregate with six attributes (`VIEW`, `EDIT_SONGS`, `EDIT`, `DELETE`, `MANAGE_COLLABORATORS`, `LEAVE`), and the controller refuses with one message per attribute, so a refusal names the rule that decided. A song is added only when the acting user can see it through their own library membership, judged by `PlaylistSongVisibilityInterface`; an unknown or invisible song answers `404`. Reordering places the listed songs first and keeps the entries it was not told about after them, so a client that sees only part of a playlist cannot delete the rest. Every song count a response carries is the viewer's visible count, and the list includes the playlists the actor collaborates on. Responses name the owner and the collaborators by public id; no user UUID leaves the API.
 
+Playlist detail responses include an opaque `revision` of 64 lowercase hexadecimal
+characters. It describes the complete stored playlist snapshot used to assemble the
+songs, including entries hidden from the viewer. List responses carry no revision.
+The token changes after a persisted metadata, song or collaborator edit; song and
+collaborator deletions cascaded from other contexts also invalidate it. Clients
+must treat the token as opaque rather than deriving it from the visible songs.
+
+Reorder requests require `expectedRevision` alongside `songIds`. A missing token or
+one outside the 64-character lowercase hexadecimal format answers `422`. The
+handler loads the playlist, rechecks the actor's current editing permission, then
+compares the revision before applying the requested order. A successful response
+returns the resulting `revision`. A stale revision or a conflicting save answers
+`409` through the standard error envelope. Refresh the detail and let the user
+reconcile the new order before submitting another request; do not replay the old
+reorder automatically. The partial reorder and song visibility rules above still
+apply.
+
+Collaborator addition is idempotent. Naming an existing collaborator succeeds
+without a write. If another writer wins while a new collaborator is being saved,
+the handler reloads the playlist and checks ownership again, for at most three
+attempts in total. Exhaustion answers `409`; unrelated database failures are not
+retried as conflicts.
+
 `tests/Integration/PlaylistMutationFirewallTest.php` proves this contract for owner, collaborator, collaborator with the flag off, unrelated member, administrator and anonymous on every mutation and both collaborator routes, through the production firewall.
 
 ## Cross-Context Dependencies
@@ -80,6 +104,18 @@ A playlist belongs to its owner and may be shared with named collaborators. The 
 | `PlaylistSongEntity` | Playlist song entries with position |
 | `PlaylistCollaboratorEntity` | Collaborator access to shared playlists |
 | `PlaylistStatisticEntity` | Playlist usage statistics |
+
+Every save of an existing playlist uses compare-and-swap against its original
+persistence version and complete song and collaborator membership. A stale writer
+answers `409` instead of replacing the winning metadata or collections, and a
+removed playlist cannot be recreated by a stale save. The repository also checks
+membership removed by cascades and rolls back a conflicting write. Metadata-only
+read projections cannot be saved as complete aggregates.
+
+When a save runs inside an enclosing transaction, the aggregate's updated snapshot
+remains provisional until that transaction commits. After an outer rollback,
+callers must discard the retained aggregate and reload it; rollback does not rewind
+the in-memory object.
 
 ### Services
 

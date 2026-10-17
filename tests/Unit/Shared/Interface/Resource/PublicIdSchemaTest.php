@@ -83,8 +83,9 @@ final class PublicIdSchemaTest extends TestCase
         self::assertNotSame('uuid', $add->properties[0]->format);
         self::assertSame($add->properties[0]->example, PublicId::fromString($add->properties[0]->example)->toString());
         $reorder = (new ReflectionClass(ReorderSongsRequest::class))->getAttributes(Schema::class)[0]->newInstance();
-        self::assertNotSame('uuid', $reorder->properties[0]->items->format);
-        foreach ($reorder->properties[0]->example as $uuid) {
+        $reorderProperties = array_column($reorder->properties, null, 'property');
+        self::assertNotSame('uuid', $reorderProperties['songIds']->items->format);
+        foreach ($reorderProperties['songIds']->example as $uuid) {
             self::assertSame($uuid, PublicId::fromString($uuid)->toString());
         }
     }

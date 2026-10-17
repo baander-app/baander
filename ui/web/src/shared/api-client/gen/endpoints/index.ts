@@ -29,22 +29,34 @@ import type { ErrorType , BodyType } from '../../axios-instance';
 export interface PlayActivityRequest {
   /**
      * Public ID of the song being played
+     * @minLength 21
+     * @maxLength 21
      * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   songId?: string | null;
   /**
      * Public ID of the album
+     * @minLength 21
+     * @maxLength 21
      * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   albumId?: string | null;
   /**
      * Public ID of the artist
+     * @minLength 21
+     * @maxLength 21
      * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   artistId?: string | null;
   /**
      * Public ID of the movie
+     * @minLength 21
+     * @maxLength 21
      * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   movieId?: string | null;
   /**
@@ -379,7 +391,12 @@ export interface UpdateArtistRequest {
 }
 
 export interface ArtistSongRequest {
-  /** Song public identifier */
+  /**
+     * Song public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   songId: string;
   /** Artist role (primary, featured, producer, composer, conductor, remixer, djmix, other) */
   role: string;
@@ -396,7 +413,12 @@ export interface UpdateRoleRequest {
 }
 
 export interface ArtistAlbumRequest {
-  /** Album public identifier */
+  /**
+     * Album public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   albumId: string;
   /** Artist role (primary, featured, producer, composer, conductor, remixer, djmix, other) */
   role: string;
@@ -407,7 +429,10 @@ export interface CreateGenreRequest {
   slug: string;
   /**
      * Public ID of the parent genre
+     * @minLength 21
+     * @maxLength 21
      * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   parentId?: string | null;
   /**
@@ -424,7 +449,10 @@ export interface UpdateGenreRequest {
   slug?: string | null;
   /**
      * Public ID of the parent genre
+     * @minLength 21
+     * @maxLength 21
      * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   parentId?: string | null;
   /**
@@ -435,12 +463,22 @@ export interface UpdateGenreRequest {
 }
 
 export interface GenreSongRequest {
-  /** Song public ID */
+  /**
+     * Song public ID
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   songId: string;
 }
 
 export interface GenreAlbumRequest {
-  /** Album public ID */
+  /**
+     * Album public ID
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   albumId: string;
 }
 
@@ -599,14 +637,27 @@ export interface UpdatePartyMemberRequest {
 }
 
 export interface TransferHostRequest {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   newHostUserId: string;
 }
 
 export interface CreatePartySessionRequest {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   videoId: string;
   /**
      * Transcode job of the video that the host's playback steers
+     * @minLength 21
+     * @maxLength 21
      * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   transcodeJobId?: string | null;
   /**
@@ -664,6 +715,13 @@ export interface AddSongRequest {
 }
 
 export interface ReorderSongsRequest {
+  /**
+     * Revision returned with the displayed playlist order
+     * @minLength 64
+     * @maxLength 64
+     * @pattern ^[a-f0-9]{64}$
+     */
+  expectedRevision: string;
   /**
      * Ordered array of song public IDs
      * @minItems 1
@@ -780,7 +838,12 @@ export const SyncSessionRequestPlaybackState = {
 } as const;
 
 export interface SyncSessionRequest {
-  /** Ordered list of track IDs */
+  /**
+     * Ordered list of track IDs
+     * @items.minLength 21
+     * @items.maxLength 21
+     * @items.pattern ^[0-9a-zA-Z_-]{21}$
+     */
   queue: string[];
   /** @minimum 0 */
   currentTrackIndex: number;
@@ -795,6 +858,9 @@ export interface ClaimSessionRequest {
   /**
      * Optional queue to bring from local device
      * @nullable
+     * @items.minLength 21
+     * @items.maxLength 21
+     * @items.pattern ^[0-9a-zA-Z_-]{21}$
      */
   queue?: string[] | null;
   /**
@@ -812,7 +878,12 @@ export interface ClaimSessionRequest {
 }
 
 export interface CreateSessionRequest {
-  /** Ordered list of track IDs */
+  /**
+     * Ordered list of track IDs
+     * @items.minLength 21
+     * @items.maxLength 21
+     * @items.pattern ^[0-9a-zA-Z_-]{21}$
+     */
   queue: string[];
   /** @minimum 0 */
   currentTrackIndex: number;
@@ -930,28 +1001,45 @@ export interface ActivityResource {
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   publicId: string;
-  /** User public ID */
+  /**
+     * User public ID
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   userId: string;
   /** Type of activity */
   activityType: string;
   /**
      * Song public ID
+     * @minLength 21
+     * @maxLength 21
      * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   songId?: string | null;
   /**
      * Album public ID
+     * @minLength 21
+     * @maxLength 21
      * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   albumId?: string | null;
   /**
      * Artist public ID
+     * @minLength 21
+     * @maxLength 21
      * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   artistId?: string | null;
   /**
      * Movie public ID
+     * @minLength 21
+     * @maxLength 21
      * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   movieId?: string | null;
   /** Number of plays */
@@ -1445,6 +1533,11 @@ export interface FileDeletionPreviewResource {
 }
 
 export type AlbumDeletePreviewResourceAlbum = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   id?: string;
   title?: string;
   songCount?: number;
@@ -1459,6 +1552,11 @@ export type AlbumDeletePreviewResourceFiles = {
  * @nullable
  */
 export type AlbumDeletePreviewResourceCoverImage = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   id?: string;
 } | null;
 
@@ -1516,11 +1614,21 @@ export interface CatalogDeletionResource {
  * @nullable
  */
 export type SongDeletePreviewResourceSongAlbum = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   id?: string;
   title?: string;
 } | null;
 
 export type SongDeletePreviewResourceSong = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   id?: string;
   title?: string;
   /** @nullable */
@@ -1565,7 +1673,12 @@ export interface SongResource {
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   publicId: string;
-  /** Album public identifier */
+  /**
+     * Album public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   albumId: string;
   /** Song title */
   title: string;
@@ -1656,7 +1769,12 @@ export interface AlbumResource {
 export type DuplicateGroupResourceAlbumsItem = { [key: string]: unknown };
 
 export interface DuplicateGroupResource {
-  /** List of album public identifiers in this duplicate group */
+  /**
+     * List of album public identifiers in this duplicate group
+     * @items.minLength 21
+     * @items.maxLength 21
+     * @items.pattern ^[0-9a-zA-Z_-]{21}$
+     */
   albumIds: string[];
   /** Confidence score between 0 and 1 */
   confidence: number;
@@ -1701,7 +1819,12 @@ export interface ArtistResource {
 }
 
 export interface GenreResource {
-  /** Genre public ID */
+  /**
+     * Genre public ID
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId: string;
   /** Genre name */
   name: string;
@@ -1709,7 +1832,10 @@ export interface GenreResource {
   slug: string;
   /**
      * Parent genre public ID
+     * @minLength 21
+     * @maxLength 21
      * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   parentId?: string | null;
   /**
@@ -1804,7 +1930,12 @@ export interface MovieResource {
      * @nullable
      */
   collectionName?: string | null;
-  /** Video public identifiers */
+  /**
+     * Video public identifiers
+     * @items.minLength 21
+     * @items.maxLength 21
+     * @items.pattern ^[0-9a-zA-Z_-]{21}$
+     */
   videoIds: string[];
   /**
      * Poster image data
@@ -1967,7 +2098,12 @@ export const LibraryAccessResourceType = {
 } as const;
 
 export interface LibraryAccessResource {
-  /** Library public ID */
+  /**
+     * Library public ID
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   libraryId: string;
   /** Library name */
   name: string;
@@ -2004,7 +2140,12 @@ export const LibraryResourceFilesystemType = {
 } as const;
 
 export interface LibraryResource {
-  /** Library public ID */
+  /**
+     * Library public ID
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId: string;
   /** Library name */
   name: string;
@@ -2158,7 +2299,9 @@ export type NotificationResourceParameters = { [key: string]: unknown } | null;
 export interface NotificationResource {
   /**
      * Public notification identifier (Nanoid)
-     * @pattern ^[A-Za-z0-9_-]{21}$
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   publicId: string;
   /** Notification category */
@@ -2200,13 +2343,26 @@ export interface PartySessionResource {
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   publicId: string;
-  /** Host user public ID */
+  /**
+     * Host user public ID
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   hostUserId: string;
-  /** Video public ID */
+  /**
+     * Video public ID
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   videoId: string;
   /**
      * Transcode job that the host's playback steers; null when none was named or the job has been deleted
+     * @minLength 21
+     * @maxLength 21
      * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   transcodeJobId?: string | null;
   /** Maximum members allowed */
@@ -3073,22 +3229,34 @@ export type GetActivityHistory200 = {
 export type PostActivityPlayBody = {
   /**
      * Public ID of the song being played
+     * @minLength 21
+     * @maxLength 21
      * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   songId?: string | null;
   /**
      * Public ID of the album
+     * @minLength 21
+     * @maxLength 21
      * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   albumId?: string | null;
   /**
      * Public ID of the artist
+     * @minLength 21
+     * @maxLength 21
      * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   artistId?: string | null;
   /**
      * Public ID of the movie
+     * @minLength 21
+     * @maxLength 21
      * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   movieId?: string | null;
   /**
@@ -3748,6 +3916,9 @@ sort?: string;
 order?: GetAlbumIndexOrder;
 /**
  * Filter by artist public ID
+ * @minLength 21
+ * @maxLength 21
+ * @pattern ^[0-9a-zA-Z_-]{21}$
  */
 artistId?: string;
 /**
@@ -3774,6 +3945,11 @@ export type GetAlbumShow200DataCoverImage = {
 } | null;
 
 export type GetAlbumShow200Data = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId?: string;
   title?: string;
   type?: string;
@@ -3828,6 +4004,11 @@ export type PostAlbumCoverUploadBody = {
 };
 
 export type PostAlbumCoverUpload200 = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId?: string;
   url?: string;
   size?: number;
@@ -3846,6 +4027,9 @@ export type PostAlbumMerge200 = {
 export type GetAdminAlbumsDuplicatesParams = {
 /**
  * Library ID to scan for duplicates
+ * @minLength 21
+ * @maxLength 21
+ * @pattern ^[0-9a-zA-Z_-]{21}$
  */
 libraryId: string;
 };
@@ -3939,6 +4123,11 @@ export type PatchArtistUpdate200 = {
 };
 
 export type PostArtistAddSongBody = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   songId?: string;
   role?: string;
 };
@@ -3953,6 +4142,11 @@ export type PatchArtistUpdateSongRoleBody = {
 };
 
 export type PostArtistAddAlbumBody = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   albumId?: string;
   role?: string;
 };
@@ -3972,6 +4166,11 @@ export type PostArtistCoverUploadBody = {
 };
 
 export type PostArtistCoverUpload200 = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId?: string;
   url?: string;
   size?: number;
@@ -3997,7 +4196,12 @@ export type GetGenreIndex200 = {
 export type PostGenreStoreBody = {
   name?: string;
   slug?: string;
-  /** @nullable */
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   parentId?: string | null;
   /** @nullable */
   mbid?: string | null;
@@ -4008,10 +4212,20 @@ export type PostGenreStore201 = {
 };
 
 export type GetGenreShow200Data = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId?: string;
   name?: string;
   slug?: string;
-  /** @nullable */
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   parentId?: string | null;
   mbid?: string;
   children?: GenreResource[];
@@ -4026,7 +4240,12 @@ export type PatchGenreUpdateBody = {
   name?: string | null;
   /** @nullable */
   slug?: string | null;
-  /** @nullable */
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   parentId?: string | null;
   /** @nullable */
   mbid?: string | null;
@@ -4037,12 +4256,22 @@ export type PatchGenreUpdate200 = {
 };
 
 export type PostGenreAddSongBody = {
-  /** Song public ID */
+  /**
+     * Song public ID
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   songId?: string;
 };
 
 export type PostGenreAddAlbumBody = {
-  /** Album public ID */
+  /**
+     * Album public ID
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   albumId?: string;
 };
 
@@ -4101,10 +4330,16 @@ q?: string;
 genres?: string;
 /**
  * Filter by artist public ID
+ * @minLength 21
+ * @maxLength 21
+ * @pattern ^[0-9a-zA-Z_-]{21}$
  */
 artistId?: string;
 /**
  * Filter by album public ID
+ * @minLength 21
+ * @maxLength 21
+ * @pattern ^[0-9a-zA-Z_-]{21}$
  */
 albumId?: string;
 /**
@@ -4898,6 +5133,9 @@ unread?: boolean;
 limit?: number;
 /**
  * Notification public ID for pagination
+ * @minLength 21
+ * @maxLength 21
+ * @pattern ^[0-9a-zA-Z_-]{21}$
  */
 cursor?: string;
 /**
@@ -4920,7 +5158,10 @@ export type GetNotificationIndex200 = {
   data: NotificationResource[];
   /**
      * Cursor for the next page, or null when exhausted
+     * @minLength 21
+     * @maxLength 21
      * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   nextCursor: string | null;
 };
@@ -4930,6 +5171,11 @@ export type GetNotificationUnreadCount200 = {
 };
 
 export type PatchNotificationMarkRead200Data = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId?: string;
   isRead?: boolean;
 };
@@ -5031,6 +5277,11 @@ export type DeletePushUnsubscribeBody = {
 };
 
 export type GetWebhookIndex200DataItem = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId?: string;
   url?: string;
 };
@@ -5046,6 +5297,11 @@ export type PostWebhookCreateBody = {
 };
 
 export type PostWebhookCreate201Data = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId?: string;
   url?: string;
   secret?: string;
@@ -5062,6 +5318,11 @@ export type PutWebhookUpdateBody = {
 };
 
 export type PutWebhookUpdate200Data = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId?: string;
   url?: string;
 };
@@ -5078,6 +5339,11 @@ export const PostWebhookRotateSecret200DataSigningVersion = {
 } as const;
 
 export type PostWebhookRotateSecret200Data = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId: string;
   /**
      * @minLength 64
@@ -5093,6 +5359,11 @@ export type PostWebhookRotateSecret200 = {
 };
 
 export type GetPartyMemberIndex200DataItem = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId?: string;
 };
 
@@ -5108,6 +5379,11 @@ export type PatchPartyMemberUpdateMeBody = {
 };
 
 export type PatchPartyMemberUpdateMe200Data = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId?: string;
 };
 
@@ -5116,6 +5392,11 @@ export type PatchPartyMemberUpdateMe200 = {
 };
 
 export type PostPartyMemberTransferHostBody = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   newHostUserId: string;
 };
 
@@ -5124,6 +5405,11 @@ export type PostPartyMemberTransferHost200 = {
 };
 
 export type GetPartySessionIndex200DataItem = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId?: string;
 };
 
@@ -5136,10 +5422,20 @@ export type PostPartySessionCreate201 = {
 };
 
 export type GetPartySessionShow200DataMembersItem = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId?: string;
 };
 
 export type GetPartySessionShow200Data = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId?: string;
   members?: GetPartySessionShow200DataMembersItem[];
 };
@@ -5153,6 +5449,11 @@ export type DeletePartySessionEnd200 = {
 };
 
 export type PostPartySessionJoin200Data = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId?: string;
 };
 
@@ -5189,7 +5490,12 @@ export type GetPlaylistShow200DataSongsItem = {
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   publicId?: string;
-  /** Album public identifier */
+  /**
+     * Album public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   albumId?: string;
   /** Stored playlist position */
   position?: number;
@@ -5247,6 +5553,13 @@ export type GetPlaylistShow200Data = {
      */
   songCount?: number;
   createdAt?: string;
+  /**
+     * Revision of the snapshot used to return songs
+     * @minLength 64
+     * @maxLength 64
+     * @pattern ^[a-f0-9]{64}$
+     */
+  revision?: string;
   songs?: GetPlaylistShow200DataSongsItem[];
 };
 
@@ -5293,6 +5606,13 @@ export type PostPlaylistAddSong201 = {
 
 export type PostPlaylistReorderBody = {
   /**
+     * Revision returned with the displayed playlist order
+     * @minLength 64
+     * @maxLength 64
+     * @pattern ^[a-f0-9]{64}$
+     */
+  expectedRevision: string;
+  /**
      * Ordered array of song public IDs
      * @items.minLength 21
      * @items.maxLength 21
@@ -5302,6 +5622,12 @@ export type PostPlaylistReorderBody = {
 };
 
 export type PostPlaylistReorder200Data = {
+  /**
+     * @minLength 64
+     * @maxLength 64
+     * @pattern ^[a-f0-9]{64}$
+     */
+  revision?: string;
   message?: string;
 };
 
@@ -5843,6 +6169,7 @@ export type GetDeviceList200DataItem = {
   /**
      * @minLength 21
      * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   publicId?: string;
   /** Browser-generated device token; distinct from publicId */
@@ -5885,10 +6212,30 @@ export type DeleteDeviceForget200 = {
 };
 
 export type GetSessionGet200Data = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId?: string;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   userId?: string;
-  /** @nullable */
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   activeDeviceId?: string | null;
+  /**
+     * @items.minLength 21
+     * @items.maxLength 21
+     * @items.pattern ^[0-9a-zA-Z_-]{21}$
+     */
   queue?: string[];
   currentTrackIndex?: number;
   position?: number;
@@ -5913,6 +6260,11 @@ export const PutSessionSyncBodyPlaybackState = {
 } as const;
 
 export type PutSessionSyncBody = {
+  /**
+     * @items.minLength 21
+     * @items.maxLength 21
+     * @items.pattern ^[0-9a-zA-Z_-]{21}$
+     */
   queue: string[];
   /** @minimum 0 */
   currentTrackIndex: number;
@@ -5922,10 +6274,30 @@ export type PutSessionSyncBody = {
 };
 
 export type PutSessionSync200Data = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId?: string;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   userId?: string;
-  /** @nullable */
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   activeDeviceId?: string | null;
+  /**
+     * @items.minLength 21
+     * @items.maxLength 21
+     * @items.pattern ^[0-9a-zA-Z_-]{21}$
+     */
   queue?: string[];
   currentTrackIndex?: number;
   position?: number;
@@ -5945,9 +6317,29 @@ export type PostSessionClaimBody = {
 };
 
 export type PostSessionClaim200Data = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId?: string;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   userId?: string;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   activeDeviceId?: string;
+  /**
+     * @items.minLength 21
+     * @items.maxLength 21
+     * @items.pattern ^[0-9a-zA-Z_-]{21}$
+     */
   queue?: string[];
   currentTrackIndex?: number;
   position?: number;
@@ -5963,6 +6355,11 @@ export type PostSessionClaim200 = {
 };
 
 export type PostSessionNewBody = {
+  /**
+     * @items.minLength 21
+     * @items.maxLength 21
+     * @items.pattern ^[0-9a-zA-Z_-]{21}$
+     */
   queue: string[];
   /** @minimum 0 */
   currentTrackIndex: number;
@@ -5971,10 +6368,30 @@ export type PostSessionNewBody = {
 };
 
 export type PostSessionNew201Data = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId?: string;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   userId?: string;
-  /** @nullable */
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   activeDeviceId?: string | null;
+  /**
+     * @items.minLength 21
+     * @items.maxLength 21
+     * @items.pattern ^[0-9a-zA-Z_-]{21}$
+     */
   queue?: string[];
   currentTrackIndex?: number;
   position?: number;
@@ -30357,7 +30774,7 @@ export const getGetTranscodeJobIndexUrl = () => {
 }
 
 /**
- * @summary List all transcode jobs
+ * @summary List orphaned transcode jobs in accessible libraries
  */
 export const getTranscodeJobIndex = async ( options?: RequestInit): Promise<GetTranscodeJobIndex200> => {
 
@@ -30428,7 +30845,7 @@ export function useGetTranscodeJobIndex<TData = Awaited<ReturnType<typeof getTra
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary List all transcode jobs
+ * @summary List orphaned transcode jobs in accessible libraries
  */
 
 export function useGetTranscodeJobIndex<TData = Awaited<ReturnType<typeof getTranscodeJobIndex>>, TError = ErrorType<unknown>>(

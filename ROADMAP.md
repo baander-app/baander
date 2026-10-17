@@ -23,6 +23,13 @@ batches describe their own checkpoints; the current gate below takes precedence.
 Any harness can take over from this section; nothing below depends on a tool that
 only one agent host has.
 
+- **Playlist concurrent writes.** Implementation on
+  `plan/playlist-concurrent-writes` closes duplicate collaborator creation and
+  stale reorder overwrites. Backend, static, web and runtime qualification pass,
+  generated-client repeat generation is unchanged, and independent code review
+  found no issues. See the
+  [verification checkpoint](#playlist-concurrent-writes-2026-10-17).
+
 - **Migration consolidation.** Implementation `78165f61` on
   `plan/consolidate-doctrine-migrations` replaces the historical chain with one
   guarded initial migration. The user authorized merging into `master` and pushing
@@ -86,16 +93,15 @@ only one agent host has.
   commits, a simplification pass, an independent code review whose justified findings
   are applied, and the delivered item with its checkpoint counts recorded here.
   Commit messages carry no agent attribution trailer.
-- **Open from item 8's review, not acted on.** Two concurrent identical
-  add-collaborator requests can hit the unique constraint and answer 500; a reorder
-  under concurrent writers has no version check; sharing has no invitation step, so
-  an owner can add any user unasked; removing a song is not judged by the actor's
-  visibility; the visible-song count materialises rows. None blocks the item.
-- **Next.** Close the playlist concurrent-write findings listed above: duplicate
-  collaborator creation and reorder conflicts.
-  Provider live qualification and bounded coroutine DNS resolution remain separate
-  acceptance work. React Native and Android remain deferred. The local dev database
-  note below stands.
+- **Remaining from item 8's review.** Sharing has no invitation step, so an
+  owner can add any user unasked; removing a song is not judged by the actor's
+  visibility; the visible-song count materialises rows. These remain deferred.
+  The duplicate collaborator and unguarded reorder findings are closed by the
+  [playlist implementation](#playlist-concurrent-writes-2026-10-17).
+- **Next.** Address bounded coroutine DNS resolution. Provider live qualification
+  remains separate acceptance work.
+  React Native and Android remain deferred. The local dev database note below
+  stands.
 
 
 The backend release-gate package is complete (see the next two sections). Eight
@@ -463,6 +469,120 @@ tests. React Native and Android remain deferred; Android's device login posts to
 pairing endpoint that does not exist and needs a decision when that work resumes.
 
 ## Current quality-gate checkpoint
+
+### Playlist concurrent writes (2026-10-17)
+
+Implementation on `plan/playlist-concurrent-writes` follows the
+[reviewed plan](docs/plans/2026-10-17-1239-fix-playlist-concurrent-writes-plan.md)
+and closes the duplicate collaborator and stale reorder findings from item 8.
+Backend, static, web and runtime qualification pass. Generated-client repeat
+generation is unchanged, and independent code review found no issues. Delivered
+locally on 2026-10-17.
+
+Every existing playlist save uses compare-and-swap on its persistence version,
+then locks and compares its complete original song positions and collaborator
+membership before reconciling collections. The immutable snapshot protects hidden
+entries as well as visible ones. A stale save rolls back and answers 409 instead
+of replacing the winning metadata or memberships or recreating a deleted playlist.
+Playlist deletion locks the parent before its children, matching save order;
+external song and collaborator cascades also invalidate the original membership.
+
+Detail responses return an opaque 64-character lowercase hexadecimal revision
+derived from the stored version and complete memberships of the aggregate used to
+assemble the displayed songs. Metadata-only list responses carry no revision.
+Reordering requires `expectedRevision`, checks current edit permission again and
+returns the saved revision. Missing or malformed revisions answer 422; stale
+revisions and persistence conflicts answer 409. Clients refresh and reconcile
+before submitting another order. Partial reordering still retains unlisted songs
+and existing visibility rules.
+
+Collaborator addition retries only typed persistence conflicts, for at most three
+attempts. Each attempt reloads the playlist and checks current ownership; an
+already-present collaborator succeeds without a write. Exhaustion answers 409.
+The OpenAPI specification and generated web client describe these contracts. The
+client refresh also synchronizes existing public-ID documentation annotations,
+with no other TypeScript behavior changes.
+
+`Version20261017130000` adds a nonnegative `persistence_version` to playlists,
+starting existing rows at zero. The initial migration remains intact, and the
+forward upgrade preserves playlist identities, metadata and memberships.
+`FinalSchemaBootstrap` applies the current migrations in timestamp order inside
+an empty isolated schema, reusing provisioned extensions. Fresh migration runs
+execute both files; a second run has no pending work. No local application database
+was migrated or reset for this work.
+
+Verification in `baander-ci-prewarm:local`:
+
+- The stale-save regression failed before the persistence fix: **1 test / 10
+  assertions**. The completed persistence selection passed **98 tests / 538
+  assertions** in **74.6 seconds**: domain **66 / 187**, service **32 / 351**.
+  Artifacts: `var/test-runs/20261017-125208-de3fb0b8`.
+- Composer platform requirements, PHPStan, Deptrac, container lint and OpenAPI
+  freshness passed after persistence implementation, before the API changes.
+  Artifacts: `var/test-runs/public-identity-static-0ebmelej`.
+- The API selection discovered **318 tests**. Ordinary checks passed **200 tests /
+  539 assertions**; service checks ran **118 / 5,421** with one anonymous-fixture
+  failure caused by an owner GET retaining authentication state. The fixture now
+  uses its raw kernel without unrelated Swoole isolation. The corrected firewall
+  selection passed **74 tests / 3,164 assertions** in **61.3 seconds**. Artifacts:
+  `var/test-runs/20261017-125903-e392470f`. The initial selection is recorded as
+  failed.
+- The first full backend run selected **9,540 tests in 909 files** and took
+  **765.8 seconds**. Ordinary checks ran **6,024 / 23,363 assertions** without
+  failures or errors but with two warnings: `PublicIdSchemaTest` assumed the first
+  request property was `songIds`, which the revision declaration displaced. Its
+  fixture now selects the property by name; the corrected ordinary rerun below
+  verifies the fix.
+  Native checks passed **644 / 8,001**, and service lanes passed **1,533 / 32,225**
+  and **1,339 / 15,265**. The full run is recorded as failed because warnings are
+  blocking. Artifacts: `var/test-runs/20261017-130027-541111ff`.
+- The corrected ordinary selection passed **6,024 tests / 23,365 assertions**
+  without warnings, errors, failures or skips in **50.466 seconds** of PHPUnit
+  execution and **69.0 seconds** including coordination. Artifacts:
+  `var/test-runs/20261017-131317-af3c0e49`. Both runs used seed `1550408278`.
+  Together with the unchanged passing native and service lanes above, qualification
+  covers **9,540 tests / 78,856 assertions**. This is the full run plus a corrected
+  ordinary rerun, not one clean full coordinator run. The selection adds **42 tests**
+  to the previous 9,498-test checkpoint, with no test removals.
+- Final-tree Composer platform requirements, PHPStan, container lint and OpenAPI
+  drift checks pass. Deptrac reports **zero violations, warnings and errors**, with
+  **489 existing baseline skips**. The static run took **71.34 seconds**. Artifacts:
+  `var/test-runs/playlist-static-dqfdf2mb`.
+- Web verification passed **2,054 tests in 186 files** in **28.94 seconds** of
+  Vitest execution (**29.69 seconds** including command overhead). Typechecking
+  passed in **17.74 seconds**; lint passed in **21.08 seconds** with zero errors
+  and seven standing warnings. Logs: `/tmp/baander-playlist-final-web-tests.log`
+  and `/tmp/baander-playlist-final-web-lint.log`.
+- Generated-client repeat generation passed in **5.77 seconds** with unchanged
+  output. Log: `/tmp/baander-playlist-client-drift.log`.
+- Serial producer and outbox runtime drills passed in **19.09 seconds** and
+  **20.28 seconds**, respectively. Logs:
+  `/tmp/baander-playlist-final-producer-runtime.log` and
+  `/tmp/baander-playlist-final-outbox-runtime.log`.
+- Consumer recovery passed in **117.80 seconds**: the killed consumer became
+  unhealthy at 92 seconds, its replacement recovered unacknowledged work, and
+  shutdown was clean. External deployment recovery passed in **32.14 seconds**
+  against real Docker and PostgreSQL 18.4. This verifies the external controller,
+  not the complete `LeasedWorkerRuntime` deployment. Logs:
+  `/tmp/baander-playlist-final-worker-runtime.log` and
+  `/tmp/baander-playlist-final-worker-recovery.log`. Full timings:
+  `/tmp/baander-playlist-verification-1.json`.
+- Disposable resources were removed. Only the pre-existing development nginx,
+  PostgreSQL and Redis containers and their network remained.
+- Independent code review completed across ten lenses with zero findings. Receipt:
+  `/tmp/compound-engineering-1000/ce-code-review/20261017-130128-playlist/`.
+- Persistence simplification removed a redundant new-aggregate flag and avoided
+  temporary UUID and playlist-song objects when comparing stored scalar rows. API
+  and qualification simplification needed no changes. The four guide updates and
+  this roadmap passed prose-preservation audits and whitespace checks.
+
+Limits: an aggregate saved inside an enclosing transaction remains provisional
+until the outer commit. An outer rollback does not rewind its in-memory snapshot;
+callers must discard it and reload before another write. Direct SQL writers and
+other writers that bypass this repository remain outside the concurrency contract.
+Invitation flow, remove-song visibility, visible-count materialization, live
+provider qualification and mobile work remain deferred. No merge or push has
+been performed.
 
 ### Public API identities (2026-10-17)
 

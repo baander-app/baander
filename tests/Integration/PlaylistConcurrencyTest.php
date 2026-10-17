@@ -8,6 +8,9 @@ use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
+use App\Playlist\Application\Command\AddCollaboratorCommand;
+use App\Playlist\Application\Command\ReorderSongsCommand;
+use App\Playlist\Application\CommandHandler\ReorderSongsHandler;
 use App\Playlist\Domain\Model\Playlist;
 use App\Playlist\Infrastructure\Doctrine\Repository\PlaylistRepository;
 use App\Shared\Application\Exception\ConflictException;
@@ -35,6 +38,7 @@ final class PlaylistConcurrencyTest extends TestCase
     private Uuid $playlistId;
     private Uuid $ownerId;
     private Uuid $collaboratorId;
+    private PublicId $collaboratorPublicId;
     /** @var list<Uuid> */
     private array $songIds;
 
@@ -61,6 +65,7 @@ final class PlaylistConcurrencyTest extends TestCase
         $manager->flush();
         $this->ownerId = $owner->getId();
         $this->collaboratorId = $collaborator->getId();
+        $this->collaboratorPublicId = $collaborator->getPublicId();
         $this->songIds = [$first->getId(), $second->getId()];
         $playlist = Playlist::create('Original', $this->ownerId, isCollaborative: true);
         $playlist->addSong($this->songIds[0], 0);
@@ -163,6 +168,89 @@ final class PlaylistConcurrencyTest extends TestCase
         $fresh = $this->load($this->repository($this->manager()));
         self::assertSame($playlist->getRevision(), $fresh->getRevision());
         self::assertSame(array_reverse(array_map(static fn (Uuid $id): string => $id->toString(), $this->songIds)), array_map(static fn ($song): string => $song->getSongId()->toString(), $fresh->getSongs()));
+    }
+
+    /** @return iterable<string, array{bool}> */
+    public static function collaboratorAdditions(): iterable
+    {
+        yield 'same collaborator' => [true];
+        yield 'different collaborators' => [false];
+    }
+
+    #[DataProvider('collaboratorAdditions')]
+    public function testConcurrentCollaboratorHandlersBothSucceedAndPreserveExistingData(bool $sameCollaborator): void
+    {
+        $manager = $this->manager();
+        $repository = $this->repository($manager);
+        $playlist = $this->load($repository);
+        $playlist->updateMetadata('Shared playlist', 'Keep this description', true, true);
+        $playlist->addSong($this->songIds[1], 1);
+        $repository->save($playlist);
+        $childPublicId = $this->collaboratorPublicId;
+        $expectedCollaborators = [$this->collaboratorId->toString()];
+        if (!$sameCollaborator) {
+            $other = new UserEntity(new PublicId(), 'Other collaborator', 'other@baander.app', 'hash', '');
+            $manager->persist($other);
+            $manager->flush();
+            $childPublicId = $other->getPublicId();
+            $expectedCollaborators[] = $other->getId()->toString();
+        }
+        $before = $this->storedState();
+        $child = $this->startChild('handler-collaborator', $childPublicId->toString());
+        $connection = $manager->getConnection();
+        $connection->beginTransaction();
+        PlaylistWriteRace::collaboratorHandler($repository, $connection)(new AddCollaboratorCommand($this->playlistId, $this->collaboratorPublicId, $this->ownerId));
+        $winnerRevision = $this->load($repository)->getRevision();
+        $this->release($child);
+        $this->awaitLockWait($child, $connection);
+        $connection->commit();
+
+        self::assertSame(['outcome' => 'saved'], $this->finish($child));
+        $after = $this->storedState();
+        self::assertSame($before['songs'], $after['songs']);
+        foreach (['id', 'public_id', 'user_id', 'name', 'description', 'is_public', 'is_collaborative'] as $column) {
+            self::assertSame($before['playlist'][$column], $after['playlist'][$column], $column);
+        }
+        sort($expectedCollaborators);
+        self::assertSame($expectedCollaborators, array_column($after['collaborators'], 'user_id'));
+        $fresh = $this->load($this->repository($this->manager()));
+        if ($sameCollaborator) {
+            self::assertSame($winnerRevision, $fresh->getRevision(), 'Retrying an existing membership must not write again.');
+        } else {
+            self::assertNotSame($winnerRevision, $fresh->getRevision());
+        }
+    }
+
+    public function testConcurrentReorderHandlersKeepTheWinnerAndRejectTheSameClientRevision(): void
+    {
+        $manager = $this->manager();
+        $repository = $this->repository($manager);
+        $playlist = $this->load($repository);
+        $playlist->addSong($this->songIds[1], 1);
+        $repository->save($playlist);
+        $expectedRevision = $playlist->getRevision();
+        $child = $this->startChild('handler-reorder', implode(',', array_map(static fn (Uuid $id): string => $id->toString(), $this->songIds)));
+        $connection = $manager->getConnection();
+        $connection->beginTransaction();
+        $winnerRevision = (new ReorderSongsHandler($repository))(new ReorderSongsCommand($this->playlistId, $this->ownerId, array_reverse($this->songIds), $expectedRevision));
+        $this->release($child);
+        $this->awaitLockWait($child, $connection);
+        $connection->commit();
+        $before = $this->storedState();
+
+        self::assertSame(['outcome' => 'conflict', 'exception' => PlaylistWriteConflictException::class], $this->finish($child));
+        self::assertSame($before, $this->storedState());
+        $freshRepository = $this->repository($this->manager());
+        $fresh = $this->load($freshRepository);
+        self::assertSame($winnerRevision, $fresh->getRevision());
+        self::assertNotSame($expectedRevision, $winnerRevision);
+        self::assertSame(array_reverse(array_map(static fn (Uuid $id): string => $id->toString(), $this->songIds)), array_map(static fn ($song): string => $song->getSongId()->toString(), $fresh->getSongs()));
+        try {
+            (new ReorderSongsHandler($freshRepository))(new ReorderSongsCommand($this->playlistId, $this->ownerId, $this->songIds, $expectedRevision));
+            self::fail('A reorder starting after the winner commits must also reject its old client revision.');
+        } catch (PlaylistWriteConflictException) {
+            self::assertSame($before, $this->storedState());
+        }
     }
 
     public function testRolledBackWinnerAllowsTheWaitingOriginalSnapshotToSave(): void

@@ -669,11 +669,27 @@ server name resolve to the same real command and preserve its options.
 The functional runner creates an isolated PostgreSQL/Redis network, extracts the
 checkout into a fresh directory, and runs Doctrine migrations twice before
 executing the requested PHPUnit paths or options. With no arguments it selects `tests/Functional`.
-The fresh database executes only `Version20261017000000`; the second run checks
-that its recorded history produces no pending work. Integration tests and runtime
-fixtures use `tests/Support/FinalSchemaBootstrap.php` to create the same final
-schema. Isolated-schema fixtures require their own schema to be empty and reuse
-extensions already provisioned in the database.
+A fresh database executes `Version20261017000000` followed by
+`Version20261017130000`; the second run checks that the two recorded migrations
+leave no pending work. Integration tests and runtime fixtures use
+`tests/Support/FinalSchemaBootstrap.php` to create the same final schema by applying
+the current migration files in timestamp order. Isolated-schema fixtures require
+their own schema to be empty and reuse extensions already provisioned in the
+database.
+
+Playlist persistence conflicts can be checked with:
+
+```bash
+bash scripts/test-functional-container.sh tests/Integration/PlaylistConcurrencyTest.php tests/Integration/PlaylistMutationFirewallTest.php tests/Integration/InitialSchemaMigrationTest.php
+```
+
+The concurrency selection uses independent PostgreSQL sessions to check competing
+playlist writes, collaborator additions, reorders and cascaded membership removal.
+It verifies that a losing save rolls back without replacing the winner. The
+firewall selection checks revision validation and stale-reorder responses alongside
+the existing permission matrix. Migration checks cover fresh initialization, a
+populated database upgraded with its playlists intact, and a repeat run with no
+pending work.
 
 Scheduler occurrence persistence can be checked with:
 
