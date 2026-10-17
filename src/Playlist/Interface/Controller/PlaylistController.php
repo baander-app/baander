@@ -11,6 +11,7 @@ use App\Playlist\Application\Command\AddSongCommand;
 use App\Playlist\Application\Command\CreatePlaylistCommand;
 use App\Playlist\Application\Command\RemoveCollaboratorCommand;
 use App\Playlist\Application\Command\RemoveSongCommand;
+use App\Playlist\Application\Command\ReorderSongsCommand;
 use App\Playlist\Application\Command\UpdatePlaylistCommand;
 use App\Playlist\Application\Port\PlaylistCollaboratorResolverInterface;
 use App\Playlist\Application\Port\PlaylistPortInterface;
@@ -180,6 +181,7 @@ final class PlaylistController
                         new OA\Property(property: 'isSmart', type: 'boolean', example: false),
                         new OA\Property(property: 'songCount', type: 'integer', minimum: 0, description: 'Number of accessible songs returned in the songs array', example: 25),
                         new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
+                        new OA\Property(property: 'revision', description: 'Revision of the snapshot used to return songs', type: 'string', pattern: '^[a-f0-9]{64}$', minLength: 64, maxLength: 64),
                         new OA\Property(property: 'songs', type: 'array', items: new OA\Items(properties: [
                             new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
                             new OA\Property(property: 'albumId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, description: 'Album public identifier'),
@@ -251,7 +253,7 @@ final class PlaylistController
 
         return $this->successResponse(array_merge(
             $this->readResource($playlist),
-            ['songs' => $songs, 'songCount' => count($songs)],
+            ['songs' => $songs, 'songCount' => count($songs), 'revision' => $playlist->getRevision()],
         ));
     }
 
@@ -488,6 +490,7 @@ final class PlaylistController
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '403', description: 'Only the owner may manage the collaborators', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Playlist not found, the value is not a public id, or no user has it', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '409', description: 'The playlist kept changing during the addition', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'The owner named themself', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
@@ -501,9 +504,15 @@ final class PlaylistController
 
         $this->authorize('MANAGE_COLLABORATORS', $playlist);
 
+        $actor = $this->security->getUser();
+        if (!$actor instanceof AuthenticatedUserIdentityInterface) {
+            return $this->unauthorized();
+        }
+
         $this->commandBus->dispatch(new AddCollaboratorCommand(
             playlistId: $playlist->getId(),
             userPublicId: PublicId::fromString($userPublicId),
+            actorUuid: Uuid::fromString($actor->getId()),
         ));
 
         return $this->noContent();
@@ -567,8 +576,9 @@ final class PlaylistController
             content: new OA\MediaType(
                 mediaType: 'application/json',
                 schema: new OA\Schema(
-                    required: ['songIds'],
+                    required: ['songIds', 'expectedRevision'],
                     properties: [
+                        new OA\Property(property: 'expectedRevision', description: 'Revision returned with the displayed playlist order', type: 'string', pattern: '^[a-f0-9]{64}$', minLength: 64, maxLength: 64),
                         new OA\Property(property: 'songIds', description: 'Ordered array of song public IDs', type: 'array', items: new OA\Items(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
                     ],
                 ),
@@ -580,12 +590,14 @@ final class PlaylistController
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', properties: [
+                    new OA\Property(property: 'revision', type: 'string', pattern: '^[a-f0-9]{64}$', minLength: 64, maxLength: 64),
                     new OA\Property(property: 'message', type: 'string', example: 'Songs reordered successfully.'),
                 ], type: 'object')], type: 'object',
             )),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '403', description: 'Only the owner, or a collaborator while the playlist is collaborative, may change its songs', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
+            new OA\Response(response: '409', description: 'The playlist changed; refresh it before reordering', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
@@ -615,10 +627,23 @@ final class PlaylistController
             $songIds[] = $songId;
         }
 
-        $playlist->reorderSongs($songIds);
-        $this->playlistService->save($playlist);
+        $actor = $this->security->getUser();
+        if (!$actor instanceof AuthenticatedUserIdentityInterface) {
+            return $this->unauthorized();
+        }
 
-        return $this->successResponse(['message' => $this->trans('success.reordered', domain: 'playlist')]);
+        $envelope = $this->commandBus->dispatch(new ReorderSongsCommand(
+            playlistId: $playlist->getId(),
+            actorUuid: Uuid::fromString($actor->getId()),
+            songIds: $songIds,
+            expectedRevision: $payload->expectedRevision,
+        ));
+        $revision = $envelope->last(HandledStamp::class)?->getResult();
+        if (!is_string($revision)) {
+            throw new \LogicException('Playlist reorder did not return a revision.');
+        }
+
+        return $this->successResponse(['message' => $this->trans('success.reordered', domain: 'playlist'), 'revision' => $revision]);
     }
 
     /**

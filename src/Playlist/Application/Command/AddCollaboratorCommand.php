@@ -13,12 +13,18 @@ final readonly class AddCollaboratorCommand
     public function __construct(
         private Uuid $playlistId,
         private PublicId $userPublicId,
+        private Uuid $actorUuid,
     ) {
     }
 
     public function getPlaylistId(): Uuid
     {
         return $this->playlistId;
+    }
+
+    public function getActorUuid(): Uuid
+    {
+        return $this->actorUuid;
     }
 
     public function getUserPublicId(): PublicId

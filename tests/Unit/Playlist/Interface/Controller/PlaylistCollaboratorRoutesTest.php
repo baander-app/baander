@@ -77,7 +77,8 @@ final class PlaylistCollaboratorRoutesTest extends TestCase
         $this->users->expects($this->never())->method('userId');
         $this->bus->expects($this->once())->method('dispatch')
             ->with($this->callback(fn (AddCollaboratorCommand $command): bool => $command->getPlaylistId()->equals($this->playlist->getId())
-                && $command->getUserPublicId()->equals($this->collaboratorPublicId)))
+                && $command->getUserPublicId()->equals($this->collaboratorPublicId)
+                && $command->getActorUuid()->equals($this->playlist->getUserId())))
             ->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
 
         $response = $this->controller->addCollaborator($this->playlist->getPublicId()->toString(), $this->collaboratorPublicId->toString());

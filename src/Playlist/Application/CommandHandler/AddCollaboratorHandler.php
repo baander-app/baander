@@ -9,7 +9,8 @@ use App\Playlist\Application\Port\PlaylistCollaboratorResolverInterface;
 use App\Playlist\Domain\Repository\PlaylistRepositoryInterface;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
-use RuntimeException;
+use App\Playlist\Application\Exception\PlaylistWriteConflictException;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
@@ -31,24 +32,36 @@ final class AddCollaboratorHandler
     #[AsMessageHandler]
     public function __invoke(AddCollaboratorCommand $command): void
     {
-        $userId = $this->users->userId($command->getUserPublicId());
+        $userId = null;
+        for ($attempt = 0; $attempt < 3; ++$attempt) {
+            $playlist = $this->playlistRepository->findByUuid($command->getPlaylistId());
+            if ($playlist === null) {
+                throw new NotFoundException('Playlist not found.');
+            }
+            if (!$playlist->getUserId()->equals($command->getActorUuid())) {
+                throw new AccessDeniedException('Only the owner may manage the collaborators of this playlist.');
+            }
 
-        $playlist = $this->playlistRepository->findByUuid($command->getPlaylistId());
-        if ($playlist === null) {
-            throw new RuntimeException(sprintf('Playlist %s not found.', $command->getPlaylistId()->toString()));
-        }
+            $userId ??= $this->users->userId($command->getUserPublicId());
+            if ($userId->equals($playlist->getUserId())) {
+                throw new InvalidInputException(
+                    'The playlist owner cannot be added as a collaborator.',
+                    ['userPublicId' => $command->getUserPublicId()->toString()],
+                );
+            }
+            if ($playlist->isCollaborator($userId)) {
+                return;
+            }
 
-        if ($userId->equals($playlist->getUserId())) {
-            throw new InvalidInputException(
-                'The playlist owner cannot be added as a collaborator.',
-                ['userPublicId' => $command->getUserPublicId()->toString()],
-            );
+            $playlist->addCollaborator($userId);
+            try {
+                $this->playlistRepository->save($playlist);
+                return;
+            } catch (PlaylistWriteConflictException $exception) {
+                if ($attempt === 2) {
+                    throw $exception;
+                }
+            }
         }
-        if ($playlist->isCollaborator($userId)) {
-            return;
-        }
-
-        $playlist->addCollaborator($userId);
-        $this->playlistRepository->save($playlist);
     }
 }

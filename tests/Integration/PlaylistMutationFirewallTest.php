@@ -222,7 +222,7 @@ final class PlaylistMutationFirewallTest extends TestCase
             $this->turnCollaborationOff();
         }
         $before = $this->state();
-        $mutation = $this->mutation($route);
+        $mutation = $this->mutation($route, $actor === 'anonymous' ? str_repeat('0', 64) : null);
 
         $response = $this->request($mutation['method'], $mutation['path'], $actor === 'anonymous' ? null : $actor, $mutation['data']);
 
@@ -285,7 +285,7 @@ final class PlaylistMutationFirewallTest extends TestCase
 
         $this->assertDecidedBy($this->request('POST', $this->playlistPath('/songs'), 'collaborator', ['songId' => $this->songPublicIds['s4']]), 403, PlaylistController::REFUSAL_MESSAGES['EDIT_SONGS'], 'add with the flag off');
         $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/songs/' . $this->songPublicIds['s1']), 'collaborator'), 403, PlaylistController::REFUSAL_MESSAGES['EDIT_SONGS'], 'remove with the flag off');
-        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/reorder'), 'collaborator', ['songIds' => $this->songPublicIds(['s3', 's1'])]), 403, PlaylistController::REFUSAL_MESSAGES['EDIT_SONGS'], 'reorder with the flag off');
+        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/reorder'), 'collaborator', ['expectedRevision' => $this->revision(), 'songIds' => $this->songPublicIds(['s3', 's1'])]), 403, PlaylistController::REFUSAL_MESSAGES['EDIT_SONGS'], 'reorder with the flag off');
         self::assertSame($before, $this->state());
         $this->assertView($this->request('GET', $this->playlistPath(), 'collaborator'), 'collaborator', ['s1', 's2', 's3']);
 
@@ -298,12 +298,48 @@ final class PlaylistMutationFirewallTest extends TestCase
 
     public function testASubsetReorderKeepsTheHiddenEntriesAfterTheListedOnes(): void
     {
-        $response = $this->request('POST', $this->playlistPath('/reorder'), 'collaborator', ['songIds' => $this->songPublicIds(['s3', 's1', 's2'])]);
+        $response = $this->request('POST', $this->playlistPath('/reorder'), 'collaborator', ['expectedRevision' => $this->revision(), 'songIds' => $this->songPublicIds(['s3', 's1', 's2'])]);
 
         self::assertSame(200, $response->getStatusCode(), $this->responseDetails($response));
         self::assertSame($this->songIds(['s3', 's1', 's2', 'o1', 'o2']), $this->state()['songs']);
         $this->assertView($this->request('GET', $this->playlistPath(), 'collaborator'), 'collaborator', ['s3', 's1', 's2']);
         $this->assertView($this->request('GET', $this->playlistPath(), 'owner'), 'owner', ['s3', 's1', 's2', 'o1', 'o2']);
+    }
+
+    public function testAStaleReorderReturnsConflictWithoutOverwritingTheWinner(): void
+    {
+        $revision = $this->revision();
+        $response = $this->request('POST', $this->playlistPath('/reorder'), 'owner', [
+            'songIds' => $this->songPublicIds(['s2', 's1']),
+            'expectedRevision' => $revision,
+        ]);
+        self::assertSame(200, $response->getStatusCode(), $this->responseDetails($response));
+        $nextRevision = $this->json($response)['data']['revision'];
+        self::assertNotSame($revision, $nextRevision);
+        self::assertSame($nextRevision, $this->revision());
+        $winner = $this->state();
+
+        $stale = $this->request('POST', $this->playlistPath('/reorder'), 'owner', [
+            'songIds' => $this->songPublicIds(['s3', 's1']),
+            'expectedRevision' => $revision,
+        ]);
+
+        self::assertSame(409, $stale->getStatusCode(), $this->responseDetails($stale));
+        self::assertSame($winner, $this->state());
+    }
+
+    public function testMissingOrMalformedRevisionsReturn422WithoutWrites(): void
+    {
+        $before = $this->state();
+        foreach ([null, '', str_repeat('a', 63), str_repeat('A', 64), str_repeat('g', 64)] as $revision) {
+            $data = ['songIds' => $this->songPublicIds(['s2', 's1'])];
+            if ($revision !== null) {
+                $data['expectedRevision'] = $revision;
+            }
+            $response = $this->request('POST', $this->playlistPath('/reorder'), 'owner', $data);
+            self::assertSame(422, $response->getStatusCode(), $this->responseDetails($response));
+            self::assertSame($before, $this->state());
+        }
     }
 
     public function testCollaboratorManagementIsIdempotentAndNamesUsersByPublicId(): void
@@ -446,11 +482,11 @@ final class PlaylistMutationFirewallTest extends TestCase
 
         $this->assertDecidedBy($this->request('POST', $this->playlistPath('/songs'), 'owner', ['songId' => 'not-a-uuid']), 400, self::SONG_ID_MALFORMED, 'malformed add');
         $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/songs/not-a-uuid'), 'owner'), 400, self::SONG_PATH_ID_MALFORMED, 'malformed remove');
-        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/reorder'), 'owner', ['songIds' => [$this->songPublicIds['s1'], 'not-a-uuid']]), 400, self::SONG_IDS_MALFORMED, 'malformed reorder');
+        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/reorder'), 'owner', ['expectedRevision' => $this->revision(), 'songIds' => [$this->songPublicIds['s1'], 'not-a-uuid']]), 400, self::SONG_IDS_MALFORMED, 'malformed reorder');
         $internalId = $this->songs['s1']->toString();
         $this->assertDecidedBy($this->request('POST', $this->playlistPath('/songs'), 'owner', ['songId' => $internalId]), 400, self::SONG_ID_MALFORMED, 'internal UUID add');
         $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/songs/' . $internalId), 'owner'), 400, self::SONG_PATH_ID_MALFORMED, 'internal UUID remove');
-        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/reorder'), 'owner', ['songIds' => [$internalId]]), 400, self::SONG_IDS_MALFORMED, 'internal UUID reorder');
+        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/reorder'), 'owner', ['expectedRevision' => $this->revision(), 'songIds' => [$internalId]]), 400, self::SONG_IDS_MALFORMED, 'internal UUID reorder');
         self::assertSame($before, $this->state());
     }
 
@@ -557,7 +593,7 @@ final class PlaylistMutationFirewallTest extends TestCase
     }
 
     /** @return array{method: string, path: string, data: array<string, mixed>} */
-    private function mutation(string $route): array
+    private function mutation(string $route, ?string $expectedRevision = null): array
     {
         return match ($route) {
             'playlist_store' => ['method' => 'POST', 'path' => '/api/playlists/', 'data' => ['name' => self::CREATED_NAME]],
@@ -565,7 +601,7 @@ final class PlaylistMutationFirewallTest extends TestCase
             'playlist_destroy' => ['method' => 'DELETE', 'path' => $this->playlistPath(), 'data' => []],
             'playlist_add_song' => ['method' => 'POST', 'path' => $this->playlistPath('/songs'), 'data' => ['songId' => $this->songPublicIds['s4']]],
             'playlist_remove_song' => ['method' => 'DELETE', 'path' => $this->playlistPath('/songs/' . $this->songPublicIds['s1']), 'data' => []],
-            'playlist_reorder' => ['method' => 'POST', 'path' => $this->playlistPath('/reorder'), 'data' => ['songIds' => $this->songPublicIds(['s2', 's1'])]],
+            'playlist_reorder' => ['method' => 'POST', 'path' => $this->playlistPath('/reorder'), 'data' => ['expectedRevision' => $expectedRevision ?? $this->revision(), 'songIds' => $this->songPublicIds(['s2', 's1'])]],
             'playlist_add_collaborator' => ['method' => 'PUT', 'path' => $this->playlistPath('/collaborators/' . $this->actors['unrelated']['publicId']), 'data' => []],
             'playlist_remove_collaborator' => ['method' => 'DELETE', 'path' => $this->playlistPath('/collaborators/' . $this->actors['collaborator']['publicId']), 'data' => []],
             default => self::fail('No request is defined for ' . $route),
@@ -804,6 +840,16 @@ final class PlaylistMutationFirewallTest extends TestCase
                 self::assertStringNotContainsString($secret, $content, basename($file) . ' carries a credential.');
             }
         }
+    }
+
+    private function revision(): string
+    {
+        $response = $this->request('GET', $this->playlistPath(), 'owner');
+        self::assertSame(200, $response->getStatusCode(), $this->responseDetails($response));
+        $revision = $this->json($response)['data']['revision'];
+        self::assertMatchesRegularExpression('/^[a-f0-9]{64}$/D', $revision);
+
+        return $revision;
     }
 
     /**

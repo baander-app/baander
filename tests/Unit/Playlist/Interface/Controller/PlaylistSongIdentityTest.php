@@ -9,6 +9,9 @@ use App\Catalog\Application\Port\SongPortInterface;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Playlist\Application\Command\AddSongCommand;
 use App\Playlist\Application\Command\RemoveSongCommand;
+use App\Playlist\Application\Command\ReorderSongsCommand;
+use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
+use Symfony\Component\Messenger\Stamp\HandledStamp;
 use App\Playlist\Application\Port\PlaylistCollaboratorResolverInterface;
 use App\Playlist\Application\Port\PlaylistPortInterface;
 use App\Playlist\Domain\Model\Playlist;
@@ -95,29 +98,69 @@ final class PlaylistSongIdentityTest extends TestCase
         self::assertSame(204, $this->mutate($this->controller($playlist, $lookup, $bus), $playlist, 'remove', $songPublicId->toString())->getStatusCode());
     }
 
-    public function testReorderResolvesPublicIdsBeforeSaving(): void
+    public function testReorderResolvesPublicIdsAndReturnsTheHandledRevision(): void
     {
-        $playlist = Playlist::create('Mix', new Uuid());
-        $first = new Uuid();
-        $second = new Uuid();
-        $playlist->addSong($first, 0);
-        $playlist->addSong($second, 1);
+        $owner = new Uuid();
+        $playlist = Playlist::create('Mix', $owner);
+        $songId = new Uuid();
         $lookup = $this->createMock(PlaylistSongVisibilityInterface::class);
-        $lookup->expects(self::once())->method('findVisibleSongId')->willReturn($second);
-        $controller = $this->controller($playlist, $lookup, $this->createStub(MessageBusInterface::class), true);
+        $lookup->expects(self::once())->method('findVisibleSongId')->willReturn($songId);
+        $bus = $this->createMock(MessageBusInterface::class);
+        $revision = str_repeat('a', 64);
+        $bus->expects(self::once())->method('dispatch')->with(self::callback(
+            static fn (ReorderSongsCommand $command): bool => $command->actorUuid->equals($owner)
+                && $command->playlistId->equals($playlist->getId())
+                && $command->songIds[0]->equals($songId)
+                && $command->expectedRevision === $playlist->getRevision(),
+        ))->willReturnCallback(static fn (object $command): Envelope => new Envelope($command, [new HandledStamp($revision, 'reorder')]));
 
-        self::assertSame(200, $this->mutate($controller, $playlist, 'reorder', (new PublicId())->toString())->getStatusCode());
-        self::assertTrue($playlist->getSongs()[0]->getSongId()->equals($second));
-        self::assertTrue($playlist->getSongs()[1]->getSongId()->equals($first));
+        $response = $this->mutate($this->controller($playlist, $lookup, $bus), $playlist, 'reorder', (new PublicId())->toString());
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame($revision, json_decode($response->getContent(), true, 512, JSON_THROW_ON_ERROR)['data']['revision']);
     }
 
-    private function controller(Playlist $playlist, PlaylistSongVisibilityInterface $lookup, MessageBusInterface $bus, bool $save = false): PlaylistController
+    public function testDetailRevisionDescribesTheAggregateUsedForSongs(): void
+    {
+        $playlist = Playlist::create('Loaded order', new Uuid());
+        $playlist->addSong(new Uuid(), 0);
+        $playlist->markPersisted(7);
+        $revision = $playlist->getRevision();
+        $view = new \App\Playlist\Domain\ReadModel\PlaylistReadView(
+            $playlist->getId(), $playlist->getPublicId(), new PublicId(), [], 'Later read', null,
+            false, false, false, [], $playlist->getCreatedAt(), $playlist->getUpdatedAt(), 99,
+        );
+        $playlists = $this->createMock(PlaylistPortInterface::class);
+        $playlists->expects(self::once())->method('findByPublicId')->willReturn($playlist);
+        $playlists->expects(self::once())->method('findRead')->willReturn($view);
+        $security = $this->createStub(Security::class);
+        $security->method('isGranted')->willReturn(true);
+        $songs = $this->createStub(SongPortInterface::class);
+        $songs->method('findVisibleByUuids')->willReturn([]);
+        $songs->method('getVisibleArtistNamesForSongs')->willReturn([]);
+        $songs->method('getVisibleAlbumTitlesByIds')->willReturn([]);
+        $scopes = $this->createStub(LibraryReadScopeProviderInterface::class);
+        $scopes->method('current')->willReturn(LibraryReadScope::none());
+        $controller = new PlaylistController($security, $playlists, $songs, $this->createStub(MessageBusInterface::class), $scopes, $this->createStub(PlaylistCollaboratorResolverInterface::class), $this->createStub(PlaylistSongVisibilityInterface::class));
+
+        $response = $controller->show($playlist->getPublicId()->toString());
+        $data = json_decode($response->getContent(), true, 512, JSON_THROW_ON_ERROR)['data'];
+
+        self::assertSame($revision, $data['revision']);
+        self::assertSame([], $data['songs']);
+        self::assertSame(0, $data['songCount']);
+    }
+
+    private function controller(Playlist $playlist, PlaylistSongVisibilityInterface $lookup, MessageBusInterface $bus): PlaylistController
     {
         $security = $this->createStub(Security::class);
         $security->method('isGranted')->willReturn(true);
+        $identity = $this->createStubForIntersectionOfInterfaces([AuthenticatedUserIdentityInterface::class, \Symfony\Component\Security\Core\User\UserInterface::class]);
+        $identity->method('getId')->willReturn($playlist->getUserId()->toString());
+        $security->method('getUser')->willReturn($identity);
         $playlists = $this->createMock(PlaylistPortInterface::class);
         $playlists->method('findByPublicId')->willReturn($playlist);
-        $playlists->expects($save ? self::once() : self::never())->method('save');
+        $playlists->expects(self::never())->method('save');
         $scopes = $this->createStub(LibraryReadScopeProviderInterface::class);
         $scopes->method('current')->willReturn(LibraryReadScope::none());
         $controller = new PlaylistController($security, $playlists, $this->createStub(SongPortInterface::class), $bus, $scopes, $this->createStub(PlaylistCollaboratorResolverInterface::class), $lookup);
@@ -133,7 +176,7 @@ final class PlaylistSongIdentityTest extends TestCase
         return match ($mutation) {
             'add' => $controller->addSong($playlist->getPublicId()->toString(), new AddSongRequest($songId)),
             'remove' => $controller->removeSong($playlist->getPublicId()->toString(), $songId),
-            'reorder' => $controller->reorder($playlist->getPublicId()->toString(), new ReorderSongsRequest([$songId])),
+            'reorder' => $controller->reorder($playlist->getPublicId()->toString(), new ReorderSongsRequest([$songId], $playlist->getRevision())),
             default => throw new \LogicException('Unknown playlist mutation fixture.'),
         };
     }
