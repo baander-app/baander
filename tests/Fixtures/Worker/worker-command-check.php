@@ -41,6 +41,7 @@ $allowedModes = [
     'verify-claim-recovered',
     'kill-relay-claimed',
     'ready',
+    'ready-recovered',
     'kill-consumer',
     'kill-scheduler',
     'reserved',
@@ -565,8 +566,9 @@ if ($mode === 'verify-outbox' || $mode === 'replay-outbox') {
     exit(0);
 }
 $row = $db->fetchAssociative('SELECT owner_boot_id, state, epoch FROM worker_deployment_leases WHERE namespace = :namespace', ['namespace' => $namespace]);
-if ($row === false || $row['owner_boot_id'] !== $bootId || $row['state'] !== 'active' || (int) $row['epoch'] !== 1) {
-    throw new RuntimeException('Expected the original active, epoch-one deployment reservation.');
+$expectedEpoch = $mode === 'ready-recovered' ? 2 : 1;
+if ($row === false || $row['owner_boot_id'] !== $bootId || $row['state'] !== 'active' || (int) $row['epoch'] !== $expectedEpoch) {
+    throw new RuntimeException('Expected the active deployment reservation at epoch ' . $expectedEpoch . '.');
 }
 if ($mode === 'expire') {
     $changed = $db->executeStatement("UPDATE worker_deployment_leases SET expires_at = clock_timestamp() - INTERVAL '1 second' WHERE namespace = :namespace AND owner_boot_id = :boot AND state = 'active' AND epoch = 1", ['namespace' => $namespace, 'boot' => $bootId]);
@@ -591,7 +593,8 @@ foreach (glob('/proc/[0-9]*/cmdline') ?: [] as $path) {
     $arguments = explode("\0", rtrim($command, "\0"));
     $role = in_array('messenger:consume', $arguments, true) ? 'consumer'
         : (in_array('app:outbox:consume', $arguments, true) ? 'relay'
-            : (in_array(dirname(__DIR__, 3) . '/bin/worker-scheduler.php', $arguments, true) ? 'scheduler' : null));
+            : (in_array(dirname(__DIR__, 3) . '/bin/worker-scheduler.php', $arguments, true) ? 'scheduler'
+                : (in_array(dirname(__DIR__, 3) . '/bin/worker-media.php', $arguments, true) ? 'media' : null)));
     if ($role === null) {
         continue;
     }
@@ -634,8 +637,8 @@ foreach (glob('/proc/[0-9]*/cmdline') ?: [] as $path) {
     }
     $roles[$role] = $pid;
 }
-if (count($roles) !== 3 || !isset($roles['consumer'], $roles['relay'], $roles['scheduler'])) {
-    throw new RuntimeException('All three production roles have not started.');
+if (count($roles) !== 4 || !isset($roles['consumer'], $roles['relay'], $roles['scheduler'], $roles['media'])) {
+    throw new RuntimeException('All four production roles have not started.');
 }
 $redis = new Redis();
 $redis->connect('redis', 6379, 1.0);

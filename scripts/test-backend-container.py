@@ -54,7 +54,7 @@ echo json_encode($evidence, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR), "\n";
 exit(isset($evidence['error']) ? 1 : 0);
 '''
 ARCHIVE_PATHS = [
-    'vendor', 'src', 'tests', 'config', 'packages', 'migrations', 'bin', 'scripts',
+    'vendor', 'src', 'tests', 'config', 'phpstan', 'packages', 'migrations', 'bin', 'scripts',
     'docker', 'templates', 'public', 'phpunit.xml.dist', '.env', '.env.test',
     '.forgejo', 'composer.json', 'composer.lock', 'symfony.lock', 'deptrac.yaml',
     'deptrac.baseline.yaml', 'phpstan.dist.neon', 'translations', 'docs-book',

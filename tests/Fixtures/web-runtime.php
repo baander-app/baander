@@ -126,8 +126,8 @@ if ($mode === 'prepare') {
     $client = $streamClient();
     $id = $track();
 
-    // In progress: this process holds the encoder lock and writes the partial file.
-    $held = new HeldRendition($storageRoot, $id, $sourceFile, 'mp3', 64);
+    // In progress: the fixture owns the accepted generation and writes its partial file.
+    $held = new HeldRendition($storageRoot, $id, $sourceFile, 'mp3', 64, $kernel->getContainer()->get('worker.media.audio_runtime'));
     $held->append(HeldRendition::bytes(16_384, 'first'));
     $received = static fn (HttpExchange $exchange): bool => strlen($exchange->body) >= strlen($held->written);
     $first = $client->open('id=' . $id . '&format=mp3&bitrate=64000');
@@ -153,29 +153,18 @@ if ($mode === 'prepare') {
     ));
     echo "An in-progress rendition streamed with Accept-Ranges: none and grew as it was written.\n";
 
-    // A real encode, run by the server's CPU process pool.
-    $encoded = $client->open('id=' . $id . '&format=mp3&bitrate=128000')->complete();
-    check($encoded->status() === 200, 'The encode answered ' . $encoded->status() . ': ' . $encoded->body);
-    check($encoded->header('Accept-Ranges') === 'none', 'The first answer during an encode was not progressive.');
-    $probeFile = (string) tempnam(sys_get_temp_dir(), 'web-runtime-');
-    file_put_contents($probeFile, $encoded->body);
-    exec(sprintf('ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of csv=p=0 %s 2>&1', escapeshellarg($probeFile)), $probe, $code);
-    unlink($probeFile);
-    check($code === 0 && $probe === ['mp3'], 'The encoded body is not MP3 audio: ' . implode("\n", $probe));
-    check(strlen($encoded->body) > 200, 'The encoded body is too short for the range check.');
-
-    $range = $client->open('id=' . $id . '&format=mp3&bitrate=128000', ['Range: bytes=100-199'])->complete();
+    $range = $client->open('id=' . $id . '&format=mp3&bitrate=64000', ['Range: bytes=100-199'])->complete();
     check($range->status() === 206, 'The complete rendition answered Range: bytes=100-199 with ' . $range->status());
     check(
-        $range->header('Content-Range') === sprintf('bytes 100-199/%d', strlen($encoded->body)),
+        $range->header('Content-Range') === sprintf('bytes 100-199/%d', strlen($held->written)),
         'The complete rendition answered Content-Range: ' . var_export($range->header('Content-Range'), true),
     );
-    check($range->body === substr($encoded->body, 100, 100), 'The range body differs from bytes 100-199 of the encoded rendition.');
-    echo "The server encoded a rendition progressively, then answered bytes=100-199 with 206.\n";
+    check($range->body === substr($held->written, 100, 100), 'The range body differs from bytes 100-199 of the completed rendition.');
+    echo "The server followed accepted growing output, then answered bytes=100-199 with 206.\n";
 } elseif ($mode === 'safari') {
     $client = $streamClient();
     $id = $track();
-    $held = new HeldRendition($storageRoot, $id, $sourceFile, 'mp3', 96);
+    $held = new HeldRendition($storageRoot, $id, $sourceFile, 'mp3', 96, $kernel->getContainer()->get('worker.media.audio_runtime'));
     $held->append(HeldRendition::bytes(98_304, 'safari'));
     $session = strtoupper((new Uuid())->toString());
     $transcript = [

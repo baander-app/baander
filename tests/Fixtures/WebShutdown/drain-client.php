@@ -28,10 +28,6 @@ declare(strict_types=1);
  *   completing-file <user> <track>  a request for a complete 4 MB rendition, read at 2 MB/s, so it
  *                                   takes about 1.6 seconds; records the Content-Length and how
  *                                   the response ended
- *   fifo-encode <user> <track>      replaces the track's source with a FIFO that a real-time
- *                                   FFmpeg writes, so the server's encoder runs as long as this
- *                                   process lets it, and streams the encode; records the writer's
- *                                   process id. Run where app:serve is not PID 1
  */
 
 use App\Tests\Fixtures\WebRuntime\HeldRendition;
@@ -147,7 +143,7 @@ if ($mode === 'ws') {
 } elseif ($mode === 'stalled-stream') {
     $track = $arguments[3] ?? '';
     $sourceFile = $projectDir . '/storage/media/web-runtime/track.flac';
-    $held = new HeldRendition((string) getenv('CONVERT_STORAGE_PATH'), $track, $sourceFile, 'mp3', 64);
+    $held = new HeldRendition((string) getenv('CONVERT_STORAGE_PATH'), $track, $sourceFile, 'mp3', 64, $kernel->getContainer()->get('worker.media.audio_runtime'));
     $held->append(HeldRendition::bytes(65_536, 'drain-first'));
     $stream = $client->open('id=' . $track . '&format=mp3&bitrate=64000');
     if (!$stream->until(static fn ($exchange): bool => strlen($exchange->body) > 0)) {
@@ -201,7 +197,7 @@ if ($mode === 'ws') {
         'ranged-file' => ['opus', 64],
         'completing-file' => ['opus', 96],
     ][$mode];
-    $held = new HeldRendition((string) getenv('CONVERT_STORAGE_PATH'), $track, $sourceFile, $format, $kbps);
+    $held = new HeldRendition((string) getenv('CONVERT_STORAGE_PATH'), $track, $sourceFile, $format, $kbps, $kernel->getContainer()->get('worker.media.audio_runtime'));
     $query = sprintf('id=%s&format=%s&bitrate=%d', $track, $format, $kbps * 1000);
     if ($mode === 'ranged-file') {
         $held->append(HeldRendition::bytes(16 * 1_048_576, 'ranged'));
@@ -243,36 +239,6 @@ if ($mode === 'ws') {
         strlen($exchange->body),
         $exchange->body === $held->written ? 'yes' : 'no',
     ));
-} elseif ($mode === 'fifo-encode') {
-    $track = $arguments[3] ?? '';
-    $sourceFile = $projectDir . '/storage/media/web-runtime/track.flac';
-    if (!is_file($sourceFile . '.real') && !rename($sourceFile, $sourceFile . '.real')) {
-        throw new RuntimeException('Cannot move the track source aside.');
-    }
-    if (!file_exists($sourceFile) && !posix_mkfifo($sourceFile, 0644)) {
-        throw new RuntimeException('Cannot create the FIFO.');
-    }
-    // FFmpeg opens the FIFO for writing once the server's encoder opens it for reading, then
-    // writes ten minutes of audio in real time.
-    $writer = proc_open([
-        'ffmpeg', '-nostdin', '-hide_banner', '-loglevel', 'error', '-re',
-        '-f', 'lavfi', '-i', 'sine=frequency=440:duration=600', '-ac', '2', '-ar', '44100',
-        '-c:a', 'flac', '-f', 'flac', '-y', $sourceFile,
-    ], [0 => ['file', '/dev/null', 'r'], 1 => ['file', '/dev/null', 'w'], 2 => ['file', '/tmp/drain-fifo-writer.log', 'a']], $pipes);
-    if ($writer === false) {
-        throw new RuntimeException('Cannot start the FIFO writer.');
-    }
-    $exchange = $client->open('id=' . $track . '&format=mp3&bitrate=128000');
-    if (!$exchange->until(static fn ($exchange): bool => strlen($exchange->body) > 0, 60.0)) {
-        throw new RuntimeException(sprintf('The encode did not stream (status %d).', $exchange->status()));
-    }
-    record('encoding', 'writer=' . proc_get_status($writer)['pid']);
-    try {
-        $exchange->until(static fn (): bool => false, 3600.0);
-    } catch (RuntimeException) {
-    }
-    record('ended', sprintf('result=%d bytes=%d', $exchange->result, strlen($exchange->body)));
-    sleep(3600);
 } else {
     throw new RuntimeException('Unknown mode ' . $mode);
 }

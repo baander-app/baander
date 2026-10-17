@@ -80,6 +80,12 @@ jobs:
                     BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
                       bash scripts/test-worker-production-container.sh
 
+            -   name: Independent web and worker media ownership
+                run: |
+                    BAANDER_TEST_IMAGE="${CI_IMAGE}-worker" \
+                    BAANDER_TEST_POSTGRES_IMAGE="$REGISTRY/$POSTGRES_IMAGE:latest" \
+                      bash scripts/test-two-command-deployment-container.sh
+
             -   name: Composer platform requirements
                 run: docker run --rm "$CI_IMAGE" composer check-platform-reqs
 
@@ -102,7 +108,9 @@ jobs:
                 run: docker compose version
 
             -   name: Backend runner regressions
-                run: python3 -m unittest discover -s scripts/tests
+                run: |
+                    python3 -m unittest discover -s scripts/tests
+                    bash scripts/test-worker-operator-cleanup.sh
 
             -   name: Backend stack isolation
                 run: |

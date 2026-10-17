@@ -41,6 +41,22 @@ if (!is_file("vendor/autoload_runtime.php")
 }
 '
 docker "${docker_args[@]}" run --rm --network none --entrypoint /usr/bin/composer "$image_id" check-platform-reqs --no-dev
+# Exercise the native file backend under the same restrictions as admitted workers.
+docker "${docker_args[@]}" run --rm --network none --cap-drop ALL --security-opt no-new-privileges \
+    --entrypoint /usr/local/bin/php "$image_id" -r '
+Swoole\Runtime::enableCoroutine(SWOOLE_HOOK_ALL);
+Swoole\Coroutine\run(static function (): void {
+    $path = tempnam(sys_get_temp_dir(), "baander-file-probe-");
+    if ($path === false) { exit(1); }
+    try {
+        if (file_put_contents($path, "worker file I/O") !== 15 || file_get_contents($path) !== "worker file I/O") {
+            throw new RuntimeException("Production coroutine file I/O failed.");
+        }
+    } finally {
+        unlink($path);
+    }
+});
+'
 # No source, vendor, cache or keys are injected into the worker image.
 BAANDER_TEST_IMAGE="$image_id" BAANDER_TEST_USE_IMAGE=1 \
     BAANDER_TEST_CHECKOUT_IN_IMAGE=1 BAANDER_TEST_OPERATOR_IN_CONTAINER=1 \

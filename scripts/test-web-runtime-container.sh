@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Starts the real Swoole web server (app:serve) in the production environment and
 # checks what functional tests cannot see outside Swoole: the language of a credential
-# email resolved at kernel.terminate, progressive streaming of a rendition while it
-# encodes, byte ranges once it is complete, the answers to Safari's opening request
+# email resolved at kernel.terminate, progressive delivery of accepted rendition output
+# while a fixture writes it, byte ranges once it is complete, the answers to Safari's opening request
 # sequence against an in-progress rendition (a committed baseline), the health alert
 # for a PostgreSQL outage that spans a reload of the server's workers, and a Redis outage
 # during which a signed-in session is told to wait (503) rather than signed out and a
@@ -102,6 +102,9 @@ for attempt in $(seq 1 60); do
 done
 app curl -fsS -o /dev/null http://127.0.0.1:9501/live
 echo "app:serve answers /live in the production environment."
+app curl -fsS http://127.0.0.1:9200/api/server |
+    php -r '$status = json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); exit(($status["server"]["settings"]["task_worker_num"] ?? 0) === 0 ? 0 : 1);'
+
 
 app php tests/Fixtures/web-runtime.php mail
 app php tests/Fixtures/web-runtime.php stream
@@ -117,8 +120,7 @@ echo "The answers to the Safari request sequence match the baseline."
 # returns. The monitor cannot deliver while PostgreSQL is down, so the alert stays owed
 # across the reload and arrives once PostgreSQL is back, naming the outage window.
 
-# The HTTP and task worker PIDs: the children of the server's manager process, which is
-# the master's one app:serve child (the CPU pool's processes are the master's too).
+# The HTTP worker PIDs are the children of the delivery server's manager process.
 worker_pids() {
     app sh -c 'set -e; master=$(pgrep -o -f "^php bin/console app:serve")
         manager=$(pgrep -P "$master" -f "^php bin/console app:serve")

@@ -19,8 +19,8 @@
 #    - `docker stop` (SIGTERM), SIGINT, DELETE /api/server and swoole:server:stop each log one
 #      drain-start line and exit 0; SIGTERM followed by SIGINT still drains once; with the server
 #      as PID 1, swoole:server:stop returns 0 once the stop is requested;
-#    - a PATCH /api/server reload keeps the server, the CPU pool's processes and an open
-#      WebSocket, and starts no drain;
+#    - a PATCH /api/server reload keeps the server and an open WebSocket, starts no drain,
+#      and leaves web execution disabled;
 #    - each event worker drains on its own (WorkerDrain): an open WebSocket receives a close frame
 #      with code 1012 before its connection ends, and a server with nothing streaming closes the
 #      drain window as soon as every worker has reported drained, then stops within S + W;
@@ -32,7 +32,7 @@
 #      terminator (curl 18), and a stream that ends within the window gets its whole body;
 #    - a file response (sendfile, which leaves its worker idle) that a client can finish reading
 #      within the window gets its whole body, and the window closes only once it is sent;
-#    - started with docker exec (not PID 1), the server leaves no FFmpeg or CPU pool process,
+#    - started with docker exec (not PID 1), the delivery server leaves no process behind,
 #      and a byte-range file response read slowly at the stop is cut short of its Content-Length
 #      when the window ends;
 #    - while the stream scenarios run, no web worker uses more than 60 % of memory_limit, as its
@@ -44,9 +44,8 @@
 # Two Swoole behaviours decide whether app:serve stops on SIGTERM:
 # - After SIGTERM, Swoole stops the master's event loop only once no timer is left in it, and
 #   it checks for timers before its own max_wait_time deadline: a master timer that never ends
-#   keeps the server running until `docker stop` sends SIGKILL. DrainCoordinator::handle() ends
-#   the CPU pool's health check (CpuProcessPool::startHealthCheck, a Timer::tick in the master)
-#   and drops the SIGINT listener.
+#   keeps the server running until `docker stop` sends SIGKILL. The web server starts no CPU
+#   health timer, and DrainCoordinator::handle() drops the SIGINT listener.
 # - Once the loop ends, the master joins Swoole's heartbeat thread before any worker stops. That
 #   thread sleeps heartbeat_check_interval seconds with signals blocked, so every stop can wait
 #   that long; config/packages/swoole.yaml sets it to 1.
@@ -242,15 +241,21 @@ start_web() {
         sleep 1
     done
     web curl -fsS -o /dev/null http://127.0.0.1:9501/live || fail 'app:serve did not answer /live'
+    assert_web_delivery_only web
     web sh -c 'tr "\0" " " < /proc/1/cmdline' | grep -q 'bin/console app:serve' || fail 'app:serve is not PID 1'
 }
-# The manager is the master's child that is not a CPU pool worker; the workers are its children.
+# Read the live manager identity through the bundle's API, independently of process titles.
 manager_pid() {
-    web sh -c 'for pid in $(pgrep -P 1); do tr "\0" " " < /proc/$pid/cmdline | grep -q "^cpu-pool-worker" || echo $pid; done' |
-        grep -v '^$'
+    web curl -fsS http://127.0.0.1:9200/api/server |
+        php -r 'echo json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR)["server"]["processes"]["manager"]["pid"];'
 }
-pool_pids() {
-    web sh -c 'for pid in $(pgrep -P 1); do tr "\0" " " < /proc/$pid/cmdline | grep -q "^cpu-pool-worker" && echo $pid; done; true' | sort
+assert_web_delivery_only() {
+    local forbidden
+    "$1" curl -fsS http://127.0.0.1:9200/api/server |
+        php -r '$status = json_decode(stream_get_contents(STDIN), true, 512, JSON_THROW_ON_ERROR); exit(($status["server"]["settings"]["task_worker_num"] ?? 0) === 0 ? 0 : 1);' ||
+        fail 'the web server enabled task workers'
+    forbidden=$("$1" ps -eo stat=,args= | awk '$1 !~ /^Z/ && /cpu-pool-worker|(^|[[:space:]\/])(ffmpeg|ffprobe|nvidia-smi)([[:space:]]|$)|bin\/worker-(media|video|audio)[.]php/' || true)
+    [ -z "$forbidden" ] || fail "the web container started a media executor or hardware probe: $forbidden"
 }
 worker_pids() {
     web pgrep -P "$(manager_pid)" | sort
@@ -330,14 +335,12 @@ sample_memory() {
     [ -n "$memory_limit_mb" ] || fail "/health reported no worker's memory against a memory_limit: $health"
 }
 
-# A reload keeps the server, the CPU pool and an open WebSocket, and starts no drain.
+# A reload keeps the delivery server and an open WebSocket, and starts no drain.
 start_web
 start_client ws "$listener"
 await_client ws ws_pong
-pool_before=$(pool_pids)
 workers_before=$(worker_pids)
 started_before=$(docker inspect --format '{{.State.StartedAt}}' "$run_id-web")
-[ -n "$pool_before" ] || fail 'the CPU pool has no processes'
 web curl -fsS -X PATCH -o /dev/null http://127.0.0.1:9200/api/server || fail 'PATCH /api/server failed'
 for attempt in $(seq 1 100); do
     workers_after=$(worker_pids)
@@ -350,13 +353,13 @@ reloaded_at=$(date +%s.%N)
 sleep 1
 [ "$(docker inspect --format '{{.State.StartedAt}}' "$run_id-web")" = "$started_before" ] &&
     [ "$(docker inspect --format '{{.State.Running}}' "$run_id-web")" = true ] || fail 'the reload restarted the server'
-[ "$(pool_pids)" = "$pool_before" ] || fail 'the reload replaced the CPU pool processes'
+assert_web_delivery_only web
 ws_log=$(web cat /tmp/drain-ws.log)
 grep -qE ' ws_(closed|close_frame) ' <<<"$ws_log" && fail "the reload closed the WebSocket: $ws_log"
 awk -v t="$reloaded_at" '$3 == "ws_pong" && $2 > t { found = 1 } END { exit !found }' <<<"$ws_log" ||
     fail 'the WebSocket answered no ping after the reload'
 grep -q 'Web server drain started' <<<"$(run_log)" && fail 'the reload started a drain'
-echo "PASS: PATCH /api/server reloaded every worker and kept the server, the CPU pool and the WebSocket, with no drain."
+echo "PASS: PATCH /api/server reloaded every worker and kept the delivery server and the WebSocket, with no drain."
 # The WebSocket is still open: its worker closes it with 1012 ("service restart") during the
 # drain, before the connection ends.
 started_at=$(date +%s.%N)
@@ -532,17 +535,16 @@ awk -v w="$window" -v f="$file_done" 'BEGIN { exit !(f >= 0.5 && w >= f - 0.3) }
     fail "the drain window closed after $window seconds, before the file response finished after $file_done seconds"
 echo "PASS: a file response in flight at the stop finished after $file_done seconds with its whole body; the window closed after $window seconds."
 
-# The server not as PID 1, started with docker exec in the client container: the stop leaves no
-# FFmpeg or CPU pool process behind. The drain client there makes the track's source a FIFO that a
-# real-time FFmpeg writes, so the server's encoder keeps running until the server stops it. A
-# byte-range file response read slowly at the stop is cut short of its Content-Length; its client
-# runs in the same container, which outlives the server, so it can record how the response ended.
+# The delivery server also drains when started with docker exec instead of as PID 1.
+# A byte-range file response read slowly at the stop is cut short of its Content-Length;
+# its client runs in the same container, which outlives the server and records the result.
 docker exec -d -w "$app_dir" "$run_id-client" sh -c 'exec php bin/console app:serve --no-interaction > /tmp/not-pid1-serve.log 2>&1'
 for attempt in $(seq 1 90); do
     if client curl -fsS -o /dev/null http://127.0.0.1:9501/live 2>/dev/null; then break; fi
     sleep 1
 done
 client curl -fsS -o /dev/null http://127.0.0.1:9501/live || fail 'app:serve in the client container did not answer /live'
+assert_web_delivery_only client
 client_in_client() {
     docker exec -d -w "$app_dir" "$run_id-client" sh -c \
         "exec php -d memory_limit=512M tests/Fixtures/WebShutdown/drain-client.php $* > /tmp/drain-$1.log 2>&1"
@@ -555,20 +557,12 @@ await_in_client() {
     client cat "/tmp/drain-$1.log" >&2 || true
     fail "the $1 client in the client container did not record $2"
 }
-client_in_client fifo-encode "$listener" "$track"
-await_in_client fifo-encode encoding
-# Named after the source, which is the FIFO from here on.
 client_in_client ranged-file "$listener" "$track"
 await_in_client ranged-file streaming
 sample_memory client
-fifo_log=$(client cat /tmp/drain-fifo-encode.log)
-writer=$(awk '$3 == "encoding" { sub(/^writer=/, "", $4); print $4; exit }' <<<"$fifo_log")
-[ -n "$writer" ] || fail "the server's encoder did not start: $fifo_log"
-# Every process in the container but zombies, which have exited, and the FIFO writer.
 processes() {
-    client ps -eo pid=,stat=,args= | awk -v writer="$writer" '$1 != writer && $2 !~ /^Z/'
+    client ps -eo pid=,stat=,args= | awk '$2 !~ /^Z/'
 }
-grep -q -- '-map 0:a:0' <<<"$(processes)" || fail "no encoder of the server runs: $(processes)"
 master=$(client pgrep -o -f '^php bin/console app:serve')
 [ "$master" != 1 ] || fail 'app:serve is PID 1 in the client container'
 started_at=$(date +%s.%N)
@@ -579,13 +573,11 @@ for attempt in $(seq 1 $((stop_timeout * 10))); do
 done
 elapsed=$(awk -v a="$started_at" -v b="$(date +%s.%N)" 'BEGIN { printf "%.1f", b - a }')
 client kill -0 "$master" 2>/dev/null && fail "app:serve (not PID 1) was still running $elapsed seconds after SIGTERM"
-left=$(processes | grep -E 'ffmpeg|cpu-pool-worker|app:serve' || true)
+left=$(processes | grep -E 'ffmpeg|ffprobe|nvidia-smi|cpu-pool-worker|worker-(media|video|audio)[.]php|app:serve' || true)
 await_in_client ranged-file ended
 ranged_log=$(client cat /tmp/drain-ranged-file.log)
-client sh -c "pkill -f 'drain-client[.]php fifo-encode'; kill $writer; true"
-client sh -c 'f=storage/media/web-runtime/track.flac; rm -f "$f" && mv "$f.real" "$f"'
 [ -z "$left" ] || fail "processes outlived app:serve (not PID 1): $left"
-echo "PASS: app:serve (not PID 1) exited $elapsed seconds after SIGTERM and left no FFmpeg or CPU pool process."
+echo "PASS: app:serve (not PID 1) exited $elapsed seconds after SIGTERM and left no web server or media executor process."
 length=$(awk '$3 == "streaming" { sub(/^length=/, "", $5); print $5; exit }' <<<"$ranged_log")
 ranged_end=$(awk '$3 == "ended" { sub(/^result=/, "", $4); sub(/^bytes=/, "", $5); print $4, $5; exit }' <<<"$ranged_log")
 ranged_result=${ranged_end% *}

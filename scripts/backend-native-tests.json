@@ -9,6 +9,7 @@
   "tests/Unit/QoL/Infrastructure/Swoole/AlgorithmProfileTableTest.php": "native shared table/channel/process-pool wrapper",
   "tests/Unit/QoL/Infrastructure/Swoole/QoLControlProbeTest.php": "nested native Swoole probe",
   "tests/Unit/QoL/Infrastructure/Swoole/QoLWorkerStartupSubscriberTest.php": "native coroutine/reactor/server; native shared table/channel/process-pool wrapper",
+  "tests/Unit/QoL/Infrastructure/Swoole/WorkerQoLLifecycleTest.php": "native coroutine timers and shared algorithm profile table",
   "tests/Unit/QoL/Interface/Console/QoLCommandsTest.php": "QoLWorkers fixture creates a native Swoole AlgorithmProfileTable.",
   "tests/Unit/Recommendation/Application/RecommendationJobUseCasesTest.php": "native shared table/channel/process-pool wrapper",
   "tests/Unit/Recommendation/Application/ScheduledGenerationTest.php": "native shared table/channel/process-pool wrapper",
