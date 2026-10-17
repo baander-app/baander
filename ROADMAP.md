@@ -2554,6 +2554,13 @@ XML and remaining workflow YAML validation passed. Repository scans found no
 retired index-tool references, deleted-plan references or development-CLI consumers.
 No backend application suite was rerun for these tooling and documentation removals.
 
+Follow-up on 2026-10-17 removed the retired graph-index service registrations
+from the Codex and Claude harness configurations, its command allowance, and
+Baander's global registry entry. Other projects' registry entries are preserved.
+The CLI binary was already absent. TOML and JSON parsing and scans of tracked
+source and active harness configuration pass; the project has no active
+integration references, cache or skill.
+
 ## Doctrine migration consolidation (2026-10-17)
 
 The [reviewed plan](docs/plans/2026-10-17-consolidate-doctrine-migrations.md) replaces
