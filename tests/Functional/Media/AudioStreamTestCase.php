@@ -13,15 +13,17 @@ use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
 use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
+use App\Transcode\Application\DTO\AudioRenditionClaim;
+use App\Transcode\Application\DTO\AudioRenditionInput;
+use App\Transcode\Application\DTO\AudioRenditionRuntimeSnapshot;
+use App\Transcode\Application\DTO\MediaWorkerIdentity;
+use App\Transcode\Application\Port\AudioRenditionRuntimePort;
+use App\Transcode\Infrastructure\Transcode\AudioRenditionExecutor;
+use Psr\Log\NullLogger;
 
 /**
- * A generated FLAC track in a library, streamed through the track stream endpoint.
- *
- * Uses the real encoder (FFmpeg) against a generated FLAC source. Outside the
- * Swoole runtime the encode runs in-process before the response streams, so
- * these tests prove the formats, caching and access rules; the progressive
- * hand-off while an encode is still running is covered by the unit tests and
- * the Swoole runtime check.
+ * HTTP format, cache and access coverage with an explicitly invoked worker executor.
+ * Durable process handoff uses independent connections in the integration suite.
  */
 abstract class AudioStreamTestCase extends TestCase
 {
@@ -72,6 +74,46 @@ abstract class AudioStreamTestCase extends TestCase
         ));
         self::getContainer()->set(StreamPortInterface::class, $stream);
         self::getContainer()->set(SegmentFileResolver::class, new SegmentFileResolver($this->cacheRoot));
+        $this->installAudioWorkerFixture();
+    }
+
+    private function installAudioWorkerFixture(): void
+    {
+        // DAMA keeps HTTP fixtures in an uncommitted transaction. Exercise the real
+        // encoder here; separate integration tests prove independent DB ownership.
+        /** @var array<string, AudioRenditionRuntimeSnapshot> $rows */
+        $rows = [];
+        $runtime = $this->createStub(AudioRenditionRuntimePort::class);
+        $runtime->method('find')->willReturnCallback(static function (string $key) use (&$rows): ?AudioRenditionRuntimeSnapshot { return $rows[$key] ?? null; });
+        $runtime->method('renew')->willReturn(true);
+        $runtime->method('start')->willReturnCallback(static function (AudioRenditionClaim $claim, string $partial, string $final) use (&$rows): bool {
+            $rows[$claim->runtime->key] = new AudioRenditionRuntimeSnapshot($claim->runtime->key, $claim->runtime->input, 'running', 1, $partial, $final, null, true);
+            return true;
+        });
+        $runtime->method('complete')->willReturnCallback(static function (AudioRenditionClaim $claim) use (&$rows): bool {
+            $row = $rows[$claim->runtime->key];
+            $rows[$row->key] = new AudioRenditionRuntimeSnapshot($row->key, $row->input, 'complete', 1, $row->partialPath, $row->finalPath, null);
+            return true;
+        });
+        $runtime->method('fail')->willReturnCallback(static function (AudioRenditionClaim $claim, string $error) use (&$rows): bool {
+            $row = $rows[$claim->runtime->key];
+            $rows[$row->key] = new AudioRenditionRuntimeSnapshot($row->key, $row->input, 'failed', 1, $row->partialPath, $row->finalPath, $error);
+            return true;
+        });
+        $runtime->method('withOwnership')->willReturnCallback(static function (AudioRenditionClaim $claim, callable $operation): bool {
+            $operation();
+            return true;
+        });
+        $executor = new AudioRenditionExecutor($runtime, new NullLogger(), getenv('FFMPEG_PATH') ?: 'ffmpeg');
+        $runtime->method('admit')->willReturnCallback(static function (AudioRenditionInput $input) use (&$rows, $executor): AudioRenditionRuntimeSnapshot {
+            if (!isset($rows[$input->key()])) {
+                $row = new AudioRenditionRuntimeSnapshot($input->key(), $input, 'pending', 1, null, null, null, true);
+                $rows[$row->key] = $row;
+                $executor->run(new AudioRenditionClaim($row, new MediaWorkerIdentity('baander.app:test', str_repeat('a', 32), 'media', 1), 'fixture'), static fn (): bool => false);
+            }
+            return $rows[$input->key()];
+        });
+        self::getContainer()->set(AudioRenditionRuntimePort::class, $runtime);
     }
 
     protected function tearDown(): void

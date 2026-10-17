@@ -11,6 +11,7 @@ use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\Exception\FFmpegProcessFailedException;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\ValueObject\QualityTier;
+use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Infrastructure\FFmpeg\SegmentEncoder;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
@@ -43,7 +44,7 @@ final class TranscodeStreamManager
     private const int DEFAULT_MAX_CONCURRENT = 4;
     private const float POLL_INTERVAL_SECONDS = 0.1;
 
-    /** @var array<string, array{identity: \stdClass, resource: mixed, pipes: array<int, mixed>, pid: int, output_dir: string, tier_name: string, marked: array<int, bool>, init_marked: bool, stderr_buffer: string}> */
+    /** @var array<string, array{identity: \stdClass, resource: mixed, pipes: array<int, mixed>, pid: int, output_dir: string, tier_name: string, availability_tier: string, marked: array<int, bool>, init_marked: bool, stderr_buffer: string}> */
     private array $streams = [];
 
     public function __construct(
@@ -73,6 +74,10 @@ final class TranscodeStreamManager
         QualityTier $tier,
         string $videoFilters,
         ?int $startSegment = null,
+        ?string $outputDirectory = null,
+        ?AudioProfile $audioProfile = null,
+        string $audioFilters = '',
+        ?int $generation = null,
     ): string {
         $jobId = $job->getId();
         $jobKey = $jobId->toString();
@@ -85,7 +90,7 @@ final class TranscodeStreamManager
 
         $this->enforceConcurrency();
 
-        $outputDir = $this->storage->resolveJobDirectory($job->getVideoId(), $tier);
+        $outputDir = $outputDirectory ?? $this->storage->resolveJobDirectory($job->getVideoId(), $tier);
         if (!is_dir($outputDir)) {
             mkdir($outputDir, 0755, true);
         }
@@ -96,6 +101,8 @@ final class TranscodeStreamManager
             $videoFilters,
             $outputDir,
             $startSegment,
+            audioProfile: $audioProfile,
+            audioFilters: $audioFilters,
         );
 
         $this->logger->info('Starting long-lived video stream', [
@@ -113,6 +120,7 @@ final class TranscodeStreamManager
             'pid' => $spawned['pid'],
             'output_dir' => $outputDir,
             'tier_name' => $tier->name,
+            'availability_tier' => $generation === null ? $tier->name : $tier->name . '/generation-' . $generation,
             'marked' => [],
             'init_marked' => false,
             'stderr_buffer' => '',
@@ -279,7 +287,7 @@ final class TranscodeStreamManager
     }
 
     /**
-     * @param array{identity: \stdClass, resource: mixed, pipes: array<int, mixed>, pid: int, output_dir: string, tier_name: string, marked: array<int, bool>, init_marked: bool, stderr_buffer: string} $entry
+     * @param array{identity: \stdClass, resource: mixed, pipes: array<int, mixed>, pid: int, output_dir: string, tier_name: string, availability_tier: string, marked: array<int, bool>, init_marked: bool, stderr_buffer: string} $entry
      */
     private function scanForNewSegments(string $jobKey, array &$entry): void
     {
@@ -339,7 +347,7 @@ final class TranscodeStreamManager
             }
 
             // The encoder's start_number makes the filename index absolute.
-            $this->availability->markReady($jobId, $entry['tier_name'], $index, $file);
+            $this->availability->markReady($jobId, $entry['availability_tier'], $index, $file);
             $this->assertStreamIdentity($jobKey, $entry['identity']);
             $entry['marked'][$index] = true;
 

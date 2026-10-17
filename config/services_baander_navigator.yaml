@@ -6,6 +6,3 @@ services:
     App\Shared\Infrastructure\Swoole\CoroutineStatsProvider:
         arguments:
             $channelProviders: !tagged_iterator app.swoole.channel_provider
-
-    App\Transcode\Infrastructure\Swoole\SeekSignalChannelStats:
-        tags: ['app.swoole.channel_provider']

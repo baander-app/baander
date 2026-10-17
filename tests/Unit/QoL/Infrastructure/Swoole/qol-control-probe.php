@@ -15,6 +15,7 @@ require dirname(__DIR__, 5) . '/vendor/autoload.php';
 use App\QoL\Application\Port\EncoderProfileFingerprintPortInterface;
 use App\QoL\Domain\Service\LearningModel;
 use App\QoL\Domain\Service\StreamGovernor;
+use App\QoL\Domain\ValueObject\UtilizationSample;
 use App\QoL\Infrastructure\QoLAdminService;
 use App\QoL\Infrastructure\StreamAdmissionService;
 use App\QoL\Infrastructure\Swoole\AlgorithmProfileTable;
@@ -143,14 +144,15 @@ $registry = new ServerControlOperationRegistry([
 
         return $governor->getActiveStreamCount();
     }),
-    // One worker streams to completion, which records a sample and saves its learning state.
-    probeOperation('probe.stream.complete', true, static function (array $payload) use ($workers, $admission, $persister): bool {
+    // One worker completes a stream and persists an explicitly seeded learning fixture.
+    probeOperation('probe.stream.complete', true, static function (array $payload) use ($workers, $admission, $persister, $governor): bool {
         if ($workers->currentHttpWorkerId() !== $payload['worker']) {
             return false;
         }
         $jobId = new Uuid();
         $admission->admit($jobId, '1080p', 5_000_000, 1080, false);
         $admission->complete($jobId, '1080p', 5_000_000, 1080, 'h264', false);
+        $governor->recordSample(new UtilizationSample(25.0, 0.0, 30.0, 1080, 'h264', false, 5_000_000, '1080p', $governor->getActiveStreamCount()));
         $persister->save();
 
         return true;

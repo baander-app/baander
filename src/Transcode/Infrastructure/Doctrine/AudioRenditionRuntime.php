@@ -75,6 +75,30 @@ SQL, [$input->key(), $input->trackKey, $input->sourceSignature, $input->sourcePa
         return $this->mutate($claim, "state = 'running', partial_path = :partial, final_path = :final", ['partial' => $partialPath, 'final' => $finalPath]);
     }
 
+    public function withOwnership(AudioRenditionClaim $claim, callable $operation): bool
+    {
+        $lost = new \RuntimeException('Audio rendition ownership changed during publication.');
+        try {
+            return $this->connection->transactional(function () use ($claim, $operation, $lost): bool {
+                $row = $this->locked('audio_rendition_runtime', 'rendition_key', $claim->runtime->key);
+                if (!$this->ownsClaim($row, $claim) || !in_array($row['state'], ['pending', 'running'], true)) {
+                    return false;
+                }
+                $operation();
+                $published = $this->locked('audio_rendition_runtime', 'rendition_key', $claim->runtime->key);
+                if (!$this->ownsClaim($published, $claim)) {
+                    throw $lost;
+                }
+                return true;
+            });
+        } catch (\Throwable $error) {
+            if ($error === $lost) {
+                return false;
+            }
+            throw $error;
+        }
+    }
+
     public function complete(AudioRenditionClaim $claim): bool
     {
         return $this->mutate($claim, "state = 'complete'", [], true);
@@ -95,8 +119,7 @@ SQL, [$input->key(), $input->trackKey, $input->sourceSignature, $input->sourcePa
     {
         return $this->connection->transactional(function () use ($claim, $assignment, $parameters, $requiresRunning): bool {
             $row = $this->locked('audio_rendition_runtime', 'rendition_key', $claim->runtime->key);
-            if ($row === null || (int) $row['generation'] !== $claim->runtime->generation
-                || !$this->owns($row, $claim->worker, $claim->token)
+            if (!$this->ownsClaim($row, $claim)
                 || !in_array($row['state'], ['pending', 'running'], true)
                 || ($requiresRunning && ($row['state'] !== 'running' || $row['final_path'] === null))
             ) {
@@ -104,6 +127,14 @@ SQL, [$input->key(), $input->trackKey, $input->sourceSignature, $input->sourcePa
             }
             return $this->connection->executeStatement('UPDATE audio_rendition_runtime SET ' . $assignment . ', updated_at = clock_timestamp() WHERE rendition_key = :key AND lease_expires_at > clock_timestamp()', $parameters + ['key' => $claim->runtime->key]) === 1;
         });
+    }
+
+    /** @param array<string, mixed>|null $row */
+    private function ownsClaim(?array $row, AudioRenditionClaim $claim): bool
+    {
+        return $row !== null
+            && (int) $row['generation'] === $claim->runtime->generation
+            && $this->owns($row, $claim->worker, $claim->token);
     }
 
     /** @param array<string, mixed> $row */

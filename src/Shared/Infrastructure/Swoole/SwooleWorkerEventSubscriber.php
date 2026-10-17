@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Shared\Infrastructure\Swoole;
 
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
-use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool;
-use Psr\Container\ContainerInterface;
 use Psr\Log\LoggerInterface;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\ServerStartedEvent;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Event\WorkerErrorEvent;
@@ -18,7 +16,6 @@ final class SwooleWorkerEventSubscriber implements EventSubscriberInterface
 {
     public function __construct(
         private readonly SwooleWorkerEventBuffer $buffer,
-        private readonly ?ContainerInterface $cpuProcessPoolLocator = null,
         private readonly ?WebSocketPusher $webSocketPusher = null,
         private readonly ?WebSocketConnectionRegistry $webSocketRegistry = null,
         private readonly ?RedisClientFactory $redisClientFactory = null,
@@ -37,13 +34,11 @@ final class SwooleWorkerEventSubscriber implements EventSubscriberInterface
     }
 
     /**
-     * The CPU pool's health check runs in the master until the drain ends it (DrainCoordinator).
      * SIGINT starts the same drain as SIGTERM: Server::shutdown() sends SIGTERM to the master.
      */
     public function onServerStarted(ServerStartedEvent $event): void
     {
         $server = $event->getServer();
-        CpuProcessPool::fromLocator($this->cpuProcessPoolLocator)?->startHealthCheck();
 
         \Swoole\Process::signal(SIGINT, static function () use ($server): void {
             $server->shutdown();

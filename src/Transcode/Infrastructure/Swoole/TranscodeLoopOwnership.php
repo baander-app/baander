@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Transcode\Infrastructure\Swoole;
 
-use App\Transcode\Application\Port\TranscodeLoopLeaseInterface;
 use Closure;
 use Throwable;
 
@@ -20,7 +19,8 @@ final class TranscodeLoopOwnership
     private readonly Closure $monotonicClock;
 
     /** @param (Closure(): int)|null $monotonicClock */
-    public function __construct(public readonly TranscodeLoopLeaseInterface $lease, ?Closure $monotonicClock = null)
+    /** @param Closure(int): bool $renew */
+    public function __construct(private readonly Closure $renew, ?Closure $monotonicClock = null)
     {
         $this->monotonicClock = $monotonicClock ?? static fn(): int => hrtime(true);
     }
@@ -31,7 +31,7 @@ final class TranscodeLoopOwnership
         if ($this->lost || $this->closed) {
             return false;
         }
-        // Timer callbacks may overlap while Redis I/O yields. Only one renewal
+        // Timer callbacks may overlap while database I/O yields. Only one renewal
         // may establish a deadline; another callback can only use existing time.
         if ($this->renewing) {
             return $this->isActive();
@@ -41,7 +41,7 @@ final class TranscodeLoopOwnership
         $started = ($this->monotonicClock)();
         $previousDeadline = $this->deadline;
         try {
-            $renewed = $this->lease->renew($ttlSeconds);
+            $renewed = ($this->renew)($ttlSeconds);
         } catch (Throwable) {
             $renewed = false;
         } finally {

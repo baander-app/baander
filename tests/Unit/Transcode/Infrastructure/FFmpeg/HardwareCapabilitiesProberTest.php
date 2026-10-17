@@ -36,7 +36,7 @@ final class HardwareCapabilitiesProberTest extends TestCase
             logger: $this->logger,
             preferredEncoder: 'libx265',
         );
-        $prober->boot();
+        $prober->probeForWorker();
 
         $profile = $prober->getProfile();
         $this->assertSame(HardwareAccelerator::None, $profile->accelerator);
@@ -54,7 +54,7 @@ final class HardwareCapabilitiesProberTest extends TestCase
                 new ExecResult('', 0),
             ],
         );
-        $prober->boot();
+        $prober->probeForWorker();
 
         $profile = $prober->getProfile();
         $this->assertSame(HardwareAccelerator::Nvenc, $profile->accelerator);
@@ -72,11 +72,11 @@ final class HardwareCapabilitiesProberTest extends TestCase
                 new ExecResult('Error: encoder not found', 1),
             ],
         );
-        $prober->boot();
+        $prober->probeForWorker();
 
         $profile = $prober->getProfile();
         $this->assertSame(HardwareAccelerator::None, $profile->accelerator);
-        $this->assertSame('hevc_nvenc', $profile->encoder);
+        $this->assertSame('libx265', $profile->encoder);
         $this->assertFalse($profile->isHardware());
     }
 
@@ -91,12 +91,39 @@ final class HardwareCapabilitiesProberTest extends TestCase
                 new ExecResult('', 0),
             ],
         );
-        $prober->boot();
+        $prober->probeForWorker();
 
         $profile = $prober->getProfile();
         $this->assertSame(HardwareAccelerator::Vaapi, $profile->accelerator);
         $this->assertSame('hevc_vaapi', $profile->encoder);
         $this->assertSame('/dev/dri/renderD128', $profile->hwaccelDevice);
+    }
+
+    public function testWorkerProbePassesDeviceAsOneArgumentAndBoundsCpuThreads(): void
+    {
+        $directory = sys_get_temp_dir() . '/baander-probe-' . bin2hex(random_bytes(8));
+        mkdir($directory);
+        $executable = $directory . '/ffmpeg with spaces';
+        $arguments = $directory . '/argv.json';
+        file_put_contents($executable, '#!' . PHP_BINARY . "\n<?php\nfile_put_contents(__DIR__ . '/argv.json', json_encode(['argv' => \$argv, 'threads' => getenv('OMP_NUM_THREADS')]));\n");
+        chmod($executable, 0700);
+        try {
+            $prober = new HardwareCapabilitiesProber($this->logger, $executable, 'hevc_vaapi', '/dev/dri/device with spaces');
+            $profile = $prober->probeForWorker();
+            self::assertTrue($profile->isHardware());
+            $captured = json_decode((string) file_get_contents($arguments), true, flags: JSON_THROW_ON_ERROR);
+            self::assertContains('vaapi=vaapi_0:/dev/dri/device with spaces', $captured['argv']);
+            self::assertSame('1', $captured['threads']);
+            foreach (['-threads', '-filter_threads', '-filter_complex_threads'] as $flag) {
+                self::assertSame('1', $captured['argv'][array_search($flag, $captured['argv'], true) + 1]);
+            }
+        } finally {
+            if (is_file($arguments)) {
+                unlink($arguments);
+            }
+            unlink($executable);
+            rmdir($directory);
+        }
     }
 
     //
@@ -110,7 +137,7 @@ final class HardwareCapabilitiesProberTest extends TestCase
             encoders: " V..... hevc_nvenc              NVIDIA NVENC hevc encoder\n V..... hevc_vaapi              VAAPI hevc encoder\n",
             validationResults: ['hevc_nvenc' => true],
         );
-        $prober->boot();
+        $prober->probeForWorker();
 
         $profile = $prober->getProfile();
         $this->assertSame(HardwareAccelerator::Nvenc, $profile->accelerator);
@@ -125,7 +152,7 @@ final class HardwareCapabilitiesProberTest extends TestCase
             encoders: " V..... hevc_vaapi              VAAPI hevc encoder\n",
             validationResults: ['hevc_vaapi' => true],
         );
-        $prober->boot();
+        $prober->probeForWorker();
 
         $profile = $prober->getProfile();
         $this->assertSame(HardwareAccelerator::Vaapi, $profile->accelerator);
@@ -139,7 +166,7 @@ final class HardwareCapabilitiesProberTest extends TestCase
             encoders: "",
             validationResults: [],
         );
-        $prober->boot();
+        $prober->probeForWorker();
 
         $profile = $prober->getProfile();
         $this->assertSame(HardwareAccelerator::None, $profile->accelerator);
@@ -153,7 +180,7 @@ final class HardwareCapabilitiesProberTest extends TestCase
             encoders: " V..... hevc_nvenc              NVIDIA NVENC hevc encoder\n V..... hevc_vaapi              VAAPI hevc encoder\n",
             validationResults: ['hevc_nvenc' => false, 'hevc_vaapi' => true],
         );
-        $prober->boot();
+        $prober->probeForWorker();
 
         $profile = $prober->getProfile();
         $this->assertSame(HardwareAccelerator::Vaapi, $profile->accelerator);
@@ -167,7 +194,7 @@ final class HardwareCapabilitiesProberTest extends TestCase
             encoders: " V..... hevc_videotoolbox       VideoToolbox HEVC encoder\n",
             validationResults: [],
         );
-        $prober->boot();
+        $prober->probeForWorker();
 
         // VideoToolbox.ffmpegHwaccelMethod() returns '' → won't match in hwaccels list
         $profile = $prober->getProfile();
@@ -181,7 +208,7 @@ final class HardwareCapabilitiesProberTest extends TestCase
             encoders: " V..... hevc_qsv                Intel QSV HEVC encoder\n",
             validationResults: ['hevc_qsv' => true],
         );
-        $prober->boot();
+        $prober->probeForWorker();
 
         $profile = $prober->getProfile();
         $this->assertSame(HardwareAccelerator::Qsv, $profile->accelerator);
@@ -192,7 +219,7 @@ final class HardwareCapabilitiesProberTest extends TestCase
     // Boot behavior
     //
 
-    public function testBootIsIdempotent(): void
+    public function testWorkerProbeIsIdempotent(): void
     {
         $execCallCount = 0;
         $prober = TestableHardwareCapabilitiesProber::createWithCallback(
@@ -210,28 +237,22 @@ final class HardwareCapabilitiesProberTest extends TestCase
             },
         );
 
-        $prober->boot();
+        $prober->probeForWorker();
         $firstProfile = $prober->getProfile();
 
-        $prober->boot(); // Should not re-probe
+        $prober->probeForWorker(); // Should not re-probe
         $secondProfile = $prober->getProfile();
 
         $this->assertSame(3, $execCallCount); // hwaccels + encoders + validate
         $this->assertTrue($firstProfile->equals($secondProfile));
     }
 
-    public function testGetProfileAutoBootsWhenNotBooted(): void
+    public function testGetProfileRequiresAnExplicitWorkerProbe(): void
     {
-        $prober = TestableHardwareCapabilitiesProber::create(
-            logger: $this->logger,
-            preferredEncoder: 'libx265',
-        );
-
-        $profile = $prober->getProfile();
-
-        $this->assertSame(HardwareAccelerator::None, $profile->accelerator);
-        $this->assertSame('libx265', $profile->encoder);
-        $this->assertTrue($prober->isBooted());
+        $prober = TestableHardwareCapabilitiesProber::create(logger: $this->logger);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Worker hardware capabilities have not been probed');
+        $prober->getProfile();
     }
 
     //
@@ -245,7 +266,7 @@ final class HardwareCapabilitiesProberTest extends TestCase
             preferredEncoder: 'libx265',
             bitrateMultiplier: 1.5,
         );
-        $prober->boot();
+        $prober->probeForWorker();
 
         $this->assertSame(1.5, $prober->getBitrateMultiplier());
     }
@@ -256,7 +277,7 @@ final class HardwareCapabilitiesProberTest extends TestCase
             logger: $this->logger,
             preferredEncoder: 'libx265',
         );
-        $prober->boot();
+        $prober->probeForWorker();
 
         $this->assertSame(1.0, $prober->getBitrateMultiplier());
     }
@@ -277,7 +298,7 @@ final class HardwareCapabilitiesProberTest extends TestCase
                 return new ExecResult('', 0);
             },
         );
-        $prober->boot();
+        $prober->probeForWorker();
 
         $this->assertStringContainsString('-init_hw_device vaapi=vaapi_0', $capturedCmd);
         $this->assertStringContainsString('hwupload', $capturedCmd);
@@ -295,7 +316,7 @@ final class HardwareCapabilitiesProberTest extends TestCase
                 return new ExecResult('', 0);
             },
         );
-        $prober->boot();
+        $prober->probeForWorker();
 
         $this->assertStringNotContainsString('-init_hw_device', $capturedCmd);
         $this->assertStringContainsString('hevc_nvenc', $capturedCmd);
@@ -389,8 +410,9 @@ class TestableHardwareCapabilitiesProber extends HardwareCapabilitiesProber
         return $instance;
     }
 
-    protected function exec(string $cmd): string
+    protected function exec(array $command): string
     {
+        $cmd = implode(' ', $command);
         if ($this->callback !== null) {
             $result = ($this->callback)($cmd);
             $this->lastExitCode = $result->exitCode;

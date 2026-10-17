@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Swoole;
 
-use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool;
-use Psr\Container\ContainerInterface;
 use SwooleBundle\SwooleBundle\Server\HttpServerConfiguration;
 use Symfony\Component\HttpKernel\DataCollector\DataCollector;
 use Symfony\Component\HttpFoundation\Request;
@@ -16,7 +14,6 @@ final class SwooleDataCollector extends DataCollector
     public function __construct(
         private readonly SwoolePoolStatsProvider $poolStatsProvider,
         private readonly SwooleWorkerEventBuffer $eventBuffer,
-        private readonly ?ContainerInterface $cpuProcessPoolLocator = null,
         private readonly ?HttpServerConfiguration $serverConfiguration = null,
     )
     {
@@ -31,7 +28,6 @@ final class SwooleDataCollector extends DataCollector
             'pool_stats' => $this->poolStatsProvider->getStats(),
             'server_settings' => $this->resolveServerSettings(),
             'worker_events' => $this->eventBuffer->getAll(),
-            'cpu_pool' => $this->resolveCpuPoolStats(),
         ];
     }
 
@@ -89,12 +85,6 @@ final class SwooleDataCollector extends DataCollector
         return $this->data['worker_events'] ?? [];
     }
 
-    /** @return array{available?: bool, boot_pending?: bool, running?: bool, worker_count?: int, result_table_size?: int} */
-    public function getCpuPool(): array
-    {
-        return $this->data['cpu_pool'] ?? [];
-    }
-
     /** @return array<string, mixed> */
     private function resolveServerSettings(): array
     {
@@ -103,37 +93,5 @@ final class SwooleDataCollector extends DataCollector
         }
 
         return $this->serverConfiguration->getSettings();
-    }
-
-    /** @return array{available: bool, boot_pending?: bool, running?: bool, worker_count?: int, result_table_size?: int} */
-    private function resolveCpuPoolStats(): array
-    {
-        if ($this->cpuProcessPoolLocator === null) {
-            return ['available' => false];
-        }
-
-        try {
-            if (!$this->cpuProcessPoolLocator->has(CpuProcessPool::class)) {
-                return ['available' => false];
-            }
-
-            $pool = $this->cpuProcessPoolLocator->get(CpuProcessPool::class);
-
-            $stats = [
-                'available' => true,
-                'running' => $pool->isRunning(),
-                'worker_count' => $pool->getWorkerCount(),
-                'result_table_size' => 0,
-            ];
-
-            $resultTable = $pool->getResultTable();
-            if ($resultTable !== null) {
-                $stats['result_table_size'] = $resultTable->count();
-            }
-
-            return $stats;
-        } catch (\Throwable) {
-            return ['available' => false, 'boot_pending' => true];
-        }
     }
 }

@@ -34,6 +34,15 @@ final class SegmentEncoderStreamArgsTest extends TestCase
         );
     }
 
+    public function testSoftwareEncoderBoundsItsInternalWorkerPool(): void
+    {
+        $args = $this->encoder()->buildStreamArgs('/video/source.mkv', QualityTier::p720(), '', '/output');
+        self::assertSame('2', $args[array_search('-threads:v', $args, true) + 1]);
+        $parameters = $args[array_search('-x265-params', $args, true) + 1];
+        self::assertStringContainsString('pools=2', $parameters);
+        self::assertStringContainsString('frame-threads=2', $parameters);
+    }
+
     public function testBuildStreamArgsProducesCoreHlsFmp4Flags(): void
     {
         $args = $this->encoder()->buildStreamArgs(

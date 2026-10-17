@@ -36,6 +36,14 @@ final class AudioRenditionFormatTest extends TestCase
         yield 'opus lowest step' => [AudioRenditionFormat::Opus, 32_000, 64_000];
     }
 
+    public function testSourceSignaturePreservesTheCanonicalFilename(): void
+    {
+        self::assertSame('mp3-192k-d5a3a24db6ce8852.mp3', AudioRenditionFormat::Mp3->sourceSignature(192000, 123, 456));
+        self::assertSame('opus-96k-d5a3a24db6ce8852.opus', AudioRenditionFormat::Opus->sourceSignature(96000, 123, 456));
+        self::assertNotSame(AudioRenditionFormat::Aac->sourceSignature(128000, 123, 456), AudioRenditionFormat::Aac->sourceSignature(128000, 124, 456));
+        self::assertNotSame(AudioRenditionFormat::Aac->sourceSignature(128000, 123, 456), AudioRenditionFormat::Aac->sourceSignature(128000, 123, 457));
+    }
+
     public function testEveryFormatHasAtMostSevenRenditionsPerTrack(): void
     {
         foreach (AudioRenditionFormat::cases() as $format) {

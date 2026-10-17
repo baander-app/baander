@@ -6,9 +6,12 @@ namespace App\Transcode\Infrastructure\Transcode;
 
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use App\Transcode\Application\DTO\TranscodeRuntimeSnapshot;
 use App\Transcode\Application\Port\StreamAuthPortInterface;
+use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
+use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Repository\TranscodeJobRepositoryInterface;
 use App\Transcode\Domain\Service\VideoProcessingRules;
 use App\Transcode\Domain\ValueObject\QualityTier;
@@ -16,6 +19,9 @@ use App\Transcode\Infrastructure\DASH\DashManifestGenerator;
 use App\Transcode\Infrastructure\HLS\ManifestGenerator;
 use App\Transcode\Infrastructure\HLS\QualityLadderRenderer;
 
+/**
+ * @phpstan-type GenerationMetadata array{videoCodec: 'h264'|'hevc'|'av1', audioCodec: string, segmentDuration: int|float, totalSegments: int, duration: float, startSegment: int, startTime: float}
+ */
 final class TranscodeStreamingService implements TranscodeStreamingPortInterface
 {
     public function __construct(
@@ -25,365 +31,323 @@ final class TranscodeStreamingService implements TranscodeStreamingPortInterface
         private readonly DashManifestGenerator $dashManifestGenerator,
         private readonly QualityLadderRenderer $qualityLadderRenderer,
         private readonly StreamAuthPortInterface $streamAuth,
-    )
-    {
-    }
+        private readonly TranscodeExecutionOwnershipPort $ownership,
+    ) {}
 
-    public function getMasterManifest(Uuid $videoId): string
+    public function getPlaybackState(Uuid $videoId, ?string $jobPublicId = null): ?array
     {
-        $jobs = $this->jobRepository->findActiveByVideo($videoId);
-        $mediaManifestUrls = [];
-        $subtitleGroups = [];
-        $firstJob = null;
-        $videoCodec = $this->currentVideoCodec();
-
-        foreach ($jobs as $job) {
-            if ($firstJob === null) {
-                $firstJob = $job;
+        $pending = null;
+        foreach ($this->jobRepository->findActiveByVideo($videoId) as $job) {
+            if ($jobPublicId !== null && $job->getPublicId()->toString() !== $jobPublicId) {
+                continue;
             }
-
-            // List every active rendition in the master manifest, even if it has
-            // not produced a single segment yet. The playlist is generated from
-            // ffprobe data, and segments are produced on demand when the player
-            // requests them — hiding a tier until it has segments defeats the
-            // on-the-fly design.
-            $tierName = $job->getQualityTierName();
-            $mediaManifestPath = sprintf(
-                '/api/transcode/%s/media.m3u8?tier=%s',
-                $job->getPublicId()->toString(),
-                $tierName,
-            );
-            $mediaManifestUrls[$tierName] = $this->streamAuth->signUrl($mediaManifestPath)['url'];
-        }
-
-        // Muxed renditions: audio is baked into each variant segment, so there
-        // are no EXT-X-MEDIA audio groups. Subtitles remain separate (WebVTT).
-        if ($firstJob !== null) {
-            $probeData = $firstJob->getProbeData();
-            $subtitleLanguages = array_column($probeData['subtitleStreams'] ?? [], 'language');
-
-            foreach ($subtitleLanguages as $language) {
-                $subtitlePath = sprintf('/api/transcode/%s/subtitles/%s/media.m3u8', $firstJob->getPublicId()->toString(), $language);
-                $subtitleGroups[] = [
-                    'language' => $language,
-                    'name' => $this->languageName($language),
-                    'uri' => $this->streamAuth->signUrl($subtitlePath)['url'],
-                    'isDefault' => $language === ($subtitleLanguages[0] ?? 'en'),
-                    'groupId' => 'subs',
-                ];
+            $runtime = $this->ownership->find($job->getId());
+            if ($runtime === null) {
+                continue;
             }
-        }
-
-        if (empty($mediaManifestUrls)) {
-            return $this->manifestGenerator->generateMasterManifest([]);
-        }
-
-        // Override the hard-coded HEVC codec strings in QualityTier with the
-        // currently configured encoder's RFC6381 identifier.
-        $urls = [];
-        $codecOverrides = [];
-        foreach ($mediaManifestUrls as $tierName => $url) {
-            $tier = QualityTier::fromString($tierName);
-            $urls[$tierName] = $url;
-            $codecOverrides[$tierName] = VideoProcessingRules::codecRfc6381($videoCodec, $tier->height);
-        }
-
-        return $this->manifestGenerator->generateMasterManifest($urls, [], $subtitleGroups, $codecOverrides);
-    }
-
-    public function getMediaManifest(PublicId $jobPublicId, string $audioProfileName): string
-    {
-        $job = $this->jobRepository->findByPublicId($jobPublicId);
-        if ($job === null) {
-            return $this->manifestGenerator->generateMediaManifest(
-                QualityTier::p720(),
-                '',
-                [],
-            );
-        }
-
-        $tier = QualityTier::fromString($job->getQualityTierName());
-        $initSegmentPath = sprintf(
-            '/api/transcode/%s/init',
-            $job->getPublicId()->toString(),
-        );
-        $initSegmentUrl = $this->streamAuth->signUrl($initSegmentPath)['url'];
-
-        $signedSegments = [];
-        foreach ($this->buildSegmentDurations($job) as $index => $duration) {
-            // Query-param segment URL: the playlist does not hardcode the
-            // on-disk filename (which now carries rendition identity). The
-            // server resolves ?index=N to the correct cached file.
-            $segmentPath = sprintf('/api/transcode/%s/segment?index=%d', $job->getPublicId()->toString(), $index);
-            $signedSegments[$index] = [
-                'url' => $this->streamAuth->signUrl($segmentPath)['url'],
-                'duration' => $duration,
+            $context = $this->context($job, $runtime->generation);
+            $ready = $context !== null;
+            $state = [
+                'jobId' => $job->getPublicId()->toString(),
+                'generation' => $runtime->generation,
+                'revision' => $runtime->desiredRevision,
+                'ready' => $ready,
+                'position' => $runtime->desired->position,
+                'status' => $runtime->desired->status,
+                'startTime' => $context['metadata']['startTime'] ?? null,
+                'duration' => $context['metadata']['duration'] ?? null,
             ];
-        }
-
-        return $this->manifestGenerator->generateMediaManifest(
-            $tier,
-            $initSegmentUrl,
-            $signedSegments,
-        );
-    }
-
-    /**
-     * @return array<int, float>
-     */
-    private function buildSegmentDurations(\App\Transcode\Domain\Model\TranscodeJob $job): array
-    {
-        $segmentMap = $job->getSegmentMap();
-        if ($segmentMap !== []) {
-            $durations = [];
-            foreach ($segmentMap as $index => $segment) {
-                $durations[(int) $index] = (float) $segment['duration'];
+            if ($ready) {
+                return $state;
             }
-            ksort($durations, SORT_NUMERIC);
-
-            return $durations;
+            $pending ??= $state;
         }
-
-        $totalSegments = $job->getTotalSegments();
-        if ($totalSegments <= 0) {
-            return [];
-        }
-
-        $probeData = $job->getProbeData();
-        $duration = (float) ($probeData['duration'] ?? 0.0);
-        $segmentDuration = \App\Transcode\Infrastructure\FFmpeg\SegmentEncoder::getSegmentDuration();
-
-        $durations = [];
-        for ($i = 0; $i < $totalSegments; $i++) {
-            $end = min(($i + 1) * $segmentDuration, $duration);
-            $start = $i * $segmentDuration;
-            $durations[$i] = max(0.0, $end - $start);
-        }
-
-        return $durations;
+        return $pending;
     }
 
-    public function getSegment(PublicId $jobPublicId, int $segmentIndex): ?string
+    public function getMasterManifest(Uuid $videoId, int $generation, ?string $jobPublicId = null): string
     {
-        $path = $this->getSegmentPath($jobPublicId, $segmentIndex);
-        if ($path === null) {
-            return null;
-        }
-
-        return file_get_contents($path);
-    }
-
-    public function getSegmentPath(PublicId $jobPublicId, int $segmentIndex): ?string
-    {
-        return $this->resolveVideoSegmentAvailability($jobPublicId, $segmentIndex)['path']
-            ?? null;
-    }
-
-    /**
-     * @return array{jobId: Uuid, tierKey: string, path: string}|null
-     */
-    public function resolveVideoSegmentAvailability(PublicId $jobPublicId, int $segmentIndex): ?array
-    {
-        $job = $this->jobRepository->findByPublicId($jobPublicId);
-        if ($job === null) {
-            return null;
-        }
-
-        $totalSegments = $job->getTotalSegments();
-        if ($totalSegments > 0 && ($segmentIndex < 0 || $segmentIndex >= $totalSegments)) {
-            return null;
-        }
-
-        $path = $this->storage->resolveSegmentPath($job->getVideoId(), QualityTier::fromString($job->getQualityTierName()), $segmentIndex);
-
-        return [
-            'jobId' => $job->getId(),
-            'tierKey' => $job->getQualityTierName(),
-            'path' => $path,
-        ];
-    }
-
-    public function getInitSegment(PublicId $jobPublicId): ?string
-    {
-        $path = $this->getInitSegmentPath($jobPublicId);
-        if ($path === null) {
-            return null;
-        }
-
-        return file_get_contents($path);
-    }
-
-    public function getInitSegmentPath(PublicId $jobPublicId): ?string
-    {
-        $job = $this->jobRepository->findByPublicId($jobPublicId);
-        if ($job === null) {
-            return null;
-        }
-
-        $path = $job->getInitSegmentPath();
-        if ($path === null) {
-            $path = $this->storage->resolveInitSegmentPath($job->getVideoId(), QualityTier::fromString($job->getQualityTierName()));
-        }
-
-        return $path;
-    }
-
-    public function getDashManifest(Uuid $videoId): string
-    {
-        $jobs = $this->jobRepository->findActiveByVideo($videoId);
-        $renditions = [];
-        $totalDuration = 0.0;
-        $firstJob = null;
-
-        foreach ($jobs as $job) {
-            if ($firstJob === null) {
-                $firstJob = $job;
+        $urls = $codecs = $subtitles = [];
+        foreach ($this->jobRepository->findActiveByVideo($videoId) as $job) {
+            if ($jobPublicId !== null && $job->getPublicId()->toString() !== $jobPublicId) {
+                continue;
             }
-
+            $context = $this->context($job, $generation);
+            if ($context === null) {
+                continue;
+            }
             $tier = QualityTier::fromString($job->getQualityTierName());
-            $durations = $this->buildSegmentDurations($job);
-            $segmentMap = [];
-            $publicId = $job->getPublicId()->toString();
-
-            foreach ($durations as $index => $duration) {
-                $segmentPath = sprintf('/api/transcode/%s/segment?index=%d', $publicId, $index);
-                $segmentMap[$index] = [
-                    'url'      => $this->streamAuth->signUrl($segmentPath)['url'],
-                    'duration' => $duration,
-                ];
+            $urls[$tier->name] = $this->signed('/api/transcode/'.$job->getPublicId().'/media.m3u8', $generation, ['tier' => $tier->name]);
+            $codecs[$tier->name] = $this->videoCodec($context['metadata'], $tier).','.$this->audioCodecToRfc6381($context['metadata']['audioCodec']);
+            if ($subtitles === []) {
+                foreach (array_column($job->getProbeData()['subtitleStreams'] ?? [], 'language') as $language) {
+                    $subtitles[] = ['language' => $language, 'name' => $this->languageName($language), 'uri' => $this->signed('/api/transcode/'.$job->getPublicId().'/subtitles/'.rawurlencode($language).'/media.m3u8', $generation), 'isDefault' => $subtitles === [], 'groupId' => 'subs'];
+                }
             }
-
-            $initPath = sprintf('/api/transcode/%s/init', $publicId);
-
-            $renditions[$job->getQualityTierName()] = [
-                'public_id'           => $publicId,
-                'quality_tier'        => $tier,
-                'init_url'            => $this->streamAuth->signUrl($initPath)['url'],
-                'segment_map'         => $segmentMap,
-                'total_duration'      => array_sum(array_column($segmentMap, 'duration')),
-                'video_codec_rfc6381' => VideoProcessingRules::codecRfc6381($this->currentVideoCodec(), $tier->height),
-                'audio_codec_rfc6381' => $this->audioCodecToRfc6381('aac'),
-            ];
-            $totalDuration = max($totalDuration, $renditions[$job->getQualityTierName()]['total_duration']);
         }
+        return $this->manifestGenerator->generateMasterManifest($urls, [], $subtitles, $codecs);
+    }
 
-        // Muxed renditions: audio is baked into each segment, so there are no
-        // separate audio AdaptationSets. The DASH manifest is video-only
-        // AdaptationSets carrying muxed audio.
-        return $this->dashManifestGenerator->generate($renditions, [], $totalDuration);
+    public function getMediaManifest(PublicId $jobPublicId, string $audioProfileName, int $generation): string
+    {
+        $job = $this->jobRepository->findByPublicId($jobPublicId);
+        $context = $job === null ? null : $this->context($job, $generation);
+        if ($context === null) {
+            return $this->manifestGenerator->generateMediaManifest(QualityTier::p720(), '', []);
+        }
+        return $this->manifestGenerator->generateMediaManifest(
+            QualityTier::fromString($job->getQualityTierName()),
+            $this->signed('/api/transcode/'.$jobPublicId.'/init', $generation),
+            $this->segments($job, $context['metadata'], $generation),
+            $context['metadata']['segmentDuration'],
+        );
     }
 
     /**
-     * @return list<array{name: string, height: int, width: int, bitrate: int, codec: string}>
+     * @param GenerationMetadata $metadata
+     * @return array<int, array{url: string, duration: float}>
      */
-    public function getQualityLadderForVideo(Uuid $videoId): array
+    private function segments(TranscodeJob $job, array $metadata, int $generation): array
     {
-        $jobs = $this->jobRepository->findActiveByVideo($videoId);
-        $tiers = [];
-
-        foreach ($jobs as $job) {
-            $tiers[] = QualityTier::fromString($job->getQualityTierName());
-        }
-
-        return $this->qualityLadderRenderer->renderAvailableTiers($tiers);
-    }
-
-    // --- Subtitle Delivery ---
-
-    public function getSubtitleManifest(PublicId $jobPublicId, string $language): string
-    {
-        $job = $this->jobRepository->findByPublicId($jobPublicId);
-        if ($job === null) {
-            return $this->manifestGenerator->generateSubtitleManifest($language, []);
-        }
-
-        $subtitleDir = $this->storage->resolveSubtitleDirectory($job->getVideoId(), $language);
-        $segments = $this->scanSubtitleSegments($subtitleDir);
-
-        return $this->manifestGenerator->generateSubtitleManifest($language, $segments);
-    }
-
-    public function getSubtitleSegment(PublicId $jobPublicId, string $language, string $segmentName): ?string
-    {
-        $path = $this->getSubtitleSegmentPath($jobPublicId, $language, $segmentName);
-        if ($path === null) {
-            return null;
-        }
-
-        return file_get_contents($path);
-    }
-
-    public function getSubtitleSegmentPath(PublicId $jobPublicId, string $language, string $segmentName): ?string
-    {
-        $job = $this->jobRepository->findByPublicId($jobPublicId);
-        if ($job === null) {
-            return null;
-        }
-
-        $path = $this->storage->resolveSubtitleSegmentPath($job->getVideoId(), $language, $segmentName);
-        if (!$this->storage->exists($path)) {
-            return null;
-        }
-
-        return $path;
-    }
-
-    // --- Helpers ---
-
-    /**
-     * @return list<array{segmentName: string, duration: float}>
-     */
-    private function scanSubtitleSegments(string $subtitleDir): array
-    {
-        if (!is_dir($subtitleDir)) {
-            return [];
-        }
-
         $segments = [];
-        $files = glob($subtitleDir . '/*.vtt') ?: [];
-        sort($files);
-
-        foreach ($files as $file) {
-            $name = basename($file, '.vtt');
-            $segments[] = [
-                'segmentName' => $name,
-                'duration' => 6.0,
+        for ($index = $metadata['startSegment']; $index < $metadata['totalSegments']; ++$index) {
+            $segments[$index] = [
+                'url' => $this->signed('/api/transcode/'.$job->getPublicId().'/segment', $generation, ['index' => $index]),
+                'duration' => max(0.0, min($metadata['segmentDuration'], $metadata['duration'] - $index * $metadata['segmentDuration'])),
             ];
         }
-
         return $segments;
     }
 
-    /**
-     * Map an audio codec name to its RFC 6381 codec identifier.
-     *
-     * @see https://tools.ietf.org/html/rfc6381
-     */
+    public function getSegment(PublicId $jobPublicId, int $segmentIndex, int $generation): ?string
+    {
+        $path = $this->getSegmentPath($jobPublicId, $segmentIndex, $generation);
+        return $path === null ? null : $this->read($path);
+    }
+
+    public function getSegmentPath(PublicId $jobPublicId, int $segmentIndex, int $generation): ?string
+    {
+        return $this->resolveVideoSegmentAvailability($jobPublicId, $segmentIndex, $generation)['path'] ?? null;
+    }
+
+    public function resolveVideoSegmentAvailability(PublicId $jobPublicId, int $segmentIndex, int $generation): ?array
+    {
+        $job = $this->jobRepository->findByPublicId($jobPublicId);
+        $context = $job === null ? null : $this->context($job, $generation);
+        if ($context === null || $segmentIndex < $context['metadata']['startSegment'] || $segmentIndex >= $context['metadata']['totalSegments']) {
+            return null;
+        }
+        try {
+            return [
+                'jobId' => $job->getId(),
+                'tierKey' => $job->getQualityTierName().'/generation-'.$generation,
+                'path' => $context['storage']->resolveSegmentPath($job->getVideoId(), QualityTier::fromString($job->getQualityTierName()), $segmentIndex),
+            ];
+        } catch (\InvalidArgumentException) {
+            return null;
+        }
+    }
+
+    public function getInitSegment(PublicId $jobPublicId, int $generation): ?string
+    {
+        $path = $this->getInitSegmentPath($jobPublicId, $generation);
+        return $path === null ? null : $this->read($path);
+    }
+
+    public function getInitSegmentPath(PublicId $jobPublicId, int $generation): ?string
+    {
+        $job = $this->jobRepository->findByPublicId($jobPublicId);
+        $context = $job === null ? null : $this->context($job, $generation);
+        if ($context === null) {
+            return null;
+        }
+        try {
+            return $context['storage']->resolveInitSegmentPath($job->getVideoId(), QualityTier::fromString($job->getQualityTierName()));
+        } catch (\InvalidArgumentException) {
+            return null;
+        }
+    }
+
+    public function getDashManifest(Uuid $videoId, int $generation, ?string $jobPublicId = null): string
+    {
+        $renditions = []; $duration = 0.0;
+        foreach ($this->jobRepository->findActiveByVideo($videoId) as $job) {
+            if ($jobPublicId !== null && $job->getPublicId()->toString() !== $jobPublicId) {
+                continue;
+            }
+            $context = $this->context($job, $generation);
+            if ($context === null) {
+                continue;
+            }
+            $tier = QualityTier::fromString($job->getQualityTierName());
+            $metadata = $context['metadata'];
+            $renditions[$tier->name] = [
+                'public_id' => $job->getPublicId()->toString(), 'quality_tier' => $tier,
+                'init_url' => $this->signed('/api/transcode/'.$job->getPublicId().'/init', $generation),
+                'segment_map' => $this->segments($job, $metadata, $generation),
+                'total_duration' => $metadata['duration'],
+                'video_codec_rfc6381' => $this->videoCodec($metadata, $tier).','.$this->audioCodecToRfc6381($metadata['audioCodec']),
+                'audio_codec_rfc6381' => $this->audioCodecToRfc6381($metadata['audioCodec']),
+            ];
+            $duration = max($duration, $metadata['duration']);
+        }
+        return $this->dashManifestGenerator->generate($renditions, [], $duration);
+    }
+
+    public function getQualityLadderForVideo(Uuid $videoId): array
+    {
+        $tiers = [];
+        foreach ($this->jobRepository->findActiveByVideo($videoId) as $job) {
+            $runtime = $this->ownership->find($job->getId());
+            $context = $runtime === null ? null : $this->context($job, $runtime->generation);
+            if ($context !== null) {
+                $tier = QualityTier::fromString($job->getQualityTierName());
+                $entry = $this->qualityLadderRenderer->renderAvailableTiers([$tier])[0];
+                $entry['codec'] = $this->videoCodec($context['metadata'], $tier);
+                $tiers[] = $entry;
+            }
+        }
+        return $tiers;
+    }
+
+    public function getSubtitleManifest(PublicId $jobPublicId, string $language, int $generation): string
+    {
+        $job = $this->jobRepository->findByPublicId($jobPublicId);
+        $context = $job === null ? null : $this->context($job, $generation);
+        $segments = [];
+        if ($context !== null) {
+            try {
+                $directory = $context['storage']->resolveSubtitleDirectory($job->getVideoId(), $language);
+            } catch (\InvalidArgumentException) {
+                return $this->manifestGenerator->generateSubtitleManifest($language, []);
+            }
+            $files = glob($directory.'/*.vtt') ?: []; sort($files);
+            foreach ($files as $file) {
+                $name = basename($file, '.vtt');
+                if ($this->subtitlePath($job, $context['storage'], $language, $name) !== null) {
+                    $segments[] = ['segmentName' => $name, 'duration' => $context['metadata']['segmentDuration'], 'url' => $this->signed('/api/transcode/'.$jobPublicId.'/subtitles/'.rawurlencode($language).'/'.rawurlencode($name).'.vtt', $generation)];
+                }
+            }
+        }
+        if ($context !== null) {
+            $runtime = $this->ownership->find($job->getId());
+            if ($runtime === null || !$this->readable($runtime, $generation, $context['directory'])) {
+                $segments = [];
+            }
+        }
+        return $this->manifestGenerator->generateSubtitleManifest($language, $segments);
+    }
+
+    public function getSubtitleSegment(PublicId $jobPublicId, string $language, string $segmentName, int $generation): ?string
+    {
+        $path = $this->getSubtitleSegmentPath($jobPublicId, $language, $segmentName, $generation);
+        return $path === null ? null : $this->read($path);
+    }
+
+    public function getSubtitleSegmentPath(PublicId $jobPublicId, string $language, string $segmentName, int $generation): ?string
+    {
+        $job = $this->jobRepository->findByPublicId($jobPublicId);
+        $context = $job === null ? null : $this->context($job, $generation);
+        if ($context === null) {
+            return null;
+        }
+        return $this->subtitlePath($job, $context['storage'], $language, $segmentName);
+    }
+
+    private function subtitlePath(TranscodeJob $job, TranscodeStoragePortInterface $storage, string $language, string $segmentName): ?string
+    {
+        try {
+            $path = $storage->resolveSubtitleSegmentPath($job->getVideoId(), $language, $segmentName);
+            return $storage->exists($path) && is_file($path) ? $path : null;
+        } catch (\InvalidArgumentException) {
+            return null;
+        }
+    }
+
+    private function readable(TranscodeRuntimeSnapshot $runtime, int $generation, string $directory): bool
+    {
+        return $runtime->generation === $generation && $runtime->outputDirectory === $directory
+            && in_array($runtime->outcome, ['ready', 'complete'], true)
+            && ($runtime->outcome === 'complete' || $runtime->ownershipLive);
+    }
+
+    /** @return array{storage: TranscodeStoragePortInterface, directory: string, metadata: GenerationMetadata}|null */
+    private function context(TranscodeJob $job, int $generation): ?array
+    {
+        if ($generation < 1) {
+            return null;
+        }
+        $runtime = $this->ownership->find($job->getId());
+        if ($runtime === null) {
+            return null;
+        }
+        try {
+            $tier = QualityTier::fromString($job->getQualityTierName());
+            $storage = $this->storage->forGeneration($job->getVideoId(), $tier, $generation);
+            $directory = $storage->resolveJobDirectory($job->getVideoId(), $tier);
+            if (!$this->readable($runtime, $generation, $directory)) {
+                return null;
+            }
+            $path = $directory.'/generation.json';
+            if (!$storage->exists($path) || !is_file($path) || is_link($path)) {
+                return null;
+            }
+            $metadata = json_decode((string) file_get_contents($path), true, 32, JSON_THROW_ON_ERROR);
+            if (!is_array($metadata) || ($metadata['schemaVersion'] ?? null) !== 1 || ($metadata['generation'] ?? null) !== $generation
+                || !in_array($metadata['videoCodec'] ?? null, ['h264', 'hevc', 'av1'], true)
+                || !is_string($metadata['videoEncoder'] ?? null) || !is_string($metadata['audioCodec'] ?? null)
+                || !is_array($metadata['audioProfile'] ?? null)
+                || (!is_int($metadata['segmentDuration'] ?? null) && !is_float($metadata['segmentDuration'] ?? null)) || $metadata['segmentDuration'] <= 0
+                || !is_int($metadata['totalSegments'] ?? null) || $metadata['totalSegments'] < 1
+                || !is_int($metadata['startSegment'] ?? null) || $metadata['startSegment'] < 0 || $metadata['startSegment'] >= $metadata['totalSegments']
+                || (!is_int($metadata['startTime'] ?? null) && !is_float($metadata['startTime'] ?? null)) || $metadata['startTime'] < 0
+                || abs($metadata['startTime'] - $metadata['startSegment'] * $metadata['segmentDuration']) > 0.001
+                || (!is_int($metadata['duration'] ?? null) && !is_float($metadata['duration'] ?? null)) || $metadata['duration'] <= 0) {
+                return null;
+            }
+            return ['storage' => $storage, 'directory' => $directory, 'metadata' => [
+                'videoCodec' => $metadata['videoCodec'],
+                'audioCodec' => $metadata['audioCodec'],
+                'segmentDuration' => $metadata['segmentDuration'],
+                'totalSegments' => $metadata['totalSegments'],
+                'duration' => (float) $metadata['duration'],
+                'startSegment' => $metadata['startSegment'],
+                'startTime' => (float) $metadata['startTime'],
+            ]];
+        } catch (\InvalidArgumentException|\JsonException) {
+            return null;
+        }
+    }
+
+    /** @param array<string, int|string> $query */
+    private function signed(string $path, int $generation, array $query = []): string
+    {
+        return $this->streamAuth->signUrl($path.'?'.http_build_query($query + ['generation' => $generation]))['url'];
+    }
+
+    private function read(string $path): ?string
+    {
+        $contents = @file_get_contents($path);
+        return $contents === false ? null : $contents;
+    }
+
+    /** @param GenerationMetadata $metadata */
+    private function videoCodec(array $metadata, QualityTier $tier): string
+    {
+        return VideoProcessingRules::codecRfc6381(match ($metadata['videoCodec']) { 'h264' => 'libx264', 'hevc' => 'libx265', 'av1' => 'libsvtav1' }, $tier->height);
+    }
+
     private function audioCodecToRfc6381(string $codec): string
     {
         return match ($codec) {
-            'aac', 'aac-lc', 'aac_lc' => 'mp4a.40.2',
             'heaac', 'he-aac', 'heaacv1' => 'mp4a.40.5',
             'heaacv2', 'he-aacv2' => 'mp4a.40.29',
-            'opus' => 'Opus',
-            default => 'mp4a.40.2', // Fallback: AAC-LC
+            'opus' => 'Opus', default => 'mp4a.40.2',
         };
-    }
-
-    private function currentVideoCodec(): string
-    {
-        return $_ENV['VIDEO_ENCODER'] ?? 'libx265';
     }
 
     private function languageName(string $code): string
     {
-        static $names = [
-            'en' => 'English', 'es' => 'Español', 'fr' => 'Français',
-            'de' => 'Deutsch', 'it' => 'Italiano', 'pt' => 'Português',
-            'ja' => '日本語', 'ko' => '한국어', 'zh' => '中文',
-            'ru' => 'Русский', 'ar' => 'العربية', 'hi' => 'हिन्दी',
-        ];
-
-        return $names[$code] ?? $code;
+        return ['en' => 'English', 'es' => 'Español', 'fr' => 'Français', 'de' => 'Deutsch', 'it' => 'Italiano', 'pt' => 'Português', 'ja' => '日本語', 'ko' => '한국어', 'zh' => '中文', 'ru' => 'Русский', 'ar' => 'العربية', 'hi' => 'हिन्दी'][$code] ?? $code;
     }
 }

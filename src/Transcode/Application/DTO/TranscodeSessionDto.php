@@ -11,6 +11,7 @@ final readonly class TranscodeSessionDto
 {
     /**
      * @param array<string, mixed> $metrics
+     * @param array<string, mixed>|null $playback
      * @param array<string, mixed> $audioProfile
      */
     public function __construct(
@@ -26,10 +27,12 @@ final readonly class TranscodeSessionDto
         private array $metrics,
         private string $createdAt,
         private string $updatedAt,
+        private ?array $playback = null,
     ) {
     }
 
-    public static function fromModel(TranscodeSession $session, PublicId $userId, PublicId $jobId, PublicId $videoId): self
+    /** @param array<string, mixed>|null $playback */
+    public static function fromModel(TranscodeSession $session, PublicId $userId, PublicId $jobId, PublicId $videoId, ?array $playback = null): self
     {
         return new self(
             publicId: $session->getPublicId()->toString(),
@@ -44,6 +47,7 @@ final readonly class TranscodeSessionDto
             metrics: $session->getMetrics(),
             createdAt: $session->getCreatedAt()->format(\DateTimeInterface::ATOM),
             updatedAt: $session->getUpdatedAt()->format(\DateTimeInterface::ATOM),
+            playback: $playback,
         );
     }
 
@@ -86,6 +90,7 @@ final readonly class TranscodeSessionDto
             'metrics' => $this->metrics,
             'createdAt' => $this->createdAt,
             'updatedAt' => $this->updatedAt,
+            'playback' => $this->playback,
         ];
     }
 }

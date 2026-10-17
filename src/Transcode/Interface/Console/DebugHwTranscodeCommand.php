@@ -12,10 +12,10 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
 /**
- * Debug command for verifying hardware transcoding configuration.
+ * Displays the last worker-published hardware transcoding observation.
  *
  * Displays the diagnostic report with hwaccel flags, decoder flags, and sample FFmpeg
- * commands for each quality tier. Use on-metal to verify GPU detection.
+ * commands for each quality tier. It never probes hardware in this process.
  *
  * Usage: php bin/console debug:hw-transcode
  */
@@ -35,7 +35,14 @@ final class DebugHwTranscodeCommand extends Command
     {
         $io = new SymfonyStyle($input, $output);
 
-        $report = $this->diagnostics->inspect();
+        try {
+            $report = $this->diagnostics->inspect();
+        } catch (\RuntimeException $exception) {
+            $io->warning($exception->getMessage());
+
+            return Command::FAILURE;
+        }
+        $io->text(sprintf('Last worker observation: %s at %s (not a live measurement).', $report->workerIdentity, gmdate('Y-m-d\TH:i:s\Z', $report->observedAt)));
 
         // --- Profile summary ---
         $io->section('Resolved Encoder Profile');

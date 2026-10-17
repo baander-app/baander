@@ -6,6 +6,7 @@ namespace App\Transcode\Infrastructure\Swoole;
 
 interface LoopLockRenewalTimerInterface
 {
+    /** @param-later-invoked-callable $callback */
     public function tick(int $intervalMs, \Closure $callback): int;
 
     public function clear(int $id): void;

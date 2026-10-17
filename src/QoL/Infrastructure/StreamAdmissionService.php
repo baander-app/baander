@@ -73,9 +73,17 @@ final class StreamAdmissionService implements StreamAdmissionPortInterface
         bool   $hardwareAccelerated,
     ): void
     {
-        $utilization = $this->sampler->getLatest() ?? [];
-        $cpuPercent = (float)($utilization['cpu_percent'] ?? 0.0);
-        $gpuPercent = (float)($utilization['gpu_percent'] ?? 0.0);
+        $utilization = $this->sampler->getLatest();
+        if ($utilization === null) {
+            $this->governor->releaseStream($jobId);
+            $this->logger->info('StreamAdmission: utilization unavailable; allocation released without learning', [
+                'jobId' => $jobId->toString(),
+            ]);
+
+            return;
+        }
+        $cpuPercent = $utilization['cpu_percent'];
+        $gpuPercent = $utilization['gpu_percent'];
 
         $this->governor->recordSample(new UtilizationSample(
             cpuPercent: $cpuPercent,

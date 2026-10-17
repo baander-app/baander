@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Swoole\Drain;
 
-use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool;
-use Psr\Container\ContainerInterface;
 use Swoole\Process;
 use Swoole\Server;
 use Swoole\Timer;
@@ -19,11 +17,11 @@ use SwooleBundle\SwooleBundle\Server\LifecycleHandler\ServerBeforeShutdownHandle
  * swoole:server:stop all reach onBeforeShutdown, which Swoole runs once per server. There the
  * coordinator:
  *
- * 1. ends the CPU pool's health check and drops the SIGINT listener. After SIGTERM, Swoole stops
+ * 1. drops the SIGINT listener. After SIGTERM, Swoole stops
  *    the master's event loop only once no timer is left in it, and it checks for timers before its
  *    own max_wait_time deadline: a timer left behind keeps the server running forever;
  * 2. records the drain start in the DrainStateTable, which every worker reads;
- * 3. starts the watchdog (DrainWatchdog), which kills the manager and the pool at the deadline D;
+ * 3. starts the watchdog (DrainWatchdog), which kills the manager at the deadline D;
  * 4. holds the drain window open with a timer of its own. While that timer runs, the master keeps
  *    its reactor threads and so every client connection, and the workers drain. The timer ends
  *    once every event worker has reported drained and no client connection has output left to
@@ -52,7 +50,6 @@ final class DrainCoordinator implements ServerBeforeShutdownHandler, Configurato
         private readonly DrainBudget $budget,
         private readonly DrainStateTable $state,
         private readonly array $watchdogCommand,
-        private readonly ?ContainerInterface $cpuProcessPoolLocator = null,
         private $log = null,
     ) {
     }
@@ -73,13 +70,11 @@ final class DrainCoordinator implements ServerBeforeShutdownHandler, Configurato
         $this->started = true;
         $startedAtNs = hrtime(true);
 
-        $pool = CpuProcessPool::fromLocator($this->cpuProcessPoolLocator);
-        $pool?->stopHealthCheck();
         Process::signal(SIGINT, null);
         $this->state->begin($startedAtNs);
 
         $deadlineNs = $startedAtNs + $this->budget->deadlineSeconds * 1_000_000_000;
-        $pids = array_values(array_filter([(int) $server->manager_pid, ...($pool?->workerPids() ?? [])], static fn (int $pid): bool => $pid > 1));
+        $pids = array_filter([(int) $server->manager_pid], static fn (int $pid): bool => $pid > 1);
         try {
             $this->watchdog = DrainWatchdog::start($this->watchdogCommand, $deadlineNs, $pids, self::foreignProcessGroups($pids));
         } catch (\Throwable $error) {

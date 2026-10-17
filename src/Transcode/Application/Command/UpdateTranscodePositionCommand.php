@@ -15,6 +15,8 @@ final readonly class UpdateTranscodePositionCommand
         public float $position,
         public string $action,
         ?string $requestId = null,
+        public ?int $expectedGeneration = null,
+        public ?int $expectedRevision = null,
     ) {
         $this->requestId = $requestId ?? Uuid::generate()->toString();
     }

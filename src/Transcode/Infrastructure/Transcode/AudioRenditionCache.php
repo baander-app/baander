@@ -5,350 +5,140 @@ declare(strict_types=1);
 namespace App\Transcode\Infrastructure\Transcode;
 
 use App\Shared\Infrastructure\Swoole\Async;
-use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool;
-use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPoolInterface;
-use App\Transcode\Application\Exception\AudioRenditionBusyException;
+use App\Transcode\Application\DTO\AudioRenditionInput;
+use App\Transcode\Application\DTO\AudioRenditionRuntimeSnapshot;
 use App\Transcode\Application\Exception\AudioRenditionFailedException;
 use App\Transcode\Application\Port\AudioRendition;
 use App\Transcode\Application\Port\AudioRenditionFormat;
 use App\Transcode\Application\Port\AudioRenditionPortInterface;
+use App\Transcode\Application\Port\AudioRenditionRuntimePort;
 use App\Transcode\Infrastructure\Storage\SegmentFileResolver;
-use App\Transcode\Infrastructure\Swoole\AudioRenditionPoolWorker;
 use Generator;
 use Psr\Log\LoggerInterface;
-use RuntimeException;
 use Throwable;
 
-/**
- * File-backed audio rendition cache under the transcode cache root.
- *
- * Renditions live in `audio-renditions/<track>/`, named by format, bitrate and
- * a fingerprint of the source file, so a replaced source is encoded again.
- * Encodes run in the CPU process pool ({@see AudioRenditionPoolWorker}), never
- * on the request's event loop. Outside the Swoole server (CLI, tests) the pool
- * is not running and the encode runs in this process before streaming.
- *
- * Coordination is through the filesystem, so it holds across HTTP workers: the
- * encoder's exclusive lock marks a running encode, the `.part` file is what
- * listeners read while it grows, and the final file appears (by rename, under
- * the lock) only when the rendition is complete.
- *
- * The pool is shared with video transcodes and other CPU work, so at most
- * `$maxConcurrentEncodes` rendition encodes are queued or running at once,
- * counted by the pool across every HTTP worker. A request that needs one more
- * gets {@see AudioRenditionBusyException}; joining a running encode is always
- * allowed.
- */
+/** Admits durable shared work and follows only its accepted execution generation. */
 final class AudioRenditionCache implements AudioRenditionPortInterface
 {
     private const int CHUNK_BYTES = 65_536;
 
-    /** How long a finished pool job may take to publish its result. */
-    private const float RESULT_GRACE_SECONDS = 2.0;
-
-    /** @var array<string, array{data: string, status: string}> */
-    private array $inlineResults = [];
-
     public function __construct(
         private readonly SegmentFileResolver $paths,
-        private readonly CpuProcessPoolInterface $pool,
-        private readonly AudioRenditionPoolWorker $inlineWorker,
+        private readonly AudioRenditionRuntimePort $runtime,
         private readonly LoggerInterface $logger,
-        private readonly string $ffmpegPath,
-        private readonly int $maxConcurrentEncodes,
         private readonly float $pollIntervalSeconds = 0.05,
         private readonly float $startTimeoutSeconds = 60.0,
-    ) {
-    }
+    ) {}
 
     public function open(string $trackKey, string $sourcePath, AudioRenditionFormat $format, int $bitrate): AudioRendition
     {
         $bitrate = $format->supportedBitrate($bitrate);
-        $context = ['track' => $trackKey, 'format' => $format->value, 'bitrate' => $bitrate];
-        $files = $this->files($trackKey, $sourcePath, $format, $bitrate, $context);
-
-        clearstatcache(true, $files['output']);
-        if (is_file($files['output'])) {
-            return AudioRendition::complete($format, $files['output']);
-        }
-
-        $jobKey = null;
-        if (!$this->isEncoding($files['lock'])) {
-            // A partial file left by an encoder that died must not be streamed
-            // while the new encode waits in the pool's queue.
-            clearstatcache(true, $files['partial']);
-            if (is_file($files['partial'])) {
-                @unlink($files['partial']);
-            }
-            $jobKey = $this->startEncode($sourcePath, $format, $bitrate, $files, $context);
-        }
-        $this->awaitFirstBytes($files, $jobKey, $context);
-
-        return AudioRendition::progressive($format, $this->follow($files, $jobKey, $context));
-    }
-
-    /**
-     * @param array<string, string|int> $context
-     * @return array{output: string, partial: string, lock: string}
-     */
-    private function files(string $trackKey, string $sourcePath, AudioRenditionFormat $format, int $bitrate, array $context): array
-    {
         clearstatcache(true, $sourcePath);
         $modified = @filemtime($sourcePath);
         $size = @filesize($sourcePath);
         if ($modified === false || $size === false) {
-            $this->fail($context, 'the source file cannot be read');
+            $this->fail('the source file cannot be read');
         }
-
-        $name = sprintf(
-            '%s-%dk-%s',
-            $format->value,
-            intdiv($bitrate, 1000),
-            hash('xxh64', sprintf('%d:%d', $modified, $size)),
-        );
+        $signature = $format->sourceSignature($bitrate, $modified, $size);
         try {
-            $directory = $this->paths->resolveAudioRenditionDirectory($trackKey);
-            if (!is_dir($directory) && !@mkdir($directory, 0755, true) && !is_dir($directory)) {
-                throw new RuntimeException('the rendition directory cannot be created');
-            }
-            $output = $this->paths->resolveAudioRenditionPath($trackKey, $name . '.' . $format->extension());
-            $lock = $this->paths->resolveAudioRenditionPath($trackKey, $name . '.lock');
+            $input = new AudioRenditionInput($trackKey, $signature, $sourcePath, $format, $bitrate, $this->paths->resolveAudioRenditionPath($trackKey, $signature));
+            $admitted = $this->runtime->admit($input);
         } catch (Throwable $error) {
-            $this->fail($context, $error->getMessage());
+            $this->fail($error->getMessage());
         }
-
-        return ['output' => $output, 'partial' => $output . SegmentFileResolver::PARTIAL_SUFFIX, 'lock' => $lock];
-    }
-
-    /**
-     * Whether another encoder holds the rendition's lock right now.
-     */
-    private function isEncoding(string $lockPath): bool
-    {
-        $handle = @fopen($lockPath, 'c');
-        if ($handle === false) {
-            return false;
-        }
-        try {
-            if (flock($handle, LOCK_SH | LOCK_NB)) {
-                flock($handle, LOCK_UN);
-
-                return false;
-            }
-
-            return true;
-        } finally {
-            fclose($handle);
-        }
-    }
-
-    /**
-     * @param array{output: string, partial: string, lock: string} $files
-     * @param array<string, string|int> $context
-     */
-    private function startEncode(string $sourcePath, AudioRenditionFormat $format, int $bitrate, array $files, array $context): string
-    {
-        $key = CpuProcessPool::resultKey(AudioRenditionPoolWorker::JOB_TYPE, bin2hex(random_bytes(8)));
-        $payload = json_encode([
-            'type' => AudioRenditionPoolWorker::JOB_TYPE,
-            'ffmpeg_path' => $this->ffmpegPath,
-            'source_path' => $sourcePath,
-            'output_path' => $files['output'],
-            'lock_path' => $files['lock'],
-            'format' => $format->value,
-            'bitrate' => $bitrate,
-        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
-
-        if ($this->pool->isRunning()) {
-            try {
-                $dispatched = $this->pool->dispatchWithinLimit($payload, $key, AudioRenditionPoolWorker::JOB_TYPE, $this->maxConcurrentEncodes);
-            } catch (Throwable $error) {
-                $this->fail($context, 'the CPU process pool rejected the encode: ' . $error->getMessage());
-            }
-            if (!$dispatched) {
-                throw new AudioRenditionBusyException(sprintf(
-                    'The server already runs %d audio rendition encodes.',
-                    $this->maxConcurrentEncodes,
-                ));
-            }
-
-            return $key;
-        }
-
-        if (Async::inCoroutine()) {
-            // Encoding here would block the server's event loop.
-            $this->fail($context, 'the CPU process pool is not running');
-        }
-
-        try {
-            $this->inlineResults[$key] = ['status' => 'ok', 'data' => $this->inlineWorker->handle($payload)];
-        } catch (Throwable $error) {
-            $this->inlineResults[$key] = ['status' => 'error', 'data' => $error->getMessage()];
-        }
-
-        return $key;
-    }
-
-    /**
-     * Wait until the rendition has audio to send, so an encode that fails at
-     * once is answered with an error instead of an empty stream.
-     *
-     * @param array{output: string, partial: string, lock: string} $files
-     * @param array<string, string|int> $context
-     */
-    private function awaitFirstBytes(array $files, ?string &$jobKey, array $context): void
-    {
         $deadline = microtime(true) + $this->startTimeoutSeconds;
-        while (true) {
-            clearstatcache(true, $files['output']);
-            clearstatcache(true, $files['partial']);
-            if (is_file($files['output']) || (int) @filesize($files['partial']) > 0) {
-                return;
+        do {
+            $current = $this->runtime->find($admitted->key) ?? $admitted;
+            if ($current->state === 'failed') {
+                $this->fail($current->error ?? 'the encoder failed');
             }
-
-            if ($jobKey !== null) {
-                $result = $this->takeResult($jobKey);
-                if ($result !== null) {
-                    $jobKey = null;
-                    if ($result['status'] !== 'ok') {
-                        $this->fail($context, $result['data']);
-                    }
-                    // Without a rendition the job found another encode holding
-                    // the lock and left the work to it: follow that encode.
-                    continue;
+            if ($current->state === 'complete') {
+                $this->validatePaths($current);
+                if (!is_file((string) $current->finalPath)) {
+                    $this->fail('the completed rendition is missing');
                 }
-            } elseif (!$this->isEncoding($files['lock'])) {
-                clearstatcache(true, $files['output']);
-                if (!is_file($files['output'])) {
-                    $this->fail($context, 'the running encode stopped without a rendition');
-                }
-
-                return;
+                return AudioRendition::complete($format, (string) $current->finalPath);
             }
-
+            if ($current->state === 'running') {
+                if (!$current->ownershipLive) {
+                    $this->fail('the audio encoder lost ownership');
+                }
+                $this->validatePaths($current);
+                clearstatcache(true, (string) $current->partialPath);
+                clearstatcache(true, (string) $current->finalPath);
+                if ((int) @filesize((string) $current->partialPath) > 0 || (int) @filesize((string) $current->finalPath) > 0) {
+                    return AudioRendition::progressive($format, $this->follow($current));
+                }
+            }
             if (microtime(true) >= $deadline) {
-                $this->fail($context, 'the encode did not start in time');
+                $this->fail('the encode did not start in time');
             }
             Async::sleep($this->pollIntervalSeconds);
-        }
+        } while (true);
     }
 
-    /**
-     * Stream the rendition from its first byte while the encoder writes it.
-     *
-     * An encode that stops before the rendition is complete raises
-     * AudioRenditionFailedException, so the response is cut as a transfer
-     * error instead of ending as if the track were over.
-     *
-     * @param array{output: string, partial: string, lock: string} $files
-     * @param array<string, string|int> $context
-     * @return Generator<int, string>
-     * @throws AudioRenditionFailedException
-     */
-    private function follow(array $files, ?string $jobKey, array $context): Generator
+    /** @return Generator<int, string> */
+    private function follow(AudioRenditionRuntimeSnapshot $pinned): Generator
     {
         $handle = null;
-        $failure = null;
         try {
             while (true) {
+                $current = $this->runtime->find($pinned->key);
+                if ($current === null || $current->generation !== $pinned->generation
+                    || $current->partialPath !== $pinned->partialPath || $current->finalPath !== $pinned->finalPath
+                    || !in_array($current->state, ['running', 'complete'], true)
+                    || ($current->state !== 'complete' && !$current->ownershipLive)
+                ) {
+                    $this->fail('the audio rendition generation stopped or lost ownership');
+                }
+                $this->validatePaths($current);
                 if ($handle === null) {
-                    clearstatcache(true, $files['output']);
-                    $path = is_file($files['output']) ? $files['output'] : $files['partial'];
-                    // The partial file can be renamed between the check and the open.
-                    $handle = @fopen($path, 'rb') ?: null;
+                    // Rename may happen between either open; both names refer to this generation.
+                    $handle = @fopen((string) $pinned->partialPath, 'rb') ?: @fopen((string) $pinned->finalPath, 'rb') ?: null;
                 }
                 if ($handle !== null) {
                     $chunk = fread($handle, self::CHUNK_BYTES);
-                    if ($chunk !== false && $chunk !== '') {
+                    if ($chunk === false) {
+                        $this->fail('the audio rendition cannot be read');
+                    }
+                    if ($chunk !== '') {
                         yield $chunk;
                         continue;
                     }
-                    // Clear the end-of-file flag so bytes written later are read.
                     fseek($handle, 0, SEEK_CUR);
                 }
-
-                clearstatcache(true, $files['output']);
-                if (is_file($files['output'])) {
+                if ($current->state === 'complete') {
                     if ($handle === null) {
-                        continue;
+                        $this->fail('the completed rendition is missing');
                     }
-                    // Complete: the encoder exited before the rename, so this is the end.
-                    $rest = stream_get_contents($handle);
-                    if ($rest !== false && $rest !== '') {
-                        yield $rest;
-                    }
-
                     return;
                 }
-                if (!$this->isEncoding($files['lock'])) {
-                    clearstatcache(true, $files['output']);
-                    if (is_file($files['output'])) {
-                        continue;
-                    }
-                    $failure = 'the encode stopped before the rendition was complete';
-
-                    break;
-                }
-
                 Async::sleep($this->pollIntervalSeconds);
             }
         } finally {
             if ($handle !== null) {
                 fclose($handle);
             }
-            $result = $jobKey === null ? null : $this->awaitResult($jobKey);
-            if ($result !== null && $result['status'] !== 'ok') {
-                $failure = $result['data'];
-            }
-            if ($failure !== null) {
-                $this->logFailure($context, $failure);
-            }
         }
-
-        // Only a stopped encode leaves the loop; a complete rendition returns from it.
-        throw new AudioRenditionFailedException('Audio transcoding failed: ' . $failure);
     }
 
-    /**
-     * Collect this request's pool result so it does not linger in the pool's
-     * result store. The encoder publishes it right after releasing its lock.
-     *
-     * @return array{data: string, status: string}|null
-     */
-    private function awaitResult(string $jobKey): ?array
+    private function validatePaths(AudioRenditionRuntimeSnapshot $runtime): void
     {
-        $deadline = microtime(true) + self::RESULT_GRACE_SECONDS;
-        while (($result = $this->takeResult($jobKey)) === null && microtime(true) < $deadline) {
-            Async::sleep($this->pollIntervalSeconds);
+        $final = $runtime->generationDirectory() . '/' . $runtime->input->sourceSignature;
+        if ($runtime->finalPath !== $final || $runtime->partialPath !== $final . SegmentFileResolver::PARTIAL_SUFFIX) {
+            $this->fail('the accepted rendition paths are invalid');
         }
-
-        return $result;
+        try {
+            $this->paths->resolvePath($final);
+            $this->paths->resolvePath($final . SegmentFileResolver::PARTIAL_SUFFIX);
+        } catch (Throwable $error) {
+            $this->fail($error->getMessage());
+        }
     }
 
-    /** @return array{data: string, status: string}|null */
-    private function takeResult(string $jobKey): ?array
+    private function fail(string $reason): never
     {
-        if (isset($this->inlineResults[$jobKey])) {
-            $result = $this->inlineResults[$jobKey];
-            unset($this->inlineResults[$jobKey]);
-
-            return $result;
-        }
-
-        return $this->pool->readResult($jobKey);
-    }
-
-    /** @param array<string, string|int> $context */
-    private function fail(array $context, string $reason): never
-    {
-        $this->logFailure($context, $reason);
-
+        $this->logger->error('Audio rendition failed: {reason}', ['reason' => $reason]);
         throw new AudioRenditionFailedException('Audio transcoding failed: ' . $reason);
-    }
-
-    /** @param array<string, string|int> $context */
-    private function logFailure(array $context, string $reason): void
-    {
-        $this->logger->error('Audio rendition of track {track} as {format} at {bitrate} bps failed: {reason}', $context + ['reason' => $reason]);
     }
 }

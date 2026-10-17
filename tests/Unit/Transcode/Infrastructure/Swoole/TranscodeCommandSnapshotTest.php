@@ -20,9 +20,7 @@ use PHPUnit\Framework\TestCase;
  * @covers \App\Transcode\Infrastructure\FFmpeg\SegmentEncoder
  * @covers \App\Transcode\Domain\ValueObject\EncoderProfile
  *
- * Validates the full pipeline: EncoderProfile → payload fields → FFmpeg command string
- * for each accelerator family, asserting correct hwaccel flags, decoder flags, and
- * video filter chains without requiring actual FFmpeg or hardware.
+ * Verifies encoder profiles and video filters without requiring hardware.
  */
 final class TranscodeCommandSnapshotTest extends TestCase
 {
@@ -87,77 +85,6 @@ final class TranscodeCommandSnapshotTest extends TestCase
         // Original immutable
         $this->assertSame('', $profile->decoder);
     }
-
-    //
-    // FFmpeg command string assembly (mirrors TranscodePoolWorker template)
-    //
-
-    public function testSoftwareCommandHasNoHwaccelBeforeInput(): void
-    {
-        $cmd = $this->buildSegmentCommand(EncoderProfile::software());
-
-        $this->assertDoesNotMatchRegularExpression('/-y\s+-hwaccel/', $cmd);
-        $this->assertMatchesRegularExpression('/-y\s+-ss/', $cmd);
-    }
-
-    public function testNvencCommandInsertsHwaccelBeforeInput(): void
-    {
-        $profile = EncoderProfile::fromEncoderName('hevc_nvenc');
-        $cmd = $this->buildSegmentCommand($profile);
-
-        $this->assertMatchesRegularExpression('/-hwaccel cuda.*-i\s/', $cmd);
-        $this->assertStringContainsString('-c:v hevc_nvenc', $cmd);
-    }
-
-    public function testNvencCommandWithH264SourceInsertsCuvidDecoder(): void
-    {
-        $profile = EncoderProfile::fromEncoderName('hevc_nvenc')->withDecoderForSource('h264');
-        $cmd = $this->buildSegmentCommand($profile);
-
-        $this->assertMatchesRegularExpression('/-hwaccel cuda.*-c:v h264_cuvid.*-i\s/', $cmd);
-    }
-
-    public function testVaapiCommandInsertsDeviceFlag(): void
-    {
-        $profile = EncoderProfile::fromEncoderName('hevc_vaapi', '/dev/dri/renderD128');
-        $cmd = $this->buildSegmentCommand($profile);
-
-        $this->assertMatchesRegularExpression('/-hwaccel vaapi.*-hwaccel_device.*-i\s/', $cmd);
-        $this->assertStringContainsString('-c:v hevc_vaapi', $cmd);
-    }
-
-    public function testQsvCommandInsertsQsvHwaccel(): void
-    {
-        $profile = EncoderProfile::fromEncoderName('hevc_qsv', '/dev/dri/renderD128');
-        $cmd = $this->buildSegmentCommand($profile);
-
-        $this->assertMatchesRegularExpression('/-hwaccel qsv.*-i\s/', $cmd);
-    }
-
-    //
-    // Init segment command (mirrors TranscodePoolWorker::encodeInitSegment template)
-    //
-
-    public function testInitSegmentCommandSoftware(): void
-    {
-        $cmd = $this->buildInitSegmentCommand(EncoderProfile::software());
-
-        $this->assertDoesNotMatchRegularExpression('/-y\s+-hwaccel/', $cmd);
-        $this->assertMatchesRegularExpression('/-y\s+-i\s/', $cmd);
-        $this->assertStringContainsString('-an', $cmd);
-    }
-
-    public function testInitSegmentCommandNvenc(): void
-    {
-        $profile = EncoderProfile::fromEncoderName('hevc_nvenc');
-        $cmd = $this->buildInitSegmentCommand($profile);
-
-        $this->assertMatchesRegularExpression('/-hwaccel cuda.*-i\s/', $cmd);
-    }
-
-    //
-    // Video filter chain tests per accelerator
-    //
 
     public function testSoftwareFiltersUseScaleAndYadif(): void
     {
@@ -272,75 +199,6 @@ final class TranscodeCommandSnapshotTest extends TestCase
     // Helpers
     //
 
-    /**
-     * Build the FFmpeg segment command string (mirrors TranscodePoolWorker::encodeSegment template).
-     */
-    private function buildSegmentCommand(EncoderProfile $profile): string
-    {
-        $hwAccelFlags = $profile->hwaccelInputFlags();
-        $decoderFlags = $profile->decoderFlags();
-        $encoderFlags = VideoProcessingRules::codecFlags($profile->encoder);
-
-        $filterArg = function (string $flag, string $filter): string {
-            if ($filter === '') {
-                return '';
-            }
-
-            return sprintf('-%s %s', $flag, escapeshellarg($filter));
-        };
-
-        return sprintf(
-            '%s -y %s%s -ss %.6f -t %.6f -i %s'
-            . ' %s'
-            . ' -b:v %d -maxrate %d -bufsize %d'
-            . ' %s %s'
-            . ' -movflags +frag_keyframe+separate_moof+default_base_moof'
-            . ' -f mp4 %s',
-            '/usr/local/bin/ffmpeg',
-            $hwAccelFlags !== '' ? $hwAccelFlags . ' ' : '',
-            $decoderFlags !== '' ? $decoderFlags . ' ' : '',
-            0.0,
-            6.0,
-            escapeshellarg('/tmp/test.mkv'),
-            $encoderFlags,
-            5_000_000,
-            7_500_000,
-            10_000_000,
-            $filterArg('vf', 'scale=1920:1080'),
-            $filterArg('af', ''),
-            escapeshellarg('/tmp/out/seg_0.mp4'),
-        );
-    }
-
-    /**
-     * Build the FFmpeg init segment command string (mirrors TranscodePoolWorker::encodeInitSegment template).
-     */
-    private function buildInitSegmentCommand(EncoderProfile $profile): string
-    {
-        $hwAccelFlags = $profile->hwaccelInputFlags();
-        $decoderFlags = $profile->decoderFlags();
-        $encoderFlags = VideoProcessingRules::initSegmentFlags($profile->encoder);
-
-        return sprintf(
-            '%s -y %s%s -i %s %s'
-            . ' -b:v %d -maxrate %d -bufsize %d'
-            . ' -movflags +frag_keyframe+separate_moof+default_base_moof'
-            . ' -an -f mp4 %s',
-            '/usr/local/bin/ffmpeg',
-            $hwAccelFlags !== '' ? $hwAccelFlags . ' ' : '',
-            $decoderFlags !== '' ? $decoderFlags . ' ' : '',
-            escapeshellarg('/tmp/test.mkv'),
-            $encoderFlags,
-            5_000_000,
-            7_500_000,
-            10_000_000,
-            escapeshellarg('/tmp/out/init.mp4'),
-        );
-    }
-
-    /**
-     * Build video filters using VideoFilterBuilder.
-     */
     private function buildVideoFilters(HardwareAccelerator $accel, VideoProbeResult $probe): string
     {
         $builder = VideoFilterBuilder::create($accel);

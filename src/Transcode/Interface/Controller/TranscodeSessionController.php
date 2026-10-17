@@ -273,7 +273,7 @@ final class TranscodeSessionController
 
     #[OA\Post(
         path: '/api/transcode/sessions/{publicId}/position',
-        summary: 'Update transcode session playback position (seek signal)',
+        summary: 'Update transcode session playback position',
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\MediaType(
@@ -281,7 +281,9 @@ final class TranscodeSessionController
                 schema: new OA\Schema(
                     properties: [
                         new OA\Property(property: 'position', type: 'number', format: 'float'),
-                        new OA\Property(property: 'action', type: 'string', enum: ['seek', 'pause', 'resume']),
+                        new OA\Property(property: 'action', type: 'string', enum: ['seek', 'pause', 'resume', 'progress']),
+                        new OA\Property(property: 'generation', type: 'integer', minimum: 1, description: 'Required for progress; generation currently attached by the player'),
+                        new OA\Property(property: 'revision', type: 'integer', minimum: 1, description: 'Required for progress; desired revision currently attached by the player'),
                     ],
                 ),
             ),
@@ -307,9 +309,14 @@ final class TranscodeSessionController
         }
         $position = $payload['position'] ?? null;
         $action = $payload['action'] ?? 'seek';
+        $generation = $payload['generation'] ?? null;
+        $revision = $payload['revision'] ?? null;
         if ((!is_int($position) && !is_float($position)) || !is_finite((float) $position) || $position < 0
-            || !in_array($action, ['seek', 'pause', 'resume'], true)) {
-            return $this->errorResponse('Position must be a nonnegative number and action must be seek, pause, or resume.', 422);
+            || !in_array($action, ['seek', 'pause', 'resume', 'progress'], true)) {
+            return $this->errorResponse('Position must be a nonnegative number and action must be seek, pause, resume, or progress.', 422);
+        }
+        if ($action === 'progress' && (!is_int($generation) || $generation < 1 || !is_int($revision) || $revision < 1)) {
+            return $this->errorResponse('Progress requires the current positive generation and revision.', 422);
         }
         $position = (float) $position;
 
@@ -317,6 +324,8 @@ final class TranscodeSessionController
             sessionId: $sessionId,
             position: $position,
             action: $action,
+            expectedGeneration: $action === 'progress' ? $generation : null,
+            expectedRevision: $action === 'progress' ? $revision : null,
         ));
 
         return $this->successResponse(['status' => 'ok', 'position' => $position]);

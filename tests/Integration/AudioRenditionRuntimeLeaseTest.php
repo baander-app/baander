@@ -71,8 +71,87 @@ final class AudioRenditionRuntimeLeaseTest extends TestCase
         self::assertFalse($runtime->complete($old));
         self::assertFalse($runtime->fail($old, 'stale failure'));
         self::assertFalse($runtime->defer($old));
+        self::assertFalse($runtime->withOwnership($old, static function (): void {
+            self::fail('A stale owner cannot enter the publication callback.');
+        }));
         self::assertTrue($runtime->renew($new));
         self::assertNotSame($directory, $new->runtime->generationDirectory());
+    }
+
+    public function testFinalRenameAndCompletionShareTheLiveOwnershipTransaction(): void
+    {
+        $directory = sys_get_temp_dir() . '/baander-audio-publication-' . bin2hex(random_bytes(8));
+        $runtime = new AudioRenditionRuntime($this->first);
+        $input = new AudioRenditionInput('baander-track', 'track-123.opus', '/fixture/source.flac', AudioRenditionFormat::Opus, 128000, $directory);
+        $row = $runtime->admit($input);
+        $claim = $runtime->claim($row->key, $this->worker());
+        self::assertNotNull($claim);
+        $generationDirectory = $claim->runtime->generationDirectory();
+        mkdir($generationDirectory, 0700, true);
+        $partial = $generationDirectory . '/audio.partial';
+        $final = $generationDirectory . '/audio.opus';
+        file_put_contents($partial, 'fixture audio');
+        try {
+            self::assertTrue($runtime->start($claim, $partial, $final));
+            self::assertTrue($runtime->withOwnership($claim, function () use ($runtime, $claim, $partial, $final): void {
+                self::assertTrue(rename($partial, $final));
+                self::assertTrue($runtime->complete($claim));
+                self::assertSame('running', $this->second->fetchOne('SELECT state FROM audio_rendition_runtime'), 'Terminal publication is not visible before the ownership transaction commits.');
+            }));
+            self::assertFileExists($final);
+            self::assertSame('complete', $runtime->find($row->key)->state);
+            self::assertSame($final, $runtime->find($row->key)->finalPath);
+            self::assertFalse($runtime->withOwnership($claim, static function (): void {
+                self::fail('Completed output cannot be published again.');
+            }));
+        } finally {
+            foreach ([$partial, $final] as $path) {
+                if (is_file($path)) {
+                    unlink($path);
+                }
+            }
+            rmdir($generationDirectory);
+            rmdir($directory);
+        }
+    }
+
+    public function testCallbackFailureRollsBackTerminalPublicationAndPropagates(): void
+    {
+        $runtime = new AudioRenditionRuntime($this->first);
+        $row = $runtime->admit($this->input());
+        $claim = $runtime->claim($row->key, $this->worker());
+        self::assertNotNull($claim);
+        $directory = $claim->runtime->generationDirectory();
+        self::assertTrue($runtime->start($claim, $directory . '/audio.partial', $directory . '/audio.opus'));
+        $failure = new \RuntimeException('Publication callback failed');
+        $caught = null;
+        try {
+            $runtime->withOwnership($claim, static function () use ($runtime, $claim, $failure): void {
+                self::assertTrue($runtime->complete($claim));
+                throw $failure;
+            });
+        } catch (\RuntimeException $error) {
+            $caught = $error;
+        }
+        self::assertSame($failure, $caught);
+        self::assertSame('running', $runtime->find($row->key)->state);
+        self::assertTrue($runtime->renew($claim));
+    }
+
+    public function testLeaseLossDuringCallbackRollsBackTerminalPublication(): void
+    {
+        $runtime = new AudioRenditionRuntime($this->first);
+        $row = $runtime->admit($this->input());
+        $claim = $runtime->claim($row->key, $this->worker());
+        self::assertNotNull($claim);
+        $directory = $claim->runtime->generationDirectory();
+        self::assertTrue($runtime->start($claim, $directory . '/audio.partial', $directory . '/audio.opus'));
+        self::assertFalse($runtime->withOwnership($claim, function () use ($runtime, $claim): void {
+            self::assertTrue($runtime->complete($claim));
+            $this->first->executeStatement("UPDATE audio_rendition_runtime SET lease_expires_at = clock_timestamp() - interval '1 second'");
+        }));
+        self::assertSame('running', $this->second->fetchOne('SELECT state FROM audio_rendition_runtime'));
+        self::assertSame(0, $this->first->getTransactionNestingLevel());
     }
 
     public function testPublicationOutsideTheGenerationDirectoryIsRejected(): void

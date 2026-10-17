@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Transcode\Infrastructure\Auth;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\Port\PlaybackPortInterface;
 use App\Transcode\Domain\ValueObject\AudioProfile;
@@ -49,6 +50,21 @@ final readonly class AuthorizedPlayback implements PlaybackPortInterface
         $videoId = $this->connection->fetchOne('SELECT video_id FROM transcode_jobs WHERE id = :jobId', ['jobId' => $jobId->toString()]);
 
         return is_string($videoId) ? Uuid::fromString($videoId) : null;
+    }
+
+    public function findSession(Uuid $videoId, PublicId $jobId): ?PublicId
+    {
+        $user = $this->security->getUser();
+        if ($user === null || !method_exists($user, 'getId')) {
+            throw new AccessDeniedException('Authentication required.');
+        }
+        $value = $this->connection->fetchOne(
+            'SELECT s.public_id FROM transcode_sessions s JOIN transcode_jobs j ON j.id = s.job_id'
+            .' JOIN transcode_runtime_state r ON r.session_id = s.id AND r.job_id = j.id'
+            .' WHERE s.user_id = :user AND s.video_id = :video AND j.public_id = :job',
+            ['user' => $user->getId(), 'video' => $videoId->toString(), 'job' => $jobId->toString()],
+        );
+        return is_string($value) ? PublicId::fromString($value) : null;
     }
 
     public function start(Uuid $videoId): void

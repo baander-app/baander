@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Transcode\Infrastructure\FFmpeg;
 
 use App\Transcode\Domain\ValueObject\EncoderProfile;
-use App\Transcode\Infrastructure\FFmpeg\HardwareCapabilitiesProber;
+use App\Transcode\Infrastructure\FFmpeg\WorkerEncoderCapabilitiesSnapshotStore;
 use App\Transcode\Infrastructure\FFmpeg\HardwareTranscodeDiagnostics;
 use PHPUnit\Framework\TestCase;
 
@@ -13,12 +13,7 @@ final class HardwareTranscodeDiagnosticsTest extends TestCase
 {
     public function testSoftwareReportPreservesUnscaledSampleBitratesAndFlags(): void
     {
-        $prober = $this->createMock(HardwareCapabilitiesProber::class);
-        $prober->expects(self::once())->method('boot')->with();
-        $prober->expects(self::once())->method('getProfile')->willReturn(EncoderProfile::software());
-        $prober->expects(self::once())->method('getBitrateMultiplier')->willReturn(1.25);
-
-        $report = new HardwareTranscodeDiagnostics($prober)->inspect();
+        $report = $this->inspectPublishedProfile(EncoderProfile::software(), 1.25);
 
         self::assertFalse($report->isHardware);
         self::assertSame('none', $report->accelerator);
@@ -39,12 +34,7 @@ final class HardwareTranscodeDiagnosticsTest extends TestCase
 
     public function testHardwareReportResolvesDecodersForEachSourceAndForSampleCommands(): void
     {
-        $prober = $this->createMock(HardwareCapabilitiesProber::class);
-        $prober->expects(self::once())->method('boot')->with();
-        $prober->expects(self::once())->method('getProfile')->willReturn(EncoderProfile::fromEncoderName('hevc_nvenc'));
-        $prober->expects(self::once())->method('getBitrateMultiplier')->willReturn(1.0);
-
-        $report = new HardwareTranscodeDiagnostics($prober)->inspect();
+        $report = $this->inspectPublishedProfile(EncoderProfile::fromEncoderName('hevc_nvenc'), 1.0);
 
         self::assertTrue($report->isHardware);
         self::assertSame('nvenc', $report->accelerator);
@@ -60,5 +50,27 @@ final class HardwareTranscodeDiagnosticsTest extends TestCase
             'vp9' => 'vp9_cuvid',
         ], $report->sourceDecoders);
         self::assertStringStartsWith('/usr/local/bin/ffmpeg -y -hwaccel cuda -hwaccel_output_format cuda -c:v h264_cuvid  -i source.mkv -c:v hevc_nvenc', $report->sampleCommands['720p']);
+    }
+
+    public function testMissingWorkerEvidenceIsUnavailable(): void
+    {
+        $store = new WorkerEncoderCapabilitiesSnapshotStore(sys_get_temp_dir() . '/absent-baander-' . bin2hex(random_bytes(8)));
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Worker encoder capabilities are unavailable');
+        new HardwareTranscodeDiagnostics($store)->inspect();
+    }
+
+    private function inspectPublishedProfile(EncoderProfile $profile, float $multiplier): \App\Transcode\Application\DTO\HardwareTranscodeDiagnosticsReport
+    {
+        $directory = sys_get_temp_dir() . '/baander-diagnostics-' . bin2hex(random_bytes(8));
+        $path = $directory . '/capabilities.json';
+        $store = new WorkerEncoderCapabilitiesSnapshotStore($path);
+        try {
+            $store->publish($profile, $multiplier, 'worker-baander');
+            return new HardwareTranscodeDiagnostics($store)->inspect();
+        } finally {
+            unlink($path);
+            rmdir($directory);
+        }
     }
 }

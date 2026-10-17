@@ -12,6 +12,8 @@ final readonly class HardwareTranscodeDiagnosticsReport
      * @param list<array{string, string, string, string, string, string}> $acceleratorReference
      */
     public function __construct(
+        public string $workerIdentity,
+        public int $observedAt,
         public string $accelerator,
         public string $encoder,
         public string $decoder,

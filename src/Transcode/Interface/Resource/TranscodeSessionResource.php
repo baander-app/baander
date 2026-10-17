@@ -20,6 +20,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'audioProfile', type: 'object', description: 'Audio profile configuration'),
         new OA\Property(property: 'currentSegmentIndex', type: 'integer', nullable: true, description: 'Current segment being processed'),
         new OA\Property(property: 'wallClockOffset', type: 'number', nullable: true, description: 'Wall clock offset'),
+        new OA\Property(property: 'playback', type: 'object', nullable: true, description: 'Current durable execution generation, readiness, desired position/status and signed manifest URL'),
         new OA\Property(property: 'metrics', type: 'object', nullable: true, description: 'Session metrics'),
         new OA\Property(property: 'createdAt', type: 'string', format: 'date-time', description: 'Creation timestamp'),
         new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time', description: 'Last update timestamp'),
@@ -34,7 +35,7 @@ final class TranscodeSessionResource extends AbstractResource
         return array_intersect_key($source->toArray(), array_flip([
             'publicId', 'userId', 'jobId', 'videoId',
             'state', 'priority', 'audioProfile', 'currentSegmentIndex',
-            'wallClockOffset', 'metrics', 'createdAt', 'updatedAt',
+            'wallClockOffset', 'metrics', 'createdAt', 'updatedAt', 'playback',
         ]));
     }
 }

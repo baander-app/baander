@@ -18380,7 +18380,7 @@
         },
         "/api/debug/workers": {
             "get": {
-                "summary": "Server worker pool stats (HTTP, task, transcoding)",
+                "summary": "Server HTTP and user worker statistics",
                 "operationId": "get_debug_workers",
                 "responses": {
                     "200": {
@@ -18404,6 +18404,16 @@
                 "summary": "Get HLS master playlist",
                 "operationId": "get_stream_master_manifest",
                 "parameters": [
+                    {
+                        "name": "generation",
+                        "in": "query",
+                        "description": "Pinned media execution generation",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
                     {
                         "name": "videoId",
                         "in": "path",
@@ -18436,6 +18446,16 @@
                 "operationId": "get_stream_media_manifest",
                 "parameters": [
                     {
+                        "name": "generation",
+                        "in": "query",
+                        "description": "Pinned media execution generation",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
                         "name": "jobPublicId",
                         "in": "path",
                         "description": "Job public ID",
@@ -18463,6 +18483,16 @@
                 "summary": "Get DASH manifest for a video",
                 "operationId": "get_stream_dash_manifest",
                 "parameters": [
+                    {
+                        "name": "generation",
+                        "in": "query",
+                        "description": "Pinned media execution generation",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
                     {
                         "name": "videoId",
                         "in": "path",
@@ -18549,6 +18579,16 @@
                 "operationId": "get_stream_subtitle_manifest",
                 "parameters": [
                     {
+                        "name": "generation",
+                        "in": "query",
+                        "description": "Pinned media execution generation",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
                         "name": "jobPublicId",
                         "in": "path",
                         "description": "Job public ID",
@@ -18589,6 +18629,16 @@
                 "summary": "Get CMAF init segment",
                 "operationId": "get_stream_segment_init_segment",
                 "parameters": [
+                    {
+                        "name": "generation",
+                        "in": "query",
+                        "description": "Pinned media execution generation",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
                     {
                         "name": "jobPublicId",
                         "in": "path",
@@ -18688,6 +18738,16 @@
                 "operationId": "get_stream_segment_segment",
                 "parameters": [
                     {
+                        "name": "generation",
+                        "in": "query",
+                        "description": "Pinned media execution generation",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
+                    {
                         "name": "jobPublicId",
                         "in": "path",
                         "description": "Job public ID",
@@ -18758,6 +18818,16 @@
                 "summary": "Get subtitle segment (WebVTT)",
                 "operationId": "get_stream_segment_subtitle_segment",
                 "parameters": [
+                    {
+                        "name": "generation",
+                        "in": "query",
+                        "description": "Pinned media execution generation",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    },
                     {
                         "name": "jobPublicId",
                         "in": "path",
@@ -18844,6 +18914,10 @@
                                     "expiresInSeconds": {
                                         "type": "integer",
                                         "example": 86400
+                                    },
+                                    "refresh": {
+                                        "description": "Read current playback state without creating another admission",
+                                        "type": "boolean"
                                     }
                                 },
                                 "type": "object"
@@ -18866,6 +18940,36 @@
                                         },
                                         "exp": {
                                             "type": "integer"
+                                        },
+                                        "generation": {
+                                            "type": "integer"
+                                        },
+                                        "jobId": {
+                                            "type": "string"
+                                        },
+                                        "sessionId": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "revision": {
+                                            "type": "integer"
+                                        },
+                                        "ready": {
+                                            "type": "boolean"
+                                        },
+                                        "position": {
+                                            "type": "number"
+                                        },
+                                        "status": {
+                                            "type": "string"
+                                        },
+                                        "startTime": {
+                                            "type": "number",
+                                            "nullable": true
+                                        },
+                                        "duration": {
+                                            "type": "number",
+                                            "nullable": true
                                         }
                                     },
                                     "type": "object"
@@ -19509,7 +19613,7 @@
                 "tags": [
                     "Transcode"
                 ],
-                "summary": "Update transcode session playback position (seek signal)",
+                "summary": "Update transcode session playback position",
                 "operationId": "post_transcode_session_position",
                 "parameters": [
                     {
@@ -19540,8 +19644,19 @@
                                         "enum": [
                                             "seek",
                                             "pause",
-                                            "resume"
+                                            "resume",
+                                            "progress"
                                         ]
+                                    },
+                                    "generation": {
+                                        "description": "Required for progress; generation currently attached by the player",
+                                        "type": "integer",
+                                        "minimum": 1
+                                    },
+                                    "revision": {
+                                        "description": "Required for progress; desired revision currently attached by the player",
+                                        "type": "integer",
+                                        "minimum": 1
                                     }
                                 },
                                 "type": "object"
@@ -26239,6 +26354,11 @@
                     "wallClockOffset": {
                         "description": "Wall clock offset",
                         "type": "number",
+                        "nullable": true
+                    },
+                    "playback": {
+                        "description": "Current durable execution generation, readiness, desired position/status and signed manifest URL",
+                        "type": "object",
                         "nullable": true
                     },
                     "metrics": {

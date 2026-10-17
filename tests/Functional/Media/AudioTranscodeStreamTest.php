@@ -8,15 +8,7 @@ use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Shared\Application\Port\SystemSettingStoreInterface;
 use App\Transcode\Application\Settings\TranscodeSettingDefinitions;
 
-/**
- * On-the-fly audio transcoding through the track stream endpoint, with transcoding on.
- *
- * Uses the real encoder (FFmpeg) against a generated FLAC source. Outside the
- * Swoole runtime the encode runs in-process before the response streams, so
- * these tests prove the formats, caching and access rules; the progressive
- * hand-off while an encode is still running is covered by the unit tests and
- * the Swoole runtime check.
- */
+/** HTTP codec, completed-cache range and access coverage through the worker executor. */
 final class AudioTranscodeStreamTest extends AudioStreamTestCase
 {
     protected function setUp(): void
@@ -33,7 +25,7 @@ final class AudioTranscodeStreamTest extends AudioStreamTestCase
         $first = $this->request($admin, 'format=mp3&bitrate=192000');
         self::assertSame(200, $first->getStatusCode());
         self::assertSame('audio/mpeg', $first->getHeader('Content-Type'));
-        self::assertSame('none', $first->getHeader('Accept-Ranges'));
+        self::assertSame('bytes', $first->getHeader('Accept-Ranges'));
         $body = $first->getContent();
         self::assertNotSame('', $body);
         self::assertSame(['codec' => 'mp3', 'bitrate' => 192000], $this->probe($body));

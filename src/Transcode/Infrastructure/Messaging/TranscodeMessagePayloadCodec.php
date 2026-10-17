@@ -11,7 +11,7 @@ use App\Transcode\Application\Command\UpdateTranscodePositionCommand;
 final readonly class TranscodeMessagePayloadCodec implements MessagePayloadCodecInterface
 {
     private const array FIELDS = [
-        'transcode.update_position' => ['session_id', 'position', 'action', 'request_id'],
+        'transcode.update_position' => ['session_id', 'position', 'action', 'request_id', 'expected_generation', 'expected_revision'],
     ];
 
     public function types(): array
@@ -29,7 +29,7 @@ final readonly class TranscodeMessagePayloadCodec implements MessagePayloadCodec
     public function encode(object $message): array
     {
         return match (true) {
-            $message instanceof UpdateTranscodePositionCommand => [$message->sessionId->toString(), $message->position, $message->action, $message->requestId],
+            $message instanceof UpdateTranscodePositionCommand => [$message->sessionId->toString(), $message->position, $message->action, $message->requestId, $message->expectedGeneration, $message->expectedRevision],
             default => throw new \InvalidArgumentException('Unsupported message type.'),
         };
     }
@@ -37,7 +37,7 @@ final readonly class TranscodeMessagePayloadCodec implements MessagePayloadCodec
     public function decode(string $type, array $p): object
     {
         return match ($type) {
-            'transcode.update_position' => new UpdateTranscodePositionCommand(Uuid::fromString($p['session_id']), $p['position'], $p['action'], $p['request_id']),
+            'transcode.update_position' => new UpdateTranscodePositionCommand(Uuid::fromString($p['session_id']), $p['position'], $p['action'], $p['request_id'], $p['expected_generation'], $p['expected_revision']),
             default => throw new \InvalidArgumentException('Unsupported message type.'),
         };
     }

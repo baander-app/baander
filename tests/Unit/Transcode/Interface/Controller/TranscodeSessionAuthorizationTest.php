@@ -106,9 +106,13 @@ final class TranscodeSessionAuthorizationTest extends TestCase
         $port->method('findByUuid')->willReturn($session);
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($status === 200 ? $this->once() : $this->never())->method('dispatch')
-            ->willReturnCallback(static function (UpdateTranscodePositionCommand $command): Envelope {
+            ->willReturnCallback(static function (UpdateTranscodePositionCommand $command) use ($json): Envelope {
                 self::assertSame(12.5, $command->position);
-                self::assertSame('seek', $command->action);
+                self::assertSame(json_decode($json, true)['action'], $command->action);
+                if ($command->action === 'progress') {
+                    self::assertSame(3, $command->expectedGeneration);
+                    self::assertSame(5, $command->expectedRevision);
+                }
                 return new Envelope($command);
             });
         $controller = new TranscodeSessionController($security, $bus, $port, $this->createStub(PlaybackPortInterface::class), new \App\Tests\Unit\Transcode\PublicViewStub());
@@ -120,6 +124,9 @@ final class TranscodeSessionAuthorizationTest extends TestCase
     public static function positions(): iterable
     {
         yield ['{"position":12.5,"action":"seek"}', 200];
+        yield ['{"position":12.5,"action":"progress","generation":3,"revision":5}', 200];
+        yield ['{"position":12.5,"action":"progress"}', 422];
+        yield ['{"position":12.5,"action":"progress","generation":0,"revision":5}', 422];
         yield ['{"position":-1}', 422];
         yield ['{"position":"12"}', 422];
         yield ['{"position":1,"action":"delete"}', 422];

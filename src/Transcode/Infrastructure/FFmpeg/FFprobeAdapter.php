@@ -24,7 +24,7 @@ final class FFprobeAdapter
         }
 
         $result = ProcessExecutor::exec(
-            sprintf('%s -v quiet -print_format json -show_format -show_streams %s', $this->ffprobePath, escapeshellarg($sourcePath)),
+            [$this->ffprobePath, '-threads', '2', '-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', $sourcePath],
             60,
         );
 

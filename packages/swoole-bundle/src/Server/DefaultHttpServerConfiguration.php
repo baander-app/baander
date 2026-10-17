@@ -716,6 +716,10 @@ final class DefaultHttpServerConfiguration implements HttpServerConfiguration
 
                 break;
             case self::SWOOLE_HTTP_SERVER_CONFIG_TASK_WORKER_COUNT:
+                Assertion::integer($value, sprintf('Setting "%s" must be an integer.', $key));
+                Assertion::greaterOrEqualThan($value, 0, 'Task worker count cannot be negative, "%s" provided.');
+
+                break;
             case self::SWOOLE_HTTP_SERVER_CONFIG_REACTOR_COUNT:
             case self::SWOOLE_HTTP_SERVER_CONFIG_WORKER_COUNT:
                 Assertion::integer($value, sprintf('Setting "%s" must be an integer.', $key));

@@ -166,11 +166,6 @@ services:
     App\Shared\Application\Port\ServerDiagnosticsInterface:
         alias: App\Shared\Infrastructure\Swoole\ServerDiagnostics
 
-    App\Shared\Infrastructure\Swoole\Control\Operation\DebugWorkersOperation:
-        arguments:
-            $cpuProcessPoolLocator: !service_locator
-                App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool: '@App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool'
-
     # --- OpenTelemetry ---
     # The span buffer's table is created before the workers fork, so every worker
     # shares it. Spans always reach it; app.otel.enabled only adds OTLP export.
@@ -196,16 +191,12 @@ services:
         # by the Symfony profiler, breaking _wdt requests.
         autoconfigure: false
         arguments:
-            $cpuProcessPoolLocator: !service_locator
-                App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool: '@App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool'
             $serverConfiguration: '@?SwooleBundle\SwooleBundle\Server\HttpServerConfiguration'
         tags:
             - { name: 'data_collector', template: 'profiler/Collector/swoole.html.twig', id: 'swoole' }
 
     App\Shared\Infrastructure\Swoole\SwooleWorkerEventSubscriber:
         arguments:
-            $cpuProcessPoolLocator: !service_locator
-                App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool: '@App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool'
             $logger: '@monolog.logger.swoole'
         tags:
             - { name: 'kernel.event_subscriber' }
@@ -860,18 +851,6 @@ services:
             $spotifyClientSecret: '%env(SPOTIFY_CLIENT_SECRET)%'
             $tasteDiveApiKey: '%env(TASTE_DIVE_API_KEY)%'
 
-    # --- Swoole Task Job Monitor ---
-    # Decorates the Swoole TaskHandler to track async jobs in job_monitors.
-    # Priority -5 places it just inside SwooleServerTaskTransportHandler (-10),
-    # so it wraps bus->dispatch() but stays outside the service-reset handlers.
-    App\Shared\Infrastructure\Messenger\SwooleTaskJobMonitorDecorator:
-        decorates: 'SwooleBundle\SwooleBundle\Bridge\Symfony\Messenger\SwooleServerTaskTransportHandler'
-        arguments:
-            $decorated: '@.inner'
-            $transportSerializer: '@messenger.default_serializer'
-
-    # --- Messenger Middleware ---
-    # Bus middleware is listed in config/packages/messenger.yaml; nothing reads a middleware tag.
     App\Shared\Infrastructure\Messenger\ResultStampMiddleware:
         arguments:
             $stampClasses: '%app.result_stamp_classes%'
@@ -927,10 +906,6 @@ services:
     Nelmio\ApiDocBundle\Render\RenderOpenApi:
         alias: nelmio_api_doc.render_docs
 
-    # SeekSignalBroker channel stats — one of potentially many channel providers
-    App\Transcode\Infrastructure\Swoole\SeekSignalChannelStats:
-        tags: [ 'app.swoole.channel_provider' ]
-
     # --- Transcode Domain Repository Aliases ---
     App\Transcode\Domain\Repository\TranscodeJobRepositoryInterface:
         alias: App\Transcode\Infrastructure\Doctrine\Repository\TranscodeJobRepository
@@ -955,7 +930,7 @@ services:
     App\Transcode\Application\Port\TranscodeJobPortInterface:
         alias: App\Transcode\Infrastructure\Transcode\TranscodeJobService
     App\Transcode\Application\Port\TranscodeStreamingPortInterface:
-        alias: App\Transcode\Infrastructure\Transcode\CachedTranscodeStreamingService
+        alias: App\Transcode\Infrastructure\QoL\QualityFilteringStreamingDecorator
 
     App\Transcode\Application\Port\StreamAuthPortInterface:
         alias: App\Transcode\Infrastructure\Auth\HmacStreamAuthAdapter
@@ -994,11 +969,6 @@ services:
             $appDomain: '%env(APP_DOMAIN)%'
 
     # --- Transcode Cache Decorator ---
-    App\Transcode\Infrastructure\Transcode\CachedTranscodeStreamingService:
-        decorates: App\Transcode\Infrastructure\QoL\QualityFilteringStreamingDecorator
-        arguments:
-            $inner: '@.inner'
-
     App\Transcode\Application\Port\TranscodeExecutionOwnershipPort:
         alias: App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState
 
@@ -1029,11 +999,9 @@ services:
             $preferredEncoder: '%env(VIDEO_ENCODER)%'
             $hwAccelDevice: '%env(HW_ACCEL_DEVICE)%'
             $bitrateMultiplier: '%env(float:HW_BITRATE_MULTIPLIER)%'
-        tags:
-            - { name: 'swoole_bundle.bootable_service' }
 
     App\Transcode\Domain\ValueObject\EncoderProfile:
-        factory: ['@App\Transcode\Infrastructure\FFmpeg\HardwareCapabilitiesProber', 'getProfile']
+        alias: worker.media.encoder_profile
 
     App\Transcode\Infrastructure\HLS\FMP4SegmentWriter:
         arguments:
@@ -1055,36 +1023,15 @@ services:
             - { name: 'swoole.cpu_pool_worker' }
 
     # --- Track audio renditions (on-the-fly audio transcoding) ---
-    App\Transcode\Infrastructure\Swoole\AudioRenditionPoolWorker:
-        tags:
-            - { name: 'swoole.cpu_pool_worker' }
-
     App\Transcode\Infrastructure\Transcode\AudioRenditionCache:
         arguments:
-            $pool: '@App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool'
-            $ffmpegPath: '%env(FFMPEG_PATH)%'
-            # Rendition encodes queued or running at once, server-wide. Keep it
-            # below the CPU pool's $workerCount (6) so video transcodes and
-            # recommendation jobs always have workers left.
-            $maxConcurrentEncodes: 4
+            $runtime: '@App\Transcode\Application\Port\AudioRenditionRuntimePort'
 
     App\Transcode\Application\Port\AudioRenditionPortInterface:
         alias: App\Transcode\Infrastructure\Transcode\AudioRenditionCache
 
     App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool:
-        arguments:
-            $handlers: !tagged_iterator 'swoole.cpu_pool_worker'
-            # Enough workers for 360p + 720p + 1080p video tiers plus audio
-            # and a little headroom for concurrent on-the-fly transcode jobs.
-            $workerCount: 6
-            $resultTableSize: 8192
-        tags:
-            - { name: 'swoole_bundle.bootable_service' }
-
-    App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPoolShutdownHandler:
-        arguments:
-            $cpuProcessPoolLocator: !service_locator
-                App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool: '@App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool'
+        alias: worker.media.cpu_pool
 
     # --- Web server drain (stop and restart) ---
     # One drain path from onBeforeShutdown; see DrainCoordinator.
@@ -1099,8 +1046,6 @@ services:
                 - '%kernel.project_dir%/bin/console'
                 - 'app:server:drain:watch'
                 - '--no-interaction'
-            $cpuProcessPoolLocator: !service_locator
-                App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool: '@App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool'
 
     SwooleBundle\SwooleBundle\Server\LifecycleHandler\ServerBeforeShutdownHandler:
         alias: App\Shared\Infrastructure\Swoole\Drain\DrainCoordinator
@@ -1119,43 +1064,25 @@ services:
 
     App\Transcode\Infrastructure\Swoole\TranscodeProcessPool:
         arguments:
-            $pool: '@App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool'
-            $encoderProfile: '@App\Transcode\Domain\ValueObject\EncoderProfile'
+            $pool: '@worker.media.cpu_pool'
 
     App\Transcode\Infrastructure\FFmpeg\SegmentEncoder:
         arguments:
             $encoderProfile: '@App\Transcode\Domain\ValueObject\EncoderProfile'
             $bitrateMultiplier: '%env(float:HW_BITRATE_MULTIPLIER)%'
 
-    App\Transcode\Infrastructure\Swoole\JobStatePersister:
-        arguments:
-            $stateDir: '%kernel.project_dir%/var/transcode_state'
-            $jsonEncoder: '@json_encoder'
-
     App\Transcode\Infrastructure\Swoole\TranscodeSessionSubscriber:
         arguments:
             $videoRepository: '@App\Catalog\Domain\Repository\VideoRepositoryInterface'
-            $jsonEncoder: '@json_encoder'
-            $streamManager: '@App\Transcode\Infrastructure\Swoole\TranscodeStreamManager'
-            $availability: '@App\Transcode\Application\Port\SegmentAvailabilityInterface'
+            $controlOwnership: '@worker.media.control_runtime'
             $renewalTimer: '@App\Transcode\Infrastructure\Swoole\LoopLockRenewalTimerInterface'
 
     App\Transcode\Application\Port\TranscodeLoopStarterInterface:
         alias: App\Transcode\Infrastructure\Swoole\TranscodeSessionSubscriber
 
     # Distributed lock ensuring only one worker runs a transcode encoding loop.
-    App\Transcode\Application\Port\TranscodeLoopLockInterface:
-        alias: App\Transcode\Infrastructure\Redis\RedisTranscodeLoopLock
-
-    App\Transcode\Infrastructure\Redis\RedisTranscodeLoopLock: ~
-
     App\Transcode\Infrastructure\Swoole\LoopLockRenewalTimerInterface:
         alias: App\Transcode\Infrastructure\Swoole\SwooleLoopLockRenewalTimer
-
-    App\Transcode\Infrastructure\Swoole\GracefulRestartHandler:
-        arguments:
-            $processPool: '@App\Transcode\Infrastructure\Swoole\TranscodeProcessPool'
-            $eventDispatcher: '@event_dispatcher'
 
     App\Transcode\Infrastructure\Swoole\PlaybackPositionChangedListener:
         tags:
@@ -1334,6 +1261,74 @@ services:
         alias: App\Scheduler\Infrastructure\Process\SchedulerWorkerRunner
         public: true
 
+    worker.media.encoder_profile:
+        class: App\Transcode\Domain\ValueObject\EncoderProfile
+        synthetic: true
+        autoconfigure: false
+        public: true
+
+    worker.media.cpu_pool:
+        class: App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool
+        synthetic: true
+        autoconfigure: false
+        public: true
+
+    App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPoolInterface:
+        alias: worker.media.cpu_pool
+
+    App\Transcode\Infrastructure\Transcode\AudioRenditionExecutor:
+        arguments:
+            $ffmpegPath: '%env(FFMPEG_PATH)%'
+
+    worker.media.control_connection:
+        class: Doctrine\DBAL\Connection
+        factory: ['App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory', 'fromUrl']
+        arguments: ['%env(DATABASE_URL)%']
+
+    worker.media.control_runtime:
+        class: App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState
+        arguments:
+            $connection: '@worker.media.control_connection'
+
+    App\Transcode\Infrastructure\FFmpeg\WorkerEncoderCapabilitiesSnapshotStore:
+        arguments:
+            $snapshotPath: '%env(CONVERT_STORAGE_PATH)%/worker-encoder-capabilities.json'
+
+    App\Transcode\Infrastructure\Worker\DoctrineMediaWorkerAuthority:
+        factory: ['App\Transcode\Infrastructure\Worker\DoctrineMediaWorkerAuthority', 'fromDsn']
+        arguments: ['%env(DATABASE_URL)%']
+
+    App\Transcode\Infrastructure\Worker\MediaWorkerAuthorityInterface:
+        alias: App\Transcode\Infrastructure\Worker\DoctrineMediaWorkerAuthority
+
+    worker.media.runner:
+        alias: App\Transcode\Infrastructure\Worker\MediaWorkerRunner
+        public: true
+
+    worker.media.hardware_prober:
+        alias: App\Transcode\Infrastructure\FFmpeg\HardwareCapabilitiesProber
+        public: true
+
+    worker.media.encoder_snapshot_store:
+        alias: App\Transcode\Infrastructure\FFmpeg\WorkerEncoderCapabilitiesSnapshotStore
+        public: true
+
+    worker.media.video_runtime:
+        alias: App\Transcode\Application\Port\TranscodeExecutionOwnershipPort
+        public: true
+
+    worker.media.audio_runtime:
+        alias: App\Transcode\Application\Port\AudioRenditionRuntimePort
+        public: true
+
+    worker.media.audio_executor:
+        alias: App\Transcode\Infrastructure\Transcode\AudioRenditionExecutor
+        public: true
+
+    transcode.loop_starter:
+        alias: App\Transcode\Application\Port\TranscodeLoopStarterInterface
+        public: true
+
     # --- Discovery Domain Repository Aliases ---
     App\Discovery\Domain\Repository\ServerInstanceRepositoryInterface:
         alias: App\Discovery\Infrastructure\Doctrine\Repository\ServerInstanceRepository
@@ -1397,19 +1392,14 @@ services:
     App\QoL\Domain\Port\AlgorithmProfileStoreInterface:
         alias: App\QoL\Infrastructure\Swoole\AlgorithmProfileTable
 
-    # QoL CPU/GPU sampler — Bootable (Table created before fork)
+    # Sampling is never started by the web runtime.
     App\QoL\Infrastructure\Swoole\CpuGpuSampler:
-        tags:
-            - { name: 'swoole_bundle.bootable_service' }
+        autoconfigure: false
 
     App\QoL\Infrastructure\Swoole\QoLWorkerStartupSubscriber:
+        autoconfigure: false
         arguments:
-            $services: !service_locator
-                App\QoL\Infrastructure\Swoole\CpuGpuSampler: '@App\QoL\Infrastructure\Swoole\CpuGpuSampler'
-                App\QoL\Infrastructure\Swoole\MidStreamMonitor: '@App\QoL\Infrastructure\Swoole\MidStreamMonitor'
-                App\QoL\Infrastructure\Swoole\LearningDataPersister: '@App\QoL\Infrastructure\Swoole\LearningDataPersister'
-                App\QoL\Domain\Service\StreamGovernor: '@App\QoL\Domain\Service\StreamGovernor'
-                App\QoL\Application\Port\EncoderProfileFingerprintPortInterface: '@App\QoL\Application\Port\EncoderProfileFingerprintPortInterface'
+            $services: !service_locator {}
 
     App\QoL\Application\Port\EncoderProfileFingerprintPortInterface:
         alias: App\Transcode\Infrastructure\FFmpeg\EncoderProfileFingerprintAdapter
@@ -1424,9 +1414,7 @@ services:
     App\QoL\Domain\Port\QualityLadderPortInterface:
         alias: App\Transcode\Infrastructure\Transcode\QualityLadderPort
 
-    # QoL stream admission and completion. Transcode Infrastructure listeners call it:
-    # StreamAdmissionListener (TranscodeSessionAttached, priority 1, synchronous veto)
-    # and StreamCompletionListener (TranscodeJobCompleted, CoWrapper offload).
+    # Worker-owned stream admission and completion.
     App\QoL\Application\Port\StreamAdmissionPortInterface:
         alias: App\QoL\Infrastructure\StreamAdmissionService
 
@@ -1441,7 +1429,7 @@ services:
     App\QoL\Infrastructure\Transcode\BudgetGuard: ~
 
     # Transcode manifest filtering by QoL's allowed tiers
-    # Chain: alias → CachedTranscodeStreamingService → QualityFilteringStreamingDecorator → TranscodeStreamingService
+    # Chain: alias → QualityFilteringStreamingDecorator → TranscodeStreamingService
     App\Transcode\Infrastructure\QoL\QualityFilteringStreamingDecorator:
         decorates: App\Transcode\Infrastructure\Transcode\TranscodeStreamingService
         decoration_priority: -1

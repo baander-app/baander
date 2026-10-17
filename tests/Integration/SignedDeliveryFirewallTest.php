@@ -144,16 +144,17 @@ final class SignedDeliveryFirewallTest extends TestCase
             $this->refusal = [$throwable::class, $throwable->getMessage()];
         }, 64);
         $this->streaming = $this->createMock(TranscodeStreamingPortInterface::class);
-        $this->streaming->method('getMasterManifest')->willReturn('#EXTM3U');
+        $this->streaming->method('getMasterManifest')->willReturn("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1\n/media");
         $this->streaming->method('getMediaManifest')->willReturn('#EXTINF:10');
-        $this->streaming->method('getDashManifest')->willReturn('<MPD/>');
-        $this->streaming->method('getSubtitleManifest')->willReturn('#EXTM3U');
+        $this->streaming->method('getDashManifest')->willReturn('<MPD><Representation/></MPD>');
+        $this->streaming->method('getSubtitleManifest')->willReturn('#EXTINF:6');
         $this->streaming->method('getInitSegmentPath')->willReturn(self::$directory . '/segment.mp4');
         $this->streaming->method('getSubtitleSegmentPath')->willReturn(self::$directory . '/segment.mp4');
         $this->streaming->method('resolveVideoSegmentAvailability')->willReturn([
             'jobId' => new Uuid(), 'tierKey' => '720p', 'path' => self::$directory . '/segment.mp4',
         ]);
         $this->streaming->method('getQualityLadderForVideo')->willReturn([]);
+        $this->streaming->method('getPlaybackState')->willReturnCallback(fn () => ['jobId' => $this->jobId->toString(), 'generation' => 3, 'revision' => 1, 'ready' => true, 'position' => 0.0, 'status' => 'running']);
         $availability = $this->createStub(SegmentAvailabilityInterface::class);
         $availability->method('isReady')->willReturn(self::$directory . '/segment.mp4');
         $this->bus = $this->createMock(MessageBusInterface::class);
@@ -206,7 +207,7 @@ final class SignedDeliveryFirewallTest extends TestCase
         $jwt = $actor === 'anonymous' ? null : $this->actorToken($actor);
         $this->bus->expects($this->never())->method('dispatch');
         foreach (self::STREAMING_METHODS as $method) {
-            $this->streaming->expects($this->once())->method($method);
+            $this->streaming->expects(in_array($method, ['getInitSegmentPath', 'getSubtitleSegmentPath', 'resolveVideoSegmentAvailability'], true) ? $this->atLeastOnce() : $this->once())->method($method);
         }
         foreach ($this->deliveryPaths() as $route => $path) {
             $response = $this->request('GET', $this->signedUrl($path), $jwt);
@@ -302,7 +303,7 @@ final class SignedDeliveryFirewallTest extends TestCase
         [$jwt, $proof, $scheme, $headers] = $this->credential($condition, proof: false);
         $sends = $condition === 'reused proof' ? 2 : 1;
         $this->bus->expects($this->never())->method('dispatch');
-        $this->streaming->expects($status === 200 ? $this->exactly($sends) : $this->never())
+        $this->streaming->expects($status === 200 ? ($route === 'stream_master_manifest' ? $this->exactly($sends) : $this->atLeast($sends)) : $this->never())
             ->method($route === 'stream_master_manifest' ? 'getMasterManifest' : 'resolveVideoSegmentAvailability');
         $url = $this->signedUrl($this->deliveryPaths()[$route]);
         if ($condition === 'reused proof') {
@@ -322,7 +323,7 @@ final class SignedDeliveryFirewallTest extends TestCase
         $foreign = $this->createVideoLibrary(false);
         $this->bus->expects($this->never())->method('dispatch');
         foreach (self::STREAMING_METHODS as $method) {
-            $this->streaming->expects($this->once())->method($method);
+            $this->streaming->expects(in_array($method, ['getInitSegmentPath', 'getSubtitleSegmentPath', 'resolveVideoSegmentAvailability'], true) ? $this->atLeastOnce() : $this->once())->method($method);
         }
         foreach (SignedDeliveryRoutes::paths($foreign->getPublicId()->toString(), $this->jobId->toString()) as $route => $path) {
             $response = $this->request('GET', $this->signedUrl($path));
@@ -670,6 +671,7 @@ final class SignedDeliveryFirewallTest extends TestCase
     /** Signs a delivery path and records the signature for the credential scan. */
     private function signedUrl(string $path, int $expiresInSeconds = 86400, ?HmacStreamAuthAdapter $signer = null): string
     {
+        $path .= (str_contains($path, '?') ? '&' : '?').'generation=3';
         $signed = ($signer ?? $this->signer)->signUrl($path, $expiresInSeconds);
         $this->signatures[] = $signed['sig'];
 

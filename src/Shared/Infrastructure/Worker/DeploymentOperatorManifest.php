@@ -79,8 +79,8 @@ final readonly class DeploymentOperatorManifest
             }
             $mounts[] = get_object_vars($mount);
         }
-        if (self::integer($fields, 'pidsLimit') < 8 + $configuration->mediaDescendantPids) {
-            throw new InvalidArgumentException('Worker PID ceiling must reserve management, four roles, scheduled console and admitted media descendants.');
+        if (self::integer($fields, 'pidsLimit') < max(128, 8 + $configuration->mediaDescendantPids)) {
+            throw new InvalidArgumentException('Worker PID ceiling must reserve at least 128 tasks for management, four roles, media descendants and bounded encoder threads.');
         }
         return new self(
             $configuration, self::string($fields, 'daemonId'), self::string($fields, 'imageId'),

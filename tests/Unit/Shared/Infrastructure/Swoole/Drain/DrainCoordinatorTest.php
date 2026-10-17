@@ -20,17 +20,10 @@ final class DrainCoordinatorTest extends TestCase
         use App\Shared\Infrastructure\Swoole\Drain\DrainShutdownHandler;
         use App\Shared\Infrastructure\Swoole\Drain\DrainStateTable;
         use App\Shared\Infrastructure\Swoole\Drain\SwooleHooks;
-        use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool;
-        use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPoolShutdownHandler;
-        use App\Shared\Infrastructure\Swoole\ProcessPool\ProcessPoolWorkerInterface;
         use App\Shared\Infrastructure\Swoole\SwooleWorkerEventBuffer;
         use App\Shared\Infrastructure\Swoole\SwooleWorkerEventSubscriber;
         use SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\EventDispatcher\EventDispatchingServerStartHandler;
         use SwooleBundle\SwooleBundle\Server\Configurator\WithServerBeforeShutdownHandler;
-        final class DrainProbeWorker implements ProcessPoolWorkerInterface {
-            public function supportedTypes(): array { return ['probe']; }
-            public function handle(string $payload): string { return 'completed'; }
-        }
         function record(string $event, array $details = []): void {
             fwrite(STDOUT, json_encode(['event' => $event, 'at' => hrtime(true) / 1e9] + $details) . "\n");
         }
@@ -47,23 +40,18 @@ final class DrainCoordinatorTest extends TestCase
             return $count;
         }
         $mode = $argv[4];
-        $pool = new CpuProcessPool([new DrainProbeWorker()], 1, new Psr\Log\NullLogger(), 16, $argv[3]);
-        $pool->boot();
-        foreach ($pool->workerPids() as $pid) { trackPid($pid); }
-        $locator = new Symfony\Component\DependencyInjection\ServiceLocator([CpuProcessPool::class => static fn() => $pool]);
         $state = new DrainStateTable();
         $state->boot();
         $coordinator = new DrainCoordinator(
             new DrainBudget(8),
             $state,
             [PHP_BINARY, $argv[2], $argv[1], 'app:server:drain:watch'],
-            $locator,
         );
-        $subscriber = new SwooleWorkerEventSubscriber(new SwooleWorkerEventBuffer(), $locator);
+        $subscriber = new SwooleWorkerEventSubscriber(new SwooleWorkerEventBuffer());
         $dispatcher = new Symfony\Component\EventDispatcher\EventDispatcher();
         $dispatcher->addSubscriber($subscriber);
         $serverStarted = new EventDispatchingServerStartHandler($dispatcher);
-        $shutdown = new DrainShutdownHandler(new CpuProcessPoolShutdownHandler($locator), $coordinator);
+        $shutdown = new DrainShutdownHandler($coordinator);
         // A stream that never ends: the worker writes until the connection's buffers are full,
         // then keeps trying, as a progressive stream follows a growing file.
         $held = new Swoole\Atomic(0);
@@ -132,12 +120,9 @@ final class DrainCoordinatorTest extends TestCase
             $shutdown->handle($server);
             record('shutdown_end', ['watchdogs' => watchdogs()]);
         });
-        $healthTimer = null;
-        $server->on('start', static function (Swoole\Server $server) use ($serverStarted, $pool, &$healthTimer, $mode, $held): void {
+        $server->on('start', static function (Swoole\Server $server) use ($serverStarted, $mode, $held): void {
             trackPid($server->manager_pid);
             $serverStarted->handle($server);
-            $healthTimer = (new ReflectionProperty($pool, 'healthTimerId'))->getValue($pool);
-            record('health_timer', ['id' => $healthTimer]);
             if ($mode === 'held' || $mode === 'sendfile') {
                 Swoole\Timer::tick(20, static function (int $timer) use ($held, $mode): void {
                     // Give the worker a moment to fill the connection's buffers.
@@ -207,27 +192,22 @@ final class DrainCoordinatorTest extends TestCase
         }
         record('start');
         if (!$server->start()) { throw new RuntimeException('The server did not start'); }
-        record('stopped', [
-            'healthTimerWasSet' => is_int($healthTimer),
-            'healthTimerLeft' => is_int($healthTimer) && Swoole\Timer::exists($healthTimer),
-        ]);
+        record('stopped');
         if (isset($clientPid)) { pcntl_waitpid($clientPid, $status); }
         PHP;
 
-    public function testTwoDrainCallsStartOneDrainAndEndThePoolHealthCheck(): void
+    public function testTwoDrainCallsStartOneDrainWithoutBackgroundExecutors(): void
     {
         [$events, $errors] = $this->scenario('twice');
 
         self::assertSame(1, $events['configured']['max_wait_time']);
         self::assertSame(1, substr_count($errors, 'Web server drain started: deadline 8 s, window 2 s, worker stop wait 1 s.'), $errors);
         self::assertSame(1, substr_count($errors, 'The web server is already draining; this stop request changes nothing.'), $errors);
-        // One window tick and one watchdog; the pool's health check is gone.
+        // One window tick and one watchdog; there are no executor timers.
         self::assertCount(1, $events['handled_twice']['added']);
         self::assertTrue($events['handled_twice']['unchangedBySecondCall']);
         self::assertSame(1, $events['handled_twice']['watchdogs']);
-        self::assertSame([$events['health_timer']['id']], $events['handled_twice']['removed']);
-        self::assertTrue($events['stopped']['healthTimerWasSet']);
-        self::assertFalse($events['stopped']['healthTimerLeft']);
+        self::assertSame([], $events['handled_twice']['removed']);
         // No worker reports drained here, so the window lasts its 2 seconds.
         self::assertMatchesRegularExpression('/^Drain window closed after 2\.\d s, the window passed; reset 0 client connection\(s\)\.$/m', $errors);
         self::assertSame(1, $events['shutdown_start']['watchdogs']);

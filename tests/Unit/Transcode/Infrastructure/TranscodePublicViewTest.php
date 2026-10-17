@@ -11,6 +11,8 @@ use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
 use App\Transcode\Infrastructure\TranscodePublicView;
+use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
+use App\Transcode\Infrastructure\Auth\HmacStreamAuthAdapter;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
 
@@ -29,7 +31,12 @@ final class TranscodePublicViewTest extends TestCase
             'videoId' => $session->getVideoId()->toString(),
         ])->willReturn(['user_id' => $user->toString(), 'job_id' => $job->toString(), 'video_id' => $video->toString()]);
 
-        $view = (new TranscodePublicView($connection))->session($session)->toArray();
+        $streaming = $this->createStub(TranscodeStreamingPortInterface::class);
+        $streaming->method('getPlaybackState')->willReturn(['jobId' => $job->toString(), 'generation' => 8, 'revision' => 4, 'ready' => true, 'position' => 42.0, 'status' => 'paused']);
+        $view = (new TranscodePublicView($connection, $streaming, new HmacStreamAuthAdapter('test-secret')))->session($session)->toArray();
+        self::assertSame(8, $view['playback']['generation']);
+        self::assertSame('paused', $view['playback']['status']);
+        self::assertStringContainsString('generation=8', $view['playback']['manifestUrl']);
 
         self::assertSame($session->getPublicId()->toString(), $view['publicId']);
         self::assertSame($user->toString(), $view['userId']);
@@ -51,7 +58,7 @@ final class TranscodePublicViewTest extends TestCase
             'SELECT public_id FROM videos WHERE id = :id', ['id' => $job->getVideoId()->toString()],
         )->willReturn($video->toString());
 
-        $view = (new TranscodePublicView($connection))->job($job)->toArray();
+        $view = (new TranscodePublicView($connection, $this->createStub(TranscodeStreamingPortInterface::class), new HmacStreamAuthAdapter('test-secret')))->job($job)->toArray();
 
         self::assertSame($video->toString(), $view['videoId']);
         self::assertSame('Could not encode video [internal ID]', $view['failReason']);

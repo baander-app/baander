@@ -20,11 +20,12 @@ final class ProcessExecutor
     /**
      * Execute a command and return stdout, stderr, and exit code.
      *
+     * @param string|list<string> $command
      * @return array{code: int, output: string, error: string}
      */
-    public static function exec(string $command, int $timeoutSeconds = 300): array
+    public static function exec(string|array $command, int $timeoutSeconds = 300): array
     {
-        if (\Swoole\Coroutine::getCid() !== -1) {
+        if (is_string($command) && \Swoole\Coroutine::getCid() !== -1) {
             return self::execInCoroutine($command);
         }
 
@@ -46,9 +47,10 @@ final class ProcessExecutor
     }
 
     /**
+     * @param string|list<string> $command
      * @return array{code: int, output: string, error: string}
      */
-    private static function execWithProcOpen(string $command, int $timeoutSeconds): array
+    private static function execWithProcOpen(string|array $command, int $timeoutSeconds): array
     {
         $descriptors = [
             0 => ['pipe', 'r'],
@@ -59,7 +61,7 @@ final class ProcessExecutor
         $process = proc_open($command, $descriptors, $pipes);
 
         if ($process === false) {
-            throw new RuntimeException('Failed to start process: ' . $command);
+            throw new RuntimeException('Failed to start media process.');
         }
 
         fclose($pipes[0]);
@@ -86,7 +88,7 @@ final class ProcessExecutor
                 fclose($pipes[2]);
                 proc_close($process);
 
-                throw new RuntimeException(sprintf('Process timed out after %d seconds: %s', $timeoutSeconds, $command));
+                throw new RuntimeException(sprintf('Media process timed out after %d seconds.', $timeoutSeconds));
             }
 
             $read = [$pipes[1], $pipes[2]];
@@ -110,6 +112,7 @@ final class ProcessExecutor
 
         fclose($pipes[1]);
         fclose($pipes[2]);
+        proc_close($process);
 
         return [
             'code' => $exitCode,

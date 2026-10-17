@@ -17,6 +17,11 @@ final class TranscodeFileStorage implements TranscodeStoragePortInterface
     ) {
     }
 
+    public function forGeneration(Uuid $videoId, QualityTier $qualityTier, int $generation): self
+    {
+        return new self($this->resolver->forGeneration($videoId, $qualityTier, $generation));
+    }
+
     public function resolveJobDirectory(Uuid $videoId, QualityTier $qualityTier): string
     {
         return $this->resolver->resolveJobDirectory($videoId, $qualityTier);
@@ -64,6 +69,7 @@ final class TranscodeFileStorage implements TranscodeStoragePortInterface
 
     public function deleteDirectory(string $path): void
     {
+        $this->resolver->assertGenerationPath($path);
         $basePath = self::normalizeDeletionPath($this->resolver->getBasePath());
         $path = self::normalizeDeletionPath($path);
         $prefix = rtrim($basePath, '/') . '/';

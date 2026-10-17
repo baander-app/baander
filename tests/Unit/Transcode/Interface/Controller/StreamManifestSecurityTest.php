@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Transcode\Interface\Controller;
 
-use App\Shared\Application\Port\SleeperInterface;
 use App\Catalog\Domain\Model\Video;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
 use App\Shared\Domain\Model\PublicId;
@@ -53,7 +52,7 @@ final class StreamManifestSecurityTest extends TestCase
         $videos = $this->createMock(TranscodePublicViewInterface::class);
         $videos->expects($valid && in_array($method, ['masterManifest', 'dashManifest'], true) ? $this->once() : $this->never())
             ->method('videoId')->with($video->getPublicId())->willReturn($video->getId());
-        $controller = new StreamManifestController($streaming, new SignedStreamRequest($signer), $playback, $this->createStub(SleeperInterface::class), $videos);
+        $controller = new StreamManifestController($streaming, new SignedStreamRequest($signer), $playback, $videos);
         if (!$valid) {
             $this->expectException(AccessDeniedHttpException::class);
         }
@@ -66,22 +65,15 @@ final class StreamManifestSecurityTest extends TestCase
         self::assertSame(200, $response->getStatusCode());
     }
 
-    public function testMediaManifestWaitsThroughTheSleeperUntilSegmentsAreListed(): void
+    public function testUnavailableMediaManifestReturnsWithoutWaitingForAWorker(): void
     {
         $jobId = (new PublicId())->toString();
         $signer = new HmacStreamAuthAdapter('test-secret');
         $streaming = $this->createMock(TranscodeStreamingPortInterface::class);
-        $streaming->expects($this->exactly(2))->method('getMediaManifest')
-            ->willReturnOnConsecutiveCalls('#EXTM3U', "#EXTM3U\n#EXTINF:10");
-        $sleeper = $this->createMock(SleeperInterface::class);
-        $sleeper->expects($this->once())->method('sleep')->with(0.5);
-        $controller = new StreamManifestController($streaming, new SignedStreamRequest($signer), $this->createStub(PlaybackPortInterface::class), $sleeper, $this->createStub(TranscodePublicViewInterface::class));
-
-        $response = $controller->mediaManifest($jobId, Request::create($signer->signUrl("/api/transcode/$jobId/media.m3u8")['url']));
-        ob_start();
-        $response->sendContent();
-
-        self::assertSame("#EXTM3U\n#EXTINF:10", ob_get_clean());
+        $streaming->expects($this->once())->method('getMediaManifest')->with(self::anything(), 'streaming_stereo', 3)->willReturn('#EXTM3U');
+        $controller = new StreamManifestController($streaming, new SignedStreamRequest($signer), $this->createStub(PlaybackPortInterface::class), $this->createStub(TranscodePublicViewInterface::class));
+        $response = $controller->mediaManifest($jobId, Request::create($signer->signUrl("/api/transcode/$jobId/media.m3u8?generation=3")['url']));
+        self::assertSame(503, $response->getStatusCode());
     }
 
     /** @return iterable<string, array{string, string}> */

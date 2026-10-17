@@ -9,6 +9,8 @@ use App\Transcode\Domain\ValueObject\QualityTier;
 
 interface TranscodeStoragePortInterface
 {
+    public function forGeneration(Uuid $videoId, QualityTier $qualityTier, int $generation): self;
+
     public function resolveJobDirectory(Uuid $videoId, QualityTier $qualityTier): string;
 
     public function resolveInitSegmentPath(Uuid $videoId, QualityTier $qualityTier): string;

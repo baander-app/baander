@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Transcode\Infrastructure\Auth;
 
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Infrastructure\Auth\AuthorizedPlayback;
 use Doctrine\DBAL\DriverManager;
@@ -35,7 +36,7 @@ final class AuthorizedPlaybackTest extends TestCase
         }
         $connection->insert('user_library_access', ['user_id' => $userId->toString(), 'library_id' => $actor === 'member' ? 'library' : 'another-library']);
         $security = $this->createStub(Security::class);
-        $security->method('getUser')->willReturn($actor === 'anonymous' ? null : new SecurityUser($userId->toString(), 'test@example.test', ''));
+        $security->method('getUser')->willReturn($actor === 'anonymous' ? null : new SecurityUser($userId->toString(), 'test@baander.app', ''));
         $security->method('isGranted')->willReturn($actor === 'admin');
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($allowed ? $this->exactly(3) : $this->never())->method('dispatch')
@@ -64,6 +65,31 @@ final class AuthorizedPlaybackTest extends TestCase
         yield ['anonymous', true, false];
         yield ['admin', false, false];
         yield ['member', false, false];
+    }
+
+    public function testControlsExposeOnlyTheActorsCurrentRuntimeSession(): void
+    {
+        $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
+        $connection->executeStatement('CREATE TABLE transcode_jobs (id TEXT PRIMARY KEY, public_id TEXT)');
+        $connection->executeStatement('CREATE TABLE transcode_sessions (id TEXT PRIMARY KEY, public_id TEXT, user_id TEXT, video_id TEXT, job_id TEXT)');
+        $connection->executeStatement('CREATE TABLE transcode_runtime_state (job_id TEXT PRIMARY KEY, session_id TEXT)');
+        $actor = new Uuid(); $video = new Uuid(); $job = new PublicId(); $session = new PublicId();
+        $security = $this->createStub(Security::class);
+        $security->method('getUser')->willReturn(new SecurityUser($actor->toString(), 'viewer@baander.app', ''));
+        $connection->insert('transcode_jobs', ['id' => 'job', 'public_id' => $job->toString()]);
+        $connection->insert('transcode_sessions', ['id' => 'session', 'public_id' => $session->toString(), 'user_id' => $actor->toString(), 'video_id' => $video->toString(), 'job_id' => 'job']);
+        $connection->insert('transcode_runtime_state', ['job_id' => 'job', 'session_id' => 'session']);
+        $playback = new AuthorizedPlayback($security, $connection, $this->createStub(MessageBusInterface::class));
+        try {
+            self::assertSame($session->toString(), $playback->findSession($video, $job)?->toString());
+            $connection->update('transcode_sessions', ['user_id' => (new Uuid())->toString()], ['id' => 'session']);
+            self::assertNull($playback->findSession($video, $job));
+            $connection->update('transcode_sessions', ['user_id' => $actor->toString()], ['id' => 'session']);
+            $connection->update('transcode_runtime_state', ['session_id' => 'retired-session'], ['job_id' => 'job']);
+            self::assertNull($playback->findSession($video, $job));
+        } finally {
+            $connection->close();
+        }
     }
 
     public function testFindsTheVideoATranscodeJobEncodes(): void

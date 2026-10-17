@@ -35,6 +35,11 @@ enum AudioRenditionFormat: string
         };
     }
 
+    public function sourceSignature(int $bitrate, int $modified, int $size): string
+    {
+        return sprintf('%s-%dk-%s.%s', $this->value, intdiv($bitrate, 1000), hash('xxh64', sprintf('%d:%d', $modified, $size)), $this->extension());
+    }
+
     /**
      * The bitrates (bits per second) a rendition is encoded at. Every request
      * snaps to one of these, so a track has at most this many renditions per

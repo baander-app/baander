@@ -42,6 +42,34 @@ final class TranscodeStorageBoundaryTest extends TestCase
         $this->removeFixture($this->fixture);
     }
 
+    public function testGenerationScopeContainsAllVideoOutputsAndLeavesBaseUnchanged(): void
+    {
+        $tier = QualityTier::p720();
+        $scoped = $this->storage->forGeneration($this->videoId, $tier, 7);
+        $directory = $this->root . '/' . $this->videoId->toString() . '/' . $tier->name . '/generation-7';
+        self::assertSame($directory, $scoped->resolveJobDirectory($this->videoId, $tier));
+        self::assertSame($directory . '/init.mp4', $scoped->resolveInitSegmentPath($this->videoId, $tier));
+        self::assertStringStartsWith($directory . '/', $scoped->resolveAudioSegmentPath($this->videoId, 'en', 2));
+        self::assertStringStartsWith($directory . '/', $scoped->resolveSubtitleSegmentPath($this->videoId, 'en', 'full'));
+        self::assertSame($this->root, $scoped->getBasePath());
+        self::assertNotSame($directory, $this->storage->resolveJobDirectory($this->videoId, $tier));
+    }
+
+    public function testGenerationScopeRejectsAnotherVideoIdentity(): void
+    {
+        $scoped = $this->storage->forGeneration($this->videoId, QualityTier::p720(), 1);
+        $this->expectException(InvalidArgumentException::class);
+        $scoped->resolveAudioDirectory(Uuid::generate(), 'en');
+    }
+
+    public function testGenerationScopeRejectsDirectAccessToRetiredFiles(): void
+    {
+        $scoped = new TranscodeFileStorage($this->resolver->forGeneration($this->videoId, QualityTier::p720(), 2));
+        $old = $this->storage->resolveJobDirectory($this->videoId, QualityTier::p720()) . '/generation-1/init.mp4';
+        $this->expectException(InvalidArgumentException::class);
+        $scoped->exists($old);
+    }
+
     /** @return iterable<string, array{string, string}> */
     public static function invalidComponents(): iterable
     {

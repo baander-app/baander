@@ -12,15 +12,15 @@ use App\Transcode\Domain\ValueObject\QualityTier;
 
 final readonly class HardwareTranscodeDiagnostics implements HardwareTranscodeDiagnosticsInterface
 {
-    public function __construct(private HardwareCapabilitiesProber $prober)
+    public function __construct(private WorkerEncoderCapabilitiesSnapshotStore $snapshots)
     {
     }
 
     public function inspect(): HardwareTranscodeDiagnosticsReport
     {
-        $this->prober->boot();
-        $profile = $this->prober->getProfile();
-        $multiplier = $this->prober->getBitrateMultiplier();
+        $snapshot = $this->snapshots->read() ?? throw new \RuntimeException('Worker encoder capabilities are unavailable');
+        $profile = $snapshot->profile;
+        $multiplier = $snapshot->bitrateMultiplier;
 
         $sourceDecoders = [];
         if ($profile->isHardware()) {
@@ -69,6 +69,8 @@ final readonly class HardwareTranscodeDiagnostics implements HardwareTranscodeDi
         }
 
         return new HardwareTranscodeDiagnosticsReport(
+            workerIdentity: $snapshot->workerIdentity,
+            observedAt: $snapshot->observedAt,
             accelerator: $profile->accelerator->value,
             encoder: $profile->encoder,
             decoder: $profile->decoder,

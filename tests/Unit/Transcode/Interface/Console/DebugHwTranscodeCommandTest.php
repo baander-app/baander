@@ -18,6 +18,8 @@ final class DebugHwTranscodeCommandTest extends TestCase
     public function testRendersReportAndOnlyShowsHardwareDecoderSectionWhenEnabled(bool $hardware): void
     {
         $report = new HardwareTranscodeDiagnosticsReport(
+            workerIdentity: 'worker-baander',
+            observedAt: 1792238400,
             accelerator: $hardware ? 'nvenc' : 'none',
             encoder: $hardware ? 'hevc_nvenc' : 'libx265',
             decoder: '',
@@ -40,7 +42,7 @@ final class DebugHwTranscodeCommandTest extends TestCase
 
         self::assertSame(Command::SUCCESS, $tester->execute([]));
         $output = $tester->getDisplay();
-        foreach (['Resolved Encoder Profile', 'FFmpeg Input Flags', 'Sample FFmpeg Commands', 'Hardware Accelerator Reference', '(per-source)', '(auto)', '1.25', '(none — resolved per-source at encode time)', '720p (init segment, h264 source):', '/usr/local/bin/ffmpeg -y -i source.mkv'] as $text) {
+        foreach (['Last worker observation: worker-baander', 'not a live measurement', 'Resolved Encoder Profile', 'FFmpeg Input Flags', 'Sample FFmpeg Commands', 'Hardware Accelerator Reference', '(per-source)', '(auto)', '1.25', '(none — resolved per-source at encode time)', '720p (init segment, h264 source):', '/usr/local/bin/ffmpeg -y -i source.mkv'] as $text) {
             self::assertStringContainsString($text, $output);
         }
         if ($hardware) {
@@ -51,6 +53,16 @@ final class DebugHwTranscodeCommandTest extends TestCase
             self::assertStringNotContainsString('Decoder Resolution Per Source Codec', $output);
             self::assertStringContainsString('No (software)', $output);
         }
+    }
+
+    public function testUnavailableWorkerEvidenceIsReportedWithoutAProfile(): void
+    {
+        $diagnostics = $this->createStub(HardwareTranscodeDiagnosticsInterface::class);
+        $diagnostics->method('inspect')->willThrowException(new \RuntimeException('Worker encoder capabilities are unavailable'));
+        $tester = new CommandTester(new DebugHwTranscodeCommand($diagnostics));
+        self::assertSame(Command::FAILURE, $tester->execute([]));
+        self::assertStringContainsString('Worker encoder capabilities are unavailable', $tester->getDisplay());
+        self::assertStringNotContainsString('Resolved Encoder Profile', $tester->getDisplay());
     }
 
     /** @return iterable<string, array{bool}> */

@@ -14,7 +14,7 @@ use Psr\Log\LoggerInterface;
 /**
  * Decorator that filters manifests to the tiers QoL currently allows.
  *
- * Chain position: alias → CachedTranscodeStreamingService → THIS → TranscodeStreamingService
+ * Chain position: alias → THIS → TranscodeStreamingService
  * decoration_priority: -1 (closer to core than cache).
  *
  * Only filters getMasterManifest() and getDashManifest() — all other methods
@@ -30,9 +30,14 @@ final readonly class QualityFilteringStreamingDecorator implements TranscodeStre
     {
     }
 
-    public function getMasterManifest(Uuid $videoId): string
+    public function getPlaybackState(Uuid $videoId, ?string $jobPublicId = null): ?array
     {
-        $manifest = $this->inner->getMasterManifest($videoId);
+        return $this->inner->getPlaybackState($videoId, $jobPublicId);
+    }
+
+    public function getMasterManifest(Uuid $videoId, int $generation, ?string $jobPublicId = null): string
+    {
+        $manifest = $this->inner->getMasterManifest($videoId, $generation, $jobPublicId);
 
         return $this->filterHlsManifest($manifest);
     }
@@ -92,39 +97,39 @@ final readonly class QualityFilteringStreamingDecorator implements TranscodeStre
         return implode("\n", $filtered);
     }
 
-    public function getMediaManifest(PublicId $jobPublicId, string $audioProfileName): string
+    public function getMediaManifest(PublicId $jobPublicId, string $audioProfileName, int $generation): string
     {
-        return $this->inner->getMediaManifest($jobPublicId, $audioProfileName);
+        return $this->inner->getMediaManifest($jobPublicId, $audioProfileName, $generation);
     }
 
-    public function getSegment(PublicId $jobPublicId, int $segmentIndex): ?string
+    public function getSegment(PublicId $jobPublicId, int $segmentIndex, int $generation): ?string
     {
-        return $this->inner->getSegment($jobPublicId, $segmentIndex);
+        return $this->inner->getSegment($jobPublicId, $segmentIndex, $generation);
     }
 
-    public function getInitSegment(PublicId $jobPublicId): ?string
+    public function getInitSegment(PublicId $jobPublicId, int $generation): ?string
     {
-        return $this->inner->getInitSegment($jobPublicId);
+        return $this->inner->getInitSegment($jobPublicId, $generation);
     }
 
-    public function getSegmentPath(PublicId $jobPublicId, int $segmentIndex): ?string
+    public function getSegmentPath(PublicId $jobPublicId, int $segmentIndex, int $generation): ?string
     {
-        return $this->inner->getSegmentPath($jobPublicId, $segmentIndex);
+        return $this->inner->getSegmentPath($jobPublicId, $segmentIndex, $generation);
     }
 
-    public function resolveVideoSegmentAvailability(PublicId $jobPublicId, int $segmentIndex): ?array
+    public function resolveVideoSegmentAvailability(PublicId $jobPublicId, int $segmentIndex, int $generation): ?array
     {
-        return $this->inner->resolveVideoSegmentAvailability($jobPublicId, $segmentIndex);
+        return $this->inner->resolveVideoSegmentAvailability($jobPublicId, $segmentIndex, $generation);
     }
 
-    public function getInitSegmentPath(PublicId $jobPublicId): ?string
+    public function getInitSegmentPath(PublicId $jobPublicId, int $generation): ?string
     {
-        return $this->inner->getInitSegmentPath($jobPublicId);
+        return $this->inner->getInitSegmentPath($jobPublicId, $generation);
     }
 
-    public function getDashManifest(Uuid $videoId): string
+    public function getDashManifest(Uuid $videoId, int $generation, ?string $jobPublicId = null): string
     {
-        $manifest = $this->inner->getDashManifest($videoId);
+        $manifest = $this->inner->getDashManifest($videoId, $generation, $jobPublicId);
 
         return $this->filterDashManifest($manifest);
     }
@@ -186,18 +191,18 @@ final readonly class QualityFilteringStreamingDecorator implements TranscodeStre
         return $this->inner->getQualityLadderForVideo($videoId);
     }
 
-    public function getSubtitleManifest(PublicId $jobPublicId, string $language): string
+    public function getSubtitleManifest(PublicId $jobPublicId, string $language, int $generation): string
     {
-        return $this->inner->getSubtitleManifest($jobPublicId, $language);
+        return $this->inner->getSubtitleManifest($jobPublicId, $language, $generation);
     }
 
-    public function getSubtitleSegment(PublicId $jobPublicId, string $language, string $segmentName): ?string
+    public function getSubtitleSegment(PublicId $jobPublicId, string $language, string $segmentName, int $generation): ?string
     {
-        return $this->inner->getSubtitleSegment($jobPublicId, $language, $segmentName);
+        return $this->inner->getSubtitleSegment($jobPublicId, $language, $segmentName, $generation);
     }
 
-    public function getSubtitleSegmentPath(PublicId $jobPublicId, string $language, string $segmentName): ?string
+    public function getSubtitleSegmentPath(PublicId $jobPublicId, string $language, string $segmentName, int $generation): ?string
     {
-        return $this->inner->getSubtitleSegmentPath($jobPublicId, $language, $segmentName);
+        return $this->inner->getSubtitleSegmentPath($jobPublicId, $language, $segmentName, $generation);
     }
 }

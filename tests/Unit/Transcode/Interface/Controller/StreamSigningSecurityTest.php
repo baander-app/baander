@@ -8,6 +8,7 @@ use App\Catalog\Domain\Model\Video;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
 use App\Transcode\Application\Port\PlaybackPortInterface;
 use App\Transcode\Application\Port\StreamAuthPortInterface;
+use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
 use App\Transcode\Interface\Controller\StreamSigningController;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -23,7 +24,7 @@ final class StreamSigningSecurityTest extends TestCase
         $auth->expects($this->never())->method('signUrl');
         $playback = $this->createMock(PlaybackPortInterface::class);
         $playback->expects($this->never())->method('start');
-        $controller = new StreamSigningController($auth, $playback, $this->videos(null));
+        $controller = new StreamSigningController($auth, $playback, $this->videos(null), $this->createStub(TranscodeStreamingPortInterface::class));
         self::assertSame(400, $controller->sign(Request::create('/', 'POST', content: $body))->getStatusCode());
     }
 
@@ -52,7 +53,7 @@ final class StreamSigningSecurityTest extends TestCase
         $playback = $this->createMock(PlaybackPortInterface::class);
         $playback->expects($this->once())->method('start')->with($this->equalTo($id))
             ->willThrowException(new AccessDeniedException());
-        $controller = new StreamSigningController($auth, $playback, $this->videos($video));
+        $controller = new StreamSigningController($auth, $playback, $this->videos($video), $this->streaming());
         $this->expectException(AccessDeniedException::class);
         $controller->sign(Request::create('/', 'POST', content: json_encode(['path' => '/api/transcode/'.$video->getPublicId().'/master.m3u8'], JSON_THROW_ON_ERROR)));
     }
@@ -65,11 +66,34 @@ final class StreamSigningSecurityTest extends TestCase
         $playback = $this->createMock(PlaybackPortInterface::class);
         $playback->expects($this->once())->method('start')->with($this->equalTo($id));
         $auth = $this->createMock(StreamAuthPortInterface::class);
-        $auth->expects($this->once())->method('signUrl')->with($path, 86400)
+        $auth->expects($this->once())->method('signUrl')->with($path.'?generation=3&job=0123456789abABCD_-xyz', 86400)
             ->willReturn(['url' => $path.'?sig=s&exp=1', 'sig' => 's', 'exp' => 1]);
-        $controller = new StreamSigningController($auth, $playback, $this->videos($video));
+        $controller = new StreamSigningController($auth, $playback, $this->videos($video), $this->streaming());
         self::assertSame(200, $controller->sign(Request::create('/', 'POST', content: json_encode(['path' => $path], JSON_THROW_ON_ERROR)))->getStatusCode());
     }
+    public function testRefreshChecksAccessWithoutAdmittingAgain(): void
+    {
+        $video = Video::create('/video.mp4', 'hash');
+        $playback = $this->createMock(PlaybackPortInterface::class);
+        $playback->expects($this->never())->method('start');
+        $playback->expects($this->once())->method('assertAccess')->with($video->getId());
+        $auth = $this->createStub(StreamAuthPortInterface::class);
+        $auth->method('signUrl')->willReturn(['url' => '/signed', 'sig' => 's', 'exp' => 1]);
+        $controller = new StreamSigningController($auth, $playback, $this->videos($video), $this->streaming());
+        $response = $controller->sign(Request::create('/', 'POST', content: json_encode(['path' => '/api/transcode/'.$video->getPublicId().'/master.m3u8', 'refresh' => true], JSON_THROW_ON_ERROR)));
+        $body = json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(3, $body['generation']);
+        self::assertTrue($body['ready']);
+        self::assertSame('paused', $body['status']);
+    }
+
+    private function streaming(): TranscodeStreamingPortInterface
+    {
+        $streaming = $this->createStub(TranscodeStreamingPortInterface::class);
+        $streaming->method('getPlaybackState')->willReturn(['generation' => 3, 'jobId' => '0123456789abABCD_-xyz', 'sessionId' => 'session', 'revision' => 5, 'ready' => true, 'status' => 'paused', 'position' => 24.0]);
+        return $streaming;
+    }
+
     private function videos(?Video $video): TranscodePublicViewInterface
     {
         $videos = $this->createStub(TranscodePublicViewInterface::class);

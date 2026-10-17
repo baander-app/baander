@@ -47,13 +47,13 @@ final class StreamSegmentControllerAvailabilityTest extends TestCase
         $jobId = Uuid::generate();
         $publicId = new PublicId();
         $streaming = $this->createMock(TranscodeStreamingPortInterface::class);
-        $streaming->expects(self::once())->method('resolveVideoSegmentAvailability')
-            ->with($publicId, 7)
+        $streaming->expects(self::atLeast(2))->method('resolveVideoSegmentAvailability')
+            ->with($publicId, 7, 3)
             ->willReturn(['jobId' => $jobId, 'tierKey' => '720p', 'path' => $this->expectedPath]);
 
         $auth = $this->createMock(StreamAuthPortInterface::class);
         $auth->expects(self::once())->method('validateUrl')
-            ->with('/api/transcode/' . $publicId . '/segment?index=7', 'valid-signature', 2000000000)
+            ->with('/api/transcode/' . $publicId . '/segment?index=7&generation=3', 'valid-signature', 2000000000)
             ->willReturn(true);
         $availability = $this->createMock(SegmentAvailabilityInterface::class);
         $availability->expects(self::once())->method('isReady')->with($jobId, '720p', 7)
@@ -63,7 +63,7 @@ final class StreamSegmentControllerAvailabilityTest extends TestCase
                 default => null,
             });
         $controller = new StreamSegmentController($streaming, new SignedStreamRequest($auth), $availability, new AsyncSleeper());
-        $request = Request::create('https://baander.app/api/transcode/' . $publicId . '/segment?index=7&sig=valid-signature&exp=2000000000');
+        $request = Request::create('https://baander.app/api/transcode/' . $publicId . '/segment?index=7&generation=3&sig=valid-signature&exp=2000000000');
 
         $response = $controller->segment($publicId->toString(), $request);
 
@@ -77,6 +77,23 @@ final class StreamSegmentControllerAvailabilityTest extends TestCase
         } finally {
             ob_end_clean();
         }
+    }
+
+    public function testGenerationRetiredDuringFileWaitNeverStreamsItsBytes(): void
+    {
+        $publicId = new PublicId();
+        $resolved = ['jobId' => Uuid::generate(), 'tierKey' => '720p/generation-3', 'path' => $this->expectedPath];
+        $streaming = $this->createStub(TranscodeStreamingPortInterface::class);
+        $state = new class { public bool $current = true; };
+        $streaming->method('resolveVideoSegmentAvailability')->willReturnCallback(function () use ($state, $resolved): ?array { return $state->current ? $resolved : null; });
+        $auth = $this->createStub(StreamAuthPortInterface::class);
+        $auth->method('validateUrl')->willReturn(true);
+        $sleeper = $this->createStub(\App\Shared\Application\Port\SleeperInterface::class);
+        $sleeper->method('sleep')->willReturnCallback(function () use ($state): void { $state->current = false; });
+        $controller = new StreamSegmentController($streaming, new SignedStreamRequest($auth), $this->createStub(SegmentAvailabilityInterface::class), $sleeper);
+        $request = Request::create('https://baander.app/api/transcode/'.$publicId.'/segment?index=7&generation=3&sig=valid&exp=2000000000');
+        $response = $controller->segment($publicId->toString(), $request);
+        self::assertSame(503, $response->getStatusCode());
     }
 
     /** @return iterable<string, array{string}> */

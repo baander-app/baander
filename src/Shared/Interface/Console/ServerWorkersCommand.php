@@ -17,15 +17,13 @@ use Throwable;
  */
 #[AsCommand(
     name: 'app:server:workers',
-    description: 'Show the web server\'s HTTP worker, task worker and transcoding pool statistics.',
+    description: 'Show the web server\'s HTTP and user worker statistics.',
 )]
 final class ServerWorkersCommand extends Command
 {
     private const array SECTIONS = [
         'http_workers' => 'HTTP workers',
-        'task_workers' => 'Task workers',
         'user_workers' => 'User workers',
-        'transcode_pool' => 'Transcoding pool',
     ];
 
     public function __construct(

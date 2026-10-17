@@ -20,10 +20,10 @@ final class DeploymentOperatorManifestTest extends TestCase
         self::assertSame([
             '/usr/local/bin/php', '-d', 'memory_limit=128M', '/var/www/html/bin/console', 'app:worker', '--no-interaction',
             '--deployment=operator.baander.app', '--boot-id=' . str_repeat('a', 32),
-            '--memory-mib=1728', '--management-mib=128', '--consumer-mib=320', '--relay-mib=320',
-            '--scheduler-mib=320', '--scheduled-console-mib=192', '--media-mib=448', '--media-descendant-pids=2', '--lock-dir=/tmp/baander-worker-locks',
+            '--memory-mib=3904', '--management-mib=128', '--consumer-mib=320', '--relay-mib=320',
+            '--scheduler-mib=320', '--scheduled-console-mib=192', '--media-mib=2624', '--media-descendant-pids=14', '--lock-dir=/tmp/baander-worker-locks',
         ], $recipe->command);
-        self::assertSame(1728 * 1024 * 1024, $recipe->memoryBytes);
+        self::assertSame(3904 * 1024 * 1024, $recipe->memoryBytes);
         self::assertSame($manifest->configuration->memoryLimitBytes, $recipe->memoryBytes);
         self::assertSame($environment, $recipe->runtimeEnvironment);
         self::assertSame('/usr/bin/docker', $manifest->dockerBinary);
@@ -164,7 +164,8 @@ final class DeploymentOperatorManifestTest extends TestCase
         yield 'excess reservation' => ['managementMiB', 1048576];
         yield 'zero CPU' => ['nanoCpus', 0];
         yield 'excess CPU' => ['nanoCpus', 64000000001];
-        yield 'insufficient media memory' => ['mediaMiB', 447];
+        yield 'encoder thread headroom' => ['pidsLimit', 127];
+        yield 'insufficient media memory' => ['mediaMiB', 2623];
         yield 'insufficient descendant capacity' => ['mediaDescendantPids', 0];
         yield 'insufficient PID reservation' => ['pidsLimit', 9];
         yield 'low PIDs' => ['pidsLimit', 7];
@@ -204,8 +205,8 @@ final class DeploymentOperatorManifestTest extends TestCase
             'version' => 2, 'namespace' => 'operator.baander.app', 'bootId' => str_repeat('a', 32),
             'daemonId' => 'docker-daemon', 'imageId' => 'sha256:' . str_repeat('b', 64), 'network' => 'none',
             'dockerBinary' => '/usr/bin/docker', 'dockerEndpoint' => 'unix:///var/run/docker.sock',
-            'memoryMiB' => 1728, 'managementMiB' => 128, 'consumerMiB' => 320, 'relayMiB' => 320,
-            'schedulerMiB' => 320, 'scheduledConsoleMiB' => 192, 'mediaMiB' => 448, 'mediaDescendantPids' => 2, 'mediaMounts' => self::mounts(), 'nanoCpus' => 1000000000, 'pidsLimit' => 64,
+            'memoryMiB' => 3904, 'managementMiB' => 128, 'consumerMiB' => 320, 'relayMiB' => 320,
+            'schedulerMiB' => 320, 'scheduledConsoleMiB' => 192, 'mediaMiB' => 2624, 'mediaDescendantPids' => 14, 'mediaMounts' => self::mounts(), 'nanoCpus' => 1000000000, 'pidsLimit' => 128,
         ];
     }
 }

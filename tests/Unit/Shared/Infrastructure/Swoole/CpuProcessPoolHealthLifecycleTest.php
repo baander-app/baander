@@ -9,22 +9,16 @@ use Symfony\Component\Process\Process;
 
 final class CpuProcessPoolHealthLifecycleTest extends TestCase
 {
-    public function testServerStartOwnsTheMonitorAndHttpWorkerStartDoesNotInheritIt(): void
+    public function testWebLifecycleStartsWithoutExecutorProcessesOrTimers(): void
     {
-        $directory = sys_get_temp_dir() . '/baander-pool-health-lifecycle-' . bin2hex(random_bytes(8));
+        $directory = sys_get_temp_dir() . '/baander-web-worker-lifecycle-' . bin2hex(random_bytes(8));
         self::assertTrue(mkdir($directory, 0700));
         $fixture = <<<'PHP'
 require $argv[1];
-use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool;
-use App\Shared\Infrastructure\Swoole\ProcessPool\ProcessPoolWorkerInterface;
 use App\Shared\Infrastructure\Swoole\SwooleWorkerEventBuffer;
 use App\Shared\Infrastructure\Swoole\SwooleWorkerEventSubscriber;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\EventDispatcher\EventDispatchingServerStartHandler;
 use SwooleBundle\SwooleBundle\Bridge\Symfony\Bundle\EventDispatcher\EventDispatchingWorkerStartHandler;
-final class LifecycleProbeWorker implements ProcessPoolWorkerInterface {
-    public function supportedTypes(): array { return ['probe']; }
-    public function handle(string $payload): string { return 'completed'; }
-}
 function check(bool $condition, string $message): void {
     if (!$condition) { throw new RuntimeException($message); }
 }
@@ -37,18 +31,11 @@ set_error_handler(static function (int $severity, string $message, string $file,
     throw new ErrorException($message, 0, $severity, $file, $line);
 });
 $owner = getmypid();
-$pool = new CpuProcessPool([new LifecycleProbeWorker()], 1, new Psr\Log\NullLogger(), 16, $argv[2]);
-$pool->boot();
-$workers = (new ReflectionProperty($pool, 'workers'))->getValue($pool);
-foreach ($workers as $worker) { trackPid($worker->pid); }
 $probe = new Swoole\Table(16);
 $probe->column('error', Swoole\Table::TYPE_STRING, 2048);
 $probe->create();
-$locator = new Symfony\Component\DependencyInjection\ServiceLocator([
-    CpuProcessPool::class => static fn() => $pool,
-]);
 $dispatcher = new Symfony\Component\EventDispatcher\EventDispatcher();
-$dispatcher->addSubscriber(new SwooleWorkerEventSubscriber(new SwooleWorkerEventBuffer(), $locator));
+$dispatcher->addSubscriber(new SwooleWorkerEventSubscriber(new SwooleWorkerEventBuffer()));
 $serverStarted = new EventDispatchingServerStartHandler($dispatcher);
 $workerStarted = new EventDispatchingWorkerStartHandler($dispatcher);
 $server = new Swoole\Http\Server('127.0.0.1', 0, SWOOLE_PROCESS);
@@ -60,61 +47,40 @@ $server->set([
     'max_wait_time' => 1,
 ]);
 $server->on('request', static function ($request, $response): void { $response->end('ready'); });
-$server->on('workerStart', static function (Swoole\Server $server, int $workerId) use ($pool, $workerStarted, $probe, $owner): void {
+$server->on('workerStart', static function (Swoole\Server $server, int $workerId) use ($workerStarted, $probe, $owner): void {
     trackPid(getmypid());
     try {
-        check(getmypid() !== $owner, 'HTTP worker did not fork from pool owner');
+        check(getmypid() !== $owner, 'HTTP worker did not fork from web master');
         $workerStarted->handle($server, $workerId);
-        check((new ReflectionProperty($pool, 'healthTimerId'))->getValue($pool) === null, 'HTTP worker startup created a pool monitor');
-        try {
-            $pool->startHealthCheck();
-            throw new RuntimeException('Inherited pool accepted monitor ownership');
-        } catch (RuntimeException $error) {
-            check(str_contains($error->getMessage(), 'Only the CPU pool owner'), 'Inherited monitor failed for another reason');
-        }
-        check((new ReflectionProperty($pool, 'healthTimerId'))->getValue($pool) === null, 'Inherited pool allowed a non-owner monitor');
+        check(Swoole\Timer::stats()['num'] === 0, 'HTTP worker startup scheduled an executor timer');
         $probe->set('worker', ['error' => '']);
     } catch (Throwable $error) {
         $probe->set('worker', ['error' => $error->getMessage()]);
     }
 });
-$server->on('start', static function (Swoole\Server $server) use ($pool, $serverStarted, $probe, $owner): void {
+$server->on('start', static function (Swoole\Server $server) use ($serverStarted, $probe, $owner): void {
     trackPid($server->manager_pid);
     try {
-        check(getmypid() === $owner, 'ServerStartedEvent did not run in CPU pool owner');
+        check(getmypid() === $owner, 'ServerStartedEvent ran outside the web master');
+        $timers = iterator_to_array(Swoole\Timer::list());
         $serverStarted->handle($server);
-        $timer = (new ReflectionProperty($pool, 'healthTimerId'))->getValue($pool);
-        check(is_int($timer) && Swoole\Timer::exists($timer), 'ServerStartedEvent did not schedule health monitoring');
-        check((new ReflectionProperty($pool, 'healthTimerOwnerPid'))->getValue($pool) === $owner, 'Health timer belongs to another process');
-        $pool->startHealthCheck();
-        check((new ReflectionProperty($pool, 'healthTimerId'))->getValue($pool) === $timer, 'Repeated owner startup replaced the health timer');
+        check(iterator_to_array(Swoole\Timer::list()) === $timers, 'Web startup scheduled an executor timer');
         $probe->set('owner', ['error' => '']);
     } catch (Throwable $error) {
         $probe->set('owner', ['error' => $error->getMessage()]);
     }
     $deadline = hrtime(true) + 3_000_000_000;
-    Swoole\Timer::tick(10, static function (int $timer) use ($pool, $probe, $server, $deadline): void {
+    Swoole\Timer::tick(10, static function (int $timer) use ($probe, $server, $deadline): void {
         if (!$probe->exists('worker') && hrtime(true) < $deadline) { return; }
         Swoole\Timer::clear($timer);
-        try {
-            $pool->shutdown();
-            check((new ReflectionProperty($pool, 'healthTimerId'))->getValue($pool) === null, 'Owner shutdown retained its health timer');
-            $probe->set('shutdown', ['error' => '']);
-        } catch (Throwable $error) {
-            $probe->set('shutdown', ['error' => $error->getMessage()]);
-        }
         $server->shutdown();
     });
 });
 check($server->start(), 'Native process-mode server failed to start');
-foreach (['owner', 'worker', 'shutdown'] as $stage) {
+foreach (['owner', 'worker'] as $stage) {
     $result = $probe->get($stage);
     check(is_array($result), 'Lifecycle callback never completed: ' . $stage);
     check($result['error'] === '', $stage . ': ' . $result['error']);
-}
-foreach ($workers as $worker) {
-    $status = 0;
-    check(pcntl_waitpid($worker->pid, $status, WNOHANG) === -1, 'Lifecycle shutdown did not reap CPU worker');
 }
 $probe->destroy();
 PHP;

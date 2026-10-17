@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Transcode\Interface\Controller;
 
-use App\Shared\Application\Port\SleeperInterface;
 use App\Shared\Domain\Model\PublicId;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
@@ -28,7 +27,6 @@ final class StreamManifestController
         private readonly TranscodeStreamingPortInterface $streamingService,
         private readonly SignedStreamRequest $signedRequest,
         private readonly PlaybackPortInterface $playback,
-        private readonly SleeperInterface $sleeper,
         private readonly TranscodePublicViewInterface $publicView,
     ) {
     }
@@ -37,6 +35,7 @@ final class StreamManifestController
         path: '/api/transcode/{videoId}/master.m3u8',
         summary: 'Get HLS master playlist',
         parameters: [
+            new OA\Parameter(name: 'generation', description: 'Pinned media execution generation', in: 'query', required: true, schema: new OA\Schema(type: 'integer', minimum: 1)),
             new OA\Parameter(name: 'videoId', description: 'Video public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
@@ -49,9 +48,11 @@ final class StreamManifestController
         $this->signedRequest->validate($request);
         $videoUuid = $this->requireVideo($videoId);
 
-        $manifest = $this->streamingService->getMasterManifest($videoUuid);
+        $manifest = $this->streamingService->getMasterManifest($videoUuid, $request->query->getInt('generation'), $request->query->get('job'));
 
-        return new StreamedResponse(static fn() => print $manifest, 200, [
+        return new StreamedResponse(static fn() => print $manifest, $this->available($manifest) ? 200 : 503, [
+            'Cache-Control' => 'no-store',
+            'Retry-After' => '2',
             'Content-Type' => 'application/vnd.apple.mpegurl',
         ]);
     }
@@ -60,6 +61,7 @@ final class StreamManifestController
         path: '/api/transcode/{jobPublicId}/media.m3u8',
         summary: 'Get HLS media playlist for a specific rendition',
         parameters: [
+            new OA\Parameter(name: 'generation', description: 'Pinned media execution generation', in: 'query', required: true, schema: new OA\Schema(type: 'integer', minimum: 1)),
             new OA\Parameter(name: 'jobPublicId', description: 'Job public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
@@ -72,20 +74,11 @@ final class StreamManifestController
         $this->signedRequest->validate($request);
         $publicId = PublicId::fromString($jobPublicId);
 
-        // Wait for the encoding loop to finish probing and populate totalSegments
-        // before serving the full VOD playlist.
-        $manifest = '';
-        $elapsed = 0.0;
-        while ($elapsed < 10.0) {
-            $manifest = $this->streamingService->getMediaManifest($publicId, 'streaming_stereo');
-            if (str_contains($manifest, '#EXTINF:')) {
-                break;
-            }
-            $this->sleeper->sleep(0.5);
-            $elapsed += 0.5;
-        }
+        $manifest = $this->streamingService->getMediaManifest($publicId, 'streaming_stereo', $request->query->getInt('generation'));
 
-        return new StreamedResponse(static fn() => print $manifest, 200, [
+        return new StreamedResponse(static fn() => print $manifest, $this->available($manifest) ? 200 : 503, [
+            'Cache-Control' => 'no-store',
+            'Retry-After' => '2',
             'Content-Type' => 'application/vnd.apple.mpegurl',
         ]);
     }
@@ -94,6 +87,7 @@ final class StreamManifestController
         path: '/api/transcode/{videoId}/manifest.mpd',
         summary: 'Get DASH manifest for a video',
         parameters: [
+            new OA\Parameter(name: 'generation', description: 'Pinned media execution generation', in: 'query', required: true, schema: new OA\Schema(type: 'integer', minimum: 1)),
             new OA\Parameter(name: 'videoId', description: 'Video public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
@@ -104,9 +98,11 @@ final class StreamManifestController
     public function dashManifest(string $videoId, Request $request): StreamedResponse
     {
         $this->signedRequest->validate($request);
-        $manifest = $this->streamingService->getDashManifest($this->requireVideo($videoId));
+        $manifest = $this->streamingService->getDashManifest($this->requireVideo($videoId), $request->query->getInt('generation'), $request->query->get('job'));
 
-        return new StreamedResponse(static fn() => print $manifest, 200, [
+        return new StreamedResponse(static fn() => print $manifest, $this->available($manifest) ? 200 : 503, [
+            'Cache-Control' => 'no-store',
+            'Retry-After' => '2',
             'Content-Type' => 'application/dash+xml',
         ]);
     }
@@ -135,6 +131,7 @@ final class StreamManifestController
         path: '/api/transcode/{jobPublicId}/subtitles/{language}/media.m3u8',
         summary: 'Get HLS subtitle playlist for a language',
         parameters: [
+            new OA\Parameter(name: 'generation', description: 'Pinned media execution generation', in: 'query', required: true, schema: new OA\Schema(type: 'integer', minimum: 1)),
             new OA\Parameter(name: 'jobPublicId', description: 'Job public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'language', description: 'BCP-47 language tag', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
@@ -146,12 +143,20 @@ final class StreamManifestController
     public function subtitleManifest(string $jobPublicId, string $language, Request $request): StreamedResponse
     {
         $this->signedRequest->validate($request);
-        $manifest = $this->streamingService->getSubtitleManifest(PublicId::fromString($jobPublicId), $language);
+        $manifest = $this->streamingService->getSubtitleManifest(PublicId::fromString($jobPublicId), $language, $request->query->getInt('generation'));
 
-        return new StreamedResponse(static fn() => print $manifest, 200, [
+        return new StreamedResponse(static fn() => print $manifest, $this->available($manifest) ? 200 : 503, [
+            'Cache-Control' => 'no-store',
+            'Retry-After' => '2',
             'Content-Type' => 'application/vnd.apple.mpegurl',
         ]);
     }
+
+    private function available(string $manifest): bool
+    {
+        return str_contains($manifest, '#EXTINF:') || str_contains($manifest, '#EXT-X-STREAM-INF:') || str_contains($manifest, '<Representation');
+    }
+
     private function requireVideo(string $publicId): \App\Shared\Domain\Model\Uuid
     {
         try {
@@ -162,5 +167,4 @@ final class StreamManifestController
 
         return $video ?? throw new NotFoundHttpException('Video not found.');
     }
-
 }

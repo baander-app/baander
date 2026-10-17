@@ -18,7 +18,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[OA\Tag(name: 'Stream', description: 'HLS streaming endpoints')]
 #[Route('/api/transcode/{jobPublicId}', name: 'stream_segment_')]
@@ -38,6 +37,7 @@ final class StreamSegmentController
         path: '/api/transcode/{jobPublicId}/init',
         summary: 'Get CMAF init segment',
         parameters: [
+            new OA\Parameter(name: 'generation', description: 'Pinned media execution generation', in: 'query', required: true, schema: new OA\Schema(type: 'integer', minimum: 1)),
             new OA\Parameter(name: 'jobPublicId', description: 'Job public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'sig', description: 'URL signature', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'exp', description: 'Expiry timestamp', in: 'query', required: true, schema: new OA\Schema(type: 'integer')),
@@ -61,13 +61,16 @@ final class StreamSegmentController
             return new JsonResponse(['error' => 'Invalid or expired signature'], Response::HTTP_FORBIDDEN);
         }
 
-        $path = $this->streamingService->getInitSegmentPath(PublicId::fromString($jobPublicId));
+        $generation = $request->query->getInt('generation');
+        $resolve = fn (): ?string => $this->streamingService->getInitSegmentPath(PublicId::fromString($jobPublicId), $generation);
+        $path = $resolve();
 
         if ($path === null) {
             return $this->notFound('Init segment not found.');
         }
 
-        $readyPath = $this->waitForFilePath($path);
+        $valid = fn (): bool => $resolve() === $path;
+        $readyPath = $this->waitForFilePath($path, 5, $valid);
         if ($readyPath === null) {
             return new StreamedResponse(
                 static fn() => print '',
@@ -76,13 +79,14 @@ final class StreamSegmentController
             );
         }
 
-        return $this->streamFile($readyPath, 'video/mp4');
+        return $this->streamFile($readyPath, 'video/mp4', $valid);
     }
 
     #[OA\Get(
         path: '/api/transcode/{jobPublicId}/segment',
         summary: 'Get fMP4 media segment (query-param routed)',
         parameters: [
+            new OA\Parameter(name: 'generation', description: 'Pinned media execution generation', in: 'query', required: true, schema: new OA\Schema(type: 'integer', minimum: 1)),
             new OA\Parameter(name: 'jobPublicId', description: 'Job public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'index', description: 'Segment index', in: 'query', required: true, schema: new OA\Schema(type: 'integer')),
             new OA\Parameter(name: 'sig', description: 'URL signature', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
@@ -107,18 +111,22 @@ final class StreamSegmentController
             return new JsonResponse(['error' => 'Missing or invalid index parameter'], Response::HTTP_BAD_REQUEST);
         }
 
-        $resolved = $this->streamingService->resolveVideoSegmentAvailability(PublicId::fromString($jobPublicId), $index);
+        $generation = $request->query->getInt('generation');
+        $resolve = fn (): ?array => $this->streamingService->resolveVideoSegmentAvailability(PublicId::fromString($jobPublicId), $index, $generation);
+        $resolved = $resolve();
 
         if ($resolved === null) {
             return $this->notFound('Segment index out of range.');
         }
 
+        $valid = fn (): bool => ($resolve()['path'] ?? null) === $resolved['path'];
         $readyPath = $this->waitForSegment(
             $resolved['jobId'],
             $resolved['tierKey'],
             $index,
             $resolved['path'],
-            60,
+            5,
+            $valid,
         );
 
         if ($readyPath === null) {
@@ -129,7 +137,7 @@ final class StreamSegmentController
             );
         }
 
-        return $this->streamFile($readyPath, 'video/mp4');
+        return $this->streamFile($readyPath, 'video/mp4', $valid);
     }
 
     // --- Subtitle Segment Delivery ---
@@ -138,6 +146,7 @@ final class StreamSegmentController
         path: '/api/transcode/{jobPublicId}/subtitles/{language}/{segment}.vtt',
         summary: 'Get subtitle segment (WebVTT)',
         parameters: [
+            new OA\Parameter(name: 'generation', description: 'Pinned media execution generation', in: 'query', required: true, schema: new OA\Schema(type: 'integer', minimum: 1)),
             new OA\Parameter(name: 'jobPublicId', description: 'Job public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'language', description: 'BCP-47 language tag', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'segment', description: 'Segment name', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
@@ -157,13 +166,13 @@ final class StreamSegmentController
             return new JsonResponse(['error' => 'Invalid or expired signature'], Response::HTTP_FORBIDDEN);
         }
 
-        $path = $this->streamingService->getSubtitleSegmentPath(PublicId::fromString($jobPublicId), $language, $segment);
+        $path = $this->streamingService->getSubtitleSegmentPath(PublicId::fromString($jobPublicId), $language, $segment, $request->query->getInt('generation'));
 
         if ($path === null) {
             return $this->notFound('Subtitle segment not found.');
         }
 
-        return $this->streamFile($path, 'text/vtt');
+        return $this->streamFile($path, 'text/vtt', fn (): bool => $this->streamingService->getSubtitleSegmentPath(PublicId::fromString($jobPublicId), $language, $segment, $request->query->getInt('generation')) === $path);
     }
 
     /**
@@ -172,17 +181,20 @@ final class StreamSegmentController
      * A nonempty, unchanged snapshot remains a readiness heuristic, not proof
      * of completed publication or encoding-attempt ownership.
      */
-    private function waitForSegment(Uuid $jobId, string $tierKey, int $index, string $path, int $timeoutSeconds = 10): ?string
+    private function waitForSegment(Uuid $jobId, string $tierKey, int $index, string $path, int $timeoutSeconds = 10, ?callable $valid = null): ?string
     {
+        if ($valid !== null && !$valid()) {
+            return null;
+        }
         $ready = $this->segmentAvailability->isReady($jobId, $tierKey, $index);
         if ($ready === $path) {
             $stable = $this->isFileSizeStable($path);
-            if ($stable !== null) {
+            if ($stable !== null && ($valid === null || $valid())) {
                 return $stable;
             }
         }
 
-        return $this->waitForFilePath($path, $timeoutSeconds);
+        return $this->waitForFilePath($path, $timeoutSeconds, $valid);
     }
 
     /**
@@ -206,13 +218,16 @@ final class StreamSegmentController
      * the observation window. Atomic producer publication is still required to
      * turn this quiet-window heuristic into a completion guarantee.
      */
-    private function waitForFilePath(string $path, int $timeoutSeconds = 10): ?string
+    private function waitForFilePath(string $path, int $timeoutSeconds = 10, ?callable $valid = null): ?string
     {
         $deadline = hrtime(true) / 1_000_000_000 + $timeoutSeconds;
         $stableChecks = 0;
         $last = null;
 
         while (hrtime(true) / 1_000_000_000 < $deadline) {
+            if ($valid !== null && !$valid()) {
+                return null;
+            }
             $snapshot = $this->readFileSnapshot($path);
             if ($snapshot !== null && $snapshot === $last) {
                 if (++$stableChecks >= 2) {
@@ -259,8 +274,11 @@ final class StreamSegmentController
      * change before the callback opens it; the already-sent status cannot be
      * changed if the file disappears at that point.
      */
-    private function streamFile(string $path, string $contentType): Response
+    private function streamFile(string $path, string $contentType, ?callable $valid = null): Response
     {
+        if ($valid !== null && !$valid()) {
+            return new JsonResponse(['error' => 'Media generation is unavailable'], Response::HTTP_SERVICE_UNAVAILABLE);
+        }
         clearstatcache(true, $path);
         if (!is_file($path)) {
             return new JsonResponse(['error' => 'Segment file not found'], Response::HTTP_NOT_FOUND);
@@ -272,7 +290,10 @@ final class StreamSegmentController
         }
 
         return new StreamedResponse(
-            static function () use ($path): void {
+            static function () use ($path, $valid): void {
+                if ($valid !== null && !$valid()) {
+                    return;
+                }
                 $stream = @fopen($path, 'rb');
                 if ($stream === false) {
                     // File vanished between the stat and the open (race).
@@ -287,7 +308,7 @@ final class StreamSegmentController
             [
                 'Content-Type' => $contentType,
                 'Content-Length' => (string) $size,
-                'Cache-Control' => 'public, max-age=31536000, immutable',
+                'Cache-Control' => 'no-store',
             ],
         );
     }

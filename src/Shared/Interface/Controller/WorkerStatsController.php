@@ -10,7 +10,7 @@ use OpenApi\Attributes as OA;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
-/** Server-level worker pool stats: HTTP workers, task workers, transcoding pool. */
+/** Server-level HTTP and user worker statistics. */
 final readonly class WorkerStatsController
 {
     public function __construct(
@@ -20,7 +20,7 @@ final readonly class WorkerStatsController
 
     #[OA\Get(
         path: '/api/debug/workers',
-        summary: 'Server worker pool stats (HTTP, task, transcoding)',
+        summary: 'Server HTTP and user worker statistics',
         responses: [
             new OA\Response(response: '200', description: 'Worker stats', content: new OA\JsonContent(type: 'object')),
         ],

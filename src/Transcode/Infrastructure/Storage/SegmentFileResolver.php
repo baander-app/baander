@@ -22,7 +22,23 @@ final class SegmentFileResolver
 
     public function __construct(
         private readonly string $basePath,
+        private readonly ?string $videoIdentity = null,
+        private readonly ?string $tierIdentity = null,
+        private readonly ?int $generation = null,
     ) {
+    }
+
+    public function forGeneration(Uuid $videoId, QualityTier $qualityTier, int $generation): self
+    {
+        self::assertComponent($qualityTier->name);
+        if ($generation < 1) {
+            throw new InvalidArgumentException('Execution generations must be positive.');
+        }
+        if ($this->generation !== null && ($this->videoIdentity !== $videoId->toString()
+            || $this->tierIdentity !== $qualityTier->name || $this->generation !== $generation)) {
+            throw new InvalidArgumentException('A generation resolver cannot change execution identity.');
+        }
+        return new self($this->basePath, $videoId->toString(), $qualityTier->name, $generation);
     }
 
     /**
@@ -86,7 +102,7 @@ final class SegmentFileResolver
 
     public function resolveJobDirectory(Uuid $videoId, QualityTier $qualityTier): string
     {
-        return $this->buildPath($videoId->toString(), $qualityTier->name);
+        return $this->videoPath($videoId, $qualityTier);
     }
 
     /**
@@ -107,7 +123,7 @@ final class SegmentFileResolver
 
     public function resolveInitSegmentPath(Uuid $videoId, QualityTier $qualityTier): string
     {
-        return $this->buildPath($videoId->toString(), $qualityTier->name, 'init.mp4');
+        return $this->videoPath($videoId, $qualityTier, 'init.mp4');
     }
 
     public function resolveSegmentPath(Uuid $videoId, QualityTier $qualityTier, int $segmentIndex): string
@@ -130,24 +146,24 @@ final class SegmentFileResolver
     ): string {
         $prefix = $this->segmentPrefix($videoStreamIndex, $audioStreamIndex, $qualityTier);
 
-        return $this->buildPath($videoId->toString(), $qualityTier->name, sprintf('%s_%d.m4s', $prefix, $segmentIndex));
+        return $this->videoPath($videoId, $qualityTier, sprintf('%s_%d.m4s', $prefix, $segmentIndex));
     }
 
     // --- Audio Paths ---
 
     public function resolveAudioDirectory(Uuid $videoId, string $language): string
     {
-        return $this->buildPath($videoId->toString(), 'audio', $language);
+        return $this->videoPath($videoId, null, 'audio', $language);
     }
 
     public function resolveAudioInitSegmentPath(Uuid $videoId, string $language): string
     {
-        return $this->buildPath($videoId->toString(), 'audio', $language, 'init.mp4');
+        return $this->videoPath($videoId, null, 'audio', $language, 'init.mp4');
     }
 
     public function resolveAudioSegmentPath(Uuid $videoId, string $language, int $segmentIndex): string
     {
-        return $this->buildPath($videoId->toString(), 'audio', $language, sprintf('seg_%d.m4s', $segmentIndex));
+        return $this->videoPath($videoId, null, 'audio', $language, sprintf('seg_%d.m4s', $segmentIndex));
     }
 
     // --- Track Audio Rendition Paths ---
@@ -166,13 +182,13 @@ final class SegmentFileResolver
 
     public function resolveSubtitleDirectory(Uuid $videoId, string $language): string
     {
-        return $this->buildPath($videoId->toString(), 'subtitles', $language);
+        return $this->videoPath($videoId, null, 'subtitles', $language);
     }
 
     public function resolveSubtitleSegmentPath(Uuid $videoId, string $language, string $segmentName): string
     {
         self::assertComponent($segmentName);
-        return $this->buildPath($videoId->toString(), 'subtitles', $language, $segmentName . '.vtt');
+        return $this->videoPath($videoId, null, 'subtitles', $language, $segmentName . '.vtt');
     }
 
     public function resolvePath(string $path): string
@@ -182,10 +198,39 @@ final class SegmentFileResolver
             throw new InvalidArgumentException('Transcode paths must be absolute and contain no traversal components.');
         }
         StoragePathBoundary::resolve($this->basePath, $path);
+        $this->assertGenerationPath($path);
+        if ($this->generation !== null) {
+            $scope = rtrim($this->basePath, '/') . '/' . $this->videoIdentity . '/' . $this->tierIdentity . '/generation-' . $this->generation;
+            StoragePathBoundary::resolve($scope, $path);
+        }
 
         // Keep the configured root spelling: deletion walks beneath that root
         // without following links, including when the configured root is an alias.
         return $path;
+    }
+
+    public function assertGenerationPath(string $path): void
+    {
+        if ($this->generation === null) {
+            return;
+        }
+        $scope = rtrim($this->basePath, '/') . '/' . $this->videoIdentity . '/' . $this->tierIdentity . '/generation-' . $this->generation;
+        if ($path !== $scope && !str_starts_with($path, $scope . '/')) {
+            throw new InvalidArgumentException('Path belongs to another execution generation.');
+        }
+    }
+
+    private function videoPath(Uuid $videoId, ?QualityTier $tier, string ...$components): string
+    {
+        if ($this->generation !== null) {
+            if ($videoId->toString() !== $this->videoIdentity || ($tier !== null && $tier->name !== $this->tierIdentity)) {
+                throw new InvalidArgumentException('Output identity does not match the execution generation.');
+            }
+            return $this->buildPath($videoId->toString(), $this->tierIdentity ?? '', 'generation-' . $this->generation, ...$components);
+        }
+        return $tier === null
+            ? $this->buildPath($videoId->toString(), ...$components)
+            : $this->buildPath($videoId->toString(), $tier->name, ...$components);
     }
 
     private function buildPath(string ...$components): string

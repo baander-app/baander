@@ -8,18 +8,16 @@ use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\HardwareAccelerator;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
-use SwooleBundle\SwooleBundle\Server\Runtime\Bootable;
 
 /**
- * Probes available hardware accelerators at server boot.
+ * Probes hardware only when explicitly called by the admitted worker runtime.
  *
  * Runs `ffmpeg -hwaccels` and `ffmpeg -encoders` to detect GPU capabilities,
  * then validates each detected accelerator with a test encode.
  * Produces an EncoderProfile for the best available hardware, or falls back to software.
  */
-class HardwareCapabilitiesProber implements Bootable
+class HardwareCapabilitiesProber
 {
-    private bool $booted = false;
     private ?EncoderProfile $profile = null;
 
     public function __construct(
@@ -31,28 +29,14 @@ class HardwareCapabilitiesProber implements Bootable
     ) {
     }
 
-    public function boot(array $runtimeConfiguration = []): void
+    public function probeForWorker(): EncoderProfile
     {
-        if ($this->booted) {
-            return;
-        }
-        $this->booted = true;
-
-        $this->profile = $this->probe();
-    }
-
-    public function isBooted(): bool
-    {
-        return $this->booted;
+        return $this->profile ??= $this->probe();
     }
 
     public function getProfile(): EncoderProfile
     {
-        if (!$this->booted) {
-            $this->boot();
-        }
-
-        return $this->profile ?? throw new RuntimeException('HardwareCapabilitiesProber failed to probe');
+        return $this->profile ?? throw new RuntimeException('Worker hardware capabilities have not been probed');
     }
 
     public function getBitrateMultiplier(): float
@@ -81,6 +65,8 @@ class HardwareCapabilitiesProber implements Bootable
                 $this->logger->warning('Configured encoder not available, falling back', [
                     'encoder' => $this->preferredEncoder,
                 ]);
+
+                return EncoderProfile::software();
             }
             // Software encoder specified (libx265, libx264, etc.) — use as-is
             return EncoderProfile::software($this->preferredEncoder);
@@ -136,7 +122,7 @@ class HardwareCapabilitiesProber implements Bootable
      */
     private function probeHwaccels(): array
     {
-        $output = $this->exec(sprintf('%s -hwaccels', $this->ffmpegPath));
+        $output = $this->exec([$this->ffmpegPath, '-hwaccels']);
 
         $methods = [];
         foreach (explode("\n", $output) as $line) {
@@ -157,7 +143,7 @@ class HardwareCapabilitiesProber implements Bootable
      */
     private function probeEncoders(): array
     {
-        $output = $this->exec(sprintf('%s -encoders', $this->ffmpegPath));
+        $output = $this->exec([$this->ffmpegPath, '-encoders']);
 
         $encoders = [];
         $hwPatterns = ['nvenc', 'vaapi', 'videotoolbox', '_qsv', '_amf'];
@@ -182,31 +168,18 @@ class HardwareCapabilitiesProber implements Bootable
      */
     private function validateEncoder(HardwareAccelerator $accel, string $encoder): bool
     {
-        // Build init_hw_device flag for accelerators requiring device path
-        $initDevice = '';
+        $command = [$this->ffmpegPath, '-nostdin', '-y', '-threads', '1', '-filter_threads', '1', '-filter_complex_threads', '1'];
         if ($accel->requiresDevicePath()) {
             $device = $this->hwAccelDevice ?: $accel->defaultDevicePath();
             $method = $accel->ffmpegHwaccelMethod();
-            $initDevice = sprintf('-init_hw_device %s=%s_0:%s', $method, $method, escapeshellarg($device));
+            array_push($command, '-init_hw_device', sprintf('%s=%s_0:%s', $method, $method, $device));
         }
-
-        // Build upload filter for hardware encoders that need frames in GPU memory
-        $uploadFilter = match (true) {
-            $accel === HardwareAccelerator::Nvenc => '',
-            $accel === HardwareAccelerator::VideoToolbox => '',
-            $accel->requiresDevicePath() => ' -vf ' . escapeshellarg('format=nv12,hwupload'),
-            default => '',
-        };
-
-        $cmd = sprintf(
-            '%s -y %s -f lavfi -i nullsrc=s=256x256:d=0.1%s -c:v %s -f null - 2>&1',
-            $this->ffmpegPath,
-            $initDevice !== '' ? $initDevice . ' ' : '',
-            $uploadFilter,
-            $encoder,
-        );
-
-        $this->exec($cmd);
+        array_push($command, '-f', 'lavfi', '-i', 'nullsrc=s=256x256:d=0.1');
+        if ($accel->requiresDevicePath()) {
+            array_push($command, '-vf', 'format=nv12,hwupload');
+        }
+        array_push($command, '-c:v', $encoder, '-threads', '1', '-f', 'null', '-');
+        $this->exec($command);
 
         if ($this->lastExitCode !== 0) {
             $this->logger->debug('Encoder validation failed', [
@@ -222,28 +195,26 @@ class HardwareCapabilitiesProber implements Bootable
 
     protected int $lastExitCode = 0;
 
-    protected function exec(string $cmd): string
+    /** @param list<string> $command */
+    protected function exec(array $command): string
     {
-        $descriptors = [
-            0 => ['pipe', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w'],
-        ];
-
-        $process = proc_open($cmd, $descriptors, $pipes);
-
-        if ($process === false) {
-            throw new RuntimeException(sprintf('Failed to execute: %s', $cmd));
+        $output = tmpfile();
+        if ($output === false) {
+            throw new RuntimeException('Cannot create hardware probe output stream');
         }
+        try {
+            $descriptors = [0 => ['file', '/dev/null', 'r'], 1 => $output, 2 => $output];
+            $process = proc_open($command, $descriptors, $pipes, env_vars: array_replace(getenv(), ['OMP_NUM_THREADS' => '1', 'OPENBLAS_NUM_THREADS' => '1']));
+            if ($process === false) {
+                throw new RuntimeException(sprintf('Failed to execute: %s', $command[0]));
+            }
+            $this->lastExitCode = proc_close($process);
+            rewind($output);
+            $stdout = stream_get_contents($output);
 
-        fclose($pipes[0]);
-        $stdout = stream_get_contents($pipes[1]);
-        $stderr = stream_get_contents($pipes[2]);
-        fclose($pipes[1]);
-        fclose($pipes[2]);
-
-        $this->lastExitCode = proc_close($process);
-
-        return $stdout . "\n" . $stderr;
+            return $stdout === false ? '' : $stdout;
+        } finally {
+            fclose($output);
+        }
     }
 }

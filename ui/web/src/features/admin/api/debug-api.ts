@@ -61,31 +61,13 @@ export interface HttpWorkerStats {
   total_send_bytes: number | null
 }
 
-export interface TaskWorkerStats {
-  total: number | null
-  idle: number | null
-  active: number | null
-  tasking_num: number | null
-  task_count: number | null
-}
-
 export interface UserWorkerStats {
   total: number | null
 }
 
-export interface TranscodePoolStats {
-  available: boolean
-  running?: boolean
-  worker_count?: number
-  result_table_size?: number
-  boot_pending?: boolean
-}
-
 export interface WorkerStats {
   http_workers: HttpWorkerStats
-  task_workers: TaskWorkerStats
   user_workers: UserWorkerStats
-  transcode_pool: TranscodePoolStats
 }
 
 export async function getWorkerStats(): Promise<WorkerStats> {

@@ -117,6 +117,7 @@ final class ManifestGenerator
         $lines[] = sprintf('#EXT-X-TARGETDURATION:%d', (int) ceil($targetDuration));
 
         if (!empty($segments)) {
+            $lines[] = '#EXT-X-MEDIA-SEQUENCE:' . array_key_first($segments);
             $lines[] = '#EXT-X-MAP:URI="' . $initSegmentUrl . '"';
         }
 
@@ -135,7 +136,7 @@ final class ManifestGenerator
      * Generate an HLS v6 subtitle media playlist for a specific language.
      *
      * @param string $language BCP-47 language tag
-     * @param list<array{segmentName: string, duration: float}> $segments
+     * @param list<array{segmentName: string, duration: float, url?: string}> $segments
      */
     public function generateSubtitleManifest(
         string $language,
@@ -150,7 +151,7 @@ final class ManifestGenerator
         foreach ($segments as $segment) {
             $duration = round($segment['duration'], 6);
             $lines[] = sprintf('#EXTINF:%.6f,', $duration);
-            $lines[] = $segment['segmentName'] . '.vtt';
+            $lines[] = $segment['url'] ?? $segment['segmentName'] . '.vtt';
         }
 
         $lines[] = '#EXT-X-ENDLIST';

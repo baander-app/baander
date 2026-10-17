@@ -10,13 +10,15 @@ use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\DTO\TranscodeJobDto;
 use App\Transcode\Application\DTO\TranscodeSessionDto;
 use App\Transcode\Application\Port\TranscodePublicViewInterface;
+use App\Transcode\Application\Port\TranscodeStreamingPortInterface;
+use App\Transcode\Application\Port\StreamAuthPortInterface;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Model\TranscodeSession;
 use Doctrine\DBAL\Connection;
 
 final readonly class TranscodePublicView implements TranscodePublicViewInterface
 {
-    public function __construct(private Connection $connection)
+    public function __construct(private Connection $connection, private TranscodeStreamingPortInterface $streaming, private StreamAuthPortInterface $streamAuth)
     {
     }
 
@@ -39,7 +41,12 @@ final readonly class TranscodePublicView implements TranscodePublicViewInterface
             throw new NotFoundException('Session relationship not found.');
         }
 
-        return TranscodeSessionDto::fromModel($session, PublicId::fromString($row['user_id']), PublicId::fromString($row['job_id']), PublicId::fromString($row['video_id']));
+        $playback = $this->streaming->getPlaybackState($session->getVideoId(), $row['job_id']);
+        if ($playback !== null) {
+            $path = '/api/transcode/'.$row['video_id'].'/master.m3u8?'.http_build_query(['generation' => $playback['generation'], 'job' => $playback['jobId']]);
+            $playback['manifestUrl'] = $this->streamAuth->signUrl($path)['url'];
+        }
+        return TranscodeSessionDto::fromModel($session, PublicId::fromString($row['user_id']), PublicId::fromString($row['job_id']), PublicId::fromString($row['video_id']), $playback);
     }
 
     public function job(TranscodeJob $job): TranscodeJobDto

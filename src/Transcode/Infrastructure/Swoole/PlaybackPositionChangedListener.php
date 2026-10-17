@@ -4,27 +4,27 @@ declare(strict_types=1);
 
 namespace App\Transcode\Infrastructure\Swoole;
 
+use App\Transcode\Application\Command\UpdateTranscodePositionCommand;
+use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Domain\Event\PlaybackPositionChanged;
+use Symfony\Component\Messenger\MessageBusInterface;
 
-/**
- * Bridges PlaybackPositionChanged domain events to the SeekSignalBroker.
- *
- * Runs in an HTTP worker coroutine. Pushes seek/pause signals to the
- * per-job channel so the encoding loop coroutine can pick them up.
- */
-final class PlaybackPositionChangedListener
+/** Applies Party playback controls through the durable session use case. */
+final readonly class PlaybackPositionChangedListener
 {
     public function __construct(
-        private readonly SeekSignalBroker $seekSignalBroker,
-    ) {
-    }
+        private TranscodeExecutionOwnershipPort $ownership,
+        private MessageBusInterface $commandBus,
+    ) {}
 
     public function __invoke(PlaybackPositionChanged $event): void
     {
-        $this->seekSignalBroker->signal(
-            $event->getJobId(),
-            $event->getPosition(),
-            $event->getAction(),
-        );
+        $runtime = $this->ownership->find($event->getJobId());
+        if ($runtime === null) {
+            return;
+        }
+        $this->commandBus->dispatch(new UpdateTranscodePositionCommand(
+            $runtime->sessionId, $event->getPosition(), $event->getAction(),
+        ));
     }
 }

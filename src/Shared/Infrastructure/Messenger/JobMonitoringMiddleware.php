@@ -13,7 +13,7 @@ use Symfony\Component\Messenger\Stamp\ReceivedStamp;
 /**
  * Gives every dispatched message its job ID before a transport stores it, so all of its
  * deliveries share one job_monitors row. A worker that later receives the message records
- * the row; see WorkerJobMonitorSubscriber and SwooleTaskJobMonitorDecorator.
+ * the row through WorkerJobMonitorSubscriber.
  */
 final readonly class JobMonitoringMiddleware implements MiddlewareInterface
 {

@@ -59,11 +59,7 @@ swoole:
             # enabled, 4 workers give enough headroom for concurrent SSE + API traffic.
             worker_count: 4
             reactor_count: 2
-            # Disable worker recycling. The CPU process pool forks child workers
-            # from each Swoole HTTP worker; when an HTTP worker is recycled, the
-            # children lose their parent pipe and exit, leaving the pool with
-            # only 2 of 4 workers and causing transcode timeouts. Memory growth
-            # is acceptable in this dev/test setup.
+            # Connection workers retain long-lived WebSocket and SSE sessions.
             worker_max_request: 0
             # Grace period unused when recycling is disabled.
             worker_max_request_grace: 0
@@ -79,8 +75,6 @@ swoole:
             dispatch_mode: 2
             # Reload workers without interrupting in-flight requests.
             reload_async: true
-            # Disable task-worker recycling for the same pool-survival reason.
-            task_max_request: 0
             upload_tmp_dir: /tmp
             user: ~
             group: ~
@@ -100,12 +94,8 @@ swoole:
                 - application/manifest+json
                 - image/svg+xml
     task_worker:
-        services:
-            reset_handler: true
         settings:
-            # 2 task workers — one for metadata enrichment (heavy I/O), one for
-            # notifications and lighter tasks. Prevents blocking between job types.
-            worker_count: 2
+            worker_count: 0
     platform:
         fiber_context:
             enabled: auto # One of "auto"; "off"; "on"

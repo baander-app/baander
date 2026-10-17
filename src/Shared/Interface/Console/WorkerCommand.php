@@ -30,8 +30,8 @@ final class WorkerCommand extends Command
             ->addOption('consumer-mib', null, InputOption::VALUE_REQUIRED, 'Required Redis consumer reservation in MiB (at least 320).')
             ->addOption('relay-mib', null, InputOption::VALUE_REQUIRED, 'Required outbox relay reservation in MiB (at least 320).')
             ->addOption('scheduler-mib', null, InputOption::VALUE_REQUIRED, 'Required scheduler reservation in MiB (at least 320).')
-            ->addOption('media-mib', null, InputOption::VALUE_REQUIRED, 'Required media role and encoder reservation in MiB (at least 320 plus 64 per descendant).')
-            ->addOption('media-descendant-pids', null, InputOption::VALUE_REQUIRED, 'Required maximum concurrent media child processes.')
+            ->addOption('media-mib', null, InputOption::VALUE_REQUIRED, 'Required media role and encoder reservation in MiB (at least 2624 for three video slots and one audio slot).')
+            ->addOption('media-descendant-pids', null, InputOption::VALUE_REQUIRED, 'Required media descendant process reservation (at least 14).')
             ->addOption('scheduled-console-mib', null, InputOption::VALUE_REQUIRED, 'Reservation for one synchronous scheduled console child in MiB (0 disables, otherwise at least 192).', '0')
             ->addOption('lock-dir', null, InputOption::VALUE_REQUIRED, 'Private local lock directory.', '/tmp/baander-worker-locks');
         $this->setHelp('This initial fixed-set supervisor requires container PID 1. Child exit or lost authority drains the deployment. Scheduled console execution is disabled unless explicitly reserved; its child reservation is additional to the consumer budget. The media role owns encoders within its explicit descendant reservation. Autoscaling is not part of this command. Reservations are admission limits, not measured capacity or OS enforcement.');
@@ -68,8 +68,8 @@ final class WorkerCommand extends Command
     private function descendantPids(InputInterface $input): int
     {
         $value = $this->stringOption($input, 'media-descendant-pids');
-        if (preg_match('/\A[1-9][0-9]{0,3}\z/D', $value) !== 1 || (int) $value > 4088) {
-            throw new \InvalidArgumentException('Media descendant capacity must be an integer between 1 and 4088.');
+        if (preg_match('/\A[1-9][0-9]{0,3}\z/D', $value) !== 1 || (int) $value < 14 || (int) $value > 4088) {
+            throw new \InvalidArgumentException('Media descendant capacity must be an integer between 14 and 4088.');
         }
         return (int) $value;
     }

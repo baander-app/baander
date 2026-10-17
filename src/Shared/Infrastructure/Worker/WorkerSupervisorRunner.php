@@ -14,10 +14,10 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
     {
         if (!str_starts_with($projectDirectory, '/') || realpath($projectDirectory) !== $projectDirectory
             || !is_file($projectDirectory . '/bin/console') || !is_file($projectDirectory . '/bin/worker-lease-agent.php')
-            || !is_file($projectDirectory . '/bin/worker-scheduler.php')
+            || !is_file($projectDirectory . '/bin/worker-scheduler.php') || !is_file($projectDirectory . '/bin/worker-media.php') || !is_file($projectDirectory . '/bin/worker-media-job.php')
             || $databaseUrl === '' || str_contains($databaseUrl, "\0")
         ) {
-            throw new \InvalidArgumentException('Worker runner requires a trusted canonical project with console/lease/scheduler entrypoints and a database URL.');
+            throw new \InvalidArgumentException('Worker runner requires a trusted canonical project with console/lease/scheduler/media entrypoints and a database URL.');
         }
     }
 
@@ -47,7 +47,7 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
             $launchAttempts = 0;
             $definitions = $this->definitions($configuration);
             $authority = new LeaseAuthority($configuration->namespace, $configuration->bootId, 30, 10, 1);
-            $runtime = new LeasedWorkerRuntime($definitions, 4 + ($configuration->scheduledConsoleReservationBytes === 0 ? 0 : 1), $configuration->memoryLimitBytes, $configuration->managementReservationBytes,
+            $runtime = new LeasedWorkerRuntime($definitions, 5 + $configuration->mediaDescendantPids + ($configuration->scheduledConsoleReservationBytes === 0 ? 0 : 1), $configuration->memoryLimitBytes, $configuration->managementReservationBytes,
                 $authority,
                 function (WorkerDefinition $definition, WorkerLaunchIdentity $identity) use ($authority, $environment, $configuration, &$stopRequested, &$launchAttempts): WorkerChildProcess {
                     if ($stopRequested) {
@@ -144,6 +144,9 @@ final readonly class WorkerSupervisorRunner implements WorkerSupervisorRunnerInt
                 $this->projectDirectory, $configuration->relayReservationBytes, 30.0),
             new WorkerDefinition('scheduler', [PHP_BINARY, '-d', 'memory_limit=256M', $this->projectDirectory . '/bin/worker-scheduler.php'],
                 $this->projectDirectory, $configuration->schedulerReservationBytes, 30.0),
+            new WorkerDefinition('media', [PHP_BINARY, '-d', 'memory_limit=256M', $this->projectDirectory . '/bin/worker-media.php'],
+                $this->projectDirectory, $configuration->mediaReservationBytes, 30.0,
+                descendantProcessReservation: $configuration->mediaDescendantPids),
         ];
     }
 

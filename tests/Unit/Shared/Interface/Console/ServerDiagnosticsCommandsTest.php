@@ -138,8 +138,9 @@ final class ServerDiagnosticsCommandsTest extends TestCase
         $display = $tester->getDisplay();
         self::assertStringContainsString('HTTP workers', $display);
         self::assertMatchesRegularExpression('/total\s+4/', $display);
-        self::assertMatchesRegularExpression('/worker count\s+6/', $display);
-        self::assertMatchesRegularExpression('/running\s+yes/', $display);
+        self::assertStringContainsString('User workers', $display);
+        self::assertStringNotContainsString('Task workers', $display);
+        self::assertStringNotContainsString('Transcoding pool', $display);
         self::assertSame([['debug.workers', []]], $this->calls);
     }
 

@@ -106,9 +106,7 @@ const WORKER_STATS: WorkerStats = {
     total_recv_bytes: 1_000,
     total_send_bytes: 2_000,
   },
-  task_workers: { total: 4, idle: 3, active: 1, tasking_num: 1, task_count: 12 },
   user_workers: { total: 1 },
-  transcode_pool: { available: true, running: true, worker_count: 6, result_table_size: 64, boot_pending: false },
 }
 
 const SPANS: Span[] = [
@@ -232,9 +230,10 @@ describe('ServerDiagnosticsPage', () => {
     mount()
 
     const pools = await screen.findByRole('region', { name: 'Worker pools' })
-    expect(await within(pools).findByText('Transcode pool workers')).toBeInTheDocument()
-    expect(within(pools).getByText('6')).toBeInTheDocument()
-    expect(within(pools).getByText('Task total')).toBeInTheDocument()
+    expect(await within(pools).findByText('HTTP total')).toBeInTheDocument()
+    expect(within(pools).getByText('2')).toBeInTheDocument()
+    expect(within(pools).queryByText('Task total')).not.toBeInTheDocument()
+    expect(within(pools).queryByText('Transcode pool')).not.toBeInTheDocument()
   })
 
   it('shows spans with operation name, status code and duration in milliseconds', async () => {

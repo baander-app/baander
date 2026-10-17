@@ -29,6 +29,14 @@ final readonly class UpdateTranscodePositionHandler
             if ($session === null) {
                 throw SessionNotFoundException::forId($sessionId);
             }
+            if ($command->action === 'progress') {
+                $current = $this->ownership->find($session->getJobId());
+                if ($current === null || $current->generation !== $command->expectedGeneration
+                    || $current->desiredRevision !== $command->expectedRevision
+                    || $current->desired->status !== 'running') {
+                    return;
+                }
+            }
             $runtime = $this->ownership->control($session->getJobId(), $sessionId, $command->requestId, status: match ($command->action) { 'pause' => 'paused', 'resume' => 'running', default => null }, position: $command->position, seek: $command->action === 'seek');
             if (in_array($runtime->outcome, ['complete', 'failed', 'refused'], true)) {
                 return;

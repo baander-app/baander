@@ -112,6 +112,14 @@ final class SegmentEncoderPublicationTest extends TestCase
                 self::assertNotSame('', $fragment);
                 $combined = $this->directory . '/combined.mp4';
                 file_put_contents($combined, $init . $fragment);
+                if ($segment === array_values($segments)[0]) {
+                    $probe = new Process(['/usr/bin/ffprobe', '-v', 'error', '-show_entries', 'format=start_time', '-of', 'json', $combined]);
+                    $probe->mustRun();
+                    $metadata = json_decode($probe->getOutput(), true, 512, JSON_THROW_ON_ERROR);
+                    $firstTimestamp = (float) $metadata['format']['start_time'];
+                    self::assertGreaterThanOrEqual(0.0, $firstTimestamp);
+                    self::assertLessThan(1.0, $firstTimestamp, 'A fresh generation uses a local media timeline after input seeking.');
+                }
                 $this->runFfmpeg(['/usr/bin/ffmpeg', '-hide_banner', '-loglevel', 'error', '-xerror',
                     '-i', $combined, '-f', 'null', '-']);
             }

@@ -156,42 +156,5 @@
             </div>
         </div>
 
-        <div class="tab">
-            <h3 class="tab-title">CPU Process Pool</h3>
-            <div class="tab-content">
-                {% if not collector.cpuPool.available %}
-                    <p class="text-muted">CPU process pool is not configured.</p>
-                {% else %}
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Metric</th>
-                                <th>Value</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td>Status</td>
-                                <td>
-                                    {% if collector.cpuPool.running %}
-                                        <span style="color: #27ae60; font-weight: bold;">Running</span>
-                                    {% else %}
-                                        <span style="color: #e74c3c; font-weight: bold;">Stopped</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            <tr>
-                                <td>Workers</td>
-                                <td>{{ collector.cpuPool.worker_count }}</td>
-                            </tr>
-                            <tr>
-                                <td>Pending Results</td>
-                                <td>{{ collector.cpuPool.result_table_size }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                {% endif %}
-            </div>
-        </div>
     </div>
 {% endblock %}

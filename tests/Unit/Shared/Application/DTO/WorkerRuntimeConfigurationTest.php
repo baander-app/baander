@@ -14,14 +14,14 @@ final class WorkerRuntimeConfigurationTest extends TestCase
     public function testInclusiveMinimumReservationsFitExactCeiling(): void
     {
         $configuration = $this->configuration();
-        self::assertSame(1536 * 1024 * 1024, $configuration->memoryLimitBytes);
+        self::assertSame(3712 * 1024 * 1024, $configuration->memoryLimitBytes);
         self::assertSame($configuration->memoryLimitBytes, $configuration->managementReservationBytes + $configuration->consumerReservationBytes + $configuration->relayReservationBytes + $configuration->schedulerReservationBytes + $configuration->mediaReservationBytes);
         self::assertSame(0, $configuration->scheduledConsoleReservationBytes);
     }
 
     public function testConsoleReservationIsAdditionalAndFitsAnExactCeiling(): void
     {
-        $configuration = $this->configuration(['memoryLimitBytes' => 1728 * 1024 * 1024, 'scheduledConsoleReservationBytes' => 192 * 1024 * 1024]);
+        $configuration = $this->configuration(['memoryLimitBytes' => 3904 * 1024 * 1024, 'scheduledConsoleReservationBytes' => 192 * 1024 * 1024]);
         self::assertSame($configuration->memoryLimitBytes,
             $configuration->managementReservationBytes + $configuration->consumerReservationBytes + $configuration->relayReservationBytes + $configuration->schedulerReservationBytes + $configuration->mediaReservationBytes + $configuration->scheduledConsoleReservationBytes);
     }
@@ -41,7 +41,7 @@ final class WorkerRuntimeConfigurationTest extends TestCase
         yield 'uppercase boot' => ['bootId', str_repeat('A', 32)];
         yield 'zero total' => ['memoryLimitBytes', 0];
         yield 'unbounded total' => ['memoryLimitBytes', 1024 * 1024 * 1024 * 1024 + 1];
-        yield 'sum exceeds ceiling' => ['memoryLimitBytes', 1536 * 1024 * 1024 - 1];
+        yield 'sum exceeds ceiling' => ['memoryLimitBytes', 3712 * 1024 * 1024 - 1];
         yield 'insufficient management' => ['managementReservationBytes', 128 * 1024 * 1024 - 1];
         yield 'insufficient consumer' => ['consumerReservationBytes', 320 * 1024 * 1024 - 1];
         yield 'legacy total excludes scheduler' => ['memoryLimitBytes', 768 * 1024 * 1024];
@@ -55,8 +55,8 @@ final class WorkerRuntimeConfigurationTest extends TestCase
         yield 'insufficient console reservation' => ['scheduledConsoleReservationBytes', 192 * 1024 * 1024 - 1];
         yield 'console exceeds remaining ceiling' => ['scheduledConsoleReservationBytes', 192 * 1024 * 1024];
         yield 'oversized console reservation' => ['scheduledConsoleReservationBytes', PHP_INT_MAX];
-        yield 'insufficient media memory' => ['mediaReservationBytes', 448 * 1024 * 1024 - 1];
-        yield 'insufficient descendant capacity' => ['mediaDescendantPids', 0];
+        yield 'insufficient media memory' => ['mediaReservationBytes', 2624 * 1024 * 1024 - 1];
+        yield 'insufficient descendant capacity' => ['mediaDescendantPids', 13];
         yield 'excess descendant capacity' => ['mediaDescendantPids', 4089];
         yield 'oversized media reservation' => ['mediaReservationBytes', PHP_INT_MAX];
         yield 'relative lock path' => ['lockDirectory', 'worker-lock'];
@@ -68,10 +68,10 @@ final class WorkerRuntimeConfigurationTest extends TestCase
     private function configuration(array $overrides = []): WorkerRuntimeConfiguration
     {
         return new WorkerRuntimeConfiguration(...array_replace([
-            'namespace' => 'worker.baander.app', 'bootId' => str_repeat('a', 32), 'memoryLimitBytes' => 1536 * 1024 * 1024,
+            'namespace' => 'worker.baander.app', 'bootId' => str_repeat('a', 32), 'memoryLimitBytes' => 3712 * 1024 * 1024,
             'managementReservationBytes' => 128 * 1024 * 1024, 'consumerReservationBytes' => 320 * 1024 * 1024,
             'scheduledConsoleReservationBytes' => 0, 'schedulerReservationBytes' => 320 * 1024 * 1024,
-            'mediaReservationBytes' => 448 * 1024 * 1024, 'mediaDescendantPids' => 2,
+            'mediaReservationBytes' => 2624 * 1024 * 1024, 'mediaDescendantPids' => 14,
             'relayReservationBytes' => 320 * 1024 * 1024, 'lockDirectory' => '/tmp/baander-worker',
         ], $overrides));
     }

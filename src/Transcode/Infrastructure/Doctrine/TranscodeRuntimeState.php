@@ -75,7 +75,7 @@ SQL, ['job' => $jobId->toString(), 'session' => $sessionId->toString(), 'request
             if ($row === null || $row['session_id'] !== $sessionId->toString()) {
                 throw new \LogicException('Control does not address the current runtime session.');
             }
-            if ($row['last_control_request_id'] === $requestId || in_array($row['outcome'], ['complete', 'failed', 'cancelled', 'refused'], true)) {
+            if ($row['last_control_request_id'] === $requestId || in_array($row['outcome'], ['failed', 'cancelled', 'refused'], true)) {
                 return $this->snapshot($row);
             }
             $previous = $this->snapshot($row)->desired;
@@ -89,9 +89,12 @@ SQL, ['job' => $jobId->toString(), 'session' => $sessionId->toString(), 'request
             $restartRequired = ($seek && ($positionChanged || $segmentChanged)) || $profileChanged;
             $generation = (int) $row['generation'] + ($restartRequired ? 1 : 0);
             $cancelled = $desired->status === 'cancelled';
+            $reactivated = $row['outcome'] === 'complete' && $restartRequired && !$cancelled;
+            $outcome = $cancelled ? 'cancelled' : ($reactivated ? 'accepted' : $row['outcome']);
+            $ownerReset = $reactivated ? ', ' . $this->clearOwnerSql() : '';
             $this->connection->executeStatement(
-                'UPDATE transcode_runtime_state SET desired = CAST(:desired AS jsonb), last_control_request_id = :request, desired_revision = desired_revision + 1, generation = :generation, outcome = :outcome, output_directory = CASE WHEN generation = :generation THEN output_directory ELSE NULL END, updated_at = clock_timestamp() WHERE job_id = :job',
-                ['desired' => $this->encodeDesired($desired), 'request' => $requestId, 'generation' => $generation, 'outcome' => $cancelled ? 'cancelled' : $row['outcome'], 'job' => $jobId->toString()],
+                'UPDATE transcode_runtime_state SET desired = CAST(:desired AS jsonb), last_control_request_id = :request, desired_revision = desired_revision + 1, generation = :generation, outcome = :outcome, output_directory = CASE WHEN generation = :generation THEN output_directory ELSE NULL END, updated_at = clock_timestamp()' . $ownerReset . ' WHERE job_id = :job',
+                ['desired' => $this->encodeDesired($desired), 'request' => $requestId, 'generation' => $generation, 'outcome' => $outcome, 'job' => $jobId->toString()],
             );
             return $this->find($jobId) ?? throw new \LogicException('Controlled runtime disappeared.');
         });

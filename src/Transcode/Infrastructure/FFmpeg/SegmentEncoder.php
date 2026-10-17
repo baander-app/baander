@@ -10,6 +10,7 @@ use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\Service\VideoProcessingRules;
 use App\Transcode\Domain\ValueObject\ColorSpace;
+use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\EncoderProfile;
 use App\Transcode\Domain\ValueObject\HardwareAccelerator;
 use App\Transcode\Domain\ValueObject\QualityTier;
@@ -38,6 +39,11 @@ final class SegmentEncoder
     /**
      * Encode the init segment for a job.
      */
+    public function getEncoderProfile(): EncoderProfile
+    {
+        return $this->encoderProfile;
+    }
+
     public function encodeInit(TranscodeJob $job, string $sourcePath): string
     {
         $tier = QualityTier::fromString($job->getQualityTierName());
@@ -79,8 +85,12 @@ final class SegmentEncoder
         TranscodeSession $session,
         array $measuredLoudness = [],
     ): string {
-        $profile = $session->getAudioProfile();
+        return $this->buildAudioFiltersForProfile($probe, $session->getAudioProfile(), $measuredLoudness);
+    }
 
+    /** @param array<string, mixed> $measuredLoudness */
+    public function buildAudioFiltersForProfile(VideoProbeResult $probe, AudioProfile $profile, array $measuredLoudness = []): string
+    {
         $builder = AudioFilterBuilder::create();
         $builder->downmix($probe, $profile);
         $builder->dialogueEnhancement($probe, $profile);
@@ -120,8 +130,12 @@ final class SegmentEncoder
         ?int $startSegment = null,
         int $videoStreamIndex = 0,
         int $audioStreamIndex = 0,
+        ?AudioProfile $audioProfile = null,
+        string $audioFilters = '',
     ): array {
         $encoderFlags = VideoProcessingRules::codecFlags($this->encoderProfile->encoder);
+        // libx265 and SVT maintain pools independently of FFmpeg's thread limit.
+        $encoderFlags = str_replace(['log-level=error', 'fast-decode=1'], ['pools=2:frame-threads=2:log-level=error', 'lp=2:fast-decode=1'], $encoderFlags);
         $hwAccelFlags = $this->encoderProfile->hwaccelInputFlags();
         $decoderFlags = $this->encoderProfile->decoderFlags();
         $segmentDuration = (int) ceil(self::SEGMENT_DURATION);
@@ -133,6 +147,9 @@ final class SegmentEncoder
             '-loglevel',
             'error',
             '-y',
+            '-threads', '2',
+            '-filter_threads', '1',
+            '-filter_complex_threads', '1',
         ];
 
         // hwaccel/decoder/encoder flags come from trusted config/code as
@@ -169,11 +186,21 @@ final class SegmentEncoder
 
         // Audio codec: AAC stereo, matching the existing audio delivery.
         $args[] = '-c:a';
-        $args[] = 'aac';
+        $args[] = ($audioProfile ?? AudioProfile::streamingStereo())->codec;
         $args[] = '-b:a';
-        $args[] = '128k';
+        $args[] = (string) ($audioProfile ?? AudioProfile::streamingStereo())->bitrate;
         $args[] = '-ac';
+        $args[] = (string) ($audioProfile ?? AudioProfile::streamingStereo())->channelCount;
+        $args[] = '-ar';
+        $args[] = (string) ($audioProfile ?? AudioProfile::streamingStereo())->sampleRate;
+        $args[] = '-threads:v';
         $args[] = '2';
+        $args[] = '-threads:a';
+        $args[] = '1';
+        if ($audioFilters !== '') {
+            $args[] = '-af';
+            $args[] = $audioFilters;
+        }
 
         $args[] = '-b:v';
         $args[] = (string) $tier->videoBitrate;

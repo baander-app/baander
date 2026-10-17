@@ -35,13 +35,13 @@ final class QualityFilteringStreamingDecoratorTest extends TestCase
 
         self::assertSame(
             "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=2800000,RESOLUTION=1280x720\n/api/stream/abc/media.m3u8?tier=720p\n",
-            $decorator->getMasterManifest($videoId),
+            $decorator->getMasterManifest($videoId, 3),
         );
         self::assertSame(
             '<MPD><Period><AdaptationSet>'
             . '<Representation id="720p" bandwidth="2800000"><BaseURL>a</BaseURL></Representation>'
             . '</AdaptationSet></Period></MPD>',
-            $decorator->getDashManifest($videoId),
+            $decorator->getDashManifest($videoId, 3),
         );
     }
 
@@ -52,22 +52,22 @@ final class QualityFilteringStreamingDecoratorTest extends TestCase
         $inner->method('getDashManifest')->willReturn(self::DASH);
         $decorator = $this->decorator($inner, restricted: false);
 
-        self::assertSame(self::HLS, $decorator->getMasterManifest(Uuid::generate()));
-        self::assertSame(self::DASH, $decorator->getDashManifest(Uuid::generate()));
+        self::assertSame(self::HLS, $decorator->getMasterManifest(Uuid::generate(), 3));
+        self::assertSame(self::DASH, $decorator->getDashManifest(Uuid::generate(), 3));
     }
 
     public function testStreamReadsPassThroughUnchanged(): void
     {
         $jobId = new PublicId();
         $inner = $this->createMock(TranscodeStreamingPortInterface::class);
-        $inner->expects(self::once())->method('getMediaManifest')->with($jobId, 'stereo')->willReturn('media');
-        $inner->expects(self::once())->method('getSegment')->with($jobId, 3)->willReturn('segment');
-        $inner->expects(self::once())->method('getSubtitleManifest')->with($jobId, 'en')->willReturn('subtitles');
+        $inner->expects(self::once())->method('getMediaManifest')->with($jobId, 'stereo', 3)->willReturn('media');
+        $inner->expects(self::once())->method('getSegment')->with($jobId, 3, 3)->willReturn('segment');
+        $inner->expects(self::once())->method('getSubtitleManifest')->with($jobId, 'en', 3)->willReturn('subtitles');
         $decorator = $this->decorator($inner, restricted: true);
 
-        self::assertSame('media', $decorator->getMediaManifest($jobId, 'stereo'));
-        self::assertSame('segment', $decorator->getSegment($jobId, 3));
-        self::assertSame('subtitles', $decorator->getSubtitleManifest($jobId, 'en'));
+        self::assertSame('media', $decorator->getMediaManifest($jobId, 'stereo', 3));
+        self::assertSame('segment', $decorator->getSegment($jobId, 3, 3));
+        self::assertSame('subtitles', $decorator->getSubtitleManifest($jobId, 'en', 3));
     }
 
     private function decorator(TranscodeStreamingPortInterface $inner, bool $restricted): QualityFilteringStreamingDecorator

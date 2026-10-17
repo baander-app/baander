@@ -2762,6 +2762,12 @@ export const TranscodeSessionResourcePriority = {
 export type TranscodeSessionResourceAudioProfile = { [key: string]: unknown };
 
 /**
+ * Current durable execution generation, readiness, desired position/status and signed manifest URL
+ * @nullable
+ */
+export type TranscodeSessionResourcePlayback = { [key: string]: unknown } | null;
+
+/**
  * Session metrics
  * @nullable
  */
@@ -2812,6 +2818,11 @@ export interface TranscodeSessionResource {
      * @nullable
      */
   wallClockOffset?: number | null;
+  /**
+     * Current durable execution generation, readiness, desired position/status and signed manifest URL
+     * @nullable
+     */
+  playback?: TranscodeSessionResourcePlayback;
   /**
      * Session metrics
      * @nullable
@@ -7031,6 +7042,30 @@ export type PostMonitorTransportFailedRetry200 = {
 
 export type GetDebugWorkers200 = { [key: string]: unknown };
 
+export type GetStreamMasterManifestParams = {
+/**
+ * Pinned media execution generation
+ * @minimum 1
+ */
+generation: number;
+};
+
+export type GetStreamMediaManifestParams = {
+/**
+ * Pinned media execution generation
+ * @minimum 1
+ */
+generation: number;
+};
+
+export type GetStreamDashManifestParams = {
+/**
+ * Pinned media execution generation
+ * @minimum 1
+ */
+generation: number;
+};
+
 export type GetStreamQualityLadder200DataItem = {
   quality?: string;
   width?: number;
@@ -7041,7 +7076,20 @@ export type GetStreamQualityLadder200 = {
   data?: GetStreamQualityLadder200DataItem[];
 };
 
+export type GetStreamSubtitleManifestParams = {
+/**
+ * Pinned media execution generation
+ * @minimum 1
+ */
+generation: number;
+};
+
 export type GetStreamSegmentInitSegmentParams = {
+/**
+ * Pinned media execution generation
+ * @minimum 1
+ */
+generation: number;
 /**
  * URL signature
  */
@@ -7058,6 +7106,11 @@ export type GetStreamSegmentInitSegment403 = {
 
 export type GetStreamSegmentSegmentParams = {
 /**
+ * Pinned media execution generation
+ * @minimum 1
+ */
+generation: number;
+/**
  * Segment index
  */
 index: number;
@@ -7073,6 +7126,11 @@ exp: number;
 
 export type GetStreamSegmentSubtitleSegmentParams = {
 /**
+ * Pinned media execution generation
+ * @minimum 1
+ */
+generation: number;
+/**
  * URL signature
  */
 sig: string;
@@ -7085,12 +7143,26 @@ exp: number;
 export type PostStreamSigningSignBody = {
   path?: string;
   expiresInSeconds?: number;
+  /** Read current playback state without creating another admission */
+  refresh?: boolean;
 };
 
 export type PostStreamSigningSign200 = {
   url?: string;
   sig?: string;
   exp?: number;
+  generation?: number;
+  jobId?: string;
+  /** @nullable */
+  sessionId?: string | null;
+  revision?: number;
+  ready?: boolean;
+  position?: number;
+  status?: string;
+  /** @nullable */
+  startTime?: number | null;
+  /** @nullable */
+  duration?: number | null;
 };
 
 export type GetTranscodeJobIndex200DataItem = {
@@ -7226,11 +7298,22 @@ export const PostTranscodeSessionPositionBodyAction = {
   seek: 'seek',
   pause: 'pause',
   resume: 'resume',
+  progress: 'progress',
 } as const;
 
 export type PostTranscodeSessionPositionBody = {
   position?: number;
   action?: PostTranscodeSessionPositionBodyAction;
+  /**
+     * Required for progress; generation currently attached by the player
+     * @minimum 1
+     */
+  generation?: number;
+  /**
+     * Required for progress; desired revision currently attached by the player
+     * @minimum 1
+     */
+  revision?: number;
 };
 
 export type PostTranscodeSessionPosition200 = {
@@ -29726,7 +29809,7 @@ export const getGetDebugWorkersUrl = () => {
 }
 
 /**
- * @summary Server worker pool stats (HTTP, task, transcoding)
+ * @summary Server HTTP and user worker statistics
  */
 export const getDebugWorkers = async ( options?: RequestInit): Promise<GetDebugWorkers200> => {
 
@@ -29797,7 +29880,7 @@ export function useGetDebugWorkers<TData = Awaited<ReturnType<typeof getDebugWor
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Server worker pool stats (HTTP, task, transcoding)
+ * @summary Server HTTP and user worker statistics
  */
 
 export function useGetDebugWorkers<TData = Awaited<ReturnType<typeof getDebugWorkers>>, TError = ErrorType<unknown>>(
@@ -29818,20 +29901,29 @@ export function useGetDebugWorkers<TData = Awaited<ReturnType<typeof getDebugWor
 
 
 
-export const getGetStreamMasterManifestUrl = (videoId: string,) => {
+export const getGetStreamMasterManifestUrl = (videoId: string,
+    params: GetStreamMasterManifestParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/transcode/${videoId}/master.m3u8`
+  return stringifiedParams.length > 0 ? `/api/transcode/${videoId}/master.m3u8?${stringifiedParams}` : `/api/transcode/${videoId}/master.m3u8`
 }
 
 /**
  * @summary Get HLS master playlist
  */
-export const getStreamMasterManifest = async (videoId: string, options?: RequestInit): Promise<unknown> => {
+export const getStreamMasterManifest = async (videoId: string,
+    params: GetStreamMasterManifestParams, options?: RequestInit): Promise<unknown> => {
 
-  return customInstance<unknown>(getGetStreamMasterManifestUrl(videoId),
+  return customInstance<unknown>(getGetStreamMasterManifestUrl(videoId,params),
   {
     ...options,
     method: 'GET'
@@ -29844,23 +29936,25 @@ export const getStreamMasterManifest = async (videoId: string, options?: Request
 
 
 
-export const getGetStreamMasterManifestQueryKey = (videoId: string,) => {
+export const getGetStreamMasterManifestQueryKey = (videoId: string,
+    params?: GetStreamMasterManifestParams,) => {
     return [
-    `/api/transcode/${videoId}/master.m3u8`
+    `/api/transcode/${videoId}/master.m3u8`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetStreamMasterManifestQueryOptions = <TData = Awaited<ReturnType<typeof getStreamMasterManifest>>, TError = ErrorType<unknown>>(videoId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMasterManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetStreamMasterManifestQueryOptions = <TData = Awaited<ReturnType<typeof getStreamMasterManifest>>, TError = ErrorType<unknown>>(videoId: string,
+    params: GetStreamMasterManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMasterManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetStreamMasterManifestQueryKey(videoId);
+  const queryKey =  queryOptions?.queryKey ?? getGetStreamMasterManifestQueryKey(videoId,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamMasterManifest>>> = ({ signal }) => getStreamMasterManifest(videoId, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamMasterManifest>>> = ({ signal }) => getStreamMasterManifest(videoId,params, { signal, ...requestOptions });
 
 
 
@@ -29874,7 +29968,8 @@ export type GetStreamMasterManifestQueryError = ErrorType<unknown>
 
 
 export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof getStreamMasterManifest>>, TError = ErrorType<unknown>>(
- videoId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMasterManifest>>, TError, TData>> & Pick<
+ videoId: string,
+    params: GetStreamMasterManifestParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMasterManifest>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamMasterManifest>>,
           TError,
@@ -29884,7 +29979,8 @@ export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof get
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof getStreamMasterManifest>>, TError = ErrorType<unknown>>(
- videoId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMasterManifest>>, TError, TData>> & Pick<
+ videoId: string,
+    params: GetStreamMasterManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMasterManifest>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamMasterManifest>>,
           TError,
@@ -29894,7 +29990,8 @@ export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof get
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof getStreamMasterManifest>>, TError = ErrorType<unknown>>(
- videoId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMasterManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ videoId: string,
+    params: GetStreamMasterManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMasterManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -29902,11 +29999,12 @@ export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof get
  */
 
 export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof getStreamMasterManifest>>, TError = ErrorType<unknown>>(
- videoId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMasterManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ videoId: string,
+    params: GetStreamMasterManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMasterManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetStreamMasterManifestQueryOptions(videoId,options)
+  const queryOptions = getGetStreamMasterManifestQueryOptions(videoId,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -29919,20 +30017,29 @@ export function useGetStreamMasterManifest<TData = Awaited<ReturnType<typeof get
 
 
 
-export const getGetStreamMediaManifestUrl = (jobPublicId: string,) => {
+export const getGetStreamMediaManifestUrl = (jobPublicId: string,
+    params: GetStreamMediaManifestParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/transcode/${jobPublicId}/media.m3u8`
+  return stringifiedParams.length > 0 ? `/api/transcode/${jobPublicId}/media.m3u8?${stringifiedParams}` : `/api/transcode/${jobPublicId}/media.m3u8`
 }
 
 /**
  * @summary Get HLS media playlist for a specific rendition
  */
-export const getStreamMediaManifest = async (jobPublicId: string, options?: RequestInit): Promise<unknown> => {
+export const getStreamMediaManifest = async (jobPublicId: string,
+    params: GetStreamMediaManifestParams, options?: RequestInit): Promise<unknown> => {
 
-  return customInstance<unknown>(getGetStreamMediaManifestUrl(jobPublicId),
+  return customInstance<unknown>(getGetStreamMediaManifestUrl(jobPublicId,params),
   {
     ...options,
     method: 'GET'
@@ -29945,23 +30052,25 @@ export const getStreamMediaManifest = async (jobPublicId: string, options?: Requ
 
 
 
-export const getGetStreamMediaManifestQueryKey = (jobPublicId: string,) => {
+export const getGetStreamMediaManifestQueryKey = (jobPublicId: string,
+    params?: GetStreamMediaManifestParams,) => {
     return [
-    `/api/transcode/${jobPublicId}/media.m3u8`
+    `/api/transcode/${jobPublicId}/media.m3u8`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetStreamMediaManifestQueryOptions = <TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<unknown>>(jobPublicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMediaManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetStreamMediaManifestQueryOptions = <TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<unknown>>(jobPublicId: string,
+    params: GetStreamMediaManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMediaManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetStreamMediaManifestQueryKey(jobPublicId);
+  const queryKey =  queryOptions?.queryKey ?? getGetStreamMediaManifestQueryKey(jobPublicId,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamMediaManifest>>> = ({ signal }) => getStreamMediaManifest(jobPublicId, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamMediaManifest>>> = ({ signal }) => getStreamMediaManifest(jobPublicId,params, { signal, ...requestOptions });
 
 
 
@@ -29975,7 +30084,8 @@ export type GetStreamMediaManifestQueryError = ErrorType<unknown>
 
 
 export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<unknown>>(
- jobPublicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMediaManifest>>, TError, TData>> & Pick<
+ jobPublicId: string,
+    params: GetStreamMediaManifestParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMediaManifest>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamMediaManifest>>,
           TError,
@@ -29985,7 +30095,8 @@ export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getS
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<unknown>>(
- jobPublicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMediaManifest>>, TError, TData>> & Pick<
+ jobPublicId: string,
+    params: GetStreamMediaManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMediaManifest>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamMediaManifest>>,
           TError,
@@ -29995,7 +30106,8 @@ export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getS
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<unknown>>(
- jobPublicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMediaManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ jobPublicId: string,
+    params: GetStreamMediaManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMediaManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -30003,11 +30115,12 @@ export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getS
  */
 
 export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getStreamMediaManifest>>, TError = ErrorType<unknown>>(
- jobPublicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMediaManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ jobPublicId: string,
+    params: GetStreamMediaManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamMediaManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetStreamMediaManifestQueryOptions(jobPublicId,options)
+  const queryOptions = getGetStreamMediaManifestQueryOptions(jobPublicId,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -30020,20 +30133,29 @@ export function useGetStreamMediaManifest<TData = Awaited<ReturnType<typeof getS
 
 
 
-export const getGetStreamDashManifestUrl = (videoId: string,) => {
+export const getGetStreamDashManifestUrl = (videoId: string,
+    params: GetStreamDashManifestParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/transcode/${videoId}/manifest.mpd`
+  return stringifiedParams.length > 0 ? `/api/transcode/${videoId}/manifest.mpd?${stringifiedParams}` : `/api/transcode/${videoId}/manifest.mpd`
 }
 
 /**
  * @summary Get DASH manifest for a video
  */
-export const getStreamDashManifest = async (videoId: string, options?: RequestInit): Promise<unknown> => {
+export const getStreamDashManifest = async (videoId: string,
+    params: GetStreamDashManifestParams, options?: RequestInit): Promise<unknown> => {
 
-  return customInstance<unknown>(getGetStreamDashManifestUrl(videoId),
+  return customInstance<unknown>(getGetStreamDashManifestUrl(videoId,params),
   {
     ...options,
     method: 'GET'
@@ -30046,23 +30168,25 @@ export const getStreamDashManifest = async (videoId: string, options?: RequestIn
 
 
 
-export const getGetStreamDashManifestQueryKey = (videoId: string,) => {
+export const getGetStreamDashManifestQueryKey = (videoId: string,
+    params?: GetStreamDashManifestParams,) => {
     return [
-    `/api/transcode/${videoId}/manifest.mpd`
+    `/api/transcode/${videoId}/manifest.mpd`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getGetStreamDashManifestQueryOptions = <TData = Awaited<ReturnType<typeof getStreamDashManifest>>, TError = ErrorType<unknown>>(videoId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamDashManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetStreamDashManifestQueryOptions = <TData = Awaited<ReturnType<typeof getStreamDashManifest>>, TError = ErrorType<unknown>>(videoId: string,
+    params: GetStreamDashManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamDashManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetStreamDashManifestQueryKey(videoId);
+  const queryKey =  queryOptions?.queryKey ?? getGetStreamDashManifestQueryKey(videoId,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamDashManifest>>> = ({ signal }) => getStreamDashManifest(videoId, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamDashManifest>>> = ({ signal }) => getStreamDashManifest(videoId,params, { signal, ...requestOptions });
 
 
 
@@ -30076,7 +30200,8 @@ export type GetStreamDashManifestQueryError = ErrorType<unknown>
 
 
 export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getStreamDashManifest>>, TError = ErrorType<unknown>>(
- videoId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamDashManifest>>, TError, TData>> & Pick<
+ videoId: string,
+    params: GetStreamDashManifestParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamDashManifest>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamDashManifest>>,
           TError,
@@ -30086,7 +30211,8 @@ export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getSt
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getStreamDashManifest>>, TError = ErrorType<unknown>>(
- videoId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamDashManifest>>, TError, TData>> & Pick<
+ videoId: string,
+    params: GetStreamDashManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamDashManifest>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamDashManifest>>,
           TError,
@@ -30096,7 +30222,8 @@ export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getSt
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getStreamDashManifest>>, TError = ErrorType<unknown>>(
- videoId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamDashManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ videoId: string,
+    params: GetStreamDashManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamDashManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -30104,11 +30231,12 @@ export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getSt
  */
 
 export function useGetStreamDashManifest<TData = Awaited<ReturnType<typeof getStreamDashManifest>>, TError = ErrorType<unknown>>(
- videoId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamDashManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ videoId: string,
+    params: GetStreamDashManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamDashManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetStreamDashManifestQueryOptions(videoId,options)
+  const queryOptions = getGetStreamDashManifestQueryOptions(videoId,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -30223,21 +30351,30 @@ export function useGetStreamQualityLadder<TData = Awaited<ReturnType<typeof getS
 
 
 export const getGetStreamSubtitleManifestUrl = (jobPublicId: string,
-    language: string,) => {
+    language: string,
+    params: GetStreamSubtitleManifestParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
 
+  const stringifiedParams = normalizedParams.toString();
 
-  return `/api/transcode/${jobPublicId}/subtitles/${language}/media.m3u8`
+  return stringifiedParams.length > 0 ? `/api/transcode/${jobPublicId}/subtitles/${language}/media.m3u8?${stringifiedParams}` : `/api/transcode/${jobPublicId}/subtitles/${language}/media.m3u8`
 }
 
 /**
  * @summary Get HLS subtitle playlist for a language
  */
 export const getStreamSubtitleManifest = async (jobPublicId: string,
-    language: string, options?: RequestInit): Promise<string> => {
+    language: string,
+    params: GetStreamSubtitleManifestParams, options?: RequestInit): Promise<string> => {
 
-  return customInstance<string>(getGetStreamSubtitleManifestUrl(jobPublicId,language),
+  return customInstance<string>(getGetStreamSubtitleManifestUrl(jobPublicId,language,params),
   {
     ...options,
     method: 'GET'
@@ -30251,24 +30388,26 @@ export const getStreamSubtitleManifest = async (jobPublicId: string,
 
 
 export const getGetStreamSubtitleManifestQueryKey = (jobPublicId: string,
-    language: string,) => {
+    language: string,
+    params?: GetStreamSubtitleManifestParams,) => {
     return [
-    `/api/transcode/${jobPublicId}/subtitles/${language}/media.m3u8`
+    `/api/transcode/${jobPublicId}/subtitles/${language}/media.m3u8`, ...(params ? [params] : [])
     ] as const;
     }
 
 
 export const getGetStreamSubtitleManifestQueryOptions = <TData = Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError = ErrorType<unknown>>(jobPublicId: string,
-    language: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+    language: string,
+    params: GetStreamSubtitleManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetStreamSubtitleManifestQueryKey(jobPublicId,language);
+  const queryKey =  queryOptions?.queryKey ?? getGetStreamSubtitleManifestQueryKey(jobPublicId,language,params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamSubtitleManifest>>> = ({ signal }) => getStreamSubtitleManifest(jobPublicId,language, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStreamSubtitleManifest>>> = ({ signal }) => getStreamSubtitleManifest(jobPublicId,language,params, { signal, ...requestOptions });
 
 
 
@@ -30283,7 +30422,8 @@ export type GetStreamSubtitleManifestQueryError = ErrorType<unknown>
 
 export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError = ErrorType<unknown>>(
  jobPublicId: string,
-    language: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError, TData>> & Pick<
+    language: string,
+    params: GetStreamSubtitleManifestParams, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamSubtitleManifest>>,
           TError,
@@ -30294,7 +30434,8 @@ export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof g
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError = ErrorType<unknown>>(
  jobPublicId: string,
-    language: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError, TData>> & Pick<
+    language: string,
+    params: GetStreamSubtitleManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getStreamSubtitleManifest>>,
           TError,
@@ -30305,7 +30446,8 @@ export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof g
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError = ErrorType<unknown>>(
  jobPublicId: string,
-    language: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+    language: string,
+    params: GetStreamSubtitleManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -30314,11 +30456,12 @@ export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof g
 
 export function useGetStreamSubtitleManifest<TData = Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError = ErrorType<unknown>>(
  jobPublicId: string,
-    language: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+    language: string,
+    params: GetStreamSubtitleManifestParams, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getStreamSubtitleManifest>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetStreamSubtitleManifestQueryOptions(jobPublicId,language,options)
+  const queryOptions = getGetStreamSubtitleManifestQueryOptions(jobPublicId,language,params,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -31700,7 +31843,7 @@ export const getPostTranscodeSessionPositionUrl = (publicId: string,) => {
 }
 
 /**
- * @summary Update transcode session playback position (seek signal)
+ * @summary Update transcode session playback position
  */
 export const postTranscodeSessionPosition = async (publicId: string,
     postTranscodeSessionPositionBody: PostTranscodeSessionPositionBody, options?: RequestInit): Promise<PostTranscodeSessionPosition200> => {
@@ -31749,7 +31892,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type PostTranscodeSessionPositionMutationError = ErrorType<unknown>
 
     /**
- * @summary Update transcode session playback position (seek signal)
+ * @summary Update transcode session playback position
  */
 export const usePostTranscodeSessionPosition = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionPosition>>, TError,{publicId: string;data: BodyType<PostTranscodeSessionPositionBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
