@@ -36,7 +36,7 @@ final class LoginBlockDeleteCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addArgument('id', InputArgument::OPTIONAL, 'The UUID of the block to remove, as app:login-block:list shows it')
+            ->addArgument('id', InputArgument::OPTIONAL, 'The public ID of the block to remove, as app:login-block:list shows it')
             ->addOption('all', null, InputOption::VALUE_NONE, 'Remove every block instead of one');
         AdminCommandSupport::addForceOption($this);
         AdminCommandSupport::addJsonOption($this);

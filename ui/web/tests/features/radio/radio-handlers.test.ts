@@ -7,7 +7,7 @@ import { registerRadioHandlers } from '@/features/radio/stores/radio-handlers'
 import type { RadioStation } from '@/features/radio/api/radio-api'
 
 const station: RadioStation = {
-  id: 'radio-1', sourceId: 'source-1', externalId: 'radio-1', name: 'Radio', country: 'DK', language: null,
+  publicId: 'radio-1', sourceId: 'source-1', externalId: 'radio-1', name: 'Radio', country: 'DK', language: null,
   genres: [], tags: [], logo: null, website: null, lastCheckedAt: null, createdAt: '', updatedAt: '',
   streams: [
     { url: 'https://radio.baander.app/primary', format: 'mp3', bitrate: 128, reliability: 2 },

@@ -11,9 +11,8 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'SongResource',
     properties: [
-        new OA\Property(property: 'uuid', type: 'string', format: 'uuid', description: 'Song UUID'),
         new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, description: 'Public identifier'),
-        new OA\Property(property: 'albumId', type: 'string', description: 'Album public identifier, or UUID when unavailable'),
+        new OA\Property(property: 'albumId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, description: 'Album public identifier'),
         new OA\Property(property: 'title', type: 'string', description: 'Song title'),
         new OA\Property(property: 'artistName', type: 'string', nullable: true, description: 'Primary artist name'),
         new OA\Property(property: 'albumName', type: 'string', nullable: true, description: 'Album title'),
@@ -46,9 +45,8 @@ final class SongResource extends AbstractResource
         $albumUuid = $song->getAlbumId()->toString();
 
         return [
-            'uuid' => $songUuid,
             'publicId' => $song->getPublicId()->toString(),
-            'albumId' => $song->getAlbumPublicId()?->toString() ?? $albumUuid,
+            'albumId' => ($song->getAlbumPublicId() ?? throw new \LogicException('Song projection requires the album public identifier.'))->toString(),
             'title' => $song->getTitle(),
             'artistName' => $artistNames[$songUuid] ?? null,
             'albumName' => $albumTitles[$albumUuid] ?? null,

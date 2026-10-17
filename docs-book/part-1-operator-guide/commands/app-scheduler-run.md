@@ -5,20 +5,20 @@ Request one run of a scheduled job outside its schedule, for example to backfill
 ## Quick start
 
 ```bash
-make exec cmd="php bin/console app:scheduler:run 0192a3b4-c5d6-7890-abcd-ef1234567890"
+make exec cmd="php bin/console app:scheduler:run aB3dE5fG7hJ9kL1mN3pQr"
 ```
 
 Print the result as JSON, for a script:
 
 ```bash
-make exec cmd="php bin/console app:scheduler:run 0192a3b4-c5d6-7890-abcd-ef1234567890 --json"
+make exec cmd="php bin/console app:scheduler:run aB3dE5fG7hJ9kL1mN3pQr --json"
 ```
 
 ## Arguments
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `id` | Yes | UUID of the scheduled job, as [app:scheduler:list](app-scheduler-list.md) prints it |
+| `id` | Yes | Public ID of the scheduled job, as [app:scheduler:list](app-scheduler-list.md) prints it |
 
 ## Options
 
@@ -33,12 +33,12 @@ The command prints the request UUID before it records anything. If the command e
 
 The command waits only until the request is recorded, not until the job has run. The job runs with the command and parameters stored on the job when the request was recorded. A paused job can still be run this way.
 
-With `--json` the command prints only `{"occurrenceId": "...", "jobId": "..."}`, the API's `data` object, and writes the request UUID and any error to stderr.
+With `--json` the command prints only `{"occurrenceId": "...", "jobId": "..."}`, the API's `data` object, and writes the request UUID and any error to stderr. `occurrenceId` and `jobId` are public IDs; the request UUID is the separate retry key.
 
 ## Exit codes
 
 | Code | Meaning |
 |------|---------|
 | 0 | The request was recorded, or an earlier request with the same UUID was found |
-| 1 | No scheduled job has this UUID, or the request UUID belongs to another job |
-| 2 | The job ID or the request UUID is not a UUID |
+| 1 | No scheduled job has this public ID, or the request UUID belongs to another job |
+| 2 | The job ID is not a public ID, or the request ID is not a UUID |

@@ -217,7 +217,7 @@ final class ImageReadFirewallTest extends TestCase
         $data = json_decode((string) $response->getContent(), true, 512, JSON_THROW_ON_ERROR)['data'];
         self::assertNull($data['albumId']);
         self::assertNull($data['playlistId']);
-        self::assertSame($this->allowedArtist->getId()->toString(), $data['artistId']);
+        self::assertSame($this->allowedArtist->getPublicId()->toString(), $data['artistId']);
         self::assertArrayNotHasKey('path', $data);
         $imageId = $this->images['mixed']->getId();
         $albumId = $this->deniedAlbum->getId();

@@ -117,9 +117,9 @@ export interface CreateTranscodeSessionPayload {
   priority?: SessionPriority;
 }
 
-/** Response from GET /api/transcode/sessions/{uuid} */
+/** Response from GET /api/transcode/sessions/{publicId} */
 export interface TranscodeSessionInfo {
-  uuid: string;
+  publicId: string;
   status: SessionStatus;
   qualityTier: string;
 }

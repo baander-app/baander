@@ -20,7 +20,6 @@ export interface ArtistCredit {
 }
 
 export interface AlbumSummary {
-  uuid: string
   publicId: string
   title: string
   type: string
@@ -43,7 +42,6 @@ export interface AlbumSummary {
 }
 
 export interface SongSummary {
-  uuid: string
   publicId: string
   albumId: string
   title: string

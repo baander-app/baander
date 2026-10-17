@@ -11,6 +11,7 @@ use App\Scheduler\Application\DTO\SchedulerOccurrenceOrigin;
 use App\Scheduler\Application\Port\SchedulerManualOccurrenceRecorderInterface;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory;
 use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
@@ -38,6 +39,22 @@ final class DoctrineSchedulerManualOccurrenceRecorder implements SchedulerManual
         return new self(DedicatedConnectionFactory::fromUrl($databaseUrl));
     }
 
+    public function recordByPublicId(PublicId $jobPublicId, Uuid $requestId): ?SchedulerOccurrence
+    {
+        $resolved = $this->operation(function () use ($jobPublicId, $requestId): SchedulerOccurrence|Uuid|null {
+            $prior = $this->connection->fetchAssociative('SELECT job_id, job_public_id FROM scheduler_occurrences WHERE id = :id', ['id' => $requestId->toString()]);
+            if ($prior !== false) {
+                if ($prior['job_public_id'] !== $jobPublicId->toString()) {
+                    throw new SchedulerOccurrenceConflict('Scheduler request belongs to another public job.');
+                }
+                return $this->findRequest(Uuid::fromString($prior['job_id']), $requestId);
+            }
+            $id = $this->connection->fetchOne('SELECT id FROM scheduled_jobs WHERE public_id = :id', ['id' => $jobPublicId->toString()]);
+            return $id === false ? null : Uuid::fromString($id);
+        });
+        return $resolved instanceof Uuid ? $this->record($resolved, $requestId) : $resolved;
+    }
+
     public function record(Uuid $jobId, Uuid $requestId): ?SchedulerOccurrence
     {
         return $this->operation(function () use ($jobId, $requestId): ?SchedulerOccurrence {
@@ -47,7 +64,7 @@ final class DoctrineSchedulerManualOccurrenceRecorder implements SchedulerManual
             }
             // Bound payload transfer before decoding, without requiring an active cron schedule.
             $row = $this->connection->fetchAssociative(<<<'SQL'
-                SELECT CASE WHEN job_type IN ('messenger', 'console') THEN job_type END AS job_type,
+                SELECT public_id, CASE WHEN job_type IN ('messenger', 'console') THEN job_type END AS job_type,
                     CASE WHEN octet_length(command) BETWEEN 1 AND 512 THEN command END AS command,
                     CASE WHEN octet_length(parameters::text) <= 16384 THEN parameters::text END AS parameters
                 FROM scheduled_jobs WHERE id = :id
@@ -69,20 +86,17 @@ final class DoctrineSchedulerManualOccurrenceRecorder implements SchedulerManual
             if (!is_array($parameters)) {
                 throw new \UnexpectedValueException('Scheduled manual parameters must be an array or object.');
             }
-            $occurrence = new SchedulerOccurrence(
-                $requestId, $jobId, $minute, JobType::from($row['job_type']), $row['command'], $parameters,
-                SchedulerOccurrenceOrigin::Manual,
-            );
+            $occurrence = new SchedulerOccurrence($requestId, $jobId, $minute, JobType::from($row['job_type']), $row['command'], $parameters, origin: SchedulerOccurrenceOrigin::Manual, jobPublicId: PublicId::fromString($row['public_id']));
             // Global ID uniqueness and the writer's collision checks fail closed across different jobs.
             (new TransactionalSchedulerOccurrenceWriter($this->connection))->record($occurrence);
-            return $occurrence;
+            return $this->findRequest($jobId, $requestId) ?? throw new \UnexpectedValueException('Recorded scheduler request has no snapshot.');
         });
     }
 
     private function findRequest(Uuid $jobId, Uuid $requestId): ?SchedulerOccurrence
     {
         $row = $this->connection->fetchAssociative(<<<'SQL'
-            SELECT id, job_id, scheduled_for, origin,
+            SELECT job_public_id, public_id, id, job_id, scheduled_for, origin,
                 CASE WHEN job_type IN ('messenger', 'console') THEN job_type END AS job_type,
                 CASE WHEN octet_length(command) BETWEEN 1 AND 512 THEN command END AS command,
                 CASE WHEN octet_length(parameters::text) <= 16384 THEN parameters::text END AS parameters
@@ -101,10 +115,7 @@ final class DoctrineSchedulerManualOccurrenceRecorder implements SchedulerManual
         if (!is_array($parameters)) {
             throw new \UnexpectedValueException('Persisted scheduler manual parameters must be an array or object.');
         }
-        return new SchedulerOccurrence(
-            Uuid::fromString($row['id']), Uuid::fromString($row['job_id']), new DateTimeImmutable($row['scheduled_for']),
-            JobType::from($row['job_type']), $row['command'], $parameters, SchedulerOccurrenceOrigin::Manual,
-        );
+        return new SchedulerOccurrence(Uuid::fromString($row['id']), Uuid::fromString($row['job_id']), new DateTimeImmutable($row['scheduled_for']), JobType::from($row['job_type']), $row['command'], $parameters, origin: SchedulerOccurrenceOrigin::Manual, publicId: PublicId::fromString($row['public_id']), jobPublicId: PublicId::fromString($row['job_public_id']));
     }
 
     /**

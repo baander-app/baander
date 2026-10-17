@@ -33,7 +33,7 @@ final class PlaylistService implements PlaylistPortInterface, PlaylistDeletionPr
 
     /**
      * @param list<Uuid> $songIds
-     * @return list<array{uuid: string, name: string}>
+     * @return list<array{publicId: string, name: string}>
      */
     public function findContainingSongs(array $songIds): array
     {
@@ -50,7 +50,7 @@ final class PlaylistService implements PlaylistPortInterface, PlaylistDeletionPr
             $seenSongIds[$songKey] = true;
 
             foreach ($this->playlistRepository->findPlaylistNamesContainingSong($songId) as $playlist) {
-                $playlistsById[$playlist['uuid']] = $playlist;
+                $playlistsById[$playlist['publicId']] = $playlist;
             }
         }
 

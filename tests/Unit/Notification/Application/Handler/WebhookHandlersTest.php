@@ -22,6 +22,7 @@ use App\Notification\Infrastructure\Webhook\WebhookSecretCodec;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -83,7 +84,7 @@ final class WebhookHandlersTest extends TestCase
     {
         $webhook = $this->seed(signingVersion: 1);
 
-        $rotated = (new RotateWebhookSecretHandler($this->webhooks, $this->codec))(new RotateWebhookSecretCommand($webhook->id->toString()));
+        $rotated = (new RotateWebhookSecretHandler($this->webhooks, $this->codec))(new RotateWebhookSecretCommand($webhook->publicId->toString()));
 
         self::assertSame(1, $rotated->webhook->signingVersion);
         self::assertSame($webhook->id->toString(), $rotated->webhook->id->toString());
@@ -96,11 +97,11 @@ final class WebhookHandlersTest extends TestCase
         $webhook = $this->seed();
         $update = new UpdateWebhookHandler($this->webhooks, $this->input);
 
-        $renamed = $update(new UpdateWebhookCommand($webhook->id->toString(), changesUrl: true, url: 'https://8.8.8.8/hook'));
+        $renamed = $update(new UpdateWebhookCommand($webhook->publicId->toString(), changesUrl: true, url: 'https://8.8.8.8/hook'));
         self::assertSame('https://8.8.8.8/hook', $renamed->url);
         self::assertSame(['security'], $renamed->categoryFilter);
 
-        $cleared = $update(new UpdateWebhookCommand($webhook->id->toString(), changesCategoryFilter: true, categoryFilter: null));
+        $cleared = $update(new UpdateWebhookCommand($webhook->publicId->toString(), changesCategoryFilter: true, categoryFilter: null));
         self::assertSame('https://8.8.8.8/hook', $cleared->url);
         self::assertNull($cleared->categoryFilter);
     }
@@ -111,9 +112,9 @@ final class WebhookHandlersTest extends TestCase
         $update = new UpdateWebhookHandler($this->webhooks, $this->input);
 
         foreach ([
-            new UpdateWebhookCommand($webhook->id->toString(), changesUrl: true, url: 'http://192.168.1.2/hook', changesCategoryFilter: true, categoryFilter: null),
-            new UpdateWebhookCommand($webhook->id->toString(), changesUrl: true, url: '', changesCategoryFilter: true, categoryFilter: null),
-            new UpdateWebhookCommand($webhook->id->toString(), changesUrl: true, url: 'https://8.8.8.8/hook', changesCategoryFilter: true, categoryFilter: ['key' => 'security']),
+            new UpdateWebhookCommand($webhook->publicId->toString(), changesUrl: true, url: 'http://192.168.1.2/hook', changesCategoryFilter: true, categoryFilter: null),
+            new UpdateWebhookCommand($webhook->publicId->toString(), changesUrl: true, url: '', changesCategoryFilter: true, categoryFilter: null),
+            new UpdateWebhookCommand($webhook->publicId->toString(), changesUrl: true, url: 'https://8.8.8.8/hook', changesCategoryFilter: true, categoryFilter: ['key' => 'security']),
         ] as $command) {
             try {
                 $update($command);
@@ -128,7 +129,7 @@ final class WebhookHandlersTest extends TestCase
 
     public function testAnUnknownWebhookIsNotFoundAndAMalformedIdIsInvalidInput(): void
     {
-        $unknown = Uuid::generate()->toString();
+        $unknown = (new PublicId())->toString();
         $actions = [
             function (string $id): void {
                 (new UpdateWebhookHandler($this->webhooks, $this->input))(new UpdateWebhookCommand($id, changesUrl: true, url: 'https://1.1.1.1/hook'));
@@ -142,7 +143,7 @@ final class WebhookHandlersTest extends TestCase
         ];
 
         foreach ($actions as $action) {
-            foreach ([$unknown => NotFoundException::class, 'not-a-uuid' => InvalidInputException::class] as $id => $outcome) {
+            foreach ([$unknown => NotFoundException::class, 'not-a-public-id' => InvalidInputException::class, Uuid::generate()->toString() => InvalidInputException::class] as $id => $outcome) {
                 try {
                     $action($id);
                     self::fail(sprintf('"%s" must be rejected.', $id));
@@ -159,9 +160,32 @@ final class WebhookHandlersTest extends TestCase
     {
         $webhook = $this->seed();
 
-        (new DeleteWebhookHandler($this->webhooks))(new DeleteWebhookCommand($webhook->id->toString()));
+        (new DeleteWebhookHandler($this->webhooks))(new DeleteWebhookCommand($webhook->publicId->toString()));
 
         self::assertNull($this->webhooks->find($webhook->id));
+    }
+
+    public function testKnownInternalUuidIsRejectedForEveryMutationWithoutChangingStorage(): void
+    {
+        $webhook = $this->seed();
+        $id = $webhook->id->toString();
+        foreach ([
+            fn () => (new UpdateWebhookHandler($this->webhooks, $this->input))(new UpdateWebhookCommand($id, changesUrl: true, url: 'https://8.8.8.8/hook')),
+            fn () => (new DeleteWebhookHandler($this->webhooks))(new DeleteWebhookCommand($id)),
+            fn () => (new RotateWebhookSecretHandler($this->webhooks, $this->codec))(new RotateWebhookSecretCommand($id)),
+        ] as $action) {
+            try {
+                $action();
+                self::fail('An internal UUID cannot address the webhook.');
+            } catch (InvalidInputException) {
+            }
+        }
+        self::assertSame(0, $this->webhooks->writes);
+        self::assertSame($webhook, $this->webhooks->find($webhook->id));
+        $output = \App\Notification\Interface\Resource\WebhookResource::from($webhook);
+        self::assertSame($webhook->publicId->toString(), $output['publicId']);
+        self::assertArrayNotHasKey('id', $output);
+        self::assertStringNotContainsString($id, json_encode($output, JSON_THROW_ON_ERROR));
     }
 
     private function create(CreateWebhookCommand $command): IssuedWebhookSecret
@@ -172,7 +196,7 @@ final class WebhookHandlersTest extends TestCase
     private function seed(int $signingVersion = 2): WebhookView
     {
         $now = new \DateTimeImmutable('2026-10-01T12:00:00+00:00');
-        $webhook = new WebhookView(Uuid::generate(), 'https://1.1.1.1/hook', ['security'], $signingVersion, $now, $now);
+        $webhook = new WebhookView(Uuid::generate(), 'https://1.1.1.1/hook', ['security'], $signingVersion, $now, $now, new PublicId());
         $this->webhooks->seed($webhook, $this->codec->encrypt('original-secret'));
 
         return $webhook;

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Domain\Model;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use DateTimeImmutable;
 
 final class LoginBlock
@@ -21,6 +22,7 @@ final class LoginBlock
     ): self {
         return new self(new LoginBlockState(
             id: new Uuid(),
+            publicId: new PublicId(),
             ipAddress: $ipAddress,
             email: $email,
             fieldValue: $fieldValue,
@@ -32,6 +34,11 @@ final class LoginBlock
     public static function reconstitute(LoginBlockState $state): self
     {
         return new self($state);
+    }
+
+    public function getPublicId(): PublicId
+    {
+        return $this->state->publicId;
     }
 
     public function getId(): Uuid

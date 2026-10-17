@@ -467,9 +467,9 @@ if ($mode === 'seed-scheduler') {
     $job = App\Shared\Domain\Model\Uuid::v7();
     $request = App\Shared\Domain\Model\Uuid::v7();
     $db->executeStatement(<<<'SQL'
-        INSERT INTO scheduled_jobs (id, revision, name, expression, job_type, command, status, parameters, created_at, updated_at, run_count)
-        VALUES (:id, :revision, 'Worker command scheduler fixture', '* * * * *', 'console', 'app:transcode:cache-sweep', 'paused', '{"dry-run":true}', clock_timestamp(), clock_timestamp(), 0)
-        SQL, ['id' => $job->toString(), 'revision' => App\Shared\Domain\Model\Uuid::v7()->toString()]);
+        INSERT INTO scheduled_jobs (id, public_id, revision, name, expression, job_type, command, status, parameters, created_at, updated_at, run_count)
+        VALUES (:id, :public_id, :revision, 'Worker command scheduler fixture', '* * * * *', 'console', 'app:transcode:cache-sweep', 'paused', '{"dry-run":true}', clock_timestamp(), clock_timestamp(), 0)
+        SQL, ['id' => $job->toString(), 'public_id' => (new App\Shared\Domain\Model\PublicId())->toString(), 'revision' => App\Shared\Domain\Model\Uuid::v7()->toString()]);
     if ((new App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerManualOccurrenceRecorder($db))->record($job, $request) === null
         || (int) $db->fetchOne('SELECT count(*) FROM scheduler_occurrences WHERE dispatched_at IS NOT NULL') !== 0
         || (int) $db->fetchOne('SELECT count(*) FROM scheduler_occurrence_executions') !== 0) {

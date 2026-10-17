@@ -10,7 +10,6 @@ use App\Catalog\Domain\Repository\SongRepositoryInterface;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Recommendation\Application\Query\GetRecommendationsForUserQuery;
 use App\Recommendation\Domain\Repository\RecommendationRepositoryInterface;
-use App\Recommendation\Interface\Resource\RecommendationResource;
 use App\Shared\Domain\Model\Uuid;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -24,12 +23,13 @@ final class GetRecommendationsForUserHandler
         private readonly SongRepositoryInterface $songRepository,
         private readonly ImagePortInterface $imagePort,
         private readonly RequestStack $requestStack,
+        private readonly \App\Recommendation\Application\Port\RecommendationPublicIdentityInterface $identities,
     ) {
     }
 
     /**
      * @return list<array{
-     *     id: string, name: string, source_type: string, source_id: string,
+     *     public_id: string, name: string, source_type: string, source_id: string,
      *     target_type: string, target_id: string, score: float, position: int|null,
      *     user_id: string|null, created_at: string, updated_at: string,
      *     sourceName: string|null, targetTitle: string|null,
@@ -139,7 +139,8 @@ final class GetRecommendationsForUserHandler
         // Enrich recommendations
         $enriched = [];
         foreach ($recommendations as $rec) {
-            $resource = RecommendationResource::from($rec);
+            $resource = $this->identities->project($rec, $query->getUserId(), $query->administrator);
+            if ($resource === null) { continue; }
             $targetId = $rec->getTargetId();
             $targetType = (string) $rec->getTargetType();
             $sourceId = $rec->getSourceId();

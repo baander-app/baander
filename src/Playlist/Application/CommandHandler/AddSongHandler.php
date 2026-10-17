@@ -33,7 +33,7 @@ final class AddSongHandler
         }
 
         if (!$this->songVisibility->isVisible($command->getSongId(), $command->getScope())) {
-            throw new NotFoundException('Song not found.', ['songId' => $command->getSongId()->toString()]);
+            throw new NotFoundException('Song not found.');
         }
 
         // Idempotent: if the song already exists in the playlist, return as-is

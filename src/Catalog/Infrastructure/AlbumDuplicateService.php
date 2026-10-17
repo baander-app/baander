@@ -10,6 +10,7 @@ use App\Media\Application\Port\ImagePortInterface;
 use App\Catalog\Domain\Service\AlbumDuplicateDetector;
 use App\Catalog\Domain\ValueObject\DuplicateGroup;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Catalog\Interface\Resource\AlbumResource;
 
@@ -19,7 +20,14 @@ final class AlbumDuplicateService implements AlbumDuplicatePortInterface
         private readonly AlbumDuplicateDetector $detector,
         private readonly AlbumPortInterface $albumService,
         private readonly ImagePortInterface $imagePort,
+        private readonly \Doctrine\DBAL\Connection $connection,
     ) {
+    }
+
+    public function findDuplicatesByLibraryPublicId(\App\Shared\Domain\Model\PublicId $libraryId): ?array
+    {
+        $id = $this->connection->fetchOne('SELECT id FROM libraries WHERE public_id = :public_id', ['public_id' => $libraryId->toString()]);
+        return $id === false ? null : $this->findDuplicates(Uuid::fromString((string) $id));
     }
 
     public function findVisibleDuplicatesForAlbum(Uuid $albumId, LibraryReadScope $scope): array
@@ -78,30 +86,29 @@ final class AlbumDuplicateService implements AlbumDuplicatePortInterface
         $albums = [];
 
         foreach ($albumIds as $id) {
-            $album = $this->albumService->findByUuid($id);
-            if ($album !== null) {
-                $albumData = AlbumResource::from($album);
+            $album = $this->albumService->findByUuid($id)
+                ?? throw new ConflictException('Album duplicate results changed. Refresh and try again.');
+            $albumData = AlbumResource::from($album);
 
-                // Add cover image
-                $coverImageId = $album->getCoverImageId();
-                if ($coverImageId !== null) {
-                    $coverImage = $this->imagePort->findByUuid($coverImageId);
-                    if ($coverImage !== null) {
-                        $albumData['coverImage'] = [
-                            'publicId' => $coverImage->getPublicId()->toString(),
-                            'blurhash' => $coverImage->getBlurhash(),
-                        ];
-                    }
-                } else {
-                    $albumData['coverImage'] = null;
+            // Add cover image
+            $coverImageId = $album->getCoverImageId();
+            if ($coverImageId !== null) {
+                $coverImage = $this->imagePort->findByUuid($coverImageId);
+                if ($coverImage !== null) {
+                    $albumData['coverImage'] = [
+                        'publicId' => $coverImage->getPublicId()->toString(),
+                        'blurhash' => $coverImage->getBlurhash(),
+                    ];
                 }
-
-                // Add artist names
-                $albumIdString = $album->getId()->toString();
-                $albumData['artists'] = $artistNamesMap[$albumIdString] ?? [];
-
-                $albums[] = $albumData;
+            } else {
+                $albumData['coverImage'] = null;
             }
+
+            // Add artist names
+            $albumIdString = $album->getId()->toString();
+            $albumData['artists'] = $artistNamesMap[$albumIdString] ?? [];
+
+            $albums[] = $albumData;
         }
 
         return new DuplicateGroup(

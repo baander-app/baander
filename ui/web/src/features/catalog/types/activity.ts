@@ -1,5 +1,4 @@
 export interface ActivityEntry {
-  uuid: string
   publicId: string
   userId: string
   activityType: string

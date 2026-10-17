@@ -16,7 +16,7 @@ function makeStream(
 
 function makeStation(streams: StreamInfo[]): RadioStation {
   return {
-    id: 'station-1',
+    publicId: 'station-1',
     sourceId: 'source-1',
     externalId: 'ext-1',
     name: 'Test Station',

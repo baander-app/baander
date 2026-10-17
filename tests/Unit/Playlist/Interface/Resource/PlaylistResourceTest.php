@@ -37,7 +37,6 @@ final class PlaylistResourceTest extends TestCase
         ));
 
         $this->assertSame([
-            'uuid' => $id->toString(),
             'publicId' => $publicId->toString(),
             'ownerPublicId' => $owner->toString(),
             'collaboratorPublicIds' => [$first->toString(), $second->toString()],

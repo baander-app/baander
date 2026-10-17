@@ -22,13 +22,15 @@ final class ScheduledJobConsole
 
     public static function addIdArgument(Command $command): void
     {
-        $command->addArgument(self::ID_ARGUMENT, InputArgument::REQUIRED, 'UUID of the scheduled job, as app:scheduler:list prints it');
+        $command->addArgument(self::ID_ARGUMENT, InputArgument::REQUIRED, 'Public ID of the scheduled job, as app:scheduler:list prints it');
     }
 
-    /** @throws InvalidInputException when the argument is not a UUID */
-    public static function id(InputInterface $input): Uuid
+    /** @throws InvalidInputException when the argument is not a public ID */
+    public static function id(InputInterface $input, \App\Scheduler\Application\Port\ScheduledJobAdministrationInterface $jobs): Uuid
     {
-        return AdminCommandSupport::uuid($input->getArgument(self::ID_ARGUMENT), 'The job ID');
+        try { $publicId = \App\Shared\Domain\Model\PublicId::fromString((string) $input->getArgument(self::ID_ARGUMENT)); }
+        catch (\InvalidArgumentException) { throw new InvalidInputException('The job identity must be a public ID.'); }
+        return ($jobs->getByPublicId($publicId) ?? throw self::notFound())->getId();
     }
 
     /** The outcome the admin API reports as 404 for the same job. */
@@ -45,7 +47,7 @@ final class ScheduledJobConsole
     public static function show(SymfonyStyle $io, array $job): void
     {
         $io->definitionList(
-            ['ID' => $job['id']],
+            ['ID' => $job['publicId']],
             ['Name' => $job['name']],
             ['Description' => $job['description'] ?? '-'],
             ['Expression' => $job['expression']],
@@ -71,10 +73,10 @@ final class ScheduledJobConsole
      * @param \Closure(Uuid): ?object $change the administration port's action; null when the job does not exist
      * @param string                  $done   the action in the past tense, such as "Paused"
      */
-    public static function changeStatus(InputInterface $input, SymfonyStyle $io, \Closure $change, string $done): int
+    public static function changeStatus(InputInterface $input, SymfonyStyle $io, \Closure $change, string $done, \App\Scheduler\Application\Port\ScheduledJobAdministrationInterface $jobs): int
     {
         try {
-            $job = ScheduledJobResource::from($change(self::id($input)) ?? throw self::notFound());
+            $job = ScheduledJobResource::from($change(self::id($input, $jobs)) ?? throw self::notFound());
         } catch (Throwable $failure) {
             return AdminCommandSupport::fail($io, $failure);
         }

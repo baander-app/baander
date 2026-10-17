@@ -32,7 +32,7 @@ The default table has one row per genre, sorted by name:
 | Name | The genre name |
 | Slug | The slug the other `app:genre:*` commands take |
 | Parent | The parent genre's slug, or `-` for a root genre |
-| UUID | The genre UUID, which `--parent` options take |
+| Public ID | The genre public ID, which `--parent` options take |
 | MusicBrainz ID | The MusicBrainz ID, or `-` |
 
 With `--tree`, root genres and siblings are sorted by name. `--json` always prints the flat list, also when `--tree` is given. When no genre exists, the command prints `No genres exist.`

@@ -7,6 +7,7 @@ namespace App\Catalog\Application\QueryHandler\Album;
 use App\Catalog\Application\Service\CatalogInput;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Media\Application\Port\ImagePortInterface;
 use App\Catalog\Application\Query\Album\AlbumDeletePreview;
 use App\Catalog\Application\Query\Album\GetAlbumDeletePreviewQuery;
 use App\Catalog\Application\Query\FileDeletionPreview;
@@ -26,6 +27,7 @@ final readonly class GetAlbumDeletePreviewHandler
         private SongPortInterface $songs,
         private PlaylistDeletionPreviewPortInterface $playlists,
         private LibraryMediaFilesInterface $mediaFiles,
+        private ImagePortInterface $images,
     ) {
     }
 
@@ -47,7 +49,9 @@ final readonly class GetAlbumDeletePreviewHandler
             title: $album->getTitle(),
             songCount: count($songs),
             totalSize: array_sum(array_map(static fn (Song $song): int => $song->getSize(), $songs)),
-            coverImageId: $album->getCoverImageId()?->toString(),
+            coverImageId: $album->getCoverImageId() !== null
+                ? ($this->images->findByUuid($album->getCoverImageId()) ?? throw new \LogicException('Album cover image is missing.'))->getPublicId()->toString()
+                : null,
             playlistNames: array_column($playlists, 'name'),
             fileDeletion: $query->deleteFiles
                 ? FileDeletionPreview::fromInspection($this->mediaFiles->inspect(

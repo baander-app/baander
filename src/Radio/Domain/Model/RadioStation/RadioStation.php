@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Radio\Domain\Model\RadioStation;
 
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use InvalidArgumentException;
@@ -54,6 +55,7 @@ final class RadioStation
 
         return new self(new RadioStationState(
             id: new Uuid(),
+            publicId: new PublicId(),
             sourceId: $sourceId,
             externalId: $externalId,
             name: $name,
@@ -137,6 +139,11 @@ final class RadioStation
         $this->pendingEvents = [];
 
         return $events;
+    }
+
+    public function getPublicId(): PublicId
+    {
+        return $this->state->publicId;
     }
 
     public function getId(): Uuid

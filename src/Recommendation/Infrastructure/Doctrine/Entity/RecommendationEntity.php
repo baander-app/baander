@@ -6,10 +6,12 @@ namespace App\Recommendation\Infrastructure\Doctrine\Entity;
 
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'recommendations')]
+#[ORM\UniqueConstraint(name: 'uniq_recommendations_public_id', columns: ['public_id'])]
 #[ORM\Index(name: 'idx_recommendations_user_id', columns: ['user_id'])]
 #[ORM\Index(name: 'idx_recommendations_target_type_target_id', columns: ['target_type', 'target_id'])]
 #[ORM\UniqueConstraint(
@@ -22,6 +24,11 @@ class RecommendationEntity
     #[ORM\Column(type: 'uuid')]
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
+
+    #[ORM\Column(type: 'public_id')]
+    private PublicId $publicId;
+
+    public function getPublicId(): PublicId { return $this->publicId; }
 
     #[ORM\ManyToOne(targetEntity: UserEntity::class)]
     #[ORM\JoinColumn(name: 'user_id', referencedColumnName: 'id', nullable: true, onDelete: 'CASCADE')]
@@ -64,8 +71,10 @@ class RecommendationEntity
         float $score = 0.0,
         ?int $position = null,
         ?Uuid $id = null,
+        ?PublicId $publicId = null,
     ) {
         $this->id = $id ?? new Uuid();
+        $this->publicId = $publicId ?? new PublicId();
         $this->user = $user;
         $this->name = $name;
         $this->sourceType = $sourceType;

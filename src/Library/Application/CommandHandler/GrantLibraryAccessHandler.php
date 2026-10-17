@@ -12,6 +12,7 @@ use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Application\Service\LibraryLookup;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
+use App\Shared\Domain\Model\PublicId;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /** Lets a user see a library, for the admin user page and `app:library:member:grant`. Granting twice changes nothing. */
@@ -31,7 +32,9 @@ final readonly class GrantLibraryAccessHandler
     #[AsMessageHandler]
     public function __invoke(GrantLibraryAccessCommand $command): LibraryAccess
     {
-        $userId = $this->users->userId($command->user);
+        $userId = (preg_match('/^[0-9A-Za-z_-]{21}$/', $command->user) === 1
+            ? $this->users->userIdByPublicId(new PublicId($command->user))
+            : $this->users->userId($command->user));
         // Unrestricted: the grant route and `app:library:member:grant` are administrator-only.
         $library = $this->lookup->byIdentifier($command->library, LibraryReadScope::unrestricted());
 

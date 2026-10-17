@@ -196,8 +196,8 @@ export class AIOrchestrator {
       throw new Error(`Remix failed: ${response.status} ${response.statusText}`);
     }
 
-    const json = await response.json() as { uuid: string };
-    return json.uuid;
+    const json = await response.json() as { publicId: string };
+    return json.publicId;
   }
 
   /** Destroy the orchestrator and worker. */

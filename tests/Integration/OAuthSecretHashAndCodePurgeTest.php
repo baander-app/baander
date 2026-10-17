@@ -329,10 +329,21 @@ final class OAuthSecretHashAndCodePurgeTest extends TestCase
     {
         self::loadMigration();
         $connection = $this->manager->getConnection();
+        if ($direction === 'up') {
+            // The historical migration seeds a schedule before public identities
+            // existed. Reproduce that boundary inside this rolled-back fixture.
+            $connection->executeStatement('ALTER TABLE scheduled_jobs ALTER COLUMN public_id DROP NOT NULL');
+        }
         $migration = new Version20261007100000($connection, new NullLogger());
         $migration->{$direction}(new Schema());
         foreach ($migration->getSql() as $query) {
             $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
+        }
+        if ($direction === 'up') {
+            foreach ($connection->fetchFirstColumn('SELECT id FROM scheduled_jobs WHERE public_id IS NULL') as $id) {
+                $connection->update('scheduled_jobs', ['public_id' => (new PublicId())->toString()], ['id' => $id]);
+            }
+            $connection->executeStatement('ALTER TABLE scheduled_jobs ALTER COLUMN public_id SET NOT NULL');
         }
     }
 

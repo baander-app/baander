@@ -425,8 +425,8 @@ final class LyricsAdminControllerTest extends TestCase
         $libraryId = Uuid::v7();
         $albumId = Uuid::v7();
         $conn->executeStatement(
-            'INSERT INTO libraries (id, slug, name, path, type, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [$libraryId->toString(), 'lyrics-admin-' . bin2hex(random_bytes(4)), 'Lyrics admin', '/music/lyrics-admin', 'music', 0, $now, $now],
+            'INSERT INTO libraries (id, public_id, slug, name, path, type, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [$libraryId->toString(), (new PublicId())->toString(), 'lyrics-admin-' . bin2hex(random_bytes(4)), 'Lyrics admin', '/music/lyrics-admin', 'music', 0, $now, $now],
         );
         $conn->executeStatement(
             'INSERT INTO albums (id, public_id, library_id, title, type, locked_fields, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',

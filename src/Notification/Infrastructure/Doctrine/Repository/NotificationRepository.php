@@ -89,12 +89,19 @@ final class NotificationRepository implements NotificationRepositoryInterface
         }
 
         if ($cursor !== null) {
+            $anchor = $this->getEntityRepository()->findOneBy([
+                'publicId' => PublicId::fromString($cursor),
+                'userId' => $userId,
+            ]);
+            if ($anchor === null) {
+                return [];
+            }
             if ($direction === 'asc') {
                 $qb->andWhere('e.id > :cursor');
             } else {
                 $qb->andWhere('e.id < :cursor');
             }
-            $qb->setParameter('cursor', $cursor);
+            $qb->setParameter('cursor', $anchor->getId(), 'uuid');
         }
 
         if ($limit !== null) {

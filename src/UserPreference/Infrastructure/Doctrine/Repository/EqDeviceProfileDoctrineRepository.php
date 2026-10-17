@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Infrastructure\Doctrine\Repository;
 
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\UserPreference\Domain\Model\EqDeviceProfile;
 use App\UserPreference\Domain\Model\EqDeviceProfileState;
@@ -35,6 +36,14 @@ final class EqDeviceProfileDoctrineRepository implements EqDeviceProfileReposito
         $entity = $this->entityManager
             ->getRepository(EqDeviceProfileEntity::class)
             ->find($id);
+
+        return $entity !== null ? $this->toDomain($entity) : null;
+    }
+
+    public function findByPublicId(PublicId $publicId): ?EqDeviceProfile
+    {
+        $entity = $this->entityManager->getRepository(EqDeviceProfileEntity::class)
+            ->findOneBy(['publicId' => $publicId->toString()]);
 
         return $entity !== null ? $this->toDomain($entity) : null;
     }
@@ -96,6 +105,7 @@ final class EqDeviceProfileDoctrineRepository implements EqDeviceProfileReposito
     {
         return EqDeviceProfile::reconstitute(new EqDeviceProfileState(
             id: $entity->getId(),
+            publicId: $entity->getPublicId(),
             userId: $entity->getUserId(),
             name: $entity->getName(),
             icon: $entity->getIcon(),
@@ -111,6 +121,7 @@ final class EqDeviceProfileDoctrineRepository implements EqDeviceProfileReposito
 
     private function syncToEntity(EqDeviceProfile $model, EqDeviceProfileEntity $entity): void
     {
+        $entity->setPublicId($model->getPublicId());
         $entity->setUserId($model->getUserId());
         $entity->setName($model->getName());
         $entity->setIcon($model->getIcon());

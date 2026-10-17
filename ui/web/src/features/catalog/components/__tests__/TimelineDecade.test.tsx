@@ -42,7 +42,6 @@ vi.mock('@/features/playlist/components/AddToPlaylistDialog', () => ({
 
 function makeAlbum(publicId: string, year: number) {
   return {
-    uuid: `uuid-${publicId}`,
     publicId,
     title: `Album ${publicId}`,
     type: 'album',

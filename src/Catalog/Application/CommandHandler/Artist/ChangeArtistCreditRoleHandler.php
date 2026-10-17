@@ -8,6 +8,8 @@ use App\Catalog\Application\Command\Artist\ChangeArtistCreditRoleCommand;
 use App\Catalog\Application\Command\Artist\CreditTarget;
 use App\Catalog\Application\Service\CatalogInput;
 use App\Catalog\Application\Port\ArtistPortInterface;
+use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -22,6 +24,8 @@ final readonly class ChangeArtistCreditRoleHandler
 {
     public function __construct(
         private ArtistPortInterface $artists,
+        private SongPortInterface $songs,
+        private AlbumPortInterface $albums,
     ) {
     }
 
@@ -34,10 +38,11 @@ final readonly class ChangeArtistCreditRoleHandler
     public function __invoke(ChangeArtistCreditRoleCommand $command): void
     {
         $publicId = CatalogInput::publicId($command->artistPublicId);
-        $targetId = ArtistCreditInput::targetId($command->target, $command->targetId);
+        $targetPublicId = ArtistCreditInput::publicTargetId($command->target, $command->targetId);
         $role = ArtistCreditInput::role($command->role);
         $named = $command->currentRole === null ? null : ArtistCreditInput::role($command->currentRole);
         $artistId = ArtistCreditInput::artist($this->artists, $publicId)->getId();
+        $targetId = ArtistCreditInput::targetId($command->target, $targetPublicId, $this->songs, $this->albums);
 
         $roles = match ($command->target) {
             CreditTarget::Song => $this->artists->songCreditRoles($artistId, $targetId),

@@ -6,6 +6,7 @@ namespace App\Session\Domain\Repository\Device;
 
 use App\Session\Domain\Model\Device\Device;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 
 interface DeviceRepositoryInterface
 {
@@ -15,6 +16,8 @@ interface DeviceRepositoryInterface
     public function findByUserId(Uuid $userId): array;
 
     public function findByUserAndDevice(Uuid $userId, Uuid $deviceId): ?Device;
+
+    public function findByUserAndPublicId(Uuid $userId, PublicId $publicId): ?Device;
 
     public function save(Device $device): void;
 

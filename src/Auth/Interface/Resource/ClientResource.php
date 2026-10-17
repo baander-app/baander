@@ -11,7 +11,6 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'ClientResource',
     properties: [
-        new OA\Property(property: 'uuid', type: 'string', format: 'uuid', description: 'Internal UUID'),
         new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
         new OA\Property(property: 'name', type: 'string', description: 'Client name'),
         new OA\Property(property: 'redirect', type: 'string', description: 'JSON-encoded array of redirect URIs'),
@@ -27,7 +26,6 @@ final class ClientResource extends AbstractResource
         assert($source instanceof Client);
 
         return [
-            'uuid' => $source->getId()->toString(),
             'publicId' => $source->getPublicId()->toString(),
             'name' => $source->getName(),
             'redirect' => json_encode($source->getRedirectUris()),

@@ -24,17 +24,27 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
     private PasskeyRepositoryInterface&MockObject $passkeyRepository;
     private PasskeyVerifierInterface&MockObject $passkeyVerifier;
     private AuthenticatePasskeyHandler $handler;
+    private \App\Auth\Domain\Repository\UserRepositoryInterface $users;
 
     /** Canonical browser encoding of the binary credential identifier. */
     private const CREDENTIAL_ID = 'cmF3LWNyZWQtaWQ';
     private const RAW_ID = 'cmF3LWNyZWQtaWQ';
     private const OWNER_ID = '01900000-0000-7000-8000-000000000001';
+    private const OWNER_PUBLIC_ID = 'sssssssssssssssssssss';
 
     protected function setUp(): void
     {
         $this->passkeyRepository = $this->createMock(PasskeyRepositoryInterface::class);
         $this->passkeyVerifier = $this->createMock(PasskeyVerifierInterface::class);
-        $this->handler = new AuthenticatePasskeyHandler($this->passkeyRepository, $this->passkeyVerifier);
+        $this->users = $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class);
+        $this->users->method('findByUuid')->willReturnCallback(static function (Uuid $id): \App\Auth\Domain\Model\User {
+            $now = new \DateTimeImmutable();
+            return \App\Auth\Domain\Model\User::reconstitute(new \App\Auth\Domain\Model\UserState(
+                id: $id, publicId: new \App\Shared\Domain\Model\PublicId($id->toString() === self::OWNER_ID ? self::OWNER_PUBLIC_ID : str_repeat('v', 21)),
+                name: 'Owner', email: 'owner@baander.app', password: 'hash', totpSecret: null, createdAt: $now, updatedAt: $now,
+            ));
+        });
+        $this->handler = new AuthenticatePasskeyHandler($this->passkeyRepository, $this->passkeyVerifier, $this->users);
     }
 
     /** @return array<string,mixed> */
@@ -63,7 +73,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
                 'attestationType' => 'none',
                 'aaguid' => '00000000-0000-0000-0000-000000000000',
                 'credentialPublicKey' => base64_encode('public-key'),
-                'userHandle' => self::OWNER_ID,
+                'userHandle' => self::OWNER_PUBLIC_ID,
             ],
             $counter,
         );
@@ -79,7 +89,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
             trustPath: EmptyTrustPath::create(),
             aaguid: \Symfony\Component\Uid\Uuid::fromString('00000000-0000-0000-0000-000000000000'),
             credentialPublicKey: 'public-key',
-            userHandle: self::OWNER_ID,
+            userHandle: self::OWNER_PUBLIC_ID,
             counter: $counter,
         );
     }
@@ -94,7 +104,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
             trustPath: EmptyTrustPath::create(),
             aaguid: \Symfony\Component\Uid\Uuid::fromString('00000000-0000-0000-0000-000000000000'),
             credentialPublicKey: 'public-key',
-            userHandle: self::OWNER_ID,
+            userHandle: self::OWNER_PUBLIC_ID,
             counter: $counter,
         );
     }
@@ -387,6 +397,28 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
         }
     }
 
+    public function testLegacyUuidHandleIsRejectedWithoutCounterPersistence(): void
+    {
+        $passkey = $this->createPasskey(self::CREDENTIAL_ID);
+        $response = $this->createValidResponse();
+        $stored = $this->createStoredCredential();
+        $stored->userHandle = self::OWNER_ID;
+        $this->passkeyRepository->method('ofCredentialId')->willReturn($passkey);
+        $this->passkeyRepository->method('userIdForCredentialId')->willReturn(Uuid::fromString(self::OWNER_ID));
+        $this->passkeyRepository->expects(self::never())->method('markUsed');
+        $this->passkeyVerifier->method('getChallenge')->willReturn(PublicKeyCredentialRequestOptions::create(random_bytes(32), 'baander.app'));
+        $this->passkeyVerifier->method('credentialRecordFromArray')->willReturn($stored);
+        $this->passkeyVerifier->method('verifyAuthenticationResponse')->willReturn($this->createUpdatedCredential());
+
+        try {
+            ($this->handler)(new AuthenticatePasskeyCommand(null, 'challenge', $response));
+            self::fail('An internal UUID handle must require re-enrollment.');
+        } catch (RuntimeException $error) {
+            self::assertSame('Credential owner does not match its registered user handle.', $error->getMessage());
+            self::assertSame(5, $passkey->getCounter());
+        }
+    }
+
     public function testUrlAndStandardBase64IdentifiersResolveTheSameCredential(): void
     {
         foreach (['-_8', '+/8='] as $rawId) {
@@ -395,7 +427,7 @@ final class AuthenticatePasskeyHandlerTest extends TestCase
             $repository->expects($this->once())->method('ofCredentialId')->with('-_8')->willReturn(null);
             $verifier->expects($this->never())->method('getChallenge');
             try {
-                (new AuthenticatePasskeyHandler($repository, $verifier))(
+                (new AuthenticatePasskeyHandler($repository, $verifier, $this->users))(
                     new AuthenticatePasskeyCommand(null, 'challenge', ['rawId' => $rawId]),
                 );
                 self::fail('Fixture has no credential.');

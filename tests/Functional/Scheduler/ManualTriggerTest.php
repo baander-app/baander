@@ -23,6 +23,8 @@ final class ManualTriggerTest extends TestCase
     private ?Connection $scheduler = null;
     private ?Connection $observer = null;
     private ?string $schema = null;
+    /** @var array<string, string> */
+    private array $publicJobs = [];
 
     protected function setUp(): void
     {
@@ -59,6 +61,7 @@ final class ManualTriggerTest extends TestCase
         $recorder = new DoctrineSchedulerManualOccurrenceRecorder($this->scheduler);
         static::getContainer()->set(DoctrineSchedulerManualOccurrenceRecorder::class, $recorder);
         self::assertSame($recorder, static::getContainer()->get(SchedulerManualOccurrenceRecorderInterface::class));
+        \App\Tests\Fixtures\Scheduler\PublicIdentitySchema::upgrade($this->scheduler);
     }
 
     protected function tearDown(): void
@@ -96,7 +99,9 @@ final class ManualTriggerTest extends TestCase
         $first = $this->trigger($job, $admin, $requestId);
         $receipt = $this->assertJsonResponse($first, 202);
         self::assertSame($requestId, $first->headers->get('Idempotency-Key'));
-        self::assertSame(['data' => ['occurrenceId' => $requestId, 'jobId' => $job->toString()]], $receipt);
+        self::assertSame($this->publicJobs[$job->toString()], $receipt['data']['jobId']);
+        self::assertNotSame($requestId, $receipt['data']['occurrenceId']);
+        self::assertSame(21, strlen($receipt['data']['occurrenceId']));
         self::assertSame(1, $this->countOccurrences());
         self::assertSame('manual', $this->database()->fetchOne('SELECT origin FROM scheduler_occurrences WHERE id = :id', ['id' => $requestId]), 'An independent connection observes committed intent before the HTTP receipt.');
 
@@ -142,9 +147,10 @@ final class ManualTriggerTest extends TestCase
     {
         $id = Uuid::generate();
         $this->database()->executeStatement(<<<'SQL'
-            INSERT INTO scheduled_jobs (id, revision, name, expression, job_type, command, status, parameters, created_at, updated_at, run_count)
-            VALUES (:id, :revision, :name, '* * * * *', 'console', 'app:manual-trigger-fixture', 'paused', CAST(:parameters AS JSON), clock_timestamp(), clock_timestamp(), 0)
+            INSERT INTO scheduled_jobs (public_id, id, revision, name, expression, job_type, command, status, parameters, created_at, updated_at, run_count)
+            VALUES (substr(md5(random()::text), 1, 21), :id, :revision, :name, '* * * * *', 'console', 'app:manual-trigger-fixture', 'paused', CAST(:parameters AS JSON), clock_timestamp(), clock_timestamp(), 0)
             SQL, ['id' => $id->toString(), 'revision' => Uuid::generate()->toString(), 'name' => 'Manual trigger ' . $id->toString(), 'parameters' => '{"address":"scheduler@baander.app"}']);
+        $this->publicJobs[$id->toString()] = (string) $this->database()->fetchOne('SELECT public_id FROM scheduled_jobs WHERE id = ?', [$id->toString()]);
         return $id;
     }
 
@@ -157,7 +163,7 @@ final class ManualTriggerTest extends TestCase
 
     private function path(Uuid $job): string
     {
-        return '/api/admin/scheduler/jobs/' . $job->toString() . '/trigger';
+        return '/api/admin/scheduler/jobs/' . ($this->publicJobs[$job->toString()] ?? (new \App\Shared\Domain\Model\PublicId())->toString()) . '/trigger';
     }
 
     private function trigger(Uuid $job, User $user, string $requestId): Response

@@ -11,7 +11,6 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'ServerInstanceResource',
     properties: [
-        new OA\Property(property: 'uuid', type: 'string', format: 'uuid', description: 'Server UUID'),
         new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
         new OA\Property(property: 'serverUrl', type: 'string', format: 'uri', description: 'Server base URL'),
         new OA\Property(property: 'name', type: 'string', description: 'Server display name'),
@@ -28,7 +27,6 @@ final class ServerInstanceResource extends AbstractResource
         assert($source instanceof ServerInstance);
 
         return [
-            'uuid' => $source->getId()->toString(),
             'publicId' => $source->getPublicId()->toString(),
             'serverUrl' => $source->getServerUrl(),
             'name' => $source->getName(),

@@ -35,6 +35,7 @@ final class RecommendationController
         private readonly Security $security,
         private readonly MessageBusInterface $bus,
         private readonly JsonEncoder $jsonEncoder,
+        private readonly \App\Recommendation\Application\Port\RecommendationPublicIdentityInterface $identities,
     ) {
     }
 
@@ -67,6 +68,7 @@ final class RecommendationController
         $recommendations = $this->bus->dispatch(new GetRecommendationsForUserQuery(
             userId: Uuid::fromString($user->getId()),
             limit: $limit,
+            administrator: $this->security->isGranted('ROLE_ADMIN'),
         ))->last(HandledStamp::class)?->getResult() ?? [];
 
         return $this->successResponse($recommendations);
@@ -121,6 +123,7 @@ final class RecommendationController
         $recommendations = $this->bus->dispatch(new GetPersonalizedRecommendationsQuery(
             userId: Uuid::fromString($user->getId()),
             limit: $limit,
+            administrator: $this->security->isGranted('ROLE_ADMIN'),
             targetType: 'song',
         ))->last(HandledStamp::class)?->getResult() ?? [];
 
@@ -151,14 +154,14 @@ final class RecommendationController
 
         $recommendations = $this->bus->dispatch(new GetRecommendationsBySourceQuery(
             sourceType: $sourceType,
-            sourceId: $sourceId,
+            sourceId: $this->identities->internalEntityId($sourceType, $sourceId, $this->actorId(), $this->security->isGranted('ROLE_ADMIN'))->toString(),
             limit: $limit,
         ))->last(HandledStamp::class)?->getResult() ?? [];
 
-        return $this->successResponse(array_map(
-            static fn($r) => RecommendationResource::from($r),
+        return $this->successResponse(array_values(array_filter(array_map(
+            fn($r) => $this->identities->project($r, $this->actorId(), $this->security->isGranted('ROLE_ADMIN')),
             $recommendations,
-        ));
+        ))));
     }
 
     /**
@@ -185,14 +188,14 @@ final class RecommendationController
 
         $recommendations = $this->bus->dispatch(new GetTargetingRecommendationsQuery(
             targetType: $targetType,
-            targetId: $targetId,
+            targetId: $this->identities->internalEntityId($targetType, $targetId, $this->actorId(), $this->security->isGranted('ROLE_ADMIN'))->toString(),
             limit: $limit,
         ))->last(HandledStamp::class)?->getResult() ?? [];
 
-        return $this->successResponse(array_map(
-            static fn($r) => RecommendationResource::from($r),
+        return $this->successResponse(array_values(array_filter(array_map(
+            fn($r) => $this->identities->project($r, $this->actorId(), $this->security->isGranted('ROLE_ADMIN')),
             $recommendations,
-        ));
+        ))));
     }
 
     /**
@@ -236,9 +239,9 @@ final class RecommendationController
         try {
             $command = new SaveRecommendationCommand(
                 sourceType: \App\Recommendation\Domain\ValueObject\RecommendationType::fromString($payload['source_type']),
-                sourceId: $payload['source_id'],
+                sourceId: $this->identities->internalEntityId($payload['source_type'], $payload['source_id'], $this->actorId(), $this->security->isGranted('ROLE_ADMIN'))->toString(),
                 targetType: \App\Recommendation\Domain\ValueObject\RecommendationType::fromString($payload['target_type']),
-                targetId: $payload['target_id'],
+                targetId: $this->identities->internalEntityId($payload['target_type'], $payload['target_id'], $this->actorId(), $this->security->isGranted('ROLE_ADMIN'))->toString(),
                 score: (float) $payload['score'],
                 userId: Uuid::fromString($user->getId()),
                 name: $payload['name'] ?? 'default',
@@ -254,13 +257,13 @@ final class RecommendationController
     }
 
     /**
-     * Delete a recommendation by UUID.
+     * Delete a recommendation by public ID.
      */
     #[OA\Delete(
-        path: '/api/recommendations/{uuid}',
+        path: '/api/recommendations/{publicId}',
         summary: 'Delete a recommendation',
         parameters: [
-            new OA\Parameter(name: 'uuid', description: 'Recommendation UUID', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'publicId', description: 'Recommendation public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Deleted'),
@@ -268,8 +271,8 @@ final class RecommendationController
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{uuid}', name: 'destroy', methods: ['DELETE'])]
-    public function destroy(string $uuid): JsonResponse
+    #[Route('/{publicId}', name: 'destroy', methods: ['DELETE'])]
+    public function destroy(string $publicId): JsonResponse
     {
         $user = $this->security->getUser();
         if (!$user instanceof AuthenticatedUserIdentityInterface) {
@@ -277,9 +280,9 @@ final class RecommendationController
         }
 
         try {
-            $id = Uuid::fromString($uuid);
-        } catch (\Throwable) {
-            return $this->errorResponse('Invalid UUID format.');
+            $id = $this->identities->recommendationId($publicId, Uuid::fromString($user->getId()), $this->security->isGranted('ROLE_ADMIN'));
+        } catch (\InvalidArgumentException) {
+            return $this->errorResponse('Invalid public identity.');
         }
 
         $this->bus->dispatch(new DeleteRecommendationCommand($id));
@@ -312,9 +315,17 @@ final class RecommendationController
 
         $this->bus->dispatch(new DeleteRecommendationsBySourceCommand(
             sourceType: $sourceType,
-            sourceId: $sourceId,
+            sourceId: $this->identities->internalEntityId($sourceType, $sourceId, $this->actorId(), $this->security->isGranted('ROLE_ADMIN'))->toString(),
+            actorId: $this->security->isGranted('ROLE_ADMIN') ? null : $this->actorId(),
         ));
 
         return $this->noContent();
     }
+    private function actorId(): Uuid
+    {
+        $user = $this->security->getUser();
+        if (!$user instanceof AuthenticatedUserIdentityInterface) { throw new \Symfony\Component\Security\Core\Exception\AccessDeniedException(); }
+        return Uuid::fromString($user->getId());
+    }
+
 }

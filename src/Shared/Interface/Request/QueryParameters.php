@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Request;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Exception\InvalidQueryParameter;
 use Symfony\Component\HttpFoundation\Exception\BadRequestException;
 use Symfony\Component\HttpFoundation\InputBag;
@@ -53,6 +54,25 @@ final class QueryParameters
         }
 
         throw new InvalidQueryParameter($name, sprintf('%s must be a UUID.', $name));
+    }
+
+    /** @param InputBag<covariant string|int|float|bool|null> $query */
+    public static function optionalPublicId(InputBag $query, string $name): ?PublicId
+    {
+        if (!$query->has($name)) {
+            return null;
+        }
+
+        $value = $query->all()[$name];
+        if (is_string($value)) {
+            try {
+                return PublicId::fromString($value);
+            } catch (\InvalidArgumentException) {
+                // Map malformed input to the shared query error contract.
+            }
+        }
+
+        throw new InvalidQueryParameter($name, sprintf('%s must be a public ID.', $name));
     }
 
     /** @param InputBag<covariant string|int|float|bool|null> $query */

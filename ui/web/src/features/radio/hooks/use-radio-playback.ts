@@ -31,7 +31,7 @@ export function useRadioPlayback() {
     startStation(station, bestStream.url)
 
     try {
-      await startRadioSession(station.id, bestStream.url)
+      await startRadioSession(station.publicId, bestStream.url)
     } catch {
       // API call failed — still play locally, sync later
     }

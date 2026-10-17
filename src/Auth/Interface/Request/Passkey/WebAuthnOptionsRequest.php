@@ -9,7 +9,7 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'WebAuthnOptionsRequest',
     properties: [
-        new OA\Property(property: 'userId', description: 'Optional user ID to get passkey options for', type: 'string'),
+        new OA\Property(property: 'userId', description: 'Optional user public ID to get passkey options for', type: 'string'),
     ],
 )]
 final readonly class WebAuthnOptionsRequest

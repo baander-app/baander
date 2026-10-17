@@ -5,13 +5,13 @@ Remove a genre from a song. The command does what `DELETE /api/genres/{slug}/son
 ## Quick start
 
 ```bash
-make exec cmd="php bin/console app:genre:song:remove rock 0192a3b4-c5d6-7890-abcd-ef1234567890"
+make exec cmd="php bin/console app:genre:song:remove rock aB3dE5fG7hJ9kL1mN3pQr"
 ```
 
 In a script that reads only the exit code:
 
 ```bash
-make exec cmd="php bin/console app:genre:song:remove rock 0192a3b4-c5d6-7890-abcd-ef1234567890 --json"
+make exec cmd="php bin/console app:genre:song:remove rock aB3dE5fG7hJ9kL1mN3pQr --json"
 ```
 
 ## Arguments
@@ -19,7 +19,7 @@ make exec cmd="php bin/console app:genre:song:remove rock 0192a3b4-c5d6-7890-abc
 | Argument | Required | Description |
 |----------|----------|-------------|
 | `slug` | Yes | The genre slug |
-| `song-id` | Yes | The song UUID |
+| `song-id` | Yes | The song public ID |
 
 ## Options
 
@@ -29,7 +29,7 @@ make exec cmd="php bin/console app:genre:song:remove rock 0192a3b4-c5d6-7890-abc
 
 ## Details
 
-Only the link between the genre and the song is removed. Removing a link that does not exist succeeds without change, as in the API. A song UUID that names no song fails with `Song not found.`, which the API answers with `404`.
+Only the link between the genre and the song is removed. Removing a link that does not exist succeeds without change, as in the API. A song public ID that names no song fails with `Song not found.`, which the API answers with `404`.
 
 With `--json` the command prints nothing on success, because the API answers `204 No Content`; read the outcome from the exit code. Errors still go to stderr.
 
@@ -39,4 +39,4 @@ With `--json` the command prints nothing on success, because the API answers `20
 |------|---------|
 | 0 | The song no longer has the genre |
 | 1 | No genre has the slug, no song has the song ID, or another error occurred; the message says why |
-| 2 | The song ID is not a UUID |
+| 2 | The song ID is not a public ID |

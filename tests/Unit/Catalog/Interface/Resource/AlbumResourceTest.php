@@ -39,7 +39,7 @@ final class AlbumResourceTest extends TestCase
     {
         $result = AlbumResource::from($this->album);
 
-        $this->assertArrayHasKey('uuid', $result);
+        $this->assertArrayNotHasKey('uuid', $result);
         $this->assertArrayHasKey('publicId', $result);
         $this->assertArrayHasKey('title', $result);
         $this->assertArrayHasKey('type', $result);
@@ -62,12 +62,12 @@ final class AlbumResourceTest extends TestCase
         $this->assertSame('United Kingdom', $result['country']);
     }
 
-    public function testFromContainsUuidAsNonEmptyString(): void
+    public function testFromOmitsInternalUuid(): void
     {
         $result = AlbumResource::from($this->album);
 
-        $this->assertIsString($result['uuid']);
-        $this->assertNotEmpty($result['uuid']);
+        $this->assertArrayNotHasKey('uuid', $result);
+        $this->assertNotContains($this->album->getId()->toString(), $result);
     }
 
     public function testFromContainsPublicIdAsNonEmptyString(): void
@@ -121,7 +121,7 @@ final class AlbumResourceTest extends TestCase
     {
         $result = AlbumResource::fromWithCover($this->album, null);
 
-        $this->assertSame($this->album->getId()->toString(), $result['uuid']);
+        $this->assertArrayNotHasKey('uuid', $result);
         $this->assertSame($this->album->getPublicId()->toString(), $result['publicId']);
         $this->assertSame('Abbey Road', $result['title']);
         $this->assertSame('Album', $result['type']);

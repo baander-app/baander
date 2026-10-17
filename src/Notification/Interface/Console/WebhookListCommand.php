@@ -48,7 +48,7 @@ final class WebhookListCommand extends Command
             WebhookResource::collection($webhooks),
             ['ID', 'URL', 'Categories', 'Created', 'Updated'],
             static fn (array $webhook): array => [
-                $webhook['id'],
+                $webhook['publicId'],
                 $webhook['url'],
                 $webhook['category_filter'] === null ? 'all' : implode(', ', $webhook['category_filter']),
                 $webhook['created_at'],

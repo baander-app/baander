@@ -44,7 +44,7 @@ final class ImageController
         path: '/api/images/{publicId}',
         summary: 'Get image metadata by public ID',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Image public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string'), example: 'aB3dE5fG7hJ9kL1mN3pQr'),
+            new OA\Parameter(name: 'publicId', description: 'Image public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21), example: 'aB3dE5fG7hJ9kL1mN3pQr'),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Image metadata',
@@ -82,7 +82,7 @@ final class ImageController
         path: '/api/images/{publicId}/file',
         summary: 'Serve the image file binary data',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Image public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string'), example: 'aB3dE5fG7hJ9kL1mN3pQr'),
+            new OA\Parameter(name: 'publicId', description: 'Image public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21), example: 'aB3dE5fG7hJ9kL1mN3pQr'),
             new OA\Parameter(name: 'preset', description: 'Image size preset', in: 'query', required: false, schema: new OA\Schema(type: 'string', enum: ['thumb', 'small', 'medium', 'large'])),
         ],
         responses: [
@@ -186,7 +186,7 @@ final class ImageController
         path: '/api/images/{publicId}/blurhash',
         summary: 'Get the blurhash representation of an image',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Image public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string'), example: 'aB3dE5fG7hJ9kL1mN3pQr'),
+            new OA\Parameter(name: 'publicId', description: 'Image public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21), example: 'aB3dE5fG7hJ9kL1mN3pQr'),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Blurhash string with dimensions',

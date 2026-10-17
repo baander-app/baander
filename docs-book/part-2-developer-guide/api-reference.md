@@ -30,7 +30,21 @@ Endpoints follow a resource-oriented pattern. Collections live under a plural no
 | Update resource | `PATCH /api/playlists/{publicId}` |
 | Delete resource | `DELETE /api/playlists/{publicId}` |
 
-Playlist `{publicId}` values use `PublicId`: a 21-character NanoID matching `^[0-9a-zA-Z_-]{21}$`, for example `V1StGXR8_Z5jdHi6B-myT`. They are distinct from UUIDs. Identifier names alone do not establish the type: Party session `{uuid}` parameters and passkey deletion `{publicId}` parameters are UUIDs, while failed-transport message `{id}` parameters are integer strings. OAuth token identifiers and WebAuthn credential identifiers have their own contracts. Read each parameter schema rather than applying one identifier format to every route.
+### Public Identities
+
+A persisted entity has an internal UUID and a separate `PublicId`. Public IDs are 21-character NanoIDs matching `^[0-9a-zA-Z_-]{21}$`, for example `V1StGXR8_Z5jdHi6B-myT`. Addressable resources expose their own identity as `publicId`, without the internal primary-key fields `uuid` or `id`. Existing snake-case resource contracts retain `public_id`.
+
+Public requests, responses, cursors, signed delivery paths and WebSocket messages use public IDs for persisted entities. Relationship names such as `userId`, `songId`, `videoId`, `libraryId` and `parentId` retain their names and carry the related entity's public ID. A route parameter named `{id}` can also require a public ID; its name does not authorize a UUID fallback. Deliberate slug routes, such as genre routes, retain their documented public names. Public IDs identify resources; access still depends on ownership, roles and library membership.
+
+Protocol identifiers have separate meanings. OAuth token IDs, WebAuthn credential IDs, provider IDs, browser device tokens and failed-transport integer message IDs are not entity primary keys. Read the parameter schema for these values. WebAuthn user handles use the user's public ID; credential IDs remain authenticator-generated protocol values.
+
+### Device and Playback Identities
+
+A device resource exposes both `publicId`, its persisted public identity, and `deviceId`, the browser-generated UUID token used to register that device. Rename and forget requests at `/api/devices/{deviceId}` take the resource's public ID despite the parameter name. Registration, session claims and the `X-Baander-Device-Id` header take the browser token. A listening session's `activeDeviceId` carries the device public ID, so clients resolve their own browser token through the device list before comparing ownership.
+
+An EQ profile's `publicId` identifies the profile for updates, deletion and activation. Its optional `deviceId` is an audio-output token supplied by the client; it does not refer to a persisted device. `activeProfileId` carries the selected profile's public ID.
+
+Listening sessions, party sessions and transcode sessions expose their own public IDs. Party REST routes and WebSocket `sessionId` and participant user references use public IDs. Video parameters in `/api/transcode/{videoId}/master.m3u8` and `/api/transcode/{videoId}/manifest.mpd` take the video's public ID, including signed URLs. Segment and rendition URLs retain their transcode-job public IDs. A session queue contains song public IDs.
 
 ### Pagination
 
@@ -177,7 +191,9 @@ A successful login or refresh request returns:
 }
 ```
 
-Login responses also include a `user` object inside `data`.
+Login responses also include a `user` object inside `data`, identified by `publicId`.
+
+Access-token JWTs use the user's public ID as `sub` and the OAuth client's public ID as `client_id`. OAuth `client_id` parameters and administration's `clientId` identify that same registered client. Previously issued access tokens with UUID identity claims are rejected. Refresh with the existing refresh token to obtain the current claims; if refresh is refused, sign in again.
 
 | Field | Description |
 |-------|-------------|
@@ -245,9 +261,11 @@ DPoP: <proof>
 {"challengeKey": "...", "response": { ... }, "userId": "..."}
 ```
 
-`userId` is optional. The server checks the DPoP proof before the assertion, so a nonce challenge leaves the assertion valid for the retry. Disabled accounts cannot sign in.
+`userId` is an optional user public ID. The server checks the DPoP proof before the assertion, so a nonce challenge leaves the assertion valid for the retry. Disabled accounts cannot sign in.
 
-To register a passkey, an authenticated user calls `POST /api/auth/passkey/options` and passes the browser's credential to `POST /api/auth/passkey/register`.
+To register a passkey, an authenticated user calls `POST /api/auth/passkey/options` and passes the browser's credential to `POST /api/auth/passkey/register`. Registration options encode the user's public ID as the WebAuthn user handle. Authentication and account signals use the same public identity; there is no UUID-handle fallback.
+
+Existing passkeys enrolled with UUID user handles are invalidated by the identity migration and must be enrolled again. Account records, public IDs and passwords remain unchanged. Sign in with the account password, using password reset if needed, and register a replacement passkey. The old credential retained by the authenticator no longer authenticates.
 
 ### Refresh
 
@@ -455,7 +473,6 @@ final class PlaylistResource extends AbstractResource
         assert($source instanceof PlaylistReadView);
 
         return [
-            'uuid' => $source->getId()->toString(),
             'publicId' => $source->getPublicId()->toString(),
             'name' => $source->getName(),
             // Other playlist fields omitted from this excerpt.

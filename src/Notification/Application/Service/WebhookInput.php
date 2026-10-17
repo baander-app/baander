@@ -6,7 +6,7 @@ namespace App\Notification\Application\Service;
 
 use App\Notification\Application\Port\WebhookDestinationPortInterface;
 use App\Shared\Application\Exception\InvalidInputException;
-use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 
 /**
  * Validates the webhook input that the API and the console pass to the webhook use cases.
@@ -22,14 +22,14 @@ final readonly class WebhookInput
     }
 
     /**
-     * @throws InvalidInputException when the ID is not a UUID
+     * @throws InvalidInputException when the ID is not a public ID
      */
-    public static function id(string $webhookId): Uuid
+    public static function id(string $webhookId): PublicId
     {
         try {
-            return Uuid::fromString($webhookId);
+            return PublicId::fromString($webhookId);
         } catch (\InvalidArgumentException $error) {
-            throw new InvalidInputException('The webhook ID must be a UUID.', previous: $error);
+            throw new InvalidInputException('The webhook ID must be a public ID.', previous: $error);
         }
     }
 

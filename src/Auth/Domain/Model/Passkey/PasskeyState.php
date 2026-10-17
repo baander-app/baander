@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Domain\Model\Passkey;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use DateTimeImmutable;
 
 /**
@@ -18,6 +19,7 @@ final class PasskeyState
     /** @param array<array-key, mixed> $data */
     public function __construct(
         public readonly Uuid $id,
+        public readonly PublicId $publicId,
         public string $name,
         public readonly string $credentialId,
         public readonly array $data,

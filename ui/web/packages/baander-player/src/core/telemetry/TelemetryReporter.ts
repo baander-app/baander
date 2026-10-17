@@ -49,7 +49,7 @@ const MAX_QUEUE_SIZE = 1000;
  * Usage:
  * ```ts
  * const reporter = new TelemetryReporter(playerConfig, config);
- * reporter.start('session-uuid', 'video-uuid');
+ * reporter.start('session-publicId', 'video-publicId');
  *
  * reporter.record({ type: 'buffer-health', timestamp: Date.now(), value: 5.2 });
  * reporter.record({ type: 'rendition-switch', timestamp: Date.now(), metadata: { from: '720p', to: '1080p' } });

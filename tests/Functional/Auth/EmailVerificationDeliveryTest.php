@@ -162,7 +162,7 @@ final class EmailVerificationDeliveryTest extends RateLimitTestCase
         $user = $this->createTestUser($this->uniqueEmail());
         $newAddress = $this->uniqueEmail();
 
-        $response = $this->authenticatedRequest('PATCH', '/api/admin/users/' . $user->getId()->toString(), $this->createSuperAdminUser(), ['email' => $newAddress]);
+        $response = $this->authenticatedRequest('PATCH', '/api/admin/users/' . $user->getPublicId()->toString(), $this->createSuperAdminUser(), ['email' => $newAddress]);
 
         $body = $this->assertJsonResponse($response, 200, 'data');
         $this->assertSame($newAddress, $body['data']['email']);

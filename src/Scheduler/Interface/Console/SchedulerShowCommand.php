@@ -39,7 +39,7 @@ final class SchedulerShowCommand extends Command
 
         try {
             $job = ScheduledJobResource::from(
-                $this->jobs->getById(ScheduledJobConsole::id($input)) ?? throw ScheduledJobConsole::notFound(),
+                $this->jobs->getById(ScheduledJobConsole::id($input, $this->jobs)) ?? throw ScheduledJobConsole::notFound(),
             );
         } catch (Throwable $failure) {
             return AdminCommandSupport::fail($io, $failure);

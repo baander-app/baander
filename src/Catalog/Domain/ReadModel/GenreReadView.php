@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Domain\ReadModel;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 
 final readonly class GenreReadView
 {
@@ -14,8 +15,14 @@ final readonly class GenreReadView
         private string $slug,
         private ?Uuid $parent,
         private ?string $mbid,
+        private PublicId $publicId,
+        private ?PublicId $parentPublicId,
     ) {
     }
+
+    public function getPublicId(): PublicId { return $this->publicId; }
+
+    public function getParentPublicId(): ?PublicId { return $this->parentPublicId; }
 
     public function getId(): Uuid
     {

@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Transcode\Interface\Console;
 
 use App\Shared\Application\Exception\NotFoundException;
+use App\Shared\Application\Exception\InvalidInputException;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
+use App\Transcode\Application\Port\TranscodePublicViewInterface;
 use App\Transcode\Interface\Resource\TranscodeSessionResource;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -17,7 +20,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
 
 /**
- * The CLI counterpart of GET /api/transcode/sessions/{uuid}.
+ * The CLI counterpart of GET /api/transcode/sessions/{publicId}.
  *
  * The API shows a session to its owner or an administrator; the shell has full
  * authority and shows any session.
@@ -30,13 +33,14 @@ final class TranscodeSessionShowCommand extends Command
 {
     public function __construct(
         private readonly TranscodeSessionPortInterface $sessions,
+        private readonly TranscodePublicViewInterface $publicView,
     ) {
         parent::__construct();
     }
 
     protected function configure(): void
     {
-        $this->addArgument('uuid', InputArgument::REQUIRED, 'UUID of the session, as app:transcode:session:list prints it');
+        $this->addArgument('publicId', InputArgument::REQUIRED, 'Public identifier of the session');
         AdminCommandSupport::addJsonOption($this);
     }
 
@@ -45,19 +49,24 @@ final class TranscodeSessionShowCommand extends Command
         $io = new SymfonyStyle($input, $output);
 
         try {
-            $session = $this->sessions->findByUuid(AdminCommandSupport::uuid($input->getArgument('uuid'), 'The session ID'))
+            $argument = $input->getArgument('publicId');
+            try {
+                $publicId = PublicId::fromString($argument);
+            } catch (\InvalidArgumentException) {
+                throw new InvalidInputException('The session ID must be a public identifier.');
+            }
+            $session = $this->sessions->findByPublicId($publicId)
                 ?? throw new NotFoundException('Session not found.');
         } catch (Throwable $failure) {
             return AdminCommandSupport::fail($io, $failure);
         }
 
-        $data = TranscodeSessionResource::from($session);
+        $data = TranscodeSessionResource::from($this->publicView->session($session));
         if (AdminCommandSupport::wantsJson($input)) {
             return AdminCommandSupport::json($io, $data);
         }
 
         $io->definitionList(
-            ['UUID' => $data['uuid']],
             ['Public ID' => $data['publicId']],
             ['User' => $data['userId']],
             ['Job' => $data['jobId']],

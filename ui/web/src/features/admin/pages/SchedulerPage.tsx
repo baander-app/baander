@@ -168,7 +168,7 @@ export function SchedulerPage() {
           </ColumnHeader>
 
           {jobs.map((job) => (
-            <JobRow key={job.id}>
+            <JobRow key={job.publicId}>
               <JobNameGroup>
                 <JobName>{job.name}</JobName>
                 {job.description && <JobDesc>{job.description}</JobDesc>}

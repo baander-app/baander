@@ -11,7 +11,7 @@ use Symfony\Component\Validator\Constraints\NotBlank;
     schema: 'AddSongRequest',
     required: ['songId'],
     properties: [
-        new OA\Property(property: 'songId', description: 'UUID of the song to add', type: 'string', format: 'uuid', example: '770f9510-f30c-52e5-b827-557755550222'),
+        new OA\Property(property: 'songId', description: 'Public ID of the song to add', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, example: 'aB3dE5fG7hJ9kL1mN3pQr'),
     ],
 )]
 final readonly class AddSongRequest

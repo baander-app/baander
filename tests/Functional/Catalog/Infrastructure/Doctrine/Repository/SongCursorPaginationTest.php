@@ -54,8 +54,11 @@ final class SongCursorPaginationTest extends TestCase
 
     private LibraryReadScope $scope;
 
-    /** @var array<string, array<string, int|string|null>> song id => sort field => key */
+    /** @var array<string, array<string, int|string|null>> song public id => sort field => key */
     private array $keys = [];
+
+    /** @var array<string, int> public ID => database collation rank */
+    private array $identityOrder = [];
 
     protected function setUp(): void
     {
@@ -90,7 +93,7 @@ final class SongCursorPaginationTest extends TestCase
 
             $id = $song->getId()->toString();
             $added[$id] = $definition['added'];
-            $this->keys[$id] = [
+            $this->keys[$song->getPublicId()->toString()] = [
                 'title' => $definition['title'],
                 'artist' => $definition['artist'] ?? '',
                 'album' => self::ALBUMS[$definition['album']]['title'],
@@ -101,6 +104,17 @@ final class SongCursorPaginationTest extends TestCase
         $this->entityManager->flush();
 
         $connection = $this->entityManager->getConnection();
+        // Public IDs contain mixed case and punctuation. Use PostgreSQL's text
+        // collation for their tie order, rather than PHP's byte comparison.
+        $orderedIds = $connection->fetchFirstColumn(
+            'SELECT public_id FROM songs WHERE id IN (:ids) ORDER BY public_id ASC',
+            ['ids' => array_keys($added)], ['ids' => \Doctrine\DBAL\ArrayParameterType::STRING],
+        );
+        foreach ($orderedIds as $rank => $publicId) {
+            self::assertIsString($publicId);
+            $this->identityOrder[$publicId] = $rank;
+        }
+        self::assertCount(count(self::SONGS), $this->identityOrder);
         foreach ($added as $id => $timestamp) {
             $connection->executeStatement('UPDATE songs SET created_at = :added WHERE id = :id', ['added' => $timestamp, 'id' => $id]);
         }
@@ -186,6 +200,10 @@ final class SongCursorPaginationTest extends TestCase
             $next = $page->getNextCursor();
             self::assertNotNull($next);
             $cursor = $codec->decode($next);
+            $cursorId = $cursor->getValues()['id'];
+            self::assertIsString($cursorId);
+            self::assertArrayHasKey($cursorId, $this->keys);
+            self::assertSame($cursorId, PublicId::fromString($cursorId)->toString());
         }
 
         self::fail(sprintf('%s %s, limit %d: forward walk did not terminate.', $field, $order, $limit));
@@ -199,7 +217,7 @@ final class SongCursorPaginationTest extends TestCase
             $a = $this->keys[$left][$field];
             $b = $this->keys[$right][$field];
 
-            return [$a !== null, $a, $left] <=> [$b !== null, $b, $right];
+            return [$a !== null, $a, $this->identityOrder[$left]] <=> [$b !== null, $b, $this->identityOrder[$right]];
         });
 
         return $order === 'desc' ? array_reverse($ids) : $ids;
@@ -212,7 +230,7 @@ final class SongCursorPaginationTest extends TestCase
      */
     private function ids(array $songs): array
     {
-        return array_map(static fn (Song $song): string => $song->getId()->toString(), $songs);
+        return array_map(static fn (Song $song): string => $song->getPublicId()->toString(), $songs);
     }
 
     /** @param list<string> $ids */

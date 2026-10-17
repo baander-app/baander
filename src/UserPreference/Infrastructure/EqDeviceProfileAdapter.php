@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Infrastructure;
 
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\UserPreference\Application\Exception\EqDeviceProfileNotFound;
 use App\UserPreference\Application\Port\EqDeviceProfilePortInterface;
@@ -33,7 +34,7 @@ final class EqDeviceProfileAdapter implements EqDeviceProfilePortInterface
     /**
      * @return ProfileData
      */
-    public function getProfile(Uuid $userId, Uuid $profileId): array
+    public function getProfile(Uuid $userId, PublicId $profileId): array
     {
         $model = $this->requireOwnedProfile($userId, $profileId);
 
@@ -72,7 +73,7 @@ final class EqDeviceProfileAdapter implements EqDeviceProfilePortInterface
      * @param array<array-key, mixed>|null $payload
      * @return ProfileData
      */
-    public function updateProfile(Uuid $userId, Uuid $profileId, ?string $name, ?string $icon, ?string $deviceId, ?array $payload, ?int $sortOrder): array
+    public function updateProfile(Uuid $userId, PublicId $profileId, ?string $name, ?string $icon, ?string $deviceId, ?array $payload, ?int $sortOrder): array
     {
         $model = $this->requireOwnedProfile($userId, $profileId);
 
@@ -89,7 +90,7 @@ final class EqDeviceProfileAdapter implements EqDeviceProfilePortInterface
         return $this->toArray($model);
     }
 
-    public function deleteProfile(Uuid $userId, Uuid $profileId): void
+    public function deleteProfile(Uuid $userId, PublicId $profileId): void
     {
         $model = $this->requireOwnedProfile($userId, $profileId);
 
@@ -100,16 +101,16 @@ final class EqDeviceProfileAdapter implements EqDeviceProfilePortInterface
         $this->repository->delete($model);
     }
 
-    public function activateProfile(Uuid $userId, Uuid $profileId): array
+    public function activateProfile(Uuid $userId, PublicId $profileId): array
     {
         $this->requireOwnedProfile($userId, $profileId);
 
         return ['activeProfileId' => $profileId->toString()];
     }
 
-    private function requireOwnedProfile(Uuid $userId, Uuid $profileId): EqDeviceProfile
+    private function requireOwnedProfile(Uuid $userId, PublicId $profileId): EqDeviceProfile
     {
-        $profile = $this->repository->findById($profileId);
+        $profile = $this->repository->findByPublicId($profileId);
         if ($profile === null || !$profile->getUserId()->equals($userId)) {
             throw new EqDeviceProfileNotFound();
         }
@@ -133,7 +134,7 @@ final class EqDeviceProfileAdapter implements EqDeviceProfilePortInterface
     private function toArray(EqDeviceProfile $m): array
     {
         return [
-            'id' => $m->getId()->toString(),
+            'publicId' => $m->getPublicId()->toString(),
             'name' => $m->getName(),
             'icon' => $m->getIcon(),
             'deviceId' => $m->getDeviceId(),

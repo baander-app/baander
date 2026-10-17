@@ -11,7 +11,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     schema: 'GenreAlbumRequest',
     required: ['albumId'],
     properties: [
-        new OA\Property(property: 'albumId', description: 'Album UUID', type: 'string'),
+        new OA\Property(property: 'albumId', description: 'Album public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
     ],
 )]
 final readonly class GenreAlbumRequest

@@ -11,7 +11,6 @@ use App\Catalog\Infrastructure\Doctrine\Entity\ArtistSongEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\SongEntity;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Shared\Domain\Model\PublicId;
-use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
@@ -46,7 +45,7 @@ final class ArtistCreditCommandsTest extends TestCase
     public function testAddingACreditForAnUnknownArtistSongOrAlbumIsNotFoundOnBothPaths(): void
     {
         $admin = $this->createAdminUser();
-        $unknown = (new Uuid())->toString();
+        $unknown = (new PublicId())->toString();
         $base = '/api/artists/' . $this->artist->getPublicId();
 
         $song = $this->assertJsonResponse($this->authenticatedRequest('POST', $base . '/songs', $admin, ['songId' => $unknown, 'role' => 'primary']), 404);
@@ -167,6 +166,9 @@ final class ArtistCreditCommandsTest extends TestCase
         $admin = $this->createAdminUser();
         $base = '/api/artists/' . $this->artist->getPublicId();
 
+        $this->assertJsonResponse($this->authenticatedRequest('POST', $base . '/songs', $admin, ['songId' => $this->song->getId()->toString(), 'role' => 'primary']), 422);
+        $internal = $this->command('app:artist:song:add');
+        self::assertSame(Command::INVALID, $internal->execute(['public-id' => $this->publicId(), 'song-id' => $this->song->getId()->toString(), 'role' => 'primary']));
         $role = $this->assertJsonResponse($this->authenticatedRequest('POST', $base . '/songs', $admin, ['songId' => $this->songId(), 'role' => 'singer']), 422);
         self::assertStringStartsWith('Invalid role "singer".', $role['error']['message']);
         $this->assertJsonResponse($this->authenticatedRequest('POST', $base . '/albums', $admin, ['albumId' => 'not-a-uuid', 'role' => 'primary']), 422);
@@ -231,12 +233,12 @@ final class ArtistCreditCommandsTest extends TestCase
 
     private function songId(): string
     {
-        return $this->song->getId()->toString();
+        return $this->song->getPublicId()->toString();
     }
 
     private function albumId(): string
     {
-        return $this->album->getId()->toString();
+        return $this->album->getPublicId()->toString();
     }
 
     private function assertNoContent(Response $response): void

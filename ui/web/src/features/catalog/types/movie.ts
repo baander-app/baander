@@ -1,7 +1,7 @@
 /**
  * Movie shapes returned by the catalog movie endpoints.
  *
- * The generated `MovieResource` only documents the core fields (uuid, publicId,
+ * The generated `MovieResource` only documents the core fields (publicId,
  * title, year, summary, createdAt). The real API additionally returns enriched
  * metadata (poster/backdrop URLs, rating, runtime, TMDB/IMDB ids, videos) that
  * the movie UI depends on. These fields are modelled here as optional rather
@@ -9,8 +9,7 @@
  */
 
 export interface MovieVideo {
-  uuid: string
-  publicId?: string
+  publicId: string
   width?: number
   height?: number
   duration?: number
@@ -27,7 +26,6 @@ export interface MovieSummary {
 }
 
 export interface MovieDetail extends MovieSummary {
-  uuid?: string
   tagline?: string | null
   backdropUrl?: string | null
   overview?: string | null

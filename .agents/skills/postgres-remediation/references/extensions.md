@@ -108,6 +108,48 @@ which asserts index scans through `pg_stat_get_xact_numscans`
 2026-10-07 on disposable `baander-database:latest` via `information_schema.columns`).
 Reset and verification tokens and OAuth client secrets are hashed with SHA-256 in PHP. Version20261007100000 converted existing plain-text client secrets with core `sha256()` (PostgreSQL 11+, not pgcrypto), and calls pgcrypto `gen_random_bytes(32)` once to give a revoked, secretless confidential client the digest of no known secret. Verified 2026-10-07 by applying the migration and running OAuthSecretHashAndCodePurgeTest on disposable `baander-database:latest`; the pgcrypto extension version was not checked.
 
+[Version20261015120000](../../../../migrations/Version20261015120000.php) uses
+[pgcrypto random bytes](https://www.postgresql.org/docs/18/pgcrypto.html#PGCRYPTO-RANDOM-DATA-FUNCS)
+to populate public identity columns on 14 tables. It takes the first 21 base64 symbols
+from `gen_random_bytes(16)` and translates the alphabet to produce independent
+PublicIds with 126 random bits; internal UUID keys remain unchanged. Scheduler
+occurrences retain their live job's public ID. For deleted jobs, a materialized
+query generates one public identity per orphan job UUID and shares it across
+that job's occurrences. Missing active-session devices are registered per owner
+and browser token, retaining existing registrations and tokens. Their internal
+keys use PostgreSQL 18's core
+[`uuidv7()`](https://www.postgresql.org/docs/18/functions-uuid.html), which does
+not require a UUID extension. New public IDs have unique, non-null text columns
+without database defaults; application writers must supply them.
+
+Existing passkeys are removed so users can enroll credentials with public user
+handles. The migration acquires an `ACCESS EXCLUSIVE` lock on passkeys before
+deleting them and retains it through commit, closing the insertion window before
+the later column changes. Lock acquisition uses a five-second timeout. Accounts,
+passwords and OAuth tokens are retained; there is no legacy UUID-handle fallback.
+
+On 2026-10-15, [PublicIdentityMigrationTest](../../../../tests/Integration/PublicIdentityMigrationTest.php)
+passed 6 tests and 201 assertions in 0.516 seconds on disposable
+`baander-database:latest` through `baander-ci-prewarm:local`. Fresh stacks applied
+the latest migrations before the tests; populated upgrade fixtures verified
+identity and credential preservation, orphan grouping, device recovery,
+constraints and rollback. This checkpoint preceded the approved passkey
+invalidation and its upfront table lock.
+
+On 2026-10-17, the same test passed 7 tests and 203 assertions in 0.547643
+seconds after passkey invalidation and the upfront lock were added. The fixtures
+verified passkey deletion, account/password/OAuth-token preservation, re-enrollment
+with public user handles and restoration of deleted credentials on migration
+failure. The focused CI run passed 159 tests and 2,516 assertions in 98.0 seconds
+on fresh disposable stacks; its JUnit report is
+`var/test-runs/20261017-110836-5c088ef2/run/stack-1.junit.xml`.
+Lock contention was not tested with a second connection.
+
+These runs establish successful use of pgcrypto's random-byte function in those
+test databases. Exact server and extension versions were not queried; the image
+targets PostgreSQL 18. These checks do not establish the extension state of
+development or deployed databases.
+
 ## Diff and performance checks
 
 Preserve the custom platform, mapping attributes and migration-managed indexes

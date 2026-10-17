@@ -22,7 +22,6 @@ export interface GenerateRecommendationsRequest {
 }
 
 export interface RecommendationJob {
-  id: string
   public_id: string
   status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'cancelled'
   is_full: boolean
@@ -40,7 +39,6 @@ export interface RecommendationJob {
 }
 
 export interface AsyncJobResponse {
-  job_id: string
   public_id: string
   mode: 'full' | 'incremental'
   status: string
@@ -70,7 +68,7 @@ export const recommendationsAdminApi = {
   cancelJob: (publicId: string) =>
     AXIOS_INSTANCE.delete(`/api/admin/recommendations/jobs/${publicId}`),
   requeueJob: (publicId: string) =>
-    AXIOS_INSTANCE.post<{ data: { job_id: string; public_id: string; mode: 'full' | 'incremental'; status: string } }>(
+    AXIOS_INSTANCE.post<{ data: { public_id: string; mode: 'full' | 'incremental'; status: string } }>(
       `/api/admin/recommendations/jobs/${publicId}/requeue`
     ),
 }

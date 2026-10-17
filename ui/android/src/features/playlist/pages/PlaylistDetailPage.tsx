@@ -30,7 +30,7 @@ function formatDuration(seconds: number): string {
 
 function playlistTrackToTrack(pt: PlaylistTrack): Track {
   return {
-    id: pt.uuid,
+    id: pt.publicId,
     publicId: pt.songPublicId,
     title: pt.title,
     artistName: pt.artistName,

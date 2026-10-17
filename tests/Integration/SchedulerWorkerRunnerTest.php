@@ -80,6 +80,7 @@ final class SchedulerWorkerRunnerTest extends TestCase
         $this->stderr = tmpfile();
         self::assertIsResource($this->stdout);
         self::assertIsResource($this->stderr);
+        \App\Tests\Fixtures\Scheduler\PublicIdentitySchema::upgrade($this->database);
     }
 
     public function testRealLoopPublishesHealthyIntentDespitePoisonAndStopsOnTerm(): void
@@ -138,8 +139,8 @@ final class SchedulerWorkerRunnerTest extends TestCase
     {
         $job = $this->seed();
         $this->database->executeStatement(<<<'SQL'
-            INSERT INTO scheduler_occurrences (id, job_id, scheduled_for, origin, job_type, command, parameters)
-            VALUES (:id, :job, date_trunc('minute', clock_timestamp(), 'UTC'), 'manual', 'console', 'app:fixture.baander.app', '[]')
+            INSERT INTO scheduler_occurrences (public_id, job_public_id, id, job_id, scheduled_for, origin, job_type, command, parameters)
+            VALUES (substr(md5(random()::text), 1, 21), substr(md5(random()::text), 1, 21), :id, :job, date_trunc('minute', clock_timestamp(), 'UTC'), 'manual', 'console', 'app:fixture.baander.app', '[]')
             SQL, ['id' => Uuid::v7()->toString(), 'job' => $job]);
         $this->database->beginTransaction();
         $this->database->executeStatement('LOCK TABLE scheduled_jobs IN ACCESS EXCLUSIVE MODE');
@@ -174,8 +175,8 @@ final class SchedulerWorkerRunnerTest extends TestCase
     {
         $id = Uuid::v7()->toString();
         $this->database->executeStatement(<<<'SQL'
-            INSERT INTO scheduled_jobs (id, revision, name, expression, job_type, command, created_at, updated_at, evaluated_through)
-            VALUES (:id, :revision, 'Isolated worker fixture', :expression, 'console', 'app:fixture.baander.app', clock_timestamp(), clock_timestamp(), date_trunc('minute', clock_timestamp(), 'UTC') - INTERVAL '1 minute')
+            INSERT INTO scheduled_jobs (public_id, id, revision, name, expression, job_type, command, created_at, updated_at, evaluated_through)
+            VALUES (substr(md5(random()::text), 1, 21), :id, :revision, 'Isolated worker fixture', :expression, 'console', 'app:fixture.baander.app', clock_timestamp(), clock_timestamp(), date_trunc('minute', clock_timestamp(), 'UTC') - INTERVAL '1 minute')
             SQL, ['id' => $id, 'revision' => Uuid::v7()->toString(), 'expression' => $expression]);
         return $id;
     }

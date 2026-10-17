@@ -73,18 +73,18 @@ final class LoginBlockCommandsTest extends TestCase
 
     public function testDeleteRemovesOneBlockAndAnUnknownOrMalformedIdFails(): void
     {
-        $known = new Uuid();
+        $known = new \App\Shared\Domain\Model\PublicId();
         $blocks = $this->createMock(LoginBlockRepositoryInterface::class);
         $blocks->expects(self::exactly(2))
-            ->method('deleteByUuid')
-            ->willReturnCallback(static fn (Uuid $id): bool => $id->equals($known));
+            ->method('deleteByPublicId')
+            ->willReturnCallback(static fn (\App\Shared\Domain\Model\PublicId $id): bool => $id->equals($known));
         $blocks->expects(self::never())->method('deleteAll');
         $command = new LoginBlockDeleteCommand($this->support($blocks));
 
         self::assertSame(Command::SUCCESS, (new CommandTester($command))->execute(['id' => $known->toString()], ['interactive' => false]));
 
         $unknown = new CommandTester($command);
-        $unknownId = (new Uuid())->toString();
+        $unknownId = (new \App\Shared\Domain\Model\PublicId())->toString();
         self::assertSame(Command::FAILURE, $unknown->execute(['id' => $unknownId], ['interactive' => false]));
         self::assertStringContainsString(sprintf('Login block "%s" not found.', $unknownId), $unknown->getDisplay());
 
@@ -130,9 +130,9 @@ final class LoginBlockCommandsTest extends TestCase
 
     public function testDeleteWithJsonPrintsNothingAsTheApiAnswersWithNoContent(): void
     {
-        $known = new Uuid();
+        $known = new \App\Shared\Domain\Model\PublicId();
         $blocks = $this->createMock(LoginBlockRepositoryInterface::class);
-        $blocks->expects(self::once())->method('deleteByUuid')->willReturn(true);
+        $blocks->expects(self::once())->method('deleteByPublicId')->willReturn(true);
         $blocks->expects(self::once())->method('deleteAll');
         $command = new LoginBlockDeleteCommand($this->support($blocks));
 
@@ -148,13 +148,13 @@ final class LoginBlockCommandsTest extends TestCase
     public function testDeleteNeedsExactlyOneOfAnIdAndAll(): void
     {
         $blocks = $this->createMock(LoginBlockRepositoryInterface::class);
-        $blocks->expects(self::never())->method('deleteByUuid');
+        $blocks->expects(self::never())->method('deleteByPublicId');
         $blocks->expects(self::never())->method('deleteAll');
         $command = new LoginBlockDeleteCommand($this->support($blocks));
 
         self::assertSame(Command::INVALID, (new CommandTester($command))->execute([], ['interactive' => false]));
         self::assertSame(Command::INVALID, (new CommandTester($command))->execute(
-            ['id' => (new Uuid())->toString(), '--all' => true, '--force' => true],
+            ['id' => (new \App\Shared\Domain\Model\PublicId())->toString(), '--all' => true, '--force' => true],
             ['interactive' => false],
         ));
     }

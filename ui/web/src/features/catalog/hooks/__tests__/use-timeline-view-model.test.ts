@@ -20,7 +20,6 @@ function makeAlbum(
   title?: string,
 ) {
   return {
-    uuid: `uuid-${publicId}`,
     publicId,
     title: title ?? `Album ${publicId}`,
     type: 'album',

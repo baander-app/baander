@@ -20,7 +20,7 @@ import {
 import styled, { keyframes } from 'styled-components'
 
 type Device = {
-  id?: string
+  publicId?: string
   name?: string
   lastUsedAt?: string | null
 }
@@ -173,17 +173,17 @@ export function DeviceManagement() {
   const [forgetTarget, setForgetTarget] = useState<Device | null>(null)
 
   function handleRename() {
-    if (!editTarget?.id) return
+    if (!editTarget?.publicId) return
     const name = editName.trim()
     if (!name) return
-    renameDevice.mutate({ deviceId: editTarget.id, data: { name } }, {
+    renameDevice.mutate({ deviceId: editTarget.publicId, data: { name } }, {
       onSuccess: () => setEditTarget(null),
     })
   }
 
   function handleForget() {
-    if (!forgetTarget?.id) return
-    forgetDevice.mutate({ deviceId: forgetTarget.id }, {
+    if (!forgetTarget?.publicId) return
+    forgetDevice.mutate({ deviceId: forgetTarget.publicId }, {
       onSuccess: () => setForgetTarget(null),
     })
   }
@@ -209,7 +209,7 @@ export function DeviceManagement() {
       ) : (
         <DeviceList>
           {devices.map((device) => (
-            <DeviceRow key={device.id}>
+            <DeviceRow key={device.publicId}>
               <DeviceInfo>
                 <DeviceIcon size={14} />
                 <div style={{ minWidth: 0 }}>
@@ -223,11 +223,13 @@ export function DeviceManagement() {
               </DeviceInfo>
               <DeviceActions>
                 <SmallButton
+                  aria-label={`Rename ${device.name || 'device'}`}
                   onClick={() => { setEditTarget(device); setEditName(device.name ?? '') }}
                 >
                   <IconMuted><Pencil size={14} /></IconMuted>
                 </SmallButton>
                 <SmallButton
+                  aria-label={`Forget ${device.name || 'device'}`}
                   onClick={() => setForgetTarget(device)}
                   disabled={forgetDevice.isPending}
                 >

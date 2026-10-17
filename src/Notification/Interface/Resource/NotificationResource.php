@@ -12,7 +12,7 @@ use OpenApi\Attributes as OA;
     schema: 'NotificationResource',
     required: ['publicId', 'category', 'eventType', 'title', 'body', 'parameters', 'isRead', 'createdAt'],
     properties: [
-        new OA\Property(property: 'publicId', type: 'string', pattern: '^[A-Za-z0-9_-]{21}$', description: 'Public notification identifier (Nanoid)'),
+        new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public notification identifier (Nanoid)'),
         new OA\Property(property: 'category', type: 'string', description: 'Notification category'),
         new OA\Property(property: 'eventType', type: 'string', description: 'Event type'),
         new OA\Property(property: 'title', type: 'string', description: 'Notification title'),

@@ -33,7 +33,7 @@ final class WebhookUpdateCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addArgument('id', InputArgument::REQUIRED, 'The webhook UUID')
+            ->addArgument('id', InputArgument::REQUIRED, 'The webhook public ID')
             ->addOption('url', null, InputOption::VALUE_REQUIRED, 'The new destination URL; it must resolve only to allowed addresses')
             ->addOption('category', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Deliver only this notification category; repeat for several. Replaces the current categories')
             ->addOption('all-categories', null, InputOption::VALUE_NONE, 'Deliver every notification category, clearing the category filter');
@@ -70,7 +70,7 @@ final class WebhookUpdateCommand extends Command
 
         $io->success(sprintf(
             'Webhook %s now delivers %s to %s.',
-            $updated['id'],
+            $updated['publicId'],
             $updated['category_filter'] === null ? 'every category' : implode(', ', $updated['category_filter']),
             $updated['url'],
         ));

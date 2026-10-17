@@ -125,6 +125,19 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         self::assertSame(200, $response->getStatusCode(), $response->getContent());
         $data = json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR);
         self::assertSame($this->user->getEmail(), $data['data']['email']);
+        self::assertSame($this->user->getPublicId()->toString(), $data['data']['publicId']);
+        self::assertArrayNotHasKey('uuid', $data['data']);
+        self::assertStringNotContainsString($this->user->getId()->toString(), $response->getContent());
+    }
+
+    public function testInternalUuidSubjectIsRejectedDespiteValidSignatureAndProof(): void
+    {
+        $jwt = $this->accessJwt(subject: $this->user->getId()->toString());
+        $response = $this->request($jwt, $this->proof->create('GET', 'https://baander.app/api/auth/me', $jwt));
+
+        self::assertSame(401, $response->getStatusCode(), (string) $response->getContent());
+        $data = json_decode($response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame('AUTH_INVALID_TOKEN', $data['error']['code']);
     }
 
     public function testLeadingZeroEcCoordinateWorksThroughProductionFirewall(): void
@@ -278,7 +291,7 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         $response = $this->request($jwt, $proof);
         self::assertSame(200, $response->getStatusCode());
         $data = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame(['uuid', 'publicId', 'name', 'email', 'emailVerifiedAt', 'createdAt', 'roles'], array_keys($data['data']));
+        self::assertSame(['publicId', 'name', 'email', 'emailVerifiedAt', 'createdAt', 'roles'], array_keys($data['data']));
         $failure = $this->request($jwt, $proof);
         self::assertSame(403, $failure->getStatusCode());
         foreach ([$response, $failure] as $result) {
@@ -443,11 +456,11 @@ final class OAuthFirewallAcceptanceTest extends TestCase
         return $redeemer;
     }
 
-    private function accessJwt(string $audience = 'https://baander.app'): string
+    private function accessJwt(string $audience = 'https://baander.app', ?string $subject = null): string
     {
         $claims = [
             'jti' => $this->token->getTokenId(),
-            'sub' => $this->user->getId()->toString(),
+            'sub' => $subject ?? $this->user->getPublicId()->toString(),
             'aud' => $audience,
             'client_id' => $this->client->getIdentifier(),
             'scopes' => ['profile'],

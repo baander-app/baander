@@ -9,6 +9,7 @@ use App\Session\Domain\Model\Device\DeviceState;
 use App\Session\Domain\Repository\Device\DeviceRepositoryInterface;
 use App\Session\Infrastructure\Doctrine\Entity\DeviceEntity;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class DeviceDoctrineRepository implements DeviceRepositoryInterface
@@ -32,6 +33,14 @@ final class DeviceDoctrineRepository implements DeviceRepositoryInterface
         $entity = $this->entityManager
             ->getRepository(DeviceEntity::class)
             ->findOneBy(['userId' => $userId, 'deviceId' => $deviceId]);
+
+        return $entity !== null ? $this->toDomain($entity) : null;
+    }
+
+    public function findByUserAndPublicId(Uuid $userId, PublicId $publicId): ?Device
+    {
+        $entity = $this->entityManager->getRepository(DeviceEntity::class)
+            ->findOneBy(['userId' => $userId, 'publicId' => $publicId->toString()]);
 
         return $entity !== null ? $this->toDomain($entity) : null;
     }
@@ -70,6 +79,7 @@ final class DeviceDoctrineRepository implements DeviceRepositoryInterface
             userId: $device->getUserId(),
             deviceId: $device->getDeviceId(),
             id: $device->getId(),
+            publicId: $device->getPublicId(),
         );
     }
 
@@ -77,6 +87,7 @@ final class DeviceDoctrineRepository implements DeviceRepositoryInterface
     {
         return Device::reconstitute(new DeviceState(
             id: $entity->getId(),
+            publicId: $entity->getPublicId(),
             userId: $entity->getUserId(),
             deviceId: $entity->getDeviceId(),
             name: $entity->getName(),

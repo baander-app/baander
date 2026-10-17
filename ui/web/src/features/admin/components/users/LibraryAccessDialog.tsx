@@ -96,7 +96,7 @@ export function LibraryAccessDialog({ user, open, onOpenChange, returnFocusTo }:
           <DialogTitle>Library access</DialogTitle>
           <DialogDescription>Choose the libraries {user.email} can see.</DialogDescription>
         </DialogHeader>
-        <LibraryAccessForm userId={user.id} onClose={() => onOpenChange(false)} />
+        <LibraryAccessForm userId={user.publicId} onClose={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
   )

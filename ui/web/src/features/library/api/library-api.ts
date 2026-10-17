@@ -4,7 +4,7 @@ export const LIBRARY_TYPES = ['music', 'podcast', 'audiobook', 'movie', 'tv_show
 export type LibraryType = (typeof LIBRARY_TYPES)[number]
 
 export interface Library {
-  id: string
+  publicId: string
   name: string
   slug: string
   path: string

@@ -18,7 +18,6 @@ vi.mock('sonner', () => ({
 const mockPost = vi.mocked(AXIOS_INSTANCE.post)
 
 const KEPT: AlbumSummary = {
-  uuid: '0199bf3c-8a00-7000-8000-0000000000a1',
   publicId: 'keptAlbumPublicId0001',
   title: 'Blue Train',
   year: 1957,
@@ -29,7 +28,6 @@ const KEPT: AlbumSummary = {
 }
 
 const MERGED: AlbumSummary = {
-  uuid: '0199bf3c-8a00-7000-8000-0000000000b2',
   publicId: 'mergedAlbumPublicId02',
   title: 'Blue Train (Remaster)',
   year: 1957,
@@ -40,7 +38,7 @@ const MERGED: AlbumSummary = {
 }
 
 const GROUP: DuplicateGroup = {
-  albumIds: [KEPT.uuid, MERGED.uuid],
+  albumIds: [KEPT.publicId, MERGED.publicId],
   confidence: 0.97,
   albumCount: 2,
   albums: [KEPT, MERGED],

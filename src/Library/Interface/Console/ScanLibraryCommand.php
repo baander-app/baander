@@ -60,7 +60,7 @@ final class ScanLibraryCommand extends Command implements SignalableCommandInter
     protected function configure(): void
     {
         $this
-            ->addArgument('library', InputArgument::OPTIONAL, 'Library UUID or slug')
+            ->addArgument('library', InputArgument::OPTIONAL, 'Library public ID or slug')
             ->addOption('all', null, InputOption::VALUE_NONE, 'Scan every library that is not already scanning, one after another')
             ->addOption('rescan', null, InputOption::VALUE_NONE, 'Re-read files the index already knows')
             ->addOption('release', null, InputOption::VALUE_NONE, 'Only release the claim of a scan or delete with files that is gone; a scan claim marks that scan failed; refused while the claim is live')
@@ -141,7 +141,7 @@ final class ScanLibraryCommand extends Command implements SignalableCommandInter
                     $claims->skipped,
                 ))
                 : LibraryResource::from($this->support->dispatch(new GetLibraryQuery(
-                    LibraryResource::from($claims->claimed[0]->library)['id'],
+                    LibraryResource::from($claims->claimed[0]->library)['publicId'],
                     LibraryReadScope::unrestricted(),
                 ))));
         } catch (Throwable $exception) {
@@ -196,7 +196,7 @@ final class ScanLibraryCommand extends Command implements SignalableCommandInter
     {
         $library = LibraryResource::from($claim->library);
         $io->text(sprintf('Claimed "%s" (%s); scanning%s...', $library['name'], $library['slug'], $rescan ? ' all files again' : ''));
-        $this->scanning = $library['id'];
+        $this->scanning = $claim->library->getId()->toString();
 
         try {
             if ($this->interruptedBy !== null) {

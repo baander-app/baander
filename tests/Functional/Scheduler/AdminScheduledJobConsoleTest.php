@@ -171,6 +171,20 @@ final class AdminScheduledJobConsoleTest extends TestCase
         self::assertSame(Command::FAILURE, $show->execute(['id' => $id]));
     }
 
+    public function testPublicAddressSucceedsAndInternalUuidIsNotAnHttpAddress(): void
+    {
+        $publicId = $this->createdOverHttp('Public scheduler identity');
+        $job = $this->job($publicId);
+        self::assertNotNull($job);
+        self::assertNotSame($job->getId()->toString(), $publicId);
+        $response = $this->authenticatedRequest('GET', self::PATH . '/' . $publicId, $this->admin);
+        $data = $this->assertJsonResponse($response, 200, 'data')['data'];
+        self::assertSame($publicId, $data['publicId']);
+        self::assertArrayNotHasKey('id', $data);
+        self::assertStringNotContainsString($job->getId()->toString(), (string) $response->getContent());
+        $this->assertJsonResponse($this->authenticatedRequest('GET', self::PATH . '/' . $job->getId()->toString(), $this->admin), 404);
+    }
+
     private function createdOverHttp(string $name): string
     {
         $job = $this->assertJsonResponse($this->authenticatedRequest('POST', self::PATH, $this->admin, [
@@ -180,12 +194,12 @@ final class AdminScheduledJobConsoleTest extends TestCase
             'command' => PurgeExpiredOAuthCodesCommand::class,
         ]), 201, 'data')['data'];
 
-        return (string) $job['id'];
+        return (string) $job['publicId'];
     }
 
     private function job(string $id): ?ScheduledJob
     {
-        return $this->port()->getById(Uuid::fromString($id));
+        return $this->port()->getByPublicId(\App\Shared\Domain\Model\PublicId::fromString($id));
     }
 
     /** @return list<string> */
@@ -194,7 +208,7 @@ final class AdminScheduledJobConsoleTest extends TestCase
         $ids = [];
         foreach ($this->port()->findAll() as $job) {
             if ($job->getName() === $name) {
-                $ids[] = $job->getId()->toString();
+                $ids[] = $job->getPublicId()->toString();
             }
         }
 

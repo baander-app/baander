@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Session\Domain\Model\Device;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use DateTimeImmutable;
 
 final class Device
@@ -28,6 +29,7 @@ final class Device
 
         $device = new self(new DeviceState(
             id: new Uuid(),
+            publicId: new PublicId(),
             userId: $userId,
             deviceId: $deviceId,
             name: $name,
@@ -73,6 +75,11 @@ final class Device
     public function getId(): Uuid
     {
         return $this->state->id;
+    }
+
+    public function getPublicId(): PublicId
+    {
+        return $this->state->publicId;
     }
 
     public function getUserId(): Uuid

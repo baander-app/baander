@@ -56,6 +56,34 @@ final class RecommendationPoolWorkerTest extends TestCase
         date_default_timezone_set($this->phpZone);
     }
 
+    public function testDirectWorkerUpsertCreatesAndPreservesIndependentPublicIdentity(): void
+    {
+        $source = Uuid::v7()->toString();
+        $target = Uuid::v7()->toString();
+        $insert = new \ReflectionMethod(RecommendationPoolWorker::class, 'insertRecommendation');
+        $worker = new RecommendationPoolWorker();
+        try {
+            $insert->invoke($worker, $this->pdo, $source, $target, 0.5, 'identity-fixture', null);
+            $select = $this->pdo->prepare('SELECT id, public_id, score FROM recommendations WHERE source_id = ? AND target_id = ? AND name = ?');
+            $select->execute([$source, $target, 'identity-fixture']);
+            $first = $select->fetch(\PDO::FETCH_ASSOC);
+            self::assertIsArray($first);
+            self::assertSame(21, strlen($first['public_id']));
+            self::assertNotSame($first['id'], $first['public_id']);
+            $insert->invoke($worker, $this->pdo, $source, $target, 0.9, 'identity-fixture', null);
+            $select->execute([$source, $target, 'identity-fixture']);
+            $second = $select->fetch(\PDO::FETCH_ASSOC);
+            self::assertIsArray($second);
+            self::assertSame($first['public_id'], $second['public_id']);
+            self::assertSame($first['id'], $second['id']);
+            self::assertSame(0.9, (float) $second['score']);
+            self::assertFalse($select->fetch());
+        } finally {
+            $delete = $this->pdo->prepare('DELETE FROM recommendations WHERE source_id = ? AND target_id = ? AND name = ?');
+            $delete->execute([$source, $target, 'identity-fixture']);
+        }
+    }
+
     public function testAJobCancelledBeforeAWorkerPicksItUpStaysCancelledAndDoesNotRun(): void
     {
         $id = $this->job('cancelled');

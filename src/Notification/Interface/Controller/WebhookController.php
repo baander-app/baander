@@ -44,7 +44,7 @@ final class WebhookController
         path: '/api/webhooks/',
         summary: 'List all webhooks',
         responses: [
-            new OA\Response(response: '200', description: 'List of webhooks', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'id', type: 'string'), new OA\Property(property: 'url', type: 'string')]))])),
+            new OA\Response(response: '200', description: 'List of webhooks', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'), new OA\Property(property: 'url', type: 'string')]))])),
             new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
@@ -77,7 +77,7 @@ final class WebhookController
             ),
         ),
         responses: [
-            new OA\Response(response: '201', description: 'Webhook created', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'id', type: 'string'), new OA\Property(property: 'url', type: 'string'), new OA\Property(property: 'secret', type: 'string')])])),
+            new OA\Response(response: '201', description: 'Webhook created', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'), new OA\Property(property: 'url', type: 'string'), new OA\Property(property: 'secret', type: 'string')])])),
             new OA\Response(response: '422', description: 'Invalid input', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
             new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
@@ -111,10 +111,10 @@ final class WebhookController
             ),
         ),
         parameters: [
-            new OA\Parameter(name: 'id', description: 'Webhook UUID', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'id', description: 'Webhook public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Webhook updated', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'id', type: 'string'), new OA\Property(property: 'url', type: 'string')])])),
+            new OA\Response(response: '200', description: 'Webhook updated', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'), new OA\Property(property: 'url', type: 'string')])])),
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '422', description: 'Invalid input', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
             new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
@@ -143,12 +143,12 @@ final class WebhookController
         path: '/api/webhooks/{id}',
         summary: 'Delete a webhook',
         parameters: [
-            new OA\Parameter(name: 'id', description: 'Webhook UUID', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'id', description: 'Webhook public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Deleted'),
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'The ID is not a UUID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '422', description: 'The ID is not a public ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
             new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
@@ -164,19 +164,19 @@ final class WebhookController
     #[OA\Post(
         path: '/api/webhooks/{id}/rotate-secret',
         summary: 'Rotate a webhook secret; the webhook keeps its signature version',
-        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'))],
         responses: [
             new OA\Response(response: '200', description: 'New secret, returned once', content: new OA\JsonContent(
                 required: ['data'],
-                properties: [new OA\Property(property: 'data', type: 'object', required: ['id', 'secret', 'signing_version'], properties: [
-                    new OA\Property(property: 'id', type: 'string', format: 'uuid'),
+                properties: [new OA\Property(property: 'data', type: 'object', required: ['publicId', 'secret', 'signing_version'], properties: [
+                    new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
                     new OA\Property(property: 'secret', type: 'string', minLength: 64, maxLength: 64, pattern: '^[a-f0-9]{64}$'),
                     new OA\Property(property: 'signing_version', type: 'integer', enum: [2]),
                 ])],
             )),
             new OA\Response(response: '403', description: 'Administrator required', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Webhook not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
-            new OA\Response(response: '422', description: 'The ID is not a UUID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
+            new OA\Response(response: '422', description: 'The ID is not a public ID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
     #[Route('/{id}/rotate-secret', name: 'rotate_secret', methods: ['POST'])]

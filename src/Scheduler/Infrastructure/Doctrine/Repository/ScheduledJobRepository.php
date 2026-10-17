@@ -11,6 +11,7 @@ use App\Scheduler\Domain\Repository\ScheduledJobRepositoryInterface;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Domain\ValueObject\ScheduleStatus;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use Doctrine\DBAL\ParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -30,7 +31,7 @@ final class ScheduledJobRepository implements ScheduledJobRepositoryInterface
         $state = $job->getState();
         $revision = Uuid::v7();
         $parameters = [
-            'id' => $state->id->toString(), 'revision' => $revision->toString(),
+            'public_id' => $state->publicId->toString(), 'id' => $state->id->toString(), 'revision' => $revision->toString(),
             'name' => $state->name, 'expression' => $state->expression,
             'job_type' => $state->jobType->value, 'command' => $state->command,
             'status' => $state->status->value, 'description' => $state->description,
@@ -45,9 +46,9 @@ final class ScheduledJobRepository implements ScheduledJobRepositoryInterface
         ];
         if ($state->revision === null) {
             $sql = <<<'SQL'
-                INSERT INTO scheduled_jobs (id, revision, name, expression, job_type, command, status, description,
+                INSERT INTO scheduled_jobs (public_id, id, revision, name, expression, job_type, command, status, description,
                     parameters, created_at, updated_at, last_run_at, next_run_at, last_result, run_count, last_failure_at, last_error)
-                VALUES (:id, :revision, :name, :expression, :job_type, :command, :status, :description,
+                VALUES (:public_id, :id, :revision, :name, :expression, :job_type, :command, :status, :description,
                     CAST(:parameters AS JSON), :created_at, :updated_at, :last_run_at, :next_run_at, :last_result, :run_count, :last_failure_at, :last_error)
                 ON CONFLICT (id) DO NOTHING RETURNING revision
                 SQL;
@@ -60,7 +61,7 @@ final class ScheduledJobRepository implements ScheduledJobRepositoryInterface
                           OR parameters::text <> :parameters OR status <> :status THEN NULL
                         ELSE evaluated_through
                     END,
-                    revision = :revision, name = :name, expression = :expression, job_type = :job_type,
+                    public_id = :public_id, revision = :revision, name = :name, expression = :expression, job_type = :job_type,
                     command = :command, status = :status, description = :description, parameters = CAST(:parameters AS JSON),
                     created_at = :created_at, updated_at = :updated_at, last_run_at = :last_run_at, next_run_at = :next_run_at,
                     last_result = :last_result, run_count = :run_count, last_failure_at = :last_failure_at, last_error = :last_error
@@ -72,6 +73,12 @@ final class ScheduledJobRepository implements ScheduledJobRepositoryInterface
             throw new ScheduledJobConflict();
         }
         $state->revision = Uuid::fromString($savedRevision);
+    }
+
+    public function findByPublicId(PublicId $publicId): ?ScheduledJob
+    {
+        $row = $this->entityManager->getConnection()->fetchAssociative('SELECT * FROM scheduled_jobs WHERE public_id = :id', ['id' => $publicId->toString()]);
+        return $row === false ? null : $this->toDomain($row);
     }
 
     public function findByUuid(Uuid $uuid): ?ScheduledJob
@@ -117,7 +124,7 @@ final class ScheduledJobRepository implements ScheduledJobRepositoryInterface
             nextRunAt: $row['next_run_at'] === null ? null : new \DateTimeImmutable($row['next_run_at']),
             lastResult: $row['last_result'], runCount: (int) $row['run_count'],
             lastFailureAt: $row['last_failure_at'] === null ? null : new \DateTimeImmutable($row['last_failure_at']),
-            lastError: $row['last_error'], revision: Uuid::fromString($row['revision']),
+            publicId: PublicId::fromString($row['public_id']), lastError: $row['last_error'], revision: Uuid::fromString($row['revision']),
         ));
     }
 }

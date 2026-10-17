@@ -7,7 +7,7 @@ Remove one login block, or every block with `--all`. The command does what `DELE
 Remove one block:
 
 ```bash
-make exec cmd="php bin/console app:login-block:delete 0199c3a2-6f1e-7a35-9d4b-2f6c8e1a4b70"
+make exec cmd="php bin/console app:login-block:delete aB3dE5fG7hJ9kL1mN3pQr"
 ```
 
 Remove every block without a terminal, for example in a script:
@@ -20,7 +20,7 @@ make exec cmd="php bin/console app:login-block:delete --all --force"
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `id` | Unless `--all` is given | The UUID of the block to remove, as [app:login-block:list](app-login-block-list.md) shows it |
+| `id` | Unless `--all` is given | The public ID of the block to remove, as [app:login-block:list](app-login-block-list.md) shows it |
 
 ## Options
 
@@ -45,5 +45,5 @@ A block is a record of a honeypot hit. Removing it clears the record; the next a
 | Code | Meaning |
 |------|---------|
 | 0 | The block, or every block, was removed |
-| 1 | No block has the ID, the ID is not a UUID, the operator declined, or another error occurred; the message says why |
+| 1 | No block has the ID, the ID is not a public ID, the operator declined, or another error occurred; the message says why |
 | 2 | Neither or both of an ID and `--all` were given, or `--all` was given without a terminal and without `--force`; nothing was removed |

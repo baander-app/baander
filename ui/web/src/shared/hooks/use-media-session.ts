@@ -184,10 +184,10 @@ export function useMediaSession() {
 
     // --- Subscribe to radio store (identity comparison on stationId) ---
     let lastStationId: string | null =
-      useRadioStore.getState().activeStation?.id ?? null
+      useRadioStore.getState().activeStation?.publicId ?? null
 
     const unsubRadio = useRadioStore.subscribe((state, prevState) => {
-      const stationId = state.activeStation?.id ?? null
+      const stationId = state.activeStation?.publicId ?? null
       const stationChanged = stationId !== lastStationId
 
       // Evaluate playback state BEFORE nullifying sourceRef (fixes radio stop race)

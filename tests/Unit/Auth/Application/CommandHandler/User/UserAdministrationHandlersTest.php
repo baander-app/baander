@@ -45,7 +45,7 @@ final class UserAdministrationHandlersTest extends TestCase
 
     public function testRenamingToTheCurrentNameSucceedsWithoutChange(): void
     {
-        $this->renameHandler()(new RenameUserCommand($this->user->getId()->toString(), 'Member'));
+        $this->renameHandler()(new RenameUserCommand($this->user->getPublicId()->toString(), 'Member'));
 
         self::assertSame([], $this->log);
     }
@@ -110,7 +110,7 @@ final class UserAdministrationHandlersTest extends TestCase
 
     public function testDeletingRemovesTheNamedUser(): void
     {
-        $this->deleteHandler()(new DeleteUserCommand($this->user->getId()->toString()));
+        $this->deleteHandler()(new DeleteUserCommand($this->user->getPublicId()->toString()));
 
         self::assertSame(['delete ' . $this->user->getId()->toString()], $this->log);
     }
@@ -187,8 +187,8 @@ final class UserAdministrationHandlersTest extends TestCase
     private function userRepository(): UserRepositoryInterface
     {
         $users = $this->createStub(UserRepositoryInterface::class);
-        $users->method('findByUuid')->willReturnCallback(
-            fn (Uuid $id): ?User => $id->equals($this->user->getId()) ? $this->user : null,
+        $users->method('findByPublicId')->willReturnCallback(
+            fn (\App\Shared\Domain\Model\PublicId $id): ?User => $id->equals($this->user->getPublicId()) ? $this->user : null,
         );
         $users->method('findByEmail')->willReturnCallback(
             fn (Email $email): ?User => $email->toString() === $this->user->getEmail() ? $this->user : null,

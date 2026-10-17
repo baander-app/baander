@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Session\Domain\Model\ListeningSession;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use DateTimeImmutable;
 use InvalidArgumentException;
 
@@ -42,6 +43,7 @@ final class ListeningSession
 
         $session = new self(new ListeningSessionState(
             id: new Uuid(),
+            publicId: new PublicId(),
             userId: $userId,
             activeDeviceId: null,
             queue: $queue,
@@ -91,6 +93,14 @@ final class ListeningSession
             deviceId: $deviceId,
             occurredAt: new DateTimeImmutable(),
         );
+    }
+
+    public function releaseDevice(Uuid $deviceId): void
+    {
+        if ($this->state->activeDeviceId?->equals($deviceId)) {
+            $this->state->activeDeviceId = null;
+            $this->state->updatedAt = new DateTimeImmutable();
+        }
     }
 
     /**
@@ -165,6 +175,11 @@ final class ListeningSession
     public function getId(): Uuid
     {
         return $this->state->id;
+    }
+
+    public function getPublicId(): PublicId
+    {
+        return $this->state->publicId;
     }
 
     public function getUserId(): Uuid

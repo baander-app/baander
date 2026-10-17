@@ -102,7 +102,7 @@ final class PruneMissingImagesCommand extends Command
         $io->table(
             ['Image ID', 'Type', 'Path'],
             array_map(
-                static fn (array $image): array => [$image['id'], $image['type'], $image['path']],
+                static fn (array $image): array => [$image['publicId'], $image['type'], $image['path']],
                 $report['missingImages'],
             ),
         );

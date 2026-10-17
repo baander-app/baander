@@ -28,7 +28,7 @@ final readonly class SetUserRolesHandler
     /**
      * @return User the user with the new roles
      *
-     * @throws UserNotFoundException when no user has the email address or UUID
+     * @throws UserNotFoundException when no user has the email address or public ID
      * @throws InvalidInputException when no role is given or a role is unknown
      */
     #[AsMessageHandler]

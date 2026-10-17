@@ -55,10 +55,12 @@ final class SessionOwnershipPersistenceTest extends TestCase
 
         // Interleave owners and insertion order so neither owner nor insertion order explains the result.
         $seen = [];
+        $publicIds = [];
         foreach ([[$first, 'a-old', 10], [$second, 'b-new', 40], [$first, 'a-new', 50], [$second, 'b-old', 5], [$first, 'a-mid', 30]] as [$owner, $name, $offset]) {
             $device = Device::create($owner, Uuid::generate(), $name);
             $repository->save($device);
             $seen[$name] = $device->getDeviceId();
+            $publicIds[$name] = $device->getPublicId();
             $connection->executeStatement(
                 "UPDATE devices SET last_seen_at = TIMESTAMPTZ '2026-10-06 12:00:00+00' + make_interval(mins => :offset) WHERE id = :id",
                 ['offset' => $offset, 'id' => $device->getId()->toString()],
@@ -74,6 +76,9 @@ final class SessionOwnershipPersistenceTest extends TestCase
         self::assertNotNull($found);
         self::assertTrue($found->getUserId()->equals($first));
         self::assertSame('a-mid', $found->getName());
+        self::assertTrue($found->getPublicId()->equals($publicIds['a-mid']));
+        self::assertNotNull($repository->findByUserAndPublicId($first, $publicIds['a-mid']));
+        self::assertNull($repository->findByUserAndPublicId($second, $publicIds['a-mid']));
         self::assertNull($repository->findByUserAndDevice($second, $seen['a-mid']));
     }
 
@@ -84,11 +89,13 @@ final class SessionOwnershipPersistenceTest extends TestCase
         $repository = new ListeningSessionDoctrineRepository($this->manager);
 
         $ids = [];
+        $publicIds = [];
         foreach ([$first, $second] as $index => $owner) {
             $session = ListeningSession::create($owner, ['track-' . $index], 0, 1.5);
             $session->claim(Uuid::generate());
             $repository->save($session);
             $ids[$owner->toString()] = $session->getId();
+            $publicIds[$owner->toString()] = $session->getPublicId();
         }
         $this->manager->clear();
 
@@ -96,6 +103,7 @@ final class SessionOwnershipPersistenceTest extends TestCase
             $found = $repository->findByUserId($owner);
             self::assertNotNull($found);
             self::assertTrue($found->getId()->equals($ids[$owner->toString()]));
+            self::assertTrue($found->getPublicId()->equals($publicIds[$owner->toString()]));
             self::assertTrue($found->getUserId()->equals($owner));
             self::assertSame(['track-' . $index], $found->getQueue());
         }

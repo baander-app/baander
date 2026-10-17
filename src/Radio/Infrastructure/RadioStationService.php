@@ -10,6 +10,7 @@ use App\Radio\Domain\Model\RadioStation\RadioStation;
 use App\Radio\Domain\Model\RadioStation\Stream;
 use App\Radio\Domain\Repository\RadioSource\RadioSourceRepositoryInterface;
 use App\Radio\Domain\Repository\RadioStation\RadioStationRepositoryInterface;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use RuntimeException;
 
@@ -20,6 +21,11 @@ final class RadioStationService implements RadioStationPortInterface
         private readonly RadioSourceRepositoryInterface $sourceRepository,
         private readonly StationSyncPortInterface $syncAdapter,
     ) {
+    }
+
+    public function findByPublicId(PublicId $publicId): ?RadioStation
+    {
+        return $this->stationRepository->findByPublicId($publicId);
     }
 
     public function listStations(?string $countryCode = null, ?string $query = null): array
@@ -112,8 +118,9 @@ final class RadioStationService implements RadioStationPortInterface
     private function stationToArray(RadioStation $station): array
     {
         return [
-            'id' => $station->getId()->toString(),
-            'sourceId' => $station->getSourceId()->toString(),
+            'publicId' => $station->getPublicId()->toString(),
+            'sourceId' => ($this->sourceRepository->find($station->getSourceId())
+                ?? throw new \App\Shared\Application\Exception\NotFoundException('Radio source not found.'))->getPublicId()->toString(),
             'externalId' => $station->getExternalId(),
             'name' => $station->getName(),
             'country' => $station->getCountry(),

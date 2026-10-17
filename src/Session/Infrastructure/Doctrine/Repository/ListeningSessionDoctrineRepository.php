@@ -63,6 +63,7 @@ final class ListeningSessionDoctrineRepository implements ListeningSessionReposi
             currentTrackIndex: $session->getCurrentTrackIndex(),
             position: $session->getPosition(),
             id: $session->getId(),
+            publicId: $session->getPublicId(),
         );
     }
 
@@ -70,6 +71,7 @@ final class ListeningSessionDoctrineRepository implements ListeningSessionReposi
     {
         return ListeningSession::reconstitute(new ListeningSessionState(
             id: $entity->getId(),
+            publicId: $entity->getPublicId(),
             userId: $entity->getUserId(),
             activeDeviceId: $entity->getActiveDeviceId(),
             queue: $entity->getQueue(),

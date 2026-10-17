@@ -24,7 +24,7 @@ make exec cmd="php bin/console app:library:scan my-music --release"
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `library` | Unless `--all` is given | The library's UUID or slug |
+| `library` | Unless `--all` is given | The library's public ID or slug |
 
 ## Options
 
@@ -65,7 +65,7 @@ A delete with files holds its claim under the same 15-minute lease and renews it
 | Code | Meaning |
 |------|---------|
 | 0 | Every scan started completed; with `--release`, the claim is released or there was none |
-| 1 | The library is already scanning or a delete with files holds it, no library has the UUID or slug, a scan failed, was cancelled or lost its claim, or `--release` found a live claim without `--force`; the message says why |
+| 1 | The library is already scanning or a delete with files holds it, no library has the public ID or slug, a scan failed, was cancelled or lost its claim, or `--release` found a live claim without `--force`; the message says why |
 | 2 | Invalid options: no library and no `--all`, both, `--release` with an option other than `--force`, or `--force` without `--release` |
 | 130 | Interrupted by SIGINT; the unfinished scans are released |
 | 143 | Interrupted by SIGTERM; the unfinished scans are released |

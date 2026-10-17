@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Application\Port;
 
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 
 /**
- * @phpstan-type ProfileData array{id: string, name: string, icon: string, deviceId: string|null, payload: array<array-key, mixed>, isDefault: bool, sortOrder: int, version: int, createdAt: string, updatedAt: string}
+ * @phpstan-type ProfileData array{publicId: string, name: string, icon: string, deviceId: string|null, payload: array<array-key, mixed>, isDefault: bool, sortOrder: int, version: int, createdAt: string, updatedAt: string}
  */
 interface EqDeviceProfilePortInterface
 {
@@ -19,7 +20,7 @@ interface EqDeviceProfilePortInterface
     /**
      * @return ProfileData
      */
-    public function getProfile(Uuid $userId, Uuid $profileId): array;
+    public function getProfile(Uuid $userId, PublicId $profileId): array;
 
     /**
      * @param array<array-key, mixed> $payload
@@ -31,14 +32,14 @@ interface EqDeviceProfilePortInterface
      * @param array<array-key, mixed>|null $payload
      * @return ProfileData
      */
-    public function updateProfile(Uuid $userId, Uuid $profileId, ?string $name, ?string $icon, ?string $deviceId, ?array $payload, ?int $sortOrder): array;
+    public function updateProfile(Uuid $userId, PublicId $profileId, ?string $name, ?string $icon, ?string $deviceId, ?array $payload, ?int $sortOrder): array;
 
-    public function deleteProfile(Uuid $userId, Uuid $profileId): void;
+    public function deleteProfile(Uuid $userId, PublicId $profileId): void;
 
     /**
      * @return array{activeProfileId: string|null}
      */
-    public function activateProfile(Uuid $userId, Uuid $profileId): array;
+    public function activateProfile(Uuid $userId, PublicId $profileId): array;
 
     /**
      * @return ProfileData|null

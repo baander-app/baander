@@ -18,7 +18,7 @@ make exec cmd="php bin/console app:library:delete my-music --force"
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `library` | Yes | The library's UUID or slug |
+| `library` | Yes | The library's public ID or slug |
 
 ## Options
 
@@ -37,5 +37,5 @@ On a terminal, the command asks before it deletes; answering no leaves the libra
 | Code | Meaning |
 |------|---------|
 | 0 | Library deleted |
-| 1 | No library has the UUID or slug, the operator declined, or another error occurred; the message says why |
+| 1 | No library has the public ID or slug, the operator declined, or another error occurred; the message says why |
 | 2 | No terminal is attached and `--force` was not given; nothing was deleted |

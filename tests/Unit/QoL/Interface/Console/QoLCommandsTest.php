@@ -32,7 +32,7 @@ final class QoLCommandsTest extends TestCase
     {
         $this->directory = sys_get_temp_dir() . '/baander-qol-commands-' . bin2hex(random_bytes(8));
         $this->workers = new QoLWorkers($this->directory);
-        $this->qol = new QoLAdminService($this->workers);
+        $this->qol = new QoLAdminService($this->workers, new \App\Tests\Unit\QoL\QoLPublicIds());
     }
 
     protected function tearDown(): void
@@ -84,7 +84,7 @@ final class QoLCommandsTest extends TestCase
         self::assertSame(Command::SUCCESS, $tester->execute([]));
 
         $display = $tester->getDisplay();
-        self::assertMatchesRegularExpression('/^\s*2\s+1\s+a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11 4K 55\.57/m', $display);
+        self::assertStringContainsString(\App\Tests\Unit\QoL\QoLPublicIds::forId('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11') . ' 4K 55.57', $display);
         self::assertMatchesRegularExpression('/^\s*Total\s+1\s+predicted cost 55\.57/m', $display);
     }
 
@@ -201,7 +201,7 @@ final class QoLCommandsTest extends TestCase
     {
         $port = $this->createStub(ServerControlPortInterface::class);
         $port->method('execute')->willThrowException(new ServerNotRunningException());
-        $qol = new QoLAdminService($port);
+        $qol = new QoLAdminService($port, new \App\Tests\Unit\QoL\QoLPublicIds());
 
         foreach ([
             [new QoLStatusCommand($qol), []],

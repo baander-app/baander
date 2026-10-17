@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Media\Interface\Resource;
 
-use App\Media\Domain\Model\Image;
+use App\Media\Domain\ReadModel\ImageReadView;
 use App\Media\Interface\Resource\ImageResource;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
@@ -19,31 +19,30 @@ final class ImageResourceTest extends TestCase
         $publicId = PublicId::fromString(str_repeat('a', 21));
         $createdAt = new DateTimeImmutable('2025-06-01 12:00:00');
         $updatedAt = new DateTimeImmutable('2025-06-02 15:30:00');
-        $albumId = Uuid::v4();
+        $albumId = new PublicId();
 
-        $image = Image::reconstitute(
-            new \App\Media\Domain\Model\ImageState(
-                id: $id,
-                publicId: $publicId,
-                path: 'images/album-cover.jpg',
-                extension: 'jpg',
-                mimeType: 'image/jpeg',
-                blurhash: 'LEHV6nWB2yk8pyo0adR*.7kCMdnj',
-                size: 2048,
-                width: 800,
-                height: 600,
-                imageableType: 'album',
-                albumId: $albumId,
-                artistId: null,
-                playlistId: null,
-                createdAt: $createdAt,
-                updatedAt: $updatedAt,
-            ),
+        $image = new ImageReadView(
+            id: $id,
+            publicId: $publicId,
+            path: 'images/album-cover.jpg',
+            extension: 'jpg',
+            mimeType: 'image/jpeg',
+            blurhash: 'LEHV6nWB2yk8pyo0adR*.7kCMdnj',
+            size: 2048,
+            width: 800,
+            height: 600,
+            imageableType: 'album',
+            albumPublicId: $albumId,
+            artistPublicId: null,
+            playlistPublicId: null,
+            createdAt: $createdAt,
+            updatedAt: $updatedAt,
         );
 
         $result = ImageResource::from($image);
 
-        $this->assertSame($id->toString(), $result['id']);
+        $this->assertArrayNotHasKey('id', $result);
+        $this->assertNotContains($id->toString(), $result);
         $this->assertSame($publicId->toString(), $result['publicId']);
         $this->assertArrayNotHasKey('path', $result);
         $this->assertSame('jpg', $result['extension']);
@@ -62,24 +61,22 @@ final class ImageResourceTest extends TestCase
 
     public function testFromTransformsImageWithNullOwnerIds(): void
     {
-        $image = Image::reconstitute(
-            new \App\Media\Domain\Model\ImageState(
-                id: Uuid::v4(),
-                publicId: PublicId::fromString(str_repeat('b', 21)),
-                path: 'images/artist-photo.png',
-                extension: 'png',
-                mimeType: 'image/png',
-                blurhash: null,
-                size: 4096,
-                width: 500,
-                height: 500,
-                imageableType: 'artist',
-                albumId: null,
-                artistId: null,
-                playlistId: null,
-                createdAt: new DateTimeImmutable(),
-                updatedAt: new DateTimeImmutable(),
-            ),
+        $image = new ImageReadView(
+            id: Uuid::v4(),
+            publicId: PublicId::fromString(str_repeat('b', 21)),
+            path: 'images/artist-photo.png',
+            extension: 'png',
+            mimeType: 'image/png',
+            blurhash: null,
+            size: 4096,
+            width: 500,
+            height: 500,
+            imageableType: 'artist',
+            albumPublicId: null,
+            artistPublicId: null,
+            playlistPublicId: null,
+            createdAt: new DateTimeImmutable(),
+            updatedAt: new DateTimeImmutable(),
         );
 
         $result = ImageResource::from($image);
@@ -92,28 +89,26 @@ final class ImageResourceTest extends TestCase
 
     public function testFromTransformsImageWithAllOwnerIds(): void
     {
-        $albumId = Uuid::v4();
-        $artistId = Uuid::v4();
-        $playlistId = Uuid::v4();
+        $albumId = new PublicId();
+        $artistId = new PublicId();
+        $playlistId = new PublicId();
 
-        $image = Image::reconstitute(
-            new \App\Media\Domain\Model\ImageState(
-                id: Uuid::v4(),
-                publicId: PublicId::fromString(str_repeat('c', 21)),
-                path: 'images/multi.jpg',
-                extension: 'jpg',
-                mimeType: 'image/jpeg',
-                blurhash: null,
-                size: 1000,
-                width: 100,
-                height: 100,
-                imageableType: 'playlist',
-                albumId: $albumId,
-                artistId: $artistId,
-                playlistId: $playlistId,
-                createdAt: new DateTimeImmutable(),
-                updatedAt: new DateTimeImmutable(),
-            ),
+        $image = new ImageReadView(
+            id: Uuid::v4(),
+            publicId: PublicId::fromString(str_repeat('c', 21)),
+            path: 'images/multi.jpg',
+            extension: 'jpg',
+            mimeType: 'image/jpeg',
+            blurhash: null,
+            size: 1000,
+            width: 100,
+            height: 100,
+            imageableType: 'playlist',
+            albumPublicId: $albumId,
+            artistPublicId: $artistId,
+            playlistPublicId: $playlistId,
+            createdAt: new DateTimeImmutable(),
+            updatedAt: new DateTimeImmutable(),
         );
 
         $result = ImageResource::from($image);
@@ -125,44 +120,40 @@ final class ImageResourceTest extends TestCase
 
     public function testCollectionTransformsMultipleImages(): void
     {
-        $image1 = Image::reconstitute(
-            new \App\Media\Domain\Model\ImageState(
-                id: Uuid::v4(),
-                publicId: PublicId::fromString(str_repeat('d', 21)),
-                path: 'images/one.jpg',
-                extension: 'jpg',
-                mimeType: 'image/jpeg',
-                blurhash: null,
-                size: 100,
-                width: 10,
-                height: 10,
-                imageableType: 'album',
-                albumId: null,
-                artistId: null,
-                playlistId: null,
-                createdAt: new DateTimeImmutable(),
-                updatedAt: new DateTimeImmutable(),
-            ),
+        $image1 = new ImageReadView(
+            id: Uuid::v4(),
+            publicId: PublicId::fromString(str_repeat('d', 21)),
+            path: 'images/one.jpg',
+            extension: 'jpg',
+            mimeType: 'image/jpeg',
+            blurhash: null,
+            size: 100,
+            width: 10,
+            height: 10,
+            imageableType: 'album',
+            albumPublicId: null,
+            artistPublicId: null,
+            playlistPublicId: null,
+            createdAt: new DateTimeImmutable(),
+            updatedAt: new DateTimeImmutable(),
         );
 
-        $image2 = Image::reconstitute(
-            new \App\Media\Domain\Model\ImageState(
-                id: Uuid::v4(),
-                publicId: PublicId::fromString(str_repeat('e', 21)),
-                path: 'images/two.png',
-                extension: 'png',
-                mimeType: 'image/png',
-                blurhash: null,
-                size: 200,
-                width: 20,
-                height: 20,
-                imageableType: 'artist',
-                albumId: null,
-                artistId: null,
-                playlistId: null,
-                createdAt: new DateTimeImmutable(),
-                updatedAt: new DateTimeImmutable(),
-            ),
+        $image2 = new ImageReadView(
+            id: Uuid::v4(),
+            publicId: PublicId::fromString(str_repeat('e', 21)),
+            path: 'images/two.png',
+            extension: 'png',
+            mimeType: 'image/png',
+            blurhash: null,
+            size: 200,
+            width: 20,
+            height: 20,
+            imageableType: 'artist',
+            albumPublicId: null,
+            artistPublicId: null,
+            playlistPublicId: null,
+            createdAt: new DateTimeImmutable(),
+            updatedAt: new DateTimeImmutable(),
         );
 
         $result = ImageResource::collection([$image1, $image2]);

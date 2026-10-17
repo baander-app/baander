@@ -424,7 +424,6 @@ final class AuthController
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'uuid', type: 'string', format: 'uuid'),
                             new OA\Property(property: 'publicId', type: 'string'),
                             new OA\Property(property: 'name', type: 'string'),
                             new OA\Property(property: 'email', type: 'string', format: 'email'),
@@ -467,7 +466,7 @@ final class AuthController
         // Send CurrentUserDetails signal so the client updates the passkey picker
         try {
             $signal = $this->passkeyService->createCurrentUserDetailsSignal(
-                $user->getId()->toString(),
+                $user->getPublicId()->toString(),
                 $user->getEmail(),
                 $user->getName(),
             );
@@ -609,7 +608,7 @@ final class AuthController
         }
 
         try {
-            $changed = $this->commandBus->dispatch(new ChangeEmailCommand($user->getId()->toString(), $payload->email))
+            $changed = $this->commandBus->dispatch(new ChangeEmailCommand($user->getPublicId()->toString(), $payload->email))
                 ->last(HandledStamp::class)?->getResult();
         } catch (\Throwable $e) {
             return $this->handleCommandException(

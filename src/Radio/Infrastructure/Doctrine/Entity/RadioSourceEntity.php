@@ -4,17 +4,22 @@ declare(strict_types=1);
 
 namespace App\Radio\Infrastructure\Doctrine\Entity;
 
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'radio_sources')]
+#[ORM\UniqueConstraint(name: 'uniq_radio_sources_public_id', columns: ['public_id'])]
 class RadioSourceEntity
 {
     #[ORM\Id]
     #[ORM\Column(type: 'uuid')]
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
+
+    #[ORM\Column(name: 'public_id', type: 'text')]
+    private string $publicId;
 
     #[ORM\Column(type: 'text')]
     private string $name;
@@ -51,6 +56,7 @@ class RadioSourceEntity
         ?string $syncSchedule = null,
     ) {
         $this->id = $id;
+        $this->publicId = (new PublicId())->toString();
         $this->name = $name;
         $this->type = $type;
         $this->syncUrl = $syncUrl;
@@ -59,6 +65,16 @@ class RadioSourceEntity
         $this->isActive = true;
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function getPublicId(): PublicId
+    {
+        return PublicId::fromString($this->publicId);
+    }
+
+    public function setPublicId(PublicId $publicId): void
+    {
+        $this->publicId = $publicId->toString();
     }
 
     public function getId(): Uuid

@@ -38,18 +38,13 @@ final class JobMonitorResource extends AbstractResource
     }
 
     /**
-     * A job with its error, stored message, run time and whether it can be cancelled.
+     * A job with its run time and whether it can be cancelled.
      *
      * @return array<string, mixed>
      */
     public static function detail(JobMonitorRecord $job): array
     {
-        $failed = $job->status === JobStatus::Failed;
-
         return self::from($job) + [
-            'exception' => $failed ? $job->exception : null,
-            'data' => $job->data,
-            'dataTruncated' => $job->dataTruncated,
             'duration' => $job->durationMicroseconds === null ? null : $job->durationMicroseconds / 1e6,
             'cancellable' => $job->cancellable === true,
         ];

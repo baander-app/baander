@@ -14,6 +14,7 @@ use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Library\Infrastructure\Doctrine\Repository\LibraryRepository;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Tests\Fixtures\Library\LibraryScanClaimRace;
@@ -477,9 +478,9 @@ final class LibraryScanClaimTest extends TestCase
     {
         $id = (new Uuid())->toString();
         $connection->executeStatement(
-            "INSERT INTO libraries (id, name, slug, path, type, sort_order, created_at, updated_at, filesystem_type)
-             VALUES (?, 'Constraint', ?, '/media/constraint', 'music', 0, now(), now(), 'local')",
-            [$id, 'constraint-' . bin2hex(random_bytes(4))],
+            "INSERT INTO libraries (id, public_id, name, slug, path, type, sort_order, created_at, updated_at, filesystem_type)
+             VALUES (?, ?, 'Constraint', ?, '/media/constraint', 'music', 0, now(), now(), 'local')",
+            [$id, (new PublicId())->toString(), 'constraint-' . bin2hex(random_bytes(4))],
         );
 
         return $id;

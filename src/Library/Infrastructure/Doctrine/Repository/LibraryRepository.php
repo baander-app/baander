@@ -16,6 +16,7 @@ use App\Library\Domain\ValueObject\LibraryType;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Library\Domain\Model\LibraryState;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use Doctrine\DBAL\ParameterType;
 use Doctrine\ORM\EntityManagerInterface;
@@ -49,6 +50,17 @@ final class LibraryRepository implements LibraryRepositoryInterface
             ->getQuery()
             ->getResult();
         return array_map($this->toDomain(...), $entities);
+    }
+
+    public function findVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): ?Library
+    {
+        $entity = $this
+            ->visibleQuery($scope)
+            ->andWhere('l.publicId = :id')
+            ->setParameter('id', $publicId->toString())
+            ->getQuery()
+            ->getOneOrNullResult();
+        return $entity === null ? null : $this->toDomain($entity);
     }
 
     public function findVisibleByUuid(Uuid $uuid, LibraryReadScope $scope): ?Library
@@ -96,6 +108,13 @@ final class LibraryRepository implements LibraryRepositoryInterface
         $this->syncToEntity($library, $entity);
         $this->entityManager->persist($entity);
         $this->entityManager->flush();
+    }
+
+    public function findByPublicId(PublicId $publicId): ?Library
+    {
+        $entity = $this->entityManager->getRepository(LibraryEntity::class)->findOneBy(['publicId' => $publicId->toString()]);
+
+        return $entity === null ? null : $this->toDomain($entity);
     }
 
     public function findByUuid(Uuid $uuid): ?Library
@@ -379,6 +398,7 @@ final class LibraryRepository implements LibraryRepositoryInterface
             $state->filesystemType->value,
             $state->sortOrder,
             id: $state->id,
+            publicId: $state->publicId,
         );
     }
 
@@ -386,6 +406,7 @@ final class LibraryRepository implements LibraryRepositoryInterface
     {
         return Library::reconstitute(new LibraryState(
             id: $entity->getId(),
+            publicId: $entity->getPublicId(),
             name: $entity->getName(),
             slug: new LibrarySlug($entity->getSlug()),
             path: new LibraryPath($entity->getPath()),

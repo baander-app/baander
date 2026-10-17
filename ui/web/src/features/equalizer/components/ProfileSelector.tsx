@@ -182,7 +182,7 @@ export function ProfileSelector() {
         setProfiles(list)
         // Auto-activate default
         const def = list.find((p) => p.isDefault)
-        if (def) setActiveProfileId(def.id)
+        if (def) setActiveProfileId(def.publicId)
       })
       .catch((err) => {
         if (cancelled) return
@@ -206,7 +206,7 @@ export function ProfileSelector() {
       // Offline fallback: create locally
       toast.warning('Could not reach server — profile saved locally.')
       const local: EqProfile = {
-        id: `local-${Date.now()}`,
+        publicId: `local-${Date.now()}`,
         name: newName.trim(),
         icon: newIcon,
         payload: {},
@@ -233,7 +233,7 @@ export function ProfileSelector() {
 
   const handleActivate = useCallback(async (id: string) => {
     setActiveProfileId(id)
-    const profile = useEqProfilesStore.getState().profiles.find((p) => p.id === id)
+    const profile = useEqProfilesStore.getState().profiles.find((p) => p.publicId === id)
     if (profile?.payload && Object.keys(profile.payload).length > 0) {
       applyProfilePayload(profile.payload)
     }
@@ -304,9 +304,9 @@ export function ProfileSelector() {
         <ProfileList>
           {profiles.map((profile) => (
             <ProfileItem
-              key={profile.id}
-              $active={activeProfileId === profile.id}
-              onClick={() => handleActivate(profile.id)}
+              key={profile.publicId}
+              $active={activeProfileId === profile.publicId}
+              onClick={() => handleActivate(profile.publicId)}
             >
               <ProfileIcon>{ICON_LABEL[profile.icon]}</ProfileIcon>
               <ProfileName>{profile.name}</ProfileName>
@@ -316,7 +316,7 @@ export function ProfileSelector() {
               <Button
                 variant="ghost"
                 size="xs"
-                onClick={(e) => { e.stopPropagation(); handleSave(profile.id) }}
+                onClick={(e) => { e.stopPropagation(); handleSave(profile.publicId) }}
                 title="Save current settings to this profile"
               >
                 Save
@@ -325,7 +325,7 @@ export function ProfileSelector() {
                 <Button
                   variant="ghost"
                   size="xs"
-                  onClick={(e) => { e.stopPropagation(); handleDelete(profile.id) }}
+                  onClick={(e) => { e.stopPropagation(); handleDelete(profile.publicId) }}
                   title="Delete profile"
                 >
                   Del

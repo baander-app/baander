@@ -51,13 +51,17 @@ final class GetPersonalizedRecommendationsHandlerTest extends TestCase
             ->method('findByUuids')
             ->willReturn([$targetId => $song]);
 
-        $handler = new GetPersonalizedRecommendationsHandler($recommendationRepository, $songRepository);
+        $identities = $this->createStub(\App\Recommendation\Application\Port\RecommendationPublicIdentityInterface::class);
+        $identities->method('publicEntityId')->willReturn('publicReference1234567');
+        $handler = new GetPersonalizedRecommendationsHandler($recommendationRepository, $songRepository, $identities);
 
         $query = new GetPersonalizedRecommendationsQuery($userId, 12, 'song');
         $result = $handler($query);
 
         $this->assertCount(1, $result);
-        $this->assertSame($targetId, $result[0]['target_id']);
+        $this->assertSame($song->getPublicId()->toString(), $result[0]['target_id']);
+        $this->assertArrayNotHasKey('id', $result[0]['song']);
+        $this->assertSame('publicReference1234567', $result[0]['song']['album_id']);
         $this->assertSame(1.0, $result[0]['total_score']);
         // Highest-scoring strategy ('content' = 0.6) drives the explanation.
         $this->assertSame('Similar sound and mood', $result[0]['explanation']);

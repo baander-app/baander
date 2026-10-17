@@ -9,7 +9,7 @@ const DEVICES_KEY = ['devices']
 const SESSION_KEY = ['session', 'current']
 
 interface Device {
-  id: string
+  publicId: string
   deviceId: string
   name: string | null
   lastUsedAt: string | null
@@ -103,8 +103,8 @@ export function DevicePicker() {
   })
 
   const activeDeviceId = session?.activeDeviceId ?? null
-  const isActive = activeDeviceId === myDeviceId
-  const activeDevice = devices.find(d => d.deviceId === activeDeviceId)
+  const isActive = activeDeviceId === devices.find(d => d.deviceId === myDeviceId)?.publicId
+  const activeDevice = devices.find(d => d.publicId === activeDeviceId)
   const activeName = activeDevice?.name ?? 'Unknown device'
 
   // Single device, nothing to show

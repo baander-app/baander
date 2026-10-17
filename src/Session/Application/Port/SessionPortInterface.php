@@ -6,6 +6,8 @@ namespace App\Session\Application\Port;
 
 use App\Session\Application\Exception\DeviceNotFound;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
+use App\Session\Domain\Model\Device\Device;
 
 interface SessionPortInterface
 {
@@ -53,15 +55,20 @@ interface SessionPortInterface
      */
     public function getDevices(Uuid $userId): array;
 
+    public function findDeviceByPublicId(PublicId $publicId, Uuid $userId): ?Device;
+
+    /** Resolve a browser token to its owner's persisted public device identity. */
+    public function devicePublicId(Uuid $userId, Uuid $browserToken): ?PublicId;
+
     /**
      * Rename a device.
      *
      * @throws DeviceNotFound When the device is not registered for this user.
      */
-    public function renameDevice(Uuid $userId, Uuid $deviceId, string $name): void;
+    public function renameDevice(Uuid $userId, PublicId $deviceId, string $name): void;
 
     /**
      * Forget (remove) a device.
      */
-    public function forgetDevice(Uuid $userId, Uuid $deviceId): void;
+    public function forgetDevice(Uuid $userId, PublicId $deviceId): void;
 }

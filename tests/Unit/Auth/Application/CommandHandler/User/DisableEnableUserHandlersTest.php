@@ -57,9 +57,9 @@ final class DisableEnableUserHandlersTest extends TestCase
         );
     }
 
-    public function testDisablingByUuidFindsTheSameUser(): void
+    public function testDisablingByPublicIdFindsTheSameUser(): void
     {
-        $this->disableHandler()(new DisableUserCommand($this->user->getId()->toString()));
+        $this->disableHandler()(new DisableUserCommand($this->user->getPublicId()->toString()));
 
         self::assertTrue($this->user->isDisabled());
     }
@@ -217,6 +217,7 @@ final class DisableEnableUserHandlersTest extends TestCase
     private function userRepository(): UserRepositoryInterface
     {
         $users = $this->createStub(UserRepositoryInterface::class);
+        $users->method('findByPublicId')->willReturnCallback(fn (\App\Shared\Domain\Model\PublicId $id): ?User => $id->equals($this->user->getPublicId()) ? $this->user : null);
         $users->method('findByUuid')->willReturnCallback(
             fn (Uuid $id): ?User => $id->equals($this->user->getId()) ? $this->user : null,
         );

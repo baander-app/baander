@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Infrastructure\Doctrine\Entity;
 
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'eq_device_profiles')]
+#[ORM\UniqueConstraint(name: 'uniq_eq_device_profiles_public_id', columns: ['public_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_eq_device_profiles_user_id_name', columns: ['user_id', 'name'])]
 class EqDeviceProfileEntity
 {
@@ -16,6 +18,9 @@ class EqDeviceProfileEntity
     #[ORM\Column(type: 'uuid')]
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
+
+    #[ORM\Column(name: 'public_id', type: 'text')]
+    private string $publicId;
 
     #[ORM\Column(name: 'user_id', type: 'uuid')]
     private Uuid $userId;
@@ -51,6 +56,7 @@ class EqDeviceProfileEntity
     public function __construct(Uuid $id)
     {
         $this->id = $id;
+        $this->publicId = (new PublicId())->toString();
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
     }
@@ -58,6 +64,16 @@ class EqDeviceProfileEntity
     public function getId(): Uuid
     {
         return $this->id;
+    }
+
+    public function getPublicId(): PublicId
+    {
+        return PublicId::fromString($this->publicId);
+    }
+
+    public function setPublicId(PublicId $publicId): void
+    {
+        $this->publicId = $publicId->toString();
     }
 
     public function getUserId(): Uuid

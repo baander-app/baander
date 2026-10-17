@@ -11,7 +11,6 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'MovieResource',
     properties: [
-        new OA\Property(property: 'uuid', type: 'string', format: 'uuid', description: 'Movie UUID'),
         new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, description: 'Public identifier'),
         new OA\Property(property: 'title', type: 'string', description: 'Movie title'),
         new OA\Property(property: 'year', type: 'integer', nullable: true, description: 'Release year'),
@@ -27,7 +26,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'imdbId', type: 'string', nullable: true, description: 'IMDB ID'),
         new OA\Property(property: 'tmdbCollectionId', type: 'integer', nullable: true, description: 'TMDB collection ID'),
         new OA\Property(property: 'collectionName', type: 'string', nullable: true, description: 'Collection name'),
-        new OA\Property(property: 'videoIds', type: 'array', items: new OA\Items(type: 'string'), description: 'Video UUIDs'),
+        new OA\Property(property: 'videoIds', type: 'array', items: new OA\Items(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21), description: 'Video public identifiers'),
         new OA\Property(property: 'posterImage', type: 'object', nullable: true, description: 'Poster image data'),
         new OA\Property(property: 'genres', type: 'array', items: new OA\Items(type: 'object'), description: 'Genre list'),
         new OA\Property(property: 'videos', type: 'array', items: new OA\Items(type: 'object'), description: 'Video variants'),
@@ -42,7 +41,6 @@ final class MovieResource extends AbstractResource
         assert($source instanceof Movie);
 
         return [
-            'uuid' => $source->getId()->toString(),
             'publicId' => $source->getPublicId()->toString(),
             'title' => $source->getTitle(),
             'year' => $source->getYear(),
@@ -58,7 +56,7 @@ final class MovieResource extends AbstractResource
             'imdbId' => $source->getImdbId(),
             'tmdbCollectionId' => $source->getTmdbCollectionId(),
             'collectionName' => $source->getCollectionName(),
-            'videoIds' => $source->getVideoIds(),
+            'videoIds' => $source->getVideoPublicIds(),
             'createdAt' => $source->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'updatedAt' => $source->getUpdatedAt()->format(\DateTimeInterface::ATOM),
         ];

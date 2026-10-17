@@ -8,6 +8,7 @@ use App\Scheduler\Application\DTO\SchedulerOccurrence;
 use App\Scheduler\Application\Port\SchedulerOccurrenceMaterializerInterface;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory;
 use Cron\CronExpression;
 use DateTimeImmutable;
@@ -45,7 +46,7 @@ final class DoctrineSchedulerOccurrenceMaterializer implements SchedulerOccurren
         return $this->operation(function () use ($jobId, $minuteLimit): int {
             // Bound payload transfer before decoding. The schedule API currently allows larger values.
             $row = $this->connection->fetchAssociative(<<<'SQL'
-                SELECT evaluated_through,
+                SELECT public_id, evaluated_through,
                     CASE WHEN octet_length(expression) BETWEEN 1 AND 1024 THEN expression END AS expression,
                     CASE WHEN job_type IN ('messenger', 'console') THEN job_type END AS job_type,
                     CASE WHEN octet_length(command) BETWEEN 1 AND 512 THEN command END AS command,
@@ -68,7 +69,7 @@ final class DoctrineSchedulerOccurrenceMaterializer implements SchedulerOccurren
                 throw new \UnexpectedValueException('Scheduled recovery parameters must be an array or object.');
             }
             // Validate before initialization or sparse scans; the DTO enforces the eight-array nesting bound.
-            $snapshot = new SchedulerOccurrence(Uuid::v7(), $jobId, $cutoff, JobType::from($row['job_type']), $row['command'], $parameters);
+            $snapshot = new SchedulerOccurrence(Uuid::v7(), $jobId, $cutoff, JobType::from($row['job_type']), $row['command'], $parameters, jobPublicId: PublicId::fromString($row['public_id']));
             if ($row['evaluated_through'] === null) {
                 $this->advance($jobId, $cutoff);
                 return 0;
@@ -83,9 +84,7 @@ final class DoctrineSchedulerOccurrenceMaterializer implements SchedulerOccurren
             for ($scanned = 0; $scanned < $minuteLimit && $cursor < $cutoff; ++$scanned) {
                 $cursor = $cursor->modify('+1 minute');
                 if ($cron->isDue($cursor, 'UTC')) {
-                    $inserted += (int) $writer->record(new SchedulerOccurrence(
-                        Uuid::v7(), $jobId, $cursor, $snapshot->jobType, $snapshot->command, $snapshot->parameters,
-                    ));
+                    $inserted += (int) $writer->record(new SchedulerOccurrence(Uuid::v7(), $jobId, $cursor, $snapshot->jobType, $snapshot->command, $snapshot->parameters, jobPublicId: $snapshot->jobPublicId));
                 }
             }
             $this->advance($jobId, $cursor);

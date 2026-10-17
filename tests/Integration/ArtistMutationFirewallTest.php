@@ -194,8 +194,8 @@ final class ArtistMutationFirewallTest extends TestCase
     private function mutation(string $action): array
     {
         $base = '/api/artists/' . $this->artist->getPublicId();
-        $songId = $this->song->getId()->toString();
-        $albumId = $this->album->getId()->toString();
+        $songId = $this->song->getPublicId()->toString();
+        $albumId = $this->album->getPublicId()->toString();
 
         return match ($action) {
             'store' => ['POST', '/api/artists/', ['name' => $this->createdName], 201],

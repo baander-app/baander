@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\UserPreference\Interface\Controller;
 
 use App\Auth\Infrastructure\Security\SecurityUser;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\UserPreference\Application\Exception\EqDeviceProfileNotFound;
@@ -43,7 +44,7 @@ final class EqDeviceProfileController
         responses: [
             new OA\Response(response: '200', description: 'Profile list', content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'profiles', type: 'array', items: new OA\Items(properties: [
-                    new OA\Property(property: 'id', type: 'string'),
+                    new OA\Property(property: 'publicId', type: 'string'),
                     new OA\Property(property: 'name', type: 'string'),
                     new OA\Property(property: 'icon', type: 'string'),
                     new OA\Property(property: 'isDefault', type: 'boolean'),
@@ -257,10 +258,10 @@ final class EqDeviceProfileController
         return $this->successResponse($result);
     }
 
-    private function profileId(string $id): Uuid
+    private function profileId(string $id): PublicId
     {
         try {
-            return Uuid::fromString($id);
+            return PublicId::fromString($id);
         } catch (\InvalidArgumentException) {
             throw new EqDeviceProfileNotFound();
         }

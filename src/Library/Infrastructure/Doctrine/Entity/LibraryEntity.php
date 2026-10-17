@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Library\Infrastructure\Doctrine\Entity;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'libraries')]
+#[ORM\UniqueConstraint(name: 'uniq_libraries_public_id', columns: ['public_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_libraries_slug', columns: ['slug'])]
 #[ORM\UniqueConstraint(name: 'uniq_libraries_claim_id', columns: ['claim_id'])]
 class LibraryEntity
@@ -17,6 +19,9 @@ class LibraryEntity
     #[ORM\Column(type: 'uuid')]
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
+
+    #[ORM\Column(type: 'text')]
+    private string $publicId;
 
     #[ORM\Column(type: 'text')]
     private string $name;
@@ -71,8 +76,10 @@ class LibraryEntity
         string $filesystemType,
         int $sortOrder = 0,
         ?Uuid $id = null,
+        ?PublicId $publicId = null,
     ) {
         $this->id = $id ?? new Uuid();
+        $this->publicId = ($publicId ?? new PublicId())->toString();
         $this->name = $name;
         $this->slug = $slug;
         $this->path = $path;
@@ -82,6 +89,8 @@ class LibraryEntity
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
     }
+
+    public function getPublicId(): PublicId { return new PublicId($this->publicId); }
 
     public function getId(): Uuid
     {

@@ -51,7 +51,7 @@ final class RadioStationListCommand extends Command
             $stations,
             ['ID', 'Name', 'Country', 'Language', 'Genres', 'Streams'],
             static fn (array $station): array => [
-                $station['id'],
+                $station['publicId'],
                 $station['name'],
                 $station['country'] ?? '-',
                 $station['language'] ?? '-',

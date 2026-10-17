@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Playlist\Application\Port;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 
 /**
@@ -13,5 +14,7 @@ use App\Shared\Domain\ValueObject\LibraryReadScope;
  */
 interface PlaylistSongVisibilityInterface
 {
+    public function findVisibleSongId(PublicId $songId, LibraryReadScope $scope): ?Uuid;
+
     public function isVisible(Uuid $songId, LibraryReadScope $scope): bool;
 }

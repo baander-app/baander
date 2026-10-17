@@ -24,16 +24,17 @@ final readonly class RotateWebhookSecretHandler
      * @return IssuedWebhookSecret the webhook, with its own signing version, and the new plain secret,
      *                             which is not available again
      *
-     * @throws \App\Shared\Application\Exception\InvalidInputException when the ID is not a UUID
+     * @throws \App\Shared\Application\Exception\InvalidInputException when the ID is not a public ID
      * @throws NotFoundException                                         when no webhook has the ID
      */
     #[AsMessageHandler]
     public function __invoke(RotateWebhookSecretCommand $command): IssuedWebhookSecret
     {
         $id = WebhookInput::id($command->webhookId);
+        $current = $this->webhooks->findByPublicId($id) ?? throw new NotFoundException('Webhook not found.');
         $secret = bin2hex(random_bytes(32));
 
-        $webhook = $this->webhooks->replaceSecret($id, $this->secrets->encrypt($secret))
+        $webhook = $this->webhooks->replaceSecret($current->id, $this->secrets->encrypt($secret))
             ?? throw new NotFoundException('Webhook not found.');
 
         return new IssuedWebhookSecret($webhook, $secret);

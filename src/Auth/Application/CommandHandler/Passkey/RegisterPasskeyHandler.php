@@ -35,6 +35,11 @@ final class RegisterPasskeyHandler
             throw new RuntimeException(sprintf('User "%s" not found.', $userId->toString()));
         }
 
+        $userHandle = $command->getCredentialRecordData()['userHandle'] ?? null;
+        if (!is_string($userHandle) || !hash_equals($user->getPublicId()->toString(), $userHandle)) {
+            throw new RuntimeException('Credential owner does not match its registered user handle.');
+        }
+
         $passkeyId = Uuid::generate();
         $credentialId = $command->getCredentialId();
 

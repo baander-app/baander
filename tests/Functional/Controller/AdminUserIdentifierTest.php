@@ -37,7 +37,7 @@ final class AdminUserIdentifierTest extends TestCase
     {
         $admin = $this->createSuperAdminUser();
 
-        $response = $this->authenticatedRequest($method, '/api/admin/users/00000000-0000-7000-8000-000000000000' . $suffix, $admin, $payload);
+        $response = $this->authenticatedRequest($method, '/api/admin/users/aaaaaaaaaaaaaaaaaaaaa' . $suffix, $admin, $payload);
 
         $this->assertJsonResponse($response, 404);
     }

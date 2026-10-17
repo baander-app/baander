@@ -41,7 +41,7 @@ export function TVHomePage() {
         <TVContentRow title="Featured" onViewAll={() => {}}>
           {featuredAlbums.map((album) => (
             <TVCard
-              key={album.uuid}
+              key={album.publicId}
               title={album.title}
               subtitle={album.artistName ?? undefined}
               onPress={() => navigation.navigate('TVAlbumDetail', { publicId: album.publicId })}
@@ -55,7 +55,7 @@ export function TVHomePage() {
         <TVContentRow title="Recently Added" onViewAll={() => {}}>
           {recentAlbums.map((album) => (
             <TVCard
-              key={album.uuid}
+              key={album.publicId}
               title={album.title}
               subtitle={album.artistName ?? undefined}
               onPress={() => navigation.navigate('TVAlbumDetail', { publicId: album.publicId })}

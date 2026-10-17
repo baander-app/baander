@@ -130,10 +130,10 @@ final class ImageReadScopeRepositoryTest extends TestCase
             $this->assertTrue($this->repository->saveVisibleBlurhash($image->getId(), 'song-cover', $this->scope));
         }
         $this->assertSame(
-            $artist->getId()->toString(),
-            $this->repository->findVisibleByPublicId($direct->getPublicId(), $this->scope)?->getArtistId()?->toString(),
+            $artist->getPublicId()->toString(),
+            $this->repository->findVisibleByPublicId($direct->getPublicId(), $this->scope)?->getArtistPublicId()?->toString(),
         );
-        $this->assertNull($this->repository->findVisibleByPublicId($reverse->getPublicId(), $this->scope)?->getArtistId());
+        $this->assertNull($this->repository->findVisibleByPublicId($reverse->getPublicId(), $this->scope)?->getArtistPublicId());
         $this->entityManager->getConnection()->executeStatement(
             'DELETE FROM artist_song WHERE artist_id = :artist',
             ['artist' => $artist->getId()->toString()],
@@ -166,14 +166,14 @@ final class ImageReadScopeRepositoryTest extends TestCase
         $image = $this->images['shared'];
         $view = $this->repository->findVisibleByPublicId($image->getPublicId(), $this->scope);
         $this->assertNotNull($view);
-        $this->assertNull($view->getAlbumId());
-        $this->assertNull($view->getPlaylistId());
-        $this->assertSame($this->sharedArtist->getId()->toString(), $view->getArtistId()?->toString());
+        $this->assertNull($view->getAlbumPublicId());
+        $this->assertNull($view->getPlaylistPublicId());
+        $this->assertSame($this->sharedArtist->getPublicId()->toString(), $view->getArtistPublicId()?->toString());
         $this->assertTrue($this->repository->saveVisibleBlurhash($image->getId(), 'authorized-hash', $this->scope));
         $stored = $this->repository->findVisibleByPublicId($image->getPublicId(), $this->adminScope);
         $this->assertNotNull($stored);
-        $this->assertSame($this->deniedAlbum->getId()->toString(), $stored->getAlbumId()?->toString());
-        $this->assertSame($this->otherPlaylist->getId()->toString(), $stored->getPlaylistId()?->toString());
+        $this->assertSame($this->deniedAlbum->getPublicId()->toString(), $stored->getAlbumPublicId()?->toString());
+        $this->assertSame($this->otherPlaylist->getPublicId()->toString(), $stored->getPlaylistPublicId()?->toString());
         $this->assertSame('authorized-hash', $stored->getBlurhash());
     }
 
@@ -218,7 +218,7 @@ final class ImageReadScopeRepositoryTest extends TestCase
         $stored = $this->repository->findVisibleByPublicId($this->images['album']->getPublicId(), $this->adminScope);
         $this->assertNotNull($stored);
         $this->assertSame('/images/pending.webp', $stored->getPath());
-        $this->assertSame($this->deniedAlbum->getId()->toString(), $stored->getAlbumId()?->toString());
+        $this->assertSame($this->deniedAlbum->getPublicId()->toString(), $stored->getAlbumPublicId()?->toString());
         $this->assertNull($stored->getBlurhash());
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Auth\Infrastructure\Security;
 
 use App\Auth\Domain\Model\OAuth\TokenId;
+use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Domain\Model\OAuth\TokenMetadata;
 use App\Auth\Domain\Repository\OAuth\TokenMetadataRepositoryInterface;
 use App\Auth\Infrastructure\Security\OAuth\OAuth2Authenticator;
@@ -145,7 +146,7 @@ final class OAuth2AuthenticatorTest extends TestCase
     {
         // League exposes the JWT jti, the access token's public identifier.
         $accessTokenId = TokenId::generate();
-        $this->setupSuccessfulResourceServerValidation($accessTokenId->toString(), Uuid::generate()->toString());
+        $this->setupSuccessfulResourceServerValidation($accessTokenId->toString(), (new \App\Shared\Domain\Model\PublicId())->toString());
 
         $tokenMetadataRepository = $this->createMock(TokenMetadataRepositoryInterface::class);
         $tokenMetadataRepository->expects($this->once())->method('findByTokenId')
@@ -187,7 +188,7 @@ final class OAuth2AuthenticatorTest extends TestCase
             'Disabled User',
         );
         $user->disable();
-        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), $user->getId()->toString());
+        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), $user->getPublicId()->toString());
 
         $request = Request::create('/');
         $request->headers->set('Authorization', 'Bearer token123');
@@ -206,9 +207,9 @@ final class OAuth2AuthenticatorTest extends TestCase
     public function testABoundTokenUnderTheBearerSchemeIsRefused(): void
     {
         $user = $this->user('bound@baander.app');
-        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), $user->getId()->toString(), 'bound-key-thumbprint');
+        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), $user->getPublicId()->toString(), 'bound-key-thumbprint');
         $userRepository = $this->createMock(\App\Auth\Domain\Repository\UserRepositoryInterface::class);
-        $userRepository->expects($this->never())->method('findByUuid');
+        $userRepository->expects($this->never())->method('findByPublicId');
         $authenticator = $this->createAuthenticator($this->createStub(TokenMetadataRepositoryInterface::class), userRepository: $userRepository);
 
         $request = Request::create('/');
@@ -231,7 +232,7 @@ final class OAuth2AuthenticatorTest extends TestCase
     public function testABoundTokenUnderTheDpopSchemeAuthenticatesItsUser(): void
     {
         $user = $this->user('bound@baander.app');
-        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), $user->getId()->toString(), 'bound-key-thumbprint');
+        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), $user->getPublicId()->toString(), 'bound-key-thumbprint');
 
         $request = Request::create('/');
         $request->headers->set('Authorization', 'DPoP token123');
@@ -245,7 +246,7 @@ final class OAuth2AuthenticatorTest extends TestCase
     public function testAnUnboundTokenUnderTheBearerSchemeAuthenticatesItsUser(): void
     {
         $user = $this->user('unbound@baander.app');
-        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), $user->getId()->toString());
+        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), $user->getPublicId()->toString());
 
         $request = Request::create('/');
         $request->headers->set('Authorization', 'Bearer token123');
@@ -261,14 +262,28 @@ final class OAuth2AuthenticatorTest extends TestCase
         return \App\Auth\Domain\Model\User::register(new \App\Shared\Domain\Model\Email($email), 'hashed-pw', 'Test User');
     }
 
-    /** @param string|null $dpopJkt The thumbprint of the key the token is bound to; unbound when null. */
+
+    public function testAnAlreadyIssuedUuidSubjectIsRejectedWithoutLookingUpAnInternalIdentity(): void
+    {
+        $this->setupSuccessfulResourceServerValidation(TokenId::generate()->toString(), Uuid::generate()->toString());
+        $users = $this->createMock(UserRepositoryInterface::class);
+        $users->expects(self::never())->method('findByUuid');
+        $users->expects(self::never())->method('findByPublicId');
+        $request = Request::create('/api/auth/me');
+        $request->headers->set('Authorization', 'Bearer existing-token');
+
+        $this->expectException(CustomUserMessageAuthenticationException::class);
+
+        $this->createAuthenticator($this->createStub(TokenMetadataRepositoryInterface::class), userRepository: $users)->authenticate($request);
+    }
+
     private function setupSuccessfulResourceServerValidation(string $accessTokenId, string $userId, ?string $dpopJkt = null): void
     {
         $psrRequest = new Psr7Request('GET', '/');
         $psrRequest = $psrRequest
             ->withAttribute('oauth_access_token_id', $accessTokenId)
             ->withAttribute('oauth_user_id', $userId)
-            ->withAttribute('oauth_client_id', 'client-uuid')
+            ->withAttribute('oauth_client_id', 'V1StGXR8_Z5jdHi6B-myT')
             ->withAttribute('oauth_scopes', ['profile']);
         if ($dpopJkt !== null) {
             $psrRequest = $psrRequest->withAttribute('oauth_dpop_jkt', $dpopJkt);
@@ -285,7 +300,7 @@ final class OAuth2AuthenticatorTest extends TestCase
     ): OAuth2Authenticator {
         if ($userRepository === null) {
             $userRepository = $this->createStub(\App\Auth\Domain\Repository\UserRepositoryInterface::class);
-            $userRepository->method('findByUuid')->willReturn($user ?? $this->user('test@baander.app'));
+            $userRepository->method('findByPublicId')->willReturn($user ?? $this->user('test@baander.app'));
         }
 
         return new OAuth2Authenticator(

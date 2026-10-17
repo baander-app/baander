@@ -43,26 +43,26 @@ export function RowActions({
           Edit
         </DropdownMenuItem>
         {job.status === 'active' && (
-          <DropdownMenuItem onSelect={() => pauseJob.mutate(job.id)}>
+          <DropdownMenuItem onSelect={() => pauseJob.mutate(job.publicId)}>
             <Pause size={14} /> Pause
           </DropdownMenuItem>
         )}
         {job.status === 'paused' && (
-          <DropdownMenuItem onSelect={() => resumeJob.mutate(job.id)}>
+          <DropdownMenuItem onSelect={() => resumeJob.mutate(job.publicId)}>
             <Play size={14} /> Resume
           </DropdownMenuItem>
         )}
         {(job.status === 'active' || job.status === 'paused') && (
-          <DropdownMenuItem onSelect={() => disableJob.mutate(job.id)}>
+          <DropdownMenuItem onSelect={() => disableJob.mutate(job.publicId)}>
             <Ban size={14} /> Disable
           </DropdownMenuItem>
         )}
         {job.status === 'disabled' && (
-          <DropdownMenuItem onSelect={() => enableJob.mutate(job.id)}>
+          <DropdownMenuItem onSelect={() => enableJob.mutate(job.publicId)}>
             <CheckCircle size={14} /> Enable
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem onSelect={() => triggerJob.mutate(job.id)}>
+        <DropdownMenuItem onSelect={() => triggerJob.mutate(job.publicId)}>
           <Zap size={14} /> Trigger Now
         </DropdownMenuItem>
         <DropdownMenuSeparator />

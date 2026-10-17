@@ -59,7 +59,7 @@ final class LibraryScanStartTest extends TestCase
         $this->claims()->claim('music');
 
         try {
-            (new StartLibraryScanHandler($this->claims(), $this->bus()))(new StartLibraryScanCommand($music->getId()->toString()));
+            (new StartLibraryScanHandler($this->claims(), $this->bus()))(new StartLibraryScanCommand($music->getPublicId()->toString()));
             self::fail('The second start must conflict.');
         } catch (LibraryBusyException $conflict) {
             self::assertSame(['reason' => 'library_busy', 'holder' => 'scan'], $conflict->details);
@@ -73,7 +73,7 @@ final class LibraryScanStartTest extends TestCase
         self::assertTrue($this->libraries->claimDelete($music->getId(), new Uuid(), LibraryScanClaims::DEFAULT_LEASE_SECONDS)->claimed);
 
         try {
-            (new StartLibraryScanHandler($this->claims(), $this->bus()))(new StartLibraryScanCommand($music->getId()->toString()));
+            (new StartLibraryScanHandler($this->claims(), $this->bus()))(new StartLibraryScanCommand($music->getPublicId()->toString()));
             self::fail('A start while a delete holds the library must conflict.');
         } catch (LibraryBusyException $conflict) {
             self::assertSame(['reason' => 'library_busy', 'holder' => 'delete'], $conflict->details);

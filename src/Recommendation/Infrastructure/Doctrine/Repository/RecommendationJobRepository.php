@@ -152,6 +152,7 @@ final class RecommendationJobRepository implements RecommendationJobRepositoryIn
             completedAt: $entity->getCompletedAt(),
             metadata: $entity->getMetadata(),
             originalJobId: $entity->getOriginalJobId(),
+            originalJobPublicId: $entity->getOriginalJobId() === null ? null : $this->entityManager->getRepository(RecommendationJobEntity::class)->find($entity->getOriginalJobId())?->getPublicId(),
         ));
     }
 

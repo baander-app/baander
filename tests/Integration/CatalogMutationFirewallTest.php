@@ -321,13 +321,14 @@ final class CatalogMutationFirewallTest extends TestCase
         $this->storage->expects($this->never())->method($this->anything());
         $jwt = $this->actorToken('admin');
         $library = $this->seedLibrary();
-        $path = '/api/libraries/' . $library->getId()->toString() . '/scan';
+        $path = '/api/libraries/' . $library->getPublicId()->toString() . '/scan';
 
         $response = $this->request('POST', $path, $jwt);
         self::assertSame(202, $response->getStatusCode(), $this->responseDetails($response));
         self::assertNull($this->refusal);
         $body = $this->json($response);
-        self::assertSame($library->getId()->toString(), $body['data']['id'] ?? null);
+        self::assertSame($library->getPublicId()->toString(), $body['data']['publicId'] ?? null);
+        self::assertArrayNotHasKey('id', $body['data']);
         self::assertSame('scanning', $body['data']['scanStatus'] ?? null);
 
         $claim = $this->claimRow($library);
@@ -367,7 +368,7 @@ final class CatalogMutationFirewallTest extends TestCase
         $library = $this->seedLibrary(member: $this->lastUserId());
         $before = $this->claimRow($library);
 
-        $response = $this->request('POST', '/api/libraries/' . $library->getId()->toString() . '/scan', $jwt);
+        $response = $this->request('POST', '/api/libraries/' . $library->getPublicId()->toString() . '/scan', $jwt);
         self::assertSame(403, $response->getStatusCode(), $this->responseDetails($response));
         self::assertSame([AccessDeniedException::class, self::ROLE_REFUSED], $this->refusal);
         self::assertSame(403, $this->json($response)['error']['code'] ?? null);
@@ -645,7 +646,7 @@ final class CatalogMutationFirewallTest extends TestCase
         $album = $this->album->getPublicId()->toString();
         $song = $this->song->getPublicId()->toString();
         $genre = '/api/genres/' . $this->genre->getSlug();
-        $library = '/api/libraries/' . $this->library->getId()->toString();
+        $library = '/api/libraries/' . $this->library->getPublicId()->toString();
 
         return match ($route) {
             'album_update' => $this->row('PATCH', '/api/albums/' . $album, ['title' => 'Modified album'], 200),
@@ -658,10 +659,10 @@ final class CatalogMutationFirewallTest extends TestCase
             'genre_store' => $this->row('POST', '/api/genres/', ['name' => 'Created genre ' . $this->suffix, 'slug' => $this->createdSlug()], 201),
             'genre_update' => $this->row('PATCH', $genre, ['name' => 'Modified genre'], 200),
             'genre_destroy' => $this->row('DELETE', $genre, [], 204),
-            'genre_add_song' => $this->row('POST', $genre . '/songs', ['songId' => $this->song->getId()->toString()], 204),
-            'genre_remove_song' => $this->row('DELETE', $genre . '/songs/' . $this->song->getId()->toString(), [], 204),
-            'genre_add_album' => $this->row('POST', $genre . '/albums', ['albumId' => $this->album->getId()->toString()], 204),
-            'genre_remove_album' => $this->row('DELETE', $genre . '/albums/' . $this->album->getId()->toString(), [], 204),
+            'genre_add_song' => $this->row('POST', $genre . '/songs', ['songId' => $this->song->getPublicId()->toString()], 204),
+            'genre_remove_song' => $this->row('DELETE', $genre . '/songs/' . $this->song->getPublicId()->toString(), [], 204),
+            'genre_add_album' => $this->row('POST', $genre . '/albums', ['albumId' => $this->album->getPublicId()->toString()], 204),
+            'genre_remove_album' => $this->row('DELETE', $genre . '/albums/' . $this->album->getPublicId()->toString(), [], 204),
             'album_cover_upload' => $this->row('POST', '/api/albums/' . $album . '/cover', [], 200) + ['upload' => $this->pixel()],
             'album_cover_delete' => $this->row('DELETE', '/api/albums/' . $album . '/cover', [], 204),
             'artist_cover_upload' => $this->row('POST', '/api/artists/' . $this->artist->getPublicId()->toString() . '/cover', [], 200) + ['upload' => $this->pixel()],
@@ -671,7 +672,7 @@ final class CatalogMutationFirewallTest extends TestCase
             'admin_album_delete_preview' => $this->row('GET', '/api/admin/albums/' . $album . '/delete-preview', [], 200),
             'admin_song_delete' => $this->row('DELETE', '/api/admin/songs/' . $song, [], 200),
             'admin_song_delete_preview' => $this->row('GET', '/api/admin/songs/' . $song . '/delete-preview', [], 200),
-            'admin_albums_duplicates' => $this->row('GET', '/api/admin/albums/duplicates?libraryId=' . $this->library->getId()->toString(), [], 200),
+            'admin_albums_duplicates' => $this->row('GET', '/api/admin/albums/duplicates?libraryId=' . $this->library->getPublicId()->toString(), [], 200),
             'library_store' => $this->row('POST', '/api/libraries', ['name' => 'Created library ' . $this->suffix, 'path' => self::$directory . '/created-' . $this->suffix, 'type' => 'music', 'slug' => $this->createdSlug()], 201),
             'library_update' => $this->row('PATCH', $library, ['name' => 'Modified library'], 200),
             'library_delete' => $this->row('DELETE', $library, [], 200),

@@ -6,6 +6,8 @@ namespace App\Catalog\Application\Service;
 
 use App\Catalog\Application\Command\Artist\CreditTarget;
 use App\Catalog\Application\Port\ArtistPortInterface;
+use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Domain\Model\Artist;
 use App\Catalog\Domain\ValueObject\ArtistRole;
 use App\Shared\Application\Exception\InvalidInputException;
@@ -20,12 +22,26 @@ use InvalidArgumentException;
 final class ArtistCreditInput
 {
     /**
-     * @throws InvalidInputException when the value is not a UUID
+     * @throws InvalidInputException when the value is not a public identifier
      */
-    public static function targetId(CreditTarget $target, string $value): Uuid
+    public static function targetId(
+        CreditTarget $target,
+        PublicId $publicId,
+        SongPortInterface $songs,
+        AlbumPortInterface $albums,
+    ): Uuid
+    {
+        $entity = match ($target) {
+            CreditTarget::Song => $songs->findByPublicId($publicId),
+            CreditTarget::Album => $albums->findByPublicId($publicId),
+        };
+        return ($entity ?? throw new NotFoundException(sprintf('%s "%s" not found.', $target->label(), $publicId->toString())))->getId();
+    }
+
+    public static function publicTargetId(CreditTarget $target, string $value): PublicId
     {
         try {
-            return Uuid::fromString($value);
+            return PublicId::fromString($value);
         } catch (InvalidArgumentException $exception) {
             throw new InvalidInputException(sprintf('Invalid %s ID format.', $target->value), [], $exception);
         }

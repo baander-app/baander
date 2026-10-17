@@ -54,7 +54,7 @@ export function ResetPasswordDialog({ user, open, onOpenChange }: { user: AdminU
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     resetPassword.mutate(
-      { id: user.id, password },
+      { id: user.publicId, password },
       {
         onSuccess: () => {
           setPassword('')

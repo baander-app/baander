@@ -36,7 +36,7 @@ final class ExecuteScheduledOccurrenceHandlerTest extends TestCase
 
     private function occurrence(ScheduledJob $job): SchedulerOccurrence
     {
-        return new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-03T12:00:00Z'), $job->getJobType(), $job->getCommand(), $job->getParameters());
+        return new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-03T12:00:00Z'), $job->getJobType(), $job->getCommand(), $job->getParameters(), jobPublicId: new \App\Shared\Domain\Model\PublicId());
     }
 
     private function handler(SchedulerOccurrenceExecutionStoreInterface $store, ScheduledJobPortInterface $jobs, MessageBusInterface $bus, ?SchedulerRegistry $registry = null): ExecuteScheduledOccurrenceHandler
@@ -206,8 +206,7 @@ final class ExecuteScheduledOccurrenceHandlerTest extends TestCase
         if ($change === 'zero_sign') {
             $job->getState()->parameters = ['value' => -0.0];
         }
-        $occurrence = new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-03T12:00:00Z'),
-            $job->getJobType(), $job->getCommand(), $job->getParameters(), SchedulerOccurrenceOrigin::Manual);
+        $occurrence = new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-03T12:00:00Z'), $job->getJobType(), $job->getCommand(), $job->getParameters(), origin: SchedulerOccurrenceOrigin::Manual, jobPublicId: new \App\Shared\Domain\Model\PublicId());
         match ($change) {
             'paused' => $job->pause(),
             'disabled' => $job->disable(),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Radio\Domain\Model\CountrySubscription;
 
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use InvalidArgumentException;
@@ -31,6 +32,7 @@ final class CountrySubscription
 
         $sub = new self(new CountrySubscriptionState(
             id: new Uuid(),
+            publicId: new PublicId(),
             userId: $userId,
             sourceId: $sourceId,
             countryCode: $countryCode,
@@ -60,6 +62,11 @@ final class CountrySubscription
         $this->pendingEvents = [];
 
         return $events;
+    }
+
+    public function getPublicId(): PublicId
+    {
+        return $this->state->publicId;
     }
 
     public function getId(): Uuid

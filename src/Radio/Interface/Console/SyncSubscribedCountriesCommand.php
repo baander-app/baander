@@ -63,7 +63,7 @@ final class SyncSubscribedCountriesCommand extends Command
                 '0 */6 * * *',
             );
 
-            $io->success(sprintf('Created default IPRD source: %s', $activeSource['id']));
+            $io->success(sprintf('Created default IPRD source: %s', $activeSource['publicId']));
         } else {
             $activeSource = null;
             foreach ($sources as $source) {
@@ -80,8 +80,6 @@ final class SyncSubscribedCountriesCommand extends Command
             }
         }
 
-        $sourceId = Uuid::fromString($activeSource['id']);
-
         if ($filterCountry !== null) {
             $countries = [$filterCountry];
         } else {
@@ -93,6 +91,10 @@ final class SyncSubscribedCountriesCommand extends Command
                 return Command::SUCCESS;
             }
         }
+
+        $source = $this->sourcePort->findByPublicId(\App\Shared\Domain\Model\PublicId::fromString($activeSource['publicId']))
+            ?? throw new \RuntimeException('Radio source not found.');
+        $sourceId = $source->getId();
 
         $io->title('Radio station sync');
 

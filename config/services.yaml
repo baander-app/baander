@@ -1480,6 +1480,36 @@ services:
     App\Shared\Application\Port\WorkerSupervisorRunnerInterface:
         alias: App\Shared\Infrastructure\Worker\WorkerSupervisorRunner
 
+    App\Catalog\Application\Port\VideoPortInterface:
+        alias: App\Catalog\Infrastructure\VideoService
+
+    App\Transcode\Application\Port\TranscodePublicViewInterface:
+        alias: App\Transcode\Infrastructure\TranscodePublicView
+
+    App\Shared\Application\Port\WebSocketIdentityLookupInterface:
+        alias: App\Shared\Infrastructure\Swoole\WebSocketIdentityLookup
+
+    App\Activity\Application\Port\ActivityIdentityProjectionPortInterface:
+        alias: App\Activity\Infrastructure\Doctrine\ActivityIdentityProjection
+
+    App\Session\Application\Port\SessionUserPublicIdentityInterface:
+        alias: App\Session\Infrastructure\Doctrine\SessionUserPublicIdentityProjection
+
+    App\Radio\Application\Port\RadioPublicIdentityInterface:
+        alias: App\Radio\Infrastructure\RadioPublicIdentity
+
+    App\Favorites\Application\Port\FavoriteTargetAccessInterface:
+        alias: App\Favorites\Infrastructure\FavoriteTargetAccess
+
+    App\QoL\Application\Port\QoLJobIdentityInterface:
+        alias: App\QoL\Infrastructure\QoLJobIdentity
+
+    App\Party\Application\Port\PartyPublicIdentityPortInterface:
+        alias: App\Party\Infrastructure\PartyPublicIdentity
+
+    App\Recommendation\Application\Port\RecommendationPublicIdentityInterface:
+        alias: App\Recommendation\Infrastructure\Projection\RecommendationPublicIdentity
+
 when@test:
     parameters:
         notification.push.allowed_domains: ['push.baander.app']

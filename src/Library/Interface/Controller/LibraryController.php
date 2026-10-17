@@ -131,7 +131,7 @@ final class LibraryController
         path: '/api/libraries/{id}',
         summary: 'Get a single library',
         parameters: [
-            new OA\Parameter(name: 'id', description: 'Library UUID or slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'id', description: 'Library public ID or slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
@@ -158,7 +158,7 @@ final class LibraryController
                 ],
             ))),
         parameters: [
-            new OA\Parameter(name: 'id', description: 'Library UUID or slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'id', description: 'Library public ID or slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
@@ -184,7 +184,7 @@ final class LibraryController
         path: '/api/libraries/{id}',
         summary: 'Delete a library (admin)',
         parameters: [
-            new OA\Parameter(name: 'id', description: 'Library UUID or slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'id', description: 'Library public ID or slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Deleted', content: new OA\JsonContent(
@@ -210,7 +210,7 @@ final class LibraryController
         summary: 'Trigger a library scan (admin)',
         description: 'Claims the library for a scan and dispatches an asynchronous scan job. The scan runs in the background; follow it in the job monitor and in the scan status of the library. A library that is already scanning answers 409.',
         parameters: [
-            new OA\Parameter(name: 'id', description: 'Library UUID or slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'id', description: 'Library public ID or slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(response: '202', description: 'Scan dispatched', content: new OA\JsonContent(
@@ -238,7 +238,7 @@ final class LibraryController
         path: '/api/libraries/{id}/stats',
         summary: 'Get library statistics',
         parameters: [
-            new OA\Parameter(name: 'id', description: 'Library UUID or slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'id', description: 'Library public ID or slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(

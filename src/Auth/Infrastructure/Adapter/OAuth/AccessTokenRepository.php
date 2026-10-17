@@ -17,6 +17,7 @@ use App\Auth\Infrastructure\Doctrine\Entity\OAuth\AccessTokenEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\OAuth\ClientEntity;
 use App\Auth\Infrastructure\Doctrine\Entity\UserEntity;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use Symfony\Component\HttpFoundation\RequestStack;
 use League\OAuth2\Server\Entities\AccessTokenEntityInterface;
 use League\OAuth2\Server\Entities\ClientEntityInterface;
@@ -44,7 +45,12 @@ final class AccessTokenRepository implements AccessTokenRepositoryInterface
         $user = null;
 
         if ($userIdentifier !== null) {
-            $domainUser = $this->userRepository->findByUuid(Uuid::fromString($userIdentifier));
+            try {
+                $publicId = PublicId::fromString($userIdentifier);
+            } catch (\InvalidArgumentException) {
+                throw OAuthServerException::accessDenied('User account is unavailable.');
+            }
+            $domainUser = $this->userRepository->findByPublicId($publicId);
 
             if ($domainUser === null) {
                 throw OAuthServerException::accessDenied('User account is unavailable.');

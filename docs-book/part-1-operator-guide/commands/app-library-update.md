@@ -12,7 +12,7 @@ make exec cmd="php bin/console app:library:update my-music --name='Music' --sort
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `library` | Yes | The library's UUID or slug |
+| `library` | Yes | The library's public ID or slug |
 
 ## Options
 
@@ -33,5 +33,5 @@ On success, the command prints the library as it is now. Running it again with t
 | Code | Meaning |
 |------|---------|
 | 0 | Library updated |
-| 1 | No library has the UUID or slug, or another error occurred; the message says why |
+| 1 | No library has the public ID or slug, or another error occurred; the message says why |
 | 2 | A blank name, or a sort order that is not a whole number |

@@ -14,7 +14,7 @@ function buildGenreTree(genres: Genre[]): GenreTreeNode[] {
   const roots: GenreTreeNode[] = []
 
   for (const g of genres) {
-    map.set(g.uuid, { ...g, children: [] })
+    map.set(g.publicId, { ...g, children: [] })
   }
 
   for (const node of map.values()) {
@@ -159,7 +159,7 @@ function TreeNode({
       {expanded &&
         node.children.map((child) => (
           <TreeNode
-            key={child.uuid}
+            key={child.publicId}
             node={child}
             depth={depth + 1}
             onEdit={onEdit}
@@ -191,7 +191,7 @@ export function GenreTree({
     <TreeContainer>
       {tree.map((node) => (
         <TreeNode
-          key={node.uuid}
+          key={node.publicId}
           node={node}
           depth={0}
           onEdit={onEdit ?? (() => {})}

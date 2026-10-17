@@ -29,10 +29,12 @@ final class WebhookSigningVersionTest extends TestCase
         $codec = new WebhookSecretCodec('test-app-secret');
         $webhook = new WebhookEntity(Uuid::generate(), $codec->encrypt($secret));
         $webhook->setUrl('https://1.1.1.1/hook');
-        $repository = $this->createStub(EntityRepository::class);
-        $repository->method('findAll')->willReturn([$webhook]);
+        $repository = $this->createMock(EntityRepository::class);
+        $repository->expects(self::exactly(2))->method('findAll')->willReturn([$webhook]);
+        $repository->expects(self::once())->method('findOneBy')
+            ->with(['publicId' => $webhook->getPublicId()])->willReturn($webhook);
         $em = $this->createMock(EntityManagerInterface::class);
-        $em->expects(self::exactly(2))->method('getRepository')->willReturn($repository);
+        $em->expects(self::exactly(3))->method('getRepository')->willReturn($repository);
         $em->method('find')->willReturn($webhook);
         $em->expects(self::exactly(2))->method('persist');
         $em->expects(self::exactly(3))->method('flush');
@@ -53,7 +55,7 @@ final class WebhookSigningVersionTest extends TestCase
 
         $previousSecret = $secret;
         $rotate = new RotateWebhookSecretHandler(new WebhookRepository($em), $codec);
-        $secret = $rotate(new RotateWebhookSecretCommand($webhook->getId()->toString()))->secret;
+        $secret = $rotate(new RotateWebhookSecretCommand($webhook->getPublicId()->toString()))->secret;
         self::assertNotSame($previousSecret, $secret);
         $service->deliverAll('title', 'body', NotificationCategory::Security, 'event-after-rotation', Uuid::generate());
         self::assertSame(2, $client->getRequestsCount());

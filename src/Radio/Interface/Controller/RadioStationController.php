@@ -66,7 +66,9 @@ final class RadioStationController
         responses: [
             new OA\Response(response: '200', description: 'List of stations', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [
-                    new OA\Property(property: 'stationuuid', type: 'string', format: 'uuid'),
+                    new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                    new OA\Property(property: 'externalId', type: 'string', description: 'Station identifier assigned by the external provider'),
+                    new OA\Property(property: 'sourceId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
                     new OA\Property(property: 'name', type: 'string'),
                     new OA\Property(property: 'countrycode', type: 'string'),
                     new OA\Property(property: 'url_resolved', type: 'string', format: 'uri', nullable: true),

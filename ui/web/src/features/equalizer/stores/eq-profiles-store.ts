@@ -5,7 +5,7 @@ import { create } from 'zustand'
 export type EqProfileIcon = 'headphones' | 'speakers' | 'hifi-speaker' | 'wireless-speaker' | 'car' | 'tv' | 'monitor' | 'custom'
 
 export interface EqProfile {
-  id: string
+  publicId: string
   name: string
   icon: EqProfileIcon
   deviceId?: string
@@ -39,20 +39,20 @@ export const useEqProfilesStore = create<EqProfilesState>()(withStoreDebug('equa
   },
 
   addProfile: (profile) => {
-    set((s) => s.profiles.some((item) => item.id === profile.id) ? s : { profiles: [...s.profiles, profile] })
+    set((s) => s.profiles.some((item) => item.publicId === profile.publicId) ? s : { profiles: [...s.profiles, profile] })
   },
 
   updateProfile: (id, updates) => {
-    set((s) => !s.profiles.some((profile) => profile.id === id && Object.entries(updates).some(([key, value]) => profile[key as keyof EqProfile] !== value)) ? s : ({
-      profiles: s.profiles.map((p) => (p.id === id ? { ...p, ...updates } : p)),
+    set((s) => !s.profiles.some((profile) => profile.publicId === id && Object.entries(updates).some(([key, value]) => profile[key as keyof EqProfile] !== value)) ? s : ({
+      profiles: s.profiles.map((p) => (p.publicId === id ? { ...p, ...updates } : p)),
     }))
   },
 
   removeProfile: (id) => {
-    set((s) => !s.profiles.some((profile) => profile.id === id) ? s : ({
-      profiles: s.profiles.filter((p) => p.id !== id),
+    set((s) => !s.profiles.some((profile) => profile.publicId === id) ? s : ({
+      profiles: s.profiles.filter((p) => p.publicId !== id),
       activeProfileId: s.activeProfileId === id
-        ? s.profiles.find((p) => p.id !== id && p.isDefault)?.id ?? null
+        ? s.profiles.find((p) => p.publicId !== id && p.isDefault)?.publicId ?? null
         : s.activeProfileId,
     }))
   },

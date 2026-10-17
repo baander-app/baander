@@ -48,7 +48,7 @@ final class AdminUserCliParityTest extends TestCase
             $data = $this->assertJsonResponse($this->authenticatedRequest('POST', $this->userPath($viaApi) . '/enable', $superAdmin), 200, 'data')['data'];
             self::assertFalse($data['disabled'], 'API attempt ' . $attempt);
             $enable = $this->command('app:user:enable');
-            self::assertSame(Command::SUCCESS, $enable->execute(['identifier' => $viaCli->getId()->toString()]), 'CLI attempt ' . $attempt);
+            self::assertSame(Command::SUCCESS, $enable->execute(['identifier' => $viaCli->getPublicId()->toString()]), 'CLI attempt ' . $attempt);
         }
         self::assertSame($this->state($viaApi), $this->state($viaCli));
         self::assertFalse($this->stored($viaCli)->isDisabled());
@@ -216,7 +216,7 @@ final class AdminUserCliParityTest extends TestCase
 
     private function userPath(User $user): string
     {
-        return self::PATH . '/' . $user->getId()->toString();
+        return self::PATH . '/' . $user->getPublicId()->toString();
     }
 
     private function stored(User $user): User

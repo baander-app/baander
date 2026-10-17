@@ -36,6 +36,7 @@ final class LibraryAccessHandlersTest extends TestCase
     private Library $music;
     private Library $films;
     private Uuid $userId;
+    private PublicId $userPublicId;
     private UserIdentifierResolverInterface $users;
     /** @var LibraryAccessPortInterface&object{memberships: array<string, true>} */
     private LibraryAccessPortInterface $access;
@@ -46,8 +47,9 @@ final class LibraryAccessHandlersTest extends TestCase
         $this->music = $this->libraries->add(Library::create('Music', new LibrarySlug('music'), new LibraryPath('/media/music'), LibraryType::Music, FilesystemType::Local));
         $this->films = $this->libraries->add(Library::create('Films', new LibrarySlug('films'), new LibraryPath('/media/films'), LibraryType::Movie, FilesystemType::Local));
         $this->userId = new Uuid();
-        $this->users = new readonly class(self::EMAIL, $this->userId) implements UserIdentifierResolverInterface {
-            public function __construct(private string $email, private Uuid $id)
+        $this->userPublicId = new PublicId();
+        $this->users = new readonly class(self::EMAIL, $this->userId, $this->userPublicId) implements UserIdentifierResolverInterface {
+            public function __construct(private string $email, private Uuid $id, private PublicId $publicId)
             {
             }
 
@@ -60,8 +62,17 @@ final class LibraryAccessHandlersTest extends TestCase
                 throw new NotFoundException(sprintf('User "%s" not found.', $identifier));
             }
 
+            public function publicIdByUserId(Uuid $userId): PublicId
+            {
+                throw new NotFoundException('User not found.');
+            }
+
             public function userIdByPublicId(PublicId $publicId): Uuid
             {
+                if ($this->publicId->equals($publicId)) {
+                    return $this->id;
+                }
+
                 throw new NotFoundException(sprintf('User "%s" not found.', $publicId));
             }
         };
@@ -103,7 +114,7 @@ final class LibraryAccessHandlersTest extends TestCase
     {
         $this->access->grant($this->userId, $this->films->getId());
 
-        $entries = $this->list(self::EMAIL);
+        $entries = $this->list($this->userPublicId->toString());
 
         self::assertSame(
             [['music', false], ['films', true]],
@@ -113,8 +124,8 @@ final class LibraryAccessHandlersTest extends TestCase
 
     public function testGrantingTwiceLeavesOneMembership(): void
     {
-        $first = $this->grant($this->userId->toString(), 'music');
-        $second = $this->grant(self::EMAIL, $this->music->getId()->toString());
+        $first = $this->grant($this->userPublicId->toString(), 'music');
+        $second = $this->grant(self::EMAIL, $this->music->getPublicId()->toString());
 
         self::assertTrue($first->granted);
         self::assertTrue($second->granted);
@@ -126,7 +137,7 @@ final class LibraryAccessHandlersTest extends TestCase
     {
         $this->access->grant($this->userId, $this->films->getId());
 
-        $entry = $this->revoke(self::EMAIL, 'music');
+        $entry = $this->revoke($this->userPublicId->toString(), 'music');
 
         self::assertFalse($entry->granted);
         self::assertSame($this->music, $entry->library);
@@ -137,7 +148,7 @@ final class LibraryAccessHandlersTest extends TestCase
     {
         $this->access->grant($this->userId, $this->music->getId());
 
-        self::assertFalse($this->revoke(self::EMAIL, 'music')->granted);
+        self::assertFalse($this->revoke($this->userPublicId->toString(), 'music')->granted);
         self::assertSame([], $this->access->getUserLibraryIds($this->userId));
     }
 

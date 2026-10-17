@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\UserPreference\Infrastructure;
 
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\UserPreference\Application\Exception\EqDeviceProfileNotFound;
 use App\UserPreference\Domain\Model\EqDeviceProfile;
@@ -28,9 +29,9 @@ final class EqDeviceProfileAdapterTest extends TestCase
     {
         $userId = Uuid::generate();
         $profile = $foreign ? EqDeviceProfile::create(Uuid::generate(), 'Private profile', payload: ['gain' => 3]) : null;
-        $profileId = $profile?->getId() ?? Uuid::generate();
+        $profileId = $profile?->getPublicId() ?? new PublicId();
         $repository = $this->createMock(EqDeviceProfileRepositoryInterface::class);
-        $repository->expects($this->once())->method('findById')->with($profileId)->willReturn($profile);
+        $repository->expects($this->once())->method('findByPublicId')->with($profileId)->willReturn($profile);
         $repository->expects($this->never())->method('save');
         $repository->expects($this->never())->method('delete');
         $adapter = new EqDeviceProfileAdapter($repository);
@@ -53,15 +54,15 @@ final class EqDeviceProfileAdapterTest extends TestCase
         $userId = Uuid::generate();
         $profile = EqDeviceProfile::create($userId, 'Owned profile');
         $repository = $this->createMock(EqDeviceProfileRepositoryInterface::class);
-        $repository->expects($this->exactly(3))->method('findById')->with($profile->getId())->willReturn($profile);
+        $repository->expects($this->exactly(3))->method('findByPublicId')->with($profile->getPublicId())->willReturn($profile);
         $repository->expects($this->once())->method('save')->with($profile);
         $repository->expects($this->never())->method('delete');
         $adapter = new EqDeviceProfileAdapter($repository);
-        self::assertSame('Owned profile', $adapter->getProfile($userId, $profile->getId())['name']);
-        $updated = $adapter->updateProfile($userId, $profile->getId(), 'Updated', null, null, ['gain' => 6], null);
+        self::assertSame('Owned profile', $adapter->getProfile($userId, $profile->getPublicId())['name']);
+        $updated = $adapter->updateProfile($userId, $profile->getPublicId(), 'Updated', null, null, ['gain' => 6], null);
         self::assertSame('Updated', $updated['name']);
         self::assertSame(['gain' => 6], $updated['payload']);
-        self::assertSame(['activeProfileId' => $profile->getId()->toString()], $adapter->activateProfile($userId, $profile->getId()));
+        self::assertSame(['activeProfileId' => $profile->getPublicId()->toString()], $adapter->activateProfile($userId, $profile->getPublicId()));
     }
 
     public function testOwnerCanDeleteRegularProfile(): void
@@ -69,10 +70,10 @@ final class EqDeviceProfileAdapterTest extends TestCase
         $userId = Uuid::generate();
         $profile = EqDeviceProfile::create($userId, 'Owned profile');
         $repository = $this->createMock(EqDeviceProfileRepositoryInterface::class);
-        $repository->expects($this->once())->method('findById')->with($profile->getId())->willReturn($profile);
+        $repository->expects($this->once())->method('findByPublicId')->with($profile->getPublicId())->willReturn($profile);
         $repository->expects($this->once())->method('delete')->with($profile);
         $adapter = new EqDeviceProfileAdapter($repository);
-        $adapter->deleteProfile($userId, $profile->getId());
+        $adapter->deleteProfile($userId, $profile->getPublicId());
     }
 
     public function testDefaultProfileProtectionRunsOnlyAfterOwnershipCheck(): void
@@ -80,20 +81,37 @@ final class EqDeviceProfileAdapterTest extends TestCase
         $ownerId = Uuid::generate();
         $profile = EqDeviceProfile::create($ownerId, 'Default', isDefault: true);
         $repository = $this->createMock(EqDeviceProfileRepositoryInterface::class);
-        $repository->expects($this->exactly(2))->method('findById')->with($profile->getId())->willReturn($profile);
+        $repository->expects($this->exactly(2))->method('findByPublicId')->with($profile->getPublicId())->willReturn($profile);
         $repository->expects($this->never())->method('delete');
         $adapter = new EqDeviceProfileAdapter($repository);
         try {
-            $adapter->deleteProfile(Uuid::generate(), $profile->getId());
+            $adapter->deleteProfile(Uuid::generate(), $profile->getPublicId());
             self::fail('Foreign default profile must remain inaccessible.');
         } catch (EqDeviceProfileNotFound) {
         }
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Cannot delete the default profile.');
-        $adapter->deleteProfile($ownerId, $profile->getId());
+        $adapter->deleteProfile($ownerId, $profile->getPublicId());
     }
 
-    private function operate(EqDeviceProfileAdapter $adapter, string $method, Uuid $userId, Uuid $profileId): void
+    public function testClientAudioOutputTokenIsPreservedIndependentlyOfProfileIdentity(): void
+    {
+        $owner = new Uuid();
+        $token = 'audio-output-group-abc';
+        $repository = $this->createMock(EqDeviceProfileRepositoryInterface::class);
+        $repository->method('findByUserId')->willReturn([]);
+        $repository->expects(self::once())->method('save')->with(self::callback(
+            static fn (EqDeviceProfile $profile): bool => $profile->getDeviceId() === $token,
+        ));
+
+        $result = (new EqDeviceProfileAdapter($repository))->createProfile($owner, 'Headphones', 'headphones', $token, []);
+
+        self::assertSame($token, $result['deviceId']);
+        self::assertArrayNotHasKey('id', $result);
+        self::assertSame($result['publicId'], PublicId::fromString($result['publicId'])->toString());
+    }
+
+    private function operate(EqDeviceProfileAdapter $adapter, string $method, Uuid $userId, PublicId $profileId): void
     {
         if ($method === 'updateProfile') {
             $adapter->updateProfile($userId, $profileId, 'Hacked', null, null, ['gain' => 12], null);

@@ -18,7 +18,7 @@ final class RecommendationGenerationResource extends AbstractResource
         assert($source instanceof RecommendationGenerationResult);
 
         $data = [
-            'job_id' => $source->jobId,
+            'job_id' => $source->publicId,
             'public_id' => $source->publicId,
             'mode' => $source->mode,
             'status' => $source->status,

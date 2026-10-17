@@ -11,7 +11,7 @@ use OpenApi\Attributes as OA;
     properties: [
         new OA\Property(property: 'name', type: 'string', example: 'Updated Genre Name', nullable: true),
         new OA\Property(property: 'slug', type: 'string', nullable: true),
-        new OA\Property(property: 'parentId', description: 'Public ID of the parent genre', type: 'string', nullable: true),
+        new OA\Property(property: 'parentId', description: 'Public ID of the parent genre', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, nullable: true),
         new OA\Property(property: 'mbid', description: 'MusicBrainz ID', type: 'string', nullable: true),
     ],
 )]

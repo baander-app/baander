@@ -62,7 +62,7 @@ final class MediaAdminService implements MediaAdminPortInterface
         $batchSize = 500;
         $cursor = null;
         $missingCount = 0;
-        /** @var array<array{id: string, path: string, type: string}> $missingImages */
+        /** @var array<array{publicId: string, path: string, type: string}> $missingImages */
         $missingImages = [];
 
         while (true) {
@@ -76,7 +76,7 @@ final class MediaAdminService implements MediaAdminPortInterface
                 if (!$this->storage->exists($image->getPath())) {
                     ++$missingCount;
                     $missingImages[] = [
-                        'id' => $image->getId()->toString(),
+                        'publicId' => $image->getPublicId()->toString(),
                         'path' => $image->getPath(),
                         'type' => $image->getImageableType(),
                     ];

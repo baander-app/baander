@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace App\Radio\Interface\Controller;
 
+use App\Radio\Application\Port\RadioStationPortInterface;
+
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Radio\Application\Command\StartRadioCommand;
 use App\Radio\Application\Command\StopRadioCommand;
 use App\Radio\Application\Port\RadioSessionPortInterface;
 use App\Radio\Interface\Request\StartRadioRequest;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -30,6 +34,7 @@ final class RadioSessionController
         private readonly Security $security,
         private readonly RadioSessionPortInterface $sessionPort,
         private readonly MessageBusInterface $commandBus,
+        private readonly RadioStationPortInterface $stations,
     ) {
     }
 
@@ -39,7 +44,7 @@ final class RadioSessionController
         responses: [
             new OA\Response(response: '200', description: 'Current session data', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', type: 'object', properties: [
-                    new OA\Property(property: 'stationId', type: 'string', format: 'uuid'),
+                    new OA\Property(property: 'stationId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
                     new OA\Property(property: 'stationName', type: 'string'),
                     new OA\Property(property: 'streamUrl', type: 'string', format: 'uri'),
                     new OA\Property(property: 'startedAt', type: 'string', format: 'date-time'),
@@ -76,7 +81,7 @@ final class RadioSessionController
             content: new OA\JsonContent(
                 required: ['stationId', 'streamUrl'],
                 properties: [
-                    new OA\Property(property: 'stationId', type: 'string', format: 'uuid'),
+                    new OA\Property(property: 'stationId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
                     new OA\Property(property: 'streamUrl', type: 'string', format: 'uri'),
                 ],
             ),
@@ -84,7 +89,7 @@ final class RadioSessionController
         responses: [
             new OA\Response(response: '200', description: 'Radio playing', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', type: 'object', properties: [
-                    new OA\Property(property: 'stationId', type: 'string', format: 'uuid'),
+                    new OA\Property(property: 'stationId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
                     new OA\Property(property: 'streamUrl', type: 'string', format: 'uri'),
                 ])],
                 type: 'object',
@@ -102,7 +107,7 @@ final class RadioSessionController
         }
 
         $userId = Uuid::fromString($user->getId());
-        $stationId = Uuid::fromString($payload->stationId);
+        $stationId = $this->stationId($payload->stationId);
 
         $envelope = $this->commandBus->dispatch(new StartRadioCommand($userId, $stationId, $payload->streamUrl));
         $handledStamp = $envelope->last(HandledStamp::class);
@@ -148,4 +153,15 @@ final class RadioSessionController
 
         return $user;
     }
+    private function stationId(string $publicId): Uuid
+    {
+        try {
+            $station = $this->stations->findByPublicId(PublicId::fromString($publicId));
+        } catch (\InvalidArgumentException) {
+            throw new NotFoundHttpException('Radio station not found.');
+        }
+
+        return ($station ?? throw new NotFoundHttpException('Radio station not found.'))->getId();
+    }
+
 }

@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Auth\Infrastructure\Doctrine\Entity;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'passkeys')]
+#[ORM\UniqueConstraint(name: 'uniq_passkeys_public_id', columns: ['public_id'])]
 #[ORM\Index(name: 'idx_passkeys_user_id', columns: ['user_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_passkeys_credential_id', columns: ['credential_id'])]
 class PasskeyEntity
@@ -17,6 +19,9 @@ class PasskeyEntity
     #[ORM\Column(type: 'uuid')]
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
+
+    #[ORM\Column(type: 'public_id')]
+    private PublicId $publicId;
 
     #[ORM\ManyToOne(targetEntity: UserEntity::class)]
     #[ORM\JoinColumn(name: 'user_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
@@ -52,8 +57,10 @@ class PasskeyEntity
         array $data,
         int $counter = 0,
         ?Uuid $id = null,
+        ?PublicId $publicId = null,
     ) {
         $this->id = $id ?? new Uuid();
+        $this->publicId = $publicId ?? new PublicId();
         $this->user = $user;
         $this->name = $name;
         $this->credentialId = $credentialId;
@@ -61,6 +68,11 @@ class PasskeyEntity
         $this->counter = $counter;
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function getPublicId(): PublicId
+    {
+        return $this->publicId;
     }
 
     public function getId(): Uuid

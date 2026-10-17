@@ -28,7 +28,7 @@ vi.mock('../services/SessionSyncBus', () => ({ SessionSyncBus: class {
   constructor() { buses.instances.push(this) }
 } }))
 
-const session = { id: 'session-1', userId: 'user-1', activeDeviceId: 'local-device',
+const session = { publicId: 'session-1', userId: 'user-1', activeDeviceId: 'local-device-public-id',
   queue: ['first'], currentTrackIndex: 0, position: 0, playbackState: 'paused', createdAt: '', updatedAt: '', lastUsedAt: null }
 const clients: QueryClient[] = []
 function wrapper({ children }: { children: ReactNode }) {
@@ -43,7 +43,7 @@ beforeEach(() => {
   buses.instances = []
   usePlayerStore.setState(usePlayerStore.getInitialState(), true)
   usePlayerStore.getState().restoreQueue([{ publicId: 'first', title: 'First' }], 0, 0)
-  vi.mocked(AXIOS_INSTANCE.get).mockResolvedValue({ data: { data: session } })
+  vi.mocked(AXIOS_INSTANCE.get).mockImplementation(async (url) => ({ data: { data: url === '/api/devices' ? [{ publicId: 'local-device-public-id', deviceId: 'local-device' }] : session } }))
 })
 afterEach(() => {
   vi.useRealTimers()
@@ -53,7 +53,7 @@ afterEach(() => {
 it('syncs continuously at a bounded cadence using the latest sole-clock position without hook renders', async () => {
   let renders = 0
   const hook = renderHook(() => { renders++; return useSession() }, { wrapper })
-  await waitFor(() => expect(hook.result.current.session?.id).toBe('session-1'))
+  await waitFor(() => expect(hook.result.current.session?.publicId).toBe('session-1'))
   vi.useFakeTimers()
   act(() => { usePlayerStore.getState().setIsPlaying(true) })
   const initialRenders = renders
@@ -75,7 +75,7 @@ it('syncs continuously at a bounded cadence using the latest sole-clock position
 it('uses the connected websocket without duplicate REST writes', async () => {
   buses.connected = true
   const hook = renderHook(() => useSession(), { wrapper })
-  await waitFor(() => expect(hook.result.current.session?.id).toBe('session-1'))
+  await waitFor(() => expect(hook.result.current.session?.publicId).toBe('session-1'))
   vi.useFakeTimers()
   for (let tick = 1; tick <= 8; tick++) act(() => { updateTime(tick / 4); vi.advanceTimersByTime(250) })
   expect(buses.instances[0].sendSync).toHaveBeenCalledOnce()
@@ -84,9 +84,9 @@ it('uses the connected websocket without duplicate REST writes', async () => {
 })
 
 it('never syncs an inactive device despite a continuously changing clock', async () => {
-  vi.mocked(AXIOS_INSTANCE.get).mockResolvedValue({ data: { data: { ...session, activeDeviceId: 'other-device' } } })
+  vi.mocked(AXIOS_INSTANCE.get).mockImplementation(async (url) => ({ data: { data: url === '/api/devices' ? [{ publicId: 'local-device-public-id', deviceId: 'local-device' }] : { ...session, activeDeviceId: 'other-device' } } }))
   const hook = renderHook(() => useSession(), { wrapper })
-  await waitFor(() => expect(hook.result.current.session?.id).toBe('session-1'))
+  await waitFor(() => expect(hook.result.current.session?.publicId).toBe('session-1'))
   vi.useFakeTimers()
   for (let tick = 1; tick <= 16; tick++) act(() => { updateTime(tick / 4); vi.advanceTimersByTime(250) })
   expect(AXIOS_INSTANCE.put).not.toHaveBeenCalled()

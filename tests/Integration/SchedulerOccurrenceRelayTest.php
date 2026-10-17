@@ -63,6 +63,7 @@ final class SchedulerOccurrenceRelayTest extends TestCase
                 $this->writer->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
             }
         }
+        \App\Tests\Fixtures\Scheduler\PublicIdentitySchema::upgrade($this->writer);
     }
 
     public function testCommittedReservationPrecedesRealSendAndReceiptSurvivesRelayRestart(): void
@@ -213,8 +214,7 @@ final class SchedulerOccurrenceRelayTest extends TestCase
 
     private function record(): SchedulerOccurrence
     {
-        $occurrence = new SchedulerOccurrence(Uuid::generate(), Uuid::generate(), new \DateTimeImmutable('2026-10-02T10:00:00Z'), JobType::Console,
-            'app:relay-fixture', ['address' => 'scheduler@baander.app', 'fraction' => 1.0]);
+        $occurrence = new SchedulerOccurrence(Uuid::generate(), Uuid::generate(), new \DateTimeImmutable('2026-10-02T10:00:00Z'), JobType::Console, 'app:relay-fixture', ['address' => 'scheduler@baander.app', 'fraction' => 1.0], jobPublicId: new \App\Shared\Domain\Model\PublicId());
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->writer))->record($occurrence));
         return $occurrence;
     }

@@ -137,9 +137,9 @@ export function GenreDialog({
             >
               <option value="">None (root)</option>
               {genres
-                .filter((g) => g.uuid !== genre?.uuid)
+                .filter((g) => g.publicId !== genre?.publicId)
                 .map((g) => (
-                  <option key={g.uuid} value={g.uuid}>
+                  <option key={g.publicId} value={g.publicId}>
                     {g.name}
                   </option>
                 ))}

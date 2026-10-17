@@ -74,7 +74,7 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
         };
         $parameters = ['ttl-hours' => 1.0];
         $job = ScheduledJob::create('Occurrence console', '* * * * *', JobType::Console, 'app:occurrence-console', parameters: $parameters);
-        $occurrence = new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-02T10:00:00Z'), JobType::Console, $job->getCommand(), $parameters);
+        $occurrence = new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-02T10:00:00Z'), JobType::Console, $job->getCommand(), $parameters, jobPublicId: new \App\Shared\Domain\Model\PublicId());
         $this->jobService = $this->createMock(ScheduledJobPortInterface::class);
         $this->jobService->expects(self::once())->method('getById')->willReturn($job);
         $persistenceError = new \RuntimeException('Storage failure');
@@ -134,7 +134,7 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
         if ($reason === 'paused') {
             $job->pause();
         }
-        $occurrence = new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-02T10:00:00Z'), JobType::Console, $job->getCommand(), ['value' => $reason === 'snapshot changed' ? 2.0 : 1.0]);
+        $occurrence = new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-02T10:00:00Z'), JobType::Console, $job->getCommand(), ['value' => $reason === 'snapshot changed' ? 2.0 : 1.0], jobPublicId: new \App\Shared\Domain\Model\PublicId());
         $this->jobService = $this->createMock(ScheduledJobPortInterface::class);
         $this->jobService->expects(self::once())->method('getById')->willReturn($job);
         $this->jobService->expects($reason === 'not registered' ? self::once() : self::never())->method('save');
@@ -158,10 +158,7 @@ final class ExecuteScheduledJobHandlerTest extends TestCase
 
     private function executeOccurrence(ExecuteScheduledJobHandler $handler, ExecuteScheduledJobCommand $command): void
     {
-        $handler->executeOccurrence(new SchedulerOccurrence(
-            Uuid::generate(), Uuid::fromString($command->jobId), new \DateTimeImmutable('2026-10-03T10:00:00Z'),
-            JobType::from($command->jobType), $command->command, $command->parameters,
-        ));
+        $handler->executeOccurrence(new SchedulerOccurrence(Uuid::generate(), Uuid::fromString($command->jobId), new \DateTimeImmutable('2026-10-03T10:00:00Z'), JobType::from($command->jobType), $command->command, $command->parameters, jobPublicId: new \App\Shared\Domain\Model\PublicId()));
     }
 
     // --- Job not found ---

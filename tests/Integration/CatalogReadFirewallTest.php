@@ -350,10 +350,10 @@ final class CatalogReadFirewallTest extends TestCase
         }
     }
 
-    /** The admin duplicates listing is refused by role for a member and answers the administrator, who gets 400 for a library id that is not a UUID. */
+    /** The admin duplicates listing is refused by role for a member and answers the administrator, who gets 400 for a library id that is not a public ID. */
     public function testAdminDuplicatesListingIsAdministratorOnly(): void
     {
-        $libraryId = $this->catalog['denied']['library']->getId()->toString();
+        $libraryId = $this->catalog['denied']['library']->getPublicId()->toString();
         $path = '/api/admin/albums/duplicates?' . http_build_query(['libraryId' => $libraryId]);
         $this->authenticate('member');
         $response = $this->request($path);
@@ -402,7 +402,7 @@ final class CatalogReadFirewallTest extends TestCase
             '/api/albums/' . $allowed['album']->getPublicId() . '/duplicates',
             '/api/albums/' . $allowed['album']->getPublicId() . '/cover',
             '/api/genres/' . $this->genres['allowed-root']->getSlug(),
-            '/api/libraries/' . $allowed['library']->getId() . '/stats',
+            '/api/libraries/' . $allowed['library']->getPublicId() . '/stats',
         ];
         foreach ($details as $path) {
             $response = $this->request($path);
@@ -423,8 +423,8 @@ final class CatalogReadFirewallTest extends TestCase
     {
         $this->authenticate($actor);
         $expected = match ($actor) {
-            'member' => [$this->catalog['allowed']['library']->getId()->toString()],
-            'admin' => array_map(static fn (array $entities): string => $entities['library']->getId()->toString(), $this->catalog),
+            'member' => [$this->catalog['allowed']['library']->getPublicId()->toString()],
+            'admin' => array_map(static fn (array $entities): string => $entities['library']->getPublicId()->toString(), $this->catalog),
             default => [],
         };
         sort($expected);
@@ -432,13 +432,13 @@ final class CatalogReadFirewallTest extends TestCase
             $response = $this->request($path);
             self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
             $body = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
-            $ids = array_column($body['data'], 'id');
+            $ids = array_column($body['data'], 'publicId');
             sort($ids);
             self::assertSame($expected, $ids);
         }
         foreach ($this->catalog as $visibility => $entities) {
             $allowed = $actor === 'admin' || ($actor === 'member' && $visibility === 'allowed');
-            $path = '/api/libraries/' . $entities['library']->getId();
+            $path = '/api/libraries/' . $entities['library']->getPublicId();
             foreach ([$path, $path . '/stats'] as $route) {
                 $response = $this->request($route);
                 self::assertSame($allowed ? 200 : 404, $response->getStatusCode(), (string) $response->getContent());
@@ -455,7 +455,7 @@ final class CatalogReadFirewallTest extends TestCase
     {
         $this->authenticate('member');
         $libraryId = $this->catalog['allowed']['library']->getId();
-        $path = '/api/libraries/' . $libraryId;
+        $path = '/api/libraries/' . $this->catalog['allowed']['library']->getPublicId();
         self::assertSame(200, $this->request($path)->getStatusCode());
         $access = $this->kernel->getContainer()->get('catalog.acceptance.library_access');
         self::assertInstanceOf(LibraryAccessPortInterface::class, $access);
@@ -549,13 +549,13 @@ final class CatalogReadFirewallTest extends TestCase
             $response = $this->request('/api/genres/?' . http_build_query(['flat' => $flat ? 'true' : 'false']));
             self::assertSame(200, $response->getStatusCode(), (string) $response->getContent());
             $body = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
-            $expected = array_map(fn (string $key): string => $this->genres[$key]->getId()->toString(), $flat ? $visible : $roots);
-            $ids = array_column($body['data'], 'uuid');
+            $expected = array_map(fn (string $key): string => $this->genres[$key]->getPublicId()->toString(), $flat ? $visible : $roots);
+            $ids = array_column($body['data'], 'publicId');
             sort($expected);
             sort($ids);
             self::assertSame($expected, $ids);
             if ($actor === 'member') {
-                $promoted = array_filter($body['data'], fn (array $genre): bool => $genre['uuid'] === $this->genres['allowed-movie']->getId()->toString());
+                $promoted = array_filter($body['data'], fn (array $genre): bool => $genre['publicId'] === $this->genres['allowed-movie']->getPublicId()->toString());
                 self::assertCount(1, $promoted);
                 self::assertNull(array_values($promoted)[0]['parentId']);
             }
@@ -566,10 +566,10 @@ final class CatalogReadFirewallTest extends TestCase
             self::assertSame($allowed ? 200 : 404, $response->getStatusCode(), (string) $response->getContent());
             if ($allowed && $key === 'allowed-root') {
                 $body = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
-                $children = array_column($body['data']['children'], 'uuid');
-                $expectedChildren = [$this->genres['allowed-song']->getId()->toString()];
+                $children = array_column($body['data']['children'], 'publicId');
+                $expectedChildren = [$this->genres['allowed-song']->getPublicId()->toString()];
                 if ($actor === 'admin') {
-                    $expectedChildren[] = $this->genres['denied-child']->getId()->toString();
+                    $expectedChildren[] = $this->genres['denied-child']->getPublicId()->toString();
                 }
                 sort($children);
                 sort($expectedChildren);

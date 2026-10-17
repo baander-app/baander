@@ -10,7 +10,6 @@ const mockRefetch = vi.fn()
 
 function makeAlbum(publicId: string, year: number | null) {
   return {
-    uuid: `uuid-${publicId}`,
     publicId,
     title: `Album ${publicId}`,
     type: 'album',

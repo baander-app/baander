@@ -10,6 +10,7 @@ use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 
 final class LibraryService implements LibraryPortInterface
@@ -37,6 +38,16 @@ final class LibraryService implements LibraryPortInterface
     public function save(Library $library): void
     {
         $this->libraryRepository->save($library);
+    }
+
+    public function findByPublicId(PublicId $publicId): ?Library
+    {
+        return $this->libraryRepository->findByPublicId($publicId);
+    }
+
+    public function findVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): ?Library
+    {
+        return $this->libraryRepository->findVisibleByPublicId($publicId, $scope);
     }
 
     public function findByUuid(Uuid $uuid): ?Library

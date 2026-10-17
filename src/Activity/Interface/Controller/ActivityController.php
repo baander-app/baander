@@ -48,6 +48,7 @@ final class ActivityController
         private readonly AlbumPortInterface $albumPort,
         private readonly ArtistPortInterface $artistPort,
         private readonly MoviePortInterface $moviePort,
+        private readonly \App\Activity\Application\Port\ActivityIdentityProjectionPortInterface $identities,
     ) {
     }
 
@@ -99,10 +100,10 @@ final class ActivityController
         summary: 'Record a play event for a song or movie',
         requestBody: new OA\RequestBody(required: true, content: new OA\MediaType(mediaType: 'application/json', schema: new OA\Schema(
             properties: [
-                new OA\Property(property: 'songId', description: 'Public ID of the song being played', type: 'string', nullable: true),
-                new OA\Property(property: 'albumId', description: 'Public ID of the album', type: 'string', nullable: true),
-                new OA\Property(property: 'artistId', description: 'Public ID of the artist', type: 'string', nullable: true),
-                new OA\Property(property: 'movieId', description: 'Public ID of the movie', type: 'string', nullable: true),
+                new OA\Property(property: 'songId', description: 'Public ID of the song being played', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true),
+                new OA\Property(property: 'albumId', description: 'Public ID of the album', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true),
+                new OA\Property(property: 'artistId', description: 'Public ID of the artist', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true),
+                new OA\Property(property: 'movieId', description: 'Public ID of the movie', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true),
                 new OA\Property(property: 'platform', description: 'Playback platform (e.g. web, mobile, desktop)', type: 'string', nullable: true),
                 new OA\Property(property: 'player', description: 'Player application name', type: 'string', nullable: true),
             ],
@@ -126,6 +127,8 @@ final class ActivityController
             return $this->unauthorized();
         }
 
+        $scope = $this->identities->readScope(Uuid::fromString($user->getId()), $this->security->isGranted('ROLE_ADMIN'));
+
         // Resolve song (optional for movie plays)
         $songUuid = null;
         if ($payload->songId !== null && $payload->songId !== '') {
@@ -135,7 +138,7 @@ final class ActivityController
                 return $this->errorResponse($this->trans('errors.invalid_song_id_format'));
             }
 
-            $song = $this->songPort->findByPublicId($songPublicId);
+            $song = $this->songPort->findVisibleByPublicId($songPublicId, $scope);
             if ($song === null) {
                 return $this->notFound($this->trans('errors.not_found', domain: 'song'));
             }
@@ -151,7 +154,7 @@ final class ActivityController
                 return $this->errorResponse($this->trans('errors.invalid_movie_id_format'));
             }
 
-            $movie = $this->moviePort->findByPublicId($moviePublicId);
+            $movie = $this->moviePort->findVisibleByPublicId($moviePublicId, $scope);
             if ($movie === null) {
                 return $this->notFound($this->trans('errors.not_found', domain: 'movie'));
             }
@@ -167,10 +170,13 @@ final class ActivityController
         if ($payload->albumId !== null) {
             try {
                 $albumPublicId = PublicId::fromString($payload->albumId);
-                $album = $this->albumPort->findByPublicId($albumPublicId);
-                $albumUuid = $album?->getId();
+                $album = $this->albumPort->findVisibleByPublicId($albumPublicId, $scope);
+                if ($album === null) {
+                    return $this->notFound('The album was not found.');
+                }
+                $albumUuid = $album->getId();
             } catch (\InvalidArgumentException) {
-                // Ignore invalid album ID
+                return $this->errorResponse('Invalid album public ID.');
             }
         }
 
@@ -178,10 +184,13 @@ final class ActivityController
         if ($payload->artistId !== null) {
             try {
                 $artistPublicId = PublicId::fromString($payload->artistId);
-                $artist = $this->artistPort->findByPublicId($artistPublicId);
-                $artistUuid = $artist?->getId();
+                $artist = $this->artistPort->findVisibleByPublicId($artistPublicId, $scope);
+                if ($artist === null) {
+                    return $this->notFound('The artist was not found.');
+                }
+                $artistUuid = $artist->getId();
             } catch (\InvalidArgumentException) {
-                // Ignore invalid artist ID
+                return $this->errorResponse('Invalid artist public ID.');
             }
         }
 
@@ -197,7 +206,7 @@ final class ActivityController
 
         $activity = $envelope->last(HandledStamp::class)?->getResult();
 
-        return $this->successResponse(ActivityResource::from($activity), Response::HTTP_CREATED);
+        return $this->successResponse($this->enrichmentService->enrich([$activity], '')[0], Response::HTTP_CREATED);
     }
 
     /**
@@ -207,7 +216,7 @@ final class ActivityController
         path: '/api/activity/love/{publicId}',
         summary: 'Toggle love on an activity',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Activity public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Activity public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
@@ -249,7 +258,7 @@ final class ActivityController
 
         $activity = $envelope->last(HandledStamp::class)?->getResult();
 
-        return $this->successResponse(ActivityResource::from($activity));
+        return $this->successResponse($this->enrichmentService->enrich([$activity], '')[0]);
     }
 
     /**
@@ -275,7 +284,7 @@ final class ActivityController
 
         $activities = $this->activityService->findLoved(Uuid::fromString($user->getId()));
 
-        return $this->successResponse(ActivityResource::collection($activities));
+        return $this->successResponse($this->enrichmentService->enrich($activities, ''));
     }
 
 

@@ -5,20 +5,20 @@ Change a webhook's URL or the notification categories it receives. The command d
 ## Quick start
 
 ```bash
-make exec cmd="php bin/console app:webhook:update 0192a3b4-c5d6-7890-abcd-ef1234567890 --url=https://hooks.baander.app/notify"
+make exec cmd="php bin/console app:webhook:update aB3dE5fG7hJ9kL1mN3pQr --url=https://hooks.baander.app/notify"
 ```
 
 Deliver every category again, clearing the category filter:
 
 ```bash
-make exec cmd="php bin/console app:webhook:update 0192a3b4-c5d6-7890-abcd-ef1234567890 --all-categories"
+make exec cmd="php bin/console app:webhook:update aB3dE5fG7hJ9kL1mN3pQr --all-categories"
 ```
 
 ## Arguments
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `id` | Yes | The webhook UUID, as [app:webhook:list](app-webhook-list.md) shows it |
+| `id` | Yes | The webhook public ID, as [app:webhook:list](app-webhook-list.md) shows it |
 
 ## Options
 
@@ -37,7 +37,7 @@ An option that is not given leaves its field unchanged. `--category` and `--all-
 
 The new URL passes the same checks as in [app:webhook:create](app-webhook-create.md). When the URL or a category is rejected, nothing changes, not even the field that was valid.
 
-With `--json` the command prints the API's `data` object: `id`, `url`, `category_filter`, `created_at` and `updated_at`.
+With `--json` the command prints the API's `data` object: `publicId`, `url`, `category_filter`, `created_at` and `updated_at`.
 
 ## Exit codes
 
@@ -45,4 +45,4 @@ With `--json` the command prints the API's `data` object: `id`, `url`, `category
 |------|---------|
 | 0 | Webhook updated |
 | 1 | No webhook has the ID, or another error occurred; the message says why |
-| 2 | The ID is not a UUID, the URL or a category was rejected, or `--category` was combined with `--all-categories`; nothing changed |
+| 2 | The ID is not a public ID, the URL or a category was rejected, or `--category` was combined with `--all-categories`; nothing changed |

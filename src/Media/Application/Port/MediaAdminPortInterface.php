@@ -23,7 +23,7 @@ interface MediaAdminPortInterface
     /**
      * Check how many images have missing files (dry-run).
      *
-     * @return array{totalImages: int, missingCount: int, missingImages: array<array{id: string, path: string, type: string}>}
+     * @return array{totalImages: int, missingCount: int, missingImages: array<array{publicId: string, path: string, type: string}>}
      */
     public function checkMissingImages(): array;
 }

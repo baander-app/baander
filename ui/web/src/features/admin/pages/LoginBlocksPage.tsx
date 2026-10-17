@@ -216,7 +216,7 @@ export function LoginBlocksPage() {
             </thead>
             <tbody>
               {blocks.map((block) => (
-                <BodyRow key={block.id}>
+                <BodyRow key={block.publicId}>
                   <TdMono>{block.ipAddress}</TdMono>
                   <Td>{block.email || '—'}</Td>
                   <TdWarn>{truncate(block.fieldValue, 30)}</TdWarn>
@@ -235,7 +235,7 @@ export function LoginBlocksPage() {
                         <DropdownMenuItem
                           style={{ color: 'var(--color-destructive)' }}
                           onClick={() => {
-                            deleteBlock.mutate(block.id)
+                            deleteBlock.mutate(block.publicId)
                           }}
                         >
                           <Trash2 size={13} style={{ marginRight: '0.375rem' }} />

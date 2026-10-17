@@ -45,7 +45,7 @@ final class SchedulerUpdateCommand extends Command
         $io = new SymfonyStyle($input, $output);
 
         try {
-            $id = ScheduledJobConsole::id($input);
+            $id = ScheduledJobConsole::id($input, $this->jobs);
             $current = ScheduledJobResource::from($this->jobs->getById($id) ?? throw ScheduledJobConsole::notFound());
             $job = ScheduledJobResource::from(
                 $this->jobs->updateJob($id, $this->reader->forUpdate($input, $current)) ?? throw ScheduledJobConsole::notFound(),

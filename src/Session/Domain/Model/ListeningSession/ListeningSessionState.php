@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Session\Domain\Model\ListeningSession;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use DateTimeImmutable;
 
 /**
@@ -20,6 +21,7 @@ final class ListeningSessionState
      */
     public function __construct(
         public readonly Uuid $id,
+        public readonly PublicId $publicId,
         public readonly Uuid $userId,
         public ?Uuid $activeDeviceId,
         public array $queue,

@@ -186,7 +186,7 @@ export interface RegisterPasskeyRequest {
 }
 
 export interface WebAuthnOptionsRequest {
-  /** Optional user ID to get passkey options for */
+  /** Optional user public ID to get passkey options for */
   userId?: string;
 }
 
@@ -379,7 +379,7 @@ export interface UpdateArtistRequest {
 }
 
 export interface ArtistSongRequest {
-  /** Song UUID */
+  /** Song public identifier */
   songId: string;
   /** Artist role (primary, featured, producer, composer, conductor, remixer, djmix, other) */
   role: string;
@@ -396,7 +396,7 @@ export interface UpdateRoleRequest {
 }
 
 export interface ArtistAlbumRequest {
-  /** Album UUID */
+  /** Album public identifier */
   albumId: string;
   /** Artist role (primary, featured, producer, composer, conductor, remixer, djmix, other) */
   role: string;
@@ -406,7 +406,7 @@ export interface CreateGenreRequest {
   name: string;
   slug: string;
   /**
-     * UUID of the parent genre
+     * Public ID of the parent genre
      * @nullable
      */
   parentId?: string | null;
@@ -435,12 +435,12 @@ export interface UpdateGenreRequest {
 }
 
 export interface GenreSongRequest {
-  /** Song UUID */
+  /** Song public ID */
   songId: string;
 }
 
 export interface GenreAlbumRequest {
-  /** Album UUID */
+  /** Album public ID */
   albumId: string;
 }
 
@@ -527,6 +527,11 @@ export const AddFavoriteRequestEntityType = {
 
 export interface AddFavoriteRequest {
   entityType: AddFavoriteRequestEntityType;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[A-Za-z0-9_-]{21}$
+     */
   entityPublicId: string;
 }
 
@@ -649,20 +654,32 @@ export interface UpdatePlaylistRequest {
 }
 
 export interface AddSongRequest {
-  /** UUID of the song to add */
+  /**
+     * Public ID of the song to add
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   songId: string;
 }
 
 export interface ReorderSongsRequest {
   /**
-     * Ordered array of song UUIDs
+     * Ordered array of song public IDs
      * @minItems 1
+     * @items.minLength 21
+     * @items.maxLength 21
+     * @items.pattern ^[0-9a-zA-Z_-]{21}$
      */
   songIds: string[];
 }
 
 export interface SubscribeCountryRequest {
-  /** @nullable */
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @nullable
+     */
   sourceId?: string | null;
   /**
      * @minLength 2
@@ -672,6 +689,10 @@ export interface SubscribeCountryRequest {
 }
 
 export interface StartRadioRequest {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     */
   stationId: string;
   streamUrl: string;
 }
@@ -688,6 +709,10 @@ export interface CreateRadioSourceRequest {
 }
 
 export interface StarStationRequest {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     */
   stationId: string;
 }
 
@@ -734,7 +759,7 @@ export interface UpdateScheduledJobRequest {
 }
 
 export interface RegisterDeviceRequest {
-  /** Persistent device identifier from localStorage */
+  /** Browser-generated device token from localStorage; distinct from the persisted device publicId */
   deviceId: string;
   /** @maxLength 255 */
   name?: string;
@@ -765,7 +790,7 @@ export interface SyncSessionRequest {
 }
 
 export interface ClaimSessionRequest {
-  /** The device claiming the session */
+  /** Browser-generated device token claiming the session; distinct from device publicId */
   deviceId: string;
   /**
      * Optional queue to bring from local device
@@ -843,6 +868,11 @@ export const CreateTranscodeSessionRequestPriority = {
 } as const;
 
 export interface CreateTranscodeSessionRequest {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   videoId: string;
   qualityTier?: CreateTranscodeSessionRequestQualityTier;
   audioProfile?: CreateTranscodeSessionRequestAudioProfile;
@@ -893,8 +923,6 @@ export interface ApiError {
 }
 
 export interface ActivityResource {
-  /** Activity UUID */
-  uuid: string;
   /**
      * Public identifier
      * @minLength 21
@@ -902,27 +930,27 @@ export interface ActivityResource {
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   publicId: string;
-  /** User UUID */
+  /** User public ID */
   userId: string;
   /** Type of activity */
   activityType: string;
   /**
-     * Song UUID
+     * Song public ID
      * @nullable
      */
   songId?: string | null;
   /**
-     * Album UUID
+     * Album public ID
      * @nullable
      */
   albumId?: string | null;
   /**
-     * Artist UUID
+     * Artist public ID
      * @nullable
      */
   artistId?: string | null;
   /**
-     * Movie UUID
+     * Movie public ID
      * @nullable
      */
   movieId?: string | null;
@@ -1030,8 +1058,13 @@ export interface RecentItemResource {
 }
 
 export interface LoginBlockResource {
-  /** Block entry UUID */
-  id: string;
+  /**
+     * Block public ID
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId: string;
   /** Blocked IP address */
   ipAddress: string;
   /** Email used in the blocked attempt */
@@ -1093,8 +1126,6 @@ export interface AdminOAuthClientCredentialsResource {
 }
 
 export interface AdminUserResource {
-  /** Internal UUID */
-  id: string;
   /**
      * Public identifier
      * @minLength 21
@@ -1163,8 +1194,6 @@ export interface AdminUserSettingResource {
 }
 
 export interface ClientResource {
-  /** Internal UUID */
-  uuid: string;
   /**
      * Public identifier
      * @minLength 21
@@ -1346,8 +1375,6 @@ export interface TokenResource {
 }
 
 export interface UserResource {
-  /** Internal UUID */
-  uuid: string;
   /**
      * Public identifier
      * @minLength 21
@@ -1531,8 +1558,6 @@ export interface PaginatedResponse {
 }
 
 export interface SongResource {
-  /** Song UUID */
-  uuid: string;
   /**
      * Public identifier
      * @minLength 21
@@ -1540,7 +1565,7 @@ export interface SongResource {
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   publicId: string;
-  /** Album public identifier, or UUID when unavailable */
+  /** Album public identifier */
   albumId: string;
   /** Song title */
   title: string;
@@ -1593,8 +1618,6 @@ export interface SongResource {
 }
 
 export interface AlbumResource {
-  /** Album UUID */
-  uuid: string;
   /**
      * Public identifier
      * @minLength 21
@@ -1633,7 +1656,7 @@ export interface AlbumResource {
 export type DuplicateGroupResourceAlbumsItem = { [key: string]: unknown };
 
 export interface DuplicateGroupResource {
-  /** List of album UUIDs in this duplicate group */
+  /** List of album public identifiers in this duplicate group */
   albumIds: string[];
   /** Confidence score between 0 and 1 */
   confidence: number;
@@ -1644,8 +1667,6 @@ export interface DuplicateGroupResource {
 }
 
 export interface ArtistResource {
-  /** Artist UUID */
-  uuid: string;
   /**
      * Public identifier
      * @minLength 21
@@ -1680,14 +1701,14 @@ export interface ArtistResource {
 }
 
 export interface GenreResource {
-  /** Genre UUID */
-  uuid: string;
+  /** Genre public ID */
+  publicId: string;
   /** Genre name */
   name: string;
   /** URL-safe slug */
   slug: string;
   /**
-     * Parent genre UUID
+     * Parent genre public ID
      * @nullable
      */
   parentId?: string | null;
@@ -1709,8 +1730,6 @@ export type MovieResourceGenresItem = { [key: string]: unknown };
 export type MovieResourceVideosItem = { [key: string]: unknown };
 
 export interface MovieResource {
-  /** Movie UUID */
-  uuid: string;
   /**
      * Public identifier
      * @minLength 21
@@ -1785,7 +1804,7 @@ export interface MovieResource {
      * @nullable
      */
   collectionName?: string | null;
-  /** Video UUIDs */
+  /** Video public identifiers */
   videoIds: string[];
   /**
      * Poster image data
@@ -1832,8 +1851,6 @@ export const ServerInstanceResourceStatus = {
 } as const;
 
 export interface ServerInstanceResource {
-  /** Server UUID */
-  uuid: string;
   /**
      * Public identifier
      * @minLength 21
@@ -1871,8 +1888,6 @@ export const PairingSessionResourceMethod = {
 } as const;
 
 export interface PairingSessionResource {
-  /** Pairing session UUID */
-  uuid: string;
   /**
      * Public identifier
      * @minLength 21
@@ -1922,9 +1937,12 @@ export const FavoriteResourceEntityType = {
 } as const;
 
 export interface FavoriteResource {
-  /** Favorite UUID */
-  uuid: string;
-  /** Public identifier */
+  /**
+     * Public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId: string;
   /** Entity type */
   entityType: FavoriteResourceEntityType;
@@ -1949,7 +1967,7 @@ export const LibraryAccessResourceType = {
 } as const;
 
 export interface LibraryAccessResource {
-  /** Library UUID */
+  /** Library public ID */
   libraryId: string;
   /** Library name */
   name: string;
@@ -1986,8 +2004,8 @@ export const LibraryResourceFilesystemType = {
 } as const;
 
 export interface LibraryResource {
-  /** Library UUID */
-  id: string;
+  /** Library public ID */
+  publicId: string;
   /** Library name */
   name: string;
   /** URL-friendly slug */
@@ -2077,8 +2095,6 @@ export interface LrclibSearchResource {
 }
 
 export interface ImageResource {
-  /** Image UUID */
-  id: string;
   /**
      * Public identifier
      * @minLength 21
@@ -2104,18 +2120,27 @@ export interface ImageResource {
   /** Parent entity type */
   imageableType: string;
   /**
-     * Associated album UUID
+     * Associated album public ID
+     * @minLength 21
+     * @maxLength 21
      * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   albumId?: string | null;
   /**
-     * Associated artist UUID
+     * Associated artist public ID
+     * @minLength 21
+     * @maxLength 21
      * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   artistId?: string | null;
   /**
-     * Associated playlist UUID
+     * Associated playlist public ID
+     * @minLength 21
+     * @maxLength 21
      * @nullable
+     * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   playlistId?: string | null;
   /** Creation timestamp */
@@ -2168,8 +2193,6 @@ export const PartySessionResourcePlaybackState = {
 } as const;
 
 export interface PartySessionResource {
-  /** Session UUID */
-  uuid: string;
   /**
      * Public identifier
      * @minLength 21
@@ -2177,9 +2200,9 @@ export interface PartySessionResource {
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   publicId: string;
-  /** Host user UUID */
+  /** Host user public ID */
   hostUserId: string;
-  /** Video UUID */
+  /** Video public ID */
   videoId: string;
   /**
      * Transcode job that the host's playback steers; null when none was named or the job has been deleted
@@ -2209,8 +2232,6 @@ export interface PartySessionResource {
 }
 
 export interface PlaylistResource {
-  /** Playlist UUID */
-  uuid: string;
   /**
      * Public identifier
      * @minLength 21
@@ -2270,7 +2291,6 @@ export type RecommendationJobResourceStrategyCounts = { [key: string]: unknown }
 export type RecommendationJobResourceMetadata = { [key: string]: unknown };
 
 export interface RecommendationJobResource {
-  id: string;
   public_id: string;
   status: RecommendationJobResourceStatus;
   is_full: boolean;
@@ -2293,8 +2313,8 @@ export interface RecommendationJobResource {
 }
 
 export interface RecommendationResource {
-  /** Recommendation UUID */
-  id: string;
+  /** Public recommendation identity */
+  public_id: string;
   /** Recommendation name */
   name: string;
   /** Source entity type */
@@ -2322,7 +2342,7 @@ export interface RecommendationResource {
      */
   position?: number | null;
   /**
-     * User UUID
+     * Public user identity
      * @nullable
      */
   user_id?: string | null;
@@ -2361,8 +2381,8 @@ export const ScheduledJobResourceStatus = {
 export type ScheduledJobResourceParameters = { [key: string]: unknown };
 
 export interface ScheduledJobResource {
-  /** Job UUID */
-  id: string;
+  /** Public job identity */
+  publicId: string;
   /** Job name */
   name: string;
   /** Cron expression */
@@ -2520,8 +2540,6 @@ export interface FailedMessageResource {
 }
 
 export interface TranscodeMetricsResource {
-  /** Job UUID */
-  uuid: string;
   /**
      * Public identifier
      * @minLength 21
@@ -2529,7 +2547,12 @@ export interface TranscodeMetricsResource {
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   publicId: string;
-  /** Video UUID */
+  /**
+     * Video public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   videoId: string;
   /** Quality tier name */
   qualityTier: string;
@@ -2589,8 +2612,6 @@ export type TranscodeSessionResourceAudioProfile = { [key: string]: unknown };
 export type TranscodeSessionResourceMetrics = { [key: string]: unknown } | null;
 
 export interface TranscodeSessionResource {
-  /** Session UUID */
-  uuid: string;
   /**
      * Public identifier
      * @minLength 21
@@ -2598,11 +2619,26 @@ export interface TranscodeSessionResource {
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   publicId: string;
-  /** User UUID */
+  /**
+     * User public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   userId: string;
-  /** Transcode job UUID */
+  /**
+     * Transcode job public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   jobId: string;
-  /** Video UUID */
+  /**
+     * Video public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   videoId: string;
   /** Session state */
   state: TranscodeSessionResourceState;
@@ -2783,14 +2819,19 @@ export interface SaveAudioPreferencesRequest {
 export type EqDeviceProfileResourcePayload = { [key: string]: unknown };
 
 export interface EqDeviceProfileResource {
-  /** Profile UUID */
-  id: string;
+  /**
+     * Profile public identifier
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId: string;
   /** Profile name */
   name: string;
   /** Icon identifier */
   icon: string;
   /**
-     * Device UUID
+     * Client audio-output token, independent of database identity
      * @nullable
      */
   deviceId?: string | null;
@@ -3350,6 +3391,11 @@ export type PostOauthDeviceApprove200 = {
 };
 
 export type GetPasskeyList200DataItem = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   publicId?: string;
   name?: string;
   createdAt?: string;
@@ -3393,7 +3439,7 @@ export type PostPasskeyRegister201 = {
 };
 
 export type PostPasskeyAuthenticateOptionsBody = {
-  /** Optional user ID to get passkey options for */
+  /** Optional user public ID to get passkey options for */
   userId?: string;
 };
 
@@ -3421,6 +3467,11 @@ export type PostPasskeyAuthenticateBody = {
 };
 
 export type PostPasskeyAuthenticate200Data = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   userId?: string;
   credentialId?: string;
   signCount?: number;
@@ -3564,7 +3615,6 @@ export type PutAuthMeUpdateBody = {
 export type PutAuthMeUpdate200DataSignal = { [key: string]: unknown } | null;
 
 export type PutAuthMeUpdate200Data = {
-  uuid?: string;
   publicId?: string;
   name?: string;
   email?: string;
@@ -3724,7 +3774,6 @@ export type GetAlbumShow200DataCoverImage = {
 } | null;
 
 export type GetAlbumShow200Data = {
-  uuid?: string;
   publicId?: string;
   title?: string;
   type?: string;
@@ -3959,7 +4008,7 @@ export type PostGenreStore201 = {
 };
 
 export type GetGenreShow200Data = {
-  uuid?: string;
+  publicId?: string;
   name?: string;
   slug?: string;
   /** @nullable */
@@ -3988,12 +4037,12 @@ export type PatchGenreUpdate200 = {
 };
 
 export type PostGenreAddSongBody = {
-  /** Song UUID */
+  /** Song public ID */
   songId?: string;
 };
 
 export type PostGenreAddAlbumBody = {
-  /** Album UUID */
+  /** Album public ID */
   albumId?: string;
 };
 
@@ -4481,7 +4530,12 @@ export type PostAdminMediaPruneMissing200 = {
 };
 
 export type GetAdminMediaMissingCheck200DataMissingImagesItem = {
-  id?: string;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[A-Za-z0-9_-]{21}$
+     */
+  publicId?: string;
   path?: string;
   type?: string;
 };
@@ -4843,7 +4897,7 @@ unread?: boolean;
  */
 limit?: number;
 /**
- * Internal notification UUID for pagination
+ * Notification public ID for pagination
  */
 cursor?: string;
 /**
@@ -4977,7 +5031,7 @@ export type DeletePushUnsubscribeBody = {
 };
 
 export type GetWebhookIndex200DataItem = {
-  id?: string;
+  publicId?: string;
   url?: string;
 };
 
@@ -4992,7 +5046,7 @@ export type PostWebhookCreateBody = {
 };
 
 export type PostWebhookCreate201Data = {
-  id?: string;
+  publicId?: string;
   url?: string;
   secret?: string;
 };
@@ -5008,7 +5062,7 @@ export type PutWebhookUpdateBody = {
 };
 
 export type PutWebhookUpdate200Data = {
-  id?: string;
+  publicId?: string;
   url?: string;
 };
 
@@ -5024,7 +5078,7 @@ export const PostWebhookRotateSecret200DataSigningVersion = {
 } as const;
 
 export type PostWebhookRotateSecret200Data = {
-  id: string;
+  publicId: string;
   /**
      * @minLength 64
      * @maxLength 64
@@ -5039,8 +5093,7 @@ export type PostWebhookRotateSecret200 = {
 };
 
 export type GetPartyMemberIndex200DataItem = {
-  uuid?: string;
-  nickname?: string;
+  publicId?: string;
 };
 
 export type GetPartyMemberIndex200 = {
@@ -5055,8 +5108,7 @@ export type PatchPartyMemberUpdateMeBody = {
 };
 
 export type PatchPartyMemberUpdateMe200Data = {
-  uuid?: string;
-  nickname?: string;
+  publicId?: string;
 };
 
 export type PatchPartyMemberUpdateMe200 = {
@@ -5072,7 +5124,6 @@ export type PostPartyMemberTransferHost200 = {
 };
 
 export type GetPartySessionIndex200DataItem = {
-  uuid?: string;
   publicId?: string;
 };
 
@@ -5085,11 +5136,10 @@ export type PostPartySessionCreate201 = {
 };
 
 export type GetPartySessionShow200DataMembersItem = {
-  uuid?: string;
+  publicId?: string;
 };
 
 export type GetPartySessionShow200Data = {
-  uuid?: string;
   publicId?: string;
   members?: GetPartySessionShow200DataMembersItem[];
 };
@@ -5103,8 +5153,7 @@ export type DeletePartySessionEnd200 = {
 };
 
 export type PostPartySessionJoin200Data = {
-  uuid?: string;
-  nickname?: string;
+  publicId?: string;
 };
 
 export type PostPartySessionJoin200 = {
@@ -5134,14 +5183,13 @@ export type PostPlaylistStoreBody = {
 };
 
 export type GetPlaylistShow200DataSongsItem = {
-  uuid?: string;
   /**
      * @minLength 21
      * @maxLength 21
      * @pattern ^[0-9a-zA-Z_-]{21}$
      */
   publicId?: string;
-  /** Album public identifier, or UUID when unavailable */
+  /** Album public identifier */
   albumId?: string;
   /** Stored playlist position */
   position?: number;
@@ -5169,7 +5217,6 @@ export type GetPlaylistShow200DataSongsItem = {
 };
 
 export type GetPlaylistShow200Data = {
-  uuid?: string;
   /**
      * @minLength 21
      * @maxLength 21
@@ -5226,16 +5273,31 @@ export type PatchPlaylistUpdate200 = {
 };
 
 export type PostPlaylistAddSongBody = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   songId: string;
 };
 
 export type PostPlaylistAddSong201 = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   songId?: string;
   position?: number;
 };
 
 export type PostPlaylistReorderBody = {
-  /** Ordered array of song UUIDs */
+  /**
+     * Ordered array of song public IDs
+     * @items.minLength 21
+     * @items.maxLength 21
+     * @items.pattern ^[0-9a-zA-Z_-]{21}$
+     */
   songIds: string[];
 };
 
@@ -5261,6 +5323,11 @@ export type PatchAdminQolProfileBody = {
 };
 
 export type GetRadioSubscriptionList200DataItem = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   sourceId?: string;
   countryCode?: string;
   subscribedAt?: string;
@@ -5271,11 +5338,21 @@ export type GetRadioSubscriptionList200 = {
 };
 
 export type PostRadioSubscriptionSubscribeBody = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   sourceId: string;
   countryCode: string;
 };
 
 export type PostRadioSubscriptionSubscribe201Data = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   sourceId?: string;
   countryCode?: string;
 };
@@ -5293,6 +5370,11 @@ export type PostRadioSubscriptionRefresh200 = {
 };
 
 export type GetRadioSessionGet200Data = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   stationId?: string;
   stationName?: string;
   streamUrl?: string;
@@ -5304,11 +5386,21 @@ export type GetRadioSessionGet200 = {
 };
 
 export type PostRadioSessionStartBody = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   stationId: string;
   streamUrl: string;
 };
 
 export type PostRadioSessionStart200Data = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   stationId?: string;
   streamUrl?: string;
 };
@@ -5328,7 +5420,12 @@ export type PostRadioSessionStop200 = {
 };
 
 export type GetRadioSourceList200DataItem = {
-  id?: string;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId?: string;
   name?: string;
   type?: string;
   syncUrl?: string;
@@ -5352,7 +5449,12 @@ export type PostRadioSourceCreateBody = {
 };
 
 export type PostRadioSourceCreate201Data = {
-  id?: string;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId?: string;
   name?: string;
   type?: string;
 };
@@ -5377,7 +5479,20 @@ q?: string;
 };
 
 export type GetRadioStations200DataItem = {
-  stationuuid?: string;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  publicId?: string;
+  /** Station identifier assigned by the external provider */
+  externalId?: string;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
+  sourceId?: string;
   name?: string;
   countrycode?: string;
   /** @nullable */
@@ -5397,6 +5512,11 @@ export type GetRadioStations200 = {
 };
 
 export type GetRadioStarredList200DataItem = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   stationId?: string;
   name?: string;
   countryCode?: string;
@@ -5410,10 +5530,20 @@ export type GetRadioStarredList200 = {
 };
 
 export type PostRadioStarredStarBody = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   stationId: string;
 };
 
 export type PostRadioStarredStar201Data = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   stationId?: string;
   starred?: boolean;
 };
@@ -5710,7 +5840,13 @@ export type GetAdminSchedulerCommands200 = {
 };
 
 export type GetDeviceList200DataItem = {
-  id?: string;
+  /**
+     * @minLength 21
+     * @maxLength 21
+     */
+  publicId?: string;
+  /** Browser-generated device token; distinct from publicId */
+  deviceId?: string;
   name?: string;
   /** @nullable */
   lastUsedAt?: string | null;
@@ -5749,7 +5885,7 @@ export type DeleteDeviceForget200 = {
 };
 
 export type GetSessionGet200Data = {
-  id?: string;
+  publicId?: string;
   userId?: string;
   /** @nullable */
   activeDeviceId?: string | null;
@@ -5786,7 +5922,7 @@ export type PutSessionSyncBody = {
 };
 
 export type PutSessionSync200Data = {
-  id?: string;
+  publicId?: string;
   userId?: string;
   /** @nullable */
   activeDeviceId?: string | null;
@@ -5809,7 +5945,7 @@ export type PostSessionClaimBody = {
 };
 
 export type PostSessionClaim200Data = {
-  id?: string;
+  publicId?: string;
   userId?: string;
   activeDeviceId?: string;
   queue?: string[];
@@ -5835,7 +5971,7 @@ export type PostSessionNewBody = {
 };
 
 export type PostSessionNew201Data = {
-  id?: string;
+  publicId?: string;
   userId?: string;
   /** @nullable */
   activeDeviceId?: string | null;
@@ -6024,7 +6160,7 @@ export type GetMonitorAnalyticsFailures200 = {
 export type GetMonitorStatus200DataCounts = { [key: string]: unknown };
 
 export type GetMonitorStatus200DataRunningItem = {
-  /** Internal job identifier */
+  /** Public job identifier */
   jobId?: string;
   /** Job name */
   name?: string;
@@ -6112,7 +6248,7 @@ export const GetMonitorJobsDirection = {
 } as const;
 
 export type GetMonitorJobs200DataItemsItem = {
-  /** Internal job identifier */
+  /** Public job identifier */
   jobId?: string;
   /**
      * Job name
@@ -6166,18 +6302,8 @@ export type GetMonitorJobs200 = {
   data?: GetMonitorJobs200Data;
 };
 
-/**
- * Full exception details (failed jobs only)
- * @nullable
- */
-export type GetMonitorJobsDetail200DataException = {
-  message?: string;
-  file?: string;
-  line?: number;
-} | null;
-
 export type GetMonitorJobsDetail200Data = {
-  /** Internal job identifier */
+  /** Public job identifier */
   jobId?: string;
   /**
      * Job name
@@ -6212,18 +6338,6 @@ export type GetMonitorJobsDetail200Data = {
      * @nullable
      */
   exceptionClass?: string | null;
-  /**
-     * Full exception details (failed jobs only)
-     * @nullable
-     */
-  exception?: GetMonitorJobsDetail200DataException;
-  /**
-     * Serialized message payload
-     * @nullable
-     */
-  data?: string | null;
-  /** Whether the message payload was truncated */
-  dataTruncated?: boolean;
   /**
      * Execution time in seconds (null if not finished)
      * @nullable
@@ -6587,7 +6701,7 @@ export type PostTranscodeJobCleanup200 = {
 };
 
 export type GetTranscodeSessionIndex200DataItem = {
-  uuid?: string;
+  publicId?: string;
   status?: string;
 };
 
@@ -6633,6 +6747,11 @@ export const PostTranscodeSessionCreateBodyPriority = {
 } as const;
 
 export type PostTranscodeSessionCreateBody = {
+  /**
+     * @minLength 21
+     * @maxLength 21
+     * @pattern ^[0-9a-zA-Z_-]{21}$
+     */
   videoId: string;
   qualityTier?: PostTranscodeSessionCreateBodyQualityTier;
   audioProfile?: PostTranscodeSessionCreateBodyAudioProfile;
@@ -6640,7 +6759,7 @@ export type PostTranscodeSessionCreateBody = {
 };
 
 export type GetTranscodeSessionShow200Data = {
-  uuid?: string;
+  publicId?: string;
   status?: string;
   qualityTier?: string;
 };
@@ -6761,7 +6880,7 @@ export type PostAudioPreferencesRollback200 = {
 };
 
 export type GetEqProfilesIndex200ProfilesItem = {
-  id?: string;
+  publicId?: string;
   name?: string;
   icon?: string;
   isDefault?: boolean;
@@ -8290,20 +8409,20 @@ export const useDeleteAdminLoginBlocksDeleteAll = <TError = ErrorType<unknown>,
       return useMutation(getDeleteAdminLoginBlocksDeleteAllMutationOptions(options), queryClient);
     }
 
-export const getDeleteAdminLoginBlocksDeleteUrl = (id: string,) => {
+export const getDeleteAdminLoginBlocksDeleteUrl = (publicId: string,) => {
 
 
 
 
-  return `/api/admin/login-blocks/${id}`
+  return `/api/admin/login-blocks/${publicId}`
 }
 
 /**
  * @summary Delete a single block
  */
-export const deleteAdminLoginBlocksDelete = async (id: string, options?: RequestInit): Promise<void> => {
+export const deleteAdminLoginBlocksDelete = async (publicId: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<void>(getDeleteAdminLoginBlocksDeleteUrl(id),
+  return customInstance<void>(getDeleteAdminLoginBlocksDeleteUrl(publicId),
   {
     ...options,
     method: 'DELETE'
@@ -8316,8 +8435,8 @@ export const deleteAdminLoginBlocksDelete = async (id: string, options?: Request
 
 
 export const getDeleteAdminLoginBlocksDeleteMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminLoginBlocksDelete>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteAdminLoginBlocksDelete>>, TError,{id: string}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminLoginBlocksDelete>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteAdminLoginBlocksDelete>>, TError,{publicId: string}, TContext> => {
 
 const mutationKey = ['deleteAdminLoginBlocksDelete'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -8329,10 +8448,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAdminLoginBlocksDelete>>, {id: string}> = (props) => {
-          const {id} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAdminLoginBlocksDelete>>, {publicId: string}> = (props) => {
+          const {publicId} = props ?? {};
 
-          return  deleteAdminLoginBlocksDelete(id,requestOptions)
+          return  deleteAdminLoginBlocksDelete(publicId,requestOptions)
         }
 
 
@@ -8350,11 +8469,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Delete a single block
  */
 export const useDeleteAdminLoginBlocksDelete = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminLoginBlocksDelete>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminLoginBlocksDelete>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteAdminLoginBlocksDelete>>,
         TError,
-        {id: string},
+        {publicId: string},
         TContext
       > => {
       return useMutation(getDeleteAdminLoginBlocksDeleteMutationOptions(options), queryClient);
@@ -8854,20 +8973,20 @@ export const usePostAdminUsersCreate = <TError = ErrorType<ApiError | Validation
       return useMutation(getPostAdminUsersCreateMutationOptions(options), queryClient);
     }
 
-export const getDeleteAdminUsersDeleteUrl = (id: string,) => {
+export const getDeleteAdminUsersDeleteUrl = (publicId: string,) => {
 
 
 
 
-  return `/api/admin/users/${id}`
+  return `/api/admin/users/${publicId}`
 }
 
 /**
  * @summary Delete a user
  */
-export const deleteAdminUsersDelete = async (id: string, options?: RequestInit): Promise<void> => {
+export const deleteAdminUsersDelete = async (publicId: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<void>(getDeleteAdminUsersDeleteUrl(id),
+  return customInstance<void>(getDeleteAdminUsersDeleteUrl(publicId),
   {
     ...options,
     method: 'DELETE'
@@ -8880,8 +8999,8 @@ export const deleteAdminUsersDelete = async (id: string, options?: RequestInit):
 
 
 export const getDeleteAdminUsersDeleteMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUsersDelete>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUsersDelete>>, TError,{id: string}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUsersDelete>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUsersDelete>>, TError,{publicId: string}, TContext> => {
 
 const mutationKey = ['deleteAdminUsersDelete'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -8893,10 +9012,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAdminUsersDelete>>, {id: string}> = (props) => {
-          const {id} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAdminUsersDelete>>, {publicId: string}> = (props) => {
+          const {publicId} = props ?? {};
 
-          return  deleteAdminUsersDelete(id,requestOptions)
+          return  deleteAdminUsersDelete(publicId,requestOptions)
         }
 
 
@@ -8914,32 +9033,32 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Delete a user
  */
 export const useDeleteAdminUsersDelete = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUsersDelete>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUsersDelete>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteAdminUsersDelete>>,
         TError,
-        {id: string},
+        {publicId: string},
         TContext
       > => {
       return useMutation(getDeleteAdminUsersDeleteMutationOptions(options), queryClient);
     }
 
-export const getPatchAdminUsersUpdateUrl = (id: string,) => {
+export const getPatchAdminUsersUpdateUrl = (publicId: string,) => {
 
 
 
 
-  return `/api/admin/users/${id}`
+  return `/api/admin/users/${publicId}`
 }
 
 /**
  * A new email address starts unverified and is sent a verification link. The CLI counterparts are app:user:rename and app:user:change-email.
  * @summary Update a user
  */
-export const patchAdminUsersUpdate = async (id: string,
+export const patchAdminUsersUpdate = async (publicId: string,
     adminUpdateUserRequest: AdminUpdateUserRequest, options?: RequestInit): Promise<PatchAdminUsersUpdate200> => {
 
-  return customInstance<PatchAdminUsersUpdate200>(getPatchAdminUsersUpdateUrl(id),
+  return customInstance<PatchAdminUsersUpdate200>(getPatchAdminUsersUpdateUrl(publicId),
   {
     ...options,
     method: 'PATCH',
@@ -8952,8 +9071,8 @@ export const patchAdminUsersUpdate = async (id: string,
 
 
 export const getPatchAdminUsersUpdateMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchAdminUsersUpdate>>, TError,{id: string;data: BodyType<AdminUpdateUserRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof patchAdminUsersUpdate>>, TError,{id: string;data: BodyType<AdminUpdateUserRequest>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchAdminUsersUpdate>>, TError,{publicId: string;data: BodyType<AdminUpdateUserRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchAdminUsersUpdate>>, TError,{publicId: string;data: BodyType<AdminUpdateUserRequest>}, TContext> => {
 
 const mutationKey = ['patchAdminUsersUpdate'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -8965,10 +9084,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchAdminUsersUpdate>>, {id: string;data: BodyType<AdminUpdateUserRequest>}> = (props) => {
-          const {id,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchAdminUsersUpdate>>, {publicId: string;data: BodyType<AdminUpdateUserRequest>}> = (props) => {
+          const {publicId,data} = props ?? {};
 
-          return  patchAdminUsersUpdate(id,data,requestOptions)
+          return  patchAdminUsersUpdate(publicId,data,requestOptions)
         }
 
 
@@ -8986,31 +9105,31 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Update a user
  */
 export const usePatchAdminUsersUpdate = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchAdminUsersUpdate>>, TError,{id: string;data: BodyType<AdminUpdateUserRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchAdminUsersUpdate>>, TError,{publicId: string;data: BodyType<AdminUpdateUserRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof patchAdminUsersUpdate>>,
         TError,
-        {id: string;data: BodyType<AdminUpdateUserRequest>},
+        {publicId: string;data: BodyType<AdminUpdateUserRequest>},
         TContext
       > => {
       return useMutation(getPatchAdminUsersUpdateMutationOptions(options), queryClient);
     }
 
-export const getPostAdminUsersAssignRolesUrl = (id: string,) => {
+export const getPostAdminUsersAssignRolesUrl = (publicId: string,) => {
 
 
 
 
-  return `/api/admin/users/${id}/roles`
+  return `/api/admin/users/${publicId}/roles`
 }
 
 /**
  * @summary Assign roles to a user
  */
-export const postAdminUsersAssignRoles = async (id: string,
+export const postAdminUsersAssignRoles = async (publicId: string,
     adminAssignRolesRequest: AdminAssignRolesRequest, options?: RequestInit): Promise<PostAdminUsersAssignRoles200> => {
 
-  return customInstance<PostAdminUsersAssignRoles200>(getPostAdminUsersAssignRolesUrl(id),
+  return customInstance<PostAdminUsersAssignRoles200>(getPostAdminUsersAssignRolesUrl(publicId),
   {
     ...options,
     method: 'POST',
@@ -9023,8 +9142,8 @@ export const postAdminUsersAssignRoles = async (id: string,
 
 
 export const getPostAdminUsersAssignRolesMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersAssignRoles>>, TError,{id: string;data: BodyType<AdminAssignRolesRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersAssignRoles>>, TError,{id: string;data: BodyType<AdminAssignRolesRequest>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersAssignRoles>>, TError,{publicId: string;data: BodyType<AdminAssignRolesRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersAssignRoles>>, TError,{publicId: string;data: BodyType<AdminAssignRolesRequest>}, TContext> => {
 
 const mutationKey = ['postAdminUsersAssignRoles'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -9036,10 +9155,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAdminUsersAssignRoles>>, {id: string;data: BodyType<AdminAssignRolesRequest>}> = (props) => {
-          const {id,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAdminUsersAssignRoles>>, {publicId: string;data: BodyType<AdminAssignRolesRequest>}> = (props) => {
+          const {publicId,data} = props ?? {};
 
-          return  postAdminUsersAssignRoles(id,data,requestOptions)
+          return  postAdminUsersAssignRoles(publicId,data,requestOptions)
         }
 
 
@@ -9057,32 +9176,32 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Assign roles to a user
  */
 export const usePostAdminUsersAssignRoles = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersAssignRoles>>, TError,{id: string;data: BodyType<AdminAssignRolesRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersAssignRoles>>, TError,{publicId: string;data: BodyType<AdminAssignRolesRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postAdminUsersAssignRoles>>,
         TError,
-        {id: string;data: BodyType<AdminAssignRolesRequest>},
+        {publicId: string;data: BodyType<AdminAssignRolesRequest>},
         TContext
       > => {
       return useMutation(getPostAdminUsersAssignRolesMutationOptions(options), queryClient);
     }
 
-export const getPostAdminUsersResetPasswordUrl = (id: string,) => {
+export const getPostAdminUsersResetPasswordUrl = (publicId: string,) => {
 
 
 
 
-  return `/api/admin/users/${id}/reset-password`
+  return `/api/admin/users/${publicId}/reset-password`
 }
 
 /**
  * Sets the password and signs the user out of every session.
  * @summary Reset a user password
  */
-export const postAdminUsersResetPassword = async (id: string,
+export const postAdminUsersResetPassword = async (publicId: string,
     adminResetPasswordRequest: AdminResetPasswordRequest, options?: RequestInit): Promise<PostAdminUsersResetPassword200> => {
 
-  return customInstance<PostAdminUsersResetPassword200>(getPostAdminUsersResetPasswordUrl(id),
+  return customInstance<PostAdminUsersResetPassword200>(getPostAdminUsersResetPasswordUrl(publicId),
   {
     ...options,
     method: 'POST',
@@ -9095,8 +9214,8 @@ export const postAdminUsersResetPassword = async (id: string,
 
 
 export const getPostAdminUsersResetPasswordMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersResetPassword>>, TError,{id: string;data: BodyType<AdminResetPasswordRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersResetPassword>>, TError,{id: string;data: BodyType<AdminResetPasswordRequest>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersResetPassword>>, TError,{publicId: string;data: BodyType<AdminResetPasswordRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersResetPassword>>, TError,{publicId: string;data: BodyType<AdminResetPasswordRequest>}, TContext> => {
 
 const mutationKey = ['postAdminUsersResetPassword'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -9108,10 +9227,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAdminUsersResetPassword>>, {id: string;data: BodyType<AdminResetPasswordRequest>}> = (props) => {
-          const {id,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAdminUsersResetPassword>>, {publicId: string;data: BodyType<AdminResetPasswordRequest>}> = (props) => {
+          const {publicId,data} = props ?? {};
 
-          return  postAdminUsersResetPassword(id,data,requestOptions)
+          return  postAdminUsersResetPassword(publicId,data,requestOptions)
         }
 
 
@@ -9129,30 +9248,30 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Reset a user password
  */
 export const usePostAdminUsersResetPassword = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersResetPassword>>, TError,{id: string;data: BodyType<AdminResetPasswordRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersResetPassword>>, TError,{publicId: string;data: BodyType<AdminResetPasswordRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postAdminUsersResetPassword>>,
         TError,
-        {id: string;data: BodyType<AdminResetPasswordRequest>},
+        {publicId: string;data: BodyType<AdminResetPasswordRequest>},
         TContext
       > => {
       return useMutation(getPostAdminUsersResetPasswordMutationOptions(options), queryClient);
     }
 
-export const getPostAdminUsersDisableUrl = (id: string,) => {
+export const getPostAdminUsersDisableUrl = (publicId: string,) => {
 
 
 
 
-  return `/api/admin/users/${id}/disable`
+  return `/api/admin/users/${publicId}/disable`
 }
 
 /**
  * @summary Disable a user
  */
-export const postAdminUsersDisable = async (id: string, options?: RequestInit): Promise<PostAdminUsersDisable200> => {
+export const postAdminUsersDisable = async (publicId: string, options?: RequestInit): Promise<PostAdminUsersDisable200> => {
 
-  return customInstance<PostAdminUsersDisable200>(getPostAdminUsersDisableUrl(id),
+  return customInstance<PostAdminUsersDisable200>(getPostAdminUsersDisableUrl(publicId),
   {
     ...options,
     method: 'POST'
@@ -9165,8 +9284,8 @@ export const postAdminUsersDisable = async (id: string, options?: RequestInit): 
 
 
 export const getPostAdminUsersDisableMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersDisable>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersDisable>>, TError,{id: string}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersDisable>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersDisable>>, TError,{publicId: string}, TContext> => {
 
 const mutationKey = ['postAdminUsersDisable'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -9178,10 +9297,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAdminUsersDisable>>, {id: string}> = (props) => {
-          const {id} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAdminUsersDisable>>, {publicId: string}> = (props) => {
+          const {publicId} = props ?? {};
 
-          return  postAdminUsersDisable(id,requestOptions)
+          return  postAdminUsersDisable(publicId,requestOptions)
         }
 
 
@@ -9199,30 +9318,30 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Disable a user
  */
 export const usePostAdminUsersDisable = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersDisable>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersDisable>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postAdminUsersDisable>>,
         TError,
-        {id: string},
+        {publicId: string},
         TContext
       > => {
       return useMutation(getPostAdminUsersDisableMutationOptions(options), queryClient);
     }
 
-export const getPostAdminUsersEnableUrl = (id: string,) => {
+export const getPostAdminUsersEnableUrl = (publicId: string,) => {
 
 
 
 
-  return `/api/admin/users/${id}/enable`
+  return `/api/admin/users/${publicId}/enable`
 }
 
 /**
  * @summary Enable a user
  */
-export const postAdminUsersEnable = async (id: string, options?: RequestInit): Promise<PostAdminUsersEnable200> => {
+export const postAdminUsersEnable = async (publicId: string, options?: RequestInit): Promise<PostAdminUsersEnable200> => {
 
-  return customInstance<PostAdminUsersEnable200>(getPostAdminUsersEnableUrl(id),
+  return customInstance<PostAdminUsersEnable200>(getPostAdminUsersEnableUrl(publicId),
   {
     ...options,
     method: 'POST'
@@ -9235,8 +9354,8 @@ export const postAdminUsersEnable = async (id: string, options?: RequestInit): P
 
 
 export const getPostAdminUsersEnableMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersEnable>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersEnable>>, TError,{id: string}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersEnable>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersEnable>>, TError,{publicId: string}, TContext> => {
 
 const mutationKey = ['postAdminUsersEnable'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -9248,10 +9367,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAdminUsersEnable>>, {id: string}> = (props) => {
-          const {id} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postAdminUsersEnable>>, {publicId: string}> = (props) => {
+          const {publicId} = props ?? {};
 
-          return  postAdminUsersEnable(id,requestOptions)
+          return  postAdminUsersEnable(publicId,requestOptions)
         }
 
 
@@ -9269,31 +9388,31 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Enable a user
  */
 export const usePostAdminUsersEnable = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersEnable>>, TError,{id: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postAdminUsersEnable>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postAdminUsersEnable>>,
         TError,
-        {id: string},
+        {publicId: string},
         TContext
       > => {
       return useMutation(getPostAdminUsersEnableMutationOptions(options), queryClient);
     }
 
-export const getGetAdminUserSettingsIndexUrl = (id: string,) => {
+export const getGetAdminUserSettingsIndexUrl = (publicId: string,) => {
 
 
 
 
-  return `/api/admin/users/${id}/settings`
+  return `/api/admin/users/${publicId}/settings`
 }
 
 /**
  * A stored value that is no longer allowed is returned with storedValueValid false.
  * @summary List a user's settings
  */
-export const getAdminUserSettingsIndex = async (id: string, options?: RequestInit): Promise<GetAdminUserSettingsIndex200> => {
+export const getAdminUserSettingsIndex = async (publicId: string, options?: RequestInit): Promise<GetAdminUserSettingsIndex200> => {
 
-  return customInstance<GetAdminUserSettingsIndex200>(getGetAdminUserSettingsIndexUrl(id),
+  return customInstance<GetAdminUserSettingsIndex200>(getGetAdminUserSettingsIndexUrl(publicId),
   {
     ...options,
     method: 'GET'
@@ -9306,29 +9425,29 @@ export const getAdminUserSettingsIndex = async (id: string, options?: RequestIni
 
 
 
-export const getGetAdminUserSettingsIndexQueryKey = (id: string,) => {
+export const getGetAdminUserSettingsIndexQueryKey = (publicId: string,) => {
     return [
-    `/api/admin/users/${id}/settings`
+    `/api/admin/users/${publicId}/settings`
     ] as const;
     }
 
 
-export const getGetAdminUserSettingsIndexQueryOptions = <TData = Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError = ErrorType<ApiError>>(id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetAdminUserSettingsIndexQueryOptions = <TData = Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError = ErrorType<ApiError>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetAdminUserSettingsIndexQueryKey(id);
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminUserSettingsIndexQueryKey(publicId);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>> = ({ signal }) => getAdminUserSettingsIndex(id, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>> = ({ signal }) => getAdminUserSettingsIndex(publicId, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetAdminUserSettingsIndexQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>>
@@ -9336,7 +9455,7 @@ export type GetAdminUserSettingsIndexQueryError = ErrorType<ApiError>
 
 
 export function useGetAdminUserSettingsIndex<TData = Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError = ErrorType<ApiError>>(
- id: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError, TData>> & Pick<
+ publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getAdminUserSettingsIndex>>,
           TError,
@@ -9346,7 +9465,7 @@ export function useGetAdminUserSettingsIndex<TData = Awaited<ReturnType<typeof g
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetAdminUserSettingsIndex<TData = Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError = ErrorType<ApiError>>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError, TData>> & Pick<
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getAdminUserSettingsIndex>>,
           TError,
@@ -9356,7 +9475,7 @@ export function useGetAdminUserSettingsIndex<TData = Awaited<ReturnType<typeof g
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetAdminUserSettingsIndex<TData = Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError = ErrorType<ApiError>>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -9364,11 +9483,11 @@ export function useGetAdminUserSettingsIndex<TData = Awaited<ReturnType<typeof g
  */
 
 export function useGetAdminUserSettingsIndex<TData = Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError = ErrorType<ApiError>>(
- id: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getAdminUserSettingsIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetAdminUserSettingsIndexQueryOptions(id,options)
+  const queryOptions = getGetAdminUserSettingsIndexQueryOptions(publicId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -9381,24 +9500,24 @@ export function useGetAdminUserSettingsIndex<TData = Awaited<ReturnType<typeof g
 
 
 
-export const getPutAdminUserSettingsSetUrl = (id: string,
+export const getPutAdminUserSettingsSetUrl = (publicId: string,
     key: string,) => {
 
 
 
 
-  return `/api/admin/users/${id}/settings/${key}`
+  return `/api/admin/users/${publicId}/settings/${key}`
 }
 
 /**
  * Works for every user setting, including ones users cannot change themselves. The change is logged.
  * @summary Set a user's choice for a setting
  */
-export const putAdminUserSettingsSet = async (id: string,
+export const putAdminUserSettingsSet = async (publicId: string,
     key: string,
     setAdminUserSettingRequest: SetAdminUserSettingRequest, options?: RequestInit): Promise<PutAdminUserSettingsSet200> => {
 
-  return customInstance<PutAdminUserSettingsSet200>(getPutAdminUserSettingsSetUrl(id,key),
+  return customInstance<PutAdminUserSettingsSet200>(getPutAdminUserSettingsSetUrl(publicId,key),
   {
     ...options,
     method: 'PUT',
@@ -9411,8 +9530,8 @@ export const putAdminUserSettingsSet = async (id: string,
 
 
 export const getPutAdminUserSettingsSetMutationOptions = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAdminUserSettingsSet>>, TError,{id: string;key: string;data: BodyType<SetAdminUserSettingRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof putAdminUserSettingsSet>>, TError,{id: string;key: string;data: BodyType<SetAdminUserSettingRequest>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAdminUserSettingsSet>>, TError,{publicId: string;key: string;data: BodyType<SetAdminUserSettingRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof putAdminUserSettingsSet>>, TError,{publicId: string;key: string;data: BodyType<SetAdminUserSettingRequest>}, TContext> => {
 
 const mutationKey = ['putAdminUserSettingsSet'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -9424,10 +9543,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putAdminUserSettingsSet>>, {id: string;key: string;data: BodyType<SetAdminUserSettingRequest>}> = (props) => {
-          const {id,key,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof putAdminUserSettingsSet>>, {publicId: string;key: string;data: BodyType<SetAdminUserSettingRequest>}> = (props) => {
+          const {publicId,key,data} = props ?? {};
 
-          return  putAdminUserSettingsSet(id,key,data,requestOptions)
+          return  putAdminUserSettingsSet(publicId,key,data,requestOptions)
         }
 
 
@@ -9445,33 +9564,33 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Set a user's choice for a setting
  */
 export const usePutAdminUserSettingsSet = <TError = ErrorType<ApiError | ValidationError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAdminUserSettingsSet>>, TError,{id: string;key: string;data: BodyType<SetAdminUserSettingRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof putAdminUserSettingsSet>>, TError,{publicId: string;key: string;data: BodyType<SetAdminUserSettingRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof putAdminUserSettingsSet>>,
         TError,
-        {id: string;key: string;data: BodyType<SetAdminUserSettingRequest>},
+        {publicId: string;key: string;data: BodyType<SetAdminUserSettingRequest>},
         TContext
       > => {
       return useMutation(getPutAdminUserSettingsSetMutationOptions(options), queryClient);
     }
 
-export const getDeleteAdminUserSettingsResetUrl = (id: string,
+export const getDeleteAdminUserSettingsResetUrl = (publicId: string,
     key: string,) => {
 
 
 
 
-  return `/api/admin/users/${id}/settings/${key}`
+  return `/api/admin/users/${publicId}/settings/${key}`
 }
 
 /**
  * The change is logged.
  * @summary Remove a user's choice so the setting follows its default
  */
-export const deleteAdminUserSettingsReset = async (id: string,
+export const deleteAdminUserSettingsReset = async (publicId: string,
     key: string, options?: RequestInit): Promise<DeleteAdminUserSettingsReset200> => {
 
-  return customInstance<DeleteAdminUserSettingsReset200>(getDeleteAdminUserSettingsResetUrl(id,key),
+  return customInstance<DeleteAdminUserSettingsReset200>(getDeleteAdminUserSettingsResetUrl(publicId,key),
   {
     ...options,
     method: 'DELETE'
@@ -9484,8 +9603,8 @@ export const deleteAdminUserSettingsReset = async (id: string,
 
 
 export const getDeleteAdminUserSettingsResetMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUserSettingsReset>>, TError,{id: string;key: string}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUserSettingsReset>>, TError,{id: string;key: string}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUserSettingsReset>>, TError,{publicId: string;key: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUserSettingsReset>>, TError,{publicId: string;key: string}, TContext> => {
 
 const mutationKey = ['deleteAdminUserSettingsReset'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -9497,10 +9616,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAdminUserSettingsReset>>, {id: string;key: string}> = (props) => {
-          const {id,key} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAdminUserSettingsReset>>, {publicId: string;key: string}> = (props) => {
+          const {publicId,key} = props ?? {};
 
-          return  deleteAdminUserSettingsReset(id,key,requestOptions)
+          return  deleteAdminUserSettingsReset(publicId,key,requestOptions)
         }
 
 
@@ -9518,11 +9637,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Remove a user's choice so the setting follows its default
  */
 export const useDeleteAdminUserSettingsReset = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUserSettingsReset>>, TError,{id: string;key: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminUserSettingsReset>>, TError,{publicId: string;key: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteAdminUserSettingsReset>>,
         TError,
-        {id: string;key: string},
+        {publicId: string;key: string},
         TContext
       > => {
       return useMutation(getDeleteAdminUserSettingsResetMutationOptions(options), queryClient);
@@ -20740,20 +20859,20 @@ export const usePostWebhookRotateSecret = <TError = ErrorType<ApiError | Validat
       return useMutation(getPostWebhookRotateSecretMutationOptions(options), queryClient);
     }
 
-export const getGetPartyMemberIndexUrl = (uuid: string,) => {
+export const getGetPartyMemberIndexUrl = (publicId: string,) => {
 
 
 
 
-  return `/api/party/sessions/${uuid}/members/`
+  return `/api/party/sessions/${publicId}/members/`
 }
 
 /**
  * @summary List members for a party session
  */
-export const getPartyMemberIndex = async (uuid: string, options?: RequestInit): Promise<GetPartyMemberIndex200> => {
+export const getPartyMemberIndex = async (publicId: string, options?: RequestInit): Promise<GetPartyMemberIndex200> => {
 
-  return customInstance<GetPartyMemberIndex200>(getGetPartyMemberIndexUrl(uuid),
+  return customInstance<GetPartyMemberIndex200>(getGetPartyMemberIndexUrl(publicId),
   {
     ...options,
     method: 'GET'
@@ -20766,29 +20885,29 @@ export const getPartyMemberIndex = async (uuid: string, options?: RequestInit): 
 
 
 
-export const getGetPartyMemberIndexQueryKey = (uuid: string,) => {
+export const getGetPartyMemberIndexQueryKey = (publicId: string,) => {
     return [
-    `/api/party/sessions/${uuid}/members/`
+    `/api/party/sessions/${publicId}/members/`
     ] as const;
     }
 
 
-export const getGetPartyMemberIndexQueryOptions = <TData = Awaited<ReturnType<typeof getPartyMemberIndex>>, TError = ErrorType<ApiError>>(uuid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartyMemberIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetPartyMemberIndexQueryOptions = <TData = Awaited<ReturnType<typeof getPartyMemberIndex>>, TError = ErrorType<ApiError>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartyMemberIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetPartyMemberIndexQueryKey(uuid);
+  const queryKey =  queryOptions?.queryKey ?? getGetPartyMemberIndexQueryKey(publicId);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPartyMemberIndex>>> = ({ signal }) => getPartyMemberIndex(uuid, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPartyMemberIndex>>> = ({ signal }) => getPartyMemberIndex(publicId, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: uuid !== null && uuid !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPartyMemberIndex>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPartyMemberIndex>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetPartyMemberIndexQueryResult = NonNullable<Awaited<ReturnType<typeof getPartyMemberIndex>>>
@@ -20796,7 +20915,7 @@ export type GetPartyMemberIndexQueryError = ErrorType<ApiError>
 
 
 export function useGetPartyMemberIndex<TData = Awaited<ReturnType<typeof getPartyMemberIndex>>, TError = ErrorType<ApiError>>(
- uuid: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartyMemberIndex>>, TError, TData>> & Pick<
+ publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartyMemberIndex>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getPartyMemberIndex>>,
           TError,
@@ -20806,7 +20925,7 @@ export function useGetPartyMemberIndex<TData = Awaited<ReturnType<typeof getPart
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetPartyMemberIndex<TData = Awaited<ReturnType<typeof getPartyMemberIndex>>, TError = ErrorType<ApiError>>(
- uuid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartyMemberIndex>>, TError, TData>> & Pick<
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartyMemberIndex>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getPartyMemberIndex>>,
           TError,
@@ -20816,7 +20935,7 @@ export function useGetPartyMemberIndex<TData = Awaited<ReturnType<typeof getPart
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetPartyMemberIndex<TData = Awaited<ReturnType<typeof getPartyMemberIndex>>, TError = ErrorType<ApiError>>(
- uuid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartyMemberIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartyMemberIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -20824,11 +20943,11 @@ export function useGetPartyMemberIndex<TData = Awaited<ReturnType<typeof getPart
  */
 
 export function useGetPartyMemberIndex<TData = Awaited<ReturnType<typeof getPartyMemberIndex>>, TError = ErrorType<ApiError>>(
- uuid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartyMemberIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartyMemberIndex>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetPartyMemberIndexQueryOptions(uuid,options)
+  const queryOptions = getGetPartyMemberIndexQueryOptions(publicId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -20841,21 +20960,21 @@ export function useGetPartyMemberIndex<TData = Awaited<ReturnType<typeof getPart
 
 
 
-export const getPatchPartyMemberUpdateMeUrl = (uuid: string,) => {
+export const getPatchPartyMemberUpdateMeUrl = (publicId: string,) => {
 
 
 
 
-  return `/api/party/sessions/${uuid}/members/me`
+  return `/api/party/sessions/${publicId}/members/me`
 }
 
 /**
  * @summary Update current user member preferences
  */
-export const patchPartyMemberUpdateMe = async (uuid: string,
+export const patchPartyMemberUpdateMe = async (publicId: string,
     patchPartyMemberUpdateMeBody: PatchPartyMemberUpdateMeBody, options?: RequestInit): Promise<PatchPartyMemberUpdateMe200> => {
 
-  return customInstance<PatchPartyMemberUpdateMe200>(getPatchPartyMemberUpdateMeUrl(uuid),
+  return customInstance<PatchPartyMemberUpdateMe200>(getPatchPartyMemberUpdateMeUrl(publicId),
   {
     ...options,
     method: 'PATCH',
@@ -20868,8 +20987,8 @@ export const patchPartyMemberUpdateMe = async (uuid: string,
 
 
 export const getPatchPartyMemberUpdateMeMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchPartyMemberUpdateMe>>, TError,{uuid: string;data: BodyType<PatchPartyMemberUpdateMeBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof patchPartyMemberUpdateMe>>, TError,{uuid: string;data: BodyType<PatchPartyMemberUpdateMeBody>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchPartyMemberUpdateMe>>, TError,{publicId: string;data: BodyType<PatchPartyMemberUpdateMeBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchPartyMemberUpdateMe>>, TError,{publicId: string;data: BodyType<PatchPartyMemberUpdateMeBody>}, TContext> => {
 
 const mutationKey = ['patchPartyMemberUpdateMe'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -20881,10 +21000,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchPartyMemberUpdateMe>>, {uuid: string;data: BodyType<PatchPartyMemberUpdateMeBody>}> = (props) => {
-          const {uuid,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchPartyMemberUpdateMe>>, {publicId: string;data: BodyType<PatchPartyMemberUpdateMeBody>}> = (props) => {
+          const {publicId,data} = props ?? {};
 
-          return  patchPartyMemberUpdateMe(uuid,data,requestOptions)
+          return  patchPartyMemberUpdateMe(publicId,data,requestOptions)
         }
 
 
@@ -20902,31 +21021,31 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Update current user member preferences
  */
 export const usePatchPartyMemberUpdateMe = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchPartyMemberUpdateMe>>, TError,{uuid: string;data: BodyType<PatchPartyMemberUpdateMeBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchPartyMemberUpdateMe>>, TError,{publicId: string;data: BodyType<PatchPartyMemberUpdateMeBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof patchPartyMemberUpdateMe>>,
         TError,
-        {uuid: string;data: BodyType<PatchPartyMemberUpdateMeBody>},
+        {publicId: string;data: BodyType<PatchPartyMemberUpdateMeBody>},
         TContext
       > => {
       return useMutation(getPatchPartyMemberUpdateMeMutationOptions(options), queryClient);
     }
 
-export const getPostPartyMemberTransferHostUrl = (uuid: string,) => {
+export const getPostPartyMemberTransferHostUrl = (publicId: string,) => {
 
 
 
 
-  return `/api/party/sessions/${uuid}/members/transfer-host`
+  return `/api/party/sessions/${publicId}/members/transfer-host`
 }
 
 /**
  * @summary Transfer host role to another member
  */
-export const postPartyMemberTransferHost = async (uuid: string,
+export const postPartyMemberTransferHost = async (publicId: string,
     postPartyMemberTransferHostBody: PostPartyMemberTransferHostBody, options?: RequestInit): Promise<PostPartyMemberTransferHost200> => {
 
-  return customInstance<PostPartyMemberTransferHost200>(getPostPartyMemberTransferHostUrl(uuid),
+  return customInstance<PostPartyMemberTransferHost200>(getPostPartyMemberTransferHostUrl(publicId),
   {
     ...options,
     method: 'POST',
@@ -20939,8 +21058,8 @@ export const postPartyMemberTransferHost = async (uuid: string,
 
 
 export const getPostPartyMemberTransferHostMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartyMemberTransferHost>>, TError,{uuid: string;data: BodyType<PostPartyMemberTransferHostBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postPartyMemberTransferHost>>, TError,{uuid: string;data: BodyType<PostPartyMemberTransferHostBody>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartyMemberTransferHost>>, TError,{publicId: string;data: BodyType<PostPartyMemberTransferHostBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postPartyMemberTransferHost>>, TError,{publicId: string;data: BodyType<PostPartyMemberTransferHostBody>}, TContext> => {
 
 const mutationKey = ['postPartyMemberTransferHost'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -20952,10 +21071,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPartyMemberTransferHost>>, {uuid: string;data: BodyType<PostPartyMemberTransferHostBody>}> = (props) => {
-          const {uuid,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPartyMemberTransferHost>>, {publicId: string;data: BodyType<PostPartyMemberTransferHostBody>}> = (props) => {
+          const {publicId,data} = props ?? {};
 
-          return  postPartyMemberTransferHost(uuid,data,requestOptions)
+          return  postPartyMemberTransferHost(publicId,data,requestOptions)
         }
 
 
@@ -20973,11 +21092,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Transfer host role to another member
  */
 export const usePostPartyMemberTransferHost = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartyMemberTransferHost>>, TError,{uuid: string;data: BodyType<PostPartyMemberTransferHostBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartyMemberTransferHost>>, TError,{publicId: string;data: BodyType<PostPartyMemberTransferHostBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postPartyMemberTransferHost>>,
         TError,
-        {uuid: string;data: BodyType<PostPartyMemberTransferHostBody>},
+        {publicId: string;data: BodyType<PostPartyMemberTransferHostBody>},
         TContext
       > => {
       return useMutation(getPostPartyMemberTransferHostMutationOptions(options), queryClient);
@@ -21154,20 +21273,20 @@ export const usePostPartySessionCreate = <TError = ErrorType<ApiError | Validati
       return useMutation(getPostPartySessionCreateMutationOptions(options), queryClient);
     }
 
-export const getGetPartySessionShowUrl = (uuid: string,) => {
+export const getGetPartySessionShowUrl = (publicId: string,) => {
 
 
 
 
-  return `/api/party/sessions/${uuid}`
+  return `/api/party/sessions/${publicId}`
 }
 
 /**
  * @summary Get a party session
  */
-export const getPartySessionShow = async (uuid: string, options?: RequestInit): Promise<GetPartySessionShow200> => {
+export const getPartySessionShow = async (publicId: string, options?: RequestInit): Promise<GetPartySessionShow200> => {
 
-  return customInstance<GetPartySessionShow200>(getGetPartySessionShowUrl(uuid),
+  return customInstance<GetPartySessionShow200>(getGetPartySessionShowUrl(publicId),
   {
     ...options,
     method: 'GET'
@@ -21180,29 +21299,29 @@ export const getPartySessionShow = async (uuid: string, options?: RequestInit): 
 
 
 
-export const getGetPartySessionShowQueryKey = (uuid: string,) => {
+export const getGetPartySessionShowQueryKey = (publicId: string,) => {
     return [
-    `/api/party/sessions/${uuid}`
+    `/api/party/sessions/${publicId}`
     ] as const;
     }
 
 
-export const getGetPartySessionShowQueryOptions = <TData = Awaited<ReturnType<typeof getPartySessionShow>>, TError = ErrorType<ApiError>>(uuid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetPartySessionShowQueryOptions = <TData = Awaited<ReturnType<typeof getPartySessionShow>>, TError = ErrorType<ApiError>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetPartySessionShowQueryKey(uuid);
+  const queryKey =  queryOptions?.queryKey ?? getGetPartySessionShowQueryKey(publicId);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPartySessionShow>>> = ({ signal }) => getPartySessionShow(uuid, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPartySessionShow>>> = ({ signal }) => getPartySessionShow(publicId, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: uuid !== null && uuid !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPartySessionShow>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPartySessionShow>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetPartySessionShowQueryResult = NonNullable<Awaited<ReturnType<typeof getPartySessionShow>>>
@@ -21210,7 +21329,7 @@ export type GetPartySessionShowQueryError = ErrorType<ApiError>
 
 
 export function useGetPartySessionShow<TData = Awaited<ReturnType<typeof getPartySessionShow>>, TError = ErrorType<ApiError>>(
- uuid: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionShow>>, TError, TData>> & Pick<
+ publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionShow>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getPartySessionShow>>,
           TError,
@@ -21220,7 +21339,7 @@ export function useGetPartySessionShow<TData = Awaited<ReturnType<typeof getPart
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetPartySessionShow<TData = Awaited<ReturnType<typeof getPartySessionShow>>, TError = ErrorType<ApiError>>(
- uuid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionShow>>, TError, TData>> & Pick<
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionShow>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getPartySessionShow>>,
           TError,
@@ -21230,7 +21349,7 @@ export function useGetPartySessionShow<TData = Awaited<ReturnType<typeof getPart
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetPartySessionShow<TData = Awaited<ReturnType<typeof getPartySessionShow>>, TError = ErrorType<ApiError>>(
- uuid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
@@ -21238,11 +21357,11 @@ export function useGetPartySessionShow<TData = Awaited<ReturnType<typeof getPart
  */
 
 export function useGetPartySessionShow<TData = Awaited<ReturnType<typeof getPartySessionShow>>, TError = ErrorType<ApiError>>(
- uuid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getPartySessionShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetPartySessionShowQueryOptions(uuid,options)
+  const queryOptions = getGetPartySessionShowQueryOptions(publicId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -21255,20 +21374,20 @@ export function useGetPartySessionShow<TData = Awaited<ReturnType<typeof getPart
 
 
 
-export const getDeletePartySessionEndUrl = (uuid: string,) => {
+export const getDeletePartySessionEndUrl = (publicId: string,) => {
 
 
 
 
-  return `/api/party/sessions/${uuid}`
+  return `/api/party/sessions/${publicId}`
 }
 
 /**
  * @summary End a party session (host only)
  */
-export const deletePartySessionEnd = async (uuid: string, options?: RequestInit): Promise<DeletePartySessionEnd200> => {
+export const deletePartySessionEnd = async (publicId: string, options?: RequestInit): Promise<DeletePartySessionEnd200> => {
 
-  return customInstance<DeletePartySessionEnd200>(getDeletePartySessionEndUrl(uuid),
+  return customInstance<DeletePartySessionEnd200>(getDeletePartySessionEndUrl(publicId),
   {
     ...options,
     method: 'DELETE'
@@ -21281,8 +21400,8 @@ export const deletePartySessionEnd = async (uuid: string, options?: RequestInit)
 
 
 export const getDeletePartySessionEndMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePartySessionEnd>>, TError,{uuid: string}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof deletePartySessionEnd>>, TError,{uuid: string}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePartySessionEnd>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deletePartySessionEnd>>, TError,{publicId: string}, TContext> => {
 
 const mutationKey = ['deletePartySessionEnd'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -21294,10 +21413,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deletePartySessionEnd>>, {uuid: string}> = (props) => {
-          const {uuid} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deletePartySessionEnd>>, {publicId: string}> = (props) => {
+          const {publicId} = props ?? {};
 
-          return  deletePartySessionEnd(uuid,requestOptions)
+          return  deletePartySessionEnd(publicId,requestOptions)
         }
 
 
@@ -21315,30 +21434,30 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary End a party session (host only)
  */
 export const useDeletePartySessionEnd = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePartySessionEnd>>, TError,{uuid: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePartySessionEnd>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deletePartySessionEnd>>,
         TError,
-        {uuid: string},
+        {publicId: string},
         TContext
       > => {
       return useMutation(getDeletePartySessionEndMutationOptions(options), queryClient);
     }
 
-export const getPostPartySessionJoinUrl = (uuid: string,) => {
+export const getPostPartySessionJoinUrl = (publicId: string,) => {
 
 
 
 
-  return `/api/party/sessions/${uuid}/join`
+  return `/api/party/sessions/${publicId}/join`
 }
 
 /**
  * @summary Join a party session
  */
-export const postPartySessionJoin = async (uuid: string, options?: RequestInit): Promise<PostPartySessionJoin200> => {
+export const postPartySessionJoin = async (publicId: string, options?: RequestInit): Promise<PostPartySessionJoin200> => {
 
-  return customInstance<PostPartySessionJoin200>(getPostPartySessionJoinUrl(uuid),
+  return customInstance<PostPartySessionJoin200>(getPostPartySessionJoinUrl(publicId),
   {
     ...options,
     method: 'POST'
@@ -21351,8 +21470,8 @@ export const postPartySessionJoin = async (uuid: string, options?: RequestInit):
 
 
 export const getPostPartySessionJoinMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionJoin>>, TError,{uuid: string}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postPartySessionJoin>>, TError,{uuid: string}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionJoin>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postPartySessionJoin>>, TError,{publicId: string}, TContext> => {
 
 const mutationKey = ['postPartySessionJoin'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -21364,10 +21483,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPartySessionJoin>>, {uuid: string}> = (props) => {
-          const {uuid} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPartySessionJoin>>, {publicId: string}> = (props) => {
+          const {publicId} = props ?? {};
 
-          return  postPartySessionJoin(uuid,requestOptions)
+          return  postPartySessionJoin(publicId,requestOptions)
         }
 
 
@@ -21385,30 +21504,30 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Join a party session
  */
 export const usePostPartySessionJoin = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionJoin>>, TError,{uuid: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionJoin>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postPartySessionJoin>>,
         TError,
-        {uuid: string},
+        {publicId: string},
         TContext
       > => {
       return useMutation(getPostPartySessionJoinMutationOptions(options), queryClient);
     }
 
-export const getPostPartySessionLeaveUrl = (uuid: string,) => {
+export const getPostPartySessionLeaveUrl = (publicId: string,) => {
 
 
 
 
-  return `/api/party/sessions/${uuid}/leave`
+  return `/api/party/sessions/${publicId}/leave`
 }
 
 /**
  * @summary Leave a party session
  */
-export const postPartySessionLeave = async (uuid: string, options?: RequestInit): Promise<PostPartySessionLeave200> => {
+export const postPartySessionLeave = async (publicId: string, options?: RequestInit): Promise<PostPartySessionLeave200> => {
 
-  return customInstance<PostPartySessionLeave200>(getPostPartySessionLeaveUrl(uuid),
+  return customInstance<PostPartySessionLeave200>(getPostPartySessionLeaveUrl(publicId),
   {
     ...options,
     method: 'POST'
@@ -21421,8 +21540,8 @@ export const postPartySessionLeave = async (uuid: string, options?: RequestInit)
 
 
 export const getPostPartySessionLeaveMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionLeave>>, TError,{uuid: string}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postPartySessionLeave>>, TError,{uuid: string}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionLeave>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postPartySessionLeave>>, TError,{publicId: string}, TContext> => {
 
 const mutationKey = ['postPartySessionLeave'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -21434,10 +21553,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPartySessionLeave>>, {uuid: string}> = (props) => {
-          const {uuid} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPartySessionLeave>>, {publicId: string}> = (props) => {
+          const {publicId} = props ?? {};
 
-          return  postPartySessionLeave(uuid,requestOptions)
+          return  postPartySessionLeave(publicId,requestOptions)
         }
 
 
@@ -21455,31 +21574,31 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Leave a party session
  */
 export const usePostPartySessionLeave = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionLeave>>, TError,{uuid: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionLeave>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postPartySessionLeave>>,
         TError,
-        {uuid: string},
+        {publicId: string},
         TContext
       > => {
       return useMutation(getPostPartySessionLeaveMutationOptions(options), queryClient);
     }
 
-export const getPostPartySessionSyncUrl = (uuid: string,) => {
+export const getPostPartySessionSyncUrl = (publicId: string,) => {
 
 
 
 
-  return `/api/party/sessions/${uuid}/sync`
+  return `/api/party/sessions/${publicId}/sync`
 }
 
 /**
  * @summary Synchronize playback position
  */
-export const postPartySessionSync = async (uuid: string,
+export const postPartySessionSync = async (publicId: string,
     syncPlaybackRequest: SyncPlaybackRequest, options?: RequestInit): Promise<PostPartySessionSync200> => {
 
-  return customInstance<PostPartySessionSync200>(getPostPartySessionSyncUrl(uuid),
+  return customInstance<PostPartySessionSync200>(getPostPartySessionSyncUrl(publicId),
   {
     ...options,
     method: 'POST',
@@ -21492,8 +21611,8 @@ export const postPartySessionSync = async (uuid: string,
 
 
 export const getPostPartySessionSyncMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionSync>>, TError,{uuid: string;data: BodyType<SyncPlaybackRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postPartySessionSync>>, TError,{uuid: string;data: BodyType<SyncPlaybackRequest>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionSync>>, TError,{publicId: string;data: BodyType<SyncPlaybackRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postPartySessionSync>>, TError,{publicId: string;data: BodyType<SyncPlaybackRequest>}, TContext> => {
 
 const mutationKey = ['postPartySessionSync'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -21505,10 +21624,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPartySessionSync>>, {uuid: string;data: BodyType<SyncPlaybackRequest>}> = (props) => {
-          const {uuid,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postPartySessionSync>>, {publicId: string;data: BodyType<SyncPlaybackRequest>}> = (props) => {
+          const {publicId,data} = props ?? {};
 
-          return  postPartySessionSync(uuid,data,requestOptions)
+          return  postPartySessionSync(publicId,data,requestOptions)
         }
 
 
@@ -21526,11 +21645,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Synchronize playback position
  */
 export const usePostPartySessionSync = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionSync>>, TError,{uuid: string;data: BodyType<SyncPlaybackRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postPartySessionSync>>, TError,{publicId: string;data: BodyType<SyncPlaybackRequest>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postPartySessionSync>>,
         TError,
-        {uuid: string;data: BodyType<SyncPlaybackRequest>},
+        {publicId: string;data: BodyType<SyncPlaybackRequest>},
         TContext
       > => {
       return useMutation(getPostPartySessionSyncMutationOptions(options), queryClient);
@@ -25157,20 +25276,20 @@ export function useGetRecommendationTargeting<TData = Awaited<ReturnType<typeof 
 
 
 
-export const getDeleteRecommendationDestroyUrl = (uuid: string,) => {
+export const getDeleteRecommendationDestroyUrl = (publicId: string,) => {
 
 
 
 
-  return `/api/recommendations/${uuid}`
+  return `/api/recommendations/${publicId}`
 }
 
 /**
  * @summary Delete a recommendation
  */
-export const deleteRecommendationDestroy = async (uuid: string, options?: RequestInit): Promise<void> => {
+export const deleteRecommendationDestroy = async (publicId: string, options?: RequestInit): Promise<void> => {
 
-  return customInstance<void>(getDeleteRecommendationDestroyUrl(uuid),
+  return customInstance<void>(getDeleteRecommendationDestroyUrl(publicId),
   {
     ...options,
     method: 'DELETE'
@@ -25183,8 +25302,8 @@ export const deleteRecommendationDestroy = async (uuid: string, options?: Reques
 
 
 export const getDeleteRecommendationDestroyMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteRecommendationDestroy>>, TError,{uuid: string}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteRecommendationDestroy>>, TError,{uuid: string}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteRecommendationDestroy>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteRecommendationDestroy>>, TError,{publicId: string}, TContext> => {
 
 const mutationKey = ['deleteRecommendationDestroy'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -25196,10 +25315,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteRecommendationDestroy>>, {uuid: string}> = (props) => {
-          const {uuid} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteRecommendationDestroy>>, {publicId: string}> = (props) => {
+          const {publicId} = props ?? {};
 
-          return  deleteRecommendationDestroy(uuid,requestOptions)
+          return  deleteRecommendationDestroy(publicId,requestOptions)
         }
 
 
@@ -25217,11 +25336,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Delete a recommendation
  */
 export const useDeleteRecommendationDestroy = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteRecommendationDestroy>>, TError,{uuid: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteRecommendationDestroy>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteRecommendationDestroy>>,
         TError,
-        {uuid: string},
+        {publicId: string},
         TContext
       > => {
       return useMutation(getDeleteRecommendationDestroyMutationOptions(options), queryClient);
@@ -30773,20 +30892,20 @@ export const usePostTranscodeSessionCreate = <TError = ErrorType<ApiError | Vali
       return useMutation(getPostTranscodeSessionCreateMutationOptions(options), queryClient);
     }
 
-export const getGetTranscodeSessionShowUrl = (uuid: string,) => {
+export const getGetTranscodeSessionShowUrl = (publicId: string,) => {
 
 
 
 
-  return `/api/transcode/sessions/${uuid}`
+  return `/api/transcode/sessions/${publicId}`
 }
 
 /**
- * @summary Get a transcode session by UUID
+ * @summary Get a transcode session by public identifier
  */
-export const getTranscodeSessionShow = async (uuid: string, options?: RequestInit): Promise<GetTranscodeSessionShow200> => {
+export const getTranscodeSessionShow = async (publicId: string, options?: RequestInit): Promise<GetTranscodeSessionShow200> => {
 
-  return customInstance<GetTranscodeSessionShow200>(getGetTranscodeSessionShowUrl(uuid),
+  return customInstance<GetTranscodeSessionShow200>(getGetTranscodeSessionShowUrl(publicId),
   {
     ...options,
     method: 'GET'
@@ -30799,29 +30918,29 @@ export const getTranscodeSessionShow = async (uuid: string, options?: RequestIni
 
 
 
-export const getGetTranscodeSessionShowQueryKey = (uuid: string,) => {
+export const getGetTranscodeSessionShowQueryKey = (publicId: string,) => {
     return [
-    `/api/transcode/sessions/${uuid}`
+    `/api/transcode/sessions/${publicId}`
     ] as const;
     }
 
 
-export const getGetTranscodeSessionShowQueryOptions = <TData = Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError = ErrorType<ApiError>>(uuid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+export const getGetTranscodeSessionShowQueryOptions = <TData = Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError = ErrorType<ApiError>>(publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getGetTranscodeSessionShowQueryKey(uuid);
+  const queryKey =  queryOptions?.queryKey ?? getGetTranscodeSessionShowQueryKey(publicId);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTranscodeSessionShow>>> = ({ signal }) => getTranscodeSessionShow(uuid, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTranscodeSessionShow>>> = ({ signal }) => getTranscodeSessionShow(publicId, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, enabled: uuid !== null && uuid !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+   return  { queryKey, queryFn, enabled: publicId !== null && publicId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
 }
 
 export type GetTranscodeSessionShowQueryResult = NonNullable<Awaited<ReturnType<typeof getTranscodeSessionShow>>>
@@ -30829,7 +30948,7 @@ export type GetTranscodeSessionShowQueryError = ErrorType<ApiError>
 
 
 export function useGetTranscodeSessionShow<TData = Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError = ErrorType<ApiError>>(
- uuid: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>> & Pick<
+ publicId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>> & Pick<
         DefinedInitialDataOptions<
           Awaited<ReturnType<typeof getTranscodeSessionShow>>,
           TError,
@@ -30839,7 +30958,7 @@ export function useGetTranscodeSessionShow<TData = Awaited<ReturnType<typeof get
  , queryClient?: QueryClient
   ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetTranscodeSessionShow<TData = Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError = ErrorType<ApiError>>(
- uuid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>> & Pick<
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>> & Pick<
         UndefinedInitialDataOptions<
           Awaited<ReturnType<typeof getTranscodeSessionShow>>,
           TError,
@@ -30849,19 +30968,19 @@ export function useGetTranscodeSessionShow<TData = Awaited<ReturnType<typeof get
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 export function useGetTranscodeSessionShow<TData = Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError = ErrorType<ApiError>>(
- uuid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
   ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
 /**
- * @summary Get a transcode session by UUID
+ * @summary Get a transcode session by public identifier
  */
 
 export function useGetTranscodeSessionShow<TData = Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError = ErrorType<ApiError>>(
- uuid: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
+ publicId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof getTranscodeSessionShow>>, TError, TData>>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient
  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
-  const queryOptions = getGetTranscodeSessionShowQueryOptions(uuid,options)
+  const queryOptions = getGetTranscodeSessionShowQueryOptions(publicId,options)
 
   const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -30874,20 +30993,20 @@ export function useGetTranscodeSessionShow<TData = Awaited<ReturnType<typeof get
 
 
 
-export const getDeleteTranscodeSessionCancelUrl = (uuid: string,) => {
+export const getDeleteTranscodeSessionCancelUrl = (publicId: string,) => {
 
 
 
 
-  return `/api/transcode/sessions/${uuid}`
+  return `/api/transcode/sessions/${publicId}`
 }
 
 /**
  * @summary Cancel a transcode session
  */
-export const deleteTranscodeSessionCancel = async (uuid: string, options?: RequestInit): Promise<DeleteTranscodeSessionCancel200> => {
+export const deleteTranscodeSessionCancel = async (publicId: string, options?: RequestInit): Promise<DeleteTranscodeSessionCancel200> => {
 
-  return customInstance<DeleteTranscodeSessionCancel200>(getDeleteTranscodeSessionCancelUrl(uuid),
+  return customInstance<DeleteTranscodeSessionCancel200>(getDeleteTranscodeSessionCancelUrl(publicId),
   {
     ...options,
     method: 'DELETE'
@@ -30900,8 +31019,8 @@ export const deleteTranscodeSessionCancel = async (uuid: string, options?: Reque
 
 
 export const getDeleteTranscodeSessionCancelMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTranscodeSessionCancel>>, TError,{uuid: string}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteTranscodeSessionCancel>>, TError,{uuid: string}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTranscodeSessionCancel>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteTranscodeSessionCancel>>, TError,{publicId: string}, TContext> => {
 
 const mutationKey = ['deleteTranscodeSessionCancel'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -30913,10 +31032,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTranscodeSessionCancel>>, {uuid: string}> = (props) => {
-          const {uuid} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTranscodeSessionCancel>>, {publicId: string}> = (props) => {
+          const {publicId} = props ?? {};
 
-          return  deleteTranscodeSessionCancel(uuid,requestOptions)
+          return  deleteTranscodeSessionCancel(publicId,requestOptions)
         }
 
 
@@ -30934,31 +31053,31 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Cancel a transcode session
  */
 export const useDeleteTranscodeSessionCancel = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTranscodeSessionCancel>>, TError,{uuid: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTranscodeSessionCancel>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof deleteTranscodeSessionCancel>>,
         TError,
-        {uuid: string},
+        {publicId: string},
         TContext
       > => {
       return useMutation(getDeleteTranscodeSessionCancelMutationOptions(options), queryClient);
     }
 
-export const getPatchTranscodeSessionUpdateUrl = (uuid: string,) => {
+export const getPatchTranscodeSessionUpdateUrl = (publicId: string,) => {
 
 
 
 
-  return `/api/transcode/sessions/${uuid}`
+  return `/api/transcode/sessions/${publicId}`
 }
 
 /**
  * @summary Update a transcode session
  */
-export const patchTranscodeSessionUpdate = async (uuid: string,
+export const patchTranscodeSessionUpdate = async (publicId: string,
     patchTranscodeSessionUpdateBody: PatchTranscodeSessionUpdateBody, options?: RequestInit): Promise<PatchTranscodeSessionUpdate200> => {
 
-  return customInstance<PatchTranscodeSessionUpdate200>(getPatchTranscodeSessionUpdateUrl(uuid),
+  return customInstance<PatchTranscodeSessionUpdate200>(getPatchTranscodeSessionUpdateUrl(publicId),
   {
     ...options,
     method: 'PATCH',
@@ -30971,8 +31090,8 @@ export const patchTranscodeSessionUpdate = async (uuid: string,
 
 
 export const getPatchTranscodeSessionUpdateMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionUpdate>>, TError,{uuid: string;data: BodyType<PatchTranscodeSessionUpdateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionUpdate>>, TError,{uuid: string;data: BodyType<PatchTranscodeSessionUpdateBody>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionUpdate>>, TError,{publicId: string;data: BodyType<PatchTranscodeSessionUpdateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionUpdate>>, TError,{publicId: string;data: BodyType<PatchTranscodeSessionUpdateBody>}, TContext> => {
 
 const mutationKey = ['patchTranscodeSessionUpdate'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -30984,10 +31103,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchTranscodeSessionUpdate>>, {uuid: string;data: BodyType<PatchTranscodeSessionUpdateBody>}> = (props) => {
-          const {uuid,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchTranscodeSessionUpdate>>, {publicId: string;data: BodyType<PatchTranscodeSessionUpdateBody>}> = (props) => {
+          const {publicId,data} = props ?? {};
 
-          return  patchTranscodeSessionUpdate(uuid,data,requestOptions)
+          return  patchTranscodeSessionUpdate(publicId,data,requestOptions)
         }
 
 
@@ -31005,30 +31124,30 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Update a transcode session
  */
 export const usePatchTranscodeSessionUpdate = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionUpdate>>, TError,{uuid: string;data: BodyType<PatchTranscodeSessionUpdateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionUpdate>>, TError,{publicId: string;data: BodyType<PatchTranscodeSessionUpdateBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof patchTranscodeSessionUpdate>>,
         TError,
-        {uuid: string;data: BodyType<PatchTranscodeSessionUpdateBody>},
+        {publicId: string;data: BodyType<PatchTranscodeSessionUpdateBody>},
         TContext
       > => {
       return useMutation(getPatchTranscodeSessionUpdateMutationOptions(options), queryClient);
     }
 
-export const getPatchTranscodeSessionPauseUrl = (uuid: string,) => {
+export const getPatchTranscodeSessionPauseUrl = (publicId: string,) => {
 
 
 
 
-  return `/api/transcode/sessions/${uuid}/pause`
+  return `/api/transcode/sessions/${publicId}/pause`
 }
 
 /**
  * @summary Pause a transcode session
  */
-export const patchTranscodeSessionPause = async (uuid: string, options?: RequestInit): Promise<PatchTranscodeSessionPause200> => {
+export const patchTranscodeSessionPause = async (publicId: string, options?: RequestInit): Promise<PatchTranscodeSessionPause200> => {
 
-  return customInstance<PatchTranscodeSessionPause200>(getPatchTranscodeSessionPauseUrl(uuid),
+  return customInstance<PatchTranscodeSessionPause200>(getPatchTranscodeSessionPauseUrl(publicId),
   {
     ...options,
     method: 'PATCH'
@@ -31041,8 +31160,8 @@ export const patchTranscodeSessionPause = async (uuid: string, options?: Request
 
 
 export const getPatchTranscodeSessionPauseMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionPause>>, TError,{uuid: string}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionPause>>, TError,{uuid: string}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionPause>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionPause>>, TError,{publicId: string}, TContext> => {
 
 const mutationKey = ['patchTranscodeSessionPause'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -31054,10 +31173,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchTranscodeSessionPause>>, {uuid: string}> = (props) => {
-          const {uuid} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchTranscodeSessionPause>>, {publicId: string}> = (props) => {
+          const {publicId} = props ?? {};
 
-          return  patchTranscodeSessionPause(uuid,requestOptions)
+          return  patchTranscodeSessionPause(publicId,requestOptions)
         }
 
 
@@ -31075,30 +31194,30 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Pause a transcode session
  */
 export const usePatchTranscodeSessionPause = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionPause>>, TError,{uuid: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionPause>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof patchTranscodeSessionPause>>,
         TError,
-        {uuid: string},
+        {publicId: string},
         TContext
       > => {
       return useMutation(getPatchTranscodeSessionPauseMutationOptions(options), queryClient);
     }
 
-export const getPatchTranscodeSessionResumeUrl = (uuid: string,) => {
+export const getPatchTranscodeSessionResumeUrl = (publicId: string,) => {
 
 
 
 
-  return `/api/transcode/sessions/${uuid}/resume`
+  return `/api/transcode/sessions/${publicId}/resume`
 }
 
 /**
  * @summary Resume a paused transcode session
  */
-export const patchTranscodeSessionResume = async (uuid: string, options?: RequestInit): Promise<PatchTranscodeSessionResume200> => {
+export const patchTranscodeSessionResume = async (publicId: string, options?: RequestInit): Promise<PatchTranscodeSessionResume200> => {
 
-  return customInstance<PatchTranscodeSessionResume200>(getPatchTranscodeSessionResumeUrl(uuid),
+  return customInstance<PatchTranscodeSessionResume200>(getPatchTranscodeSessionResumeUrl(publicId),
   {
     ...options,
     method: 'PATCH'
@@ -31111,8 +31230,8 @@ export const patchTranscodeSessionResume = async (uuid: string, options?: Reques
 
 
 export const getPatchTranscodeSessionResumeMutationOptions = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionResume>>, TError,{uuid: string}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionResume>>, TError,{uuid: string}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionResume>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionResume>>, TError,{publicId: string}, TContext> => {
 
 const mutationKey = ['patchTranscodeSessionResume'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -31124,10 +31243,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchTranscodeSessionResume>>, {uuid: string}> = (props) => {
-          const {uuid} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof patchTranscodeSessionResume>>, {publicId: string}> = (props) => {
+          const {publicId} = props ?? {};
 
-          return  patchTranscodeSessionResume(uuid,requestOptions)
+          return  patchTranscodeSessionResume(publicId,requestOptions)
         }
 
 
@@ -31145,31 +31264,31 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Resume a paused transcode session
  */
 export const usePatchTranscodeSessionResume = <TError = ErrorType<ApiError>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionResume>>, TError,{uuid: string}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof patchTranscodeSessionResume>>, TError,{publicId: string}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof patchTranscodeSessionResume>>,
         TError,
-        {uuid: string},
+        {publicId: string},
         TContext
       > => {
       return useMutation(getPatchTranscodeSessionResumeMutationOptions(options), queryClient);
     }
 
-export const getPostTranscodeSessionPositionUrl = (uuid: string,) => {
+export const getPostTranscodeSessionPositionUrl = (publicId: string,) => {
 
 
 
 
-  return `/api/transcode/sessions/${uuid}/position`
+  return `/api/transcode/sessions/${publicId}/position`
 }
 
 /**
  * @summary Update transcode session playback position (seek signal)
  */
-export const postTranscodeSessionPosition = async (uuid: string,
+export const postTranscodeSessionPosition = async (publicId: string,
     postTranscodeSessionPositionBody: PostTranscodeSessionPositionBody, options?: RequestInit): Promise<PostTranscodeSessionPosition200> => {
 
-  return customInstance<PostTranscodeSessionPosition200>(getPostTranscodeSessionPositionUrl(uuid),
+  return customInstance<PostTranscodeSessionPosition200>(getPostTranscodeSessionPositionUrl(publicId),
   {
     ...options,
     method: 'POST',
@@ -31182,8 +31301,8 @@ export const postTranscodeSessionPosition = async (uuid: string,
 
 
 export const getPostTranscodeSessionPositionMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionPosition>>, TError,{uuid: string;data: BodyType<PostTranscodeSessionPositionBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
-): UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionPosition>>, TError,{uuid: string;data: BodyType<PostTranscodeSessionPositionBody>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionPosition>>, TError,{publicId: string;data: BodyType<PostTranscodeSessionPositionBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+): UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionPosition>>, TError,{publicId: string;data: BodyType<PostTranscodeSessionPositionBody>}, TContext> => {
 
 const mutationKey = ['postTranscodeSessionPosition'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -31195,10 +31314,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postTranscodeSessionPosition>>, {uuid: string;data: BodyType<PostTranscodeSessionPositionBody>}> = (props) => {
-          const {uuid,data} = props ?? {};
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postTranscodeSessionPosition>>, {publicId: string;data: BodyType<PostTranscodeSessionPositionBody>}> = (props) => {
+          const {publicId,data} = props ?? {};
 
-          return  postTranscodeSessionPosition(uuid,data,requestOptions)
+          return  postTranscodeSessionPosition(publicId,data,requestOptions)
         }
 
 
@@ -31216,11 +31335,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Update transcode session playback position (seek signal)
  */
 export const usePostTranscodeSessionPosition = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionPosition>>, TError,{uuid: string;data: BodyType<PostTranscodeSessionPositionBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postTranscodeSessionPosition>>, TError,{publicId: string;data: BodyType<PostTranscodeSessionPositionBody>}, TContext>, request?: SecondParameter<typeof customInstance>}
  , queryClient?: QueryClient): UseMutationResult<
         Awaited<ReturnType<typeof postTranscodeSessionPosition>>,
         TError,
-        {uuid: string;data: BodyType<PostTranscodeSessionPositionBody>},
+        {publicId: string;data: BodyType<PostTranscodeSessionPositionBody>},
         TContext
       > => {
       return useMutation(getPostTranscodeSessionPositionMutationOptions(options), queryClient);

@@ -10,7 +10,6 @@ import { catalogApi } from '@/features/catalog/api/catalog-api';
  * Playlist types.
  */
 export interface Playlist {
-  uuid: string;
   publicId: string;
   name: string;
   description: string | null;
@@ -22,7 +21,6 @@ export interface Playlist {
 }
 
 export interface PlaylistTrack {
-  uuid: string;
   publicId: string;
   position: number;
   songPublicId: string;

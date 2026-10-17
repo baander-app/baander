@@ -16,6 +16,7 @@ use App\Party\Interface\Request\CreatePartySessionRequest;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -31,9 +32,13 @@ use Symfony\Component\Security\Http\Controller\UserValueResolver;
 final class PartySessionControllerTest extends TestCase
 {
     private MessageBusInterface&MockObject $commandBus;
-    private PartySessionPortInterface $sessionPort;
+    private PartySessionPortInterface&Stub $sessionPort;
     private PartyMemberPortInterface $memberPort;
     private PartySessionController $controller;
+    private \App\Party\Application\Port\PartyPublicIdentityPortInterface&Stub $identities;
+    private PublicId $hostPublicId;
+    private PublicId $videoPublicId;
+    private PublicId $jobPublicId;
 
     protected function setUp(): void
     {
@@ -41,9 +46,17 @@ final class PartySessionControllerTest extends TestCase
         $this->sessionPort = $this->createStub(PartySessionPortInterface::class);
         $this->memberPort = $this->createStub(PartyMemberPortInterface::class);
 
+        $this->hostPublicId = new PublicId();
+        $this->videoPublicId = new PublicId();
+        $this->jobPublicId = new PublicId();
+        $this->identities = $this->createStub(\App\Party\Application\Port\PartyPublicIdentityPortInterface::class);
+        $this->identities->method('session')->willReturnCallback(fn (SyncedPartySession $session) => new \App\Party\Application\DTO\PartySessionView($session, $this->hostPublicId, $this->videoPublicId, $this->jobPublicId));
+        $this->identities->method('member')->willReturnCallback(fn (PartyMember $member) => new \App\Party\Application\DTO\PartyMemberView($member, $this->hostPublicId, new PublicId()));
+
         $this->controller = new PartySessionController(
             $this->commandBus,
             $this->sessionPort,
+            $this->identities,
             $this->memberPort,
         );
     }
@@ -58,15 +71,17 @@ final class PartySessionControllerTest extends TestCase
             maxMembers: 5,
         );
 
+        $this->identities->method('videoId')->willReturn($session->getVideoId());
+        $this->identities->method('transcodeJobId')->willReturn($session->getTranscodeJobId());
         $this->commandBus
             ->expects($this->once())
             ->method('dispatch')
-            ->with($this->isInstanceOf(CreatePartySessionCommand::class))
+            ->with($this->callback(static fn (CreatePartySessionCommand $command): bool => $command->getVideoId()->equals($session->getVideoId()) && $command->getTranscodeJobId()?->equals($session->getTranscodeJobId()) === true))
             ->willReturn(new Envelope(new \stdClass(), [new HandledStamp($session, 'handler')]));
 
         $payload = new CreatePartySessionRequest(
-            videoId: $session->getVideoId()->toString(),
-            transcodeJobId: $session->getTranscodeJobId()?->toString(),
+            videoId: $this->videoPublicId->toString(),
+            transcodeJobId: $this->jobPublicId->toString(),
             maxMembers: 5,
         );
 
@@ -74,14 +89,17 @@ final class PartySessionControllerTest extends TestCase
         $data = json_decode((string) $response->getContent(), true);
 
         $this->assertSame(201, $response->getStatusCode());
-        $this->assertSame($session->getId()->toString(), $data['data']['uuid']);
-        $this->assertSame($session->getHostUserId()->toString(), $data['data']['hostUserId']);
+        $this->assertSame($session->getPublicId()->toString(), $data['data']['publicId']);
+        $this->assertArrayNotHasKey('uuid', $data['data']);
+        $this->assertSame($this->hostPublicId->toString(), $data['data']['hostUserId']);
     }
 
     public function testJoinUnwrapsEnvelopeBeforeMappingResource(): void
     {
         $user = $this->principal();
-        $sessionId = Uuid::v7();
+        $session = SyncedPartySession::create(Uuid::fromString($user->getId()), new Uuid(), null);
+        $sessionId = $session->getId();
+        $this->sessionPort->method('findByPublicIdentifier')->willReturn($session);
         $member = PartyMember::create(
             userId: Uuid::fromString($user->getId()),
             sessionId: $sessionId,
@@ -93,12 +111,13 @@ final class PartySessionControllerTest extends TestCase
             ->with($this->isInstanceOf(JoinPartySessionCommand::class))
             ->willReturn(new Envelope(new \stdClass(), [new HandledStamp($member, 'handler')]));
 
-        $response = $this->controller->join($sessionId->toString(), $user);
+        $response = $this->controller->join($session->getPublicId()->toString(), $user);
         $data = json_decode((string) $response->getContent(), true);
 
         $this->assertSame(200, $response->getStatusCode());
-        $this->assertSame($member->getId()->toString(), $data['data']['uuid']);
-        $this->assertSame($user->getId(), $data['data']['userId']);
+        $this->assertSame($member->getPublicId()->toString(), $data['data']['publicId']);
+        $this->assertArrayNotHasKey('uuid', $data['data']);
+        $this->assertSame($this->hostPublicId->toString(), $data['data']['userId']);
     }
 
     public function testEveryPartyMutationResolvesThePublicIdentityContract(): void
@@ -127,6 +146,17 @@ final class PartySessionControllerTest extends TestCase
         $this->expectException(AccessDeniedException::class);
 
         (new UserValueResolver(new TokenStorage()))->resolve(Request::create('/api/party/sessions'), $userArgument);
+    }
+
+    public function testInternalSessionUuidCannotAddressAnyPublicPartyAction(): void
+    {
+        $this->commandBus->expects($this->never())->method('dispatch');
+        $user = $this->principal();
+        $id = (new Uuid())->toString();
+        self::assertSame(404, $this->controller->show($id)->getStatusCode());
+        self::assertSame(404, $this->controller->join($id, $user)->getStatusCode());
+        self::assertSame(404, $this->controller->leave($id, $user)->getStatusCode());
+        self::assertSame(404, $this->controller->end($id, $user)->getStatusCode());
     }
 
     private function principal(): AuthenticatedUserIdentityInterface&UserInterface

@@ -87,7 +87,7 @@ final class RegisterPasskeyHandlerTest extends TestCase
             $userId->toString(),
             'My Key',
             'cred-id',
-            ['data' => 'value'],
+            ['userHandle' => $user->getPublicId()->toString()],
             0,
         ));
 
@@ -112,6 +112,23 @@ final class RegisterPasskeyHandlerTest extends TestCase
         ));
     }
 
+    public function testRejectsLegacyOrForeignHandleBeforePersisting(): void
+    {
+        $user = User::register(new Email('passkey@baander.app'), 'hash', 'Owner');
+        $this->userRepository->method('findByUuid')->willReturn($user);
+        $repository = $this->createMock(PasskeyRepositoryInterface::class);
+        $repository->expects(self::never())->method('save');
+        $handler = new RegisterPasskeyHandler($this->userRepository, $repository, $this->eventDispatcher, $this->transaction);
+        foreach ([$user->getId()->toString(), (new \App\Shared\Domain\Model\PublicId())->toString()] as $handle) {
+            try {
+                $handler(new RegisterPasskeyCommand($user->getId()->toString(), 'Key', 'credential', ['userHandle' => $handle], 0));
+                self::fail('The credential handle must belong to the authenticated public user.');
+            } catch (RuntimeException $error) {
+                self::assertSame('Credential owner does not match its registered user handle.', $error->getMessage());
+            }
+        }
+    }
+
     public function testThrowsOnDuplicateCredentialId(): void
     {
         $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
@@ -126,7 +143,7 @@ final class RegisterPasskeyHandlerTest extends TestCase
             $user->getId()->toString(),
             'Key',
             'cred-id',
-            [],
+            ['userHandle' => $user->getPublicId()->toString()],
             0,
         ));
     }

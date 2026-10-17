@@ -44,7 +44,7 @@ export function useColumnBrowser(): UseColumnBrowserReturn {
     const genres = asGenres(genreData)
     return genres
       .map((g) => ({
-        id: g.uuid || g.slug || g.name,
+        id: g.publicId || g.slug || g.name,
         label: g.name,
       }))
       .sort((a, b) => a.label.localeCompare(b.label))
@@ -55,7 +55,7 @@ export function useColumnBrowser(): UseColumnBrowserReturn {
     const genres = asGenres(genreData)
     const map = new Map<string, string>()
     for (const g of genres) {
-      const id = g.uuid || g.slug || g.name
+      const id = g.publicId || g.slug || g.name
       map.set(id, g.slug || g.name)
     }
     return map

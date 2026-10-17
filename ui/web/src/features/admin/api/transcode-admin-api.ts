@@ -6,7 +6,6 @@ import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
  * sessions for the authenticated user wrapped in the `{ data: ... }` envelope.
  */
 export interface TranscodeSession {
-  uuid: string
   publicId: string
   userId: string
   jobId: string
@@ -27,8 +26,8 @@ export const transcodeAdminApi = {
       (r) => r.data.data ?? [],
     ),
 
-  getSession: (uuid: string) =>
-    AXIOS_INSTANCE.get<{ data: TranscodeSession }>(`/api/transcode/sessions/${uuid}`).then(
+  getSession: (publicId: string) =>
+    AXIOS_INSTANCE.get<{ data: TranscodeSession }>(`/api/transcode/sessions/${publicId}`).then(
       (r) => r.data.data,
     ),
 }

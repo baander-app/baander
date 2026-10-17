@@ -11,7 +11,7 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'LibraryResource',
     properties: [
-        new OA\Property(property: 'id', type: 'string', format: 'uuid', description: 'Library UUID'),
+        new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, description: 'Library public ID'),
         new OA\Property(property: 'name', type: 'string', description: 'Library name'),
         new OA\Property(property: 'slug', type: 'string', description: 'URL-friendly slug'),
         new OA\Property(property: 'path', type: 'string', description: 'Filesystem path'),
@@ -31,7 +31,7 @@ final class LibraryResource extends AbstractResource
         assert($source instanceof Library);
 
         return [
-            'id' => $source->getId()->toString(),
+            'publicId' => $source->getPublicId()->toString(),
             'name' => $source->getName(),
             'slug' => $source->getSlug()->toString(),
             'path' => $source->getPath()->toString(),

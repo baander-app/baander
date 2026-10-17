@@ -39,7 +39,7 @@ final class SchedulerDeleteCommand extends Command
         $io = new SymfonyStyle($input, $output);
 
         try {
-            $id = ScheduledJobConsole::id($input);
+            $id = ScheduledJobConsole::id($input, $this->jobs);
             $job = ScheduledJobResource::from($this->jobs->getById($id) ?? throw ScheduledJobConsole::notFound());
         } catch (Throwable $failure) {
             return AdminCommandSupport::fail($io, $failure);

@@ -6,6 +6,7 @@ namespace App\Party\Interface\Controller;
 
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Party\Application\Command\CreatePartySessionCommand;
 use App\Party\Application\Command\EndPartySessionCommand;
@@ -16,6 +17,7 @@ use App\Party\Application\Exception\PartyMediaNotFoundException;
 use App\Party\Application\Exception\TranscodeJobVideoMismatchException;
 use App\Party\Application\Port\PartyMemberPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
+use App\Party\Application\Port\PartyPublicIdentityPortInterface;
 use App\Party\Interface\Request\CreatePartySessionRequest;
 use App\Party\Interface\Request\SyncPlaybackRequest;
 use App\Party\Interface\Resource\PartyMemberResource;
@@ -41,6 +43,7 @@ final class PartySessionController
     public function __construct(
         private readonly MessageBusInterface $commandBus,
         private readonly PartySessionPortInterface $sessionPort,
+        private readonly PartyPublicIdentityPortInterface $identities,
         private readonly PartyMemberPortInterface $memberPort,
     ) {
     }
@@ -77,10 +80,12 @@ final class PartySessionController
         try {
             $envelope = $this->commandBus->dispatch(new CreatePartySessionCommand(
                 hostUserId: Uuid::fromString($user->getId()),
-                videoId: Uuid::fromString($payload->videoId),
-                transcodeJobId: $payload->transcodeJobId === null ? null : Uuid::fromString($payload->transcodeJobId),
+                videoId: $this->identities->videoId(PublicId::fromString($payload->videoId)),
+                transcodeJobId: $payload->transcodeJobId === null ? null : $this->identities->transcodeJobId(PublicId::fromString($payload->transcodeJobId)),
                 maxMembers: $payload->maxMembers,
             ));
+        } catch (PartyMediaNotFoundException $exception) {
+            return $this->notFound($exception->getMessage());
         } catch (HandlerFailedException $exception) {
             $failures = $exception->getWrappedExceptions();
             $failure = count($failures) === 1 ? reset($failures) : null;
@@ -96,14 +101,14 @@ final class PartySessionController
             throw $exception;
         }
 
-        return $this->created(['data' => PartySessionResource::from($this->unwrapResult($envelope))]);
+        return $this->created(['data' => PartySessionResource::from($this->identities->session($this->unwrapResult($envelope)))]);
     }
 
     #[OA\Get(
         path: '/api/party/sessions/',
         summary: 'List active party sessions',
         responses: [
-            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'uuid', type: 'string'), new OA\Property(property: 'publicId', type: 'string')]))])),
+            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')]))])),
         ],
     )]
     #[Route('/', name: 'index', methods: ['GET'])]
@@ -111,24 +116,24 @@ final class PartySessionController
     {
         $sessions = $this->sessionPort->findActiveSessions();
 
-        return $this->successResponse(PartySessionResource::collection($sessions));
+        return $this->successResponse(PartySessionResource::collection(array_map($this->identities->session(...), $sessions)));
     }
 
     #[OA\Get(
-        path: '/api/party/sessions/{uuid}',
+        path: '/api/party/sessions/{publicId}',
         summary: 'Get a party session',
         parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'uuid', type: 'string'), new OA\Property(property: 'publicId', type: 'string'), new OA\Property(property: 'members', type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'uuid', type: 'string')]))])])),
+            new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'), new OA\Property(property: 'members', type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')]))])])),
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{uuid}', name: 'show', methods: ['GET'])]
-    public function show(string $uuid): JsonResponse
+    #[Route('/{publicId}', name: 'show', methods: ['GET'])]
+    public function show(string $publicId): JsonResponse
     {
-        $session = $this->sessionPort->findByUuid(Uuid::fromString($uuid));
+        $session = $this->sessionPort->findByPublicIdentifier($publicId);
         if ($session === null) {
             return $this->notFound();
         }
@@ -136,68 +141,83 @@ final class PartySessionController
         $members = $this->memberPort->findBySession($session->getId());
 
         return $this->successResponse(array_merge(
-            PartySessionResource::from($session),
-            ['members' => PartyMemberResource::collection($members)],
+            PartySessionResource::from($this->identities->session($session)),
+            ['members' => PartyMemberResource::collection(array_map($this->identities->member(...), $members))],
         ));
     }
 
     #[OA\Post(
-        path: '/api/party/sessions/{uuid}/join',
+        path: '/api/party/sessions/{publicId}/join',
         summary: 'Join a party session',
         parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Joined', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'uuid', type: 'string'), new OA\Property(property: 'nickname', type: 'string')])])),
+            new OA\Response(response: '200', description: 'Joined', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')])])),
         ],
     )]
-    #[Route('/{uuid}/join', name: 'join', methods: ['POST'])]
-    public function join(string $uuid, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
+    #[Route('/{publicId}/join', name: 'join', methods: ['POST'])]
+    public function join(string $publicId, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
+        $session = $this->sessionPort->findByPublicIdentifier($publicId);
+        if ($session === null) {
+            return $this->notFound();
+        }
+
         $member = $this->unwrapResult($this->commandBus->dispatch(new JoinPartySessionCommand(
             userId: Uuid::fromString($user->getId()),
-            sessionId: Uuid::fromString($uuid),
+            sessionId: $session->getId(),
         )));
 
-        return $this->successResponse(PartyMemberResource::from($member));
+        return $this->successResponse(PartyMemberResource::from($this->identities->member($member)));
     }
 
     #[OA\Post(
-        path: '/api/party/sessions/{uuid}/leave',
+        path: '/api/party/sessions/{publicId}/leave',
         summary: 'Leave a party session',
         parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Left', content: new OA\JsonContent(properties: [new OA\Property(property: 'message', type: 'string')])),
         ],
     )]
-    #[Route('/{uuid}/leave', name: 'leave', methods: ['POST'])]
-    public function leave(string $uuid, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
+    #[Route('/{publicId}/leave', name: 'leave', methods: ['POST'])]
+    public function leave(string $publicId, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
+        $session = $this->sessionPort->findByPublicIdentifier($publicId);
+        if ($session === null) {
+            return $this->notFound();
+        }
+
         $this->commandBus->dispatch(new LeavePartySessionCommand(
             userId: Uuid::fromString($user->getId()),
-            sessionId: Uuid::fromString($uuid),
+            sessionId: $session->getId(),
         ));
 
         return $this->successResponse(['message' => 'Left session.']);
     }
 
     #[OA\Post(
-        path: '/api/party/sessions/{uuid}/sync',
+        path: '/api/party/sessions/{publicId}/sync',
         summary: 'Synchronize playback position',
         parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Synced position', content: new OA\JsonContent(properties: [new OA\Property(property: 'serverPosition', type: 'number')])),
         ],
     )]
-    #[Route('/{uuid}/sync', name: 'sync', methods: ['POST'])]
-    public function sync(string $uuid, #[MapRequestPayload] SyncPlaybackRequest $payload, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
+    #[Route('/{publicId}/sync', name: 'sync', methods: ['POST'])]
+    public function sync(string $publicId, #[MapRequestPayload] SyncPlaybackRequest $payload, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
+        $session = $this->sessionPort->findByPublicIdentifier($publicId);
+        if ($session === null) {
+            return $this->notFound();
+        }
+
         $position = $this->unwrapResult($this->commandBus->dispatch(new SyncPlaybackCommand(
-            sessionId: Uuid::fromString($uuid),
+            sessionId: $session->getId(),
             userId: Uuid::fromString($user->getId()),
             clientPosition: $payload->clientPosition,
             clientLatency: $payload->clientLatency,
@@ -207,20 +227,25 @@ final class PartySessionController
     }
 
     #[OA\Delete(
-        path: '/api/party/sessions/{uuid}',
+        path: '/api/party/sessions/{publicId}',
         summary: 'End a party session (host only)',
         parameters: [
-            new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Ended', content: new OA\JsonContent(properties: [new OA\Property(property: 'message', type: 'string')])),
         ],
     )]
-    #[Route('/{uuid}', name: 'end', methods: ['DELETE'])]
-    public function end(string $uuid, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
+    #[Route('/{publicId}', name: 'end', methods: ['DELETE'])]
+    public function end(string $publicId, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
+        $session = $this->sessionPort->findByPublicIdentifier($publicId);
+        if ($session === null) {
+            return $this->notFound();
+        }
+
         $this->commandBus->dispatch(new EndPartySessionCommand(
-            sessionId: Uuid::fromString($uuid),
+            sessionId: $session->getId(),
             userId: Uuid::fromString($user->getId()),
         ));
 

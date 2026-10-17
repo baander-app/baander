@@ -21,7 +21,7 @@ final class RadioAdminCommandsTest extends TestCase
     public function testStationListPassesTheCountryAndQueryToThePortTheApiUses(): void
     {
         $station = [
-            'id' => '0199b8a0-0000-7000-8000-000000000001',
+            'publicId' => '0123456789abABCD_-xy1',
             'name' => 'DR P1',
             'country' => 'DK',
             'language' => 'da',
@@ -70,7 +70,7 @@ final class RadioAdminCommandsTest extends TestCase
         $sources->expects(self::once())
             ->method('createSource')
             ->with('Local', 'iprd', 'https://radio.baander.app/iprd', ['region' => 'eu'], '0 */6 * * *')
-            ->willReturn(['id' => '0199b8a0-0000-7000-8000-000000000002', 'name' => 'Local', 'type' => 'iprd']);
+            ->willReturn(['publicId' => '0123456789abABCD_-xy2', 'name' => 'Local', 'type' => 'iprd']);
         $tester = new CommandTester($this->sourceCreate($sources));
 
         $exitCode = $tester->execute([
@@ -82,12 +82,12 @@ final class RadioAdminCommandsTest extends TestCase
         ]);
 
         self::assertSame(Command::SUCCESS, $exitCode);
-        self::assertStringContainsString('Created radio source "Local" (0199b8a0-0000-7000-8000-000000000002).', $tester->getDisplay());
+        self::assertStringContainsString('Created radio source "Local" (0123456789abABCD_-xy2).', $tester->getDisplay());
     }
 
     public function testSourceCreateJsonIsTheSourceTheApiReturns(): void
     {
-        $created = ['id' => '0199b8a0-0000-7000-8000-000000000003', 'name' => 'Local', 'type' => 'iprd'];
+        $created = ['publicId' => '0123456789abABCD_-xy3', 'name' => 'Local', 'type' => 'iprd'];
         $sources = $this->createStub(RadioSourcePortInterface::class);
         $sources->method('createSource')->willReturn($created);
         $tester = new CommandTester($this->sourceCreate($sources));

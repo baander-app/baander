@@ -26,7 +26,7 @@ import { AddToPlaylistDialog } from '@/features/playlist/components/AddToPlaylis
 
 function mockMutation(overrides = {}) {
   return {
-    mutateAsync: vi.fn().mockResolvedValue({ publicId: 'pl_new', uuid: 'playlist-uuid', userId: 'user-uuid', name: 'New Mix', isPublic: false, isCollaborative: false, isSmart: false, songCount: 0, createdAt: '2026-10-04T12:00:00Z' }),
+    mutateAsync: vi.fn().mockResolvedValue({ publicId: 'pl_new', userId: 'user-uuid', name: 'New Mix', isPublic: false, isCollaborative: false, isSmart: false, songCount: 0, createdAt: '2026-10-04T12:00:00Z' }),
     isPending: false,
     ...overrides,
   }

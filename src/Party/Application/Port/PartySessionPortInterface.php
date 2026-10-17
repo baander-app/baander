@@ -21,6 +21,8 @@ interface PartySessionPortInterface
 
     public function findByPublicId(PublicId $publicId): ?SyncedPartySession;
 
+    public function findByPublicIdentifier(string $publicId): ?SyncedPartySession;
+
     /** @return SyncedPartySession[] */
     public function findActiveSessions(): array;
 

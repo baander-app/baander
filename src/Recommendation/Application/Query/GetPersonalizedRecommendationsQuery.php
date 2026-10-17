@@ -12,6 +12,7 @@ final readonly class GetPersonalizedRecommendationsQuery
         private readonly Uuid $userId,
         private readonly int $limit = 50,
         private readonly string $targetType = 'song',
+        public bool $administrator = false,
     ) {
     }
 

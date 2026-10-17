@@ -12,6 +12,7 @@ use App\Scheduler\Interface\Request\CreateScheduledJobRequest;
 use App\Scheduler\Interface\Request\UpdateScheduledJobRequest;
 use App\Scheduler\Interface\Resource\ScheduledJobResource;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -31,7 +32,7 @@ final class AdminScheduledJobController
     use ApiResponsesTrait;
 
     /** A job ID; anything else is no job's address and answers 404. */
-    private const string UUID = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+    private const string PUBLIC_ID = '[0-9a-zA-Z_-]{21}';
 
     public function __construct(
         private readonly ScheduledJobAdministrationInterface $scheduledJobService,
@@ -75,11 +76,11 @@ final class AdminScheduledJobController
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}', name: 'show', methods: ['GET'], requirements: ['id' => self::UUID])]
+    #[Route('/{id}', name: 'show', methods: ['GET'], requirements: ['id' => self::PUBLIC_ID])]
     #[CliCounterpart('app:scheduler:show')]
     public function show(string $id): JsonResponse
     {
-        $job = $this->scheduledJobService->getById(Uuid::fromString($id));
+        $job = $this->scheduledJobService->getByPublicId(PublicId::fromString($id));
         if ($job === null) {
             return $this->notFound('Scheduled job not found.');
         }
@@ -133,11 +134,13 @@ final class AdminScheduledJobController
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}', name: 'update', methods: ['PUT'], requirements: ['id' => self::UUID])]
+    #[Route('/{id}', name: 'update', methods: ['PUT'], requirements: ['id' => self::PUBLIC_ID])]
     #[CliCounterpart('app:scheduler:update')]
     public function update(string $id, #[MapRequestPayload] UpdateScheduledJobRequest $request): JsonResponse
     {
-        $job = $this->scheduledJobService->updateJob(Uuid::fromString($id), new ScheduledJobInput(
+        $addressed = $this->scheduledJobService->getByPublicId(PublicId::fromString($id));
+        if ($addressed === null) { return $this->notFound('Scheduled job not found.'); }
+        $job = $this->scheduledJobService->updateJob($addressed->getId(), new ScheduledJobInput(
             name: $request->name,
             expression: $request->expression,
             jobType: $request->jobType,
@@ -161,11 +164,13 @@ final class AdminScheduledJobController
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}', name: 'delete', methods: ['DELETE'], requirements: ['id' => self::UUID])]
+    #[Route('/{id}', name: 'delete', methods: ['DELETE'], requirements: ['id' => self::PUBLIC_ID])]
     #[CliCounterpart('app:scheduler:delete')]
     public function delete(string $id): JsonResponse
     {
-        if (!$this->scheduledJobService->deleteById(Uuid::fromString($id))) {
+        $addressed = $this->scheduledJobService->getByPublicId(PublicId::fromString($id));
+        if ($addressed === null) { return $this->notFound('Scheduled job not found.'); }
+        if (!$this->scheduledJobService->deleteById($addressed->getId())) {
             return $this->notFound('Scheduled job not found.');
         }
 
@@ -183,11 +188,13 @@ final class AdminScheduledJobController
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}/pause', name: 'pause', methods: ['POST'], requirements: ['id' => self::UUID])]
+    #[Route('/{id}/pause', name: 'pause', methods: ['POST'], requirements: ['id' => self::PUBLIC_ID])]
     #[CliCounterpart('app:scheduler:pause')]
     public function pause(string $id): JsonResponse
     {
-        $job = $this->scheduledJobService->pause(Uuid::fromString($id));
+        $addressed = $this->scheduledJobService->getByPublicId(PublicId::fromString($id));
+        if ($addressed === null) { return $this->notFound('Scheduled job not found.'); }
+        $job = $this->scheduledJobService->pause($addressed->getId());
         if ($job === null) {
             return $this->notFound('Scheduled job not found.');
         }
@@ -206,11 +213,13 @@ final class AdminScheduledJobController
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}/resume', name: 'resume', methods: ['POST'], requirements: ['id' => self::UUID])]
+    #[Route('/{id}/resume', name: 'resume', methods: ['POST'], requirements: ['id' => self::PUBLIC_ID])]
     #[CliCounterpart('app:scheduler:resume')]
     public function resume(string $id): JsonResponse
     {
-        $job = $this->scheduledJobService->resume(Uuid::fromString($id));
+        $addressed = $this->scheduledJobService->getByPublicId(PublicId::fromString($id));
+        if ($addressed === null) { return $this->notFound('Scheduled job not found.'); }
+        $job = $this->scheduledJobService->resume($addressed->getId());
         if ($job === null) {
             return $this->notFound('Scheduled job not found.');
         }
@@ -230,28 +239,28 @@ final class AdminScheduledJobController
             new OA\Response(response: '202', description: 'Manual request durably accepted; execution is asynchronous',
                 headers: [new OA\Header(header: 'Idempotency-Key', description: 'Accepted request UUID', schema: new OA\Schema(type: 'string', format: 'uuid'))],
                 content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [
-                    new OA\Property(property: 'occurrenceId', type: 'string', format: 'uuid'),
-                    new OA\Property(property: 'jobId', type: 'string', format: 'uuid'),
+                    new OA\Property(property: 'occurrenceId', type: 'string'),
+                    new OA\Property(property: 'jobId', type: 'string'),
                 ])])),
             new OA\Response(response: '400', description: 'Invalid request UUID', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '409', description: 'Request UUID already belongs to another job or origin', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Job not found for a new request', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}/trigger', name: 'trigger', methods: ['POST'])]
+    #[Route('/{id}/trigger', name: 'trigger', methods: ['POST'], requirements: ['id' => self::PUBLIC_ID])]
     #[CliCounterpart('app:scheduler:run')]
     public function trigger(string $id, Request $request): JsonResponse
     {
         try {
-            $jobId = Uuid::fromString($id);
+            $jobId = PublicId::fromString($id);
             $header = $request->headers->get('Idempotency-Key');
             $requestId = $header === null ? Uuid::generate() : Uuid::fromString($header);
         } catch (\InvalidArgumentException) {
-            return $this->errorResponse('Job and request identifiers must be UUIDs.');
+            return $this->errorResponse('Invalid public job identity or request UUID.');
         }
 
         try {
-            $occurrence = $this->manualOccurrences->record($jobId, $requestId);
+            $occurrence = $this->manualOccurrences->recordByPublicId($jobId, $requestId);
         } catch (SchedulerOccurrenceConflict) {
             return $this->errorResponse('Request UUID already belongs to another job or origin.', Response::HTTP_CONFLICT);
         }
@@ -260,8 +269,8 @@ final class AdminScheduledJobController
         }
 
         $response = $this->successResponse([
-            'occurrenceId' => $occurrence->id->toString(),
-            'jobId' => $occurrence->jobId->toString(),
+            'occurrenceId' => $occurrence->publicId->toString(),
+            'jobId' => $occurrence->jobPublicId->toString(),
         ], Response::HTTP_ACCEPTED);
         $response->headers->set('Idempotency-Key', $requestId->toString());
         return $response;
@@ -278,11 +287,13 @@ final class AdminScheduledJobController
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}/enable', name: 'enable', methods: ['POST'], requirements: ['id' => self::UUID])]
+    #[Route('/{id}/enable', name: 'enable', methods: ['POST'], requirements: ['id' => self::PUBLIC_ID])]
     #[CliCounterpart('app:scheduler:enable')]
     public function enable(string $id): JsonResponse
     {
-        $job = $this->scheduledJobService->enable(Uuid::fromString($id));
+        $addressed = $this->scheduledJobService->getByPublicId(PublicId::fromString($id));
+        if ($addressed === null) { return $this->notFound('Scheduled job not found.'); }
+        $job = $this->scheduledJobService->enable($addressed->getId());
         if ($job === null) {
             return $this->notFound('Scheduled job not found.');
         }
@@ -301,11 +312,13 @@ final class AdminScheduledJobController
             new OA\Response(response: '404', description: 'Job not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}/disable', name: 'disable', methods: ['POST'], requirements: ['id' => self::UUID])]
+    #[Route('/{id}/disable', name: 'disable', methods: ['POST'], requirements: ['id' => self::PUBLIC_ID])]
     #[CliCounterpart('app:scheduler:disable')]
     public function disable(string $id): JsonResponse
     {
-        $job = $this->scheduledJobService->disable(Uuid::fromString($id));
+        $addressed = $this->scheduledJobService->getByPublicId(PublicId::fromString($id));
+        if ($addressed === null) { return $this->notFound('Scheduled job not found.'); }
+        $job = $this->scheduledJobService->disable($addressed->getId());
         if ($job === null) {
             return $this->notFound('Scheduled job not found.');
         }

@@ -32,7 +32,6 @@ import {
 } from '@/shared/crypto/keychain-storage';
 
 export interface User {
-  uuid: string;
   email: string;
   publicId: string;
   name: string | null;

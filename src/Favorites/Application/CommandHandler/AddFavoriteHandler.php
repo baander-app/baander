@@ -14,6 +14,7 @@ final class AddFavoriteHandler
 {
     public function __construct(
         private readonly FavoritesPortInterface $favoritesPort,
+        private readonly \App\Favorites\Application\Port\FavoriteTargetAccessInterface $targets,
     ) {
     }
 
@@ -21,6 +22,8 @@ final class AddFavoriteHandler
     public function __invoke(AddFavoriteCommand $command): UserFavorite
     {
         $entityType = FavoriteType::from($command->getEntityType());
+        $publicId = \App\Shared\Domain\Model\PublicId::fromString($command->getEntityPublicId());
+        $this->targets->assertVisible($command->getUserId(), $entityType, $publicId);
 
         $existing = $this->favoritesPort->findByUserAndEntity(
             $command->getUserId(),

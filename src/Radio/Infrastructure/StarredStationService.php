@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Radio\Infrastructure;
 
 use App\Radio\Application\Port\StarredStationPortInterface;
+use App\Radio\Domain\Repository\RadioStation\RadioStationRepositoryInterface;
 use App\Radio\Domain\Model\StarredStation\StarredStation;
 use App\Radio\Domain\Repository\StarredStation\StarredStationRepositoryInterface;
+use App\Radio\Application\Port\RadioPublicIdentityInterface;
+use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\Model\Uuid;
 use RuntimeException;
 
@@ -14,6 +17,8 @@ final class StarredStationService implements StarredStationPortInterface
 {
     public function __construct(
         private readonly StarredStationRepositoryInterface $repository,
+        private readonly RadioPublicIdentityInterface $identities,
+        private readonly RadioStationRepositoryInterface $stations,
     ) {
     }
 
@@ -55,9 +60,9 @@ final class StarredStationService implements StarredStationPortInterface
     private function starredToArray(StarredStation $starred): array
     {
         return [
-            'id' => $starred->getId()->toString(),
-            'userId' => $starred->getUserId()->toString(),
-            'stationId' => $starred->getStationId()->toString(),
+            'userId' => $this->identities->userPublicId($starred->getUserId())->toString(),
+            'stationId' => ($this->stations->find($starred->getStationId())
+                ?? throw new NotFoundException('Radio station not found.'))->getPublicId()->toString(),
             'starredAt' => $starred->getStarredAt()->format(\DateTimeInterface::ATOM),
         ];
     }

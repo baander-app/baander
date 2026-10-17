@@ -31,6 +31,7 @@ final class AdminScheduledJobAdministrationTest extends TestCase
             ['limit' => 3],
         );
         $admin = $this->createMock(ScheduledJobAdministrationInterface::class);
+        $admin->method('getByPublicId')->willReturn($job);
         $admin->expects(self::once())->method('createJob')->with($input)->willReturn($job);
         $admin->expects(self::once())->method('updateJob')->with($job->getId(), $input)->willReturn($job);
         $controller = new AdminScheduledJobController(
@@ -46,7 +47,7 @@ final class AdminScheduledJobAdministrationTest extends TestCase
             $input->parameters,
         ));
         $updated = $controller->update(
-            $job->getId()->toString(),
+            $job->getPublicId()->toString(),
             new UpdateScheduledJobRequest(
                 $input->name,
                 $input->expression,
@@ -72,12 +73,13 @@ final class AdminScheduledJobAdministrationTest extends TestCase
     {
         $job = ScheduledJob::create('Original', '* * * * *', JobType::Console, 'app:test');
         $admin = $this->createMock(ScheduledJobAdministrationInterface::class);
+        $admin->method('getByPublicId')->willReturn($job);
         $admin->expects(self::once())->method($action)->with($job->getId())->willReturn($job);
         $controller = new AdminScheduledJobController(
             $admin,
             $this->createStub(SchedulerManualOccurrenceRecorderInterface::class),
         );
-        $response = $controller->{$action}($job->getId()->toString());
+        $response = $controller->{$action}($job->getPublicId()->toString());
         self::assertSame(200, $response->getStatusCode());
         self::assertSame(
             ['data' => ScheduledJobResource::from($job)],
@@ -95,9 +97,12 @@ final class AdminScheduledJobAdministrationTest extends TestCase
 
     public function testMissingJobsPreserve404AndDeletePreserves204(): void
     {
-        $id = Uuid::generate();
+        $id = new \App\Shared\Domain\Model\PublicId();
         $admin = $this->createStub(ScheduledJobAdministrationInterface::class);
-        $admin->method('deleteById')->willReturn(false, true);
+        $present = ScheduledJob::create('Present', '* * * * *', JobType::Console, 'app:test');
+        $calls = 0;
+        $admin->method('getByPublicId')->willReturnCallback(static function () use (&$calls, $present) { return ++$calls <= 7 ? null : $present; });
+        $admin->method('deleteById')->willReturn(true);
         $controller = new AdminScheduledJobController(
             $admin,
             $this->createStub(SchedulerManualOccurrenceRecorderInterface::class),

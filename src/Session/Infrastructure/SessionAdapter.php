@@ -11,6 +11,8 @@ use App\Session\Domain\Model\ListeningSession\ListeningSession;
 use App\Session\Domain\Repository\Device\DeviceRepositoryInterface;
 use App\Session\Domain\Repository\ListeningSession\ListeningSessionRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
+use App\Session\Application\Port\SessionUserPublicIdentityInterface;
 use RuntimeException;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
 
@@ -20,6 +22,7 @@ final class SessionAdapter implements SessionPortInterface
         private readonly ListeningSessionRepositoryInterface $sessionRepository,
         private readonly DeviceRepositoryInterface $deviceRepository,
         private readonly EventDispatcherInterface $eventDispatcher,
+        private readonly SessionUserPublicIdentityInterface $userIdentifiers,
     ) {
     }
 
@@ -44,6 +47,7 @@ final class SessionAdapter implements SessionPortInterface
             return $this->sessionToArray($session);
         }
 
+        $queue = $this->publicQueue($queue);
         $session->updatePlayback($queue, $currentTrackIndex, $position, $playbackState);
         $session->markUsed();
         $this->sessionRepository->save($session);
@@ -60,6 +64,7 @@ final class SessionAdapter implements SessionPortInterface
             throw new RuntimeException('No active session found for user.');
         }
 
+        $this->registerDevice($userId, $deviceId, '');
         $session->claim($deviceId);
         $this->sessionRepository->save($session);
         $this->dispatchEvents($session);
@@ -69,6 +74,7 @@ final class SessionAdapter implements SessionPortInterface
 
     public function createSession(Uuid $userId, array $queue, int $currentTrackIndex, float $position): array
     {
+        $queue = $this->publicQueue($queue);
         $existing = $this->sessionRepository->findByUserId($userId);
         if ($existing !== null) {
             $this->sessionRepository->remove($existing);
@@ -103,7 +109,7 @@ final class SessionAdapter implements SessionPortInterface
 
         return array_map(function (Device $device): array {
             return [
-                'id' => $device->getId()->toString(),
+                'publicId' => $device->getPublicId()->toString(),
                 'deviceId' => $device->getDeviceId()->toString(),
                 'name' => $device->getName(),
                 'lastUsedAt' => $device->getLastSeenAt()?->format(\DateTimeInterface::ATOM),
@@ -111,9 +117,19 @@ final class SessionAdapter implements SessionPortInterface
         }, $devices);
     }
 
-    public function renameDevice(Uuid $userId, Uuid $deviceId, string $name): void
+    public function findDeviceByPublicId(PublicId $publicId, Uuid $userId): ?Device
     {
-        $device = $this->deviceRepository->findByUserAndDevice($userId, $deviceId);
+        return $this->deviceRepository->findByUserAndPublicId($userId, $publicId);
+    }
+
+    public function devicePublicId(Uuid $userId, Uuid $browserToken): ?PublicId
+    {
+        return $this->deviceRepository->findByUserAndDevice($userId, $browserToken)?->getPublicId();
+    }
+
+    public function renameDevice(Uuid $userId, PublicId $deviceId, string $name): void
+    {
+        $device = $this->deviceRepository->findByUserAndPublicId($userId, $deviceId);
 
         if ($device === null) {
             throw new DeviceNotFound('Device not found.');
@@ -123,11 +139,16 @@ final class SessionAdapter implements SessionPortInterface
         $this->deviceRepository->save($device);
     }
 
-    public function forgetDevice(Uuid $userId, Uuid $deviceId): void
+    public function forgetDevice(Uuid $userId, PublicId $deviceId): void
     {
-        $device = $this->deviceRepository->findByUserAndDevice($userId, $deviceId);
+        $device = $this->deviceRepository->findByUserAndPublicId($userId, $deviceId);
 
         if ($device !== null) {
+            $session = $this->sessionRepository->findByUserId($userId);
+            if ($session !== null && $session->getActiveDeviceId()?->equals($device->getDeviceId())) {
+                $session->releaseDevice($device->getDeviceId());
+                $this->sessionRepository->save($session);
+            }
             $this->deviceRepository->remove($device);
         }
     }
@@ -144,15 +165,33 @@ final class SessionAdapter implements SessionPortInterface
     }
 
     /**
+     * @param array<array-key, mixed> $queue
+     * @return list<string>
+     */
+    private function publicQueue(array $queue): array
+    {
+        return array_values(array_map(static function (mixed $id): string {
+            if (!is_string($id)) {
+                throw new \InvalidArgumentException('Queue entries must be song public IDs.');
+            }
+
+            return PublicId::fromString($id)->toString();
+        }, $queue));
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function sessionToArray(ListeningSession $session): array
     {
         return [
-            'id' => $session->getId()->toString(),
-            'userId' => $session->getUserId()->toString(),
-            'activeDeviceId' => $session->getActiveDeviceId()?->toString(),
-            'queue' => $session->getQueue(),
+            'publicId' => $session->getPublicId()->toString(),
+            'userId' => $this->userIdentifiers->publicIdByUserId($session->getUserId())->toString(),
+            'activeDeviceId' => $session->getActiveDeviceId() !== null
+                ? ($this->devicePublicId($session->getUserId(), $session->getActiveDeviceId())
+                    ?? throw new RuntimeException('The active device is not registered.'))->toString()
+                : null,
+            'queue' => $this->publicQueue($session->getQueue()),
             'currentTrackIndex' => $session->getCurrentTrackIndex(),
             'position' => $session->getPosition(),
             'playbackState' => $session->getPlaybackState(),

@@ -27,7 +27,7 @@ final readonly class UpdateWebhookHandler
     public function __invoke(UpdateWebhookCommand $command): WebhookView
     {
         $id = WebhookInput::id($command->webhookId);
-        $webhook = $this->webhooks->find($id) ?? throw self::notFound();
+        $webhook = $this->webhooks->findByPublicId($id) ?? throw self::notFound();
 
         $categoryFilter = $command->changesCategoryFilter
             ? WebhookInput::categoryFilter($command->categoryFilter)
@@ -36,7 +36,7 @@ final readonly class UpdateWebhookHandler
             ? $this->input->url($command->url, 'URL must be a non-empty string.')
             : $webhook->url;
 
-        return $this->webhooks->update($id, $url, $categoryFilter) ?? throw self::notFound();
+        return $this->webhooks->update($webhook->id, $url, $categoryFilter) ?? throw self::notFound();
     }
 
     private static function notFound(): NotFoundException

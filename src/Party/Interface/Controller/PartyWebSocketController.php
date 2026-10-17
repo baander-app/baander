@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Party\Interface\Controller;
 
 use App\Party\Application\Port\PartySessionPortInterface;
+use App\Party\Application\Port\PartyPublicIdentityPortInterface;
 use App\Party\Interface\Resource\PartySessionResource;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
@@ -22,6 +23,7 @@ final class PartyWebSocketController
 
     public function __construct(
         private readonly PartySessionPortInterface $sessionPort,
+        private readonly PartyPublicIdentityPortInterface $identities,
     )
     {
     }
@@ -31,7 +33,7 @@ final class PartyWebSocketController
         description: 'Returns session details and the WebSocket connection URL. Actual WebSocket handling is done through Swoole, not Symfony HTTP.',
         summary: 'Get WebSocket connection info for a party session',
         parameters: [
-            new OA\Parameter(name: 'sessionPublicId', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'sessionPublicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
             new OA\Response(
@@ -40,7 +42,7 @@ final class PartyWebSocketController
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'session', type: 'object'),
-                        new OA\Property(property: 'wsUrl', type: 'string', example: 'wss://example.com/ws/party/{publicId}'),
+                        new OA\Property(property: 'wsUrl', type: 'string', example: 'wss://baander.app/ws/party/{publicId}'),
                     ],
                 ),
             ),
@@ -50,17 +52,17 @@ final class PartyWebSocketController
     #[Route('/', name: 'info', methods: ['GET'])]
     public function info(string $sessionPublicId, Request $request): JsonResponse
     {
-        $session = $this->sessionPort->findByPublicId(
-            PublicId::fromString($sessionPublicId),
-        );
+        try {
+            $session = $this->sessionPort->findByPublicId(PublicId::fromString($sessionPublicId));
+        } catch (\InvalidArgumentException) {
+            return $this->notFound();
+        }
         if ($session === null) {
             return $this->notFound();
         }
 
-        $host = $request->getSchemeAndHttpHost();
-
         return $this->successResponse([
-            'session' => PartySessionResource::from($session),
+            'session' => PartySessionResource::from($this->identities->session($session)),
             'wsUrl'   => sprintf('wss://%s/ws/party/%s', $request->getHost(), $sessionPublicId),
         ]);
     }

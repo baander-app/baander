@@ -202,7 +202,7 @@ final class AdminUserSettingsControllerTest extends TestCase
 
     private function url(User $user, ?string $key = null): string
     {
-        return '/api/admin/users/' . $user->getId()->toString() . '/settings' . ($key === null ? '' : '/' . $key);
+        return '/api/admin/users/' . $user->getPublicId()->toString() . '/settings' . ($key === null ? '' : '/' . $key);
     }
 
     /**

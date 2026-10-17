@@ -34,12 +34,24 @@ final class ArtistCreditHandlersTest extends TestCase
     /** @var list<array{string, string|null, string}> calls to update*Role: target key, current role, new role */
     private array $changes = [];
     private ArtistPortInterface $artists;
+    private \App\Catalog\Application\Port\SongPortInterface $songs;
+    private \App\Catalog\Application\Port\AlbumPortInterface $albums;
+    private string $songPublicId;
+    private string $albumPublicId;
 
     protected function setUp(): void
     {
         $this->artist = Artist::create('Nina Simone');
-        $this->song = new Uuid();
-        $this->album = new Uuid();
+        $album = \App\Catalog\Domain\Model\Album::create(new Uuid(), 'Album', 'album');
+        $song = \App\Catalog\Domain\Model\Song::create($album->getId(), 'Song', '/music/song.flac', 1, 'audio/flac');
+        $this->song = $song->getId();
+        $this->album = $album->getId();
+        $this->songPublicId = $song->getPublicId()->toString();
+        $this->albumPublicId = $album->getPublicId()->toString();
+        $this->songs = $this->createStub(\App\Catalog\Application\Port\SongPortInterface::class);
+        $this->songs->method('findByPublicId')->willReturnCallback(fn (PublicId $id) => $id->equals($song->getPublicId()) ? $song : null);
+        $this->albums = $this->createStub(\App\Catalog\Application\Port\AlbumPortInterface::class);
+        $this->albums->method('findByPublicId')->willReturnCallback(fn (PublicId $id) => $id->equals($album->getPublicId()) ? $album : null);
         $artists = $this->createStub(ArtistPortInterface::class);
         $artists->method('findByPublicId')->willReturnCallback(
             fn (PublicId $id): ?Artist => $id->equals($this->artist->getPublicId()) ? $this->artist : null,
@@ -55,29 +67,38 @@ final class ArtistCreditHandlersTest extends TestCase
         $this->artists = $artists;
     }
 
+    public function testInternalSongUuidIsRejectedBeforeAnyMutation(): void
+    {
+        $this->expectException(InvalidInputException::class);
+        $this->expectExceptionMessage('Invalid song ID format.');
+        (new AddArtistCreditHandler($this->artists, $this->songs, $this->albums))(
+            new AddArtistCreditCommand($this->publicId(), CreditTarget::Song, $this->song->toString(), 'primary'),
+        );
+    }
+
     public function testAddingACreditTwiceKeepsOneCredit(): void
     {
-        $handler = new AddArtistCreditHandler($this->artists);
-        $handler(new AddArtistCreditCommand($this->publicId(), CreditTarget::Song, $this->song->toString(), 'primary'));
-        $handler(new AddArtistCreditCommand($this->publicId(), CreditTarget::Song, $this->song->toString(), 'primary'));
+        $handler = new AddArtistCreditHandler($this->artists, $this->songs, $this->albums);
+        $handler(new AddArtistCreditCommand($this->publicId(), CreditTarget::Song, $this->songPublicId, 'primary'));
+        $handler(new AddArtistCreditCommand($this->publicId(), CreditTarget::Song, $this->songPublicId, 'primary'));
 
         self::assertSame(['primary'], $this->credits['song|' . $this->song->toString()]);
     }
 
     public function testAddingACreditForAnUnknownAlbumIsNotFound(): void
     {
-        $unknown = (new Uuid())->toString();
+        $unknown = (new PublicId())->toString();
 
         $this->expectException(NotFoundException::class);
         $this->expectExceptionMessage(sprintf('Album "%s" not found.', $unknown));
 
-        (new AddArtistCreditHandler($this->artists))(new AddArtistCreditCommand($this->publicId(), CreditTarget::Album, $unknown, 'primary'));
+        (new AddArtistCreditHandler($this->artists, $this->songs, $this->albums))(new AddArtistCreditCommand($this->publicId(), CreditTarget::Album, $unknown, 'primary'));
     }
 
     /** @return iterable<string, array{object, class-string<\Throwable>, string}> */
     public static function rejectedInput(): iterable
     {
-        $song = (new Uuid())->toString();
+        $song = (new PublicId())->toString();
         $artist = (new PublicId())->toString();
 
         yield 'unknown role' => [new AddArtistCreditCommand($artist, CreditTarget::Song, $song, 'singer'), InvalidInputException::class, 'Invalid role "singer". Valid roles: primary, featured,'];
@@ -106,16 +127,16 @@ final class ArtistCreditHandlersTest extends TestCase
     public function testRemovingACreditTheArtistDoesNotHaveIsNotFound(): void
     {
         $this->expectException(NotFoundException::class);
-        $this->expectExceptionMessage(sprintf('Artist "%s" has no credit on song "%s".', $this->publicId(), $this->song->toString()));
+        $this->expectExceptionMessage(sprintf('Artist "%s" has no credit on song "%s".', $this->publicId(), $this->songPublicId));
 
-        (new RemoveArtistCreditHandler($this->artists))(new RemoveArtistCreditCommand($this->publicId(), CreditTarget::Song, $this->song->toString()));
+        (new RemoveArtistCreditHandler($this->artists, $this->songs, $this->albums))(new RemoveArtistCreditCommand($this->publicId(), CreditTarget::Song, $this->songPublicId));
     }
 
     public function testRemovingACreditRemovesEveryRole(): void
     {
         $this->credits['album|' . $this->album->toString()] = ['featured', 'producer'];
 
-        (new RemoveArtistCreditHandler($this->artists))(new RemoveArtistCreditCommand($this->publicId(), CreditTarget::Album, $this->album->toString()));
+        (new RemoveArtistCreditHandler($this->artists, $this->songs, $this->albums))(new RemoveArtistCreditCommand($this->publicId(), CreditTarget::Album, $this->albumPublicId));
 
         self::assertSame([], $this->credits);
     }
@@ -147,8 +168,8 @@ final class ArtistCreditHandlersTest extends TestCase
     {
         $this->credits['album|' . $this->album->toString()] = ['featured', 'producer'];
 
-        (new ChangeArtistCreditRoleHandler($this->artists))(
-            new ChangeArtistCreditRoleCommand($this->publicId(), CreditTarget::Album, $this->album->toString(), 'producer', 'featured'),
+        (new ChangeArtistCreditRoleHandler($this->artists, $this->songs, $this->albums))(
+            new ChangeArtistCreditRoleCommand($this->publicId(), CreditTarget::Album, $this->albumPublicId, 'producer', 'featured'),
         );
 
         self::assertSame([['album|' . $this->album->toString(), 'featured', 'producer']], $this->changes);
@@ -159,7 +180,7 @@ final class ArtistCreditHandlersTest extends TestCase
         $this->credits['song|' . $this->song->toString()] = ['primary'];
 
         $this->expectException(NotFoundException::class);
-        $this->expectExceptionMessage(sprintf('Artist "%s" has no "featured" credit on song "%s".', $this->publicId(), $this->song->toString()));
+        $this->expectExceptionMessage(sprintf('Artist "%s" has no "featured" credit on song "%s".', $this->publicId(), $this->songPublicId));
 
         $this->changeSong('producer', 'featured');
     }
@@ -174,17 +195,17 @@ final class ArtistCreditHandlersTest extends TestCase
 
     private function changeSong(string $role, ?string $current = null): void
     {
-        (new ChangeArtistCreditRoleHandler($this->artists))(
-            new ChangeArtistCreditRoleCommand($this->publicId(), CreditTarget::Song, $this->song->toString(), $role, $current),
+        (new ChangeArtistCreditRoleHandler($this->artists, $this->songs, $this->albums))(
+            new ChangeArtistCreditRoleCommand($this->publicId(), CreditTarget::Song, $this->songPublicId, $role, $current),
         );
     }
 
     private function handle(object $command): void
     {
         match (true) {
-            $command instanceof AddArtistCreditCommand => (new AddArtistCreditHandler($this->artists))($command),
-            $command instanceof RemoveArtistCreditCommand => (new RemoveArtistCreditHandler($this->artists))($command),
-            $command instanceof ChangeArtistCreditRoleCommand => (new ChangeArtistCreditRoleHandler($this->artists))($command),
+            $command instanceof AddArtistCreditCommand => (new AddArtistCreditHandler($this->artists, $this->songs, $this->albums))($command),
+            $command instanceof RemoveArtistCreditCommand => (new RemoveArtistCreditHandler($this->artists, $this->songs, $this->albums))($command),
+            $command instanceof ChangeArtistCreditRoleCommand => (new ChangeArtistCreditRoleHandler($this->artists, $this->songs, $this->albums))($command),
             default => throw new \LogicException('Unknown command.'),
         };
     }

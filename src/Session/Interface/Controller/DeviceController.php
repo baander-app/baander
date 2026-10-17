@@ -10,6 +10,7 @@ use App\Session\Application\Port\SessionPortInterface;
 use App\Session\Interface\Request\RegisterDeviceRequest;
 use App\Session\Interface\Request\RenameDeviceRequest;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -82,7 +83,8 @@ final class DeviceController
                     properties: [
                         new OA\Property(property: 'data', type: 'array', items: new OA\Items(
                             properties: [
-                                new OA\Property(property: 'id', type: 'string', format: 'uuid'),
+                                new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
+                                new OA\Property(property: 'deviceId', type: 'string', format: 'uuid', description: 'Browser-generated device token; distinct from publicId'),
                                 new OA\Property(property: 'name', type: 'string'),
                                 new OA\Property(property: 'lastUsedAt', type: 'string', format: 'date-time', nullable: true),
                             ],
@@ -120,7 +122,7 @@ final class DeviceController
             ),
         ),
         parameters: [
-            new OA\Parameter(name: 'deviceId', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'deviceId', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
         ],
         responses: [
             new OA\Response(
@@ -150,13 +152,13 @@ final class DeviceController
         $userId = Uuid::fromString($user->getId());
 
         try {
-            $deviceUuid = Uuid::fromString($deviceId);
+            $devicePublicId = PublicId::fromString($deviceId);
         } catch (\InvalidArgumentException) {
             return $this->errorResponse('Invalid device ID.');
         }
 
         try {
-            $this->sessionPort->renameDevice($userId, $deviceUuid, $payload->name);
+            $this->sessionPort->renameDevice($userId, $devicePublicId, $payload->name);
         } catch (DeviceNotFound) {
             return $this->notFound('Device not found.');
         }
@@ -168,7 +170,7 @@ final class DeviceController
         path: '/api/devices/{deviceId}',
         summary: 'Forget (remove) a device',
         parameters: [
-            new OA\Parameter(name: 'deviceId', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'deviceId', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
         ],
         responses: [
             new OA\Response(
@@ -196,12 +198,12 @@ final class DeviceController
         $userId = Uuid::fromString($user->getId());
 
         try {
-            $deviceUuid = Uuid::fromString($deviceId);
+            $devicePublicId = PublicId::fromString($deviceId);
         } catch (\InvalidArgumentException) {
             return $this->errorResponse('Invalid device ID.');
         }
 
-        $this->sessionPort->forgetDevice($userId, $deviceUuid);
+        $this->sessionPort->forgetDevice($userId, $devicePublicId);
 
         return $this->successResponse(['message' => 'Device forgotten.']);
     }

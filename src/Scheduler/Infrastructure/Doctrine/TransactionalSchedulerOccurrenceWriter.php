@@ -25,15 +25,15 @@ final readonly class TransactionalSchedulerOccurrenceWriter
             throw new \LogicException('Scheduler intent insertion requires an active caller transaction.');
         }
         $parameters = [
-            'id' => $occurrence->id->toString(), 'job' => $occurrence->jobId->toString(),
+            'job_public_id' => $occurrence->jobPublicId->toString(), 'public_id' => $occurrence->publicId->toString(), 'id' => $occurrence->id->toString(), 'job' => $occurrence->jobId->toString(),
             'scheduled' => $occurrence->scheduledFor->format('Y-m-d H:i:s.uP'),
             'origin' => $occurrence->origin->value,
             'type' => $occurrence->jobType->value, 'command' => $occurrence->command,
             'parameters' => $occurrence->parametersJson(),
         ];
         $inserted = $this->connection->executeStatement(<<<'SQL'
-            INSERT INTO scheduler_occurrences (id, job_id, scheduled_for, origin, job_type, command, parameters)
-            VALUES (:id, :job, :scheduled, :origin, :type, :command, CAST(:parameters AS JSON))
+            INSERT INTO scheduler_occurrences (job_public_id, public_id, id, job_id, scheduled_for, origin, job_type, command, parameters)
+            VALUES (:job_public_id, :public_id, :id, :job, :scheduled, :origin, :type, :command, CAST(:parameters AS JSON))
             ON CONFLICT DO NOTHING
             SQL, $parameters);
         if ($inserted === 1) {

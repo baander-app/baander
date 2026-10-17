@@ -21,9 +21,9 @@ final readonly class ImageReadView
         private int $width,
         private int $height,
         private string $imageableType,
-        private ?Uuid $albumId,
-        private ?Uuid $artistId,
-        private ?Uuid $playlistId,
+        private ?PublicId $albumPublicId,
+        private ?PublicId $artistPublicId,
+        private ?PublicId $playlistPublicId,
         private DateTimeImmutable $createdAt,
         private DateTimeImmutable $updatedAt,
     ) {
@@ -79,19 +79,19 @@ final readonly class ImageReadView
         return $this->imageableType;
     }
 
-    public function getAlbumId(): ?Uuid
+    public function getAlbumPublicId(): ?PublicId
     {
-        return $this->albumId;
+        return $this->albumPublicId;
     }
 
-    public function getArtistId(): ?Uuid
+    public function getArtistPublicId(): ?PublicId
     {
-        return $this->artistId;
+        return $this->artistPublicId;
     }
 
-    public function getPlaylistId(): ?Uuid
+    public function getPlaylistPublicId(): ?PublicId
     {
-        return $this->playlistId;
+        return $this->playlistPublicId;
     }
 
     public function getCreatedAt(): DateTimeImmutable

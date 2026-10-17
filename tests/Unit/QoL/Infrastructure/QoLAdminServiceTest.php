@@ -26,7 +26,7 @@ final class QoLAdminServiceTest extends TestCase
     {
         $this->directory = sys_get_temp_dir() . '/baander-qol-admin-' . bin2hex(random_bytes(8));
         $this->workers = new QoLWorkers($this->directory);
-        $this->service = new QoLAdminService($this->workers);
+        $this->service = new QoLAdminService($this->workers, new \App\Tests\Unit\QoL\QoLPublicIds());
     }
 
     protected function tearDown(): void
@@ -84,7 +84,7 @@ final class QoLAdminServiceTest extends TestCase
         self::assertSame([
             'worker_id' => 1,
             'active_streams' => 1,
-            'streams' => [['job_id' => 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'quality_tier' => '4K', 'predicted_cost' => 55.57]],
+            'streams' => [['job_id' => \App\Tests\Unit\QoL\QoLPublicIds::forId('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'), 'quality_tier' => '4K', 'predicted_cost' => 55.57]],
         ], $streams['workers'][1]);
         self::assertSame(['active_streams' => 2, 'predicted_cost' => 75.57], $streams['total']);
     }
@@ -172,7 +172,7 @@ final class QoLAdminServiceTest extends TestCase
         $this->expectException(ServerNotRunningException::class);
         $this->expectExceptionMessage('no web server is running in this container');
 
-        (new QoLAdminService($port))->getStatus();
+        (new QoLAdminService($port, new \App\Tests\Unit\QoL\QoLPublicIds()))->getStatus();
     }
 
     /** @return array<string, mixed> */

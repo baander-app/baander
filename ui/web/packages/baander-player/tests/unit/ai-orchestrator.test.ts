@@ -28,7 +28,7 @@ function createOrchestrator(): AIOrchestrator {
       onError: vi.fn(),
     },
   );
-  orchestrator.setVideoId('bfe7435b-b318-42b6-b0de-6a39c68fdcfe');
+  orchestrator.setVideoId('videoPublicIdentity01');
   return orchestrator;
 }
 
@@ -38,9 +38,9 @@ describe('AIOrchestrator remixMoment', () => {
   });
 
   it('returns the created session UUID from the direct resource response', async () => {
-    const sessionId = '90fd162c-1574-4f43-a15b-b963936ba4d4';
+    const sessionId = 'transcodePublicIdent1';
     const fetchMock = vi.fn().mockResolvedValue(new Response(
-      JSON.stringify({ uuid: sessionId }),
+      JSON.stringify({ publicId: sessionId }),
       { status: 201, headers: { 'Content-Type': 'application/json' } },
     ));
     vi.stubGlobal('fetch', fetchMock);
@@ -62,7 +62,7 @@ describe('AIOrchestrator remixMoment', () => {
           'X-Baander-Client': 'embedded-player',
         },
         body: JSON.stringify({
-          videoId: 'bfe7435b-b318-42b6-b0de-6a39c68fdcfe',
+          videoId: 'videoPublicIdentity01',
           qualityTier: '1080p',
           audioProfile: 'streaming_stereo',
           priority: 'normal',

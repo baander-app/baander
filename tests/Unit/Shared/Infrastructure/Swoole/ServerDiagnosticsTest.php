@@ -37,6 +37,21 @@ final class ServerDiagnosticsTest extends TestCase
         self::assertSame(['workers', 'missing_workers', 'worker_errors', 'redis'], array_keys($stats));
     }
 
+    public function testWorkerErrorsAndTraceAttributesDoNotExposeInternalIds(): void
+    {
+        $id = '01900000-0000-7000-8000-000000000001';
+        $port = $this->createStub(ServerControlPortInterface::class);
+        $port->method('execute')->willReturnOnConsecutiveCalls(
+            new ServerControlResult(results: [], errors: [1 => 'Failed for ' . $id]),
+            new ServerControlResult([0 => [['attributes' => ['entity' => $id], 'status_message' => 'Failed ' . $id]]]),
+        );
+        $redis = new RecordingRedis();
+        $diagnostics = new ServerDiagnostics($port, new RedisClientFactory('redis://127.0.0.1:6379', connectionFactory: static fn (): Redis => $redis));
+
+        self::assertSame([['worker_id' => 1, 'error' => 'Failed for [internal ID]']], $diagnostics->stats()['worker_errors']);
+        self::assertSame('[internal ID]', $diagnostics->spans(10)[0]['attributes']['entity']);
+    }
+
     private function diagnostics(Redis $redis): ServerDiagnostics
     {
         $port = $this->createStub(ServerControlPortInterface::class);

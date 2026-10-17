@@ -49,7 +49,6 @@ final class MonitorJobShowCommand extends Command
             return AdminCommandSupport::json($io, $job);
         }
 
-        $exception = is_array($job['exception']) ? $job['exception'] : null;
         $io->definitionList(
             ['Job ID' => $job['jobId']],
             ['Type' => $job['name'] ?? '-'],
@@ -63,8 +62,7 @@ final class MonitorJobShowCommand extends Command
             ['Started' => $job['startedAt'] ?? '-'],
             ['Finished' => $job['finishedAt'] ?? '-'],
             ['Duration' => $job['duration'] === null ? '-' : sprintf('%.3f s', $job['duration'])],
-            ['Error' => $exception === null ? '-' : sprintf('%s: %s', $job['exceptionClass'] ?? '-', $exception['message'] ?? '')],
-            ['Message' => $job['data'] ?? ($job['dataTruncated'] === true ? '(too large to store)' : '-')],
+            ['Error class' => $job['exceptionClass'] ?? '-'],
         );
 
         return Command::SUCCESS;

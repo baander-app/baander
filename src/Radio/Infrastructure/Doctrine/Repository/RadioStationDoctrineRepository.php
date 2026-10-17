@@ -10,6 +10,7 @@ use App\Radio\Domain\Model\RadioStation\Stream;
 use App\Radio\Domain\Repository\RadioStation\RadioStationRepositoryInterface;
 use App\Radio\Infrastructure\Doctrine\Entity\RadioSourceEntity;
 use App\Radio\Infrastructure\Doctrine\Entity\RadioStationEntity;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -32,6 +33,14 @@ final class RadioStationDoctrineRepository implements RadioStationRepositoryInte
         $entity = $this->entityManager
             ->getRepository(RadioStationEntity::class)
             ->findOneBy(['source' => $sourceId, 'externalId' => $externalId]);
+
+        return $entity !== null ? $this->toDomain($entity) : null;
+    }
+
+    public function findByPublicId(PublicId $publicId): ?RadioStation
+    {
+        $entity = $this->entityManager->getRepository(RadioStationEntity::class)
+            ->findOneBy(['publicId' => $publicId->toString()]);
 
         return $entity !== null ? $this->toDomain($entity) : null;
     }
@@ -113,6 +122,7 @@ final class RadioStationDoctrineRepository implements RadioStationRepositoryInte
 
     private function syncToEntity(RadioStation $station, RadioStationEntity $entity): void
     {
+        $entity->setPublicId($station->getPublicId());
         $state = $station->getState();
         $entity->setName($state->name);
         $entity->setCountry($state->country);
@@ -142,6 +152,7 @@ final class RadioStationDoctrineRepository implements RadioStationRepositoryInte
 
         return RadioStation::reconstitute(new RadioStationState(
             id: $entity->getId(),
+            publicId: $entity->getPublicId(),
             sourceId: $entity->getSourceId(),
             externalId: $entity->getExternalId(),
             name: $entity->getName(),

@@ -49,6 +49,7 @@ final class PasskeyTest extends TestCase
 
         $passkey = Passkey::reconstitute(new PasskeyState(
             id: Uuid::v4(),
+            publicId: new \App\Shared\Domain\Model\PublicId(),
             name: 'Key',
             credentialId: 'cred-id',
             data: [],
@@ -65,6 +66,7 @@ final class PasskeyTest extends TestCase
     {
         $passkey = Passkey::reconstitute(new PasskeyState(
             id: Uuid::v4(),
+            publicId: new \App\Shared\Domain\Model\PublicId(),
             name: 'Key',
             credentialId: 'cred-id',
             data: [],

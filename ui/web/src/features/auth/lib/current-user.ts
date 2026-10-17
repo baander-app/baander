@@ -9,7 +9,7 @@ import { useAuthStore } from '../stores/auth-store'
  */
 export function applyCurrentUser(resource: UserResource): void {
   const { user, updateUser } = useAuthStore.getState()
-  if (user === null || user.uuid !== resource.uuid) return
+  if (user === null || user.publicId !== resource.publicId) return
 
   updateUser({
     email: resource.email,

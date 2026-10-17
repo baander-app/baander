@@ -28,7 +28,7 @@ final class SchedulerRunCommand extends Command
 
     protected function configure(): void
     {
-        $this->addArgument('id', InputArgument::REQUIRED, 'The UUID of the scheduled job');
+        $this->addArgument('id', InputArgument::REQUIRED, 'The public ID of the scheduled job');
         $this->addOption('request-id', null, InputOption::VALUE_REQUIRED, 'Request UUID; reuse after an uncertain result');
         AdminCommandSupport::addJsonOption($this);
     }
@@ -40,18 +40,18 @@ final class SchedulerRunCommand extends Command
         $messages = $json && $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
 
         try {
-            $jobId = Uuid::fromString((string) $input->getArgument('id'));
+            $jobId = \App\Shared\Domain\Model\PublicId::fromString((string) $input->getArgument('id'));
             $provided = $input->getOption('request-id');
             $requestId = $provided === null ? Uuid::generate() : Uuid::fromString((string) $provided);
         } catch (\InvalidArgumentException) {
-            $messages->writeln('<error>Job and request identifiers must be UUIDs.</error>');
+            $messages->writeln('<error>The job identity must be a public ID and the request identity must be a UUID.</error>');
             return Command::INVALID;
         }
 
         // Print identity before recording: an uncertain commit is retried with this exact UUID.
         $messages->writeln(sprintf('Request UUID: %s', $requestId->toString()));
         try {
-            $occurrence = $this->manualOccurrences->record($jobId, $requestId);
+            $occurrence = $this->manualOccurrences->recordByPublicId($jobId, $requestId);
         } catch (SchedulerOccurrenceConflict) {
             $messages->writeln('<error>Request UUID already belongs to another job or origin.</error>');
             return Command::FAILURE;
@@ -63,12 +63,12 @@ final class SchedulerRunCommand extends Command
 
         if ($json) {
             return AdminCommandSupport::json(new SymfonyStyle($input, $output), [
-                'occurrenceId' => $occurrence->id->toString(),
-                'jobId' => $occurrence->jobId->toString(),
+                'occurrenceId' => $occurrence->publicId->toString(),
+                'jobId' => $occurrence->jobPublicId->toString(),
             ]);
         }
 
-        $output->writeln(sprintf('<info>Accepted occurrence %s for asynchronous execution.</info>', $occurrence->id->toString()));
+        $output->writeln(sprintf('<info>Accepted occurrence %s for asynchronous execution.</info>', $occurrence->publicId->toString()));
         return Command::SUCCESS;
     }
 }

@@ -200,42 +200,6 @@ const ExceptionMessage = styled.p`
   color: var(--color-muted-foreground);
 `
 
-const ExceptionLocation = styled.p`
-  margin-top: 0.25rem;
-  font-family: monospace;
-  font-size: 0.75rem;
-  color: var(--color-muted-foreground);
-`
-
-const DetailsBlock = styled.details`
-  margin-top: 1.5rem;
-`
-
-const DetailsSummary = styled.summary`
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--color-card-foreground);
-`
-
-const TruncatedWarning = styled.p`
-  margin-top: 0.5rem;
-  font-size: 0.875rem;
-  color: var(--color-highlight-foreground);
-`
-
-const PreBlock = styled.pre`
-  margin-top: 0.5rem;
-  max-height: 16rem;
-  overflow: auto;
-  border-radius: 0.375rem;
-  background-color: var(--color-muted);
-  padding: 0.75rem;
-  font-family: monospace;
-  font-size: 0.75rem;
-  color: var(--color-muted-foreground);
-`
-
 const RetryButton = styled.button`
   margin-top: 1.5rem;
   width: 100%;
@@ -402,15 +366,6 @@ export function JobDetailPanel({ jobId, onClose }: JobDetailPanelProps) {
     }
   }
 
-  function parseJobData(data: string | null): string {
-    if (!data) return '{}'
-    try {
-      return JSON.stringify(JSON.parse(data), null, 2)
-    } catch {
-      return data
-    }
-  }
-
   return (
     <>
       <Dialog open={!!jobId} onOpenChange={(o) => !o && onClose()}>
@@ -475,10 +430,6 @@ export function JobDetailPanel({ jobId, onClose }: JobDetailPanelProps) {
                   <MetadataValue><TextValue>{job.attempt}</TextValue></MetadataValue>
                 </MetadataItem>
 
-                <MetadataItem>
-                  <MetadataLabel>Data Truncated</MetadataLabel>
-                  <MetadataValue><TextValue>{job.dataTruncated ? 'Yes' : 'No'}</TextValue></MetadataValue>
-                </MetadataItem>
 
                 <MetadataItem>
                   <MetadataLabel>Created At</MetadataLabel>
@@ -501,22 +452,13 @@ export function JobDetailPanel({ jobId, onClose }: JobDetailPanelProps) {
                 </MetadataItem>
               </MetadataGrid>
 
-              {job.exception && (
+              {job.exceptionClass && (
                 <ExceptionBox>
                   <ExceptionTitle>Exception</ExceptionTitle>
-                  <ExceptionMessage>{job.exception.message}</ExceptionMessage>
-                  <ExceptionLocation>{job.exception.file}:{job.exception.line}</ExceptionLocation>
+                  <ExceptionMessage>{job.exceptionClass}</ExceptionMessage>
                 </ExceptionBox>
               )}
 
-              <DetailsBlock>
-                <DetailsSummary>Message Payload</DetailsSummary>
-                {job.dataTruncated ? (
-                  <TruncatedWarning>Payload was too large to store.</TruncatedWarning>
-                ) : (
-                  <PreBlock>{parseJobData(job.data)}</PreBlock>
-                )}
-              </DetailsBlock>
 
               {(job.status === 'failed' && !job.retried) && (
                 <RetryButton

@@ -35,7 +35,7 @@ export function DeleteUserDialog({ user, open, onOpenChange }: { user: AdminUser
           <Button
             variant="destructive"
             disabled={deleteUser.isPending}
-            onClick={() => deleteUser.mutate(user.id, { onSuccess: () => onOpenChange(false) })}
+            onClick={() => deleteUser.mutate(user.publicId, { onSuccess: () => onOpenChange(false) })}
           >
             {deleteUser.isPending ? 'Deleting...' : 'Delete'}
           </Button>

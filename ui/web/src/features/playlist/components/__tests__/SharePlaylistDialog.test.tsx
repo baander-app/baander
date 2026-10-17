@@ -87,7 +87,7 @@ function serve() {
 
 function signInAs(publicId: string) {
   useAuthStore.setState({
-    user: { uuid: '0199c0de-7600-7000-8000-0000000000a1', publicId, email: 'owner@baander.app', name: 'Owner', roles: ['ROLE_USER'] },
+    user: { publicId, email: 'owner@baander.app', name: 'Owner', roles: ['ROLE_USER'] },
     isAuthenticated: true,
   })
 }

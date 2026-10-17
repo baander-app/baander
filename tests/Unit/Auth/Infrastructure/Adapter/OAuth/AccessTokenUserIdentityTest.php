@@ -21,9 +21,9 @@ final class AccessTokenUserIdentityTest extends TestCase
 {
     public function testMissingExplicitUserCannotBecomeClientIdentity(): void
     {
-        $id = Uuid::generate();
+        $id = new PublicId();
         $users = $this->createMock(UserRepositoryInterface::class);
-        $users->expects(self::once())->method('findByUuid')->with(self::equalTo($id))->willReturn(null);
+        $users->expects(self::once())->method('findByPublicId')->with(self::equalTo($id))->willReturn(null);
         $repository = $this->repository($users);
 
         try {
@@ -40,11 +40,11 @@ final class AccessTokenUserIdentityTest extends TestCase
         $user = User::register(Email::fromString('disabled@baander.app'), 'hashed', 'Disabled user');
         $user->disable();
         $users = $this->createMock(UserRepositoryInterface::class);
-        $users->expects(self::once())->method('findByUuid')->with(self::equalTo($user->getId()))->willReturn($user);
+        $users->expects(self::once())->method('findByPublicId')->with(self::equalTo($user->getPublicId()))->willReturn($user);
         $repository = $this->repository($users);
 
         try {
-            $repository->getNewToken($this->client(), [], $user->getId()->toString());
+            $repository->getNewToken($this->client(), [], $user->getPublicId()->toString());
             self::fail('A disabled user must not produce a client token.');
         } catch (OAuthServerException $error) {
             self::assertSame('access_denied', $error->getErrorType());
@@ -55,7 +55,7 @@ final class AccessTokenUserIdentityTest extends TestCase
     public function testClientCredentialIssuanceWithNoUserDoesNotLookUpAUser(): void
     {
         $users = $this->createMock(UserRepositoryInterface::class);
-        $users->expects(self::never())->method('findByUuid');
+        $users->expects(self::never())->method('findByPublicId');
         $client = $this->client();
         $token = $this->repository($users)->getNewToken($client, [], null);
 
@@ -63,6 +63,17 @@ final class AccessTokenUserIdentityTest extends TestCase
         self::assertNull($token->getUserIdentifier());
         self::assertSame($client, $token->getClient());
         self::assertNotSame('', $token->getIdentifier());
+    }
+
+    public function testAnInternalUserUuidIsNotAcceptedAsTheProtocolUserIdentifier(): void
+    {
+        $users = $this->createMock(UserRepositoryInterface::class);
+        $users->expects(self::never())->method('findByPublicId');
+        $users->expects(self::never())->method('findByUuid');
+
+        $this->expectException(OAuthServerException::class);
+
+        $this->repository($users)->getNewToken($this->client(), [], Uuid::generate()->toString());
     }
 
     private function repository(UserRepositoryInterface $users): AccessTokenRepository

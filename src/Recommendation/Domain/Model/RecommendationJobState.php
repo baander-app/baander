@@ -31,6 +31,7 @@ final class RecommendationJobState
         public array $metadata = [],
         /** @var Uuid|null ID of the original job if this is a requeue */
         public ?Uuid $originalJobId = null,
+        public ?PublicId $originalJobPublicId = null,
     ) {
     }
 }

@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => {
   })
   return {
     audio: sync(), player: sync(), layout: sync(),
-    auth: { isAuthenticated: true, user: { uuid: 'account-a' } as { uuid: string } | null },
+    auth: { isAuthenticated: true, user: { publicId: 'account-a' } as { publicId: string } | null },
     subscribe: vi.fn(), unsubscribe: vi.fn(),
     get: vi.fn(), mount: vi.fn(), cleanup: vi.fn(),
     isActive: undefined as (() => boolean) | undefined,
@@ -66,7 +66,7 @@ function provider() {
 describe('PreferenceSyncProvider conflicts', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.auth = { isAuthenticated: true, user: { uuid: 'account-a' } }
+    mocks.auth = { isAuthenticated: true, user: { publicId: 'account-a' } }
     mocks.subscribe.mockReturnValue(mocks.unsubscribe)
     mocks.get.mockResolvedValue({ data: {} })
     localStorage.clear()
@@ -136,7 +136,7 @@ describe('PreferenceSyncProvider conflicts', () => {
     expect(mocks.mount).toHaveBeenCalledTimes(1)
     expect(mocks.audio.fetchFromServer).toHaveBeenCalledTimes(1)
 
-    mocks.auth = { isAuthenticated: true, user: { uuid: 'account-b' } }
+    mocks.auth = { isAuthenticated: true, user: { publicId: 'account-b' } }
     // Auth changes invalidate the old callbacks even before React commits cleanup.
     expect(previousIsActive?.()).toBe(false)
     rerender(<PreferenceSyncProvider>{content}</PreferenceSyncProvider>)
@@ -157,7 +157,7 @@ describe('PreferenceSyncProvider conflicts', () => {
     mocks.auth = { isAuthenticated: true, user: null }
     const { rerender } = render(provider())
     expect(mocks.mount).not.toHaveBeenCalled()
-    mocks.auth.user = { uuid: 'account-a' }
+    mocks.auth.user = { publicId: 'account-a' }
     rerender(provider())
     expect(mocks.mount).toHaveBeenCalledTimes(1)
     expect(mocks.audio.fetchFromServer).toHaveBeenCalledTimes(1)
@@ -169,7 +169,7 @@ describe('PreferenceSyncProvider conflicts', () => {
     const { rerender } = render(provider())
     const firstConfig = mocks.get.mock.calls[0][1]
     expect(firstConfig.signal.aborted).toBe(false)
-    mocks.auth = { isAuthenticated: true, user: { uuid: 'account-b' } }
+    mocks.auth = { isAuthenticated: true, user: { publicId: 'account-b' } }
     rerender(provider())
     expect(firstConfig.signal.aborted).toBe(true)
     await act(async () => { resolveMood?.({ data: { mood: 'warm' } }) })

@@ -326,7 +326,7 @@ function RadioStationCard({ station }: { station: RadioStation }) {
   const { start } = useRadioPlayback()
   const activeStation = useRadioStore((s) => s.activeStation)
   const isPlaying = useRadioStore((s) => s.isPlaying)
-  const isActive = activeStation?.id === station.id
+  const isActive = activeStation?.publicId === station.publicId
 
   return (
     <CoverCardWithRing
@@ -423,7 +423,7 @@ export function HomePage() {
               <DashboardSection title="Radio Stations">
                 <HorizontalScrollRow>
                   {radioStations.map((station) => (
-                    <RadioStationCard key={station.id} station={station} />
+                    <RadioStationCard key={station.publicId} station={station} />
                   ))}
                 </HorizontalScrollRow>
               </DashboardSection>

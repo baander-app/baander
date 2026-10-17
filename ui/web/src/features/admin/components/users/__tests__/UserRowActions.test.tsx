@@ -5,7 +5,7 @@ import { UserRowActions } from '../UserRowActions'
 import { type AdminUser } from '../../../api/user-admin-api'
 
 const ALICE = {
-  id: '0199bf3c-8a00-7000-8000-00000000a11c',
+  publicId: 'AlicePublicIdentity01',
   email: 'alice@baander.app',
   name: 'Alice',
   roles: ['ROLE_USER'],

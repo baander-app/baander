@@ -100,8 +100,10 @@ final class AuthControllerTest extends TestCase
 
         $data = $this->assertJsonResponse($response, 200, 'data');
         $this->assertArrayHasKey('email', $data['data']);
-        $this->assertArrayHasKey('uuid', $data['data']);
-        $this->assertArrayHasKey('publicId', $data['data']);
+        $this->assertArrayNotHasKey('uuid', $data['data']);
+        $this->assertArrayNotHasKey('id', $data['data']);
+        $this->assertSame($user->getPublicId()->toString(), $data['data']['publicId']);
+        $this->assertStringNotContainsString($user->getId()->toString(), $response->getContent());
         $this->assertArrayHasKey('name', $data['data']);
     }
 

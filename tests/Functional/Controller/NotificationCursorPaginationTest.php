@@ -72,11 +72,18 @@ final class NotificationCursorPaginationTest extends TestCase
         $otherNewest = $this->createNotification($otherUser);
 
         $otherPage = $this->getPage($otherUser, ['limit' => 1]);
-        $this->assertSame($otherNewest->getId()->toString(), $otherPage['nextCursor']);
+        $this->assertSame($otherNewest->getPublicId()->toString(), $otherPage['nextCursor']);
 
         $page = $this->getPage($user, ['limit' => 1, 'cursor' => $otherPage['nextCursor']]);
-        $this->assertSame([$owned->getPublicId()->toString()], array_column($page['data'], 'publicId'));
+        $this->assertSame([], $page['data']);
         $this->assertNull($page['nextCursor']);
+    }
+
+    public function testInternalUuidIsRejectedAsAPublicCursor(): void
+    {
+        $user = $this->createTestUser();
+        $notification = $this->createNotification($user);
+        $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/notifications/?cursor=' . $notification->getId()->toString(), $user), 400);
     }
 
     /**
@@ -107,7 +114,7 @@ final class NotificationCursorPaginationTest extends TestCase
                 $this->assertNull($page['nextCursor']);
             } else {
                 $last = $expected[array_key_last($expected)];
-                $this->assertSame($last->getId()->toString(), $page['nextCursor']);
+                $this->assertSame($last->getPublicId()->toString(), $page['nextCursor']);
                 $query['cursor'] = $page['nextCursor'];
             }
         }

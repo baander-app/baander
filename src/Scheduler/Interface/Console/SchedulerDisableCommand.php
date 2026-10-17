@@ -37,7 +37,7 @@ final class SchedulerDisableCommand extends Command
             $input,
             new SymfonyStyle($input, $output),
             $this->jobs->disable(...),
-            'Disabled',
+            'Disabled', $this->jobs,
         );
     }
 }

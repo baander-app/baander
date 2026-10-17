@@ -7,6 +7,7 @@ namespace App\Playlist\Infrastructure;
 use App\Catalog\Application\Port\SongLookupInterface;
 use App\Playlist\Application\Port\PlaylistSongVisibilityInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 
 final class PlaylistSongVisibility implements PlaylistSongVisibilityInterface
@@ -14,6 +15,11 @@ final class PlaylistSongVisibility implements PlaylistSongVisibilityInterface
     public function __construct(
         private readonly SongLookupInterface $songs,
     ) {
+    }
+
+    public function findVisibleSongId(PublicId $songId, LibraryReadScope $scope): ?Uuid
+    {
+        return $this->songs->findVisibleSongId($songId, $scope);
     }
 
     public function isVisible(Uuid $songId, LibraryReadScope $scope): bool

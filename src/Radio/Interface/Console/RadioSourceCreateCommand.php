@@ -70,7 +70,7 @@ final class RadioSourceCreateCommand extends Command
             return AdminCommandSupport::json($io, $source);
         }
 
-        $io->success(sprintf('Created radio source "%s" (%s).', $source['name'], $source['id']));
+        $io->success(sprintf('Created radio source "%s" (%s).', $source['name'], $source['publicId']));
 
         return Command::SUCCESS;
     }

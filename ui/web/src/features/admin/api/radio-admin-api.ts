@@ -1,7 +1,7 @@
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 
 export interface RadioStation {
-  id: string
+  publicId: string
   sourceId: string
   externalId: string
   name: string
@@ -23,7 +23,7 @@ export interface RadioStation {
 }
 
 export interface RadioSource {
-  id: string
+  publicId: string
   name: string
   type: string
   url: string

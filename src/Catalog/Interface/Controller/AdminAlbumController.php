@@ -38,7 +38,7 @@ final class AdminAlbumController
         path: '/api/admin/albums/{publicId}/delete-preview',
         summary: 'Preview what will be deleted when deleting an album',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
             new OA\Parameter(name: 'deleteFiles', description: 'Also check each song file as a delete with deleteFiles would', in: 'query', required: false, schema: new OA\Schema(type: 'boolean')),
         ],
         responses: [
@@ -72,7 +72,7 @@ final class AdminAlbumController
         path: '/api/admin/albums/{publicId}',
         summary: 'Delete an album with optional file deletion',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
             new OA\Parameter(name: 'deleteFiles', description: 'Also delete the song audio files, inside the library root only', in: 'query', required: false, schema: new OA\Schema(type: 'boolean')),
             new OA\Parameter(name: 'deleteCover', description: 'Whether to delete cover image (default: true)', in: 'query', required: false, schema: new OA\Schema(type: 'boolean')),
         ],

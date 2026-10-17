@@ -20,7 +20,6 @@ const FRIEND = 'friendPublicId0000001'
 
 function playlist(overrides: Partial<PlaylistResource>): PlaylistResource {
   return {
-    uuid: '0199c0de-7600-7000-8000-0000000000b1',
     publicId: 'playlistPublicId00001',
     ownerPublicId: VIEWER,
     collaboratorPublicIds: [],
@@ -37,7 +36,6 @@ function playlist(overrides: Partial<PlaylistResource>): PlaylistResource {
 
 const MINE = playlist({ name: 'Mine' })
 const THEIRS = playlist({
-  uuid: '0199c0de-7600-7000-8000-0000000000b2',
   publicId: 'playlistPublicId00002',
   ownerPublicId: FRIEND,
   collaboratorPublicIds: [VIEWER],
@@ -64,7 +62,7 @@ describe('PlaylistsPage shared badge', () => {
       throw new Error(`Unexpected request ${url}`)
     })
     useAuthStore.setState({
-      user: { uuid: '0199c0de-7600-7000-8000-0000000000a1', publicId: VIEWER, email: 'viewer@baander.app', name: 'Viewer', roles: ['ROLE_USER'] },
+      user: { publicId: VIEWER, email: 'viewer@baander.app', name: 'Viewer', roles: ['ROLE_USER'] },
       isAuthenticated: true,
     })
   })

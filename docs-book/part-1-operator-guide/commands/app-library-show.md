@@ -12,7 +12,7 @@ make exec cmd="php bin/console app:library:show my-music"
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `library` | Yes | The library's UUID or slug |
+| `library` | Yes | The library's public ID or slug |
 
 ## Options
 
@@ -22,7 +22,7 @@ make exec cmd="php bin/console app:library:show my-music"
 
 ## Details
 
-The command prints the library's UUID, name, slug, path, type, filesystem, sort order, scan status, last scan, creation time and last update. Times are in ISO 8601 format.
+The command prints the library's public ID, name, slug, path, type, filesystem, sort order, scan status, last scan, creation time and last update. Times are in ISO 8601 format.
 
 The command reads any library. In the API, a user who is not an admin sees only the libraries they were granted; shell access is not bound by grants.
 
@@ -31,4 +31,4 @@ The command reads any library. In the API, a user who is not an admin sees only 
 | Code | Meaning |
 |------|---------|
 | 0 | Library printed |
-| 1 | No library has the UUID or slug, or another error occurred; the message says why |
+| 1 | No library has the public ID or slug, or another error occurred; the message says why |

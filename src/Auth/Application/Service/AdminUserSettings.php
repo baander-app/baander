@@ -30,11 +30,11 @@ final readonly class AdminUserSettings
     }
 
     /**
-     * @param string $user the user's email address or UUID
+     * @param string $user the user's email address or public ID
      *
      * @return list<UserSettingView>
      *
-     * @throws UserNotFoundException when no user has the email address or UUID
+     * @throws UserNotFoundException when no user has the email address or public ID
      */
     public function settings(string $user): array
     {
@@ -42,9 +42,9 @@ final readonly class AdminUserSettings
     }
 
     /**
-     * @param string $user the user's email address or UUID
+     * @param string $user the user's email address or public ID
      *
-     * @throws UserNotFoundException   when no user has the email address or UUID
+     * @throws UserNotFoundException   when no user has the email address or public ID
      * @throws UnknownSettingException when no user setting has the key
      */
     public function setting(string $user, string $key): UserSettingView
@@ -54,10 +54,10 @@ final readonly class AdminUserSettings
 
     /**
      * @param string $actorId the signed-in administrator's id, or {@see self::CLI_ACTOR}
-     * @param string $user    the user's email address or UUID
+     * @param string $user    the user's email address or public ID
      * @param mixed  $value   a CLI string or a JSON value, parsed against the setting's definition
      *
-     * @throws UserNotFoundException         when no user has the email address or UUID
+     * @throws UserNotFoundException         when no user has the email address or public ID
      * @throws UnknownSettingException       when no user setting has the key
      * @throws InvalidSettingValuesException when the value is not allowed
      */
@@ -75,9 +75,9 @@ final readonly class AdminUserSettings
 
     /**
      * @param string $actorId the signed-in administrator's id, or {@see self::CLI_ACTOR}
-     * @param string $user    the user's email address or UUID
+     * @param string $user    the user's email address or public ID
      *
-     * @throws UserNotFoundException   when no user has the email address or UUID
+     * @throws UserNotFoundException   when no user has the email address or public ID
      * @throws UnknownSettingException when no user setting has the key
      */
     public function reset(string $actorId, string $user, string $key): UserSettingView
@@ -93,7 +93,7 @@ final readonly class AdminUserSettings
     }
 
     /**
-     * @throws UserNotFoundException when no user has the email address or UUID
+     * @throws UserNotFoundException when no user has the email address or public ID
      */
     private function userId(string $user): string
     {

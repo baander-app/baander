@@ -49,10 +49,10 @@ final class SessionController
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'id', type: 'string', format: 'uuid'),
-                            new OA\Property(property: 'userId', type: 'string', format: 'uuid'),
-                            new OA\Property(property: 'activeDeviceId', type: 'string', format: 'uuid', nullable: true),
-                            new OA\Property(property: 'queue', type: 'array', items: new OA\Items(type: 'string')),
+                            new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                            new OA\Property(property: 'userId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                            new OA\Property(property: 'activeDeviceId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true),
+                            new OA\Property(property: 'queue', type: 'array', items: new OA\Items(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
                             new OA\Property(property: 'currentTrackIndex', type: 'integer'),
                             new OA\Property(property: 'position', type: 'number'),
                             new OA\Property(property: 'playbackState', type: 'string'),
@@ -92,7 +92,7 @@ final class SessionController
             content: new OA\JsonContent(
                 required: ['queue', 'currentTrackIndex', 'position', 'playbackState'],
                 properties: [
-                    new OA\Property(property: 'queue', type: 'array', items: new OA\Items(type: 'string')),
+                    new OA\Property(property: 'queue', type: 'array', items: new OA\Items(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
                     new OA\Property(property: 'currentTrackIndex', type: 'integer', minimum: 0),
                     new OA\Property(property: 'position', type: 'number', minimum: 0),
                     new OA\Property(property: 'playbackState', type: 'string', enum: ['playing', 'paused', 'stopped']),
@@ -106,10 +106,10 @@ final class SessionController
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'id', type: 'string', format: 'uuid'),
-                            new OA\Property(property: 'userId', type: 'string', format: 'uuid'),
-                            new OA\Property(property: 'activeDeviceId', type: 'string', format: 'uuid', nullable: true),
-                            new OA\Property(property: 'queue', type: 'array', items: new OA\Items(type: 'string')),
+                            new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                            new OA\Property(property: 'userId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                            new OA\Property(property: 'activeDeviceId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true),
+                            new OA\Property(property: 'queue', type: 'array', items: new OA\Items(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
                             new OA\Property(property: 'currentTrackIndex', type: 'integer'),
                             new OA\Property(property: 'position', type: 'number'),
                             new OA\Property(property: 'playbackState', type: 'string'),
@@ -179,10 +179,10 @@ final class SessionController
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'id', type: 'string', format: 'uuid'),
-                            new OA\Property(property: 'userId', type: 'string', format: 'uuid'),
-                            new OA\Property(property: 'activeDeviceId', type: 'string', format: 'uuid'),
-                            new OA\Property(property: 'queue', type: 'array', items: new OA\Items(type: 'string')),
+                            new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                            new OA\Property(property: 'userId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                            new OA\Property(property: 'activeDeviceId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                            new OA\Property(property: 'queue', type: 'array', items: new OA\Items(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
                             new OA\Property(property: 'currentTrackIndex', type: 'integer'),
                             new OA\Property(property: 'position', type: 'number'),
                             new OA\Property(property: 'playbackState', type: 'string'),
@@ -230,7 +230,7 @@ final class SessionController
             content: new OA\JsonContent(
                 required: ['queue', 'currentTrackIndex', 'position'],
                 properties: [
-                    new OA\Property(property: 'queue', type: 'array', items: new OA\Items(type: 'string')),
+                    new OA\Property(property: 'queue', type: 'array', items: new OA\Items(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
                     new OA\Property(property: 'currentTrackIndex', type: 'integer', minimum: 0),
                     new OA\Property(property: 'position', type: 'number', minimum: 0),
                 ],
@@ -243,10 +243,10 @@ final class SessionController
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'id', type: 'string', format: 'uuid'),
-                            new OA\Property(property: 'userId', type: 'string', format: 'uuid'),
-                            new OA\Property(property: 'activeDeviceId', type: 'string', format: 'uuid', nullable: true),
-                            new OA\Property(property: 'queue', type: 'array', items: new OA\Items(type: 'string')),
+                            new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                            new OA\Property(property: 'userId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
+                            new OA\Property(property: 'activeDeviceId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true),
+                            new OA\Property(property: 'queue', type: 'array', items: new OA\Items(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
                             new OA\Property(property: 'currentTrackIndex', type: 'integer'),
                             new OA\Property(property: 'position', type: 'number'),
                             new OA\Property(property: 'playbackState', type: 'string'),

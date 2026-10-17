@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Interface\Console;
 
 use App\Catalog\Application\Port\GenrePortInterface;
+use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -26,6 +27,7 @@ final class GenreAlbumAddCommand extends Command
 {
     public function __construct(
         private readonly GenrePortInterface $genres,
+        private readonly AlbumPortInterface $targets,
     ) {
         parent::__construct();
     }
@@ -34,7 +36,7 @@ final class GenreAlbumAddCommand extends Command
     {
         $this
             ->addArgument('slug', InputArgument::REQUIRED, 'The genre slug')
-            ->addArgument('album-id', InputArgument::REQUIRED, 'The album UUID');
+            ->addArgument('album-id', InputArgument::REQUIRED, 'The album public ID');
         AdminCommandSupport::addJsonOption($this);
     }
 
@@ -44,7 +46,7 @@ final class GenreAlbumAddCommand extends Command
         $slug = (string) $input->getArgument('slug');
 
         try {
-            $link = GenreLinkTarget::resolve($this->genres, $slug, (string) $input->getArgument('album-id'), 'album');
+            $link = GenreLinkTarget::resolve($this->genres, $slug, (string) $input->getArgument('album-id'), 'album', $this->targets);
             if (!$this->genres->addAlbumToGenre($link->genreId, $link->targetId)) {
                 throw new NotFoundException('Album not found.');
             }
@@ -53,7 +55,7 @@ final class GenreAlbumAddCommand extends Command
         }
 
         if (!AdminCommandSupport::wantsJson($input)) {
-            $io->success(sprintf('Album %s has the genre "%s".', $link->targetId->toString(), $slug));
+            $io->success(sprintf('Album %s has the genre "%s".', (string) $input->getArgument('album-id'), $slug));
         }
 
         return Command::SUCCESS;

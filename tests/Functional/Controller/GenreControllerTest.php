@@ -139,7 +139,7 @@ final class GenreControllerTest extends TestCase
             $this->authenticatedRequest('POST', '/api/genres/', $admin, [
                 'name' => 'Hard Rock',
                 'slug' => 'hard-rock',
-                'parentId' => $root['uuid'],
+                'parentId' => $root['publicId'],
             ]),
             201,
         );
@@ -156,7 +156,7 @@ final class GenreControllerTest extends TestCase
         $this->assertArrayHasKey('children', $data['data']);
         $this->assertCount(1, $data['data']['children']);
         $this->assertSame('hard-rock', $data['data']['children'][0]['slug']);
-        $this->assertSame($root['uuid'], $data['data']['children'][0]['parentId']);
+        $this->assertSame($root['publicId'], $data['data']['children'][0]['parentId']);
     }
 
     public function testShowDeniesGenreWithoutAccessibleMedia(): void

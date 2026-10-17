@@ -7,6 +7,7 @@ namespace App\Scheduler\Application\Port;
 use App\Scheduler\Application\DTO\SchedulerOccurrence;
 use App\Scheduler\Application\Exception\SchedulerOccurrenceConflict;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 
 interface SchedulerManualOccurrenceRecorderInterface
 {
@@ -20,5 +21,7 @@ interface SchedulerManualOccurrenceRecorderInterface
      *
      * @throws SchedulerOccurrenceConflict If the request ID belongs to another immutable occurrence.
      */
+    public function recordByPublicId(PublicId $jobPublicId, Uuid $requestId): ?SchedulerOccurrence;
+
     public function record(Uuid $jobId, Uuid $requestId): ?SchedulerOccurrence;
 }

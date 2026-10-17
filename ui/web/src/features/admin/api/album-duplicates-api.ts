@@ -1,7 +1,6 @@
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 
 export interface AlbumSummary {
-  uuid: string
   publicId: string
   title: string
   type?: string

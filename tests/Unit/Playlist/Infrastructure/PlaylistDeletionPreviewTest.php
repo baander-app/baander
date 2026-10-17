@@ -15,8 +15,8 @@ final class PlaylistDeletionPreviewTest extends TestCase
     {
         $firstSong = new Uuid();
         $secondSong = new Uuid();
-        $sharedPlaylist = ['uuid' => (new Uuid())->toString(), 'name' => 'Favorites'];
-        $otherPlaylist = ['uuid' => (new Uuid())->toString(), 'name' => 'Favorites'];
+        $sharedPlaylist = ['publicId' => (new \App\Shared\Domain\Model\PublicId())->toString(), 'name' => 'Favorites'];
+        $otherPlaylist = ['publicId' => (new \App\Shared\Domain\Model\PublicId())->toString(), 'name' => 'Favorites'];
 
         $repository = $this->createMock(PlaylistRepositoryInterface::class);
         $repository->expects(self::exactly(2))

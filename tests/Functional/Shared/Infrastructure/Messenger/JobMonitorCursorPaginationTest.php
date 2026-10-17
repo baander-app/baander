@@ -44,6 +44,10 @@ final class JobMonitorCursorPaginationTest extends TestCase
         }
         $this->entityManager->clear();
 
+        foreach ($rows as $jobId => &$row) {
+            $row[1] = $jobId;
+        }
+        unset($row);
         uasort($rows, static fn (array $left, array $right): int => $left <=> $right);
         $this->expected = array_map('strval', array_keys($rows));
     }
@@ -212,6 +216,6 @@ final class JobMonitorCursorPaginationTest extends TestCase
 
     private function idOf(string $jobId): string
     {
-        return (string) $this->entityManager->getConnection()->fetchOne('SELECT id FROM job_monitors WHERE job_id = ?', [$jobId]);
+        return $jobId;
     }
 }

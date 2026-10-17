@@ -7,7 +7,7 @@ namespace App\Auth\Infrastructure\Doctrine\Repository;
 use App\Auth\Domain\Model\LoginBlock;
 use App\Auth\Domain\Repository\LoginBlockRepositoryInterface;
 use App\Auth\Infrastructure\Doctrine\Entity\LoginBlockEntity;
-use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class LoginBlockRepository implements LoginBlockRepositoryInterface
@@ -20,6 +20,7 @@ final class LoginBlockRepository implements LoginBlockRepositoryInterface
     {
         $entity = new LoginBlockEntity(
             id: $block->getId(),
+            publicId: $block->getPublicId(),
             ipAddress: $block->getIpAddress(),
             email: $block->getEmail(),
             fieldValue: $block->getFieldValue(),
@@ -47,9 +48,9 @@ final class LoginBlockRepository implements LoginBlockRepositoryInterface
             ->count([]);
     }
 
-    public function deleteByUuid(Uuid $uuid): bool
+    public function deleteByPublicId(PublicId $publicId): bool
     {
-        $entity = $this->entityManager->find(LoginBlockEntity::class, $uuid);
+        $entity = $this->entityManager->getRepository(LoginBlockEntity::class)->findOneBy(['publicId' => $publicId]);
         if ($entity === null) {
             return false;
         }

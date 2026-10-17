@@ -88,8 +88,6 @@ deptrac:
       - App\Media\Application\Port\ImagePortInterface
     App\Catalog\Interface\Controller\ArtistController:
       - App\Media\Application\Port\ImagePortInterface
-    App\Catalog\Interface\Controller\MovieController:
-      - App\Catalog\Domain\Repository\VideoRepositoryInterface
     App\Catalog\Interface\Controller\SongController:
       - App\Catalog\Domain\Model\Song
       - App\Shared\Infrastructure\Pagination\CursorCodec
@@ -245,7 +243,6 @@ deptrac:
       - App\Catalog\Domain\Repository\ArtistRepositoryInterface
       - App\Catalog\Domain\Repository\SongRepositoryInterface
       - App\Media\Application\Port\ImagePortInterface
-      - App\Recommendation\Interface\Resource\RecommendationResource
     App\Recommendation\Infrastructure\Doctrine\Entity\RecommendationEntity:
       - App\Auth\Infrastructure\Doctrine\Entity\UserEntity
     App\Recommendation\Infrastructure\Doctrine\Repository\RecommendationRepository:

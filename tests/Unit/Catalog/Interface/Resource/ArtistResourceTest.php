@@ -31,7 +31,7 @@ final class ArtistResourceTest extends TestCase
     {
         $result = ArtistResource::from($this->artist);
 
-        $this->assertArrayHasKey('uuid', $result);
+        $this->assertArrayNotHasKey('uuid', $result);
         $this->assertArrayHasKey('publicId', $result);
         $this->assertArrayHasKey('name', $result);
         $this->assertArrayHasKey('country', $result);
@@ -52,12 +52,12 @@ final class ArtistResourceTest extends TestCase
         $this->assertSame('Beatles, The', $result['sortName']);
     }
 
-    public function testFromContainsUuidAsNonEmptyString(): void
+    public function testFromOmitsInternalUuid(): void
     {
         $result = ArtistResource::from($this->artist);
 
-        $this->assertIsString($result['uuid']);
-        $this->assertNotEmpty($result['uuid']);
+        $this->assertArrayNotHasKey('uuid', $result);
+        $this->assertNotContains($this->artist->getId()->toString(), $result);
     }
 
     public function testFromContainsPublicIdAsNonEmptyString(): void

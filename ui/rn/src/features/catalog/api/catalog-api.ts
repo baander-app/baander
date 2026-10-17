@@ -104,7 +104,6 @@ export interface ApiResponse<T> {
  * Album types.
  */
 export interface Album {
-  uuid: string;
   publicId: string;
   title: string;
   artistName: string | null;
@@ -118,7 +117,6 @@ export interface Album {
  * Artist types.
  */
 export interface Artist {
-  uuid: string;
   publicId: string;
   name: string;
   imageBlurhash: string | null;
@@ -130,7 +128,6 @@ export interface Artist {
  * Song types.
  */
 export interface Song {
-  uuid: string;
   publicId: string;
   title: string;
   artistName: string | null;
@@ -146,7 +143,6 @@ export interface Song {
  * Genre types.
  */
 export interface Genre {
-  uuid: string;
   publicId: string;
   name: string;
   albumCount: number;

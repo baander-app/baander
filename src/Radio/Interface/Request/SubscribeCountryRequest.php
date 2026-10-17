@@ -9,7 +9,8 @@ use Symfony\Component\Validator\Constraints as Assert;
 final readonly class SubscribeCountryRequest
 {
     public function __construct(
-        #[Assert\Uuid]
+        #[Assert\Length(exactly: 21)]
+        #[Assert\Regex(pattern: '/^[0-9a-zA-Z_-]{21}$/D')]
         public ?string $sourceId = null,
 
         #[Assert\NotBlank]

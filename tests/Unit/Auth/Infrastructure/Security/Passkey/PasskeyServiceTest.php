@@ -64,7 +64,7 @@ final class PasskeyServiceTest extends TestCase
 
         $creationOptions = PublicKeyCredentialCreationOptions::create(
             rp: \Webauthn\PublicKeyCredentialRpEntity::create(name: 'Test App', id: 'localhost'),
-            user: \Webauthn\PublicKeyCredentialUserEntity::create(name: 'user@test.com', id: 'user-1', displayName: 'User'),
+            user: \Webauthn\PublicKeyCredentialUserEntity::create(name: 'user@baander.app', id: 'user-1', displayName: 'User'),
             challenge: random_bytes(32),
         );
 
@@ -89,7 +89,7 @@ final class PasskeyServiceTest extends TestCase
     {
         $creationOptions = PublicKeyCredentialCreationOptions::create(
             rp: \Webauthn\PublicKeyCredentialRpEntity::create(name: 'Test App', id: 'localhost'),
-            user: \Webauthn\PublicKeyCredentialUserEntity::create(name: 'user@test.com', id: 'user-1', displayName: 'User'),
+            user: \Webauthn\PublicKeyCredentialUserEntity::create(name: 'user@baander.app', id: 'user-1', displayName: 'User'),
             challenge: random_bytes(32),
         );
 
@@ -148,7 +148,7 @@ final class PasskeyServiceTest extends TestCase
 
         $creationOptions = PublicKeyCredentialCreationOptions::create(
             rp: \Webauthn\PublicKeyCredentialRpEntity::create(name: 'Test App', id: 'localhost'),
-            user: \Webauthn\PublicKeyCredentialUserEntity::create(name: 'user@test.com', id: 'user-1', displayName: 'User'),
+            user: \Webauthn\PublicKeyCredentialUserEntity::create(name: 'user@baander.app', id: 'user-1', displayName: 'User'),
             challenge: random_bytes(32),
         );
 
@@ -283,7 +283,7 @@ final class PasskeyServiceTest extends TestCase
 
         $creationOptions = PublicKeyCredentialCreationOptions::create(
             rp: \Webauthn\PublicKeyCredentialRpEntity::create(name: 'Test App', id: 'localhost'),
-            user: \Webauthn\PublicKeyCredentialUserEntity::create(name: 'user@test.com', id: 'user-1', displayName: 'User'),
+            user: \Webauthn\PublicKeyCredentialUserEntity::create(name: 'user@baander.app', id: 'user-1', displayName: 'User'),
             challenge: random_bytes(32),
         );
 
@@ -346,8 +346,8 @@ final class PasskeyServiceTest extends TestCase
     public function testCreateRegistrationOptionsReturnsChallengeKeyAndOptions(): void
     {
         $result = $this->service->createRegistrationOptions(
-            userId: 'user-1',
-            username: 'user@test.com',
+            userId: 'sssssssssssssssssssss',
+            username: 'user@baander.app',
             existingCredentialIds: [],
         );
 
@@ -357,6 +357,24 @@ final class PasskeyServiceTest extends TestCase
         $this->assertNotEmpty($result['options']['challenge']);
         $this->assertSame('localhost', $result['options']['rp']['id']);
         $this->assertSame('Test App', $result['options']['rp']['name']);
+        $this->assertSame('sssssssssssssssssssss', base64_decode(strtr($result['options']['user']['id'], '-_', '+/'), true));
+    }
+
+    public function testRegistrationOptionsAndAccountSignalsRejectUuidHandles(): void
+    {
+        $uuid = \App\Shared\Domain\Model\Uuid::v7()->toString();
+        foreach ([
+            fn () => $this->service->createRegistrationOptions($uuid, 'user@baander.app'),
+            fn () => $this->service->createAllAcceptedCredentialsSignal($uuid, 'user@baander.app', []),
+            fn () => $this->service->createCurrentUserDetailsSignal($uuid, 'user@baander.app', 'User'),
+        ] as $operation) {
+            try {
+                $operation();
+                self::fail('WebAuthn user handles must be public IDs.');
+            } catch (\InvalidArgumentException $error) {
+                self::assertStringContainsString('PublicId', $error->getMessage());
+            }
+        }
     }
 
     public function testCreateRegistrationOptionsExcludesExistingCredentials(): void
@@ -364,8 +382,8 @@ final class PasskeyServiceTest extends TestCase
         $existingId = base64_encode('existing-cred-id');
 
         $result = $this->service->createRegistrationOptions(
-            userId: 'user-1',
-            username: 'user@test.com',
+            userId: 'sssssssssssssssssssss',
+            username: 'user@baander.app',
             existingCredentialIds: [$existingId],
         );
 
@@ -470,8 +488,8 @@ final class PasskeyServiceTest extends TestCase
         $credId = base64_encode('cred-id-1');
 
         $signal = $this->service->createAllAcceptedCredentialsSignal(
-            userId: 'user-1',
-            username: 'user@test.com',
+            userId: 'sssssssssssssssssssss',
+            username: 'user@baander.app',
             credentialIds: [$credId],
         );
 
@@ -480,15 +498,15 @@ final class PasskeyServiceTest extends TestCase
         $this->assertArrayHasKey('rpId', $data);
         $this->assertArrayHasKey('allAcceptedCredentialIds', $data);
         $this->assertSame('localhost', $data['rpId']);
-        $this->assertSame('dXNlci0x', $data['userId']);
+        $this->assertSame(rtrim(strtr(base64_encode('sssssssssssssssssssss'), '+/', '-_'), '='), $data['userId']);
         $this->assertCount(1, $data['allAcceptedCredentialIds']);
     }
 
     public function testCreateAllAcceptedCredentialsSignalWithEmptyList(): void
     {
         $signal = $this->service->createAllAcceptedCredentialsSignal(
-            userId: 'user-1',
-            username: 'user@test.com',
+            userId: 'sssssssssssssssssssss',
+            username: 'user@baander.app',
             credentialIds: [],
         );
 
@@ -500,16 +518,16 @@ final class PasskeyServiceTest extends TestCase
     public function testCreateCurrentUserDetailsSignalReturnsJson(): void
     {
         $signal = $this->service->createCurrentUserDetailsSignal(
-            userId: 'user-1',
-            username: 'user@test.com',
+            userId: 'sssssssssssssssssssss',
+            username: 'user@baander.app',
             displayName: 'Test User',
         );
 
         $data = json_decode($signal, true, 512, JSON_THROW_ON_ERROR);
 
         $this->assertSame('localhost', $data['rpId']);
-        $this->assertSame('dXNlci0x', $data['userId']);
-        $this->assertSame('user@test.com', $data['name']);
+        $this->assertSame(rtrim(strtr(base64_encode('sssssssssssssssssssss'), '+/', '-_'), '='), $data['userId']);
+        $this->assertSame('user@baander.app', $data['name']);
         $this->assertSame('Test User', $data['displayName']);
     }
 

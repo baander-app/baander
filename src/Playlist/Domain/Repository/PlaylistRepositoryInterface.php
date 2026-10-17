@@ -39,7 +39,7 @@ interface PlaylistRepositoryInterface
     /**
      * Find playlists containing a specific song.
      *
-     * @return array<array{uuid: string, name: string}>
+     * @return array<array{publicId: string, name: string}>
      */
     public function findPlaylistNamesContainingSong(Uuid $songId): array;
 

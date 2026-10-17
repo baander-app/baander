@@ -12,6 +12,8 @@ use App\Session\Infrastructure\SessionAdapter;
 use App\Session\Interface\Controller\DeviceController;
 use App\Session\Interface\Request\RenameDeviceRequest;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
+use App\Session\Application\Port\SessionUserPublicIdentityInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -32,14 +34,14 @@ final class DeviceRenameFailureTest extends TestCase
     public function testRepositoryFailureEscapesBothAdapterAndControllerUnchanged(string $stage, \Exception $failure): void
     {
         $userId = Uuid::generate();
-        $deviceId = Uuid::generate();
+        $deviceId = new PublicId();
         $devices = $this->createMock(DeviceRepositoryInterface::class);
         if ($stage === 'lookup') {
-            $devices->expects(self::once())->method('findByUserAndDevice')->with($userId, $deviceId)->willThrowException($failure);
+            $devices->expects(self::once())->method('findByUserAndPublicId')->with($userId, $deviceId)->willThrowException($failure);
             $devices->expects(self::never())->method('save');
         } else {
-            $device = Device::create($userId, $deviceId, 'Original Name');
-            $devices->expects(self::once())->method('findByUserAndDevice')->with($userId, $deviceId)->willReturn($device);
+            $device = Device::create($userId, Uuid::generate(), 'Original Name');
+            $devices->expects(self::once())->method('findByUserAndPublicId')->with($userId, $deviceId)->willReturn($device);
             $devices->expects(self::once())->method('save')->with($device)->willThrowException($failure);
         }
         $controller = $this->controller($userId, $devices);
@@ -58,9 +60,9 @@ final class DeviceRenameFailureTest extends TestCase
     public function testMissingDeviceReturnsNotFoundWithoutSaving(): void
     {
         $userId = Uuid::generate();
-        $deviceId = Uuid::generate();
+        $deviceId = new PublicId();
         $devices = $this->createMock(DeviceRepositoryInterface::class);
-        $devices->expects(self::once())->method('findByUserAndDevice')->with($userId, $deviceId)->willReturn(null);
+        $devices->expects(self::once())->method('findByUserAndPublicId')->with($userId, $deviceId)->willReturn(null);
         $devices->expects(self::never())->method('save');
         $controller = $this->controller($userId, $devices);
 
@@ -78,6 +80,6 @@ final class DeviceRenameFailureTest extends TestCase
         $sessions = $this->createStub(ListeningSessionRepositoryInterface::class);
         $events = $this->createStub(EventDispatcherInterface::class);
 
-        return new DeviceController($security, new SessionAdapter($sessions, $devices, $events));
+        return new DeviceController($security, new SessionAdapter($sessions, $devices, $events, $this->createStub(SessionUserPublicIdentityInterface::class)));
     }
 }

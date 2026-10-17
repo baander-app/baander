@@ -86,11 +86,24 @@ describe('feature store transitions', () => {
   })
 
   it('never selects a removed default profile as the replacement', () => {
-    const profile: EqProfile = { id: 'default', name: 'Default', icon: 'headphones', payload: {}, isDefault: true, sortOrder: 0, version: 1 }
+    const profile: EqProfile = { publicId: 'default', name: 'Default', icon: 'headphones', payload: {}, isDefault: true, sortOrder: 0, version: 1 }
     useEqProfilesStore.getState().setProfiles([profile])
-    useEqProfilesStore.getState().setActiveProfileId(profile.id)
-    useEqProfilesStore.getState().removeProfile(profile.id)
+    useEqProfilesStore.getState().setActiveProfileId(profile.publicId)
+    useEqProfilesStore.getState().removeProfile(profile.publicId)
     expect(useEqProfilesStore.getState().activeProfileId).toBeNull()
     expect(useEqProfilesStore.getState().profiles).toEqual([])
   })
+
+  it('selects the remaining default profile by public identity after removal', () => {
+    const defaults: EqProfile = {
+      publicId: 'DefaultEqPublicIdent1', name: 'Default', icon: 'headphones',
+      payload: {}, isDefault: true, sortOrder: 0, version: 1,
+    }
+    const selected: EqProfile = { ...defaults, publicId: 'CustomEqPublicIdent01', isDefault: false }
+    useEqProfilesStore.getState().setProfiles([defaults, selected])
+    useEqProfilesStore.getState().setActiveProfileId(selected.publicId)
+    useEqProfilesStore.getState().removeProfile(selected.publicId)
+    expect(useEqProfilesStore.getState().activeProfileId).toBe(defaults.publicId)
+  })
+
 })

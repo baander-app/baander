@@ -72,9 +72,9 @@ final class UserSettingCommandTest extends TestCase
         ], $this->logs->getRecords()[0]->context);
     }
 
-    public function testTheUserCanBeNamedByUuid(): void
+    public function testTheUserCanBeNamedByPublicId(): void
     {
-        $exitCode = $this->tester->execute(['action' => 'set', 'identifier' => $this->aliceId(), 'key' => 'language', 'value' => 'th']);
+        $exitCode = $this->tester->execute(['action' => 'set', 'identifier' => $this->alice->getPublicId()->toString(), 'key' => 'language', 'value' => 'th']);
 
         $this->assertSame(Command::SUCCESS, $exitCode, $this->tester->getDisplay());
         $this->assertSame('th', $this->stored[$this->aliceId()]['language']);
@@ -216,6 +216,7 @@ final class UserSettingCommandTest extends TestCase
     private function users(): UserRepositoryInterface
     {
         $users = $this->createStub(UserRepositoryInterface::class);
+        $users->method('findByPublicId')->willReturnCallback(fn (\App\Shared\Domain\Model\PublicId $id): ?User => $id->equals($this->alice->getPublicId()) ? $this->alice : null);
         $users->method('findByEmail')->willReturnCallback(
             fn (Email $email): ?User => $email->toString() === 'alice@baander.app' ? $this->alice : null,
         );

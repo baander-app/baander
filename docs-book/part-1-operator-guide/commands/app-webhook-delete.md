@@ -5,20 +5,20 @@ Delete an outgoing webhook. The command does what `DELETE /api/webhooks/{id}` do
 ## Quick start
 
 ```bash
-make exec cmd="php bin/console app:webhook:delete 0192a3b4-c5d6-7890-abcd-ef1234567890"
+make exec cmd="php bin/console app:webhook:delete aB3dE5fG7hJ9kL1mN3pQr"
 ```
 
 Without a terminal, for example in a script:
 
 ```bash
-make exec cmd="php bin/console app:webhook:delete 0192a3b4-c5d6-7890-abcd-ef1234567890 --force"
+make exec cmd="php bin/console app:webhook:delete aB3dE5fG7hJ9kL1mN3pQr --force"
 ```
 
 ## Arguments
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `id` | Yes | The webhook UUID, as [app:webhook:list](app-webhook-list.md) shows it |
+| `id` | Yes | The webhook public ID, as [app:webhook:list](app-webhook-list.md) shows it |
 
 ## Options
 
@@ -41,4 +41,4 @@ With `--json` the command prints nothing on success; read the outcome from the e
 |------|---------|
 | 0 | Webhook deleted |
 | 1 | No webhook has the ID, the operator declined, or another error occurred; the message says why |
-| 2 | The ID is not a UUID, or no terminal is attached and `--force` was not given; nothing was deleted |
+| 2 | The ID is not a public ID, or no terminal is attached and `--force` was not given; nothing was deleted |

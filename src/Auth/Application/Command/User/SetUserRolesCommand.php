@@ -11,7 +11,7 @@ final readonly class SetUserRolesCommand
      * @param list<string> $roles the complete new set of roles, such as ROLE_USER and ROLE_ADMIN
      */
     public function __construct(
-        /** The user's email address or UUID. */
+        /** The user's email address or public ID. */
         public string $identifier,
         public array $roles,
     ) {

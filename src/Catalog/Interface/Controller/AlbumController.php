@@ -69,7 +69,7 @@ final class AlbumController
             new OA\Parameter(name: 'q', description: 'Search query', in: 'query', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'sort', description: 'Sort field (title, year, artist, added)', in: 'query', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'order', description: 'Sort order (asc, desc)', in: 'query', schema: new OA\Schema(type: 'string', enum: ['asc', 'desc'], default: 'asc')),
-            new OA\Parameter(name: 'artistId', description: 'Filter by artist public ID', in: 'query', schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'artistId', description: 'Filter by artist public ID', in: 'query', schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
             new OA\Parameter(name: 'genre', description: 'Filter by genre slug', in: 'query', schema: new OA\Schema(type: 'string')),
         ],
         responses: [
@@ -154,14 +154,13 @@ final class AlbumController
         path: '/api/albums/{publicId}',
         summary: 'Get a single album with its songs',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Album with songs', content: new OA\JsonContent(
                 properties: [
                     new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'uuid', type: 'string', format: 'uuid'),
-                        new OA\Property(property: 'publicId', type: 'string'),
+                        new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
                         new OA\Property(property: 'title', type: 'string'),
                         new OA\Property(property: 'type', type: 'string'),
                         new OA\Property(property: 'year', type: 'integer'),
@@ -228,7 +227,7 @@ final class AlbumController
         path: '/api/albums/{publicId}/cover',
         summary: 'Get album cover image',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
         ],
         responses: [
             new OA\Response(response: '302', description: 'Redirect to cover image file'),
@@ -276,7 +275,7 @@ final class AlbumController
         path: '/api/albums/{publicId}/duplicates',
         summary: 'Get duplicate albums for a specific album',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'List of duplicate groups containing this album', content: new OA\JsonContent(
@@ -330,7 +329,7 @@ final class AlbumController
                 new OA\Property(property: 'annotation', type: 'string', nullable: true),
             ])),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Album updated', content: new OA\JsonContent(
@@ -418,7 +417,7 @@ final class AlbumController
         path: '/api/albums/{publicId}',
         summary: 'Delete an album',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
         ],
         responses: [
             new OA\Response(

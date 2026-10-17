@@ -11,6 +11,7 @@ use App\Library\Domain\ValueObject\LibraryClaimRelease;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 
 interface LibraryRepositoryInterface
@@ -23,6 +24,10 @@ interface LibraryRepositoryInterface
     public function findVisibleBySlug(LibrarySlug $slug, LibraryReadScope $scope): ?Library;
 
     public function save(Library $library): void;
+
+    public function findByPublicId(PublicId $publicId): ?Library;
+
+    public function findVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): ?Library;
 
     public function findByUuid(Uuid $uuid): ?Library;
 

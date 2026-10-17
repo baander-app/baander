@@ -40,7 +40,7 @@ final class ReferentialIntegrityTest extends TestCase
         'job_monitors.job_id' => 'Messenger message identifier',
         'job_monitors.job_uuid' => 'Messenger message identifier',
         'libraries.claim_id' => 'the library claim\'s own identifier, which the scan or delete holding the claim carries',
-        'listening_sessions.active_device_id' => 'client device identifier; claiming a session does not require a registered device',
+        'listening_sessions.active_device_id' => 'browser device token scoped to its user, distinct from the device primary key',
         'lyrics.lrclib_id' => 'external LRCLIB identifier',
         'movie_collections.tmdb_collection_id' => 'external TMDB identifier',
         'movies.imdb_id' => 'external IMDb identifier',
@@ -62,6 +62,7 @@ final class ReferentialIntegrityTest extends TestCase
         'scheduler_occurrence_executions.attempt_id' => 'the attempt\'s own identifier',
         'scheduler_occurrence_executions.deployment_boot_id' => 'worker boot identifier with no table',
         'scheduler_occurrences.job_id' => 'occurrences keep their history after the schedule is deleted (Version20261002230000)',
+        'scheduler_occurrences.job_public_id' => 'immutable public job identity snapshot retained after schedule deletion',
         'songs.discogs_id' => 'external Discogs identifier',
         'songs.spotify_id' => 'external Spotify identifier',
         'user_favorites.entity_public_id' => 'polymorphic with entity_type',
@@ -409,6 +410,7 @@ final class ReferentialIntegrityTest extends TestCase
     {
         $listener = $this->createUser();
         $source = $this->insert('radio_sources', [
+            'public_id' => (new PublicId())->toString(),
             'name' => 'Integrity source',
             'type' => 'radio-browser',
             'sync_url' => 'https://radio.baander.app',
@@ -418,6 +420,7 @@ final class ReferentialIntegrityTest extends TestCase
         $stations = [];
         foreach (['deleted', 'kept'] as $name) {
             $stations[] = $station = $this->insert('radio_stations', [
+                'public_id' => (new PublicId())->toString(),
                 'source_id' => $source->toString(),
                 'external_id' => 'integrity-' . $name,
                 'name' => 'Station ' . $name,
@@ -520,7 +523,15 @@ final class ReferentialIntegrityTest extends TestCase
         $migration = new $class($connection, new NullLogger());
         $migration->{$direction}(new Schema());
         foreach ($migration->getSql() as $query) {
-            $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
+            $sql = $query->getStatement();
+            $parameters = $query->getParameters();
+            if (str_contains($sql, 'INSERT INTO scheduled_jobs (id,')) {
+                // Supply the later identity column when replaying this historical seed.
+                $sql = str_replace('scheduled_jobs (id,', 'scheduled_jobs (public_id, id,', $sql);
+                $sql = str_replace('VALUES (:id,', 'VALUES (:public_id, :id,', $sql);
+                $parameters['public_id'] = (new PublicId())->toString();
+            }
+            $connection->executeStatement($sql, $parameters, $query->getTypes());
         }
     }
 

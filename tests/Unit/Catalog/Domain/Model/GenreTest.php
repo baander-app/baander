@@ -137,6 +137,7 @@ final class GenreTest extends TestCase
         $now = new \DateTimeImmutable();
         $mbid = 'b1b2b3b4-b5b6-7890-abcd-ef1234567890';
         $genre = Genre::reconstitute(new GenreState(
+            publicId: new \App\Shared\Domain\Model\PublicId(),
             id: Uuid::v4(),
             name: 'Blues',
             slug: 'blues',
@@ -156,6 +157,7 @@ final class GenreTest extends TestCase
     {
         $now = new \DateTimeImmutable();
         $genre = Genre::reconstitute(new GenreState(
+            publicId: new \App\Shared\Domain\Model\PublicId(),
             id: Uuid::v4(),
             name: 'Classical',
             slug: 'classical',

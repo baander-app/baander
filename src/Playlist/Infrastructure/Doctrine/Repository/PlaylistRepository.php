@@ -266,7 +266,7 @@ final class PlaylistRepository implements PlaylistRepositoryInterface
         foreach ($playlistSongEntities as $psEntity) {
             $playlist = $psEntity->getPlaylist();
             $result[] = [
-                'uuid' => $playlist->getId()->toString(),
+                'publicId' => $playlist->getPublicId()->toString(),
                 'name' => $playlist->getName(),
             ];
         }

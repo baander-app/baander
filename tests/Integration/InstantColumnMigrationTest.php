@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
+use App\Shared\Domain\Model\PublicId;
 use Doctrine\DBAL\Schema\Schema;
 use DoctrineMigrations\Version20261010180000;
 use PHPUnit\Framework\TestCase;
@@ -35,9 +36,9 @@ final class InstantColumnMigrationTest extends TestCase
         self::assertSame('timestamp(0) without time zone', $this->type('webhooks', 'created_at'));
         self::assertSame('timestamp(0) with time zone', $this->type('notifications', 'created_at'));
         $connection->executeStatement(
-            "INSERT INTO webhooks (id, url, encrypted_secret, created_at, updated_at)
-             VALUES (:id, 'https://hooks.baander.app/migration', 'secret', TIMESTAMP '2026-03-29 01:30:00', TIMESTAMP '2026-10-10 23:59:59')",
-            ['id' => self::WEBHOOK],
+            "INSERT INTO webhooks (id, public_id, url, encrypted_secret, created_at, updated_at)
+             VALUES (:id, :public_id, 'https://hooks.baander.app/migration', 'secret', TIMESTAMP '2026-03-29 01:30:00', TIMESTAMP '2026-10-10 23:59:59')",
+            ['id' => self::WEBHOOK, 'public_id' => (new PublicId())->toString()],
         );
         $notification = $this->notification("TIMESTAMPTZ '2026-10-10 21:59:59+00'");
         $counts = $this->rowCounts();
@@ -68,8 +69,8 @@ final class InstantColumnMigrationTest extends TestCase
         $defaulted = $this->notification(null);
         self::assertTrue($connection->fetchOne('SELECT created_at = now() FROM notifications WHERE id = :id', ['id' => $defaulted]));
         $connection->executeStatement(
-            "INSERT INTO eq_device_profiles (id, user_id, name) VALUES (gen_random_uuid(), :user, 'Migration test')",
-            ['user' => $this->createUser()->toString()],
+            "INSERT INTO eq_device_profiles (id, public_id, user_id, name) VALUES (gen_random_uuid(), :public_id, :user, 'Migration test')",
+            ['user' => $this->createUser()->toString(), 'public_id' => (new PublicId())->toString()],
         );
         self::assertSame(
             ['created_at' => true, 'updated_at' => true],
@@ -89,9 +90,9 @@ final class InstantColumnMigrationTest extends TestCase
     {
         $connection = $this->manager->getConnection();
         $connection->executeStatement(
-            "INSERT INTO webhooks (id, url, encrypted_secret, created_at, updated_at)
-             VALUES (:id, 'https://hooks.baander.app/migration', 'secret', TIMESTAMPTZ '2026-10-10 23:59:59.654321+00', TIMESTAMPTZ '2026-10-10 12:00:00.25+00')",
-            ['id' => self::WEBHOOK],
+            "INSERT INTO webhooks (id, public_id, url, encrypted_secret, created_at, updated_at)
+             VALUES (:id, :public_id, 'https://hooks.baander.app/migration', 'secret', TIMESTAMPTZ '2026-10-10 23:59:59.654321+00', TIMESTAMPTZ '2026-10-10 12:00:00.25+00')",
+            ['id' => self::WEBHOOK, 'public_id' => (new PublicId())->toString()],
         );
         $notification = $this->notification("TIMESTAMPTZ '2026-10-10 21:59:59.4+00'");
 

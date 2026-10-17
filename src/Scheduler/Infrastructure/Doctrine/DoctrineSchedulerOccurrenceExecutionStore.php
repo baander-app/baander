@@ -10,6 +10,7 @@ use App\Scheduler\Application\Exception\ScheduledOccurrenceJobBusy;
 use App\Scheduler\Application\Port\SchedulerOccurrenceExecutionStoreInterface;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Infrastructure\Doctrine\DedicatedConnectionFactory;
 use App\Shared\Infrastructure\Worker\DeploymentLease;
 use DateTimeImmutable;
@@ -90,7 +91,7 @@ final class DoctrineSchedulerOccurrenceExecutionStore implements SchedulerOccurr
                 return null;
             }
             $row = $this->connection->fetchAssociative(<<<'SQL'
-                SELECT occurrence.id, occurrence.job_id, occurrence.scheduled_for, occurrence.origin, occurrence.job_type, occurrence.command, occurrence.parameters
+                SELECT occurrence.job_public_id, occurrence.public_id, occurrence.id, occurrence.job_id, occurrence.scheduled_for, occurrence.origin, occurrence.job_type, occurrence.command, occurrence.parameters
                 FROM scheduler_occurrences occurrence
                 JOIN scheduler_occurrence_executions execution ON execution.occurrence_id = occurrence.id
                 WHERE execution.occurrence_id = :occurrence AND execution.attempt_id = :attempt
@@ -102,7 +103,7 @@ final class DoctrineSchedulerOccurrenceExecutionStore implements SchedulerOccurr
             if (!is_array($snapshot)) {
                 throw new \UnexpectedValueException('Persisted scheduler parameters must be an array or object.');
             }
-            $occurrence = new SchedulerOccurrence(Uuid::fromString($row['id']), Uuid::fromString($row['job_id']), new DateTimeImmutable($row['scheduled_for']), JobType::from($row['job_type']), $row['command'], $snapshot, SchedulerOccurrenceOrigin::from($row['origin']));
+            $occurrence = new SchedulerOccurrence(Uuid::fromString($row['id']), Uuid::fromString($row['job_id']), new DateTimeImmutable($row['scheduled_for']), JobType::from($row['job_type']), $row['command'], $snapshot, origin: SchedulerOccurrenceOrigin::from($row['origin']), publicId: PublicId::fromString($row['public_id']), jobPublicId: PublicId::fromString($row['job_public_id']));
             $this->requireActiveAuthority($authority);
             return $occurrence;
         });

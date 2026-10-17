@@ -9,6 +9,7 @@ use App\Radio\Domain\Model\RadioSource\RadioSourceState;
 use App\Radio\Domain\Repository\RadioSource\RadioSourceRepositoryInterface;
 use App\Radio\Domain\ValueObject\SyncConfig;
 use App\Radio\Infrastructure\Doctrine\Entity\RadioSourceEntity;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -22,6 +23,14 @@ final class RadioSourceDoctrineRepository implements RadioSourceRepositoryInterf
     public function find(Uuid $id): ?RadioSource
     {
         $entity = $this->entityManager->find(RadioSourceEntity::class, $id);
+
+        return $entity !== null ? $this->toDomain($entity) : null;
+    }
+
+    public function findByPublicId(PublicId $publicId): ?RadioSource
+    {
+        $entity = $this->entityManager->getRepository(RadioSourceEntity::class)
+            ->findOneBy(['publicId' => $publicId->toString()]);
 
         return $entity !== null ? $this->toDomain($entity) : null;
     }
@@ -96,6 +105,7 @@ final class RadioSourceDoctrineRepository implements RadioSourceRepositoryInterf
 
     private function syncToEntity(RadioSource $source, RadioSourceEntity $entity): void
     {
+        $entity->setPublicId($source->getPublicId());
         $state = $source->getState();
         $entity->setName($state->name);
         $entity->setType($state->type);
@@ -110,6 +120,7 @@ final class RadioSourceDoctrineRepository implements RadioSourceRepositoryInterf
     {
         return RadioSource::reconstitute(new RadioSourceState(
             id: $entity->getId(),
+            publicId: $entity->getPublicId(),
             name: $entity->getName(),
             type: $entity->getType(),
             syncConfig: new SyncConfig(

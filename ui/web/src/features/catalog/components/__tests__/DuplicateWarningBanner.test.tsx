@@ -20,7 +20,6 @@ vi.mock('sonner', () => ({
 const mockPost = vi.mocked(AXIOS_INSTANCE.post)
 
 const VIEWED: AlbumSummary = {
-  uuid: '0199bf3c-8a00-7000-8000-0000000000c3',
   publicId: 'viewedAlbumPublicId03',
   title: 'Kind of Blue',
   year: 1959,
@@ -30,7 +29,6 @@ const VIEWED: AlbumSummary = {
 }
 
 const DUPLICATE: AlbumSummary = {
-  uuid: '0199bf3c-8a00-7000-8000-0000000000d4',
   publicId: 'otherAlbumPublicId004',
   title: 'Kind of Blue (Legacy Edition)',
   year: 1959,
@@ -40,7 +38,7 @@ const DUPLICATE: AlbumSummary = {
 }
 
 const GROUP: DuplicateGroup = {
-  albumIds: [VIEWED.uuid, DUPLICATE.uuid],
+  albumIds: [VIEWED.publicId, DUPLICATE.publicId],
   confidence: 0.9,
   albumCount: 2,
   albums: [VIEWED, DUPLICATE],

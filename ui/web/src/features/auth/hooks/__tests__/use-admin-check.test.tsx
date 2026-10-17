@@ -10,7 +10,6 @@ import { useAdminCheck, useIsAdmin } from '../use-admin-check'
 
 const initialState = useAuthStore.getState()
 const user = {
-  uuid: '0198d4d2-7600-7000-8000-000000000001',
   publicId: 'AdminSelectorFixture1',
   email: 'selector@baander.app',
   name: 'Selector user',

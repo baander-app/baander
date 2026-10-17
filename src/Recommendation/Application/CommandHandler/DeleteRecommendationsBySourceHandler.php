@@ -21,6 +21,7 @@ final class DeleteRecommendationsBySourceHandler
         $this->recommendationRepository->deleteBySource(
             $command->getSourceType(),
             $command->getSourceId(),
+            $command->actorId,
         );
     }
 }

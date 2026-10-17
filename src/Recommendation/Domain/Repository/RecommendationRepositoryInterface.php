@@ -6,6 +6,7 @@ namespace App\Recommendation\Domain\Repository;
 
 use App\Recommendation\Domain\Model\Recommendation;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 
 interface RecommendationRepositoryInterface
 {
@@ -17,6 +18,8 @@ interface RecommendationRepositoryInterface
     public function saveMany(array $recommendations): void;
 
     public function findByUuid(Uuid $uuid): ?Recommendation;
+
+    public function findByPublicId(PublicId $publicId): ?Recommendation;
 
     /**
      * Get recommendations for a given source entity.
@@ -42,7 +45,7 @@ interface RecommendationRepositoryInterface
     /**
      * Delete all recommendations for a given source.
      */
-    public function deleteBySource(string $sourceType, string $sourceId): void;
+    public function deleteBySource(string $sourceType, string $sourceId, ?Uuid $actorId = null): void;
 
     public function delete(Recommendation $recommendation): void;
 }

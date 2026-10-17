@@ -38,7 +38,7 @@ final class AdminSongController
         path: '/api/admin/songs/{publicId}/delete-preview',
         summary: 'Preview what will be deleted when deleting a song',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Song public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Song public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
             new OA\Parameter(name: 'deleteFile', description: 'Also check the song file as a delete with deleteFile would', in: 'query', required: false, schema: new OA\Schema(type: 'boolean')),
         ],
         responses: [
@@ -72,7 +72,7 @@ final class AdminSongController
         path: '/api/admin/songs/{publicId}',
         summary: 'Delete a song with optional file deletion',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Song public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Song public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
             new OA\Parameter(name: 'deleteFile', description: 'Also delete the audio file, inside the library root only', in: 'query', required: false, schema: new OA\Schema(type: 'boolean')),
         ],
         responses: [

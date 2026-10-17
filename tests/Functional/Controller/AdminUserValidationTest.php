@@ -47,7 +47,7 @@ final class AdminUserValidationTest extends TestCase
         $originalPassword = $target->getPassword();
         $originalUpdatedAt = $target->getUpdatedAt();
 
-        $response = $this->authenticatedRequest('PATCH', '/api/admin/users/' . $target->getId()->toString(), $admin, $payload);
+        $response = $this->authenticatedRequest('PATCH', '/api/admin/users/' . $target->getPublicId()->toString(), $admin, $payload);
 
         $this->assertJsonResponse($response, 422);
         $stored = $this->storedUser($target->getId());
@@ -74,7 +74,7 @@ final class AdminUserValidationTest extends TestCase
         $admin = $this->createSuperAdminUser();
         $target = $this->createTestUser('original@baander.app', 'Original Name');
 
-        $response = $this->authenticatedRequest('PATCH', '/api/admin/users/' . $target->getId()->toString(), $admin, $payload);
+        $response = $this->authenticatedRequest('PATCH', '/api/admin/users/' . $target->getPublicId()->toString(), $admin, $payload);
 
         $data = $this->assertJsonResponse($response, 200, 'data')['data'];
         $this->assertSame($expectedName, $data['name']);
@@ -96,7 +96,7 @@ final class AdminUserValidationTest extends TestCase
 
         $data = $this->assertJsonResponse($response, 201, 'data')['data'];
         $this->assertSame(' New User ', $data['name']);
-        $stored = $this->storedUser(Uuid::fromString($data['id']));
+        $stored = $this->userRepository->findByPublicId(\App\Shared\Domain\Model\PublicId::fromString($data['publicId']));
         $this->assertSame(' New User ', $stored->getName());
         $this->assertSame('created@baander.app', $stored->getEmail());
     }

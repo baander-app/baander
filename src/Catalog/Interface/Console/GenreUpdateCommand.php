@@ -37,7 +37,7 @@ final class GenreUpdateCommand extends Command
             ->addArgument('slug', InputArgument::REQUIRED, 'The current slug of the genre')
             ->addOption('name', null, InputOption::VALUE_REQUIRED, 'The new name')
             ->addOption('slug', null, InputOption::VALUE_REQUIRED, 'The new slug')
-            ->addOption('parent', null, InputOption::VALUE_REQUIRED, 'UUID of the new parent genre')
+            ->addOption('parent', null, InputOption::VALUE_REQUIRED, 'Public ID of the new parent genre')
             ->addOption('mbid', null, InputOption::VALUE_REQUIRED, 'The new MusicBrainz ID');
         AdminCommandSupport::addJsonOption($this);
     }

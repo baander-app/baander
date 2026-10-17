@@ -9,6 +9,7 @@ final readonly class DeleteRecommendationsBySourceCommand
     public function __construct(
         private readonly string $sourceType,
         private readonly string $sourceId,
+        public ?\App\Shared\Domain\Model\Uuid $actorId = null,
     ) {
     }
 

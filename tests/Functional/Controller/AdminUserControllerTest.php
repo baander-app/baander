@@ -137,7 +137,7 @@ final class AdminUserControllerTest extends TestCase
 
         $response = $this->authenticatedRequest(
             'PATCH',
-            '/api/admin/users/' . $target->getId()->toString(),
+            '/api/admin/users/' . $target->getPublicId()->toString(),
             $superAdmin,
             ['name' => 'Updated Name', 'email' => 'updated@baander.app'],
         );
@@ -172,7 +172,7 @@ final class AdminUserControllerTest extends TestCase
 
         $response = $this->authenticatedRequest(
             'POST',
-            '/api/admin/users/' . $target->getId()->toString() . '/roles',
+            '/api/admin/users/' . $target->getPublicId()->toString() . '/roles',
             $superAdmin,
             ['roles' => ['ROLE_USER', 'ROLE_ADMIN']],
         );
@@ -188,7 +188,7 @@ final class AdminUserControllerTest extends TestCase
 
         $response = $this->authenticatedRequest(
             'POST',
-            '/api/admin/users/' . $target->getId()->toString() . '/roles',
+            '/api/admin/users/' . $target->getPublicId()->toString() . '/roles',
             $admin,
             ['roles' => ['ROLE_USER', 'ROLE_ADMIN']],
         );
@@ -207,7 +207,7 @@ final class AdminUserControllerTest extends TestCase
 
         $response = $this->authenticatedRequest(
             'POST',
-            '/api/admin/users/' . $target->getId()->toString() . '/reset-password',
+            '/api/admin/users/' . $target->getPublicId()->toString() . '/reset-password',
             $superAdmin,
             ['password' => 'brandNewPassword999'],
         );
@@ -226,7 +226,7 @@ final class AdminUserControllerTest extends TestCase
 
         $response = $this->authenticatedRequest(
             'POST',
-            '/api/admin/users/' . $target->getId()->toString() . '/disable',
+            '/api/admin/users/' . $target->getPublicId()->toString() . '/disable',
             $superAdmin,
         );
 
@@ -246,14 +246,14 @@ final class AdminUserControllerTest extends TestCase
         // Disable first
         $this->authenticatedRequest(
             'POST',
-            '/api/admin/users/' . $target->getId()->toString() . '/disable',
+            '/api/admin/users/' . $target->getPublicId()->toString() . '/disable',
             $superAdmin,
         );
 
         // Then enable
         $response = $this->authenticatedRequest(
             'POST',
-            '/api/admin/users/' . $target->getId()->toString() . '/enable',
+            '/api/admin/users/' . $target->getPublicId()->toString() . '/enable',
             $superAdmin,
         );
 
@@ -272,7 +272,7 @@ final class AdminUserControllerTest extends TestCase
 
         $response = $this->authenticatedRequest(
             'DELETE',
-            '/api/admin/users/' . $target->getId()->toString(),
+            '/api/admin/users/' . $target->getPublicId()->toString(),
             $superAdmin,
         );
 

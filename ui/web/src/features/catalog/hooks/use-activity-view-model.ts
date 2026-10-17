@@ -46,11 +46,10 @@ export function useActivityViewModel({
   })
 
   const entries = useMemo(() => {
-    const byUuid = new Map<string, ActivityEntry>()
+    const byPublicId = new Map<string, ActivityEntry>()
     for (const page of data?.pages ?? []) {
       for (const entry of page.data ?? []) {
-        byUuid.set(entry.uuid, {
-          uuid: entry.uuid,
+        byPublicId.set(entry.publicId, {
           publicId: entry.publicId,
           userId: entry.userId,
           activityType: entry.activityType,
@@ -70,7 +69,7 @@ export function useActivityViewModel({
         })
       }
     }
-    return [...byUuid.values()]
+    return [...byPublicId.values()]
   }, [data])
 
   const groups: ActivityGroup[] = useMemo(() => {

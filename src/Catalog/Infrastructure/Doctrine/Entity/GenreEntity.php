@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Catalog\Infrastructure\Doctrine\Entity;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'genres')]
+#[ORM\UniqueConstraint(name: 'uniq_genres_public_id', columns: ['public_id'])]
 #[ORM\Index(name: 'idx_genres_parent_id', columns: ['parent_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_genres_slug', columns: ['slug'])]
 #[ORM\Index(name: 'idx_genres_name_pgroonga', columns: ['name'], flags: ['pgroonga'], options: ['with' => "plugins='token_filters/stem', tokenizer='TokenNgram', normalizer='NormalizerAuto', token_filters='TokenFilterStem'"])]
@@ -18,6 +20,9 @@ class GenreEntity
     #[ORM\Column(type: 'uuid')]
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
+
+    #[ORM\Column(type: 'text')]
+    private string $publicId;
 
     #[ORM\ManyToOne(targetEntity: self::class)]
     #[ORM\JoinColumn(name: 'parent_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
@@ -44,8 +49,10 @@ class GenreEntity
         ?GenreEntity $parent = null,
         ?string $mbid = null,
         ?Uuid $id = null,
+        ?PublicId $publicId = null,
     ) {
         $this->id = $id ?? new Uuid();
+        $this->publicId = ($publicId ?? new PublicId())->toString();
         $this->name = $name;
         $this->slug = $slug;
         $this->parent = $parent;
@@ -53,6 +60,8 @@ class GenreEntity
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
     }
+
+    public function getPublicId(): PublicId { return new PublicId($this->publicId); }
 
     public function getId(): Uuid
     {

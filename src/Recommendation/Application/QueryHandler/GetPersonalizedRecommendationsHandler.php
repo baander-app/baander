@@ -11,7 +11,7 @@ use App\Recommendation\Domain\ValueObject\RecommendationType;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
- * @phpstan-type RecommendedSong array{id: string, public_id: string, title: string, album_id: string, track: int|null, disc: int|null, year: int|null, length: float|null}
+ * @phpstan-type RecommendedSong array{public_id: string, title: string, album_id: string, track: int|null, disc: int|null, year: int|null, length: float|null}
  */
 final class GetPersonalizedRecommendationsHandler
 {
@@ -25,6 +25,7 @@ final class GetPersonalizedRecommendationsHandler
     public function __construct(
         private readonly RecommendationRepositoryInterface $recommendationRepository,
         private readonly SongRepositoryInterface $songRepository,
+        private readonly \App\Recommendation\Application\Port\RecommendationPublicIdentityInterface $identities,
     ) {
     }
 
@@ -79,18 +80,21 @@ final class GetPersonalizedRecommendationsHandler
                 continue;
             }
 
+            $albumPublicId = $this->identities->publicEntityId('album', $song->getAlbumId()->toString(), $query->getUserId(), $query->administrator);
+            if ($albumPublicId === null || $this->identities->publicEntityId('song', $targetId, $query->getUserId(), $query->administrator) === null) { continue; }
+
             // Get top contributing strategy for one-line explanation
             arsort($data['strategies']);
             $topStrategy = array_key_first($data['strategies']);
             $topScore = $data['strategies'][$topStrategy];
 
             $result[] = [
-                'target_id' => $targetId,
+                'target_id' => $song->getPublicId()->toString(),
                 'target_type' => $query->getTargetType(),
                 'total_score' => round($data['total_score'], 3),
                 'explanation' => self::STRATEGY_LABELS[$topStrategy] ?? 'Recommended for you',
                 'strategies' => $data['strategies'],
-                'song' => $this->songToArray($song),
+                'song' => $this->songToArray($song, $albumPublicId),
             ];
         }
 
@@ -98,13 +102,12 @@ final class GetPersonalizedRecommendationsHandler
     }
 
     /** @return RecommendedSong */
-    private function songToArray(\App\Catalog\Domain\Model\Song $song): array
+    private function songToArray(\App\Catalog\Domain\Model\Song $song, string $albumPublicId): array
     {
         return [
-            'id' => $song->getId()->toString(),
             'public_id' => $song->getPublicId()->toString(),
             'title' => $song->getTitle(),
-            'album_id' => $song->getAlbumId()->toString(),
+            'album_id' => $albumPublicId,
             'track' => $song->getTrack(),
             'disc' => $song->getDisc(),
             'year' => $song->getYear(),

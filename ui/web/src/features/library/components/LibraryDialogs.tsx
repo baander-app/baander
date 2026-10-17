@@ -248,7 +248,7 @@ interface EditLibraryDialogProps {
 export function EditLibraryDialog(props: EditLibraryDialogProps) {
   if (!props.library) return null
 
-  return <EditLibraryForm key={props.library.id} {...props} library={props.library} />
+  return <EditLibraryForm key={props.library.publicId} {...props} library={props.library} />
 }
 
 type EditLibraryFormProps = Omit<EditLibraryDialogProps, 'library'> & {
@@ -359,7 +359,7 @@ interface ScanLibraryDialogProps {
 export function ScanLibraryDialog(props: ScanLibraryDialogProps) {
   if (!props.library) return null
 
-  return <ScanLibraryForm key={props.library.id} {...props} library={props.library} />
+  return <ScanLibraryForm key={props.library.publicId} {...props} library={props.library} />
 }
 
 type ScanLibraryFormProps = Omit<ScanLibraryDialogProps, 'library'> & {

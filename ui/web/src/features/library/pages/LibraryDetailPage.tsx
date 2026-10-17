@@ -348,7 +348,7 @@ export function LibraryDetailPage() {
         onClose={() => setScanDialogOpen(false)}
         onConfirm={(rescan) => {
           scanMutation.mutate(
-            { id: library.id, rescan },
+            { id: library.publicId, rescan },
             {
               onSuccess: () => {
                 setScanDialogOpen(false)
@@ -366,7 +366,7 @@ export function LibraryDetailPage() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => {
           if (!deleteTarget) return
-          deleteMutation.mutate(deleteTarget.id, {
+          deleteMutation.mutate(deleteTarget.publicId, {
             onSuccess: () => {
               setDeleteTarget(null)
               toast.success('Library deleted')

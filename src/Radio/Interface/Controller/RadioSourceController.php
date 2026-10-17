@@ -36,7 +36,7 @@ final class RadioSourceController
         responses: [
             new OA\Response(response: '200', description: 'List of sources', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [
-                    new OA\Property(property: 'id', type: 'string', format: 'uuid'),
+                    new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
                     new OA\Property(property: 'name', type: 'string'),
                     new OA\Property(property: 'type', type: 'string'),
                     new OA\Property(property: 'syncUrl', type: 'string', format: 'uri'),
@@ -78,7 +78,7 @@ final class RadioSourceController
         responses: [
             new OA\Response(response: '201', description: 'Source created', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', type: 'object', properties: [
-                    new OA\Property(property: 'id', type: 'string', format: 'uuid'),
+                    new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
                     new OA\Property(property: 'name', type: 'string'),
                     new OA\Property(property: 'type', type: 'string'),
                 ])],

@@ -33,7 +33,7 @@ describe('RecommendationCluster', () => {
     sourceName: 'Album A',
     items: [
       {
-        id: 'rec-1',
+        public_id: 'rec-1',
         name: 'Because you listened to Album A',
         source_type: 'album',
         source_id: 'album-a',
@@ -46,7 +46,7 @@ describe('RecommendationCluster', () => {
         updated_at: '',
       },
       {
-        id: 'rec-2',
+        public_id: 'rec-2',
         name: 'Because you listened to Album A',
         source_type: 'album',
         source_id: 'album-a',
@@ -67,7 +67,7 @@ describe('RecommendationCluster', () => {
     sourceName: 'Artist X',
     items: [
       {
-        id: 'rec-3',
+        public_id: 'rec-3',
         name: 'Similar to Artist X',
         source_type: 'artist',
         source_id: 'artist-x',

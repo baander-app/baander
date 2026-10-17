@@ -14,10 +14,10 @@ vi.mock('@/shared/crypto/dpop-store', () => ({
 }))
 vi.mock('@/shared/crypto/dpop-proof', () => ({ createDpopProof: vi.fn() }))
 
-function makeEntry(uuid: string, playCount = 1) {
+function makeEntry(publicId: string, playCount = 1) {
   const timestamp = new Date().toISOString()
-  return { uuid, publicId: uuid, userId: 'user1', activityType: 'play', playCount,
-    love: false, createdAt: timestamp, lastPlayedAt: timestamp, songTitle: `Song ${uuid}` }
+  return { publicId, userId: 'user1', activityType: 'play', playCount,
+    love: false, createdAt: timestamp, lastPlayedAt: timestamp, songTitle: `Song ${publicId}` }
 }
 
 function deferredPage() {
@@ -92,10 +92,10 @@ describe('useActivityViewModel with the generated API client', () => {
     await waitFor(() => expect(api.history.get).toHaveLength(2))
     const oldSignal = api.history.get[1].signal
     rerender({ limit: 3 })
-    await waitFor(() => expect(result.current.groups[0].items[0].uuid).toBe('new'))
+    await waitFor(() => expect(result.current.groups[0].items[0].publicId).toBe('new'))
     expect(oldSignal?.aborted).toBe(true)
     await act(async () => { pending.resolve([200, { data: [makeEntry('late')] }]) })
-    expect(result.current.groups.flatMap(group => group.items).map(entry => entry.uuid)).toEqual(['new'])
+    expect(result.current.groups.flatMap(group => group.items).map(entry => entry.publicId)).toEqual(['new'])
     expect(result.current.hasMore).toBe(false)
   })
 

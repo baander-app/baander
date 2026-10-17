@@ -173,7 +173,7 @@ $registry = new ServerControlOperationRegistry([
 $coordinator = new ServerControlCoordinator($registry, $workers, REPLY_TIMEOUT);
 $client = new SocketServerControlClient($socketPath, 5.0);
 $serverControl = new ServerControl($coordinator, $client);
-$qol = new QoLAdminService($serverControl);
+$qol = new QoLAdminService($serverControl, new \App\Tests\Unit\QoL\QoLPublicIds());
 $holder->controller = new QoLAdminController($qol);
 $pipeMessages = new ControlPipeMessageHandler($coordinator);
 

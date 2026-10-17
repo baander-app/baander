@@ -11,7 +11,6 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'RecommendationJobResource',
     properties: [
-        new OA\Property(property: 'id', type: 'string', format: 'uuid'),
         new OA\Property(property: 'public_id', type: 'string'),
         new OA\Property(property: 'status', type: 'string', enum: ['pending', 'in_progress', 'completed', 'failed', 'cancelled']),
         new OA\Property(property: 'is_full', type: 'boolean'),
@@ -25,7 +24,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'completed_at', type: 'string', format: 'date-time', nullable: true),
         new OA\Property(property: 'fail_reason', type: 'string', nullable: true),
         new OA\Property(property: 'metadata', type: 'object', additionalProperties: true),
-        new OA\Property(property: 'original_job_id', type: 'string', format: 'uuid', nullable: true),
+        new OA\Property(property: 'original_job_id', type: 'string', nullable: true),
     ],
 )]
 final class RecommendationJobResource extends AbstractResource
@@ -40,7 +39,6 @@ final class RecommendationJobResource extends AbstractResource
         }
 
         return [
-            'id' => $source->getId()->toString(),
             'public_id' => $source->getPublicId()->toString(),
             'status' => $source->getStatus()->value,
             'is_full' => $source->isFull(),
@@ -52,9 +50,9 @@ final class RecommendationJobResource extends AbstractResource
             'created_at' => $source->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'started_at' => $source->getStartedAt()?->format(\DateTimeInterface::ATOM),
             'completed_at' => $source->getCompletedAt()?->format(\DateTimeInterface::ATOM),
-            'fail_reason' => $source->getFailReason(),
-            'metadata' => $source->getMetadata(),
-            'original_job_id' => $source->getOriginalJobId()?->toString(),
+            'fail_reason' => $source->getFailReason() === null ? null : \App\Shared\Application\PublicDiagnosticText::redact($source->getFailReason()),
+            'metadata' => \App\Shared\Application\PublicDiagnosticText::details($source->getMetadata()),
+            'original_job_id' => $source->getOriginalJobPublicId()?->toString(),
         ];
     }
 }

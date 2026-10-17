@@ -11,7 +11,6 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'AdminUserResource',
     properties: [
-        new OA\Property(property: 'id', type: 'string', format: 'uuid', description: 'Internal UUID'),
         new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
         new OA\Property(property: 'name', type: 'string', description: 'Display name'),
         new OA\Property(property: 'email', type: 'string', format: 'email', description: 'Email address'),
@@ -29,7 +28,6 @@ final class AdminUserResource extends AbstractResource
         assert($source instanceof User);
 
         return [
-            'id' => $source->getId()->toString(),
             'publicId' => $source->getPublicId()->toString(),
             'name' => $source->getName(),
             'email' => $source->getEmail(),

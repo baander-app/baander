@@ -10,8 +10,8 @@ use App\Catalog\Infrastructure\Doctrine\Entity\VideoEntity;
 use App\Library\Application\Port\LibraryAccessPortInterface;
 use App\Library\Infrastructure\Doctrine\Entity\LibraryEntity;
 use App\Party\Application\Command\JoinPartySessionCommand;
+use App\Party\Application\Port\PartySessionPortInterface;
 use App\Shared\Domain\Model\PublicId;
-use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Messenger\Stamp\PartyMemberResultStamp;
 use App\Tests\Functional\TestCase;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -41,14 +41,17 @@ final class ResultStampWiringTest extends TestCase
         $this->entityManager->flush();
         self::getContainer()->get(LibraryAccessPortInterface::class)->grant($host->getId(), $library->getId());
         $party = $this->assertJsonResponse(
-            $this->authenticatedRequest('POST', '/api/party/sessions/', $host, ['videoId' => $video->getId()->toString()]),
+            $this->authenticatedRequest('POST', '/api/party/sessions/', $host, ['videoId' => $video->getPublicId()->toString()]),
             201,
             'data',
         )['data'];
+        $session = self::getContainer()->get(PartySessionPortInterface::class)->findByPublicId(PublicId::fromString($party['publicId']));
+        self::assertNotNull($session);
+        self::assertArrayNotHasKey('uuid', $party);
         $guest = $this->createTestUser();
 
         $envelope = self::getContainer()->get(MessageBusInterface::class)->dispatch(
-            new JoinPartySessionCommand($guest->getId(), Uuid::fromString($party['uuid'])),
+            new JoinPartySessionCommand($guest->getId(), $session->getId()),
         );
 
         $member = $envelope->last(PartyMemberResultStamp::class)?->getMember();

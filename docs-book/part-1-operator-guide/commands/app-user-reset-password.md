@@ -1,6 +1,6 @@
 # app:user:reset-password
 
-Set a new password for a user and sign them out of every session. Use it when a user has forgotten their password or an account may be compromised. It does the same as **Reset password** in the admin panel (`POST /api/admin/users/{id}/reset-password`).
+Set a new password for a user and sign them out of every session. Use it when a user has forgotten their password or an account may be compromised. It does the same as **Reset password** in the admin panel (`POST /api/admin/users/{publicId}/reset-password`).
 
 ## Quick start
 
@@ -10,10 +10,10 @@ The command asks for the new password without echoing it:
 make exec cmd="php bin/console app:user:reset-password alice@baander.app"
 ```
 
-By UUID:
+By public ID:
 
 ```bash
-make exec cmd="php bin/console app:user:reset-password 0192a3b4-c5d6-7890-abcd-ef1234567890"
+make exec cmd="php bin/console app:user:reset-password aB3dE5fG7hJ9kL1mN3pQr"
 ```
 
 For scripts, pipe the password on stdin with `--password`:
@@ -26,7 +26,7 @@ echo "new-secure-password" | make exec cmd="php bin/console app:user:reset-passw
 
 | Argument / option | Required | Description |
 |-------------------|----------|-------------|
-| `identifier` | Yes | User's email address or UUID |
+| `identifier` | Yes | User's email address or public ID |
 | `--password` | No | Read the password from stdin instead of prompting |
 | `--json` | No | Print only the admin API's `data` payload, in JSON |
 

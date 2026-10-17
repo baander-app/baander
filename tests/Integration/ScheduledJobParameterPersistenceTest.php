@@ -85,14 +85,14 @@ final class ScheduledJobParameterPersistenceTest extends TestCase
         self::assertSame($parameters, $rehydrated->getParameters());
         self::assertSame($encoded, json_encode($rehydrated->getParameters(), JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION));
         $minute = new \DateTimeImmutable('2026-10-02T10:00:00Z');
-        $occurrence = new SchedulerOccurrence(Uuid::generate(), $rehydrated->getId(), $minute, $rehydrated->getJobType(), $rehydrated->getCommand(), $rehydrated->getParameters());
+        $occurrence = new SchedulerOccurrence(Uuid::generate(), $rehydrated->getId(), $minute, $rehydrated->getJobType(), $rehydrated->getCommand(), $rehydrated->getParameters(), jobPublicId: new \App\Shared\Domain\Model\PublicId());
         $store = new DoctrineSchedulerOccurrenceStore($this->observer);
         self::assertTrue($store->record($occurrence));
         $snapshot = $store->find($rehydrated->getId(), $minute);
         self::assertInstanceOf(SchedulerOccurrence::class, $snapshot);
         self::assertSame($parameters, $snapshot->parameters);
         self::assertSame($encoded, $snapshot->parametersJson());
-        self::assertFalse($store->record(new SchedulerOccurrence(Uuid::generate(), $rehydrated->getId(), $minute, $rehydrated->getJobType(), $rehydrated->getCommand(), $rehydrated->getParameters())));
+        self::assertFalse($store->record(new SchedulerOccurrence(Uuid::generate(), $rehydrated->getId(), $minute, $rehydrated->getJobType(), $rehydrated->getCommand(), $rehydrated->getParameters(), jobPublicId: new \App\Shared\Domain\Model\PublicId())));
         $retained = $store->find($rehydrated->getId(), $minute);
         self::assertInstanceOf(SchedulerOccurrence::class, $retained);
         self::assertTrue($occurrence->id->equals($retained->id));

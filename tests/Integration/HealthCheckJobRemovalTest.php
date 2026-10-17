@@ -7,6 +7,7 @@ namespace App\Tests\Integration;
 use App\Scheduler\Application\Port\ScheduledJobPortInterface;
 use App\Scheduler\Domain\Service\SchedulerRegistry;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 use Doctrine\Migrations\Exception\IrreversibleMigration;
@@ -94,7 +95,15 @@ final class HealthCheckJobRemovalTest extends TestCase
         $connection = $this->manager->getConnection();
         $migration->{$direction}(new Schema());
         foreach ($migration->getSql() as $query) {
-            $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
+            $sql = $query->getStatement();
+            $parameters = $query->getParameters();
+            if (str_contains($sql, 'INSERT INTO scheduled_jobs (id,')) {
+                // Supply the later identity column when replaying this historical seed.
+                $sql = str_replace('scheduled_jobs (id,', 'scheduled_jobs (public_id, id,', $sql);
+                $sql = str_replace('VALUES (:id,', 'VALUES (:public_id, :id,', $sql);
+                $parameters['public_id'] = (new PublicId())->toString();
+            }
+            $connection->executeStatement($sql, $parameters, $query->getTypes());
         }
     }
 }

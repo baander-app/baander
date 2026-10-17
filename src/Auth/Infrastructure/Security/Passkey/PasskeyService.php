@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Infrastructure\Security\Passkey;
 
 use App\Auth\Application\Port\PasskeyVerifierInterface;
+use App\Shared\Domain\Model\PublicId;
 use Cose\Algorithm\Manager;
 use Cose\Algorithm\Signature\ECDSA\ES256;
 use Cose\Algorithm\Signature\ECDSA\ES384;
@@ -239,7 +240,7 @@ final class PasskeyService implements PasskeyVerifierInterface
     /**
      * Create WebAuthn registration options for navigator.credentials.create().
      *
-     * @param string   $userId                User UUID string (used as the user handle)
+     * @param string   $userId                User public ID (used as the user handle)
      * @param string   $username              The user's display name / email
      * @param string[] $existingCredentialIds Base64url-encoded credential IDs to exclude
      *
@@ -251,6 +252,7 @@ final class PasskeyService implements PasskeyVerifierInterface
      */
     public function createRegistrationOptions(string $userId, string $username, array $existingCredentialIds = []): array
     {
+        PublicId::fromString($userId);
         $excludeCredentials = array_map(
             static fn (string $id): PublicKeyCredentialDescriptor => new PublicKeyCredentialDescriptor(
                 PublicKeyCredentialDescriptor::CREDENTIAL_TYPE_PUBLIC_KEY,
@@ -394,6 +396,7 @@ final class PasskeyService implements PasskeyVerifierInterface
         PublicKeyCredentialRequestOptions $expectedOptions,
         CredentialRecord $storedCredential,
     ): CredentialRecord {
+        PublicId::fromString($storedCredential->userHandle);
         $publicKeyCredential = $this->serializer->deserialize(
             $this->jsonEncoder->encode($response, 'json'),
             PublicKeyCredential::class,
@@ -465,6 +468,7 @@ final class PasskeyService implements PasskeyVerifierInterface
      */
     public function createAllAcceptedCredentialsSignal(string $userId, string $username, array $credentialIds): string
     {
+        PublicId::fromString($userId);
         $credentials = array_map(
             static fn (string $id): PublicKeyCredentialDescriptor => new PublicKeyCredentialDescriptor(
                 PublicKeyCredentialDescriptor::CREDENTIAL_TYPE_PUBLIC_KEY,
@@ -487,6 +491,7 @@ final class PasskeyService implements PasskeyVerifierInterface
      */
     public function createCurrentUserDetailsSignal(string $userId, string $username, string $displayName): string
     {
+        PublicId::fromString($userId);
         $signal = new CurrentUserDetails(
             PublicKeyCredentialRpEntity::create(name: $this->appName, id: $this->appDomain),
             PublicKeyCredentialUserEntity::create(name: $username, id: $userId, displayName: $displayName),

@@ -9,6 +9,8 @@ use App\Radio\Application\Port\RadioSourcePortInterface;
 use App\Radio\Application\Port\RadioStationPortInterface;
 use App\Radio\Interface\Console\SyncSubscribedCountriesCommand;
 use App\Shared\Domain\Model\Uuid;
+use App\Radio\Domain\Model\RadioSource\RadioSource;
+use App\Radio\Domain\ValueObject\SyncConfig;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -17,8 +19,10 @@ final class SyncSubscribedCountriesCommandTest extends TestCase
 {
     public function testInitCreatesSourceThroughPortAndSyncsRequestedCountry(): void
     {
-        $sourceId = Uuid::v7();
+        $source = RadioSource::create('IPRD', 'iprd', new SyncConfig('https://radio.baander.app', null, []));
+        $sourceId = $source->getId();
         $sourcePort = $this->createMock(RadioSourcePortInterface::class);
+        $sourcePort->method('findByPublicId')->willReturn($source);
 
         $sourcePort
             ->expects(self::once())
@@ -36,7 +40,7 @@ final class SyncSubscribedCountriesCommandTest extends TestCase
                 '0 */6 * * *',
             )
             ->willReturn([
-                'id' => $sourceId->toString(),
+                'publicId' => $source->getPublicId()->toString(),
                 'name' => 'IPRD',
                 'isActive' => true,
             ]);
@@ -62,7 +66,7 @@ final class SyncSubscribedCountriesCommandTest extends TestCase
         $output = $tester->getDisplay();
 
         self::assertSame(Command::SUCCESS, $exitCode);
-        self::assertStringContainsString('Created default IPRD source: ' . $sourceId->toString(), $output);
+        self::assertStringContainsString('Created default IPRD source: ' . $source->getPublicId()->toString(), $output);
         self::assertStringContainsString('Synced 12 stations for DK', $output);
     }
 
@@ -99,10 +103,12 @@ final class SyncSubscribedCountriesCommandTest extends TestCase
 
     public function testSyncsOnlyTheCountriesSomeUserSubscribedTo(): void
     {
-        $sourceId = Uuid::v7();
+        $source = RadioSource::create('IPRD', 'iprd', new SyncConfig('https://radio.baander.app', null, []));
+        $sourceId = $source->getId();
         $sourcePort = $this->createStub(RadioSourcePortInterface::class);
+        $sourcePort->method('findByPublicId')->willReturn($source);
         $sourcePort->method('listSources')->willReturn([
-            ['id' => $sourceId->toString(), 'name' => 'IPRD', 'isActive' => true],
+            ['publicId' => $source->getPublicId()->toString(), 'name' => 'IPRD', 'isActive' => true],
         ]);
         $subscriptionPort = $this->createMock(CountrySubscriptionPortInterface::class);
         $subscriptionPort->expects(self::once())->method('listSubscribedCountryCodes')->willReturn(['DK', 'SE']);
@@ -129,7 +135,7 @@ final class SyncSubscribedCountriesCommandTest extends TestCase
     {
         $sourcePort = $this->createStub(RadioSourcePortInterface::class);
         $sourcePort->method('listSources')->willReturn([
-            ['id' => Uuid::v7()->toString(), 'name' => 'IPRD', 'isActive' => true],
+            ['publicId' => str_repeat('s', 21), 'name' => 'IPRD', 'isActive' => true],
         ]);
         $subscriptionPort = $this->createStub(CountrySubscriptionPortInterface::class);
         $subscriptionPort->method('listSubscribedCountryCodes')->willReturn([]);

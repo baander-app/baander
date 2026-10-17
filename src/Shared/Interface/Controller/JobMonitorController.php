@@ -42,7 +42,7 @@ final class JobMonitorController
                     properties: [new OA\Property(property: 'data', properties: [
                         new OA\Property(property: 'counts', description: 'Job counts by status', type: 'object'),
                         new OA\Property(property: 'running', type: 'array', items: new OA\Items(properties: [
-                            new OA\Property(property: 'jobId', description: 'Internal job identifier', type: 'string'),
+                            new OA\Property(property: 'jobId', description: 'Public job identifier', type: 'string'),
                             new OA\Property(property: 'name', description: 'Job name', type: 'string'),
                             new OA\Property(property: 'queue', description: 'Queue the job is running on', type: 'string'),
                             new OA\Property(property: 'startedAt', type: 'string', format: 'date-time', nullable: true),
@@ -89,7 +89,7 @@ final class JobMonitorController
                 content: new OA\JsonContent(
                     properties: [new OA\Property(property: 'data', properties: [
                         new OA\Property(property: 'items', type: 'array', items: new OA\Items(properties: [
-                            new OA\Property(property: 'jobId', description: 'Internal job identifier', type: 'string'),
+                            new OA\Property(property: 'jobId', description: 'Public job identifier', type: 'string'),
                             new OA\Property(property: 'name', description: 'Job name', type: 'string', nullable: true),
                             new OA\Property(property: 'queue', description: 'Queue the job was dispatched to', type: 'string', nullable: true),
                             new OA\Property(property: 'status', description: 'Job status', type: 'string'),
@@ -137,13 +137,13 @@ final class JobMonitorController
         path: '/api/monitor/jobs/{jobId}',
         summary: 'Get background job detail',
         parameters: [
-            new OA\Parameter(name: 'jobId', description: 'Internal job identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'jobId', description: 'Public job identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Full job record',
                 content: new OA\JsonContent(
                     properties: [new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'jobId', description: 'Internal job identifier', type: 'string'),
+                        new OA\Property(property: 'jobId', description: 'Public job identifier', type: 'string'),
                         new OA\Property(property: 'name', description: 'Job name', type: 'string', nullable: true),
                         new OA\Property(property: 'queue', description: 'Queue the job was dispatched to', type: 'string', nullable: true),
                         new OA\Property(property: 'status', description: 'Job status', type: 'string'),
@@ -155,13 +155,6 @@ final class JobMonitorController
                         new OA\Property(property: 'createdAt', description: 'Job creation timestamp', type: 'string', format: 'date-time'),
                         new OA\Property(property: 'updatedAt', type: 'string', format: 'date-time'),
                         new OA\Property(property: 'exceptionClass', description: 'Exception class name (failed jobs only)', type: 'string', nullable: true),
-                        new OA\Property(property: 'exception', description: 'Full exception details (failed jobs only)', properties: [
-                            new OA\Property(property: 'message', type: 'string'),
-                            new OA\Property(property: 'file', type: 'string'),
-                            new OA\Property(property: 'line', type: 'integer'),
-                        ], type: 'object', nullable: true),
-                        new OA\Property(property: 'data', description: 'Serialized message payload', type: 'string', nullable: true),
-                        new OA\Property(property: 'dataTruncated', description: 'Whether the message payload was truncated', type: 'boolean'),
                         new OA\Property(property: 'duration', description: 'Execution time in seconds (null if not finished)', type: 'number', format: 'float', nullable: true),
                         new OA\Property(property: 'cancellable', description: 'Whether cancelling the job can still change anything: it is queued or running, or it has finished and work it queued, such as lyrics fetches, may still be waiting', type: 'boolean'),
                     ], type: 'object')],
@@ -225,7 +218,7 @@ final class JobMonitorController
         description: 'Re-dispatches the original message payload of a failed job. The job must be in Failed status, not previously retried, and have a stored message payload.',
         summary: 'Retry a failed background job',
         parameters: [
-            new OA\Parameter(name: 'jobId', description: 'Internal job identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'jobId', description: 'Public job identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Job retried successfully',
@@ -257,7 +250,7 @@ final class JobMonitorController
         description: 'Sets a cooperative cancellation flag in Redis; a running job stops at its next checkpoint and becomes cancelled. A finished job that queued work to run later, such as the lyrics fetches of a bulk fetch, has that work cancelled instead: what has not run yet is skipped when it comes due, and the job becomes cancelled.',
         summary: 'Cancel a running background job, or the work a finished job queued',
         parameters: [
-            new OA\Parameter(name: 'jobId', description: 'Internal job identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'jobId', description: 'Public job identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Job cancellation requested',

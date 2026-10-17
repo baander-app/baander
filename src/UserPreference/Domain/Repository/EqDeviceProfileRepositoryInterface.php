@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Domain\Repository;
 
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\UserPreference\Domain\Model\EqDeviceProfile;
 
@@ -15,6 +16,8 @@ interface EqDeviceProfileRepositoryInterface
     public function findByUserId(Uuid $userId): array;
 
     public function findById(Uuid $id): ?EqDeviceProfile;
+
+    public function findByPublicId(PublicId $publicId): ?EqDeviceProfile;
 
     public function findDefaultByUserId(Uuid $userId): ?EqDeviceProfile;
 

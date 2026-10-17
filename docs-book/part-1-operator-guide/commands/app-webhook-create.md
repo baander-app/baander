@@ -31,11 +31,11 @@ The categories are `security`, `background_jobs`, `media_changes` and `admin_ope
 
 ## Details
 
-The command prints the new webhook's UUID and the signing secret. This is the only time the secret is shown: store it with the receiver now. Baander keeps it encrypted with `APP_SECRET` and never prints it again. A lost secret can only be replaced with [app:webhook:rotate-secret](app-webhook-rotate-secret.md). The command also prints the signing version the webhook's deliveries use; see [Notifications](../notifications.md) for verifying signatures.
+The command prints the new webhook's public ID and the signing secret. This is the only time the secret is shown: store it with the receiver now. Baander keeps it encrypted with `APP_SECRET` and never prints it again. A lost secret can only be replaced with [app:webhook:rotate-secret](app-webhook-rotate-secret.md). The command also prints the signing version the webhook's deliveries use; see [Notifications](../notifications.md) for verifying signatures.
 
 Every address the URL's host resolves to must be public, or a LAN address listed in `WEBHOOK_LAN_ALLOWLIST`; loopback, link-local and metadata addresses are never allowed. The command rejects a blank or malformed URL, a URL with embedded credentials, a host with any other address, and an unknown category, and stores nothing. The API answers the same cases with `422` and the same message.
 
-With `--json` the command prints the API's `data` object: `id`, `url`, `category_filter`, `secret`, `signing_version`, `created_at` and `updated_at`.
+With `--json` the command prints the API's `data` object: `publicId`, `url`, `category_filter`, `secret`, `signing_version`, `created_at` and `updated_at`.
 
 ## Exit codes
 

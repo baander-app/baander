@@ -37,7 +37,7 @@ final class SchedulerResumeCommand extends Command
             $input,
             new SymfonyStyle($input, $output),
             $this->jobs->resume(...),
-            'Resumed',
+            'Resumed', $this->jobs,
         );
     }
 }

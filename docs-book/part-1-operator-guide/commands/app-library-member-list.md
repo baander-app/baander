@@ -12,7 +12,7 @@ make exec cmd="php bin/console app:library:member:list listener@baander.app"
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `user` | Yes | The user, by email address or UUID, as the `app:user:*` commands take it |
+| `user` | Yes | The user, by email address or public ID, as the `app:user:*` commands take it |
 
 ## Options
 
@@ -40,4 +40,4 @@ When no library exists, the command prints `No library exists.`
 | Code | Meaning |
 |------|---------|
 | 0 | List printed, possibly empty |
-| 1 | No user has the email address or UUID, or the list could not be read; the message says why |
+| 1 | No user has the email address or public ID, or the list could not be read; the message says why |

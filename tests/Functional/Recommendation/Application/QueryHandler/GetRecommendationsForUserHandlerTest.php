@@ -58,6 +58,7 @@ final class GetRecommendationsForUserHandlerTest extends TestCase
             $this->songRepository,
             $this->imagePort,
             $this->requestStack,
+            $this->projection(),
         );
     }
 
@@ -579,9 +580,9 @@ final class GetRecommendationsForUserHandlerTest extends TestCase
         $albumResult = null;
         $artistResult = null;
         foreach ($result as $r) {
-            if ($r['target_id'] === $albumId->toString()) {
+            if ($r['target_id'] === substr(hash('sha256', $albumId->toString()), 0, 21)) {
                 $albumResult = $r;
-            } elseif ($r['target_id'] === $artistId->toString()) {
+            } elseif ($r['target_id'] === substr(hash('sha256', $artistId->toString()), 0, 21)) {
                 $artistResult = $r;
             }
         }
@@ -719,6 +720,17 @@ final class GetRecommendationsForUserHandlerTest extends TestCase
         $this->assertSame($sourceArtistName, $fromArtistResult['sourceName']);
     }
 
+    private function projection(): \App\Recommendation\Application\Port\RecommendationPublicIdentityInterface
+    {
+        $projection = $this->createStub(\App\Recommendation\Application\Port\RecommendationPublicIdentityInterface::class);
+        $projection->method('project')->willReturnCallback(static function (\App\Recommendation\Domain\Model\Recommendation $rec): array {
+            return \App\Recommendation\Interface\Resource\RecommendationResource::from($rec,
+                substr(hash('sha256', $rec->getSourceId()), 0, 21), substr(hash('sha256', $rec->getTargetId()), 0, 21),
+                $rec->getUserId() === null ? null : substr(hash('sha256', $rec->getUserId()->toString()), 0, 21));
+        });
+        return $projection;
+    }
+
     private function createLibraryFixture(): Uuid
     {
         $libraryId = Uuid::v7();
@@ -726,8 +738,9 @@ final class GetRecommendationsForUserHandlerTest extends TestCase
 
         $conn = $this->entityManager->getConnection();
         $conn->executeStatement(
-            'INSERT INTO libraries (id, slug, name, path, type, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO libraries (public_id, id, slug, name, path, type, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
+                (new PublicId())->toString(),
                 $libraryId->toString(),
                 'test-lib-' . bin2hex(random_bytes(4)),
                 'Test Library',

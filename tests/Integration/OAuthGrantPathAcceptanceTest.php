@@ -498,7 +498,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
         self::assertTokenResponse($tokens, 'library playlist');
         $claims = self::claims($tokens['access_token']);
         self::assertSame(['jkt' => $tv->thumbprint()], $claims['cnf']);
-        self::assertSame($this->user->getId()->toString(), $claims['sub']);
+        self::assertSame($this->user->getPublicId()->toString(), $claims['sub']);
         self::assertSame(200, $this->me($tokens['access_token'], $tv, $tvFingerprint)->getStatusCode());
         self::assertSame(401, $this->me($tokens['access_token'], $tv)->getStatusCode(), 'The TV fingerprint binding applies.');
 
@@ -861,7 +861,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
 
     private function registerPasskey(): WebAuthnTestCredential
     {
-        $credential = new WebAuthnTestCredential($this->user->getId()->toString(), GrantPathOAuthKernel::RELYING_PARTY);
+        $credential = new WebAuthnTestCredential($this->user->getPublicId()->toString(), GrantPathOAuthKernel::RELYING_PARTY);
         $passkeys = $this->kernel->getContainer()->get('oauth.acceptance.passkeys');
         self::assertInstanceOf(PasskeyRepositoryInterface::class, $passkeys);
         $passkeys->save($credential->passkey(), $this->user->getId());
@@ -872,7 +872,7 @@ final class OAuthGrantPathAcceptanceTest extends TestCase
     /** @return array{challengeKey: string, response: array<string, mixed>} */
     private function passkeyAssertion(WebAuthnTestCredential $credential): array
     {
-        $options = $this->send('POST', '/api/auth/passkey/authenticate/options', json: ['userId' => $this->user->getId()->toString()]);
+        $options = $this->send('POST', '/api/auth/passkey/authenticate/options', json: ['userId' => $this->user->getPublicId()->toString()]);
         self::assertSame(200, $options->getStatusCode(), (string) $options->getContent());
         $data = json_decode((string) $options->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
         self::assertIsString($data['challengeKey']);

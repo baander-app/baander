@@ -38,13 +38,14 @@ final class TranscodeAdminCommandsTest extends TestCase
         $users = $this->createMock(UserIdentifierResolverInterface::class);
         $users->expects(self::never())->method('userId');
 
-        $tester = new CommandTester(new TranscodeSessionListCommand($sessions, $users));
+        $tester = new CommandTester(new TranscodeSessionListCommand($sessions, $users, new \App\Tests\Unit\Transcode\PublicViewStub()));
 
         self::assertSame(Command::SUCCESS, $tester->execute([]));
         $display = $tester->getDisplay();
         foreach ([$first, $second] as $session) {
-            self::assertStringContainsString($session->getId()->toString(), $display);
-            self::assertStringContainsString($session->getUserId()->toString(), $display);
+            self::assertStringContainsString($session->getPublicId()->toString(), $display);
+            self::assertStringContainsString(str_repeat('u', 21), $display);
+            self::assertStringNotContainsString($session->getId()->toString(), $display);
         }
     }
 
@@ -69,10 +70,10 @@ final class TranscodeAdminCommandsTest extends TestCase
         $users = $this->createMock(UserIdentifierResolverInterface::class);
         $users->expects(self::once())->method('userId')->with($identifier)->willReturn($owner);
 
-        $tester = new CommandTester(new TranscodeSessionListCommand($sessions, $users));
+        $tester = new CommandTester(new TranscodeSessionListCommand($sessions, $users, new \App\Tests\Unit\Transcode\PublicViewStub()));
 
         self::assertSame(Command::SUCCESS, $tester->execute(['--user' => $identifier, '--json' => true]));
-        self::assertJsonStringEqualsJsonString(json_encode(TranscodeSessionResource::collection([$own]), JSON_THROW_ON_ERROR), $tester->getDisplay());
+        self::assertJsonStringEqualsJsonString(json_encode(TranscodeSessionResource::collection([(new \App\Tests\Unit\Transcode\PublicViewStub())->session($own)]), JSON_THROW_ON_ERROR), $tester->getDisplay());
     }
 
     /** @return iterable<string, array{string}> */
@@ -91,7 +92,7 @@ final class TranscodeAdminCommandsTest extends TestCase
         $sessions = $this->createMock(TranscodeSessionPortInterface::class);
         $sessions->expects(self::never())->method('findActiveByUser');
         $sessions->expects(self::never())->method('findActive');
-        $tester = new CommandTester(new TranscodeSessionListCommand($sessions, $users));
+        $tester = new CommandTester(new TranscodeSessionListCommand($sessions, $users, new \App\Tests\Unit\Transcode\PublicViewStub()));
 
         self::assertSame(Command::FAILURE, $tester->execute(['--user' => $identifier]));
         self::assertStringContainsString(sprintf('User "%s" not found.', $identifier), $tester->getDisplay());
@@ -102,27 +103,27 @@ final class TranscodeAdminCommandsTest extends TestCase
         $session = $this->session(Uuid::generate());
         $sessions = $this->createMock(TranscodeSessionPortInterface::class);
         $sessions->expects(self::once())
-            ->method('findByUuid')
-            ->with(self::callback(static fn (Uuid $id): bool => $id->equals($session->getId())))
+            ->method('findByPublicId')
+            ->with(self::callback(static fn (\App\Shared\Domain\Model\PublicId $id): bool => $id->equals($session->getPublicId())))
             ->willReturn($session);
 
-        $tester = new CommandTester(new TranscodeSessionShowCommand($sessions));
+        $tester = new CommandTester(new TranscodeSessionShowCommand($sessions, new \App\Tests\Unit\Transcode\PublicViewStub()));
 
-        self::assertSame(Command::SUCCESS, $tester->execute(['uuid' => $session->getId()->toString(), '--json' => true]));
-        self::assertJsonStringEqualsJsonString(json_encode(TranscodeSessionResource::from($session), JSON_THROW_ON_ERROR), $tester->getDisplay());
+        self::assertSame(Command::SUCCESS, $tester->execute(['publicId' => $session->getPublicId()->toString(), '--json' => true]));
+        self::assertJsonStringEqualsJsonString(json_encode(TranscodeSessionResource::from((new \App\Tests\Unit\Transcode\PublicViewStub())->session($session)), JSON_THROW_ON_ERROR), $tester->getDisplay());
     }
 
     public function testSessionShowReportsAnUnknownAndAMalformedSession(): void
     {
         $sessions = $this->createStub(TranscodeSessionPortInterface::class);
-        $sessions->method('findByUuid')->willReturn(null);
-        $tester = new CommandTester(new TranscodeSessionShowCommand($sessions));
+        $sessions->method('findByPublicId')->willReturn(null);
+        $tester = new CommandTester(new TranscodeSessionShowCommand($sessions, new \App\Tests\Unit\Transcode\PublicViewStub()));
 
-        self::assertSame(Command::FAILURE, $tester->execute(['uuid' => Uuid::generate()->toString()]));
+        self::assertSame(Command::FAILURE, $tester->execute(['publicId' => (new \App\Shared\Domain\Model\PublicId())->toString()]));
         self::assertStringContainsString('Session not found.', $tester->getDisplay());
 
-        self::assertSame(Command::INVALID, $tester->execute(['uuid' => 'not-a-uuid']));
-        self::assertStringContainsString('The session ID must be a UUID.', $tester->getDisplay());
+        self::assertSame(Command::INVALID, $tester->execute(['publicId' => 'not-a-public-id']));
+        self::assertStringContainsString('The session ID must be a public identifier.', $tester->getDisplay());
     }
 
     public function testJobCleanupDispatchesTheCleanupTheApiDispatches(): void

@@ -9,6 +9,7 @@ use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use DateTimeImmutable;
 
 /**
@@ -21,6 +22,7 @@ final class LibraryState
 {
     public function __construct(
         public readonly Uuid $id,
+        public readonly PublicId $publicId,
         public string $name,
         public readonly LibrarySlug $slug,
         public readonly LibraryPath $path,

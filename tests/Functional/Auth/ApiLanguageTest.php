@@ -6,7 +6,7 @@ namespace App\Tests\Functional\Auth;
 
 use App\Auth\Domain\Model\User;
 use App\Shared\Application\Http\BaanderHeader;
-use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Tests\Functional\TestCase;
 use App\UserPreference\Application\Port\UserSettingsContractInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
@@ -28,7 +28,7 @@ final class ApiLanguageTest extends TestCase
     {
         $danish = $this->userWithLanguage('da');
         $thai = $this->userWithLanguage('th');
-        $missing = Uuid::v7()->toString();
+        $missing = (new PublicId())->toString();
         $kernel = $this->client->getKernel();
         $translator = $this->translator();
 

@@ -13,6 +13,8 @@ use App\Party\Interface\Controller\PartyMemberController;
 use App\Party\Interface\Request\TransferHostRequest;
 use App\Party\Interface\Request\UpdatePartyMemberRequest;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
+use App\Party\Domain\Model\SyncedPartySession;
 use PHPUnit\Framework\TestCase;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Container;
@@ -27,7 +29,10 @@ final class PartyMemberControllerTest extends TestCase
     public function testUpdateUsesTheResolvedPrincipalForMemberOwnership(): void
     {
         $userId = new Uuid();
-        $sessionId = new Uuid();
+        $session = SyncedPartySession::create($userId, new Uuid(), null);
+        $sessionId = $session->getId();
+        $sessions = $this->createStub(PartySessionPortInterface::class);
+        $sessions->method('findByPublicIdentifier')->willReturn($session);
         $user = new SecurityUser($userId->toString(), 'member@baander.app', '');
         $member = PartyMember::create($userId, $sessionId);
         $members = $this->createMock(PartyMemberPortInterface::class);
@@ -41,11 +46,12 @@ final class PartyMemberControllerTest extends TestCase
         $controller = new PartyMemberController(
             $this->security($user),
             $this->createStub(MessageBusInterface::class),
-            $this->createStub(PartySessionPortInterface::class),
+            $sessions,
+            $this->identities(),
             $members,
         );
 
-        $response = $controller->updateMe($sessionId->toString(), new UpdatePartyMemberRequest('stereo', 'eng'));
+        $response = $controller->updateMe($session->getPublicId()->toString(), new UpdatePartyMemberRequest('stereo', 'eng'));
 
         self::assertSame(200, $response->getStatusCode());
         self::assertSame('stereo', $member->getAudioProfileId());
@@ -55,7 +61,10 @@ final class PartyMemberControllerTest extends TestCase
     public function testTransferDispatchesTheResolvedCurrentHostIdentity(): void
     {
         $userId = new Uuid();
-        $sessionId = new Uuid();
+        $session = SyncedPartySession::create($userId, new Uuid(), null);
+        $sessionId = $session->getId();
+        $sessions = $this->createStub(PartySessionPortInterface::class);
+        $sessions->method('findByPublicIdentifier')->willReturn($session);
         $newHost = new Uuid();
         $user = new SecurityUser($userId->toString(), 'member@baander.app', '');
         $bus = $this->createMock(MessageBusInterface::class);
@@ -69,11 +78,12 @@ final class PartyMemberControllerTest extends TestCase
         $controller = new PartyMemberController(
             $this->security($user),
             $bus,
-            $this->createStub(PartySessionPortInterface::class),
+            $sessions,
+            $this->identities($newHost),
             $this->createStub(PartyMemberPortInterface::class),
         );
 
-        $response = $controller->transferHost($sessionId->toString(), new TransferHostRequest($newHost->toString()));
+        $response = $controller->transferHost($session->getPublicId()->toString(), new TransferHostRequest((new PublicId())->toString()));
 
         self::assertSame(200, $response->getStatusCode());
     }
@@ -85,7 +95,7 @@ final class PartyMemberControllerTest extends TestCase
         $members = $this->createMock(PartyMemberPortInterface::class);
         $members->expects($this->never())->method('findByUserAndSession');
         $members->expects($this->never())->method('save');
-        $controller = new PartyMemberController($this->security(null), $bus, $this->createStub(PartySessionPortInterface::class), $members);
+        $controller = new PartyMemberController($this->security(null), $bus, $this->createStub(PartySessionPortInterface::class), $this->identities(), $members);
         $sessionId = (new Uuid())->toString();
 
         $update = $controller->updateMe($sessionId, new UpdatePartyMemberRequest());
@@ -108,6 +118,7 @@ final class PartyMemberControllerTest extends TestCase
             $this->security($user),
             $bus,
             $this->createStub(PartySessionPortInterface::class),
+            $this->identities(),
             $members,
         );
         $sessionId = (new Uuid())->toString();
@@ -130,4 +141,13 @@ final class PartyMemberControllerTest extends TestCase
 
         return new Security($container);
     }
+    private function identities(?Uuid $target = null): \App\Party\Application\Port\PartyPublicIdentityPortInterface
+    {
+        $identities = $this->createStub(\App\Party\Application\Port\PartyPublicIdentityPortInterface::class);
+        $identities->method('userId')->willReturn($target ?? new Uuid());
+        $identities->method('member')->willReturnCallback(static fn (PartyMember $member) => new \App\Party\Application\DTO\PartyMemberView($member, new PublicId(), new PublicId()));
+
+        return $identities;
+    }
+
 }

@@ -20,6 +20,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use Symfony\Component\Security\Core\Exception\AuthenticationException;
 use Symfony\Component\Security\Core\Exception\BadCredentialsException;
 use Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException;
@@ -96,6 +97,18 @@ final class PasskeyAuthenticator extends AbstractAuthenticator
         if (!is_string($challengeKey) || $challengeKey === '' || !is_array($response)
             || ($claimedUserId !== null && !is_string($claimedUserId))) {
             throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
+        }
+
+        if ($claimedUserId !== null) {
+            try {
+                $claimedUser = $this->userRepository->findByPublicId(PublicId::fromString($claimedUserId));
+            } catch (\InvalidArgumentException) {
+                $claimedUser = null;
+            }
+            if ($claimedUser === null) {
+                throw new BadCredentialsException(AuthenticationFailureMessage::INVALID_CREDENTIALS);
+            }
+            $claimedUserId = $claimedUser->getId()->toString();
         }
 
         $command = new AuthenticatePasskeyCommand(

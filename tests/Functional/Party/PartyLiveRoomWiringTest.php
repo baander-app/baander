@@ -50,6 +50,26 @@ final class PartyLiveRoomWiringTest extends TestCase
         $this->assertJsonResponse($this->authenticatedRequest('DELETE', '/api/party/sessions/' . $party, $host), 200);
     }
 
+    public function testPublicPartyOutputProjectsNestedIdentitiesAndRejectsTheInternalAddress(): void
+    {
+        $host = $this->createTestUser();
+        $publicId = $this->party($host);
+        $internalId = $this->entityManager->getConnection()->fetchOne('SELECT id FROM party_sessions WHERE public_id = :publicId', ['publicId' => $publicId]);
+        $response = $this->authenticatedRequest('GET', '/api/party/sessions/' . $publicId, $host);
+        $output = $this->assertJsonResponse($response, 200, 'data')['data'];
+
+        self::assertSame($publicId, $output['publicId']);
+        self::assertSame($host->getPublicId()->toString(), $output['hostUserId']);
+        self::assertSame($host->getPublicId()->toString(), $output['members'][0]['userId']);
+        self::assertSame($publicId, $output['members'][0]['sessionId']);
+        self::assertArrayNotHasKey('uuid', $output);
+        self::assertArrayNotHasKey('uuid', $output['members'][0]);
+        self::assertStringNotContainsString($host->getId()->toString(), (string) $response->getContent());
+        self::assertStringNotContainsString($internalId, (string) $response->getContent());
+        $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/party/sessions/' . $internalId, $host), 404);
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/party/sessions/' . $internalId . '/join', $host), 404);
+    }
+
     private function party(User $host): string
     {
         $library = new LibraryEntity(
@@ -69,9 +89,9 @@ final class PartyLiveRoomWiringTest extends TestCase
         self::getContainer()->get(LibraryAccessPortInterface::class)->grant($host->getId(), $library->getId());
 
         return $this->assertJsonResponse(
-            $this->authenticatedRequest('POST', '/api/party/sessions/', $host, ['videoId' => $video->getId()->toString()]),
+            $this->authenticatedRequest('POST', '/api/party/sessions/', $host, ['videoId' => $video->getPublicId()->toString()]),
             201,
             'data',
-        )['data']['uuid'];
+        )['data']['publicId'];
     }
 }

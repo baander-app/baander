@@ -9,6 +9,7 @@ use App\Recommendation\Domain\Model\Recommendation;
 use App\Recommendation\Domain\Repository\RecommendationRepositoryInterface;
 use App\Recommendation\Infrastructure\Doctrine\Entity\RecommendationEntity;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use Doctrine\ORM\EntityManagerInterface;
 use RuntimeException;
 
@@ -36,6 +37,12 @@ final class RecommendationRepository implements RecommendationRepositoryInterfac
         }
 
         $this->entityManager->flush();
+    }
+
+    public function findByPublicId(PublicId $publicId): ?Recommendation
+    {
+        $entity = $this->entityManager->getRepository(RecommendationEntity::class)->findOneBy(['publicId' => $publicId]);
+        return $entity === null ? null : $this->toDomain($entity);
     }
 
     public function findByUuid(Uuid $uuid): ?Recommendation
@@ -90,18 +97,13 @@ final class RecommendationRepository implements RecommendationRepositoryInterfac
         return array_map(fn (RecommendationEntity $e) => $this->toDomain($e), $entities);
     }
 
-    public function deleteBySource(string $sourceType, string $sourceId): void
+    public function deleteBySource(string $sourceType, string $sourceId, ?Uuid $actorId = null): void
     {
-        $this->entityManager
-            ->getRepository(RecommendationEntity::class)
-            ->createQueryBuilder('r')
-            ->delete()
-            ->where('r.sourceType = :sourceType')
-            ->andWhere('r.sourceId = :sourceId')
-            ->setParameter('sourceType', $sourceType)
-            ->setParameter('sourceId', $sourceId)
-            ->getQuery()
-            ->execute();
+        $query = $this->entityManager->getRepository(RecommendationEntity::class)->createQueryBuilder('r')->delete()
+            ->where('r.sourceType = :sourceType')->andWhere('r.sourceId = :sourceId')
+            ->setParameter('sourceType', $sourceType)->setParameter('sourceId', $sourceId);
+        if ($actorId !== null) { $query->andWhere('r.user = :actor')->setParameter('actor', $actorId); }
+        $query->getQuery()->execute();
     }
 
     public function delete(Recommendation $recommendation): void
@@ -136,6 +138,7 @@ final class RecommendationRepository implements RecommendationRepositoryInterfac
             $recommendation->getScore(),
             $recommendation->getPosition(),
             $recommendation->getId(),
+            $recommendation->getPublicId(),
         );
     }
 
@@ -177,6 +180,7 @@ final class RecommendationRepository implements RecommendationRepositoryInterfac
             $entity->getUser()?->getId(),
             $entity->getCreatedAt(),
             $entity->getUpdatedAt(),
+            $entity->getPublicId(),
         );
     }
 }

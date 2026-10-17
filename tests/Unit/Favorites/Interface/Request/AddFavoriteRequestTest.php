@@ -27,7 +27,7 @@ final class AddFavoriteRequestTest extends TestCase
     {
         $validator = Validation::createValidatorBuilder()->enableAttributeMapping()->getValidator();
 
-        self::assertCount(0, $validator->validate(new AddFavoriteRequest($type, 'song-public-id')));
+        self::assertCount(0, $validator->validate(new AddFavoriteRequest($type, 'song_public_id_000001')));
     }
 
     /** @return iterable<string, array{string}> */
@@ -44,7 +44,7 @@ final class AddFavoriteRequestTest extends TestCase
     public function testUnsupportedTypeIsRejectedOnEntityType(string $type): void
     {
         $validator = Validation::createValidatorBuilder()->enableAttributeMapping()->getValidator();
-        $violations = $validator->validate(new AddFavoriteRequest($type, 'song-public-id'));
+        $violations = $validator->validate(new AddFavoriteRequest($type, 'song_public_id_000001'));
 
         self::assertCount(1, $violations);
         self::assertSame('entityType', $violations[0]->getPropertyPath());
@@ -54,7 +54,7 @@ final class AddFavoriteRequestTest extends TestCase
     public function testBlankTypeRetainsRequiredFieldValidation(): void
     {
         $validator = Validation::createValidatorBuilder()->enableAttributeMapping()->getValidator();
-        $violations = $validator->validate(new AddFavoriteRequest('', 'song-public-id'));
+        $violations = $validator->validate(new AddFavoriteRequest('', 'song_public_id_000001'));
         $codes = [];
         foreach ($violations as $violation) {
             self::assertSame('entityType', $violation->getPropertyPath());

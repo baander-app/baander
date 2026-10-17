@@ -81,13 +81,14 @@ describe('useSession', () => {
     vi.clearAllMocks()
     // Default: all posts resolve safely (device registration, etc.)
     mockAxios.post.mockResolvedValue({ data: {} })
+    mockAxios.get.mockResolvedValue({ data: { data: [{ publicId: 'local-device-public-id', deviceId: 'my-device-id' }] } })
   })
 
   it('fetches current session on mount', async () => {
     mockAxios.get.mockResolvedValueOnce({
       data: {
         data: {
-          id: 'session-1',
+          publicId: 'session-1',
           userId: 'user-1',
           activeDeviceId: null,
           queue: ['track-1'],
@@ -106,14 +107,14 @@ describe('useSession', () => {
     await waitFor(() => expect(result.current.session).toBeDefined())
 
     expect(mockAxios.get).toHaveBeenCalledWith('/api/session')
-    expect(result.current.session?.id).toBe('session-1')
+    expect(result.current.session?.publicId).toBe('session-1')
   })
 
   it('shows transfer prompt when another device has the session', async () => {
     mockAxios.get.mockResolvedValueOnce({
       data: {
         data: {
-          id: 'session-1',
+          publicId: 'session-1',
           userId: 'user-1',
           activeDeviceId: 'other-device',
           queue: ['track-1', 'track-2'],
@@ -141,9 +142,9 @@ describe('useSession', () => {
     mockAxios.post.mockResolvedValue({
       data: {
         data: {
-          id: 'session-1',
+          publicId: 'session-1',
           userId: 'user-1',
-          activeDeviceId: 'my-device-id',
+          activeDeviceId: 'local-device-public-id',
           queue: ['track-1'],
           currentTrackIndex: 0,
           position: 0,
@@ -174,7 +175,7 @@ describe('useSession', () => {
     mockAxios.post.mockResolvedValue({
       data: {
         data: {
-          id: 'session-2',
+          publicId: 'session-2',
           userId: 'user-1',
           activeDeviceId: null,
           queue: ['track-1', 'track-2'],
@@ -206,7 +207,7 @@ describe('useSession', () => {
     mockAxios.get.mockResolvedValueOnce({
       data: {
         data: {
-          id: 'session-1',
+          publicId: 'session-1',
           userId: 'user-1',
           activeDeviceId: 'other-device',
           queue: ['track-1'],
@@ -231,10 +232,10 @@ describe('useSession', () => {
     expect(result.current.showTransferPrompt).toBe(false)
   })
   it('keeps a dismissed transfer hidden on refetch and prompts for a new session or device', async () => {
-    const session = { id: 'session-1', userId: 'user-1', activeDeviceId: 'other-device', queue: [],
+    const session = { publicId: 'session-1', userId: 'user-1', activeDeviceId: 'other-device', queue: [],
       currentTrackIndex: 0, position: 0, playbackState: 'stopped' as const,
       createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z', lastUsedAt: null }
-    mockAxios.get.mockResolvedValue({ data: { data: session } })
+    mockAxios.get.mockImplementation(async (url) => ({ data: { data: url === '/api/devices' ? [{ publicId: 'local-device-public-id', deviceId: 'my-device-id' }] : session } }))
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     const { result, unmount } = renderHook(() => useSession(), {
       wrapper: ({ children }: { children: ReactNode }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
@@ -247,7 +248,7 @@ describe('useSession', () => {
     act(() => { client.setQueryData(['session', 'current'], { ...session, activeDeviceId: 'third-device' }) })
     await waitFor(() => expect(result.current.showTransferPrompt).toBe(true))
     act(() => { result.current.dismissTransfer() })
-    act(() => { client.setQueryData(['session', 'current'], { ...session, id: 'session-2', activeDeviceId: 'third-device' }) })
+    act(() => { client.setQueryData(['session', 'current'], { ...session, publicId: 'session-2', activeDeviceId: 'third-device' }) })
     await waitFor(() => expect(result.current.showTransferPrompt).toBe(true))
     unmount()
     client.clear()

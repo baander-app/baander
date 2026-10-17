@@ -86,13 +86,13 @@ final class PasswordHandlersTest extends TestCase
         self::assertSame('hashed:current-password', $this->user->getPassword());
     }
 
-    public function testOperatorResetFindsTheUserByEmailOrUuidAndSignsOutEverySession(): void
+    public function testOperatorResetFindsTheUserByEmailOrPublicIdAndSignsOutEverySession(): void
     {
         $handler = new SetUserPasswordHandler(new UserLookup($this->userRepository()), $this->changer());
 
         $handler(new SetUserPasswordCommand('Owner@Baander.app', 'by-email-password'));
         self::assertSame('hashed:by-email-password', $this->user->getPassword());
-        $handler(new SetUserPasswordCommand($this->user->getId()->toString(), 'by-uuid-password'));
+        $handler(new SetUserPasswordCommand($this->user->getPublicId()->toString(), 'by-uuid-password'));
         self::assertSame('hashed:by-uuid-password', $this->user->getPassword());
 
         self::assertSame(['none', 'none'], $this->keptSessions);
@@ -175,6 +175,12 @@ final class PasswordHandlersTest extends TestCase
     private function userRepository(): UserRepositoryInterface
     {
         $users = $this->createStub(UserRepositoryInterface::class);
+        $users->method('findByPublicId')->willReturnCallback(function (\App\Shared\Domain\Model\PublicId $id): ?User {
+            foreach ($this->users as $user) {
+                if ($id->equals($user->getPublicId())) { return $user; }
+            }
+            return null;
+        });
         $users->method('findByUuid')->willReturnCallback(fn (Uuid $id): ?User => $this->users[$id->toString()] ?? null);
         $users->method('findByEmail')->willReturnCallback(
             fn (Email $email): ?User => $email->toString() === $this->user->getEmail() ? $this->user : null,

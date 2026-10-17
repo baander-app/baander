@@ -43,7 +43,7 @@ final class UserSettingCommand extends Command
     {
         $this
             ->addArgument('action', InputArgument::REQUIRED, 'get, set or reset')
-            ->addArgument('identifier', InputArgument::REQUIRED, 'User email or UUID')
+            ->addArgument('identifier', InputArgument::REQUIRED, 'User email or public ID')
             ->addArgument('key', InputArgument::OPTIONAL, 'Setting key, for example language; get lists every setting without one')
             ->addArgument('value', InputArgument::OPTIONAL, 'New value for set, for example da')
             ->setHelp(<<<'HELP'

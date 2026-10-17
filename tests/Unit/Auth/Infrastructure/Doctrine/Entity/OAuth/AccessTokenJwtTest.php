@@ -45,8 +45,8 @@ final class AccessTokenJwtTest extends TestCase
         self::assertTrue(new Sha256()->verify($jwt->signature()->hash(), $jwt->payload(), InMemory::plainText($details['key'])));
         self::assertSame(['https://baander.app'], $jwt->claims()->get('aud'));
         self::assertSame('jwt-token-identifier', $jwt->claims()->get('jti'));
-        self::assertSame($user?->getId()->toString() ?? $client->getId()->toString(), $jwt->claims()->get('sub'));
-        self::assertSame($client->getId()->toString(), $jwt->claims()->get('client_id'));
+        self::assertSame($user?->getPublicId()->toString() ?? $client->getPublicId()->toString(), $jwt->claims()->get('sub'));
+        self::assertSame($client->getPublicId()->toString(), $jwt->claims()->get('client_id'));
         self::assertSame(['profile', 'library:read'], $jwt->claims()->get('scopes'));
         self::assertSame(['jkt' => str_repeat('a', 43)], $jwt->claims()->get('cnf'));
         self::assertSame($expiry->getTimestamp(), $jwt->claims()->get('exp')->getTimestamp());

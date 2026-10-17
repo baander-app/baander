@@ -42,7 +42,7 @@ export function TVSearchPage() {
           <>
             {data.albums.map((album) => (
               <TVCard
-                key={album.uuid}
+                key={album.publicId}
                 title={album.title}
                 subtitle={album.artistName ?? undefined}
                 onPress={() => navigation.navigate('TVAlbumDetail', { publicId: album.publicId })}
@@ -50,7 +50,7 @@ export function TVSearchPage() {
             ))}
             {data.artists.map((artist) => (
               <TVCard
-                key={artist.uuid}
+                key={artist.publicId}
                 title={artist.name}
                 subtitle={`${artist.albumCount} albums`}
                 onPress={() => navigation.navigate('TVArtistDetail', { publicId: artist.publicId })}

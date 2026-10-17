@@ -21,27 +21,31 @@ final class ActivityHistoryPaginationTest extends TestCase
         $playedIds = $this->seedActivities($user, 5, $timestamp);
         $unplayedIds = $this->seedActivities($user, 2, null);
         $this->seedActivities($otherUser, 3, $timestamp);
-        rsort($playedIds, SORT_STRING);
-        rsort($unplayedIds, SORT_STRING);
+        krsort($playedIds, SORT_STRING);
+        krsort($unplayedIds, SORT_STRING);
         // Preserve PostgreSQL DESC's existing NULL-first history order.
-        $expectedIds = [...$unplayedIds, ...$playedIds];
+        $expectedIds = [...array_values($unplayedIds), ...array_values($playedIds)];
         $this->entityManager->clear();
 
         $all = $this->history($user, 'limit=100');
-        self::assertSame($expectedIds, array_column($all, 'uuid'));
-        self::assertSame([$user->getId()->toString()], array_values(array_unique(array_column($all, 'userId'))));
+        self::assertSame($expectedIds, array_column($all, 'publicId'));
+        foreach ($all as $item) {
+            self::assertArrayNotHasKey('uuid', $item);
+        }
+        self::assertStringNotContainsString($user->getId()->toString(), json_encode($all, JSON_THROW_ON_ERROR));
+        self::assertSame([$user->getPublicId()->toString()], array_values(array_unique(array_column($all, 'userId'))));
 
         $pageIds = [];
         foreach ([0, 2, 4, 6] as $offset) {
             $page = $this->history($user, 'limit=2&offset=' . $offset);
-            self::assertSame(array_slice($expectedIds, $offset, 2), array_column($page, 'uuid'));
-            $pageIds = [...$pageIds, ...array_column($page, 'uuid')];
+            self::assertSame(array_slice($expectedIds, $offset, 2), array_column($page, 'publicId'));
+            $pageIds = [...$pageIds, ...array_column($page, 'publicId')];
         }
         self::assertSame($expectedIds, $pageIds);
         self::assertCount(count($pageIds), array_unique($pageIds));
         self::assertSame([], $this->history($user, 'limit=2&offset=7'));
         self::assertSame([], $this->history($user, 'limit=2&offset=' . PHP_INT_MAX));
-        self::assertSame($expectedIds, array_column($this->history($user, ''), 'uuid'));
+        self::assertSame($expectedIds, array_column($this->history($user, ''), 'publicId'));
     }
 
     /** @return iterable<string, array{string, string}> */
@@ -71,7 +75,7 @@ final class ActivityHistoryPaginationTest extends TestCase
         $this->assertJsonResponse($this->anonymousRequest('GET', '/api/activity/history?limit=2&offset=2'), 401);
     }
 
-    /** @return list<string> */
+    /** @return array<string, string> internal ordering key => public identity */
     private function seedActivities(User $user, int $count, ?\DateTimeImmutable $lastPlayedAt): array
     {
         $repository = static::getContainer()->get(MediaActivityRepositoryInterface::class);
@@ -84,7 +88,7 @@ final class ActivityHistoryPaginationTest extends TestCase
             self::assertInstanceOf(MediaActivityEntity::class, $entity);
             // Fix the timestamp through ORM metadata so ties are exact rather than timing-dependent.
             $metadata->setFieldValue($entity, 'lastPlayedAt', $lastPlayedAt);
-            $ids[] = $activity->getId()->toString();
+            $ids[$activity->getId()->toString()] = $activity->getPublicId()->toString();
         }
         $this->entityManager->flush();
 

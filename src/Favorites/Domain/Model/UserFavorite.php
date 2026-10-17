@@ -21,6 +21,7 @@ final class UserFavorite
         FavoriteType $entityType,
         string $entityPublicId,
     ): self {
+        PublicId::fromString($entityPublicId);
         return new self(new UserFavoriteState(
             id: new Uuid(),
             publicId: new PublicId(),

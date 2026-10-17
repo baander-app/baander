@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Interface\DTO;
 
+use App\Shared\Application\PublicDiagnosticText;
 use Nelmio\ApiDocBundle\Attribute\Ignore;
 use OpenApi\Attributes as OA;
 
@@ -41,13 +42,13 @@ final readonly class ApiError
     {
         $error = [
             'error' => [
-                'message' => $this->message,
+                'message' => PublicDiagnosticText::redact($this->message),
                 'code' => $this->code,
             ],
         ];
 
         if (!empty($this->details)) {
-            $error['error']['details'] = $this->details;
+            $error['error']['details'] = PublicDiagnosticText::details($this->details);
         }
 
         return $error;

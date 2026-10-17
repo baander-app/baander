@@ -35,6 +35,17 @@ final readonly class PartySessionService implements PartySessionPortInterface
         return $this->sessionRepository->findByPublicId($publicId);
     }
 
+    public function findByPublicIdentifier(string $publicId): ?SyncedPartySession
+    {
+        try {
+            $id = PublicId::fromString($publicId);
+        } catch (\InvalidArgumentException) {
+            return null;
+        }
+
+        return $this->sessionRepository->findByPublicId($id);
+    }
+
     public function findActiveSessions(): array
     {
         return $this->sessionRepository->findActiveSessions();

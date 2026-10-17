@@ -29,17 +29,17 @@ final class GenreCommandsTest extends TestCase
     {
         $admin = $this->createAdminUser();
         $rock = $this->createGenreOverHttp($admin, ['name' => 'Rock', 'slug' => 'rock']);
-        $hardRock = $this->createGenreOverHttp($admin, ['name' => 'Hard Rock', 'slug' => 'hard-rock', 'parentId' => $rock['uuid']]);
-        $grunge = $this->createGenreOverHttp($admin, ['name' => 'Grunge', 'slug' => 'grunge', 'parentId' => $hardRock['uuid']]);
+        $hardRock = $this->createGenreOverHttp($admin, ['name' => 'Hard Rock', 'slug' => 'hard-rock', 'parentId' => $rock['publicId']]);
+        $grunge = $this->createGenreOverHttp($admin, ['name' => 'Grunge', 'slug' => 'grunge', 'parentId' => $hardRock['publicId']]);
 
         $error = $this->assertJsonResponse(
-            $this->authenticatedRequest('PATCH', '/api/genres/rock', $admin, ['parentId' => $grunge['uuid']]),
+            $this->authenticatedRequest('PATCH', '/api/genres/rock', $admin, ['parentId' => $grunge['publicId']]),
             422,
         );
         self::assertSame(self::CYCLE_MESSAGE, $error['error']['message']);
 
         $update = $this->command('app:genre:update');
-        self::assertSame(Command::INVALID, $update->execute(['slug' => 'rock', '--parent' => $grunge['uuid']]));
+        self::assertSame(Command::INVALID, $update->execute(['slug' => 'rock', '--parent' => $grunge['publicId']]));
         self::assertStringContainsString(self::CYCLE_MESSAGE, $this->normalized($update->getDisplay()));
 
         self::assertNull($this->genre('rock')->getParent());
@@ -48,7 +48,7 @@ final class GenreCommandsTest extends TestCase
     public function testCreatingAGenreWithAnUnknownParentIsRejectedOnBothPaths(): void
     {
         $admin = $this->createAdminUser();
-        $unknown = (new Uuid())->toString();
+        $unknown = (new PublicId())->toString();
 
         $error = $this->assertJsonResponse(
             $this->authenticatedRequest('POST', '/api/genres/', $admin, ['name' => 'Orphan', 'slug' => 'orphan', 'parentId' => $unknown]),
@@ -75,13 +75,13 @@ final class GenreCommandsTest extends TestCase
             'slug' => 'blues',
             '--name' => 'Blues Rock',
             '--slug' => 'blues-rock',
-            '--parent' => $rock['uuid'],
+            '--parent' => $rock['publicId'],
         ]), $update->getDisplay());
 
         $this->entityManager->clear();
         $bluesRock = $this->genre('blues-rock');
         self::assertSame('Blues Rock', $bluesRock->getName());
-        self::assertSame($rock['uuid'], $bluesRock->getParent()?->getId()->toString());
+        self::assertSame($rock['publicId'], $bluesRock->getParent()?->getPublicId()->toString());
 
         $missing = $this->command('app:genre:update');
         self::assertSame(Command::FAILURE, $missing->execute(['slug' => 'blues', '--name' => 'X']));
@@ -92,7 +92,7 @@ final class GenreCommandsTest extends TestCase
     {
         $admin = $this->createAdminUser();
         $rock = $this->createGenreOverHttp($admin, ['name' => 'Rock', 'slug' => 'rock']);
-        $this->createGenreOverHttp($admin, ['name' => 'Hard Rock', 'slug' => 'hard-rock', 'parentId' => $rock['uuid']]);
+        $this->createGenreOverHttp($admin, ['name' => 'Hard Rock', 'slug' => 'hard-rock', 'parentId' => $rock['publicId']]);
         $this->createGenreOverHttp($admin, ['name' => 'Jazz', 'slug' => 'jazz']);
 
         // No genre has library media, so only the unrestricted scope can see them.
@@ -165,7 +165,7 @@ final class GenreCommandsTest extends TestCase
     {
         $admin = $this->createAdminUser();
         $this->createGenreOverHttp($admin, ['name' => 'Rock', 'slug' => 'rock']);
-        $unknown = (new Uuid())->toString();
+        $unknown = (new PublicId())->toString();
 
         $responses = [
             'Album not found.' => [
@@ -232,7 +232,7 @@ final class GenreCommandsTest extends TestCase
         return $genre;
     }
 
-    /** @return array{string, string} the album and song UUIDs */
+    /** @return array{string, string} the album and song public IDs */
     private function albumWithSong(): array
     {
         $suffix = bin2hex(random_bytes(8));
@@ -244,7 +244,7 @@ final class GenreCommandsTest extends TestCase
         $this->entityManager->persist($song);
         $this->entityManager->flush();
 
-        return [$album->getId()->toString(), $song->getId()->toString()];
+        return [$album->getPublicId()->toString(), $song->getPublicId()->toString()];
     }
 
     /** @param class-string $link */

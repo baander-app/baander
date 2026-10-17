@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Session\Infrastructure\Doctrine\Entity;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'devices')]
+#[ORM\UniqueConstraint(name: 'uniq_devices_public_id', columns: ['public_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_devices_user_id_device_id', columns: ['user_id', 'device_id'])]
 class DeviceEntity
 {
@@ -16,6 +18,9 @@ class DeviceEntity
     #[ORM\Column(type: 'uuid')]
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
+
+    #[ORM\Column(name: 'public_id', type: 'text')]
+    private string $publicId;
 
     #[ORM\Column(name: 'user_id', type: 'uuid')]
     private Uuid $userId;
@@ -36,14 +41,21 @@ class DeviceEntity
         Uuid $userId,
         Uuid $deviceId,
         ?Uuid $id = null,
+        ?PublicId $publicId = null,
     ) {
         $this->id = $id ?? new Uuid();
+        $this->publicId = ($publicId ?? new PublicId())->toString();
         $this->userId = $userId;
         $this->deviceId = $deviceId;
         $this->createdAt = new \DateTimeImmutable();
     }
 
     public function getId(): Uuid { return $this->id; }
+    public function getPublicId(): PublicId
+    {
+        return PublicId::fromString($this->publicId);
+    }
+
     public function getUserId(): Uuid { return $this->userId; }
     public function getDeviceId(): Uuid { return $this->deviceId; }
     public function getName(): ?string { return $this->name; }

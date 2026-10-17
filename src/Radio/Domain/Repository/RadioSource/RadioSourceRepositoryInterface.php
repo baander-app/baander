@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace App\Radio\Domain\Repository\RadioSource;
 
 use App\Radio\Domain\Model\RadioSource\RadioSource;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 
 interface RadioSourceRepositoryInterface
 {
     public function find(Uuid $id): ?RadioSource;
+
+    public function findByPublicId(PublicId $publicId): ?RadioSource;
 
     /** @return list<RadioSource> */
     public function findAll(): array;

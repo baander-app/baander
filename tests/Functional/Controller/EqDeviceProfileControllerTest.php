@@ -129,7 +129,7 @@ final class EqDeviceProfileControllerTest extends TestCase
     {
         $user = $this->createTestUser();
         $created = $this->assertJsonResponse($this->createProfile($user, 'Speakers', 'speakers'), 201, 'data');
-        $id = $created['data']['id'];
+        $id = $created['data']['publicId'];
 
         $data = $this->assertJsonResponse(
             $this->authenticatedRequest('GET', '/api/user/eq-profiles/' . $id, $user),
@@ -157,7 +157,7 @@ final class EqDeviceProfileControllerTest extends TestCase
         $created = $this->assertJsonResponse($this->createProfile($user, 'Old Name', 'headphones'), 201, 'data');
 
         $data = $this->assertJsonResponse(
-            $this->authenticatedRequest('PUT', '/api/user/eq-profiles/' . $created['data']['id'], $user, [
+            $this->authenticatedRequest('PUT', '/api/user/eq-profiles/' . $created['data']['publicId'], $user, [
                 'name' => 'New Name',
             ]),
             200,
@@ -174,7 +174,7 @@ final class EqDeviceProfileControllerTest extends TestCase
         $originalVersion = $created['data']['version'];
 
         $data = $this->assertJsonResponse(
-            $this->authenticatedRequest('PUT', '/api/user/eq-profiles/' . $created['data']['id'], $user, [
+            $this->authenticatedRequest('PUT', '/api/user/eq-profiles/' . $created['data']['publicId'], $user, [
                 'payload' => ['bands' => [1, 2, 3]],
             ]),
             200,
@@ -201,7 +201,7 @@ final class EqDeviceProfileControllerTest extends TestCase
         $created = $this->assertJsonResponse($this->createProfile($user, 'To Delete', 'headphones'), 201, 'data');
 
         $data = $this->assertJsonResponse(
-            $this->authenticatedRequest('DELETE', '/api/user/eq-profiles/' . $created['data']['id'], $user),
+            $this->authenticatedRequest('DELETE', '/api/user/eq-profiles/' . $created['data']['publicId'], $user),
             200,
             'data',
         );
@@ -234,12 +234,12 @@ final class EqDeviceProfileControllerTest extends TestCase
         $created = $this->assertJsonResponse($this->createProfile($user, 'Active', 'headphones'), 201, 'data');
 
         $data = $this->assertJsonResponse(
-            $this->authenticatedRequest('POST', '/api/user/eq-profiles/' . $created['data']['id'] . '/activate', $user),
+            $this->authenticatedRequest('POST', '/api/user/eq-profiles/' . $created['data']['publicId'] . '/activate', $user),
             200,
             'data',
         );
 
-        $this->assertSame($created['data']['id'], $data['data']['activeProfileId']);
+        $this->assertSame($created['data']['publicId'], $data['data']['activeProfileId']);
     }
 
     /** @return iterable<string, array{string, string, array<string, mixed>}> */
@@ -267,7 +267,7 @@ final class EqDeviceProfileControllerTest extends TestCase
         $owner = $this->createTestUser();
         $intruder = $admin ? $this->createAdminUser() : $this->createTestUser();
         $created = $this->assertJsonResponse($this->createProfile($owner, 'Private EQ Profile', 'headphones', 'private-device-id'), 201, 'data');
-        $uri = '/api/user/eq-profiles/' . $created['data']['id'];
+        $uri = '/api/user/eq-profiles/' . $created['data']['publicId'];
         $response = $this->authenticatedRequest($method, $uri . $suffix, $intruder, $content);
         $error = $this->assertJsonResponse($response, 404);
         $this->assertArrayNotHasKey('data', $error);
@@ -300,7 +300,7 @@ final class EqDeviceProfileControllerTest extends TestCase
         $admin = $this->createAdminUser();
         $port = static::getContainer()->get(EqDeviceProfilePortInterface::class);
         $profile = $port->createProfile($owner->getId(), 'Private Default', 'custom', null, [], isDefault: true);
-        $uri = '/api/user/eq-profiles/' . $profile['id'];
+        $uri = '/api/user/eq-profiles/' . $profile['publicId'];
         $this->assertJsonResponse($this->authenticatedRequest('DELETE', $uri, $admin), 404);
         $this->assertJsonResponse($this->authenticatedRequest('DELETE', $uri, $owner), 422);
         $this->entityManager->clear();

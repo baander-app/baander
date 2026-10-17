@@ -202,7 +202,7 @@ export function TranscodePage() {
             {activeSessions.map((session) => {
               const Icon = stateIcon[session.state]
               return (
-                <SessionRow key={session.uuid}>
+                <SessionRow key={session.publicId}>
                   <Icon size={14} strokeWidth={1.5} style={{ color: stateColor[session.state] }} />
                   <SessionInfo>
                     <SessionName>{stateLabel(session.state)}</SessionName>
@@ -233,7 +233,7 @@ export function TranscodePage() {
             {historySessions.map((session) => {
               const Icon = stateIcon[session.state]
               return (
-                <SessionRow key={session.uuid}>
+                <SessionRow key={session.publicId}>
                   <Icon size={14} strokeWidth={1.5} style={{ color: stateColor[session.state] }} />
                   <SessionInfo>
                     <SessionName>{stateLabel(session.state)}</SessionName>

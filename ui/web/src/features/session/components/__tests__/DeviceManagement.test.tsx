@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, screen, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { render } from '../../../../../tests/test-utils'
+import userEvent from '@testing-library/user-event'
 import MockAdapter from 'axios-mock-adapter'
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 import { getGetDeviceListQueryKey, type GetDeviceList200 } from '@/shared/api-client/gen/endpoints'
@@ -45,8 +47,8 @@ describe('DeviceManagement', () => {
   it('renders device rows through the generated hook and body-only adapter', async () => {
     const body: GetDeviceList200 = {
       data: [
-        { id: 'device-desktop', name: 'Office desktop', lastUsedAt: new Date().toISOString() },
-        { id: 'device-phone', name: 'Phone', lastUsedAt: null },
+        { publicId: 'device-desktop', name: 'Office desktop', lastUsedAt: new Date().toISOString() },
+        { publicId: 'device-phone', name: 'Phone', lastUsedAt: null },
       ],
     }
     renderDevices(body)
@@ -69,4 +71,26 @@ describe('DeviceManagement', () => {
       expect(mock.history.get).toHaveLength(1)
     },
   )
+
+  it('addresses rename and forget by public identity instead of the browser token', async () => {
+    const user = userEvent.setup()
+    const publicId = 'devicePublicIdentity1'
+    const browserToken = '0198d4d2-7600-7000-8000-000000000001'
+    mock.onPut(`/api/devices/${publicId}`).reply(200, { data: { message: 'Device renamed.' } })
+    mock.onDelete(`/api/devices/${publicId}`).reply(200, { data: { message: 'Device forgotten.' } })
+    renderDevices({ data: [{ publicId, deviceId: browserToken, name: 'Office desktop', lastUsedAt: null }] })
+
+    await user.click(await screen.findByRole('button', { name: 'Rename Office desktop' }))
+    await user.clear(screen.getByRole('textbox'))
+    await user.type(screen.getByRole('textbox'), 'Living room')
+    await user.click(screen.getByRole('button', { name: 'Rename' }))
+    await waitFor(() => expect(mock.history.put).toHaveLength(1))
+    expect(mock.history.put[0].url).toBe(`/api/devices/${publicId}`)
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: 'Forget Office desktop' }))
+    await user.click(screen.getByRole('button', { name: 'Forget' }))
+    await waitFor(() => expect(mock.history.delete).toHaveLength(1))
+    expect(mock.history.delete[0].url).toBe(`/api/devices/${publicId}`)
+  })
 })

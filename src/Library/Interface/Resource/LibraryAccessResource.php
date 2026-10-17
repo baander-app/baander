@@ -11,7 +11,7 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'LibraryAccessResource',
     properties: [
-        new OA\Property(property: 'libraryId', type: 'string', format: 'uuid', description: 'Library UUID'),
+        new OA\Property(property: 'libraryId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, description: 'Library public ID'),
         new OA\Property(property: 'name', type: 'string', description: 'Library name'),
         new OA\Property(property: 'slug', type: 'string', description: 'URL-friendly slug'),
         new OA\Property(property: 'type', type: 'string', enum: ['music', 'podcast', 'audiobook', 'movie', 'tv_show'], description: 'Library type'),
@@ -25,7 +25,7 @@ final class LibraryAccessResource extends AbstractResource
         assert($source instanceof LibraryAccess);
 
         return [
-            'libraryId' => $source->library->getId()->toString(),
+            'libraryId' => $source->library->getPublicId()->toString(),
             'name' => $source->library->getName(),
             'slug' => $source->library->getSlug()->toString(),
             'type' => $source->library->getType()->value,

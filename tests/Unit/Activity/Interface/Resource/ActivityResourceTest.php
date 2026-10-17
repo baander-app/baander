@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Activity\Interface\Resource;
 
 use App\Activity\Domain\Model\MediaActivity;
+use App\Activity\Application\DTO\ActivityView;
 use App\Activity\Interface\Resource\ActivityResource;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
@@ -41,13 +42,13 @@ final class ActivityResourceTest extends TestCase
             updatedAt: $updatedAt,
         );
 
-        $result = ActivityResource::from($activity);
+        $result = $this->map($activity);
 
-        $this->assertSame($id->toString(), $result['uuid']);
+        $this->assertArrayNotHasKey('uuid', $result);
         $this->assertSame($publicId->toString(), $result['publicId']);
-        $this->assertSame($userId->toString(), $result['userId']);
+        $this->assertSame(str_repeat('u', 21), $result['userId']);
         $this->assertSame('play', $result['activityType']);
-        $this->assertSame($songId->toString(), $result['songId']);
+        $this->assertSame(str_repeat('s', 21), $result['songId']);
         $this->assertNull($result['albumId']);
         $this->assertNull($result['artistId']);
         $this->assertNull($result['movieId']);
@@ -79,7 +80,7 @@ final class ActivityResourceTest extends TestCase
             updatedAt: new DateTimeImmutable(),
         );
 
-        $result = ActivityResource::from($activity);
+        $result = $this->map($activity);
 
         $this->assertNull($result['songId']);
         $this->assertNull($result['albumId']);
@@ -117,12 +118,12 @@ final class ActivityResourceTest extends TestCase
             updatedAt: new DateTimeImmutable(),
         );
 
-        $result = ActivityResource::from($activity);
+        $result = $this->map($activity);
 
-        $this->assertSame($songId->toString(), $result['songId']);
-        $this->assertSame($albumId->toString(), $result['albumId']);
-        $this->assertSame($artistId->toString(), $result['artistId']);
-        $this->assertSame($movieId->toString(), $result['movieId']);
+        $this->assertSame(str_repeat('s', 21), $result['songId']);
+        $this->assertSame(str_repeat('l', 21), $result['albumId']);
+        $this->assertSame(str_repeat('r', 21), $result['artistId']);
+        $this->assertSame(str_repeat('m', 21), $result['movieId']);
         $this->assertSame(5, $result['playCount']);
         $this->assertSame('desktop', $result['lastPlatform']);
         $this->assertSame('vlc', $result['lastPlayer']);
@@ -148,7 +149,7 @@ final class ActivityResourceTest extends TestCase
             updatedAt: new DateTimeImmutable(),
         );
 
-        $result = ActivityResource::from($activity);
+        $result = $this->map($activity);
 
         $this->assertSame('love', $result['activityType']);
         $this->assertTrue($result['love']);
@@ -193,7 +194,7 @@ final class ActivityResourceTest extends TestCase
             updatedAt: new DateTimeImmutable(),
         );
 
-        $result = ActivityResource::collection([$activity1, $activity2]);
+        $result = ActivityResource::collection([$this->view($activity1), $this->view($activity2)]);
 
         $this->assertCount(2, $result);
         $this->assertSame('play', $result[0]['activityType']);
@@ -201,4 +202,30 @@ final class ActivityResourceTest extends TestCase
         $this->assertFalse($result[0]['love']);
         $this->assertTrue($result[1]['love']);
     }
+    /** @return array<string, mixed> */
+    private function map(MediaActivity $activity): array
+    {
+        $result = ActivityResource::from($this->view($activity));
+        $json = json_encode($result, JSON_THROW_ON_ERROR);
+        foreach ([$activity->getId(), $activity->getUserId(), $activity->getSongId(), $activity->getAlbumId(), $activity->getArtistId(), $activity->getMovieId()] as $id) {
+            if ($id !== null) {
+                self::assertStringNotContainsString($id->toString(), $json);
+            }
+        }
+
+        return $result;
+    }
+
+    private function view(MediaActivity $activity): ActivityView
+    {
+        return new ActivityView(
+            $activity,
+            PublicId::fromString(str_repeat('u', 21)),
+            $activity->getSongId() === null ? null : PublicId::fromString(str_repeat('s', 21)),
+            $activity->getAlbumId() === null ? null : PublicId::fromString(str_repeat('l', 21)),
+            $activity->getArtistId() === null ? null : PublicId::fromString(str_repeat('r', 21)),
+            $activity->getMovieId() === null ? null : PublicId::fromString(str_repeat('m', 21)),
+        );
+    }
+
 }

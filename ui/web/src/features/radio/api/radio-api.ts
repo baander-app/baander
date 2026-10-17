@@ -3,7 +3,7 @@ import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 // --- Types ---
 
 export interface RadioSource {
-  id: string
+  publicId: string
   name: string
   type: string
   syncUrl: string
@@ -28,7 +28,7 @@ export interface StreamInfo {
 }
 
 export interface RadioStation {
-  id: string
+  publicId: string
   sourceId: string
   externalId: string
   name: string
@@ -45,7 +45,7 @@ export interface RadioStation {
 }
 
 export interface CountrySubscription {
-  id: string
+  publicId: string
   userId: string
   sourceId: string
   countryCode: string
@@ -54,14 +54,12 @@ export interface CountrySubscription {
 }
 
 export interface StarredStation {
-  id: string
   userId: string
   stationId: string
   starredAt: string
 }
 
 export interface RadioSession {
-  id: string
   userId: string
   state: 'playing' | 'stopped'
   activeStationId: string | null

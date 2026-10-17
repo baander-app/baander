@@ -95,7 +95,7 @@ final class TextColumnMigrationTest extends TestCase
         $suffix = bin2hex(random_bytes(6));
 
         $library = Uuid::generate()->toString();
-        $connection->insert('libraries', ['id' => $library, 'name' => 'U19 ' . $suffix, 'slug' => 'u19-' . $suffix,
+        $connection->insert('libraries', ['id' => $library, 'public_id' => (new PublicId())->toString(), 'name' => 'U19 ' . $suffix, 'slug' => 'u19-' . $suffix,
             'path' => '/media/u19/' . $suffix, 'type' => 'movie', 'created_at' => $now, 'updated_at' => $now]);
         $movie = Uuid::generate()->toString();
         $movieValues = [

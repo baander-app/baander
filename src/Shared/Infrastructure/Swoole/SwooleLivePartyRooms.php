@@ -6,6 +6,7 @@ namespace App\Shared\Infrastructure\Swoole;
 
 use App\Shared\Application\Port\LivePartyRoomsPortInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Infrastructure\Swoole\Control\ServerWorkers;
 
 /**
@@ -22,7 +23,7 @@ final readonly class SwooleLivePartyRooms implements LivePartyRoomsPortInterface
     ) {
     }
 
-    public function removeMember(Uuid $sessionId, Uuid $userId): void
+    public function removeMember(Uuid $sessionId, Uuid $userId, PublicId $sessionPublicId, PublicId $userPublicId): void
     {
         if (!$this->insideTheServer()) {
             return;
@@ -35,9 +36,9 @@ final readonly class SwooleLivePartyRooms implements LivePartyRoomsPortInterface
 
         $this->pusher->broadcast($room, [
             'type'      => 'party.member_event',
-            'sessionId' => $sessionId->toString(),
+            'sessionId' => $sessionPublicId->toString(),
             'action'    => 'leave',
-            'userId'    => $userId->toString(),
+            'userId'    => $userPublicId->toString(),
         ]);
     }
 

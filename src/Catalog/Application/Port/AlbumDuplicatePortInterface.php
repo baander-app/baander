@@ -6,6 +6,7 @@ namespace App\Catalog\Application\Port;
 
 use App\Catalog\Domain\ValueObject\DuplicateGroup;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 
 /**
@@ -13,6 +14,9 @@ use App\Shared\Domain\ValueObject\LibraryReadScope;
  */
 interface AlbumDuplicatePortInterface
 {
+    /** @return list<DuplicateGroup>|null null when the library does not exist */
+    public function findDuplicatesByLibraryPublicId(PublicId $libraryId): ?array;
+
     /** @return DuplicateGroup[] */
     public function findVisibleDuplicatesForAlbum(Uuid $albumId, LibraryReadScope $scope): array;
 

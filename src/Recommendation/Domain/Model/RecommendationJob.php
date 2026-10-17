@@ -222,6 +222,8 @@ final class RecommendationJob
         return $this->state->metadata;
     }
 
+    public function getOriginalJobPublicId(): ?PublicId { return $this->state->originalJobPublicId; }
+
     public function getOriginalJobId(): ?Uuid
     {
         return $this->state->originalJobId;

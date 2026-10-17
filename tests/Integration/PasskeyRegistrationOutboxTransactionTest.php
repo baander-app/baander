@@ -103,6 +103,10 @@ final class PasskeyRegistrationOutboxTransactionTest extends TestCase
         $this->manager->persist($userEntity);
         $this->manager->flush();
         $userId = $userEntity->getId();
+        $credentialRecord = [
+            'credential' => 'key-material',
+            'userHandle' => $userEntity->getPublicId()->toString(),
+        ];
         $users = new UserRepository(
             $this->manager,
             new PasswordResetTokenRepository($this->manager->getConnection()),
@@ -128,7 +132,7 @@ final class PasskeyRegistrationOutboxTransactionTest extends TestCase
 
         try {
             $this->handler($users, $passkeys, $events)(new RegisterPasskeyCommand(
-                $userId->toString(), 'Laptop', 'credential-a', ['credential' => 'key-material'], 0,
+                $userId->toString(), 'Laptop', 'credential-a', $credentialRecord, 0,
             ));
             self::fail('Outbox insertion failure must abort passkey registration.');
         } catch (\Throwable $error) {
@@ -142,7 +146,7 @@ final class PasskeyRegistrationOutboxTransactionTest extends TestCase
         $this->writer->executeStatement('DROP FUNCTION reject_outbox_event()');
         $this->manager->clear();
         $passkey = $this->handler($users, $passkeys, $events)(new RegisterPasskeyCommand(
-            $userId->toString(), 'Laptop', 'credential-a', ['credential' => 'key-material'], 0,
+            $userId->toString(), 'Laptop', 'credential-a', $credentialRecord, 0,
         ));
 
         self::assertSame(1, (int) $this->observer->fetchOne('SELECT COUNT(*) FROM passkeys'));

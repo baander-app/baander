@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Shared\Interface\Controller;
 
+use App\Shared\Domain\Model\PublicId;
+use App\Shared\Application\Port\WebSocketIdentityLookupInterface;
 use App\Party\Application\Command\JoinPartySessionCommand;
 use App\Party\Application\Command\LeavePartySessionCommand;
 use App\Party\Application\Command\PausePlaybackCommand;
@@ -47,6 +49,7 @@ final class WebSocketController extends AbstractWebSocketController
         private readonly MessageBusInterface $bus,
         private readonly JsonEncoder $jsonEncoder,
         private readonly ListeningSessionInteractionInterface $listeningSessions,
+        private readonly WebSocketIdentityLookupInterface $identities,
         private readonly ?LoggerInterface $logger = null,
     )
     {
@@ -153,7 +156,7 @@ final class WebSocketController extends AbstractWebSocketController
             'session.join' => $this->handleSessionJoin($fd, $userId, $payload),
             'session.playback' => $this->handleSessionPlayback($fd, $userId, $payload),
             'session.sync' => $this->handleSessionSync($fd, $userId, $payload),
-            'transcode.position' => $this->handleTranscodePosition($fd, $payload),
+            'transcode.position' => $this->handleTranscodePosition($fd, $userId, $payload),
             default => $this->pusher->pushToConnection($fd, [
                 'type'    => 'error',
                 'message' => sprintf('Unknown message type: "%s"', $type),
@@ -245,6 +248,16 @@ final class WebSocketController extends AbstractWebSocketController
         ]);
     }
 
+    private function partyId(string $publicId): Uuid
+    {
+        $session = $this->identities->partyId(PublicId::fromString($publicId));
+        if ($session === null) {
+            throw new InvalidArgumentException('Party session not found.');
+        }
+
+        return $session;
+    }
+
     /** @param array<array-key, mixed> $payload */
     private function handlePartyJoin(int $fd, string $userId, array $payload): void
     {
@@ -259,12 +272,20 @@ final class WebSocketController extends AbstractWebSocketController
         }
 
         try {
-            $sessionUuid = Uuid::fromString($sessionId);
+            $sessionUuid = $this->partyId($sessionId);
             $userUuid = Uuid::fromString($userId);
+            $userPublicId = $this->identities->userPublicId($userUuid) ?? throw new \UnexpectedValueException('User not found.');
         } catch (InvalidArgumentException $e) {
             $this->pusher->pushToConnection($fd, [
                 'type'    => 'error',
-                'message' => 'Invalid UUID format',
+                'message' => 'Invalid public identity',
+            ]);
+
+            return;
+        } catch (Throwable) {
+            $this->pusher->pushToConnection($fd, [
+                'type' => 'error',
+                'message' => 'Identity lookup unavailable',
             ]);
 
             return;
@@ -280,7 +301,7 @@ final class WebSocketController extends AbstractWebSocketController
         } catch (HandlerFailedException $e) {
             $this->pusher->pushToConnection($fd, [
                 'type'    => 'error',
-                'message' => $e->getPrevious()?->getMessage() ?? $e->getMessage(),
+                'message' => 'Party operation refused',
             ]);
 
             return;
@@ -297,7 +318,7 @@ final class WebSocketController extends AbstractWebSocketController
         // Add to Swoole Table room for broadcasting. A refused membership keeps the
         // party membership: the user may already be a member through another
         // connection, so leaving the party here could remove that membership.
-        $room = WebSocketRoomPolicy::partyRoom($sessionId);
+        $room = WebSocketRoomPolicy::partyRoom($sessionUuid->toString());
         if (!$this->joinBroadcastRoom($fd, $userId, $room)) {
             return;
         }
@@ -314,7 +335,7 @@ final class WebSocketController extends AbstractWebSocketController
             'type'      => 'party.member_event',
             'sessionId' => $sessionId,
             'action'    => 'join',
-            'userId'    => $userId,
+            'userId'    => $userPublicId->toString(),
             'role'      => $member->getRole()->value,
         ]);
     }
@@ -333,12 +354,19 @@ final class WebSocketController extends AbstractWebSocketController
         }
 
         try {
-            $sessionUuid = Uuid::fromString($sessionId);
+            $sessionUuid = $this->partyId($sessionId);
             $userUuid = Uuid::fromString($userId);
         } catch (InvalidArgumentException) {
             $this->pusher->pushToConnection($fd, [
                 'type'    => 'error',
-                'message' => 'Invalid UUID format',
+                'message' => 'Invalid public identity',
+            ]);
+
+            return;
+        } catch (Throwable) {
+            $this->pusher->pushToConnection($fd, [
+                'type' => 'error',
+                'message' => 'Identity lookup unavailable',
             ]);
 
             return;
@@ -351,7 +379,7 @@ final class WebSocketController extends AbstractWebSocketController
         } catch (HandlerFailedException $e) {
             $this->pusher->pushToConnection($fd, [
                 'type'    => 'error',
-                'message' => $e->getPrevious()?->getMessage() ?? $e->getMessage(),
+                'message' => 'Party operation refused',
             ]);
 
             return;
@@ -385,12 +413,19 @@ final class WebSocketController extends AbstractWebSocketController
         }
 
         try {
-            $sessionUuid = Uuid::fromString($sessionId);
+            $sessionUuid = $this->partyId($sessionId);
             $playbackAction = PlaybackAction::from($action ?? '');
         } catch (InvalidArgumentException) {
             $this->pusher->pushToConnection($fd, [
                 'type'    => 'error',
                 'message' => 'Invalid sessionId or action',
+            ]);
+
+            return;
+        } catch (Throwable) {
+            $this->pusher->pushToConnection($fd, [
+                'type' => 'error',
+                'message' => 'Identity lookup unavailable',
             ]);
 
             return;
@@ -431,7 +466,7 @@ final class WebSocketController extends AbstractWebSocketController
         } catch (HandlerFailedException $e) {
             $this->pusher->pushToConnection($fd, [
                 'type'    => 'error',
-                'message' => $e->getPrevious()?->getMessage() ?? $e->getMessage(),
+                'message' => 'Party operation refused',
             ]);
 
             return;
@@ -485,11 +520,18 @@ final class WebSocketController extends AbstractWebSocketController
 
         try {
             $userUuid = Uuid::fromString($userId);
-            $sessionUuid = Uuid::fromString($sessionId);
+            $sessionUuid = $this->partyId($sessionId);
         } catch (InvalidArgumentException) {
             $this->pusher->pushToConnection($fd, [
                 'type'    => 'error',
                 'message' => 'Invalid sessionId format',
+            ]);
+
+            return;
+        } catch (Throwable) {
+            $this->pusher->pushToConnection($fd, [
+                'type' => 'error',
+                'message' => 'Identity lookup unavailable',
             ]);
 
             return;
@@ -664,7 +706,7 @@ final class WebSocketController extends AbstractWebSocketController
     }
 
     /** @param array<array-key, mixed> $payload */
-    private function handleTranscodePosition(int $fd, array $payload): void
+    private function handleTranscodePosition(int $fd, string $userId, array $payload): void
     {
         $sessionId = $payload['sessionId'] ?? null;
         $position = $payload['position'] ?? null;
@@ -680,11 +722,22 @@ final class WebSocketController extends AbstractWebSocketController
         }
 
         try {
-            $sessionUuid = Uuid::fromString($sessionId);
+            $session = $this->identities->transcodeSessionId(PublicId::fromString($sessionId), Uuid::fromString($userId));
+            if ($session === null) {
+                throw new InvalidArgumentException('Session not found.');
+            }
+            $sessionUuid = $session;
         } catch (InvalidArgumentException) {
             $this->pusher->pushToConnection($fd, [
                 'type'    => 'error',
                 'message' => 'Invalid sessionId format',
+            ]);
+
+            return;
+        } catch (Throwable) {
+            $this->pusher->pushToConnection($fd, [
+                'type' => 'error',
+                'message' => 'Identity lookup unavailable',
             ]);
 
             return;

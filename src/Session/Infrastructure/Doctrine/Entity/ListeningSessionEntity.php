@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Session\Infrastructure\Doctrine\Entity;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'listening_sessions')]
+#[ORM\UniqueConstraint(name: 'uniq_listening_sessions_public_id', columns: ['public_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_listening_sessions_user_id', columns: ['user_id'])]
 class ListeningSessionEntity
 {
@@ -16,6 +18,9 @@ class ListeningSessionEntity
     #[ORM\Column(type: 'uuid')]
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
+
+    #[ORM\Column(name: 'public_id', type: 'text')]
+    private string $publicId;
 
     #[ORM\Column(name: 'user_id', type: 'uuid')]
     private Uuid $userId;
@@ -56,8 +61,10 @@ class ListeningSessionEntity
         int $currentTrackIndex = 0,
         float $position = 0.0,
         ?Uuid $id = null,
+        ?PublicId $publicId = null,
     ) {
         $this->id = $id ?? new Uuid();
+        $this->publicId = ($publicId ?? new PublicId())->toString();
         $this->userId = $userId;
         $this->queue = $queue;
         $this->currentTrackIndex = $currentTrackIndex;
@@ -70,6 +77,11 @@ class ListeningSessionEntity
     public function getId(): Uuid
     {
         return $this->id;
+    }
+
+    public function getPublicId(): PublicId
+    {
+        return PublicId::fromString($this->publicId);
     }
 
     public function getUserId(): Uuid

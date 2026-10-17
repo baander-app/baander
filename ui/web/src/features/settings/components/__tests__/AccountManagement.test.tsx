@@ -22,7 +22,6 @@ const VERIFIED_AT = '2026-10-01T09:30:00+00:00'
 
 function profile(overrides: Partial<UserResource> = {}): UserResource {
   return {
-    uuid: '0192a7c4-6a4e-7c3b-9f1d-2b8e5c7a1d40',
     publicId: 'usr_member',
     name: 'Member',
     email: 'member@baander.app',
@@ -40,7 +39,6 @@ function signIn(user: UserResource) {
     refreshToken: 'refresh',
     isAuthenticated: true,
     user: {
-      uuid: user.uuid,
       publicId: user.publicId,
       name: user.name,
       email: user.email,

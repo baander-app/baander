@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace App\Radio\Domain\Repository\RadioStation;
 
 use App\Radio\Domain\Model\RadioStation\RadioStation;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 
 interface RadioStationRepositoryInterface
 {
     public function find(Uuid $id): ?RadioStation;
+
+    public function findByPublicId(PublicId $publicId): ?RadioStation;
 
     public function findBySourceAndExternalId(Uuid $sourceId, string $externalId): ?RadioStation;
 

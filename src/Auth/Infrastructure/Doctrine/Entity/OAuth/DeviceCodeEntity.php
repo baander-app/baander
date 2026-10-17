@@ -206,7 +206,7 @@ class DeviceCodeEntity implements DeviceCodeEntityInterface
 
     public function getUserIdentifier(): ?string
     {
-        return $this->user?->getId()->toString();
+        return $this->user?->getPublicId()->toString();
     }
 
     public function getId(): Uuid

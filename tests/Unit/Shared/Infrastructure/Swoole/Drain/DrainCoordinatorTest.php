@@ -19,6 +19,7 @@ final class DrainCoordinatorTest extends TestCase
         use App\Shared\Infrastructure\Swoole\Drain\DrainCoordinator;
         use App\Shared\Infrastructure\Swoole\Drain\DrainShutdownHandler;
         use App\Shared\Infrastructure\Swoole\Drain\DrainStateTable;
+        use App\Shared\Infrastructure\Swoole\Drain\SwooleHooks;
         use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool;
         use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPoolShutdownHandler;
         use App\Shared\Infrastructure\Swoole\ProcessPool\ProcessPoolWorkerInterface;
@@ -105,11 +106,22 @@ final class DrainCoordinatorTest extends TestCase
                 $coordinator->handle($server);
                 $afterFirst = $timers();
                 $coordinator->handle($server);
+                // proc_open returns before the child's command line is visible in /proc.
+                // Keep this wait outside the coroutine runtime so it adds no master timer.
+                $watchdogs = SwooleHooks::without(SWOOLE_HOOK_ALL, static function (): int {
+                    $deadline = hrtime(true) + 1_000_000_000;
+                    do {
+                        $count = watchdogs();
+                        if ($count > 0) { return $count; }
+                        usleep(1000);
+                    } while (hrtime(true) < $deadline);
+                    return $count;
+                });
                 record('handled_twice', [
                     'added' => array_values(array_diff($afterFirst, $before)),
                     'removed' => array_values(array_diff($before, $afterFirst)),
                     'unchangedBySecondCall' => $timers() === $afterFirst,
-                    'watchdogs' => watchdogs(),
+                    'watchdogs' => $watchdogs,
                 ]);
             });
         } else {

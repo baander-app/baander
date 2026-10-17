@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Domain\Model;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use DateTimeImmutable;
 use InvalidArgumentException;
 
@@ -45,6 +46,7 @@ final class Genre
 
         return new self(new GenreState(
             id: new Uuid(),
+            publicId: new PublicId(),
             name: $normalizedName,
             slug: $slug,
             mbid: $mbid,
@@ -95,6 +97,7 @@ final class Genre
         }
 
         $this->state->parent = $genre?->getId();
+        $this->state->parentPublicId = $genre?->getPublicId();
         $this->state->updatedAt = new DateTimeImmutable();
     }
 
@@ -120,6 +123,8 @@ final class Genre
         $this->state->updatedAt = new DateTimeImmutable();
     }
 
+    public function getPublicId(): PublicId { return $this->state->publicId; }
+
     public function getId(): Uuid
     {
         return $this->state->id;
@@ -139,6 +144,8 @@ final class Genre
     {
         return $this->state->mbid;
     }
+
+    public function getParentPublicId(): ?PublicId { return $this->state->parentPublicId; }
 
     public function getParent(): ?Uuid
     {

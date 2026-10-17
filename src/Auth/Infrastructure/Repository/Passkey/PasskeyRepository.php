@@ -43,6 +43,7 @@ final class PasskeyRepository implements PasskeyRepositoryInterface
             $passkey->getData(),
             $passkey->getCounter(),
             $passkey->getId(),
+            $passkey->getPublicId(),
         );
 
         $this->entityManager->persist($entity);
@@ -131,6 +132,7 @@ final class PasskeyRepository implements PasskeyRepositoryInterface
     {
         return Passkey::reconstitute(new PasskeyState(
             id: $entity->getId(),
+            publicId: $entity->getPublicId(),
             name: $entity->getName(),
             credentialId: $entity->getCredentialId(),
             data: $entity->getData(),

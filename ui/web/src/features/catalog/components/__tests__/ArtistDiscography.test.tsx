@@ -50,7 +50,6 @@ import { ArtistDiscography } from '../ArtistDiscography'
 
 const makeAlbums = (count: number) =>
   Array.from({ length: count }, (_, i) => ({
-    uuid: `uuid-album-${i}`,
     publicId: `album-${i}`,
     title: `Album ${i}`,
     type: 'album',

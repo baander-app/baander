@@ -19,7 +19,7 @@ final readonly class DeleteUserHandler
     ) {
     }
 
-    /** @throws UserNotFoundException when no user has the email address or UUID */
+    /** @throws UserNotFoundException when no user has the email address or public ID */
     #[AsMessageHandler]
     public function __invoke(DeleteUserCommand $command): void
     {

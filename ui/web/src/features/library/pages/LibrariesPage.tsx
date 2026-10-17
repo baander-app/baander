@@ -208,13 +208,13 @@ export function LibrariesPage() {
           {hasAnyLibrary ? (
             libraries!.map((library) => (
               <LibraryCard
-                key={library.id}
+                key={library.publicId}
                 library={library}
                 isScanning={library.scanStatus === 'scanning'}
                 onEdit={setEditTarget}
                 onDelete={setDeleteTarget}
                 onScan={setScanTarget}
-                onViewDetail={(lib) => navigate(`/admin/library/${lib.id}`)}
+                onViewDetail={(lib) => navigate(`/admin/library/${lib.publicId}`)}
               />
             ))
           ) : (
@@ -249,7 +249,7 @@ export function LibrariesPage() {
         onSubmit={(data) => {
           if (!editTarget) return
           updateMutation.mutate(
-            { id: editTarget.id, payload: data },
+            { id: editTarget.publicId, payload: data },
             {
               onSuccess: () => {
                 setEditTarget(null)
@@ -270,7 +270,7 @@ export function LibrariesPage() {
         onConfirm={(rescan) => {
           if (!scanTarget) return
           scanMutation.mutate(
-            { id: scanTarget.id, rescan },
+            { id: scanTarget.publicId, rescan },
             {
               onSuccess: () => {
                 setScanTarget(null)
@@ -288,7 +288,7 @@ export function LibrariesPage() {
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => {
           if (!deleteTarget) return
-          deleteMutation.mutate(deleteTarget.id, {
+          deleteMutation.mutate(deleteTarget.publicId, {
             onSuccess: () => {
               setDeleteTarget(null)
               toast.success('Library deleted')

@@ -68,9 +68,11 @@ Each context owner owns its model, persistence mapping, application contracts,
 transport adapters and tests. One PostgreSQL specialist owns the consolidated
 forward migration and coordinates column names with every context owner.
 New public IDs are generated independently of UUIDs, backfilled for existing
-rows, unique and non-null. Keep primary keys, foreign keys, revision values and
-local user data. Test fresh installation and upgrading populated tables in
-disposable infrastructure. Do not reset development databases.
+rows, unique and non-null. Keep primary keys, foreign keys, revision values,
+accounts and other user data. The user authorized invalidating existing passkeys
+so they can be enrolled again with public-ID handles. Test fresh installation
+and upgrading populated tables in disposable infrastructure. Do not reset
+development databases.
 
 ## Verification and acceptance
 
@@ -99,13 +101,14 @@ locally; pushing requires a separate request.
 
 ## Workflow
 
-Independent review found one decision that cannot be resolved by a database
-backfill: an enrolled authenticator's user handle cannot be changed. Existing
-passkey invalidation or a legacy protocol exception needs the user's choice.
-That question is pending; existing credential migration and handle changes wait
-for the answer. Other implementation units may proceed. Verification must cover
-the chosen behavior with an existing credential fixture. Scheduler receipts use
-an independent persisted public ID while retaining internal deduplication keys.
+Independent review established that an enrolled authenticator's user handle
+cannot be changed by a database backfill. The user approved requiring passkey
+re-enrollment on 2026-10-15. Invalidate existing credentials in the migration,
+preserve accounts and other data, and use public-ID handles for registration,
+authentication and account signals without a UUID fallback. Verify invalidation
+with an existing credential fixture and verify enrollment and authentication
+with the new handle. Scheduler receipts use an independent persisted public ID
+while retaining internal deduplication keys.
 
 The compound-engineering skills are unavailable in this environment. Use the
 documented manual workflow: independent plan review before implementation,

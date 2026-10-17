@@ -24,6 +24,36 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 final class TranscodeSessionAuthorizationTest extends TestCase
 {
+    #[DataProvider('sessionOperations')]
+    public function testInternalSessionUuidIsRejectedBeforeLookupOrDispatch(string $operation): void
+    {
+        $sessions = $this->createMock(TranscodeSessionPortInterface::class);
+        $sessions->expects(self::never())->method('findByPublicId');
+        $sessions->expects(self::never())->method('findByUuid');
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::never())->method('dispatch');
+        $controller = new TranscodeSessionController(
+            $this->createStub(Security::class), $bus, $sessions,
+            $this->createStub(PlaybackPortInterface::class), new \App\Tests\Unit\Transcode\PublicViewStub(),
+        );
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\NotFoundHttpException::class);
+        $uuid = (new Uuid())->toString();
+
+        match ($operation) {
+            'update' => $controller->update($uuid, new UpdateTranscodeSessionRequest()),
+            'updatePosition' => $controller->updatePosition($uuid, Request::create('/', 'POST', content: '{"position":12.5}')),
+            default => $controller->$operation($uuid),
+        };
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function sessionOperations(): iterable
+    {
+        foreach (['show', 'pause', 'resume', 'cancel', 'update', 'updatePosition'] as $operation) {
+            yield $operation => [$operation];
+        }
+    }
+
     #[DataProvider('operations')]
     public function testSessionAccess(string $operation, string $actor): void
     {
@@ -31,24 +61,25 @@ final class TranscodeSessionAuthorizationTest extends TestCase
         $session = TranscodeSession::create($owner, new Uuid(), new Uuid(), AudioProfile::streamingStereo());
         $security = $this->createStub(Security::class);
         $security->method('getUser')->willReturn($actor === 'anonymous' ? null : new SecurityUser(
-            ($actor === 'owner' ? $owner : new Uuid())->toString(), 'user@example.test', '',
+            ($actor === 'owner' ? $owner : new Uuid())->toString(), 'user@baander.app', '',
         ));
         $security->method('isGranted')->willReturn($actor === 'admin');
         $allowed = in_array($actor, ['owner', 'admin'], true);
         $port = $this->createMock(TranscodeSessionPortInterface::class);
+        $port->method('findByPublicId')->willReturn($session);
         $port->method('findByUuid')->willReturn($session);
         $port->expects($allowed && $operation === 'update' ? $this->once() : $this->never())->method('save');
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($allowed && !in_array($operation, ['show', 'update'], true) ? $this->once() : $this->never())
             ->method('dispatch')->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
-        $controller = new TranscodeSessionController($security, $bus, $port, $this->createStub(PlaybackPortInterface::class));
+        $controller = new TranscodeSessionController($security, $bus, $port, $this->createStub(PlaybackPortInterface::class), new \App\Tests\Unit\Transcode\PublicViewStub());
         if (!$allowed) {
             $this->expectException($actor === 'anonymous' ? HttpException::class : AccessDeniedException::class);
         }
         $response = match ($operation) {
-            'update' => $controller->update($session->getId()->toString(), new UpdateTranscodeSessionRequest()),
-            'updatePosition' => $controller->updatePosition($session->getId()->toString(), Request::create('/', 'POST', content: '{"position":12.5,"action":"seek"}')),
-            default => $controller->$operation($session->getId()->toString()),
+            'update' => $controller->update($session->getPublicId()->toString(), new UpdateTranscodeSessionRequest()),
+            'updatePosition' => $controller->updatePosition($session->getPublicId()->toString(), Request::create('/', 'POST', content: '{"position":12.5,"action":"seek"}')),
+            default => $controller->$operation($session->getPublicId()->toString()),
         };
         self::assertSame(200, $response->getStatusCode());
     }
@@ -69,8 +100,9 @@ final class TranscodeSessionAuthorizationTest extends TestCase
         $owner = new Uuid();
         $session = TranscodeSession::create($owner, new Uuid(), new Uuid(), AudioProfile::streamingStereo());
         $security = $this->createStub(Security::class);
-        $security->method('getUser')->willReturn(new SecurityUser($owner->toString(), 'user@example.test', ''));
+        $security->method('getUser')->willReturn(new SecurityUser($owner->toString(), 'user@baander.app', ''));
         $port = $this->createStub(TranscodeSessionPortInterface::class);
+        $port->method('findByPublicId')->willReturn($session);
         $port->method('findByUuid')->willReturn($session);
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($status === 200 ? $this->once() : $this->never())->method('dispatch')
@@ -79,8 +111,8 @@ final class TranscodeSessionAuthorizationTest extends TestCase
                 self::assertSame('seek', $command->action);
                 return new Envelope($command);
             });
-        $controller = new TranscodeSessionController($security, $bus, $port, $this->createStub(PlaybackPortInterface::class));
-        $response = $controller->updatePosition($session->getId()->toString(), Request::create('/', 'POST', content: $json));
+        $controller = new TranscodeSessionController($security, $bus, $port, $this->createStub(PlaybackPortInterface::class), new \App\Tests\Unit\Transcode\PublicViewStub());
+        $response = $controller->updatePosition($session->getPublicId()->toString(), Request::create('/', 'POST', content: $json));
         self::assertSame($status, $response->getStatusCode());
     }
 

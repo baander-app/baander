@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Radio\Domain\Model\RadioSource;
 use App\Radio\Domain\Model\RadioSource\RadioSource;
 use App\Radio\Domain\Model\RadioSource\RadioSourceState;
 use App\Radio\Domain\ValueObject\SyncConfig;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use InvalidArgumentException;
@@ -85,6 +86,7 @@ final class RadioSourceTest extends TestCase
 
         $state = new RadioSourceState(
             id: $id,
+            publicId: new PublicId(),
             name: 'IPRD',
             type: 'iprd',
             syncConfig: $syncConfig,

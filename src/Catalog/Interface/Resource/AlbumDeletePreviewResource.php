@@ -14,7 +14,7 @@ use OpenApi\Attributes as OA;
     schema: 'AlbumDeletePreviewResource',
     properties: [
         new OA\Property(property: 'album', properties: [
-            new OA\Property(property: 'id', type: 'string'),
+            new OA\Property(property: 'id', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
             new OA\Property(property: 'title', type: 'string'),
             new OA\Property(property: 'songCount', type: 'integer'),
         ], type: 'object'),
@@ -23,7 +23,7 @@ use OpenApi\Attributes as OA;
             new OA\Property(property: 'totalSize', type: 'integer'),
         ], type: 'object'),
         new OA\Property(property: 'coverImage', properties: [
-            new OA\Property(property: 'id', type: 'string'),
+            new OA\Property(property: 'id', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
         ], type: 'object', nullable: true),
         new OA\Property(property: 'affected', properties: [
             new OA\Property(property: 'playlists', type: 'integer'),

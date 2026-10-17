@@ -85,7 +85,6 @@ final class PlaylistMutationFirewallTest extends TestCase
     ];
 
     private const string CREATED_NAME = 'Matrix created playlist';
-    private const string SONG_NOT_FOUND = 'Song not found.';
     private const string SONG_ID_MALFORMED = 'Invalid song_id format.';
     private const string SONG_PATH_ID_MALFORMED = 'Invalid song ID format.';
     private const string SONG_IDS_MALFORMED = 'One or more song IDs have an invalid format.';
@@ -102,6 +101,8 @@ final class PlaylistMutationFirewallTest extends TestCase
     private string $playlistPublicId;
     /** @var array<string, Uuid> song key => id */
     private array $songs = [];
+    /** @var array<string, string> song key => public ID */
+    private array $songPublicIds = [];
     /** @var list<array{class-string, Uuid}> */
     private array $rows = [];
     /** @var ?array{class-string, string} */
@@ -267,10 +268,10 @@ final class PlaylistMutationFirewallTest extends TestCase
 
     public function testACollaboratorAddsASongTheOwnerCannotSeeAndEachViewerCountsTheirOwn(): void
     {
-        $response = $this->request('POST', $this->playlistPath('/songs'), 'collaborator', ['songId' => $this->songs['c1']->toString()]);
+        $response = $this->request('POST', $this->playlistPath('/songs'), 'collaborator', ['songId' => $this->songPublicIds['c1']]);
 
         self::assertSame(201, $response->getStatusCode(), $this->responseDetails($response));
-        self::assertSame(['songId' => $this->songs['c1']->toString(), 'position' => 5], $this->json($response));
+        self::assertSame(['songId' => $this->songPublicIds['c1'], 'position' => 5], $this->json($response));
         self::assertSame($this->songIds(['s1', 'o1', 's2', 'o2', 's3', 'c1']), $this->state()['songs']);
         $this->assertView($this->request('GET', $this->playlistPath(), 'owner'), 'owner', ['s1', 'o1', 's2', 'o2', 's3']);
         $this->assertView($this->request('GET', $this->playlistPath(), 'collaborator'), 'collaborator', ['s1', 's2', 's3', 'c1']);
@@ -282,22 +283,22 @@ final class PlaylistMutationFirewallTest extends TestCase
         $this->turnCollaborationOff();
         $before = $this->state();
 
-        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/songs'), 'collaborator', ['songId' => $this->songs['s4']->toString()]), 403, PlaylistController::REFUSAL_MESSAGES['EDIT_SONGS'], 'add with the flag off');
-        $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/songs/' . $this->songs['s1']->toString()), 'collaborator'), 403, PlaylistController::REFUSAL_MESSAGES['EDIT_SONGS'], 'remove with the flag off');
-        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/reorder'), 'collaborator', ['songIds' => $this->songIds(['s3', 's1'])]), 403, PlaylistController::REFUSAL_MESSAGES['EDIT_SONGS'], 'reorder with the flag off');
+        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/songs'), 'collaborator', ['songId' => $this->songPublicIds['s4']]), 403, PlaylistController::REFUSAL_MESSAGES['EDIT_SONGS'], 'add with the flag off');
+        $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/songs/' . $this->songPublicIds['s1']), 'collaborator'), 403, PlaylistController::REFUSAL_MESSAGES['EDIT_SONGS'], 'remove with the flag off');
+        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/reorder'), 'collaborator', ['songIds' => $this->songPublicIds(['s3', 's1'])]), 403, PlaylistController::REFUSAL_MESSAGES['EDIT_SONGS'], 'reorder with the flag off');
         self::assertSame($before, $this->state());
         $this->assertView($this->request('GET', $this->playlistPath(), 'collaborator'), 'collaborator', ['s1', 's2', 's3']);
 
         $turnedOn = $this->request('PATCH', $this->playlistPath(), 'owner', ['isCollaborative' => true]);
         self::assertSame(200, $turnedOn->getStatusCode(), $this->responseDetails($turnedOn));
         self::assertTrue($this->json($turnedOn)['data']['isCollaborative']);
-        $added = $this->request('POST', $this->playlistPath('/songs'), 'collaborator', ['songId' => $this->songs['s4']->toString()]);
+        $added = $this->request('POST', $this->playlistPath('/songs'), 'collaborator', ['songId' => $this->songPublicIds['s4']]);
         self::assertSame(201, $added->getStatusCode(), $this->responseDetails($added));
     }
 
     public function testASubsetReorderKeepsTheHiddenEntriesAfterTheListedOnes(): void
     {
-        $response = $this->request('POST', $this->playlistPath('/reorder'), 'collaborator', ['songIds' => $this->songIds(['s3', 's1', 's2'])]);
+        $response = $this->request('POST', $this->playlistPath('/reorder'), 'collaborator', ['songIds' => $this->songPublicIds(['s3', 's1', 's2'])]);
 
         self::assertSame(200, $response->getStatusCode(), $this->responseDetails($response));
         self::assertSame($this->songIds(['s3', 's1', 's2', 'o1', 'o2']), $this->state()['songs']);
@@ -411,7 +412,7 @@ final class PlaylistMutationFirewallTest extends TestCase
         $before = $this->state();
         self::assertSame([], $before['collaborators']);
         $this->assertDecidedBy($this->request('GET', $this->playlistPath(), 'collaborator'), 403, PlaylistController::REFUSAL_MESSAGES['VIEW'], 'view after removal');
-        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/songs'), 'collaborator', ['songId' => $this->songs['s4']->toString()]), 403, PlaylistController::REFUSAL_MESSAGES['EDIT_SONGS'], 'add after removal');
+        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/songs'), 'collaborator', ['songId' => $this->songPublicIds['s4']]), 403, PlaylistController::REFUSAL_MESSAGES['EDIT_SONGS'], 'add after removal');
         $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/collaborators/' . $this->actors['collaborator']['publicId']), 'collaborator'), 403, PlaylistController::REFUSAL_MESSAGES['LEAVE'], 'leave after removal');
         self::assertSame($before, $this->state());
         $list = $this->json($this->request('GET', '/api/playlists/', 'collaborator'))['data'];
@@ -424,7 +425,7 @@ final class PlaylistMutationFirewallTest extends TestCase
         self::assertFalse($this->state()['exists']);
 
         $this->assertDecidedBy($this->request('GET', $this->playlistPath(), 'collaborator'), 404, 'Resource not found.', 'view after deletion');
-        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/songs'), 'collaborator', ['songId' => $this->songs['s4']->toString()]), 404, 'Resource not found.', 'add after deletion');
+        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/songs'), 'collaborator', ['songId' => $this->songPublicIds['s4']]), 404, 'Resource not found.', 'add after deletion');
         $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/collaborators/' . $this->actors['collaborator']['publicId']), 'collaborator'), 404, 'Resource not found.', 'leave after deletion');
         self::assertSame([], $this->json($this->request('GET', '/api/playlists/', 'collaborator'))['data']);
     }
@@ -433,9 +434,9 @@ final class PlaylistMutationFirewallTest extends TestCase
     {
         $before = $this->state();
 
-        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/songs'), 'owner', ['songId' => (new Uuid())->toString()]), 404, self::SONG_NOT_FOUND, 'unknown song');
-        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/songs'), 'owner', ['songId' => $this->songs['c1']->toString()]), 404, self::SONG_NOT_FOUND, 'song outside the owner\'s libraries');
-        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/songs'), 'collaborator', ['songId' => $this->songs['o1']->toString()]), 404, self::SONG_NOT_FOUND, 'song outside the collaborator\'s libraries');
+        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/songs'), 'owner', ['songId' => (new PublicId())->toString()]), 404, 'Resource not found.', 'unknown song');
+        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/songs'), 'owner', ['songId' => $this->songPublicIds['c1']]), 404, 'Resource not found.', 'song outside the owner\'s libraries');
+        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/songs'), 'collaborator', ['songId' => $this->songPublicIds['o1']]), 404, 'Resource not found.', 'song outside the collaborator\'s libraries');
         self::assertSame($before, $this->state());
     }
 
@@ -445,20 +446,24 @@ final class PlaylistMutationFirewallTest extends TestCase
 
         $this->assertDecidedBy($this->request('POST', $this->playlistPath('/songs'), 'owner', ['songId' => 'not-a-uuid']), 400, self::SONG_ID_MALFORMED, 'malformed add');
         $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/songs/not-a-uuid'), 'owner'), 400, self::SONG_PATH_ID_MALFORMED, 'malformed remove');
-        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/reorder'), 'owner', ['songIds' => [$this->songs['s1']->toString(), 'not-a-uuid']]), 400, self::SONG_IDS_MALFORMED, 'malformed reorder');
+        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/reorder'), 'owner', ['songIds' => [$this->songPublicIds['s1'], 'not-a-uuid']]), 400, self::SONG_IDS_MALFORMED, 'malformed reorder');
+        $internalId = $this->songs['s1']->toString();
+        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/songs'), 'owner', ['songId' => $internalId]), 400, self::SONG_ID_MALFORMED, 'internal UUID add');
+        $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/songs/' . $internalId), 'owner'), 400, self::SONG_PATH_ID_MALFORMED, 'internal UUID remove');
+        $this->assertDecidedBy($this->request('POST', $this->playlistPath('/reorder'), 'owner', ['songIds' => [$internalId]]), 400, self::SONG_IDS_MALFORMED, 'internal UUID reorder');
         self::assertSame($before, $this->state());
     }
 
-    public function testDuplicateAddsAndRemovalsOfAnyIdAreIdempotent(): void
+    public function testDuplicateAddsAreIdempotentAndInvisibleRemovalsAreDenied(): void
     {
         $before = $this->state();
 
-        $duplicate = $this->request('POST', $this->playlistPath('/songs'), 'owner', ['songId' => $this->songs['s1']->toString()]);
+        $duplicate = $this->request('POST', $this->playlistPath('/songs'), 'owner', ['songId' => $this->songPublicIds['s1']]);
         self::assertSame(201, $duplicate->getStatusCode(), $this->responseDetails($duplicate));
         self::assertSame($before, $this->state(), 'A duplicate add keeps the one entry.');
 
-        $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/songs/' . (new Uuid())->toString()), 'owner'), 204, null, 'removal of an id not in the playlist');
-        $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/songs/' . $this->songs['c1']->toString()), 'owner'), 204, null, 'removal of an id the owner cannot see');
+        $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/songs/' . $this->songPublicIds['s4']), 'owner'), 204, null, 'removal of a visible song not in the playlist');
+        $this->assertDecidedBy($this->request('DELETE', $this->playlistPath('/songs/' . $this->songPublicIds['c1']), 'owner'), 404, 'Resource not found.', 'removal of an id the owner cannot see');
         self::assertSame($before, $this->state());
     }
 
@@ -492,6 +497,7 @@ final class PlaylistMutationFirewallTest extends TestCase
                 $song = new SongEntity(new PublicId(), $album, $key . ' song', '/private/' . $name . '/' . $key . '.flac', $track + 1, 'audio/flac');
                 $this->persist($song);
                 $this->songs[$key] = $song->getId();
+                $this->songPublicIds[$key] = $song->getPublicId()->toString();
             }
         }
         $owner = $this->manager->find(UserEntity::class, $this->actors['owner']['id']);
@@ -557,9 +563,9 @@ final class PlaylistMutationFirewallTest extends TestCase
             'playlist_store' => ['method' => 'POST', 'path' => '/api/playlists/', 'data' => ['name' => self::CREATED_NAME]],
             'playlist_update' => ['method' => 'PATCH', 'path' => $this->playlistPath(), 'data' => ['name' => 'Renamed']],
             'playlist_destroy' => ['method' => 'DELETE', 'path' => $this->playlistPath(), 'data' => []],
-            'playlist_add_song' => ['method' => 'POST', 'path' => $this->playlistPath('/songs'), 'data' => ['songId' => $this->songs['s4']->toString()]],
-            'playlist_remove_song' => ['method' => 'DELETE', 'path' => $this->playlistPath('/songs/' . $this->songs['s1']->toString()), 'data' => []],
-            'playlist_reorder' => ['method' => 'POST', 'path' => $this->playlistPath('/reorder'), 'data' => ['songIds' => $this->songIds(['s2', 's1'])]],
+            'playlist_add_song' => ['method' => 'POST', 'path' => $this->playlistPath('/songs'), 'data' => ['songId' => $this->songPublicIds['s4']]],
+            'playlist_remove_song' => ['method' => 'DELETE', 'path' => $this->playlistPath('/songs/' . $this->songPublicIds['s1']), 'data' => []],
+            'playlist_reorder' => ['method' => 'POST', 'path' => $this->playlistPath('/reorder'), 'data' => ['songIds' => $this->songPublicIds(['s2', 's1'])]],
             'playlist_add_collaborator' => ['method' => 'PUT', 'path' => $this->playlistPath('/collaborators/' . $this->actors['unrelated']['publicId']), 'data' => []],
             'playlist_remove_collaborator' => ['method' => 'DELETE', 'path' => $this->playlistPath('/collaborators/' . $this->actors['collaborator']['publicId']), 'data' => []],
             default => self::fail('No request is defined for ' . $route),
@@ -588,6 +594,10 @@ final class PlaylistMutationFirewallTest extends TestCase
                 self::assertSame([], $data['collaboratorPublicIds']);
                 self::assertSame(0, $data['songCount']);
                 self::assertArrayNotHasKey('userId', $data);
+        self::assertStringNotContainsString($this->playlistId->toString(), $response->getContent());
+        foreach ($this->songs as $songId) {
+            self::assertStringNotContainsString($songId->toString(), $response->getContent());
+        }
                 break;
             case 'playlist_update':
                 $expected['name'] = 'Renamed';
@@ -597,13 +607,17 @@ final class PlaylistMutationFirewallTest extends TestCase
                 self::assertSame([$this->actors['collaborator']['publicId']], $data['collaboratorPublicIds']);
                 self::assertSame(count($this->visibleSongs($actor)), $data['songCount']);
                 self::assertArrayNotHasKey('userId', $data);
+        self::assertStringNotContainsString($this->playlistId->toString(), $response->getContent());
+        foreach ($this->songs as $songId) {
+            self::assertStringNotContainsString($songId->toString(), $response->getContent());
+        }
                 break;
             case 'playlist_destroy':
                 $expected = ['exists' => false];
                 break;
             case 'playlist_add_song':
                 $expected['songs'] = $this->songIds(['s1', 'o1', 's2', 'o2', 's3', 's4']);
-                self::assertSame(['songId' => $this->songs['s4']->toString(), 'position' => 5], $this->json($response));
+                self::assertSame(['songId' => $this->songPublicIds['s4'], 'position' => 5], $this->json($response));
                 break;
             case 'playlist_remove_song':
                 $expected['songs'] = $this->songIds(['o1', 's2', 'o2', 's3']);
@@ -636,8 +650,12 @@ final class PlaylistMutationFirewallTest extends TestCase
         self::assertSame($this->playlistPublicId, $data['publicId']);
         self::assertSame($this->actors['owner']['publicId'], $data['ownerPublicId']);
         self::assertArrayNotHasKey('userId', $data);
+        self::assertStringNotContainsString($this->playlistId->toString(), $response->getContent());
+        foreach ($this->songs as $songId) {
+            self::assertStringNotContainsString($songId->toString(), $response->getContent());
+        }
         self::assertSame(count($songKeys), $data['songCount'], $actor . ' counts the songs they can see.');
-        self::assertSame($this->songIds($songKeys), array_column($data['songs'], 'uuid'), $actor . ' sees their own songs in order.');
+        self::assertSame($this->songPublicIds($songKeys), array_column($data['songs'], 'publicId'), $actor . ' sees their own songs in order.');
         foreach ($data['songs'] as $song) {
             self::assertArrayNotHasKey('path', $song);
         }
@@ -708,6 +726,15 @@ final class PlaylistMutationFirewallTest extends TestCase
             'collaborator', 'collaborator-off' => ['s1', 's2', 's3'],
             default => [],
         };
+    }
+
+    /**
+     * @param list<string> $keys
+     * @return list<string>
+     */
+    private function songPublicIds(array $keys): array
+    {
+        return array_map(fn (string $key): string => $this->songPublicIds[$key], $keys);
     }
 
     /**

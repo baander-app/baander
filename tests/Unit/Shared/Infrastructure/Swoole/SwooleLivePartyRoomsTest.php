@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Infrastructure\Swoole;
 
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Swoole\Control\ServerWorkers;
 use App\Shared\Infrastructure\Swoole\SwooleLivePartyRooms;
@@ -61,7 +62,7 @@ final class SwooleLivePartyRoomsTest extends TestCase
 
     public function testRemovesEverySocketOfTheLeaverAndTellsTheRemainingMembersOnce(): void
     {
-        $this->rooms(inHttpWorker: true)->removeMember(Uuid::fromString(self::SESSION), Uuid::fromString(self::LEAVER));
+        $this->rooms(inHttpWorker: true)->removeMember(Uuid::fromString(self::SESSION), Uuid::fromString(self::LEAVER), new PublicId(str_repeat('s', 21)), new PublicId(str_repeat('u', 21)));
 
         self::assertSame([3], $this->registry->getRoomMembers(WebSocketRooms::party(self::SESSION)));
         self::assertSame([5], $this->registry->getRoomMembers(WebSocketRooms::party(self::OTHER_SESSION)));
@@ -69,9 +70,9 @@ final class SwooleLivePartyRoomsTest extends TestCase
             'fd' => 3,
             'payload' => [
                 'type' => 'party.member_event',
-                'sessionId' => self::SESSION,
+                'sessionId' => str_repeat('s', 21),
                 'action' => 'leave',
-                'userId' => self::LEAVER,
+                'userId' => str_repeat('u', 21),
             ],
         ]], $this->pushed);
     }
@@ -89,7 +90,7 @@ final class SwooleLivePartyRoomsTest extends TestCase
     {
         $rooms = $this->rooms(inHttpWorker: false);
 
-        $rooms->removeMember(Uuid::fromString(self::SESSION), Uuid::fromString(self::LEAVER));
+        $rooms->removeMember(Uuid::fromString(self::SESSION), Uuid::fromString(self::LEAVER), new PublicId(str_repeat('s', 21)), new PublicId(str_repeat('u', 21)));
         $rooms->close(Uuid::fromString(self::SESSION));
 
         $members = $this->registry->getRoomMembers(WebSocketRooms::party(self::SESSION));

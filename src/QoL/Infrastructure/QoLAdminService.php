@@ -29,6 +29,7 @@ final readonly class QoLAdminService implements QoLAdminPortInterface
 {
     public function __construct(
         private ServerControlPortInterface $serverControl,
+        private \App\QoL\Application\Port\QoLJobIdentityInterface $jobIdentities,
     ) {
     }
 
@@ -40,12 +41,26 @@ final readonly class QoLAdminService implements QoLAdminPortInterface
     public function getActiveStreams(): array
     {
         $result = $this->serverControl->execute(QoLStreamsOperation::NAME);
+        $internalIds = [];
+        foreach ($result->results as $streams) {
+            foreach (is_array($streams) ? $streams : [] as $stream) {
+                if (!is_array($stream) || !isset($stream['job_id']) || !is_string($stream['job_id'])) {
+                    throw new \RuntimeException('Invalid active stream report.');
+                }
+                $internalIds[] = $stream['job_id'];
+            }
+        }
+        $publicIds = $this->jobIdentities->publicIds($internalIds);
         $workers = [];
         $count = 0;
         $cost = 0.0;
         foreach ($result->results as $workerId => $streams) {
             /** @var list<array{job_id: string, quality_tier: string, predicted_cost: float}> $streams */
             $streams = is_array($streams) ? array_values($streams) : [];
+            foreach ($streams as &$stream) {
+                $stream['job_id'] = $publicIds[$stream['job_id']] ?? throw new \RuntimeException('Active stream job identity is unavailable.');
+            }
+            unset($stream);
             $workers[] = ['worker_id' => $workerId, 'active_streams' => count($streams), 'streams' => $streams];
             $count += count($streams);
             $cost += array_sum(array_column($streams, 'predicted_cost'));
@@ -105,7 +120,7 @@ final readonly class QoLAdminService implements QoLAdminPortInterface
     {
         $errors = [];
         foreach ($result->errors as $workerId => $error) {
-            $errors[] = ['worker_id' => $workerId, 'error' => $error];
+            $errors[] = ['worker_id' => $workerId, 'error' => \App\Shared\Application\PublicDiagnosticText::redact($error)];
         }
 
         return $errors;

@@ -12,7 +12,7 @@ function deferred<T>() {
   return { promise, resolve, reject }
 }
 function station(id: string): RadioStation {
-  return { id, sourceId: 'source', externalId: id, name: id, country: 'DK', language: null, genres: [], tags: [], logo: null,
+  return { publicId: id, sourceId: 'source', externalId: id, name: id, country: 'DK', language: null, genres: [], tags: [], logo: null,
     website: null, lastCheckedAt: null, createdAt: '', updatedAt: '', streams: [
       { url: `https://radio.baander.app/${id}/slow`, format: 'mp3', bitrate: 128, reliability: 1 },
       { url: `https://radio.baander.app/${id}/best`, format: 'mp3', bitrate: 128, reliability: 3 },

@@ -320,6 +320,7 @@ final class ListeningSessionTest extends TestCase
 
         $state = new \App\Session\Domain\Model\ListeningSession\ListeningSessionState(
             id: $id,
+            publicId: $publicId = new \App\Shared\Domain\Model\PublicId(),
             userId: $this->userId,
             activeDeviceId: $deviceId,
             queue: $queue,
@@ -334,6 +335,7 @@ final class ListeningSessionTest extends TestCase
         $session = ListeningSession::reconstitute($state);
 
         $this->assertTrue($session->getId()->equals($id));
+        $this->assertTrue($session->getPublicId()->equals($publicId));
         $this->assertTrue($session->getUserId()->equals($this->userId));
         $this->assertTrue($session->getActiveDeviceId()->equals($deviceId));
         $this->assertSame($queue, $session->getQueue());

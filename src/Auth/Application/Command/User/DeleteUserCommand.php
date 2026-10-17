@@ -8,7 +8,7 @@ namespace App\Auth\Application\Command\User;
 final readonly class DeleteUserCommand
 {
     public function __construct(
-        /** The user's email address or UUID. */
+        /** The user's email address or public ID. */
         public string $identifier,
     ) {
     }

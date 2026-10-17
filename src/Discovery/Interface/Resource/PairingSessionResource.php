@@ -11,7 +11,6 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'PairingSessionResource',
     properties: [
-        new OA\Property(property: 'uuid', type: 'string', format: 'uuid', description: 'Pairing session UUID'),
         new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
         new OA\Property(property: 'serverPublicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Server public ID'),
         new OA\Property(property: 'serverUrl', type: 'string', format: 'uri', description: 'Server base URL'),
@@ -30,7 +29,6 @@ final class PairingSessionResource extends AbstractResource
         assert($source instanceof PairingSession);
 
         return [
-            'uuid' => $source->getId()->toString(),
             'publicId' => $source->getPublicId()->toString(),
             'serverPublicId' => $source->getServerPublicId()->toString(),
             'serverUrl' => $source->getServerUrl(),

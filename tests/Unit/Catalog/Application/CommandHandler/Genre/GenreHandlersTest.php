@@ -17,6 +17,7 @@ use App\Shared\Application\Exception\ConflictException;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\Stub;
 use PHPUnit\Framework\TestCase;
@@ -37,9 +38,9 @@ final class GenreHandlersTest extends TestCase
     {
         $this->genres = $this->createStub(GenrePortInterface::class);
         $this->genres->method('findBySlug')->willReturnCallback(fn (string $slug): ?Genre => $this->stored[$slug] ?? null);
-        $this->genres->method('findByUuid')->willReturnCallback(function (Uuid $id): ?Genre {
+        $this->genres->method('findByPublicId')->willReturnCallback(function (PublicId $id): ?Genre {
             foreach ($this->stored as $genre) {
-                if ($genre->getId()->equals($id)) {
+                if ($genre->getPublicId()->equals($id)) {
                     return $genre;
                 }
             }
@@ -76,7 +77,7 @@ final class GenreHandlersTest extends TestCase
     {
         $rock = $this->store('Rock', 'rock');
 
-        $genre = $this->create(new CreateGenreCommand('Hard Rock', 'hard-rock', $rock->getId()->toString()));
+        $genre = $this->create(new CreateGenreCommand('Hard Rock', 'hard-rock', $rock->getPublicId()->toString()));
 
         self::assertTrue($rock->getId()->equals($genre->getParent()));
     }
@@ -84,7 +85,8 @@ final class GenreHandlersTest extends TestCase
     /** @return iterable<string, array{string, string}> */
     public static function invalidParents(): iterable
     {
-        yield 'unknown parent' => [(new Uuid())->toString(), 'Parent genre not found.'];
+        yield 'unknown parent' => [(new PublicId())->toString(), 'Parent genre not found.'];
+        yield 'internal UUID' => [(new Uuid())->toString(), 'Invalid parent ID format.'];
         yield 'malformed parent' => ['not-a-uuid', 'Invalid parent ID format.'];
     }
 
@@ -144,7 +146,7 @@ final class GenreHandlersTest extends TestCase
         $this->expectRejection(
             InvalidInputException::class,
             UpdateGenreHandler::CYCLE_MESSAGE,
-            fn () => $this->update(new UpdateGenreCommand('rock', name: 'Renamed', parentId: $grunge->getId()->toString())),
+            fn () => $this->update(new UpdateGenreCommand('rock', name: 'Renamed', parentId: $grunge->getPublicId()->toString())),
         );
         self::assertNull($rock->getParent());
     }
@@ -156,7 +158,7 @@ final class GenreHandlersTest extends TestCase
         $this->expectRejection(
             InvalidInputException::class,
             UpdateGenreHandler::CYCLE_MESSAGE,
-            fn () => $this->update(new UpdateGenreCommand('rock', parentId: $rock->getId()->toString())),
+            fn () => $this->update(new UpdateGenreCommand('rock', parentId: $rock->getPublicId()->toString())),
         );
     }
 
@@ -167,7 +169,7 @@ final class GenreHandlersTest extends TestCase
         $this->expectRejection(
             InvalidInputException::class,
             'Parent genre not found.',
-            fn () => $this->update(new UpdateGenreCommand('rock', parentId: (new Uuid())->toString())),
+            fn () => $this->update(new UpdateGenreCommand('rock', parentId: (new PublicId())->toString())),
         );
     }
 
@@ -177,7 +179,7 @@ final class GenreHandlersTest extends TestCase
         $blues = $this->store('Blues', 'blues');
         $mbid = '0e3fc579-2d24-4f20-9dae-736e1ec78798';
 
-        $genre = $this->update(new UpdateGenreCommand('blues', newSlug: 'blues-rock', parentId: $rock->getId()->toString(), mbid: $mbid));
+        $genre = $this->update(new UpdateGenreCommand('blues', newSlug: 'blues-rock', parentId: $rock->getPublicId()->toString(), mbid: $mbid));
 
         self::assertSame($blues, $genre);
         self::assertSame(['Blues', 'blues-rock', $mbid], [$genre->getName(), $genre->getSlug(), $genre->getMbid()]);

@@ -46,7 +46,7 @@ final class RegistrationLanguageTest extends TestCase
         ], JSON_THROW_ON_ERROR));
         $body = $this->assertJsonResponse($this->client->getResponse(), 201, 'data');
 
-        $userId = Uuid::fromString((string) $body['data']['uuid']);
+        $userId = $this->userRepository->findByPublicId(\App\Shared\Domain\Model\PublicId::fromString($body['data']['publicId']))->getId();
         $this->assertSame($stored, static::getContainer()->get(UserSettingStoreInterface::class)->find($userId, 'language'));
     }
 }

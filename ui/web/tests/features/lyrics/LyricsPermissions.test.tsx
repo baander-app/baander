@@ -48,7 +48,6 @@ import { LyricsTab } from '@/features/layout/components/LyricsTab'
 
 const initialState = useAuthStore.getState()
 const user = {
-  uuid: '0198d4d2-7600-7000-8000-000000000001',
   publicId: 'LyricsPermissionUser1',
   email: 'lyrics@baander.app',
   name: 'Lyrics user',

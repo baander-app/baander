@@ -61,18 +61,18 @@ final class GenreListCommand extends Command
             return Command::SUCCESS;
         }
 
-        $slugs = array_column($genres, 'slug', 'uuid');
+        $slugs = array_column($genres, 'slug', 'publicId');
 
         return AdminCommandSupport::list(
             $input,
             $io,
             $genres,
-            ['Name', 'Slug', 'Parent', 'UUID', 'MusicBrainz ID'],
+            ['Name', 'Slug', 'Parent', 'Public ID', 'MusicBrainz ID'],
             static fn (array $genre): array => [
                 $genre['name'],
                 $genre['slug'],
                 $genre['parentId'] === null ? '-' : ($slugs[$genre['parentId']] ?? $genre['parentId']),
-                $genre['uuid'],
+                $genre['publicId'],
                 $genre['mbid'] ?? '-',
             ],
             'No genres exist.',
@@ -87,7 +87,7 @@ final class GenreListCommand extends Command
      */
     private static function tree(array $genres): array
     {
-        $byId = array_column($genres, null, 'uuid');
+        $byId = array_column($genres, null, 'publicId');
         $children = [];
         $roots = [];
         foreach ($genres as $genre) {
@@ -103,12 +103,12 @@ final class GenreListCommand extends Command
         $printed = [];
         $walk = static function (array $genre, int $depth) use (&$walk, &$lines, &$printed, $children): void {
             // A genre is printed once, so a parent cycle in stored data cannot loop.
-            if (isset($printed[$genre['uuid']])) {
+            if (isset($printed[$genre['publicId']])) {
                 return;
             }
-            $printed[$genre['uuid']] = true;
+            $printed[$genre['publicId']] = true;
             $lines[] = sprintf('%s%s (%s)', str_repeat('  ', $depth), $genre['name'], $genre['slug']);
-            foreach ($children[$genre['uuid']] ?? [] as $child) {
+            foreach ($children[$genre['publicId']] ?? [] as $child) {
                 $walk($child, $depth + 1);
             }
         };

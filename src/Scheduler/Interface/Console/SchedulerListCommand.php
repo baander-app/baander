@@ -39,7 +39,7 @@ final class SchedulerListCommand extends Command
             ScheduledJobResource::collection($this->jobs->findAll()),
             ['ID', 'Name', 'Expression', 'Type', 'Command', 'Status', 'Last Run', 'Next Run'],
             static fn (array $job): array => [
-                $job['id'],
+                $job['publicId'],
                 $job['name'],
                 $job['expression'],
                 $job['jobType'],

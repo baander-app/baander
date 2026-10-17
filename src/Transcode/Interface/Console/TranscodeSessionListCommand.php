@@ -7,6 +7,7 @@ namespace App\Transcode\Interface\Console;
 use App\Auth\Application\Port\UserIdentifierResolverInterface;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
+use App\Transcode\Application\Port\TranscodePublicViewInterface;
 use App\Transcode\Interface\Resource\TranscodeSessionResource;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -35,13 +36,14 @@ final class TranscodeSessionListCommand extends Command
     public function __construct(
         private readonly TranscodeSessionPortInterface $sessions,
         private readonly UserIdentifierResolverInterface $users,
+        private readonly TranscodePublicViewInterface $publicView,
     ) {
         parent::__construct();
     }
 
     protected function configure(): void
     {
-        $this->addOption(self::USER_OPTION, null, InputOption::VALUE_REQUIRED, 'List only the sessions of this user, by email address or UUID');
+        $this->addOption(self::USER_OPTION, null, InputOption::VALUE_REQUIRED, 'List only the sessions of this user, by email address or public ID');
         AdminCommandSupport::addJsonOption($this);
     }
 
@@ -61,10 +63,10 @@ final class TranscodeSessionListCommand extends Command
         return AdminCommandSupport::list(
             $input,
             $io,
-            TranscodeSessionResource::collection($sessions),
-            ['UUID', 'User', 'Video', 'State', 'Priority', 'Audio', 'Segment', 'Created'],
+            array_map(fn ($session) => TranscodeSessionResource::from($this->publicView->session($session)), $sessions),
+            ['Public ID', 'User', 'Video', 'State', 'Priority', 'Audio', 'Segment', 'Created'],
             static fn (array $session): array => [
-                $session['uuid'],
+                $session['publicId'],
                 $session['userId'],
                 $session['videoId'],
                 $session['state'],

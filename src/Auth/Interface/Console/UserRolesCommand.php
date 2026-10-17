@@ -31,7 +31,7 @@ final class UserRolesCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addArgument('identifier', InputArgument::REQUIRED, 'User email or UUID')
+            ->addArgument('identifier', InputArgument::REQUIRED, 'User email or public ID')
             ->addArgument('roles', InputArgument::REQUIRED | InputArgument::IS_ARRAY, 'The complete set of roles: ROLE_USER, ROLE_ADMIN and/or ROLE_SUPER_ADMIN');
         AdminCommandSupport::addJsonOption($this);
     }

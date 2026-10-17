@@ -22,7 +22,6 @@ import { REFRESH_BUDGET_MS } from '@/shared/auth/refresh-budget'
 import { createLogger } from '@/shared/lib/logger'
 
 export interface User {
-  uuid: string
   email: string
   publicId: string
   name: string | null
@@ -199,7 +198,7 @@ export const useAuthStore = create<AuthState>()(withStoreDebug('auth.auth', with
           await new Promise((resolve) => setTimeout(resolve, 300))
           if (owner !== generation) return
           set({ accessToken: 'mock-access-token', refreshToken: 'mock-refresh-token',
-            user: { uuid: '1', email, publicId: 'usr_abc123', name: null, roles: ['ROLE_USER'] }, isAuthenticated: true })
+            user: { email, publicId: 'usr_abc123', name: null, roles: ['ROLE_USER'] }, isAuthenticated: true })
           return
         }
         const keyPair = await generateDpopKeyPair()

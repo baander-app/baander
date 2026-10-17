@@ -33,7 +33,7 @@ The command prints a table with one row per library, ordered by sort order and t
 | Path | The media directory inside the container |
 | Scan status | `scanning`, `completed`, `failed`, or `-` for a library that was never scanned |
 | Last scan | Time of the last completed scan in ISO 8601 format, or `never` |
-| UUID | The identifier the API and the other `app:library:*` commands accept |
+| Public ID | The identifier the API and the other `app:library:*` commands accept |
 
 When no library exists, the command prints `No libraries exist.`
 

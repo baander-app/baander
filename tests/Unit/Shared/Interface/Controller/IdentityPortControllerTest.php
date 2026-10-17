@@ -72,11 +72,11 @@ final class IdentityPortControllerTest extends TestCase
         $expectation->willReturn([]);
         $bus = $this->createStub(MessageBusInterface::class);
         $controller = match (true) {
-            $controllerClass === CountrySubscriptionController::class && $port instanceof CountrySubscriptionPortInterface => new CountrySubscriptionController($security, $port, $bus),
-            $controllerClass === RadioSessionController::class && $port instanceof RadioSessionPortInterface => new RadioSessionController($security, $port, $bus),
+            $controllerClass === CountrySubscriptionController::class && $port instanceof CountrySubscriptionPortInterface => new CountrySubscriptionController($security, $port, $bus, $this->createStub(RadioSourcePortInterface::class)),
+            $controllerClass === RadioSessionController::class && $port instanceof RadioSessionPortInterface => new RadioSessionController($security, $port, $bus, $this->createStub(RadioStationPortInterface::class)),
             $controllerClass === RadioSourceController::class && $port instanceof RadioSourcePortInterface => new RadioSourceController($security, $port),
             $controllerClass === RadioStationController::class && $port instanceof CountrySubscriptionPortInterface => new RadioStationController($security, $this->createStub(RadioStationPortInterface::class), $port),
-            $controllerClass === StarredStationController::class && $port instanceof StarredStationPortInterface => new StarredStationController($security, $port, $bus),
+            $controllerClass === StarredStationController::class && $port instanceof StarredStationPortInterface => new StarredStationController($security, $port, $bus, $this->createStub(RadioStationPortInterface::class)),
             $controllerClass === DeviceController::class && $port instanceof SessionPortInterface => new DeviceController($security, $port),
             $controllerClass === SessionController::class && $port instanceof SessionPortInterface => new SessionController($security, $port, $bus),
             default => throw new \LogicException('Unknown controller fixture.'),

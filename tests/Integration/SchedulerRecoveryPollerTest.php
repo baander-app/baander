@@ -87,6 +87,7 @@ final class SchedulerRecoveryPollerTest extends TestCase
         $this->configuredManager = $configured;
         $this->manager = new EntityManager($this->writer, $configured->getConfiguration(), $configured->getEventManager());
         $this->jobs = new ScheduledJobRepository($this->manager);
+        \App\Tests\Fixtures\Scheduler\PublicIdentitySchema::upgrade($this->writer);
     }
 
     public function testPoisonScheduleIsDeferredAndHealthyScheduleProgressesAfterPollerRestart(): void

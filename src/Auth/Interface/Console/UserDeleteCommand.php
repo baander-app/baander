@@ -33,7 +33,7 @@ final class UserDeleteCommand extends Command
 
     protected function configure(): void
     {
-        $this->addArgument('identifier', InputArgument::REQUIRED, 'User email or UUID');
+        $this->addArgument('identifier', InputArgument::REQUIRED, 'User email or public ID');
         AdminCommandSupport::addForceOption($this);
         AdminCommandSupport::addJsonOption($this);
     }

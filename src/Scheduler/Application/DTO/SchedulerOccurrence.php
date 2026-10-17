@@ -6,6 +6,7 @@ namespace App\Scheduler\Application\DTO;
 
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use DateTimeImmutable;
 use DateTimeZone;
 use InvalidArgumentException;
@@ -28,7 +29,9 @@ final readonly class SchedulerOccurrence
         public JobType $jobType,
         public string $command,
         array $parameters,
+        public PublicId $jobPublicId,
         public SchedulerOccurrenceOrigin $origin = SchedulerOccurrenceOrigin::Scheduled,
+        public PublicId $publicId = new PublicId(),
     ) {
         $utc = $scheduledFor->setTimezone(new DateTimeZone('UTC'));
         if ($utc->format('s.u') !== '00.000000') {

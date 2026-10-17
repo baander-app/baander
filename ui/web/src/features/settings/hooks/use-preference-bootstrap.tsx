@@ -14,7 +14,7 @@ import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 
 export function PreferenceSyncProvider({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
-  const userUuid = useAuthStore((state) => state.user?.uuid)
+  const userPublicId = useAuthStore((state) => state.user?.publicId)
   const { applyOnMount: applyThemeMood } = useThemeMood()
   const { applyOnMount: applyAccentColor } = useAccentColor()
 
@@ -26,18 +26,18 @@ export function PreferenceSyncProvider({ children }: { children: React.ReactNode
   return (
     <>
       {children}
-      {isAuthenticated && userUuid
-        ? <PreferenceSyncSession key={userUuid} userUuid={userUuid} />
+      {isAuthenticated && userPublicId
+        ? <PreferenceSyncSession key={userPublicId} userPublicId={userPublicId} />
         : null}
     </>
   )
 }
 
-function PreferenceSyncSession({ userUuid }: { userUuid: string }) {
+function PreferenceSyncSession({ userPublicId }: { userPublicId: string }) {
   const isActive = useCallback(() => {
     const auth = useAuthStore.getState()
-    return auth.isAuthenticated && auth.user?.uuid === userUuid
-  }, [userUuid])
+    return auth.isAuthenticated && auth.user?.publicId === userPublicId
+  }, [userPublicId])
   const audioSync = useAudioPreferences(isActive)
   const playerSync = usePlayerPreferences(isActive)
   const layoutSync = useLayoutPreferences(isActive)

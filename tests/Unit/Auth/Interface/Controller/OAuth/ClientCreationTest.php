@@ -38,7 +38,8 @@ final class ClientCreationTest extends TestCase
         $body = $response->getContent();
         self::assertIsString($body);
         $data = json_decode($body, true, 16, JSON_THROW_ON_ERROR);
-        self::assertSame($client->getId()->toString(), $data['data']['uuid']);
+        self::assertArrayNotHasKey('uuid', $data['data']);
+        self::assertNotContains($client->getId()->toString(), $data['data']);
         self::assertSame($client->getPublicId()->toString(), $data['data']['publicId']);
         self::assertSame('Library player', $data['data']['name']);
         self::assertTrue($data['data']['personalAccessClient']);

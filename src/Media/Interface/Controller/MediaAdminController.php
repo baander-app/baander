@@ -97,7 +97,7 @@ final class MediaAdminController
                             new OA\Property(property: 'missingCount', type: 'integer'),
                             new OA\Property(property: 'missingImages', type: 'array', items: new OA\Items(
                                 properties: [
-                                    new OA\Property(property: 'id', type: 'string'),
+                                    new OA\Property(property: 'publicId', type: 'string', pattern: '^[A-Za-z0-9_-]{21}$', minLength: 21, maxLength: 21),
                                     new OA\Property(property: 'path', type: 'string'),
                                     new OA\Property(property: 'type', type: 'string'),
                                 ],

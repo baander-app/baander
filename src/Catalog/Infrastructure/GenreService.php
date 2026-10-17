@@ -10,6 +10,7 @@ use App\Catalog\Domain\ReadModel\GenreReadView;
 use App\Catalog\Domain\Repository\GenreRepositoryInterface;
 use App\Catalog\Infrastructure\Doctrine\Repository\GenreMovieRepository;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 
 final class GenreService implements GenrePortInterface
@@ -51,6 +52,16 @@ final class GenreService implements GenrePortInterface
     public function countVisible(LibraryReadScope $scope): int
     {
         return $this->genreRepository->countVisible($scope);
+    }
+
+    public function findByPublicId(PublicId $publicId): ?Genre
+    {
+        return $this->genreRepository->findByPublicId($publicId);
+    }
+
+    public function findVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): ?GenreReadView
+    {
+        return $this->genreRepository->findVisibleByPublicId($publicId, $scope);
     }
 
     public function findByUuid(Uuid $uuid): ?Genre

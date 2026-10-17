@@ -1,7 +1,6 @@
 import type { CoverImage } from './album'
 
 export interface ArtistSummary {
-  uuid: string
   publicId: string
   name: string
   country: string | null

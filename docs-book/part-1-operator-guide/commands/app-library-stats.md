@@ -12,7 +12,7 @@ make exec cmd="php bin/console app:library:stats my-music"
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `library` | Yes | The library's UUID or slug |
+| `library` | Yes | The library's public ID or slug |
 
 ## Options
 
@@ -31,4 +31,4 @@ The command reads any library. In the API, a user who is not an admin sees only 
 | Code | Meaning |
 |------|---------|
 | 0 | Counts printed |
-| 1 | No library has the UUID or slug, or another error occurred; the message says why |
+| 1 | No library has the public ID or slug, or another error occurred; the message says why |

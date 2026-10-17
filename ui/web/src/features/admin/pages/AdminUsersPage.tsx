@@ -252,7 +252,7 @@ export function AdminUsersPage() {
                 <span />
               </ColumnHeader>
               {users.map((user) => (
-                <UserRow key={user.id}>
+                <UserRow key={user.publicId}>
                   <EmailCell>{user.email}</EmailCell>
                   <NameCell>{user.name}</NameCell>
                   <RolesCell>
@@ -271,7 +271,7 @@ export function AdminUsersPage() {
                     onAssignRoles={() => setActiveDialog({ type: 'roles', user })}
                     onLibraryAccess={(trigger) => setActiveDialog({ type: 'libraries', user, trigger })}
                     onResetPassword={() => setActiveDialog({ type: 'password', user })}
-                    onToggle={() => toggleUser.mutate({ id: user.id, disabled: user.disabled })}
+                    onToggle={() => toggleUser.mutate({ id: user.publicId, disabled: user.disabled })}
                     onDelete={() => setActiveDialog({ type: 'delete', user })}
                   />
                 </UserRow>

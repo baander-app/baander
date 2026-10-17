@@ -11,7 +11,7 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'LoginBlockResource',
     properties: [
-        new OA\Property(property: 'id', type: 'string', format: 'uuid', description: 'Block entry UUID'),
+        new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Block public ID'),
         new OA\Property(property: 'ipAddress', type: 'string', description: 'Blocked IP address'),
         new OA\Property(property: 'email', type: 'string', description: 'Email used in the blocked attempt'),
         new OA\Property(property: 'fieldValue', type: 'string', description: 'Form field value that triggered the block'),
@@ -26,7 +26,7 @@ final class LoginBlockResource extends AbstractResource
         assert($source instanceof LoginBlock);
 
         return [
-            'id' => $source->getId()->toString(),
+            'publicId' => $source->getPublicId()->toString(),
             'ipAddress' => $source->getIpAddress(),
             'email' => $source->getEmail(),
             'fieldValue' => $source->getFieldValue(),

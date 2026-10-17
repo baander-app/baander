@@ -21,7 +21,7 @@ final class ImageCommandsTest extends TestCase
         'totalImages' => 3,
         'missingCount' => 1,
         'missingImages' => [
-            ['id' => '0199bf3c-8a00-7000-8000-0000000000e5', 'path' => 'covers/ab/missing.jpg', 'type' => 'album'],
+            ['publicId' => 'image_public_id_00001', 'path' => 'covers/ab/missing.jpg', 'type' => 'album'],
         ],
     ];
 
@@ -38,7 +38,7 @@ final class ImageCommandsTest extends TestCase
         self::assertSame(Command::SUCCESS, $tester->execute(['--dry-run' => true], ['interactive' => false]));
         $display = $tester->getDisplay(true);
         self::assertStringContainsString('covers/ab/missing.jpg', $display);
-        self::assertStringContainsString('0199bf3c-8a00-7000-8000-0000000000e5', $display);
+        self::assertStringContainsString('image_public_id_00001', $display);
         self::assertStringContainsString('1 of 3 images have missing files. Nothing was deleted', preg_replace('/\s+/', ' ', $display) ?? '');
     }
 

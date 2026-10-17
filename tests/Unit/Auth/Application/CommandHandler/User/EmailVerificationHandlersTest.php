@@ -43,7 +43,7 @@ final class EmailVerificationHandlersTest extends TestCase
     {
         $user = $this->user('alice@baander.app');
 
-        $changed = ($this->changeHandler())(new ChangeEmailCommand($user->getId()->toString(), 'Alice.New@baander.app'));
+        $changed = ($this->changeHandler())(new ChangeEmailCommand($user->getPublicId()->toString(), 'Alice.New@baander.app'));
 
         $this->assertSame($user, $changed);
         $this->assertSame('alice.new@baander.app', $user->getEmail());
@@ -69,7 +69,7 @@ final class EmailVerificationHandlersTest extends TestCase
     {
         $user = $this->user('alice@baander.app');
 
-        ($this->changeHandler())(new ChangeEmailCommand($user->getId()->toString(), 'ALICE@baander.app'));
+        ($this->changeHandler())(new ChangeEmailCommand($user->getPublicId()->toString(), 'ALICE@baander.app'));
 
         $this->assertSame([], $this->saves);
         $this->assertSame([], $this->delivered);
@@ -83,7 +83,7 @@ final class EmailVerificationHandlersTest extends TestCase
         $this->expectException(EmailAddressInUseException::class);
 
         try {
-            ($this->changeHandler())(new ChangeEmailCommand($user->getId()->toString(), 'bob@baander.app'));
+            ($this->changeHandler())(new ChangeEmailCommand($user->getPublicId()->toString(), 'bob@baander.app'));
         } finally {
             $this->assertSame('alice@baander.app', $user->getEmail());
             $this->assertSame([], $this->delivered);
@@ -179,6 +179,12 @@ final class EmailVerificationHandlersTest extends TestCase
     private function userRepository(): UserRepositoryInterface
     {
         $repository = $this->createStub(UserRepositoryInterface::class);
+        $repository->method('findByPublicId')->willReturnCallback(function (\App\Shared\Domain\Model\PublicId $id): ?User {
+            foreach ($this->users as $user) {
+                if ($id->equals($user->getPublicId())) { return $user; }
+            }
+            return null;
+        });
         $repository->method('findByUuid')->willReturnCallback(fn (Uuid $id): ?User => $this->users[$id->toString()] ?? null);
         $repository->method('findByEmail')->willReturnCallback(function (Email $email): ?User {
             foreach ($this->users as $user) {

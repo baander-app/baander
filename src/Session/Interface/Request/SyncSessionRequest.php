@@ -11,7 +11,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     schema: 'SyncSessionRequest',
     required: ['queue', 'currentTrackIndex', 'position', 'playbackState'],
     properties: [
-        new OA\Property(property: 'queue', type: 'array', items: new OA\Items(type: 'string'), description: 'Ordered list of track IDs'),
+        new OA\Property(property: 'queue', type: 'array', items: new OA\Items(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'), description: 'Ordered list of track IDs'),
         new OA\Property(property: 'currentTrackIndex', type: 'integer', minimum: 0, example: 0),
         new OA\Property(property: 'position', type: 'number', minimum: 0.0, example: 45.2),
         new OA\Property(property: 'playbackState', type: 'string', enum: ['playing', 'paused', 'stopped'], example: 'playing'),
@@ -24,6 +24,7 @@ final readonly class SyncSessionRequest
      */
     public function __construct(
         #[Assert\NotNull(message: 'Queue is required.')]
+        #[Assert\All([new Assert\Type('string'), new Assert\Regex('/^[0-9a-zA-Z_-]{21}$/')])]
         public array $queue = [],
 
         #[Assert\NotNull(message: 'Current track index is required.')]

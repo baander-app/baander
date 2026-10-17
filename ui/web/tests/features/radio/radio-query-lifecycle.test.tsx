@@ -33,7 +33,7 @@ vi.mock('@/features/radio/api/radio-api', () => ({
 
 vi.mock('@/features/radio/components/StationCard', () => ({
   StationCard: ({ station, onUnstar }: StationCardMockProps) => (
-    <button onClick={() => onUnstar(station.id)}>
+    <button onClick={() => onUnstar(station.publicId)}>
       {station.name}
     </button>
   ),
@@ -65,7 +65,7 @@ it('shares subscription query ownership across StrictMode and updates cached sub
   ])
   vi.mocked(getSubscriptions).mockResolvedValue([])
   const subscription = {
-    id: 'sub',
+    publicId: 'sub',
     userId: 'user',
     sourceId: 'source',
     countryCode: 'DK',
@@ -102,10 +102,10 @@ it('loads starred stations through shared query keys and keeps unstarred results
     },
   })
   vi.mocked(getStarredStations).mockResolvedValue([
-    { id: 'star', userId: 'user', stationId: 'station', starredAt: '' },
+    { userId: 'user', stationId: 'station', starredAt: '' },
   ])
   vi.mocked(getStations).mockResolvedValue([
-    { id: 'station', name: 'Favorite station' } as RadioStation,
+    { publicId: 'station', name: 'Favorite station' } as RadioStation,
   ])
   vi.mocked(unstarStation).mockResolvedValue(undefined)
   render(<StarredStations />, {

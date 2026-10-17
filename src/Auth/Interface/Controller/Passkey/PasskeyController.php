@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Interface\Controller\Passkey;
 
 use App\Auth\Application\Command\Passkey\RegisterPasskeyCommand;
+use App\Auth\Application\Port\UserPortInterface;
 use App\Auth\Domain\Model\Passkey\Passkey;
 use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
 use App\Auth\Infrastructure\Security\Passkey\PasskeyService;
@@ -13,6 +14,7 @@ use App\Auth\Interface\Request\Passkey\RegisterPasskeyRequest;
 use App\Auth\Interface\Request\Passkey\VerifyPasskeyChallengeRequest;
 use App\Auth\Interface\Request\Passkey\WebAuthnOptionsRequest;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Shared\Interface\Controller\TranslatorTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -39,6 +41,7 @@ final class PasskeyController
         private readonly MessageBusInterface $commandBus,
         private readonly PasskeyRepositoryInterface $passkeyRepository,
         private readonly JsonEncoder $jsonEncoder,
+        private readonly UserPortInterface $users,
     ) {
     }
 
@@ -53,7 +56,7 @@ final class PasskeyController
                     properties: [
                         new OA\Property(property: 'data', type: 'array', items: new OA\Items(
                             properties: [
-                                new OA\Property(property: 'publicId', type: 'string', format: 'uuid'),
+                                new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
                                 new OA\Property(property: 'name', type: 'string'),
                                 new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
                                 new OA\Property(property: 'lastUsedAt', type: 'string', format: 'date-time', nullable: true),
@@ -77,7 +80,7 @@ final class PasskeyController
         $passkeys = $this->passkeyRepository->forUser($userUuid);
 
         $items = array_map(static fn (Passkey $passkey) => [
-            'publicId' => $passkey->getId()->toString(),
+            'publicId' => $passkey->getPublicId()->toString(),
             'name' => $passkey->getName(),
             'createdAt' => $passkey->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'lastUsedAt' => $passkey->getLastUsedAt()?->format(\DateTimeInterface::ATOM),
@@ -114,9 +117,12 @@ final class PasskeyController
             return $this->unauthorized();
         }
 
-        $userId = $user->getId();
-
-        $userUuid = Uuid::fromString($userId);
+        $userUuid = Uuid::fromString($user->getId());
+        $owner = $this->users->findByUuid($userUuid);
+        if ($owner === null) {
+            return $this->notFound();
+        }
+        $userId = $owner->getPublicId()->toString();
         $existingPasskeys = $this->passkeyRepository->forUser($userUuid);
         $existingCredentialIds = array_map(
             static fn ($passkey) => $passkey->getCredentialId(),
@@ -213,7 +219,7 @@ final class PasskeyController
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(properties: [
-                        new OA\Property(property: 'userId', description: 'Optional user ID to get passkey options for', type: 'string'),
+                        new OA\Property(property: 'userId', description: 'Optional user public ID to get passkey options for', type: 'string'),
                     ]),
         ),
         responses: [
@@ -236,8 +242,8 @@ final class PasskeyController
         $allowedCredentialIds = [];
         if ($payload->userId !== '') {
             try {
-                $userUuid = Uuid::fromString($payload->userId);
-                $passkeys = $this->passkeyRepository->forUser($userUuid);
+                $owner = $this->users->findByPublicId(PublicId::fromString($payload->userId));
+                $passkeys = $owner === null ? [] : $this->passkeyRepository->forUser($owner->getId());
                 $allowedCredentialIds = array_map(
                     static fn ($passkey) => $passkey->getCredentialId(),
                     $passkeys,
@@ -271,7 +277,7 @@ final class PasskeyController
                 content: new OA\JsonContent(
                     properties: [
                         new OA\Property(property: 'data', properties: [
-                            new OA\Property(property: 'userId', type: 'string', format: 'uuid'),
+                            new OA\Property(property: 'userId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
                             new OA\Property(property: 'credentialId', type: 'string'),
                             new OA\Property(property: 'signCount', type: 'integer'),
                         ], type: 'object'),
@@ -294,7 +300,7 @@ final class PasskeyController
         }
 
         $rawId = $payload->response['rawId'] ?? $payload->response['id'] ?? '';
-        $credentialId = self::base64UrlEncode(base64_decode($rawId, true) ?: $rawId);
+        $credentialId = self::base64UrlEncode(base64_decode(strtr($rawId, '-_', '+/'), true) ?: $rawId);
 
         $passkey = $this->passkeyRepository->ofCredentialId($credentialId);
 
@@ -311,6 +317,13 @@ final class PasskeyController
                 Response::HTTP_UNAUTHORIZED,
                 array_filter(['signal' => $signalData]),
             );
+        }
+
+        $userId = $this->passkeyRepository->userIdForCredentialId($credentialId);
+        $owner = $userId === null ? null : $this->users->findByUuid($userId);
+        if ($owner === null || !hash_equals($owner->getPublicId()->toString(), (string) ($passkey->getData()['userHandle'] ?? ''))
+            || ($payload->userId !== '' && $payload->userId !== $owner->getPublicId()->toString())) {
+            return $this->errorResponse($this->trans('errors.passkey_auth_failed', ['{details}' => 'Invalid credential owner.'], 'auth'), Response::HTTP_UNAUTHORIZED);
         }
 
         $storedCredential = $this->passkeyService->credentialRecordFromArray(
@@ -334,13 +347,8 @@ final class PasskeyController
 
         $this->passkeyRepository->markUsed($passkey);
 
-        $userId = $this->passkeyRepository->userIdForCredentialId($credentialId);
-        if ($userId === null) {
-            return $this->errorResponse($this->trans('errors.cannot_resolve_user', domain: 'auth'), Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-
         return $this->successResponse([
-            'userId' => $userId->toString(),
+            'userId' => $owner->getPublicId()->toString(),
             'credentialId' => $credentialId,
             'signCount' => $updatedCredential->counter,
         ]);
@@ -350,7 +358,7 @@ final class PasskeyController
         path: '/api/auth/passkey/{publicId}',
         summary: 'Delete a passkey',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Passkey UUID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Passkey public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(
@@ -379,7 +387,7 @@ final class PasskeyController
         }
 
         try {
-            Uuid::fromString($publicId);
+            PublicId::fromString($publicId);
         } catch (\Throwable) {
             return $this->errorResponse($this->trans('errors.invalid_public_id'));
         }
@@ -389,7 +397,7 @@ final class PasskeyController
 
         $targetPasskey = null;
         foreach ($passkeys as $passkey) {
-            if ($passkey->getId()->toString() === $publicId) {
+            if ($passkey->getPublicId()->toString() === $publicId) {
                 $targetPasskey = $passkey;
                 break;
             }
@@ -412,8 +420,9 @@ final class PasskeyController
         );
 
         try {
+            $owner = $this->users->findByUuid($userUuid) ?? throw new \UnexpectedValueException('User not found.');
             $signal = $this->passkeyService->createAllAcceptedCredentialsSignal(
-                $user->getId(),
+                $owner->getPublicId()->toString(),
                 $user->getEmail(),
                 $remainingCredentialIds,
             );

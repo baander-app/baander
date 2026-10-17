@@ -12,7 +12,7 @@ use Symfony\Component\Validator\Constraints\Count;
     schema: 'ReorderSongsRequest',
     required: ['songIds'],
     properties: [
-        new OA\Property(property: 'songIds', description: 'Ordered array of song UUIDs', type: 'array', items: new OA\Items(type: 'string', format: 'uuid'), example: ['770f9510-f30c-52e5-b827-557755550222', '770f9510-f30c-52e5-b827-557755550333']),
+        new OA\Property(property: 'songIds', description: 'Ordered array of song public IDs', type: 'array', items: new OA\Items(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21), example: ['aB3dE5fG7hJ9kL1mN3pQr', 'bB3dE5fG7hJ9kL1mN3pQr']),
     ],
 )]
 final readonly class ReorderSongsRequest

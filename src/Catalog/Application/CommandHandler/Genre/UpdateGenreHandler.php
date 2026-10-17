@@ -53,11 +53,11 @@ final readonly class UpdateGenreHandler
             }
 
             if ($command->parentId !== null) {
-                $parentId = $this->parents->resolve($command->parentId);
-                if ($this->genres->isDescendantOf($genre->getId(), $parentId)) {
+                $parent = $this->parents->resolve($command->parentId);
+                if ($this->genres->isDescendantOf($genre->getId(), $parent->getId())) {
                     throw new InvalidInputException(self::CYCLE_MESSAGE);
                 }
-                $genre->setParentId($parentId);
+                $genre->setParent($parent);
             }
 
             if ($command->mbid !== null) {

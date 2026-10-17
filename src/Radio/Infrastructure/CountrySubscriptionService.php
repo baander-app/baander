@@ -11,6 +11,8 @@ use App\Radio\Domain\Model\RadioSource\RadioSource;
 use App\Radio\Domain\Repository\CountrySubscription\CountrySubscriptionRepositoryInterface;
 use App\Radio\Domain\Repository\RadioSource\RadioSourceRepositoryInterface;
 use App\Radio\Domain\ValueObject\SyncConfig;
+use App\Radio\Application\Port\RadioPublicIdentityInterface;
+use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\Model\Uuid;
 use RuntimeException;
 
@@ -18,6 +20,7 @@ final class CountrySubscriptionService implements CountrySubscriptionPortInterfa
 {
     public function __construct(
         private readonly CountrySubscriptionRepositoryInterface $repository,
+        private readonly RadioPublicIdentityInterface $identities,
         private readonly RadioSourceRepositoryInterface $sourceRepository,
         private readonly StationSyncPortInterface $syncAdapter,
     ) {
@@ -99,9 +102,10 @@ final class CountrySubscriptionService implements CountrySubscriptionPortInterfa
     private function subscriptionToArray(CountrySubscription $subscription): array
     {
         return [
-            'id' => $subscription->getId()->toString(),
-            'userId' => $subscription->getUserId()->toString(),
-            'sourceId' => $subscription->getSourceId()->toString(),
+            'publicId' => $subscription->getPublicId()->toString(),
+            'userId' => $this->identities->userPublicId($subscription->getUserId())->toString(),
+            'sourceId' => ($this->sourceRepository->find($subscription->getSourceId())
+                ?? throw new NotFoundException('Radio source not found.'))->getPublicId()->toString(),
             'countryCode' => $subscription->getCountryCode(),
             'lastSyncedAt' => $subscription->getLastSyncedAt()?->format(\DateTimeInterface::ATOM),
             'createdAt' => $subscription->getCreatedAt()->format(\DateTimeInterface::ATOM),

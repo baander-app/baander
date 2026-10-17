@@ -495,22 +495,34 @@
                                     "songId": {
                                         "description": "Public ID of the song being played",
                                         "type": "string",
-                                        "nullable": true
+                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                        "nullable": true,
+                                        "maxLength": 21,
+                                        "minLength": 21
                                     },
                                     "albumId": {
                                         "description": "Public ID of the album",
                                         "type": "string",
-                                        "nullable": true
+                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                        "nullable": true,
+                                        "maxLength": 21,
+                                        "minLength": 21
                                     },
                                     "artistId": {
                                         "description": "Public ID of the artist",
                                         "type": "string",
-                                        "nullable": true
+                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                        "nullable": true,
+                                        "maxLength": 21,
+                                        "minLength": 21
                                     },
                                     "movieId": {
                                         "description": "Public ID of the movie",
                                         "type": "string",
-                                        "nullable": true
+                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                        "nullable": true,
+                                        "maxLength": 21,
+                                        "minLength": 21
                                     },
                                     "platform": {
                                         "description": "Playback platform (e.g. web, mobile, desktop)",
@@ -596,7 +608,10 @@
                         "description": "Activity public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -836,7 +851,7 @@
                 }
             }
         },
-        "/api/admin/login-blocks/{id}": {
+        "/api/admin/login-blocks/{publicId}": {
             "delete": {
                 "tags": [
                     "Admin / Login Blocks"
@@ -845,7 +860,7 @@
                 "operationId": "delete_admin_login_blocks_delete",
                 "parameters": [
                     {
-                        "name": "id",
+                        "name": "publicId",
                         "in": "path",
                         "required": true,
                         "schema": {
@@ -1315,7 +1330,7 @@
                 }
             }
         },
-        "/api/admin/users/{id}": {
+        "/api/admin/users/{publicId}": {
             "delete": {
                 "tags": [
                     "Admin / Users"
@@ -1324,7 +1339,7 @@
                 "operationId": "delete_admin_users_delete",
                 "parameters": [
                     {
-                        "name": "id",
+                        "name": "publicId",
                         "in": "path",
                         "required": true,
                         "schema": {
@@ -1357,7 +1372,7 @@
                 "operationId": "patch_admin_users_update",
                 "parameters": [
                     {
-                        "name": "id",
+                        "name": "publicId",
                         "in": "path",
                         "required": true,
                         "schema": {
@@ -1424,7 +1439,7 @@
                 }
             }
         },
-        "/api/admin/users/{id}/roles": {
+        "/api/admin/users/{publicId}/roles": {
             "post": {
                 "tags": [
                     "Admin / Users"
@@ -1433,7 +1448,7 @@
                 "operationId": "post_admin_users_assign_roles",
                 "parameters": [
                     {
-                        "name": "id",
+                        "name": "publicId",
                         "in": "path",
                         "required": true,
                         "schema": {
@@ -1490,7 +1505,7 @@
                 }
             }
         },
-        "/api/admin/users/{id}/reset-password": {
+        "/api/admin/users/{publicId}/reset-password": {
             "post": {
                 "tags": [
                     "Admin / Users"
@@ -1500,7 +1515,7 @@
                 "operationId": "post_admin_users_reset_password",
                 "parameters": [
                     {
-                        "name": "id",
+                        "name": "publicId",
                         "in": "path",
                         "required": true,
                         "schema": {
@@ -1552,7 +1567,7 @@
                 }
             }
         },
-        "/api/admin/users/{id}/disable": {
+        "/api/admin/users/{publicId}/disable": {
             "post": {
                 "tags": [
                     "Admin / Users"
@@ -1561,7 +1576,7 @@
                 "operationId": "post_admin_users_disable",
                 "parameters": [
                     {
-                        "name": "id",
+                        "name": "publicId",
                         "in": "path",
                         "required": true,
                         "schema": {
@@ -1598,7 +1613,7 @@
                 }
             }
         },
-        "/api/admin/users/{id}/enable": {
+        "/api/admin/users/{publicId}/enable": {
             "post": {
                 "tags": [
                     "Admin / Users"
@@ -1607,7 +1622,7 @@
                 "operationId": "post_admin_users_enable",
                 "parameters": [
                     {
-                        "name": "id",
+                        "name": "publicId",
                         "in": "path",
                         "required": true,
                         "schema": {
@@ -1644,7 +1659,7 @@
                 }
             }
         },
-        "/api/admin/users/{id}/settings": {
+        "/api/admin/users/{publicId}/settings": {
             "get": {
                 "tags": [
                     "Admin / Users"
@@ -1654,12 +1669,14 @@
                 "operationId": "get_admin_user_settings_index",
                 "parameters": [
                     {
-                        "name": "id",
+                        "name": "publicId",
                         "in": "path",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -1705,7 +1722,7 @@
                 }
             }
         },
-        "/api/admin/users/{id}/settings/{key}": {
+        "/api/admin/users/{publicId}/settings/{key}": {
             "put": {
                 "tags": [
                     "Admin / Users"
@@ -1715,12 +1732,14 @@
                 "operationId": "put_admin_user_settings_set",
                 "parameters": [
                     {
-                        "name": "id",
+                        "name": "publicId",
                         "in": "path",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     },
                     {
@@ -1800,12 +1819,14 @@
                 "operationId": "delete_admin_user_settings_reset",
                 "parameters": [
                     {
-                        "name": "id",
+                        "name": "publicId",
                         "in": "path",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     },
                     {
@@ -2607,7 +2628,9 @@
                                                 "properties": {
                                                     "publicId": {
                                                         "type": "string",
-                                                        "format": "uuid"
+                                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                        "maxLength": 21,
+                                                        "minLength": 21
                                                     },
                                                     "name": {
                                                         "type": "string"
@@ -2789,7 +2812,7 @@
                             "schema": {
                                 "properties": {
                                     "userId": {
-                                        "description": "Optional user ID to get passkey options for",
+                                        "description": "Optional user public ID to get passkey options for",
                                         "type": "string"
                                     }
                                 },
@@ -2875,7 +2898,9 @@
                                             "properties": {
                                                 "userId": {
                                                     "type": "string",
-                                                    "format": "uuid"
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "credentialId": {
                                                     "type": "string"
@@ -2936,7 +2961,7 @@
                     {
                         "name": "publicId",
                         "in": "path",
-                        "description": "Passkey UUID",
+                        "description": "Passkey public ID",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -3745,10 +3770,6 @@
                                     "properties": {
                                         "data": {
                                             "properties": {
-                                                "uuid": {
-                                                    "type": "string",
-                                                    "format": "uuid"
-                                                },
                                                 "publicId": {
                                                     "type": "string"
                                                 },
@@ -4239,7 +4260,10 @@
                         "description": "Album public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     },
                     {
@@ -4325,7 +4349,10 @@
                         "description": "Album public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     },
                     {
@@ -4430,7 +4457,10 @@
                         "description": "Song public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     },
                     {
@@ -4516,7 +4546,10 @@
                         "description": "Song public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     },
                     {
@@ -4658,7 +4691,10 @@
                         "in": "query",
                         "description": "Filter by artist public ID",
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     },
                     {
@@ -4698,7 +4734,10 @@
                         "description": "Album public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -4711,12 +4750,11 @@
                                     "properties": {
                                         "data": {
                                             "properties": {
-                                                "uuid": {
-                                                    "type": "string",
-                                                    "format": "uuid"
-                                                },
                                                 "publicId": {
-                                                    "type": "string"
+                                                    "type": "string",
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "title": {
                                                     "type": "string"
@@ -4793,7 +4831,10 @@
                         "description": "Album public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -4848,7 +4889,10 @@
                         "description": "Album public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -4957,7 +5001,10 @@
                         "description": "Album public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -4990,7 +5037,10 @@
                         "description": "Album public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -5023,7 +5073,10 @@
                                 "schema": {
                                     "properties": {
                                         "publicId": {
-                                            "type": "string"
+                                            "type": "string",
+                                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                            "maxLength": 21,
+                                            "minLength": 21
                                         },
                                         "url": {
                                             "type": "string"
@@ -5098,7 +5151,10 @@
                         "description": "Album public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -5163,7 +5219,10 @@
                         "description": "Album public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -5279,7 +5338,10 @@
                         "description": "Library ID to scan for duplicates",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -5490,7 +5552,10 @@
                         "description": "Artist public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -5535,7 +5600,10 @@
                         "description": "Artist public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -5590,7 +5658,10 @@
                         "description": "Artist public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -5687,7 +5758,10 @@
                         "description": "Artist public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -5698,7 +5772,10 @@
                             "schema": {
                                 "properties": {
                                     "songId": {
-                                        "type": "string"
+                                        "type": "string",
+                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                        "maxLength": 21,
+                                        "minLength": 21
                                     },
                                     "role": {
                                         "type": "string"
@@ -5750,16 +5827,22 @@
                         "description": "Artist public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     },
                     {
                         "name": "songId",
                         "in": "path",
-                        "description": "Song UUID",
+                        "description": "Song public identifier",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -5802,16 +5885,22 @@
                         "description": "Artist public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     },
                     {
                         "name": "songId",
                         "in": "path",
-                        "description": "Song UUID",
+                        "description": "Song public identifier",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -5876,7 +5965,10 @@
                         "description": "Artist public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -5887,7 +5979,10 @@
                             "schema": {
                                 "properties": {
                                     "albumId": {
-                                        "type": "string"
+                                        "type": "string",
+                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                        "maxLength": 21,
+                                        "minLength": 21
                                     },
                                     "role": {
                                         "type": "string"
@@ -5939,16 +6034,22 @@
                         "description": "Artist public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     },
                     {
                         "name": "albumId",
                         "in": "path",
-                        "description": "Album UUID",
+                        "description": "Album public identifier",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -5991,16 +6092,22 @@
                         "description": "Artist public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     },
                     {
                         "name": "albumId",
                         "in": "path",
-                        "description": "Album UUID",
+                        "description": "Album public identifier",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -6065,7 +6172,10 @@
                         "description": "Artist public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -6098,7 +6208,10 @@
                                 "schema": {
                                     "properties": {
                                         "publicId": {
-                                            "type": "string"
+                                            "type": "string",
+                                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                            "maxLength": 21,
+                                            "minLength": 21
                                         },
                                         "url": {
                                             "type": "string"
@@ -6173,7 +6286,10 @@
                         "description": "Artist public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -6331,7 +6447,10 @@
                                     },
                                     "parentId": {
                                         "type": "string",
-                                        "nullable": true
+                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                        "nullable": true,
+                                        "maxLength": 21,
+                                        "minLength": 21
                                     },
                                     "mbid": {
                                         "type": "string",
@@ -6409,9 +6528,11 @@
                                     "properties": {
                                         "data": {
                                             "properties": {
-                                                "uuid": {
+                                                "publicId": {
                                                     "type": "string",
-                                                    "format": "uuid"
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "name": {
                                                     "type": "string"
@@ -6421,8 +6542,10 @@
                                                 },
                                                 "parentId": {
                                                     "type": "string",
-                                                    "format": "uuid",
-                                                    "nullable": true
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "nullable": true,
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "mbid": {
                                                     "type": "string"
@@ -6520,7 +6643,10 @@
                                     },
                                     "parentId": {
                                         "type": "string",
-                                        "nullable": true
+                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                        "nullable": true,
+                                        "maxLength": 21,
+                                        "minLength": 21
                                     },
                                     "mbid": {
                                         "type": "string",
@@ -6606,8 +6732,11 @@
                             "schema": {
                                 "properties": {
                                     "songId": {
-                                        "description": "Song UUID",
-                                        "type": "string"
+                                        "description": "Song public ID",
+                                        "type": "string",
+                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                        "maxLength": 21,
+                                        "minLength": 21
                                     }
                                 },
                                 "type": "object"
@@ -6652,10 +6781,13 @@
                     {
                         "name": "songId",
                         "in": "path",
-                        "description": "Song UUID",
+                        "description": "Song public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -6701,8 +6833,11 @@
                             "schema": {
                                 "properties": {
                                     "albumId": {
-                                        "description": "Album UUID",
-                                        "type": "string"
+                                        "description": "Album public ID",
+                                        "type": "string",
+                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                        "maxLength": 21,
+                                        "minLength": 21
                                     }
                                 },
                                 "type": "object"
@@ -6747,10 +6882,13 @@
                     {
                         "name": "albumId",
                         "in": "path",
-                        "description": "Album UUID",
+                        "description": "Album public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -6834,7 +6972,10 @@
                         "description": "Movie public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -6879,7 +7020,10 @@
                         "description": "Movie public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -6934,7 +7078,10 @@
                         "description": "Movie public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -7047,7 +7194,10 @@
                         "in": "query",
                         "description": "Filter by artist public ID",
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     },
                     {
@@ -7055,7 +7205,10 @@
                         "in": "query",
                         "description": "Filter by album public ID",
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     },
                     {
@@ -7134,7 +7287,10 @@
                         "description": "Song public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -7179,7 +7335,10 @@
                         "description": "Song public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -7234,7 +7393,10 @@
                         "description": "Song public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -7709,8 +7871,9 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid",
-                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -7771,8 +7934,9 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid",
-                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     },
                     {
@@ -7781,8 +7945,9 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid",
-                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -7838,8 +8003,9 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid",
-                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     },
                     {
@@ -7848,8 +8014,9 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid",
-                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[13-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -8067,7 +8234,7 @@
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Library UUID or slug",
+                        "description": "Library public ID or slug",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -8122,7 +8289,7 @@
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Library UUID or slug",
+                        "description": "Library public ID or slug",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -8188,7 +8355,7 @@
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Library UUID or slug",
+                        "description": "Library public ID or slug",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -8286,7 +8453,7 @@
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Library UUID or slug",
+                        "description": "Library public ID or slug",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -8363,7 +8530,7 @@
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Library UUID or slug",
+                        "description": "Library public ID or slug",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -9086,7 +9253,10 @@
                         "description": "Image public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         },
                         "example": "aB3dE5fG7hJ9kL1mN3pQr"
                     }
@@ -9143,7 +9313,10 @@
                         "description": "Image public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         },
                         "example": "aB3dE5fG7hJ9kL1mN3pQr"
                     },
@@ -9215,7 +9388,10 @@
                         "description": "Image public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         },
                         "example": "aB3dE5fG7hJ9kL1mN3pQr"
                     }
@@ -9404,8 +9580,11 @@
                                                     "type": "array",
                                                     "items": {
                                                         "properties": {
-                                                            "id": {
-                                                                "type": "string"
+                                                            "publicId": {
+                                                                "type": "string",
+                                                                "pattern": "^[A-Za-z0-9_-]{21}$",
+                                                                "maxLength": 21,
+                                                                "minLength": 21
                                                             },
                                                             "path": {
                                                                 "type": "string"
@@ -10408,10 +10587,12 @@
                     {
                         "name": "cursor",
                         "in": "query",
-                        "description": "Internal notification UUID for pagination",
+                        "description": "Notification public ID for pagination",
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     },
                     {
@@ -10444,8 +10625,10 @@
                                         "nextCursor": {
                                             "description": "Cursor for the next page, or null when exhausted",
                                             "type": "string",
-                                            "format": "uuid",
-                                            "nullable": true
+                                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                            "nullable": true,
+                                            "maxLength": 21,
+                                            "minLength": 21
                                         }
                                     },
                                     "type": "object"
@@ -10506,7 +10689,10 @@
                         "description": "Notification public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -10520,7 +10706,10 @@
                                         "data": {
                                             "properties": {
                                                 "publicId": {
-                                                    "type": "string"
+                                                    "type": "string",
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "isRead": {
                                                     "type": "boolean"
@@ -10597,7 +10786,10 @@
                         "description": "Notification public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -10936,8 +11128,11 @@
                                             "type": "array",
                                             "items": {
                                                 "properties": {
-                                                    "id": {
-                                                        "type": "string"
+                                                    "publicId": {
+                                                        "type": "string",
+                                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                        "maxLength": 21,
+                                                        "minLength": 21
                                                     },
                                                     "url": {
                                                         "type": "string"
@@ -11005,8 +11200,11 @@
                                     "properties": {
                                         "data": {
                                             "properties": {
-                                                "id": {
-                                                    "type": "string"
+                                                "publicId": {
+                                                    "type": "string",
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "url": {
                                                     "type": "string"
@@ -11057,11 +11255,13 @@
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Webhook UUID",
+                        "description": "Webhook public ID",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -11097,8 +11297,11 @@
                                     "properties": {
                                         "data": {
                                             "properties": {
-                                                "id": {
-                                                    "type": "string"
+                                                "publicId": {
+                                                    "type": "string",
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "url": {
                                                     "type": "string"
@@ -11154,11 +11357,13 @@
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "Webhook UUID",
+                        "description": "Webhook public ID",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -11177,7 +11382,7 @@
                         }
                     },
                     "422": {
-                        "description": "The ID is not a UUID",
+                        "description": "The ID is not a public ID",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -11213,7 +11418,9 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -11229,14 +11436,16 @@
                                     "properties": {
                                         "data": {
                                             "required": [
-                                                "id",
+                                                "publicId",
                                                 "secret",
                                                 "signing_version"
                                             ],
                                             "properties": {
-                                                "id": {
+                                                "publicId": {
                                                     "type": "string",
-                                                    "format": "uuid"
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "secret": {
                                                     "type": "string",
@@ -11280,7 +11489,7 @@
                         }
                     },
                     "422": {
-                        "description": "The ID is not a UUID",
+                        "description": "The ID is not a public ID",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -11292,7 +11501,7 @@
                 }
             }
         },
-        "/api/party/sessions/{uuid}/members/": {
+        "/api/party/sessions/{publicId}/members/": {
             "get": {
                 "tags": [
                     "Party"
@@ -11301,12 +11510,14 @@
                 "operationId": "get_party_member_index",
                 "parameters": [
                     {
-                        "name": "uuid",
+                        "name": "publicId",
                         "in": "path",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -11321,11 +11532,11 @@
                                             "type": "array",
                                             "items": {
                                                 "properties": {
-                                                    "uuid": {
-                                                        "type": "string"
-                                                    },
-                                                    "nickname": {
-                                                        "type": "string"
+                                                    "publicId": {
+                                                        "type": "string",
+                                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                        "maxLength": 21,
+                                                        "minLength": 21
                                                     }
                                                 },
                                                 "type": "object"
@@ -11350,7 +11561,7 @@
                 }
             }
         },
-        "/api/party/sessions/{uuid}/members/me": {
+        "/api/party/sessions/{publicId}/members/me": {
             "patch": {
                 "tags": [
                     "Party"
@@ -11359,12 +11570,14 @@
                 "operationId": "patch_party_member_update_me",
                 "parameters": [
                     {
-                        "name": "uuid",
+                        "name": "publicId",
                         "in": "path",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -11397,11 +11610,11 @@
                                     "properties": {
                                         "data": {
                                             "properties": {
-                                                "uuid": {
-                                                    "type": "string"
-                                                },
-                                                "nickname": {
-                                                    "type": "string"
+                                                "publicId": {
+                                                    "type": "string",
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 }
                                             },
                                             "type": "object"
@@ -11435,7 +11648,7 @@
                 }
             }
         },
-        "/api/party/sessions/{uuid}/members/transfer-host": {
+        "/api/party/sessions/{publicId}/members/transfer-host": {
             "post": {
                 "tags": [
                     "Party"
@@ -11444,12 +11657,14 @@
                 "operationId": "post_party_member_transfer_host",
                 "parameters": [
                     {
-                        "name": "uuid",
+                        "name": "publicId",
                         "in": "path",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -11464,7 +11679,9 @@
                                 "properties": {
                                     "newHostUserId": {
                                         "type": "string",
-                                        "format": "uuid"
+                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                        "maxLength": 21,
+                                        "minLength": 21
                                     }
                                 },
                                 "type": "object"
@@ -11529,11 +11746,11 @@
                                             "type": "array",
                                             "items": {
                                                 "properties": {
-                                                    "uuid": {
-                                                        "type": "string"
-                                                    },
                                                     "publicId": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                        "maxLength": 21,
+                                                        "minLength": 21
                                                     }
                                                 },
                                                 "type": "object"
@@ -11602,7 +11819,7 @@
                 }
             }
         },
-        "/api/party/sessions/{uuid}": {
+        "/api/party/sessions/{publicId}": {
             "get": {
                 "tags": [
                     "Party"
@@ -11611,12 +11828,14 @@
                 "operationId": "get_party_session_show",
                 "parameters": [
                     {
-                        "name": "uuid",
+                        "name": "publicId",
                         "in": "path",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -11629,18 +11848,21 @@
                                     "properties": {
                                         "data": {
                                             "properties": {
-                                                "uuid": {
-                                                    "type": "string"
-                                                },
                                                 "publicId": {
-                                                    "type": "string"
+                                                    "type": "string",
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "members": {
                                                     "type": "array",
                                                     "items": {
                                                         "properties": {
-                                                            "uuid": {
-                                                                "type": "string"
+                                                            "publicId": {
+                                                                "type": "string",
+                                                                "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                                "maxLength": 21,
+                                                                "minLength": 21
                                                             }
                                                         },
                                                         "type": "object"
@@ -11675,12 +11897,14 @@
                 "operationId": "delete_party_session_end",
                 "parameters": [
                     {
-                        "name": "uuid",
+                        "name": "publicId",
                         "in": "path",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -11703,7 +11927,7 @@
                 }
             }
         },
-        "/api/party/sessions/{uuid}/join": {
+        "/api/party/sessions/{publicId}/join": {
             "post": {
                 "tags": [
                     "Party"
@@ -11712,12 +11936,14 @@
                 "operationId": "post_party_session_join",
                 "parameters": [
                     {
-                        "name": "uuid",
+                        "name": "publicId",
                         "in": "path",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -11730,11 +11956,11 @@
                                     "properties": {
                                         "data": {
                                             "properties": {
-                                                "uuid": {
-                                                    "type": "string"
-                                                },
-                                                "nickname": {
-                                                    "type": "string"
+                                                "publicId": {
+                                                    "type": "string",
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 }
                                             },
                                             "type": "object"
@@ -11748,7 +11974,7 @@
                 }
             }
         },
-        "/api/party/sessions/{uuid}/leave": {
+        "/api/party/sessions/{publicId}/leave": {
             "post": {
                 "tags": [
                     "Party"
@@ -11757,12 +11983,14 @@
                 "operationId": "post_party_session_leave",
                 "parameters": [
                     {
-                        "name": "uuid",
+                        "name": "publicId",
                         "in": "path",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -11785,7 +12013,7 @@
                 }
             }
         },
-        "/api/party/sessions/{uuid}/sync": {
+        "/api/party/sessions/{publicId}/sync": {
             "post": {
                 "tags": [
                     "Party"
@@ -11794,12 +12022,14 @@
                 "operationId": "post_party_session_sync",
                 "parameters": [
                     {
-                        "name": "uuid",
+                        "name": "publicId",
                         "in": "path",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -11960,7 +12190,10 @@
                         "description": "Playlist public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -11973,11 +12206,6 @@
                                     "properties": {
                                         "data": {
                                             "properties": {
-                                                "uuid": {
-                                                    "type": "string",
-                                                    "format": "uuid",
-                                                    "example": "550e8400-e29b-41d4-a716-446655440000"
-                                                },
                                                 "publicId": {
                                                     "type": "string",
                                                     "pattern": "^[0-9a-zA-Z_-]{21}$",
@@ -12036,10 +12264,6 @@
                                                     "type": "array",
                                                     "items": {
                                                         "properties": {
-                                                            "uuid": {
-                                                                "type": "string",
-                                                                "format": "uuid"
-                                                            },
                                                             "publicId": {
                                                                 "type": "string",
                                                                 "pattern": "^[0-9a-zA-Z_-]{21}$",
@@ -12047,8 +12271,11 @@
                                                                 "minLength": 21
                                                             },
                                                             "albumId": {
-                                                                "description": "Album public identifier, or UUID when unavailable",
-                                                                "type": "string"
+                                                                "description": "Album public identifier",
+                                                                "type": "string",
+                                                                "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                                "maxLength": 21,
+                                                                "minLength": 21
                                                             },
                                                             "position": {
                                                                 "description": "Stored playlist position",
@@ -12158,7 +12385,10 @@
                         "description": "Playlist public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -12211,7 +12441,10 @@
                         "description": "Playlist public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -12317,7 +12550,10 @@
                         "description": "Playlist public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -12331,7 +12567,10 @@
                                 ],
                                 "properties": {
                                     "songId": {
-                                        "type": "string"
+                                        "type": "string",
+                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                        "maxLength": 21,
+                                        "minLength": 21
                                     }
                                 },
                                 "type": "object"
@@ -12348,8 +12587,10 @@
                                     "properties": {
                                         "songId": {
                                             "type": "string",
-                                            "format": "uuid",
-                                            "example": "770f9510-f30c-52e5-b827-557755550222"
+                                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                            "example": "aB3dE5fG7hJ9kL1mN3pQr",
+                                            "maxLength": 21,
+                                            "minLength": 21
                                         },
                                         "position": {
                                             "type": "integer",
@@ -12418,16 +12659,22 @@
                         "description": "Playlist public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     },
                     {
                         "name": "songId",
                         "in": "path",
-                        "description": "Song UUID",
+                        "description": "Song public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -12483,7 +12730,10 @@
                         "description": "Playlist public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     },
                     {
@@ -12559,7 +12809,10 @@
                         "description": "Playlist public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     },
                     {
@@ -12626,7 +12879,10 @@
                         "description": "Playlist public ID",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -12640,11 +12896,13 @@
                                 ],
                                 "properties": {
                                     "songIds": {
-                                        "description": "Ordered array of song UUIDs",
+                                        "description": "Ordered array of song public IDs",
                                         "type": "array",
                                         "items": {
                                             "type": "string",
-                                            "format": "uuid"
+                                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                            "maxLength": 21,
+                                            "minLength": 21
                                         }
                                     }
                                 },
@@ -12883,7 +13141,9 @@
                                                 "properties": {
                                                     "sourceId": {
                                                         "type": "string",
-                                                        "format": "uuid"
+                                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                        "maxLength": 21,
+                                                        "minLength": 21
                                                     },
                                                     "countryCode": {
                                                         "type": "string"
@@ -12932,7 +13192,9 @@
                                 "properties": {
                                     "sourceId": {
                                         "type": "string",
-                                        "format": "uuid"
+                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                        "maxLength": 21,
+                                        "minLength": 21
                                     },
                                     "countryCode": {
                                         "type": "string"
@@ -12954,7 +13216,9 @@
                                             "properties": {
                                                 "sourceId": {
                                                     "type": "string",
-                                                    "format": "uuid"
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "countryCode": {
                                                     "type": "string"
@@ -13105,7 +13369,9 @@
                                             "properties": {
                                                 "stationId": {
                                                     "type": "string",
-                                                    "format": "uuid"
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "stationName": {
                                                     "type": "string"
@@ -13169,7 +13435,9 @@
                                 "properties": {
                                     "stationId": {
                                         "type": "string",
-                                        "format": "uuid"
+                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                        "maxLength": 21,
+                                        "minLength": 21
                                     },
                                     "streamUrl": {
                                         "type": "string",
@@ -13192,7 +13460,9 @@
                                             "properties": {
                                                 "stationId": {
                                                     "type": "string",
-                                                    "format": "uuid"
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "streamUrl": {
                                                     "type": "string",
@@ -13286,9 +13556,11 @@
                                             "type": "array",
                                             "items": {
                                                 "properties": {
-                                                    "id": {
+                                                    "publicId": {
                                                         "type": "string",
-                                                        "format": "uuid"
+                                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                        "maxLength": 21,
+                                                        "minLength": 21
                                                     },
                                                     "name": {
                                                         "type": "string"
@@ -13381,9 +13653,11 @@
                                     "properties": {
                                         "data": {
                                             "properties": {
-                                                "id": {
+                                                "publicId": {
                                                     "type": "string",
-                                                    "format": "uuid"
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "name": {
                                                     "type": "string"
@@ -13517,9 +13791,21 @@
                                             "type": "array",
                                             "items": {
                                                 "properties": {
-                                                    "stationuuid": {
+                                                    "publicId": {
                                                         "type": "string",
-                                                        "format": "uuid"
+                                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                        "maxLength": 21,
+                                                        "minLength": 21
+                                                    },
+                                                    "externalId": {
+                                                        "description": "Station identifier assigned by the external provider",
+                                                        "type": "string"
+                                                    },
+                                                    "sourceId": {
+                                                        "type": "string",
+                                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                        "maxLength": 21,
+                                                        "minLength": 21
                                                     },
                                                     "name": {
                                                         "type": "string"
@@ -13592,7 +13878,9 @@
                                                 "properties": {
                                                     "stationId": {
                                                         "type": "string",
-                                                        "format": "uuid"
+                                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                        "maxLength": 21,
+                                                        "minLength": 21
                                                     },
                                                     "name": {
                                                         "type": "string"
@@ -13648,7 +13936,9 @@
                                 "properties": {
                                     "stationId": {
                                         "type": "string",
-                                        "format": "uuid"
+                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                        "maxLength": 21,
+                                        "minLength": 21
                                     }
                                 },
                                 "type": "object"
@@ -13667,7 +13957,9 @@
                                             "properties": {
                                                 "stationId": {
                                                     "type": "string",
-                                                    "format": "uuid"
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "starred": {
                                                     "type": "boolean"
@@ -13715,11 +14007,13 @@
                     {
                         "name": "stationId",
                         "in": "path",
-                        "description": "Station UUID",
+                        "description": "Station public identifier",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -14673,7 +14967,7 @@
                 }
             }
         },
-        "/api/recommendations/{uuid}": {
+        "/api/recommendations/{publicId}": {
             "delete": {
                 "tags": [
                     "Recommendation"
@@ -14682,13 +14976,12 @@
                 "operationId": "delete_recommendation_destroy",
                 "parameters": [
                     {
-                        "name": "uuid",
+                        "name": "publicId",
                         "in": "path",
-                        "description": "Recommendation UUID",
+                        "description": "Recommendation public ID",
                         "required": true,
                         "schema": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "string"
                         }
                     }
                 ],
@@ -14806,7 +15099,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                            "pattern": "[0-9a-zA-Z_-]{21}"
                         }
                     }
                 ],
@@ -14851,7 +15144,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                            "pattern": "[0-9a-zA-Z_-]{21}"
                         }
                     }
                 ],
@@ -14926,7 +15219,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                            "pattern": "[0-9a-zA-Z_-]{21}"
                         }
                     }
                 ],
@@ -14971,7 +15264,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                            "pattern": "[0-9a-zA-Z_-]{21}"
                         }
                     }
                 ],
@@ -15028,7 +15321,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                            "pattern": "[0-9a-zA-Z_-]{21}"
                         }
                     }
                 ],
@@ -15094,7 +15387,8 @@
                         "in": "path",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "[0-9a-zA-Z_-]{21}"
                         }
                     }
                 ],
@@ -15117,12 +15411,10 @@
                                         "data": {
                                             "properties": {
                                                 "occurrenceId": {
-                                                    "type": "string",
-                                                    "format": "uuid"
+                                                    "type": "string"
                                                 },
                                                 "jobId": {
-                                                    "type": "string",
-                                                    "format": "uuid"
+                                                    "type": "string"
                                                 }
                                             },
                                             "type": "object"
@@ -15180,7 +15472,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                            "pattern": "[0-9a-zA-Z_-]{21}"
                         }
                     }
                 ],
@@ -15237,7 +15529,7 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "pattern": "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+                            "pattern": "[0-9a-zA-Z_-]{21}"
                         }
                     }
                 ],
@@ -15332,7 +15624,14 @@
                                             "type": "array",
                                             "items": {
                                                 "properties": {
-                                                    "id": {
+                                                    "publicId": {
+                                                        "type": "string",
+                                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                        "maxLength": 21,
+                                                        "minLength": 21
+                                                    },
+                                                    "deviceId": {
+                                                        "description": "Browser-generated device token; distinct from publicId",
                                                         "type": "string",
                                                         "format": "uuid"
                                                     },
@@ -15451,7 +15750,9 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -15540,7 +15841,9 @@
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -15595,23 +15898,32 @@
                                     "properties": {
                                         "data": {
                                             "properties": {
-                                                "id": {
+                                                "publicId": {
                                                     "type": "string",
-                                                    "format": "uuid"
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "userId": {
                                                     "type": "string",
-                                                    "format": "uuid"
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "activeDeviceId": {
                                                     "type": "string",
-                                                    "format": "uuid",
-                                                    "nullable": true
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "nullable": true,
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "queue": {
                                                     "type": "array",
                                                     "items": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                        "maxLength": 21,
+                                                        "minLength": 21
                                                     }
                                                 },
                                                 "currentTrackIndex": {
@@ -15678,7 +15990,10 @@
                                     "queue": {
                                         "type": "array",
                                         "items": {
-                                            "type": "string"
+                                            "type": "string",
+                                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                            "maxLength": 21,
+                                            "minLength": 21
                                         }
                                     },
                                     "currentTrackIndex": {
@@ -15712,23 +16027,32 @@
                                     "properties": {
                                         "data": {
                                             "properties": {
-                                                "id": {
+                                                "publicId": {
                                                     "type": "string",
-                                                    "format": "uuid"
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "userId": {
                                                     "type": "string",
-                                                    "format": "uuid"
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "activeDeviceId": {
                                                     "type": "string",
-                                                    "format": "uuid",
-                                                    "nullable": true
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "nullable": true,
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "queue": {
                                                     "type": "array",
                                                     "items": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                        "maxLength": 21,
+                                                        "minLength": 21
                                                     }
                                                 },
                                                 "currentTrackIndex": {
@@ -15820,22 +16144,31 @@
                                     "properties": {
                                         "data": {
                                             "properties": {
-                                                "id": {
+                                                "publicId": {
                                                     "type": "string",
-                                                    "format": "uuid"
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "userId": {
                                                     "type": "string",
-                                                    "format": "uuid"
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "activeDeviceId": {
                                                     "type": "string",
-                                                    "format": "uuid"
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "queue": {
                                                     "type": "array",
                                                     "items": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                        "maxLength": 21,
+                                                        "minLength": 21
                                                     }
                                                 },
                                                 "currentTrackIndex": {
@@ -15913,7 +16246,10 @@
                                     "queue": {
                                         "type": "array",
                                         "items": {
-                                            "type": "string"
+                                            "type": "string",
+                                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                            "maxLength": 21,
+                                            "minLength": 21
                                         }
                                     },
                                     "currentTrackIndex": {
@@ -15939,23 +16275,32 @@
                                     "properties": {
                                         "data": {
                                             "properties": {
-                                                "id": {
+                                                "publicId": {
                                                     "type": "string",
-                                                    "format": "uuid"
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "userId": {
                                                     "type": "string",
-                                                    "format": "uuid"
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "activeDeviceId": {
                                                     "type": "string",
-                                                    "format": "uuid",
-                                                    "nullable": true
+                                                    "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                    "nullable": true,
+                                                    "maxLength": 21,
+                                                    "minLength": 21
                                                 },
                                                 "queue": {
                                                     "type": "array",
                                                     "items": {
-                                                        "type": "string"
+                                                        "type": "string",
+                                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                                        "maxLength": 21,
+                                                        "minLength": 21
                                                     }
                                                 },
                                                 "currentTrackIndex": {
@@ -16479,7 +16824,7 @@
                                                     "items": {
                                                         "properties": {
                                                             "jobId": {
-                                                                "description": "Internal job identifier",
+                                                                "description": "Public job identifier",
                                                                 "type": "string"
                                                             },
                                                             "name": {
@@ -16624,7 +16969,7 @@
                                                     "items": {
                                                         "properties": {
                                                             "jobId": {
-                                                                "description": "Internal job identifier",
+                                                                "description": "Public job identifier",
                                                                 "type": "string"
                                                             },
                                                             "name": {
@@ -16728,7 +17073,7 @@
                     {
                         "name": "jobId",
                         "in": "path",
-                        "description": "Internal job identifier",
+                        "description": "Public job identifier",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -16745,7 +17090,7 @@
                                         "data": {
                                             "properties": {
                                                 "jobId": {
-                                                    "description": "Internal job identifier",
+                                                    "description": "Public job identifier",
                                                     "type": "string"
                                                 },
                                                 "name": {
@@ -16798,31 +17143,6 @@
                                                     "description": "Exception class name (failed jobs only)",
                                                     "type": "string",
                                                     "nullable": true
-                                                },
-                                                "exception": {
-                                                    "description": "Full exception details (failed jobs only)",
-                                                    "properties": {
-                                                        "message": {
-                                                            "type": "string"
-                                                        },
-                                                        "file": {
-                                                            "type": "string"
-                                                        },
-                                                        "line": {
-                                                            "type": "integer"
-                                                        }
-                                                    },
-                                                    "type": "object",
-                                                    "nullable": true
-                                                },
-                                                "data": {
-                                                    "description": "Serialized message payload",
-                                                    "type": "string",
-                                                    "nullable": true
-                                                },
-                                                "dataTruncated": {
-                                                    "description": "Whether the message payload was truncated",
-                                                    "type": "boolean"
                                                 },
                                                 "duration": {
                                                     "description": "Execution time in seconds (null if not finished)",
@@ -16933,7 +17253,7 @@
                     {
                         "name": "jobId",
                         "in": "path",
-                        "description": "Internal job identifier",
+                        "description": "Public job identifier",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -16997,7 +17317,7 @@
                     {
                         "name": "jobId",
                         "in": "path",
-                        "description": "Internal job identifier",
+                        "description": "Public job identifier",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -18046,11 +18366,13 @@
                     {
                         "name": "videoId",
                         "in": "path",
-                        "description": "Video UUID",
+                        "description": "Video public identifier",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -18103,11 +18425,13 @@
                     {
                         "name": "videoId",
                         "in": "path",
-                        "description": "Video UUID",
+                        "description": "Video public identifier",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -18132,11 +18456,13 @@
                     {
                         "name": "videoId",
                         "in": "path",
-                        "description": "Video UUID",
+                        "description": "Video public identifier",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -18472,7 +18798,7 @@
                                 "properties": {
                                     "path": {
                                         "type": "string",
-                                        "example": "/api/transcode/00000000-0000-4000-8000-000000000001/master.m3u8"
+                                        "example": "/api/transcode/0123456789abABCD_-xyz/master.m3u8"
                                     },
                                     "expiresInSeconds": {
                                         "type": "integer",
@@ -18535,7 +18861,7 @@
                 "tags": [
                     "Transcode"
                 ],
-                "summary": "List all transcode jobs",
+                "summary": "List orphaned transcode jobs in accessible libraries",
                 "operationId": "get_transcode_job_index",
                 "responses": {
                     "200": {
@@ -18714,7 +19040,7 @@
                                             "type": "array",
                                             "items": {
                                                 "properties": {
-                                                    "uuid": {
+                                                    "publicId": {
                                                         "type": "string"
                                                     },
                                                     "status": {
@@ -18759,7 +19085,9 @@
                                 "properties": {
                                     "videoId": {
                                         "type": "string",
-                                        "format": "uuid"
+                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                        "maxLength": 21,
+                                        "minLength": 21
                                     },
                                     "qualityTier": {
                                         "type": "string",
@@ -18853,22 +19181,24 @@
                 }
             }
         },
-        "/api/transcode/sessions/{uuid}": {
+        "/api/transcode/sessions/{publicId}": {
             "get": {
                 "tags": [
                     "Transcode"
                 ],
-                "summary": "Get a transcode session by UUID",
+                "summary": "Get a transcode session by public identifier",
                 "operationId": "get_transcode_session_show",
                 "parameters": [
                     {
-                        "name": "uuid",
+                        "name": "publicId",
                         "in": "path",
-                        "description": "Session UUID",
+                        "description": "Session public identifier",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -18881,7 +19211,7 @@
                                     "properties": {
                                         "data": {
                                             "properties": {
-                                                "uuid": {
+                                                "publicId": {
                                                     "type": "string"
                                                 },
                                                 "status": {
@@ -18919,13 +19249,15 @@
                 "operationId": "delete_transcode_session_cancel",
                 "parameters": [
                     {
-                        "name": "uuid",
+                        "name": "publicId",
                         "in": "path",
-                        "description": "Session UUID",
+                        "description": "Session public identifier",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -18965,13 +19297,15 @@
                 "operationId": "patch_transcode_session_update",
                 "parameters": [
                     {
-                        "name": "uuid",
+                        "name": "publicId",
                         "in": "path",
-                        "description": "Session UUID",
+                        "description": "Session public identifier",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -19029,7 +19363,7 @@
                 }
             }
         },
-        "/api/transcode/sessions/{uuid}/pause": {
+        "/api/transcode/sessions/{publicId}/pause": {
             "patch": {
                 "tags": [
                     "Transcode"
@@ -19038,13 +19372,15 @@
                 "operationId": "patch_transcode_session_pause",
                 "parameters": [
                     {
-                        "name": "uuid",
+                        "name": "publicId",
                         "in": "path",
-                        "description": "Session UUID",
+                        "description": "Session public identifier",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -19077,7 +19413,7 @@
                 }
             }
         },
-        "/api/transcode/sessions/{uuid}/resume": {
+        "/api/transcode/sessions/{publicId}/resume": {
             "patch": {
                 "tags": [
                     "Transcode"
@@ -19086,13 +19422,15 @@
                 "operationId": "patch_transcode_session_resume",
                 "parameters": [
                     {
-                        "name": "uuid",
+                        "name": "publicId",
                         "in": "path",
-                        "description": "Session UUID",
+                        "description": "Session public identifier",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -19125,7 +19463,7 @@
                 }
             }
         },
-        "/api/transcode/sessions/{uuid}/position": {
+        "/api/transcode/sessions/{publicId}/position": {
             "post": {
                 "tags": [
                     "Transcode"
@@ -19134,13 +19472,15 @@
                 "operationId": "post_transcode_session_position",
                 "parameters": [
                     {
-                        "name": "uuid",
+                        "name": "publicId",
                         "in": "path",
-                        "description": "Session UUID",
+                        "description": "Session public identifier",
                         "required": true,
                         "schema": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     }
                 ],
@@ -19573,7 +19913,7 @@
                                             "type": "array",
                                             "items": {
                                                 "properties": {
-                                                    "id": {
+                                                    "publicId": {
                                                         "type": "string"
                                                     },
                                                     "name": {
@@ -21186,26 +21526,38 @@
                     "songId": {
                         "description": "Public ID of the song being played",
                         "type": "string",
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
                         "nullable": true,
-                        "default": null
+                        "default": null,
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "albumId": {
                         "description": "Public ID of the album",
                         "type": "string",
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
                         "nullable": true,
-                        "default": null
+                        "default": null,
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "artistId": {
                         "description": "Public ID of the artist",
                         "type": "string",
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
                         "nullable": true,
-                        "default": null
+                        "default": null,
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "movieId": {
                         "description": "Public ID of the movie",
                         "type": "string",
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
                         "nullable": true,
-                        "default": null
+                        "default": null,
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "platform": {
                         "description": "Playback platform (e.g. web, mobile, desktop)",
@@ -21473,7 +21825,7 @@
             "WebAuthnOptionsRequest": {
                 "properties": {
                     "userId": {
-                        "description": "Optional user ID to get passkey options for",
+                        "description": "Optional user public ID to get passkey options for",
                         "type": "string",
                         "default": ""
                     }
@@ -21871,8 +22223,11 @@
                 ],
                 "properties": {
                     "songId": {
-                        "description": "Song UUID",
-                        "type": "string"
+                        "description": "Song public identifier",
+                        "type": "string",
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "role": {
                         "description": "Artist role (primary, featured, producer, composer, conductor, remixer, djmix, other)",
@@ -21906,8 +22261,11 @@
                 ],
                 "properties": {
                     "albumId": {
-                        "description": "Album UUID",
-                        "type": "string"
+                        "description": "Album public identifier",
+                        "type": "string",
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "role": {
                         "description": "Artist role (primary, featured, producer, composer, conductor, remixer, djmix, other)",
@@ -21931,10 +22289,13 @@
                         "example": "jazz"
                     },
                     "parentId": {
-                        "description": "UUID of the parent genre",
+                        "description": "Public ID of the parent genre",
                         "type": "string",
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
                         "nullable": true,
-                        "default": null
+                        "default": null,
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "mbid": {
                         "description": "MusicBrainz ID",
@@ -21961,8 +22322,11 @@
                     "parentId": {
                         "description": "Public ID of the parent genre",
                         "type": "string",
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
                         "nullable": true,
-                        "default": null
+                        "default": null,
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "mbid": {
                         "description": "MusicBrainz ID",
@@ -21979,8 +22343,11 @@
                 ],
                 "properties": {
                     "songId": {
-                        "description": "Song UUID",
-                        "type": "string"
+                        "description": "Song public ID",
+                        "type": "string",
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     }
                 },
                 "type": "object"
@@ -21991,8 +22358,11 @@
                 ],
                 "properties": {
                     "albumId": {
-                        "description": "Album UUID",
-                        "type": "string"
+                        "description": "Album public ID",
+                        "type": "string",
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     }
                 },
                 "type": "object"
@@ -22155,7 +22525,10 @@
                         ]
                     },
                     "entityPublicId": {
-                        "type": "string"
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     }
                 },
                 "type": "object"
@@ -22310,8 +22683,10 @@
                 "properties": {
                     "newHostUserId": {
                         "type": "string",
-                        "format": "uuid",
-                        "default": ""
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "default": "",
+                        "maxLength": 21,
+                        "minLength": 21
                     }
                 },
                 "type": "object"
@@ -22323,15 +22698,19 @@
                 "properties": {
                     "videoId": {
                         "type": "string",
-                        "format": "uuid",
-                        "default": ""
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "default": "",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "transcodeJobId": {
                         "description": "Transcode job of the video that the host's playback steers",
                         "type": "string",
-                        "format": "uuid",
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
                         "nullable": true,
-                        "default": null
+                        "default": null,
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "maxMembers": {
                         "type": "integer",
@@ -22443,11 +22822,13 @@
                 ],
                 "properties": {
                     "songId": {
-                        "description": "UUID of the song to add",
+                        "description": "Public ID of the song to add",
                         "type": "string",
-                        "format": "uuid",
-                        "example": "770f9510-f30c-52e5-b827-557755550222",
-                        "default": ""
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "example": "aB3dE5fG7hJ9kL1mN3pQr",
+                        "default": "",
+                        "maxLength": 21,
+                        "minLength": 21
                     }
                 },
                 "type": "object"
@@ -22458,15 +22839,17 @@
                 ],
                 "properties": {
                     "songIds": {
-                        "description": "Ordered array of song UUIDs",
+                        "description": "Ordered array of song public IDs",
                         "type": "array",
                         "items": {
                             "type": "string",
-                            "format": "uuid"
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         },
                         "example": [
-                            "770f9510-f30c-52e5-b827-557755550222",
-                            "770f9510-f30c-52e5-b827-557755550333"
+                            "aB3dE5fG7hJ9kL1mN3pQr",
+                            "bB3dE5fG7hJ9kL1mN3pQr"
                         ],
                         "default": [],
                         "minItems": 1
@@ -22479,7 +22862,9 @@
                     "sourceId": {
                         "type": "string",
                         "nullable": true,
-                        "default": null
+                        "default": null,
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "countryCode": {
                         "type": "string",
@@ -22497,7 +22882,9 @@
                 ],
                 "properties": {
                     "stationId": {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "streamUrl": {
                         "type": "string"
@@ -22542,7 +22929,9 @@
                 ],
                 "properties": {
                     "stationId": {
-                        "type": "string"
+                        "type": "string",
+                        "maxLength": 21,
+                        "minLength": 21
                     }
                 },
                 "type": "object"
@@ -22633,7 +23022,7 @@
                 ],
                 "properties": {
                     "deviceId": {
-                        "description": "Persistent device identifier from localStorage",
+                        "description": "Browser-generated device token from localStorage; distinct from the persisted device publicId",
                         "type": "string",
                         "format": "uuid",
                         "default": ""
@@ -22673,7 +23062,10 @@
                         "description": "Ordered list of track IDs",
                         "type": "array",
                         "items": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         },
                         "default": []
                     },
@@ -22708,7 +23100,7 @@
                 ],
                 "properties": {
                     "deviceId": {
-                        "description": "The device claiming the session",
+                        "description": "Browser-generated device token claiming the session; distinct from device publicId",
                         "type": "string",
                         "format": "uuid",
                         "default": ""
@@ -22717,7 +23109,10 @@
                         "description": "Optional queue to bring from local device",
                         "type": "array",
                         "items": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         },
                         "nullable": true,
                         "default": null
@@ -22750,7 +23145,10 @@
                         "description": "Ordered list of track IDs",
                         "type": "array",
                         "items": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         },
                         "default": []
                     },
@@ -22789,9 +23187,11 @@
                 "properties": {
                     "videoId": {
                         "type": "string",
-                        "format": "uuid",
-                        "example": "550e8400-e29b-41d4-a716-446655440000",
-                        "default": ""
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "example": "0123456789abABCD_-xyz",
+                        "default": "",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "qualityTier": {
                         "type": "string",
@@ -22908,7 +23308,6 @@
             },
             "ActivityResource": {
                 "required": [
-                    "uuid",
                     "publicId",
                     "userId",
                     "activityType",
@@ -22917,11 +23316,6 @@
                     "createdAt"
                 ],
                 "properties": {
-                    "uuid": {
-                        "description": "Activity UUID",
-                        "type": "string",
-                        "format": "uuid"
-                    },
                     "publicId": {
                         "description": "Public identifier",
                         "type": "string",
@@ -22930,37 +23324,47 @@
                         "minLength": 21
                     },
                     "userId": {
-                        "description": "User UUID",
+                        "description": "User public ID",
                         "type": "string",
-                        "format": "uuid"
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "activityType": {
                         "description": "Type of activity",
                         "type": "string"
                     },
                     "songId": {
-                        "description": "Song UUID",
+                        "description": "Song public ID",
                         "type": "string",
-                        "format": "uuid",
-                        "nullable": true
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "nullable": true,
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "albumId": {
-                        "description": "Album UUID",
+                        "description": "Album public ID",
                         "type": "string",
-                        "format": "uuid",
-                        "nullable": true
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "nullable": true,
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "artistId": {
-                        "description": "Artist UUID",
+                        "description": "Artist public ID",
                         "type": "string",
-                        "format": "uuid",
-                        "nullable": true
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "nullable": true,
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "movieId": {
-                        "description": "Movie UUID",
+                        "description": "Movie public ID",
                         "type": "string",
-                        "format": "uuid",
-                        "nullable": true
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "nullable": true,
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "playCount": {
                         "description": "Number of plays",
@@ -23089,7 +23493,7 @@
             },
             "LoginBlockResource": {
                 "required": [
-                    "id",
+                    "publicId",
                     "ipAddress",
                     "email",
                     "fieldValue",
@@ -23097,10 +23501,12 @@
                     "createdAt"
                 ],
                 "properties": {
-                    "id": {
-                        "description": "Block entry UUID",
+                    "publicId": {
+                        "description": "Block public ID",
                         "type": "string",
-                        "format": "uuid"
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "ipAddress": {
                         "description": "Blocked IP address",
@@ -23233,7 +23639,6 @@
             },
             "AdminUserResource": {
                 "required": [
-                    "id",
                     "publicId",
                     "name",
                     "email",
@@ -23243,11 +23648,6 @@
                     "updatedAt"
                 ],
                 "properties": {
-                    "id": {
-                        "description": "Internal UUID",
-                        "type": "string",
-                        "format": "uuid"
-                    },
                     "publicId": {
                         "description": "Public identifier",
                         "type": "string",
@@ -23401,7 +23801,6 @@
             },
             "ClientResource": {
                 "required": [
-                    "uuid",
                     "publicId",
                     "name",
                     "redirect",
@@ -23410,11 +23809,6 @@
                     "createdAt"
                 ],
                 "properties": {
-                    "uuid": {
-                        "description": "Internal UUID",
-                        "type": "string",
-                        "format": "uuid"
-                    },
                     "publicId": {
                         "description": "Public identifier",
                         "type": "string",
@@ -23756,7 +24150,6 @@
             },
             "UserResource": {
                 "required": [
-                    "uuid",
                     "publicId",
                     "name",
                     "email",
@@ -23764,11 +24157,6 @@
                     "roles"
                 ],
                 "properties": {
-                    "uuid": {
-                        "description": "Internal UUID",
-                        "type": "string",
-                        "format": "uuid"
-                    },
                     "publicId": {
                         "description": "Public identifier",
                         "type": "string",
@@ -23903,7 +24291,10 @@
                     "album": {
                         "properties": {
                             "id": {
-                                "type": "string"
+                                "type": "string",
+                                "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                "maxLength": 21,
+                                "minLength": 21
                             },
                             "title": {
                                 "type": "string"
@@ -23928,7 +24319,10 @@
                     "coverImage": {
                         "properties": {
                             "id": {
-                                "type": "string"
+                                "type": "string",
+                                "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                "maxLength": 21,
+                                "minLength": 21
                             }
                         },
                         "type": "object",
@@ -24027,7 +24421,10 @@
                     "song": {
                         "properties": {
                             "id": {
-                                "type": "string"
+                                "type": "string",
+                                "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                "maxLength": 21,
+                                "minLength": 21
                             },
                             "title": {
                                 "type": "string"
@@ -24035,7 +24432,10 @@
                             "album": {
                                 "properties": {
                                     "id": {
-                                        "type": "string"
+                                        "type": "string",
+                                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                                        "maxLength": 21,
+                                        "minLength": 21
                                     },
                                     "title": {
                                         "type": "string"
@@ -24124,7 +24524,6 @@
             },
             "SongResource": {
                 "required": [
-                    "uuid",
                     "publicId",
                     "albumId",
                     "title",
@@ -24133,11 +24532,6 @@
                     "createdAt"
                 ],
                 "properties": {
-                    "uuid": {
-                        "description": "Song UUID",
-                        "type": "string",
-                        "format": "uuid"
-                    },
                     "publicId": {
                         "description": "Public identifier",
                         "type": "string",
@@ -24146,8 +24540,11 @@
                         "minLength": 21
                     },
                     "albumId": {
-                        "description": "Album public identifier, or UUID when unavailable",
-                        "type": "string"
+                        "description": "Album public identifier",
+                        "type": "string",
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "title": {
                         "description": "Song title",
@@ -24214,18 +24611,12 @@
             },
             "AlbumResource": {
                 "required": [
-                    "uuid",
                     "publicId",
                     "title",
                     "type",
                     "createdAt"
                 ],
                 "properties": {
-                    "uuid": {
-                        "description": "Album UUID",
-                        "type": "string",
-                        "format": "uuid"
-                    },
                     "publicId": {
                         "description": "Public identifier",
                         "type": "string",
@@ -24278,10 +24669,13 @@
                 ],
                 "properties": {
                     "albumIds": {
-                        "description": "List of album UUIDs in this duplicate group",
+                        "description": "List of album public identifiers in this duplicate group",
                         "type": "array",
                         "items": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     },
                     "confidence": {
@@ -24304,17 +24698,11 @@
             },
             "ArtistResource": {
                 "required": [
-                    "uuid",
                     "publicId",
                     "name",
                     "createdAt"
                 ],
                 "properties": {
-                    "uuid": {
-                        "description": "Artist UUID",
-                        "type": "string",
-                        "format": "uuid"
-                    },
                     "publicId": {
                         "description": "Public identifier",
                         "type": "string",
@@ -24356,15 +24744,17 @@
             },
             "GenreResource": {
                 "required": [
-                    "uuid",
+                    "publicId",
                     "name",
                     "slug"
                 ],
                 "properties": {
-                    "uuid": {
-                        "description": "Genre UUID",
+                    "publicId": {
+                        "description": "Genre public ID",
                         "type": "string",
-                        "format": "uuid"
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "name": {
                         "description": "Genre name",
@@ -24375,10 +24765,12 @@
                         "type": "string"
                     },
                     "parentId": {
-                        "description": "Parent genre UUID",
+                        "description": "Parent genre public ID",
                         "type": "string",
-                        "format": "uuid",
-                        "nullable": true
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "nullable": true,
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "mbid": {
                         "description": "MusicBrainz ID",
@@ -24390,7 +24782,6 @@
             },
             "MovieResource": {
                 "required": [
-                    "uuid",
                     "publicId",
                     "title",
                     "videoIds",
@@ -24400,11 +24791,6 @@
                     "updatedAt"
                 ],
                 "properties": {
-                    "uuid": {
-                        "description": "Movie UUID",
-                        "type": "string",
-                        "format": "uuid"
-                    },
                     "publicId": {
                         "description": "Public identifier",
                         "type": "string",
@@ -24483,10 +24869,13 @@
                         "nullable": true
                     },
                     "videoIds": {
-                        "description": "Video UUIDs",
+                        "description": "Video public identifiers",
                         "type": "array",
                         "items": {
-                            "type": "string"
+                            "type": "string",
+                            "pattern": "^[0-9a-zA-Z_-]{21}$",
+                            "maxLength": 21,
+                            "minLength": 21
                         }
                     },
                     "posterImage": {
@@ -24575,7 +24964,6 @@
             },
             "ServerInstanceResource": {
                 "required": [
-                    "uuid",
                     "publicId",
                     "serverUrl",
                     "name",
@@ -24584,11 +24972,6 @@
                     "createdAt"
                 ],
                 "properties": {
-                    "uuid": {
-                        "description": "Server UUID",
-                        "type": "string",
-                        "format": "uuid"
-                    },
                     "publicId": {
                         "description": "Public identifier",
                         "type": "string",
@@ -24634,7 +25017,6 @@
             },
             "PairingSessionResource": {
                 "required": [
-                    "uuid",
                     "publicId",
                     "serverPublicId",
                     "serverUrl",
@@ -24644,11 +25026,6 @@
                     "createdAt"
                 ],
                 "properties": {
-                    "uuid": {
-                        "description": "Pairing session UUID",
-                        "type": "string",
-                        "format": "uuid"
-                    },
                     "publicId": {
                         "description": "Public identifier",
                         "type": "string",
@@ -24707,21 +25084,18 @@
             },
             "FavoriteResource": {
                 "required": [
-                    "uuid",
                     "publicId",
                     "entityType",
                     "entityPublicId",
                     "createdAt"
                 ],
                 "properties": {
-                    "uuid": {
-                        "description": "Favorite UUID",
-                        "type": "string",
-                        "format": "uuid"
-                    },
                     "publicId": {
                         "description": "Public identifier",
-                        "type": "string"
+                        "type": "string",
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "entityType": {
                         "description": "Entity type",
@@ -24754,9 +25128,11 @@
                 ],
                 "properties": {
                     "libraryId": {
-                        "description": "Library UUID",
+                        "description": "Library public ID",
                         "type": "string",
-                        "format": "uuid"
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "name": {
                         "description": "Library name",
@@ -24786,7 +25162,7 @@
             },
             "LibraryResource": {
                 "required": [
-                    "id",
+                    "publicId",
                     "name",
                     "slug",
                     "path",
@@ -24797,10 +25173,12 @@
                     "updatedAt"
                 ],
                 "properties": {
-                    "id": {
-                        "description": "Library UUID",
+                    "publicId": {
+                        "description": "Library public ID",
                         "type": "string",
-                        "format": "uuid"
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "name": {
                         "description": "Library name",
@@ -24936,7 +25314,6 @@
             },
             "ImageResource": {
                 "required": [
-                    "id",
                     "publicId",
                     "extension",
                     "mimeType",
@@ -24948,11 +25325,6 @@
                     "updatedAt"
                 ],
                 "properties": {
-                    "id": {
-                        "description": "Image UUID",
-                        "type": "string",
-                        "format": "uuid"
-                    },
                     "publicId": {
                         "description": "Public identifier",
                         "type": "string",
@@ -24990,22 +25362,28 @@
                         "type": "string"
                     },
                     "albumId": {
-                        "description": "Associated album UUID",
+                        "description": "Associated album public ID",
                         "type": "string",
-                        "format": "uuid",
-                        "nullable": true
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "nullable": true,
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "artistId": {
-                        "description": "Associated artist UUID",
+                        "description": "Associated artist public ID",
                         "type": "string",
-                        "format": "uuid",
-                        "nullable": true
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "nullable": true,
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "playlistId": {
-                        "description": "Associated playlist UUID",
+                        "description": "Associated playlist public ID",
                         "type": "string",
-                        "format": "uuid",
-                        "nullable": true
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "nullable": true,
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "createdAt": {
                         "description": "Creation timestamp",
@@ -25035,7 +25413,9 @@
                     "publicId": {
                         "description": "Public notification identifier (Nanoid)",
                         "type": "string",
-                        "pattern": "^[A-Za-z0-9_-]{21}$"
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "category": {
                         "description": "Notification category",
@@ -25072,7 +25452,6 @@
             },
             "PartySessionResource": {
                 "required": [
-                    "uuid",
                     "publicId",
                     "hostUserId",
                     "videoId",
@@ -25083,11 +25462,6 @@
                     "updatedAt"
                 ],
                 "properties": {
-                    "uuid": {
-                        "description": "Session UUID",
-                        "type": "string",
-                        "format": "uuid"
-                    },
                     "publicId": {
                         "description": "Public identifier",
                         "type": "string",
@@ -25096,20 +25470,26 @@
                         "minLength": 21
                     },
                     "hostUserId": {
-                        "description": "Host user UUID",
+                        "description": "Host user public ID",
                         "type": "string",
-                        "format": "uuid"
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "videoId": {
-                        "description": "Video UUID",
+                        "description": "Video public ID",
                         "type": "string",
-                        "format": "uuid"
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "transcodeJobId": {
                         "description": "Transcode job that the host's playback steers; null when none was named or the job has been deleted",
                         "type": "string",
-                        "format": "uuid",
-                        "nullable": true
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "nullable": true,
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "maxMembers": {
                         "description": "Maximum members allowed",
@@ -25153,7 +25533,6 @@
             },
             "PlaylistResource": {
                 "required": [
-                    "uuid",
                     "publicId",
                     "ownerPublicId",
                     "collaboratorPublicIds",
@@ -25165,11 +25544,6 @@
                     "createdAt"
                 ],
                 "properties": {
-                    "uuid": {
-                        "description": "Playlist UUID",
-                        "type": "string",
-                        "format": "uuid"
-                    },
                     "publicId": {
                         "description": "Public identifier",
                         "type": "string",
@@ -25229,7 +25603,6 @@
             },
             "RecommendationJobResource": {
                 "required": [
-                    "id",
                     "public_id",
                     "status",
                     "is_full",
@@ -25242,10 +25615,6 @@
                     "metadata"
                 ],
                 "properties": {
-                    "id": {
-                        "type": "string",
-                        "format": "uuid"
-                    },
                     "public_id": {
                         "type": "string"
                     },
@@ -25303,7 +25672,6 @@
                     },
                     "original_job_id": {
                         "type": "string",
-                        "format": "uuid",
                         "nullable": true
                     }
                 },
@@ -25311,7 +25679,7 @@
             },
             "RecommendationResource": {
                 "required": [
-                    "id",
+                    "public_id",
                     "name",
                     "source_type",
                     "target_type",
@@ -25319,10 +25687,9 @@
                     "updated_at"
                 ],
                 "properties": {
-                    "id": {
-                        "description": "Recommendation UUID",
-                        "type": "string",
-                        "format": "uuid"
+                    "public_id": {
+                        "description": "Public recommendation identity",
+                        "type": "string"
                     },
                     "name": {
                         "description": "Recommendation name",
@@ -25357,9 +25724,8 @@
                         "nullable": true
                     },
                     "user_id": {
-                        "description": "User UUID",
+                        "description": "Public user identity",
                         "type": "string",
-                        "format": "uuid",
                         "nullable": true
                     },
                     "created_at": {
@@ -25377,7 +25743,7 @@
             },
             "ScheduledJobResource": {
                 "required": [
-                    "id",
+                    "publicId",
                     "name",
                     "expression",
                     "jobType",
@@ -25389,10 +25755,9 @@
                     "updatedAt"
                 ],
                 "properties": {
-                    "id": {
-                        "description": "Job UUID",
-                        "type": "string",
-                        "format": "uuid"
+                    "publicId": {
+                        "description": "Public job identity",
+                        "type": "string"
                     },
                     "name": {
                         "description": "Job name",
@@ -25689,7 +26054,6 @@
             },
             "TranscodeMetricsResource": {
                 "required": [
-                    "uuid",
                     "publicId",
                     "videoId",
                     "qualityTier",
@@ -25701,11 +26065,6 @@
                     "updatedAt"
                 ],
                 "properties": {
-                    "uuid": {
-                        "description": "Job UUID",
-                        "type": "string",
-                        "format": "uuid"
-                    },
                     "publicId": {
                         "description": "Public identifier",
                         "type": "string",
@@ -25714,9 +26073,11 @@
                         "minLength": 21
                     },
                     "videoId": {
-                        "description": "Video UUID",
+                        "description": "Video public identifier",
                         "type": "string",
-                        "format": "uuid"
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "qualityTier": {
                         "description": "Quality tier name",
@@ -25753,7 +26114,6 @@
             },
             "TranscodeSessionResource": {
                 "required": [
-                    "uuid",
                     "publicId",
                     "userId",
                     "jobId",
@@ -25765,11 +26125,6 @@
                     "updatedAt"
                 ],
                 "properties": {
-                    "uuid": {
-                        "description": "Session UUID",
-                        "type": "string",
-                        "format": "uuid"
-                    },
                     "publicId": {
                         "description": "Public identifier",
                         "type": "string",
@@ -25778,19 +26133,25 @@
                         "minLength": 21
                     },
                     "userId": {
-                        "description": "User UUID",
+                        "description": "User public identifier",
                         "type": "string",
-                        "format": "uuid"
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "jobId": {
-                        "description": "Transcode job UUID",
+                        "description": "Transcode job public identifier",
                         "type": "string",
-                        "format": "uuid"
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "videoId": {
-                        "description": "Video UUID",
+                        "description": "Video public identifier",
                         "type": "string",
-                        "format": "uuid"
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "state": {
                         "description": "Session state",
@@ -26038,7 +26399,7 @@
             },
             "EqDeviceProfileResource": {
                 "required": [
-                    "id",
+                    "publicId",
                     "name",
                     "icon",
                     "payload",
@@ -26049,10 +26410,12 @@
                     "updatedAt"
                 ],
                 "properties": {
-                    "id": {
-                        "description": "Profile UUID",
+                    "publicId": {
+                        "description": "Profile public identifier",
                         "type": "string",
-                        "format": "uuid"
+                        "pattern": "^[0-9a-zA-Z_-]{21}$",
+                        "maxLength": 21,
+                        "minLength": 21
                     },
                     "name": {
                         "description": "Profile name",
@@ -26063,9 +26426,8 @@
                         "type": "string"
                     },
                     "deviceId": {
-                        "description": "Device UUID",
+                        "description": "Client audio-output token, independent of database identity",
                         "type": "string",
-                        "format": "uuid",
                         "nullable": true
                     },
                     "payload": {

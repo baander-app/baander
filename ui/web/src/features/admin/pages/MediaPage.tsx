@@ -287,7 +287,7 @@ export function MediaPage() {
           {missingCount > 0 && (
             <MissingList>
               {missingImages.map((img) => (
-                <MissingItem key={img.id}>
+                <MissingItem key={img.publicId}>
                   {img.path} ({img.type})
                 </MissingItem>
               ))}

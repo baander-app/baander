@@ -179,9 +179,9 @@ export function StationBrowser() {
         <ResultsList>
           {stations.map((station) => (
             <StationCard
-              key={station.id}
+              key={station.publicId}
               station={station}
-              isStarred={starredIds.has(station.id)}
+              isStarred={starredIds.has(station.publicId)}
               onStar={handleStar}
               onUnstar={handleUnstar}
             />

@@ -19,7 +19,7 @@ const mockPatch = vi.mocked(AXIOS_INSTANCE.patch)
 const initialAuthState = useAuthStore.getState()
 
 const ALICE: AdminUser = {
-  id: '0198d4d2-7600-7000-8000-0000000000a1',
+  publicId: 'AlicePublicIdentity01',
   email: 'alice@baander.app',
   name: 'Alice',
   roles: ['ROLE_USER'],
@@ -27,7 +27,7 @@ const ALICE: AdminUser = {
   createdAt: '2026-10-01T00:00:00Z',
 }
 
-const SETTINGS_URL = `/api/admin/users/${ALICE.id}/settings`
+const SETTINGS_URL = `/api/admin/users/${ALICE.publicId}/settings`
 
 function language(overrides: Partial<AdminUserSetting> = {}): AdminUserSetting {
   return {
@@ -103,7 +103,6 @@ function httpError(status: number, message: string, details?: Record<string, str
 function signIn(roles: string[]) {
   useAuthStore.setState({
     user: {
-      uuid: '0198d4d2-7600-7000-8000-0000000000aa',
       publicId: 'usr_admin',
       email: 'admin@baander.app',
       name: 'Admin',
@@ -175,7 +174,7 @@ describe('EditUserDialog', () => {
 
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false))
     expect(writeCalls()).toEqual([{ method: 'PUT', url: `${SETTINGS_URL}/language`, body: { value: 'da' } }])
-    expect(mockPatch).toHaveBeenCalledWith(`/api/admin/users/${ALICE.id}`, { email: ALICE.email, name: ALICE.name })
+    expect(mockPatch).toHaveBeenCalledWith(`/api/admin/users/${ALICE.publicId}`, { email: ALICE.email, name: ALICE.name })
   })
 
   it('resets the language when the server default is chosen over a stored choice', async () => {

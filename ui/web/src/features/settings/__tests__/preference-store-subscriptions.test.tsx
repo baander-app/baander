@@ -29,10 +29,10 @@ const initialLayout = useContextPanelStore.getState()
 const audioUrl = '/api/user/audio-preferences/'
 const playerUrl = '/api/user/player-preferences/'
 
-function authenticate(uuid: string) {
+function authenticate(publicId: string) {
   useAuthStore.setState({
     isAuthenticated: true,
-    user: { uuid, email: `${uuid}@baander.app`, publicId: uuid, name: null, roles: ['ROLE_USER'] },
+    user: { publicId, email: `${publicId}@baander.app`, name: null, roles: ['ROLE_USER'] },
   })
 }
 

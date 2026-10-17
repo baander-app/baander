@@ -33,7 +33,7 @@ final readonly class RenameUserHandler
     /**
      * @return User the renamed user
      *
-     * @throws UserNotFoundException when no user has the email address or UUID
+     * @throws UserNotFoundException when no user has the email address or public ID
      * @throws InvalidInputException when the name is blank or longer than NAME_MAX_LENGTH characters
      */
     #[AsMessageHandler]

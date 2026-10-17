@@ -165,8 +165,8 @@ final class SongLyricsCliParityTest extends TestCase
         $conn = $this->entityManager->getConnection();
 
         $conn->executeStatement(
-            'INSERT INTO libraries (id, slug, name, path, type, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [$libraryId->toString(), 'lyrics-cli-' . bin2hex(random_bytes(4)), 'Lyrics CLI', '/tmp/lyrics-cli-' . bin2hex(random_bytes(4)), 'music', 0, $now, $now],
+            'INSERT INTO libraries (id, public_id, slug, name, path, type, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [$libraryId->toString(), (new PublicId())->toString(), 'lyrics-cli-' . bin2hex(random_bytes(4)), 'Lyrics CLI', '/tmp/lyrics-cli-' . bin2hex(random_bytes(4)), 'music', 0, $now, $now],
         );
         $conn->executeStatement(
             'INSERT INTO albums (id, public_id, library_id, title, type, locked_fields, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',

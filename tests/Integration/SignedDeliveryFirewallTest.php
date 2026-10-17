@@ -82,7 +82,7 @@ final class SignedDeliveryFirewallTest extends TestCase
     private MessageBusInterface&MockObject $bus;
     private HmacStreamAuthAdapter $signer;
     private SignedDpopProof $proof;
-    private Uuid $videoId;
+    private PublicId $videoId;
     private PublicId $jobId;
     private UserEntity $actor;
     private AccessTokenEntity $accessToken;
@@ -162,7 +162,6 @@ final class SignedDeliveryFirewallTest extends TestCase
         $container->set('messenger.bus.default', $this->bus);
         $this->signer = new HmacStreamAuthAdapter('disposable-stream-secret', 'https://baander.app');
         $this->proof = new SignedDpopProof();
-        $this->videoId = new Uuid();
         $this->jobId = new PublicId();
         $this->membership = null;
         $this->entities = [];
@@ -172,6 +171,10 @@ final class SignedDeliveryFirewallTest extends TestCase
         $this->signatures = [];
         $this->bodies = [];
         $this->signedUrlRequested = false;
+        $video = new VideoEntity(new PublicId(), self::$directory . '/segment.mp4', bin2hex(random_bytes(16)));
+        $this->persist($video);
+        $this->manager->flush();
+        $this->videoId = $video->getPublicId();
     }
 
     protected function tearDown(): void
@@ -246,7 +249,7 @@ final class SignedDeliveryFirewallTest extends TestCase
                 'missing' => 'https://baander.app' . $path,
                 'expired' => $this->signedUrl($path, -10),
                 'wrong-key' => $this->signedUrl($path, signer: new HmacStreamAuthAdapter('other-secret', 'https://baander.app')),
-                'tampered-path' => str_replace($this->jobId->toString(), (new PublicId())->toString(), str_replace($this->videoId->toString(), (new Uuid())->toString(), $this->signedUrl($path))),
+                'tampered-path' => str_replace($this->jobId->toString(), (new PublicId())->toString(), str_replace($this->videoId->toString(), (new PublicId())->toString(), $this->signedUrl($path))),
                 'substituted-index' => str_replace('index=0', 'index=1', $this->signedUrl($path)),
                 default => $this->signedUrl($path) . '&extra=changed',
             };
@@ -321,7 +324,7 @@ final class SignedDeliveryFirewallTest extends TestCase
         foreach (self::STREAMING_METHODS as $method) {
             $this->streaming->expects($this->once())->method($method);
         }
-        foreach (SignedDeliveryRoutes::paths($foreign->getId()->toString(), $this->jobId->toString()) as $route => $path) {
+        foreach (SignedDeliveryRoutes::paths($foreign->getPublicId()->toString(), $this->jobId->toString()) as $route => $path) {
             $response = $this->request('GET', $this->signedUrl($path));
             self::assertSame(200, $response->getStatusCode(), $route . ': ' . $this->responseDetails($response));
         }
@@ -335,7 +338,7 @@ final class SignedDeliveryFirewallTest extends TestCase
         $this->bus->expects($this->exactly(3))->method('dispatch')
             ->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
         $this->streaming->expects($this->once())->method('getMasterManifest');
-        $path = '/api/transcode/' . $video->getId()->toString() . '/master.m3u8';
+        $path = '/api/transcode/' . $video->getPublicId()->toString() . '/master.m3u8';
         $proof = $this->mintProof($this->proof, 'POST', self::SIGN_URL, $jwt);
 
         $delivery = $this->request('GET', $this->signedUrl($path), $jwt, $proof);
@@ -387,7 +390,7 @@ final class SignedDeliveryFirewallTest extends TestCase
         $this->bus->expects($accepted ? $this->exactly(3) : $this->never())->method('dispatch')
             ->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
         $this->streaming->expects($accepted ? $this->once() : $this->never())->method('getQualityLadderForVideo');
-        $id = $video->getId()->toString();
+        $id = $video->getPublicId()->toString();
         $requests = [
             ['GET', 'https://baander.app/api/transcode/' . $id . '/quality-ladder', []],
             ['POST', self::SIGN_URL, ['path' => '/api/transcode/' . $id . '/master.m3u8']],
@@ -416,6 +419,7 @@ final class SignedDeliveryFirewallTest extends TestCase
     public static function signingValidationRows(): iterable
     {
         $manifest = '/api/transcode/{video}/master.m3u8';
+        yield 'internal video UUID' => [['path' => '/api/transcode/{internalVideo}/master.m3u8'], self::SIGN_REQUEST_REFUSED];
         yield 'media manifest path' => [['path' => '/api/transcode/{job}/media.m3u8'], self::SIGN_REQUEST_REFUSED];
         yield 'segment path' => [['path' => '/api/transcode/{job}/segment'], self::SIGN_REQUEST_REFUSED];
         yield 'path with a query' => [['path' => $manifest . '?index=0'], self::SIGN_REQUEST_REFUSED];
@@ -446,7 +450,7 @@ final class SignedDeliveryFirewallTest extends TestCase
         $video = $this->createVideoLibrary(true);
         $this->bus->expects($this->never())->method('dispatch');
         $this->streaming->expects($this->never())->method('getQualityLadderForVideo');
-        $placeholders = ['{video}' => $video->getId()->toString(), '{job}' => $this->jobId->toString()];
+        $placeholders = ['{video}' => $video->getPublicId()->toString(), '{internalVideo}' => $video->getId()->toString(), '{job}' => $this->jobId->toString()];
         $body = is_string($body)
             ? strtr($body, $placeholders)
             : array_map(static fn (mixed $value): mixed => is_string($value) ? strtr($value, $placeholders) : $value, $body);
@@ -480,7 +484,7 @@ final class SignedDeliveryFirewallTest extends TestCase
     {
         $jwt = $this->actorToken('member');
         $video = $this->createVideoLibrary(true);
-        $id = $video->getId()->toString();
+        $id = $video->getPublicId()->toString();
         $this->bus->expects($this->exactly(3))->method('dispatch')
             ->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
         $this->streaming->expects($this->once())->method('getMasterManifest');
@@ -505,7 +509,7 @@ final class SignedDeliveryFirewallTest extends TestCase
             ->willReturnCallback(static fn (object $message): Envelope => new Envelope($message));
         $this->streaming->expects($this->once())->method('getMasterManifest');
         $url = $this->issuedUrl($this->request('POST', self::SIGN_URL, $jwt, true, [
-            'path' => '/api/transcode/' . $video->getId()->toString() . '/master.m3u8',
+            'path' => '/api/transcode/' . $video->getPublicId()->toString() . '/master.m3u8',
         ]));
 
         $this->accessToken->revoke();

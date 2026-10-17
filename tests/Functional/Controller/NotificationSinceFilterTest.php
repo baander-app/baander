@@ -84,13 +84,13 @@ final class NotificationSinceFilterTest extends TestCase
         $filters = ['since' => '2026-10-04T12:00:00Z', 'category' => 'security', 'unread' => 'true', 'limit' => 1];
 
         $this->assertSame([$third->getPublicId()->toString()], $this->listedIds($user, $filters));
-        $this->assertSame([$second->getPublicId()->toString()], $this->listedIds($user, $filters + ['cursor' => $third->getId()->toString()]));
+        $this->assertSame([$second->getPublicId()->toString()], $this->listedIds($user, $filters + ['cursor' => $third->getPublicId()->toString()]));
         $ascending = $this->notifications->findByUserId(
             $user->getId(),
             category: NotificationCategory::Security,
             unreadOnly: true,
             limit: 1,
-            cursor: $first->getId()->toString(),
+            cursor: $first->getPublicId()->toString(),
             direction: 'asc',
             since: new DateTimeImmutable('2026-10-04T12:00:00Z'),
         );

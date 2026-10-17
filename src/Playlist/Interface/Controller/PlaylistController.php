@@ -21,6 +21,7 @@ use App\Playlist\Interface\Request\ReorderSongsRequest;
 use App\Playlist\Interface\Request\UpdatePlaylistRequest;
 use App\Playlist\Interface\Resource\PlaylistResource;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Playlist\Application\Port\PlaylistSongVisibilityInterface;
 use App\Catalog\Interface\Resource\SongResource;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
@@ -67,6 +68,7 @@ final class PlaylistController
         private readonly MessageBusInterface $commandBus,
         private readonly LibraryReadScopeProviderInterface $libraryScopes,
         private readonly PlaylistCollaboratorResolverInterface $collaborators,
+        private readonly PlaylistSongVisibilityInterface $songLookup,
     ) {
     }
 
@@ -162,13 +164,12 @@ final class PlaylistController
         path: '/api/playlists/{publicId}',
         summary: 'Get a playlist and its accessible songs (owner, collaborators and administrators)',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
                 properties: [
                     new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'uuid', type: 'string', format: 'uuid', example: '550e8400-e29b-41d4-a716-446655440000'),
                         new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, example: 'aB3dE5fG7hJ9kL1mN3pQr'),
                         new OA\Property(property: 'ownerPublicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, example: 'oWn3rPubL1cIdExampl_1'),
                         new OA\Property(property: 'collaboratorPublicIds', type: 'array', items: new OA\Items(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
@@ -180,9 +181,8 @@ final class PlaylistController
                         new OA\Property(property: 'songCount', type: 'integer', minimum: 0, description: 'Number of accessible songs returned in the songs array', example: 25),
                         new OA\Property(property: 'createdAt', type: 'string', format: 'date-time'),
                         new OA\Property(property: 'songs', type: 'array', items: new OA\Items(properties: [
-                            new OA\Property(property: 'uuid', type: 'string', format: 'uuid'),
                             new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
-                            new OA\Property(property: 'albumId', type: 'string', description: 'Album public identifier, or UUID when unavailable'),
+                            new OA\Property(property: 'albumId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, description: 'Album public identifier'),
                             new OA\Property(property: 'position', type: 'integer', description: 'Stored playlist position', example: 0),
                             new OA\Property(property: 'title', type: 'string'),
                             new OA\Property(property: 'artistName', type: 'string', nullable: true),
@@ -276,7 +276,7 @@ final class PlaylistController
             ),
         ),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
@@ -330,7 +330,7 @@ final class PlaylistController
         path: '/api/playlists/{publicId}',
         summary: 'Delete a playlist',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Deleted'),
@@ -367,18 +367,18 @@ final class PlaylistController
                 schema: new OA\Schema(
                     required: ['songId'],
                     properties: [
-                        new OA\Property(property: 'songId', type: 'string'),
+                        new OA\Property(property: 'songId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
                     ],
                 ),
             ),
         ),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
         ],
         responses: [
             new OA\Response(response: '201', description: 'Created', content: new OA\JsonContent(
                 properties: [
-                    new OA\Property(property: 'songId', type: 'string', format: 'uuid', example: '770f9510-f30c-52e5-b827-557755550222'),
+                    new OA\Property(property: 'songId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, example: 'aB3dE5fG7hJ9kL1mN3pQr'),
                     new OA\Property(property: 'position', type: 'integer', example: 0),
                 ], type: 'object',
             )),
@@ -399,9 +399,14 @@ final class PlaylistController
         $this->authorize('EDIT_SONGS', $playlist);
 
         try {
-            $songId = Uuid::fromString($payload->songId);
+            $songPublicId = PublicId::fromString($payload->songId);
         } catch (\Throwable) {
             return $this->errorResponse($this->trans('errors.invalid_song_id_format'));
+        }
+
+        $songId = $this->songLookup->findVisibleSongId($songPublicId, $this->libraryScopes->current());
+        if ($songId === null) {
+            return $this->notFound();
         }
 
         $position = count($playlist->getSongs());
@@ -416,7 +421,7 @@ final class PlaylistController
         ));
 
         return $this->created([
-            'songId' => $songId->toString(),
+            'songId' => $songPublicId->toString(),
             'position' => $position,
         ]);
     }
@@ -428,8 +433,8 @@ final class PlaylistController
         path: '/api/playlists/{publicId}/songs/{songId}',
         summary: 'Remove a song from a playlist',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'songId', description: 'Song UUID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
+            new OA\Parameter(name: 'songId', description: 'Song public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Deleted'),
@@ -449,9 +454,14 @@ final class PlaylistController
         $this->authorize('EDIT_SONGS', $playlist);
 
         try {
-            $resolvedSongId = Uuid::fromString($songId);
+            $songPublicId = PublicId::fromString($songId);
         } catch (\Throwable) {
             return $this->errorResponse($this->trans('errors.invalid_song_id'));
+        }
+
+        $resolvedSongId = $this->songLookup->findVisibleSongId($songPublicId, $this->libraryScopes->current());
+        if ($resolvedSongId === null) {
+            return $this->notFound();
         }
 
         $this->commandBus->dispatch(new RemoveSongCommand(
@@ -470,7 +480,7 @@ final class PlaylistController
         summary: 'Add a collaborator to a playlist',
         description: 'Only the owner may add collaborators. A collaborator may view the playlist, and may change its songs while the playlist is collaborative. Adding a user who already collaborates changes nothing.',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
             new OA\Parameter(name: 'userPublicId', description: "The user's public id", in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
         ],
         responses: [
@@ -509,7 +519,7 @@ final class PlaylistController
         summary: 'Remove a collaborator from a playlist',
         description: 'The owner may remove any collaborator; a collaborator may remove their own row to leave. Removing a user who does not collaborate changes nothing.',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
             new OA\Parameter(name: 'userPublicId', description: "The user's public id", in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
         ],
         responses: [
@@ -559,13 +569,13 @@ final class PlaylistController
                 schema: new OA\Schema(
                     required: ['songIds'],
                     properties: [
-                        new OA\Property(property: 'songIds', description: 'Ordered array of song UUIDs', type: 'array', items: new OA\Items(type: 'string', format: 'uuid')),
+                        new OA\Property(property: 'songIds', description: 'Ordered array of song public IDs', type: 'array', items: new OA\Items(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
                     ],
                 ),
             ),
         ),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Playlist public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(
@@ -590,12 +600,22 @@ final class PlaylistController
         $this->authorize('EDIT_SONGS', $playlist);
 
         try {
-            $uuids = array_map(static fn(string $id) => Uuid::fromString($id), $payload->songIds);
+            $publicIds = array_map(static fn(string $id) => PublicId::fromString($id), $payload->songIds);
         } catch (\Throwable) {
             return $this->errorResponse($this->trans('errors.invalid_song_ids_format'));
         }
 
-        $playlist->reorderSongs($uuids);
+        $scope = $this->libraryScopes->current();
+        $songIds = [];
+        foreach ($publicIds as $songPublicId) {
+            $songId = $this->songLookup->findVisibleSongId($songPublicId, $scope);
+            if ($songId === null) {
+                return $this->notFound();
+            }
+            $songIds[] = $songId;
+        }
+
+        $playlist->reorderSongs($songIds);
         $this->playlistService->save($playlist);
 
         return $this->successResponse(['message' => $this->trans('success.reordered', domain: 'playlist')]);

@@ -144,6 +144,22 @@ final class FavoritesControllerTest extends TestCase
         $this->assertJsonResponse($response, 422);
     }
 
+    public function testInternalUuidAndInaccessiblePublicIdAreRejected(): void
+    {
+        $user = $this->createTestUser();
+        $response = $this->authenticatedRequest('POST', '/api/favorites/', $user, [
+            'entityType' => 'song', 'entityPublicId' => (new \App\Shared\Domain\Model\Uuid())->toString(),
+        ]);
+        self::assertSame(422, $response->getStatusCode());
+        $other = $this->createTestUser();
+        $created = $this->addFavorite($other, 'song', 'hidden-song');
+        $hidden = json_decode($created->getContent(), true, flags: JSON_THROW_ON_ERROR);
+        $response = $this->authenticatedRequest('POST', '/api/favorites/', $user, [
+            'entityType' => 'song', 'entityPublicId' => $hidden['entityPublicId'],
+        ]);
+        self::assertSame(404, $response->getStatusCode());
+    }
+
     // ---------------------------------------------------------------
     // DELETE /{publicId} (remove)
     // ---------------------------------------------------------------
@@ -179,9 +195,18 @@ final class FavoritesControllerTest extends TestCase
 
     private function addFavorite(User $user, string $entityType, string $entityPublicId): Response
     {
+        $library = new \App\Library\Infrastructure\Doctrine\Entity\LibraryEntity('Favorites', 'favorites-' . bin2hex(random_bytes(4)), '/media/favorites/' . bin2hex(random_bytes(4)), 'music', 'local');
+        $album = new \App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity(new \App\Shared\Domain\Model\PublicId(), $library, 'Favorite album', 'album');
+        $song = new \App\Catalog\Infrastructure\Doctrine\Entity\SongEntity(new \App\Shared\Domain\Model\PublicId(), $album, 'Favorite song', '/media/favorites/song.flac', 1, 'audio/flac');
+        foreach ([$library, $album, $song] as $entity) {
+            $this->entityManager->persist($entity);
+        }
+        $this->entityManager->flush();
+        static::getContainer()->get(\App\Library\Application\Port\LibraryAccessPortInterface::class)->grant($user->getId(), $library->getId());
+        $publicId = $entityType === 'song' ? $song->getPublicId() : $album->getPublicId();
         return $this->authenticatedRequest('POST', '/api/favorites/', $user, [
             'entityType' => $entityType,
-            'entityPublicId' => $entityPublicId,
+            'entityPublicId' => $publicId->toString(),
         ]);
     }
 }

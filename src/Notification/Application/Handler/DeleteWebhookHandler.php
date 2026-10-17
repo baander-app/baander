@@ -18,13 +18,15 @@ final readonly class DeleteWebhookHandler
     }
 
     /**
-     * @throws \App\Shared\Application\Exception\InvalidInputException when the ID is not a UUID
+     * @throws \App\Shared\Application\Exception\InvalidInputException when the ID is not a public ID
      * @throws NotFoundException                                         when no webhook has the ID
      */
     #[AsMessageHandler]
     public function __invoke(DeleteWebhookCommand $command): void
     {
-        if (!$this->webhooks->delete(WebhookInput::id($command->webhookId))) {
+        $webhook = $this->webhooks->findByPublicId(WebhookInput::id($command->webhookId))
+            ?? throw new NotFoundException('Webhook not found.');
+        if (!$this->webhooks->delete($webhook->id)) {
             throw new NotFoundException('Webhook not found.');
         }
     }

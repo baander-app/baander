@@ -165,9 +165,9 @@ final class CatalogDeleteCommandsTest extends TestCase
         $this->entityManager->clear();
 
         try {
-            $refused = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries/' . $fixture['library'] . '/scan', $admin), 409);
+            $refused = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/libraries/' . $fixture['libraryPublicId'] . '/scan', $admin), 409);
             $scan = $this->command('app:library:scan');
-            self::assertSame(Command::FAILURE, $scan->execute(['library' => $fixture['library']], ['interactive' => false]));
+            self::assertSame(Command::FAILURE, $scan->execute(['library' => $fixture['libraryPublicId']], ['interactive' => false]));
         } finally {
             $files->release($claim);
         }
@@ -337,7 +337,7 @@ final class CatalogDeleteCommandsTest extends TestCase
     }
 
     /**
-     * @return array{library: string, album: string, albumId: string, paths: list<string>}
+     * @return array{library: string, libraryPublicId: string, album: string, albumId: string, paths: list<string>}
      */
     private function albumWithSongs(int $songs, int $outsideRoot = 0, bool $withFiles = true): array
     {
@@ -366,6 +366,7 @@ final class CatalogDeleteCommandsTest extends TestCase
 
         return [
             'library' => $library->getId()->toString(),
+            'libraryPublicId' => $library->getPublicId()->toString(),
             'album' => $album->getPublicId()->toString(),
             'albumId' => $album->getId()->toString(),
             'paths' => $paths,

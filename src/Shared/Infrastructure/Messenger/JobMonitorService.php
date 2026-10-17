@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Messenger;
 
+use App\Shared\Application\PublicDiagnosticText;
+
 use App\Shared\Domain\Model\Cursor;
 use App\Shared\Domain\Model\JobStatus;
 use App\Shared\Domain\Model\Uuid;
@@ -245,12 +247,12 @@ final class JobMonitorService
         return $this->cursorPaginator->paginate(
             $qb,
             $sortColumn,
-            'j.id',
+            'j.jobId',
             $cursor,
             $limit,
             /** @param JobMonitorSummary $job */
             static function (array $job) use ($sort): array {
-                return ['sort' => self::extractSortValue($job, $sort), 'id' => $job['id']->toString()];
+                return ['sort' => self::extractSortValue($job, $sort), 'id' => $job['jobId']];
             },
             withCount: false,
             descending: strtolower($direction) === 'desc',
@@ -531,7 +533,7 @@ final class JobMonitorService
                 'jobId' => $row['job_id'],
                 'name' => $row['name'],
                 'exceptionClass' => $row['exception_class'],
-                'exceptionMessage' => $row['exception_message'],
+                'exceptionMessage' => is_string($row['exception_message']) ? PublicDiagnosticText::redact($row['exception_message']) : null,
                 // PostgreSQL's text form is not RFC 3339; give the same form as the job endpoints.
                 'failedAt' => is_string($row['finished_at']) ? (new \DateTimeImmutable($row['finished_at']))->format(\DateTimeInterface::ATOM) : null,
             ];

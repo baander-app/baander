@@ -13,7 +13,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     properties: [
         new OA\Property(property: 'name', type: 'string', example: 'Jazz'),
         new OA\Property(property: 'slug', type: 'string', example: 'jazz'),
-        new OA\Property(property: 'parentId', description: 'UUID of the parent genre', type: 'string', nullable: true),
+        new OA\Property(property: 'parentId', description: 'Public ID of the parent genre', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, nullable: true),
         new OA\Property(property: 'mbid', description: 'MusicBrainz ID', type: 'string', nullable: true),
     ],
 )]

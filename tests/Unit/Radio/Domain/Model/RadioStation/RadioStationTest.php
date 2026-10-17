@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Radio\Domain\Model\RadioStation;
 use App\Radio\Domain\Model\RadioStation\RadioStation;
 use App\Radio\Domain\Model\RadioStation\RadioStationState;
 use App\Radio\Domain\Model\RadioStation\Stream;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use InvalidArgumentException;
@@ -93,6 +94,7 @@ final class RadioStationTest extends TestCase
 
         $state = new RadioStationState(
             id: $id,
+            publicId: new PublicId(),
             sourceId: $this->sourceId,
             externalId: 'ext-1',
             name: 'Test FM',

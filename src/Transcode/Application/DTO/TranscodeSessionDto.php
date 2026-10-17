@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Transcode\Application\DTO;
 
+use App\Shared\Domain\Model\PublicId;
 use App\Transcode\Domain\Model\TranscodeSession;
 
 final readonly class TranscodeSessionDto
@@ -13,7 +14,6 @@ final readonly class TranscodeSessionDto
      * @param array<string, mixed> $audioProfile
      */
     public function __construct(
-        private string $uuid,
         private string $publicId,
         private string $userId,
         private string $jobId,
@@ -29,24 +29,16 @@ final readonly class TranscodeSessionDto
     ) {
     }
 
-    public static function fromModel(TranscodeSession $session): self
+    public static function fromModel(TranscodeSession $session, PublicId $userId, PublicId $jobId, PublicId $videoId): self
     {
         return new self(
-            uuid: $session->getId()->toString(),
             publicId: $session->getPublicId()->toString(),
-            userId: $session->getUserId()->toString(),
-            jobId: $session->getJobId()->toString(),
-            videoId: $session->getVideoId()->toString(),
+            userId: $userId->toString(),
+            jobId: $jobId->toString(),
+            videoId: $videoId->toString(),
             state: $session->getSessionState()->value,
             priority: $session->getPriority()->value,
-            audioProfile: [
-                'name' => $session->getAudioProfile()->name,
-                'codec' => $session->getAudioProfile()->codec,
-                'bitrate' => $session->getAudioProfile()->bitrate,
-                'channelCount' => $session->getAudioProfile()->channelCount,
-                'sampleRate' => $session->getAudioProfile()->sampleRate,
-                'loudnessStandard' => $session->getAudioProfile()->loudnessStandard->value,
-            ],
+            audioProfile: $session->getAudioProfile()->jsonSerialize(),
             currentSegmentIndex: $session->getCurrentSegmentIndex(),
             wallClockOffset: $session->getWallClockOffset(),
             metrics: $session->getMetrics(),
@@ -61,11 +53,10 @@ final readonly class TranscodeSessionDto
     public static function fromArray(array $row): self
     {
         return new self(
-            uuid: (string) $row['id'],
             publicId: (string) $row['public_id'],
-            userId: (string) $row['user_id'],
-            jobId: (string) $row['job_id'],
-            videoId: (string) $row['video_id'],
+            userId: (string) $row['user_public_id'],
+            jobId: (string) $row['job_public_id'],
+            videoId: (string) $row['video_public_id'],
             state: (string) $row['state'],
             priority: (string) $row['priority'],
             audioProfile: \is_string($row['audio_profile']) ? json_decode($row['audio_profile'], true, 512, JSON_THROW_ON_ERROR) : (array) $row['audio_profile'],
@@ -83,7 +74,6 @@ final readonly class TranscodeSessionDto
     public function toArray(): array
     {
         return [
-            'uuid' => $this->uuid,
             'publicId' => $this->publicId,
             'userId' => $this->userId,
             'jobId' => $this->jobId,

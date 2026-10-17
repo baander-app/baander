@@ -32,18 +32,30 @@ final class ArtistCreditCommandsTest extends TestCase
 {
     private Artist $artist;
     private string $song;
+    private Uuid $targetId;
+    private \App\Catalog\Application\Port\SongPortInterface $songs;
+    private \App\Catalog\Application\Port\AlbumPortInterface $albums;
 
     protected function setUp(): void
     {
         $this->artist = Artist::create('Nina Simone');
-        $this->song = (new Uuid())->toString();
+        $album = \App\Catalog\Domain\Model\Album::create(new Uuid(), 'Album', 'album');
+        $song = \App\Catalog\Domain\Model\Song::create($album->getId(), 'Song', '/music/song.flac', 1, 'audio/flac');
+        $this->song = $song->getPublicId()->toString();
+        $this->targetId = $song->getId();
+        $this->songs = $this->createStub(\App\Catalog\Application\Port\SongPortInterface::class);
+        $this->songs->method('findByPublicId')->willReturn($song);
+        $this->albums = $this->createStub(\App\Catalog\Application\Port\AlbumPortInterface::class);
+        $state = $album->getState();
+        $album = \App\Catalog\Domain\Model\Album::reconstitute(new \App\Catalog\Domain\Model\AlbumState(...array_replace(get_object_vars($state), ['id' => $song->getId(), 'publicId' => $song->getPublicId()])));
+        $this->albums->method('findByPublicId')->willReturn($album);
     }
 
     public function testSongAddCreditsTheArtistAndPrintsNothingWithJson(): void
     {
         $artists = $this->artists();
         $artists->expects(self::exactly(2))->method('addSongToArtist')
-            ->with($this->artist->getId(), Uuid::fromString($this->song), 'featured')
+            ->with($this->artist->getId(), $this->targetId, 'featured')
             ->willReturn(true);
         $support = $this->support($artists);
 
@@ -93,7 +105,7 @@ final class ArtistCreditCommandsTest extends TestCase
         $artists->method('albumCreditRoles')->willReturn(['featured', 'producer']);
         $artists->expects(self::never())->method('updateSongRole');
         $artists->expects(self::once())->method('updateAlbumRole')
-            ->with($this->artist->getId(), Uuid::fromString($this->song), 'featured', 'producer')
+            ->with($this->artist->getId(), $this->targetId, 'featured', 'producer')
             ->willReturn(true);
         $support = $this->support($artists);
 
@@ -124,9 +136,9 @@ final class ArtistCreditCommandsTest extends TestCase
     private function support(ArtistPortInterface $artists): AdminCommandSupport
     {
         return new AdminCommandSupport(new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
-            AddArtistCreditCommand::class => [new AddArtistCreditHandler($artists)],
-            RemoveArtistCreditCommand::class => [new RemoveArtistCreditHandler($artists)],
-            ChangeArtistCreditRoleCommand::class => [new ChangeArtistCreditRoleHandler($artists)],
+            AddArtistCreditCommand::class => [new AddArtistCreditHandler($artists, $this->songs, $this->albums)],
+            RemoveArtistCreditCommand::class => [new RemoveArtistCreditHandler($artists, $this->songs, $this->albums)],
+            ChangeArtistCreditRoleCommand::class => [new ChangeArtistCreditRoleHandler($artists, $this->songs, $this->albums)],
         ]))]));
     }
 

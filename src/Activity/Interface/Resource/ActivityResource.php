@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Activity\Interface\Resource;
 
-use App\Activity\Domain\Model\MediaActivity;
+use App\Activity\Application\DTO\ActivityView;
 use App\Catalog\Domain\Model\Album;
 use App\Catalog\Domain\Model\Song;
 use App\Media\Domain\Model\Image;
@@ -14,14 +14,13 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'ActivityResource',
     properties: [
-        new OA\Property(property: 'uuid', type: 'string', format: 'uuid', description: 'Activity UUID'),
         new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
-        new OA\Property(property: 'userId', type: 'string', format: 'uuid', description: 'User UUID'),
+        new OA\Property(property: 'userId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'User public ID'),
         new OA\Property(property: 'activityType', type: 'string', description: 'Type of activity'),
-        new OA\Property(property: 'songId', type: 'string', format: 'uuid', nullable: true, description: 'Song UUID'),
-        new OA\Property(property: 'albumId', type: 'string', format: 'uuid', nullable: true, description: 'Album UUID'),
-        new OA\Property(property: 'artistId', type: 'string', format: 'uuid', nullable: true, description: 'Artist UUID'),
-        new OA\Property(property: 'movieId', type: 'string', format: 'uuid', nullable: true, description: 'Movie UUID'),
+        new OA\Property(property: 'songId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, description: 'Song public ID'),
+        new OA\Property(property: 'albumId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, description: 'Album public ID'),
+        new OA\Property(property: 'artistId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, description: 'Artist public ID'),
+        new OA\Property(property: 'movieId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, description: 'Movie public ID'),
         new OA\Property(property: 'playCount', type: 'integer', description: 'Number of plays'),
         new OA\Property(property: 'love', type: 'boolean', description: 'Whether the user loves this item'),
         new OA\Property(property: 'lastPlayedAt', type: 'string', format: 'date-time', nullable: true, description: 'Last play timestamp'),
@@ -34,17 +33,18 @@ final class ActivityResource extends AbstractResource
 {
     public static function from(mixed $source): array
     {
-        assert($source instanceof MediaActivity);
+        assert($source instanceof ActivityView);
+        $view = $source;
+        $source = $view->model;
 
         return [
-            'uuid' => $source->getId()->toString(),
             'publicId' => $source->getPublicId()->toString(),
-            'userId' => $source->getUserId()->toString(),
+            'userId' => $view->userId->toString(),
             'activityType' => $source->getActivityType(),
-            'songId' => $source->getSongId()?->toString(),
-            'albumId' => $source->getAlbumId()?->toString(),
-            'artistId' => $source->getArtistId()?->toString(),
-            'movieId' => $source->getMovieId()?->toString(),
+            'songId' => $view->songId?->toString(),
+            'albumId' => $view->albumId?->toString(),
+            'artistId' => $view->artistId?->toString(),
+            'movieId' => $view->movieId?->toString(),
             'playCount' => $source->getPlayCount(),
             'love' => $source->isLove(),
             'lastPlayedAt' => $source->getLastPlayedAt()?->format(\DateTimeInterface::ATOM),
@@ -55,21 +55,22 @@ final class ActivityResource extends AbstractResource
     }
 
     /**
-     * @param array<string, Song> $songs   keyed by song UUID
-     * @param array<string, Album> $albums keyed by album UUID
-     * @param array<string, Image> $images keyed by image UUID
-     * @param array<string, array<int, array{name: string, role: string|null}>> $albumArtists keyed by album UUID
+     * @param array<string, Song> $songs   keyed by song public ID
+     * @param array<string, Album> $albums keyed by album public ID
+     * @param array<string, Image> $images keyed by image public ID
+     * @param array<string, array<int, array{name: string, role: string|null}>> $albumArtists keyed by album public ID
      * @return array<string, mixed>
      */
     public static function fromWithDetails(
-        MediaActivity $activity,
+        ActivityView $view,
         array $songs,
         array $albums,
         array $images,
         array $albumArtists,
         string $baseUrl = '',
     ): array {
-        $data = self::from($activity);
+        $data = self::from($view);
+        $activity = $view->model;
 
         $song = $activity->getSongId() !== null ? ($songs[$activity->getSongId()->toString()] ?? null) : null;
         $album = $activity->getAlbumId() !== null ? ($albums[$activity->getAlbumId()->toString()] ?? null) : null;

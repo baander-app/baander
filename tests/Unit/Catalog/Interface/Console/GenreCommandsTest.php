@@ -13,6 +13,9 @@ use App\Catalog\Application\CommandHandler\Genre\UpdateGenreHandler;
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Catalog\Application\Service\GenreParentResolver;
 use App\Catalog\Domain\Model\Genre;
+use App\Catalog\Domain\Model\Album;
+use App\Catalog\Application\Port\AlbumPortInterface;
+use App\Catalog\Application\Port\SongPortInterface;
 use App\Catalog\Domain\ReadModel\GenreReadView;
 use App\Catalog\Interface\Console\GenreAlbumAddCommand;
 use App\Catalog\Interface\Console\GenreCreateCommand;
@@ -22,6 +25,7 @@ use App\Catalog\Interface\Console\GenreSongRemoveCommand;
 use App\Catalog\Interface\Console\GenreUpdateCommand;
 use App\Catalog\Interface\Resource\GenreResource;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use PHPUnit\Framework\TestCase;
@@ -38,10 +42,10 @@ final class GenreCommandsTest extends TestCase
 
     public function testListReadsEveryGenreWithTheUnrestrictedScopeAndShowsTheTree(): void
     {
-        $rock = new GenreReadView(new Uuid(), 'Rock', 'rock', null, null);
-        $hardRock = new GenreReadView(new Uuid(), 'Hard Rock', 'hard-rock', $rock->getId(), null);
-        $grunge = new GenreReadView(new Uuid(), 'Grunge', 'grunge', $hardRock->getId(), null);
-        $jazz = new GenreReadView(new Uuid(), 'Jazz', 'jazz', null, null);
+        $rock = new GenreReadView(new Uuid(), 'Rock', 'rock', null, null, new PublicId(), null);
+        $hardRock = new GenreReadView(new Uuid(), 'Hard Rock', 'hard-rock', $rock->getId(), null, new PublicId(), $rock->getPublicId());
+        $grunge = new GenreReadView(new Uuid(), 'Grunge', 'grunge', $hardRock->getId(), null, new PublicId(), $hardRock->getPublicId());
+        $jazz = new GenreReadView(new Uuid(), 'Jazz', 'jazz', null, null, new PublicId(), null);
         $genres = $this->createMock(GenrePortInterface::class);
         $genres->expects(self::once())
             ->method('findAllVisible')
@@ -61,10 +65,12 @@ final class GenreCommandsTest extends TestCase
     {
         $a = new Uuid();
         $b = new Uuid();
+        $aPublicId = new PublicId();
+        $bPublicId = new PublicId();
         $genres = $this->createStub(GenrePortInterface::class);
         $genres->method('findAllVisible')->willReturn([
-            new GenreReadView($a, 'A', 'a', $b, null),
-            new GenreReadView($b, 'B', 'b', $a, null),
+            new GenreReadView($a, 'A', 'a', $b, null, $aPublicId, $bPublicId),
+            new GenreReadView($b, 'B', 'b', $a, null, $bPublicId, $aPublicId),
         ]);
 
         $tester = new CommandTester(new GenreListCommand($genres));
@@ -75,9 +81,9 @@ final class GenreCommandsTest extends TestCase
 
     public function testListTableNamesTheParentBySlug(): void
     {
-        $rock = new GenreReadView(new Uuid(), 'Rock', 'rock', null, null);
+        $rock = new GenreReadView(new Uuid(), 'Rock', 'rock', null, null, new PublicId(), null);
         $genres = $this->createStub(GenrePortInterface::class);
-        $genres->method('findAllVisible')->willReturn([new GenreReadView(new Uuid(), 'Hard Rock', 'hard-rock', $rock->getId(), null), $rock]);
+        $genres->method('findAllVisible')->willReturn([new GenreReadView(new Uuid(), 'Hard Rock', 'hard-rock', $rock->getId(), null, new PublicId(), $rock->getPublicId()), $rock]);
 
         $tester = new CommandTester(new GenreListCommand($genres));
 
@@ -116,13 +122,13 @@ final class GenreCommandsTest extends TestCase
         $child = Genre::create('Hard Rock', 'hard-rock', $rock->getId());
         $genres = $this->createMock(GenrePortInterface::class);
         $genres->method('findBySlug')->willReturn($rock);
-        $genres->method('findByUuid')->willReturn($child);
+        $genres->method('findByPublicId')->willReturn($child);
         $genres->method('isDescendantOf')->willReturn(true);
         $genres->expects(self::never())->method('save');
 
         $tester = new CommandTester(new GenreUpdateCommand($this->support($genres)));
 
-        self::assertSame(Command::INVALID, $tester->execute(['slug' => 'rock', '--parent' => $child->getId()->toString()]));
+        self::assertSame(Command::INVALID, $tester->execute(['slug' => 'rock', '--parent' => $child->getPublicId()->toString()]));
         self::assertStringContainsString(UpdateGenreHandler::CYCLE_MESSAGE, (string) preg_replace('/\s+/', ' ', $tester->getDisplay()));
     }
 
@@ -133,11 +139,11 @@ final class GenreCommandsTest extends TestCase
         $genres->expects(self::never())->method('addAlbumToGenre');
         $genres->expects(self::never())->method('removeSongFromGenre');
 
-        $unknown = new CommandTester(new GenreAlbumAddCommand($genres));
-        self::assertSame(Command::FAILURE, $unknown->execute(['slug' => 'nope', 'album-id' => (new Uuid())->toString()]));
+        $unknown = new CommandTester(new GenreAlbumAddCommand($genres, $this->albums()));
+        self::assertSame(Command::FAILURE, $unknown->execute(['slug' => 'nope', 'album-id' => (new PublicId())->toString()]));
         self::assertStringContainsString('Genre "nope" not found.', $unknown->getDisplay());
 
-        $malformed = new CommandTester(new GenreSongRemoveCommand($genres));
+        $malformed = new CommandTester(new GenreSongRemoveCommand($genres, $this->createStub(SongPortInterface::class)));
         self::assertSame(Command::INVALID, $malformed->execute(['slug' => 'rock', 'song-id' => 'not-a-uuid']));
         self::assertStringContainsString('Invalid song ID format.', $malformed->getDisplay());
     }
@@ -145,14 +151,14 @@ final class GenreCommandsTest extends TestCase
     public function testAlbumAddLinksThroughThePort(): void
     {
         $rock = Genre::create('Rock', 'rock');
-        $album = new Uuid();
+        $album = Album::create(new Uuid(), 'Album', 'studio');
         $genres = $this->createMock(GenrePortInterface::class);
         $genres->method('findBySlug')->willReturn($rock);
-        $genres->expects(self::once())->method('addAlbumToGenre')->with($rock->getId(), self::callback(static fn (Uuid $id): bool => $id->equals($album)))->willReturn(true);
+        $genres->expects(self::once())->method('addAlbumToGenre')->with($rock->getId(), self::callback(static fn (Uuid $id): bool => $id->equals($album->getId())))->willReturn(true);
 
-        $tester = new CommandTester(new GenreAlbumAddCommand($genres));
+        $tester = new CommandTester(new GenreAlbumAddCommand($genres, $this->albums($album)));
 
-        self::assertSame(Command::SUCCESS, $tester->execute(['slug' => 'rock', 'album-id' => $album->toString()]));
+        self::assertSame(Command::SUCCESS, $tester->execute(['slug' => 'rock', 'album-id' => $album->getPublicId()->toString()]));
     }
 
     public function testAnAlbumThePortDoesNotFindIsNotFound(): void
@@ -161,9 +167,9 @@ final class GenreCommandsTest extends TestCase
         $genres->method('findBySlug')->willReturn(Genre::create('Rock', 'rock'));
         $genres->method('addAlbumToGenre')->willReturn(false);
 
-        $tester = new CommandTester(new GenreAlbumAddCommand($genres));
+        $tester = new CommandTester(new GenreAlbumAddCommand($genres, $this->albums()));
 
-        self::assertSame(Command::FAILURE, $tester->execute(['slug' => 'rock', 'album-id' => (new Uuid())->toString()]));
+        self::assertSame(Command::FAILURE, $tester->execute(['slug' => 'rock', 'album-id' => (new PublicId())->toString()]));
         self::assertStringContainsString('Album not found.', $tester->getDisplay());
     }
 
@@ -179,12 +185,12 @@ final class GenreCommandsTest extends TestCase
         self::assertSame(Command::SUCCESS, $create->execute(['name' => 'Rock', 'slug' => 'rock', '--json' => true]));
         $created = json_decode($create->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
         self::assertSame(GenreResource::from($this->saved['rock']), $created);
-        self::assertSame(['uuid', 'name', 'slug', 'parentId', 'mbid'], array_keys($created));
+        self::assertSame(['publicId', 'name', 'slug', 'parentId', 'mbid'], array_keys($created));
 
         $update = new CommandTester(new GenreUpdateCommand($this->support($genres)));
         self::assertSame(Command::SUCCESS, $update->execute(['slug' => 'rock', '--name' => 'Rock and Roll', '--json' => true]));
         $updated = json_decode($update->getDisplay(), true, flags: JSON_THROW_ON_ERROR);
-        self::assertSame($created['uuid'], $updated['uuid']);
+        self::assertSame($created['publicId'], $updated['publicId']);
         self::assertSame('Rock and Roll', $updated['name']);
     }
 
@@ -199,8 +205,8 @@ final class GenreCommandsTest extends TestCase
         self::assertSame(Command::SUCCESS, $delete->execute(['slug' => 'rock', '--force' => true, '--json' => true], ['interactive' => false]));
         self::assertSame('', $delete->getDisplay());
 
-        $link = new CommandTester(new GenreAlbumAddCommand($genres));
-        self::assertSame(Command::SUCCESS, $link->execute(['slug' => 'rock', 'album-id' => (new Uuid())->toString(), '--json' => true]));
+        $link = new CommandTester(new GenreAlbumAddCommand($genres, $this->albums()));
+        self::assertSame(Command::SUCCESS, $link->execute(['slug' => 'rock', 'album-id' => (new PublicId())->toString(), '--json' => true]));
         self::assertSame('', $link->getDisplay());
     }
 
@@ -214,6 +220,14 @@ final class GenreCommandsTest extends TestCase
 
         self::assertSame(Command::INVALID, $tester->execute(['slug' => 'rock', '--json' => true], ['interactive' => false, 'capture_stderr_separately' => true]));
         self::assertSame('', $tester->getDisplay());
+    }
+
+    private function albums(?Album $album = null): AlbumPortInterface
+    {
+        $albums = $this->createStub(AlbumPortInterface::class);
+        $albums->method('findVisibleByPublicId')->willReturn($album ?? Album::create(new Uuid(), 'Album', 'studio'));
+
+        return $albums;
     }
 
     private function support(GenrePortInterface $genres): AdminCommandSupport

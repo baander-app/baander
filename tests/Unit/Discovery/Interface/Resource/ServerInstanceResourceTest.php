@@ -18,6 +18,9 @@ final class ServerInstanceResourceTest extends TestCase
 
         self::assertSame('https://music.baander.app', $resource['serverUrl']);
         self::assertArrayNotHasKey('apiKey', $resource);
+        self::assertArrayNotHasKey('uuid', $resource);
+        self::assertSame($server->getPublicId()->toString(), $resource['publicId']);
+        self::assertStringNotContainsString($server->getId()->toString(), json_encode($resource, JSON_THROW_ON_ERROR));
         self::assertStringNotContainsString('private-server-key', json_encode($resource, JSON_THROW_ON_ERROR));
     }
 }

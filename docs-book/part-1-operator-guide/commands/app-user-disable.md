@@ -1,6 +1,6 @@
 # app:user:disable
 
-Disable a user account and end its sessions. The user cannot sign in until the account is enabled again. Use this to revoke access for a compromised, departed or problematic account without deleting it. The command runs the same use case as disabling a user in the admin panel (`POST /api/admin/users/{id}/disable` in the admin API).
+Disable a user account and end its sessions. The user cannot sign in until the account is enabled again. Use this to revoke access for a compromised, departed or problematic account without deleting it. The command runs the same use case as disabling a user in the admin panel (`POST /api/admin/users/{publicId}/disable` in the admin API).
 
 ## Quick start
 
@@ -8,17 +8,17 @@ Disable a user account and end its sessions. The user cannot sign in until the a
 make exec cmd="php bin/console app:user:disable alice@baander.app"
 ```
 
-By UUID:
+By public ID:
 
 ```bash
-make exec cmd="php bin/console app:user:disable 0192a3b4-c5d6-7890-abcd-ef1234567890"
+make exec cmd="php bin/console app:user:disable aB3dE5fG7hJ9kL1mN3pQr"
 ```
 
 ## Arguments
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `identifier` | Yes | User's email address or UUID |
+| `identifier` | Yes | User's email address or public ID |
 
 ## Options
 
@@ -39,7 +39,7 @@ Two kinds of media access do not end at once:
 
 Disabling an account that is already disabled leaves the account unchanged and closes any WebSocket connection of the user that is still open.
 
-With `--json` the command prints only the user as the API's `data` object, the same user resource `POST /api/admin/users/{id}/disable` returns: `id`, `publicId`, `name`, `email`, `emailVerifiedAt`, `roles`, `disabled`, `createdAt` and `updatedAt`.
+With `--json` the command prints only the user as the API's `data` object, the same user resource `POST /api/admin/users/{publicId}/disable` returns: `publicId`, `name`, `email`, `emailVerifiedAt`, `roles`, `disabled`, `createdAt` and `updatedAt`.
 
 ## Exit codes
 
@@ -51,4 +51,4 @@ With `--json` the command prints only the user as the API's `data` object, the s
 ## Tips
 
 - Disabling is reversible: enable the account with [app:user:enable](app-user-enable.md). Enabling restores none of the revoked tokens, so the user signs in again.
-- The identifier can be the email address or the UUID.
+- The identifier can be the email address or the public ID.

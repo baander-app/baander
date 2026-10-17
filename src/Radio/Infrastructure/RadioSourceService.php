@@ -8,6 +8,7 @@ use App\Radio\Application\Port\RadioSourcePortInterface;
 use App\Radio\Domain\Model\RadioSource\RadioSource;
 use App\Radio\Domain\Repository\RadioSource\RadioSourceRepositoryInterface;
 use App\Radio\Domain\ValueObject\SyncConfig;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 
 final class RadioSourceService implements RadioSourcePortInterface
@@ -15,6 +16,11 @@ final class RadioSourceService implements RadioSourcePortInterface
     public function __construct(
         private readonly RadioSourceRepositoryInterface $repository,
     ) {
+    }
+
+    public function findByPublicId(PublicId $publicId): ?RadioSource
+    {
+        return $this->repository->findByPublicId($publicId);
     }
 
     public function listSources(): array
@@ -50,7 +56,7 @@ final class RadioSourceService implements RadioSourcePortInterface
         $syncConfig = $source->getSyncConfig();
 
         return [
-            'id' => $source->getId()->toString(),
+            'publicId' => $source->getPublicId()->toString(),
             'name' => $source->getName(),
             'type' => $source->getType(),
             'syncUrl' => $syncConfig->syncUrl,

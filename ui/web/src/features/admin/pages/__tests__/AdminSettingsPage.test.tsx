@@ -175,7 +175,6 @@ function serve() {
 function signIn(roles: string[]) {
   useAuthStore.setState({
     user: {
-      uuid: '0198d4d2-7600-7000-8000-0000000000aa',
       publicId: 'usr_settings_admin',
       email: 'settings-admin@baander.app',
       name: 'Settings admin',

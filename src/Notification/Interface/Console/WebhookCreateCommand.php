@@ -53,7 +53,7 @@ final class WebhookCreateCommand extends Command
             return AdminCommandSupport::json($io, $created);
         }
 
-        $io->success(sprintf('Webhook %s created for %s.', $created['id'], $created['url']));
+        $io->success(sprintf('Webhook %s created for %s.', $created['publicId'], $created['url']));
         WebhookConsole::printSecret($io, $issued);
 
         return Command::SUCCESS;

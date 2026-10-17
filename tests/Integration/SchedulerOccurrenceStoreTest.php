@@ -50,6 +50,7 @@ final class SchedulerOccurrenceStoreTest extends TestCase
         foreach ($migration->getSql() as $query) {
             $this->first->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
         }
+        \App\Tests\Fixtures\Scheduler\PublicIdentitySchema::upgrade($this->first);
     }
 
     public function testCommittedRoundTripAfterReconnectPreservesTypedOrderedSnapshot(): void
@@ -185,7 +186,7 @@ final class SchedulerOccurrenceStoreTest extends TestCase
     {
         $occurrence = $this->occurrence();
         $this->second->beginTransaction();
-        $this->second->executeStatement('INSERT INTO scheduler_occurrences (id, job_id, scheduled_for, job_type, command, parameters) VALUES (:id, :job, :at, :type, :command, CAST(:parameters AS JSON))', ['id' => $occurrence->id->toString(), 'job' => $occurrence->jobId->toString(), 'at' => $occurrence->scheduledFor->format('c'), 'type' => $occurrence->jobType->value, 'command' => $occurrence->command, 'parameters' => $occurrence->parametersJson()]);
+        $this->second->executeStatement('INSERT INTO scheduler_occurrences (public_id, job_public_id, id, job_id, scheduled_for, job_type, command, parameters) VALUES (substr(md5(random()::text), 1, 21), substr(md5(random()::text), 1, 21), :id, :job, :at, :type, :command, CAST(:parameters AS JSON))', ['id' => $occurrence->id->toString(), 'job' => $occurrence->jobId->toString(), 'at' => $occurrence->scheduledFor->format('c'), 'type' => $occurrence->jobType->value, 'command' => $occurrence->command, 'parameters' => $occurrence->parametersJson()]);
         $started = hrtime(true);
         try {
             (new DoctrineSchedulerOccurrenceStore($this->first, 500, 50))->record($this->occurrence(id: Uuid::v7()));
@@ -222,7 +223,7 @@ final class SchedulerOccurrenceStoreTest extends TestCase
     {
         $occurrence = $this->occurrence();
         try {
-            $this->first->executeStatement('INSERT INTO scheduler_occurrences (id, job_id, scheduled_for, job_type, command, parameters) VALUES (:id, :job, :at, :type, :command, CAST(:parameters AS JSON))', array_replace(['id' => $occurrence->id->toString(), 'job' => $occurrence->jobId->toString(), 'at' => $occurrence->scheduledFor->format('c'), 'type' => $occurrence->jobType->value, 'command' => $occurrence->command, 'parameters' => $occurrence->parametersJson()], $invalid));
+            $this->first->executeStatement('INSERT INTO scheduler_occurrences (public_id, job_public_id, id, job_id, scheduled_for, job_type, command, parameters) VALUES (substr(md5(random()::text), 1, 21), substr(md5(random()::text), 1, 21), :id, :job, :at, :type, :command, CAST(:parameters AS JSON))', array_replace(['id' => $occurrence->id->toString(), 'job' => $occurrence->jobId->toString(), 'at' => $occurrence->scheduledFor->format('c'), 'type' => $occurrence->jobType->value, 'command' => $occurrence->command, 'parameters' => $occurrence->parametersJson()], $invalid));
             self::fail('Migration must independently enforce snapshot constraints.');
         } catch (DriverException $error) {
             self::assertSame('23514', $error->getSQLState());
@@ -255,10 +256,8 @@ final class SchedulerOccurrenceStoreTest extends TestCase
     public function testManualIntentsCoexistWithScheduledSlotAndLookupPreservesEachSnapshot(): void
     {
         $scheduled = $this->occurrence();
-        $manual = new SchedulerOccurrence(Uuid::v7(), $scheduled->jobId, $scheduled->scheduledFor, JobType::Console,
-            'app:baander-manual', ['address' => 'manual@baander.app', 'float' => 1.0, 'negativeZero' => -0.0], SchedulerOccurrenceOrigin::Manual);
-        $nextManual = new SchedulerOccurrence(Uuid::v7(), $scheduled->jobId, $scheduled->scheduledFor, JobType::Messenger,
-            'app:baander-next-manual', ['second' => 2, 'first' => 1], SchedulerOccurrenceOrigin::Manual);
+        $manual = new SchedulerOccurrence(Uuid::v7(), $scheduled->jobId, $scheduled->scheduledFor, JobType::Console, 'app:baander-manual', ['address' => 'manual@baander.app', 'float' => 1.0, 'negativeZero' => -0.0], origin: SchedulerOccurrenceOrigin::Manual, jobPublicId: new \App\Shared\Domain\Model\PublicId());
+        $nextManual = new SchedulerOccurrence(Uuid::v7(), $scheduled->jobId, $scheduled->scheduledFor, JobType::Messenger, 'app:baander-next-manual', ['second' => 2, 'first' => 1], origin: SchedulerOccurrenceOrigin::Manual, jobPublicId: new \App\Shared\Domain\Model\PublicId());
         $store = new DoctrineSchedulerOccurrenceStore($this->first);
         $observer = new DoctrineSchedulerOccurrenceStore($this->second);
         self::assertTrue($store->record($manual));
@@ -288,16 +287,10 @@ final class SchedulerOccurrenceStoreTest extends TestCase
     public function testManualIdCannotBeReboundToDifferentIdentityOrConfiguration(string $change): void
     {
         $base = $this->occurrence();
-        $manual = new SchedulerOccurrence($base->id, $base->jobId, $base->scheduledFor, $base->jobType, $base->command, $base->parameters, SchedulerOccurrenceOrigin::Manual);
+        $manual = new SchedulerOccurrence($base->id, $base->jobId, $base->scheduledFor, $base->jobType, $base->command, $base->parameters, origin: SchedulerOccurrenceOrigin::Manual, jobPublicId: new \App\Shared\Domain\Model\PublicId());
         $store = new DoctrineSchedulerOccurrenceStore($this->first);
         self::assertTrue($store->record($manual));
-        $conflict = new SchedulerOccurrence($manual->id,
-            $change === 'job' ? Uuid::v7() : $manual->jobId,
-            $change === 'minute' ? $manual->scheduledFor->modify('+1 minute') : $manual->scheduledFor,
-            $change === 'type' ? JobType::Messenger : $manual->jobType,
-            $change === 'command' ? 'app:baander-changed' : $manual->command,
-            $change === 'parameters' ? ['first' => 1.0, 'second' => 2] : $manual->parameters,
-            $change === 'origin' ? SchedulerOccurrenceOrigin::Scheduled : SchedulerOccurrenceOrigin::Manual);
+        $conflict = new SchedulerOccurrence($manual->id, $change === 'job' ? Uuid::v7() : $manual->jobId, $change === 'minute' ? $manual->scheduledFor->modify('+1 minute') : $manual->scheduledFor, $change === 'type' ? JobType::Messenger : $manual->jobType, $change === 'command' ? 'app:baander-changed' : $manual->command, $change === 'parameters' ? ['first' => 1.0, 'second' => 2] : $manual->parameters, origin: $change === 'origin' ? SchedulerOccurrenceOrigin::Scheduled : SchedulerOccurrenceOrigin::Manual, jobPublicId: new \App\Shared\Domain\Model\PublicId());
         try {
             $store->record($conflict);
             self::fail('Manual ID must retain its first identity and configuration.');
@@ -326,8 +319,7 @@ final class SchedulerOccurrenceStoreTest extends TestCase
     public function testMatchingScheduledSlotCannotHideManualIdReboundToScheduledOrigin(): void
     {
         $scheduled = $this->occurrence();
-        $manual = new SchedulerOccurrence(Uuid::v7(), $scheduled->jobId, $scheduled->scheduledFor, $scheduled->jobType,
-            $scheduled->command, $scheduled->parameters, SchedulerOccurrenceOrigin::Manual);
+        $manual = new SchedulerOccurrence(Uuid::v7(), $scheduled->jobId, $scheduled->scheduledFor, $scheduled->jobType, $scheduled->command, $scheduled->parameters, origin: SchedulerOccurrenceOrigin::Manual, jobPublicId: new \App\Shared\Domain\Model\PublicId());
         $store = new DoctrineSchedulerOccurrenceStore($this->first);
         self::assertTrue($store->record($scheduled));
         self::assertTrue($store->record($manual));
@@ -347,7 +339,7 @@ final class SchedulerOccurrenceStoreTest extends TestCase
     {
         $scheduled = $this->occurrence();
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->first))->record($scheduled));
-        $sql = 'INSERT INTO scheduler_occurrences (id, job_id, scheduled_for, job_type, command, parameters, origin) SELECT :id, job_id, scheduled_for, job_type, command, parameters, :origin FROM scheduler_occurrences WHERE id = :original';
+        $sql = 'INSERT INTO scheduler_occurrences (public_id, job_public_id, id, job_id, scheduled_for, job_type, command, parameters, origin) SELECT substr(md5(random()::text), 1, 21), substr(md5(random()::text), 1, 21), :id, job_id, scheduled_for, job_type, command, parameters, :origin FROM scheduler_occurrences WHERE id = :original';
         foreach ([Uuid::v7(), Uuid::v7()] as $id) {
             self::assertSame(1, $this->second->executeStatement($sql, ['id' => $id->toString(), 'origin' => 'manual', 'original' => $scheduled->id->toString()]));
         }
@@ -365,7 +357,7 @@ final class SchedulerOccurrenceStoreTest extends TestCase
     {
         $occurrence = $this->occurrence();
         try {
-            $this->first->executeStatement('INSERT INTO scheduler_occurrences (id, job_id, scheduled_for, job_type, command, parameters, origin) VALUES (:id, :job, :at, :type, :command, CAST(:parameters AS JSON), :origin)',
+            $this->first->executeStatement('INSERT INTO scheduler_occurrences (public_id, job_public_id, id, job_id, scheduled_for, job_type, command, parameters, origin) VALUES (substr(md5(random()::text), 1, 21), substr(md5(random()::text), 1, 21), :id, :job, :at, :type, :command, CAST(:parameters AS JSON), :origin)',
                 ['id' => $occurrence->id->toString(), 'job' => $occurrence->jobId->toString(), 'at' => $occurrence->scheduledFor->format('c'), 'type' => $occurrence->jobType->value, 'command' => $occurrence->command, 'parameters' => $occurrence->parametersJson(), 'origin' => $origin]);
             self::fail('Origin constraints must hold independently of application enums.');
         } catch (DriverException $error) {
@@ -392,7 +384,7 @@ final class SchedulerOccurrenceStoreTest extends TestCase
         $connection->executeStatement('SET search_path TO ' . $this->schema);
         $connection->failure = $afterCommit ? 'after' : 'before';
         $base = $this->occurrence();
-        $manual = new SchedulerOccurrence($base->id, $base->jobId, $base->scheduledFor, $base->jobType, $base->command, $base->parameters, SchedulerOccurrenceOrigin::Manual);
+        $manual = new SchedulerOccurrence($base->id, $base->jobId, $base->scheduledFor, $base->jobType, $base->command, $base->parameters, origin: SchedulerOccurrenceOrigin::Manual, jobPublicId: new \App\Shared\Domain\Model\PublicId());
         try {
             (new DoctrineSchedulerOccurrenceStore($connection))->record($manual);
             self::fail('An uncertain manual commit cannot acknowledge creation.');
@@ -418,7 +410,7 @@ final class SchedulerOccurrenceStoreTest extends TestCase
     /** @param array<array-key, scalar|null|array<array-key, scalar|null|array<string, string>>> $parameters */
     private function occurrence(?Uuid $id = null, ?Uuid $job = null, ?DateTimeImmutable $at = null, JobType $type = JobType::Console, string $command = 'app:baander-check', array $parameters = ['first' => 1, 'second' => 2]): SchedulerOccurrence
     {
-        return new SchedulerOccurrence($id ?? Uuid::v7(), $job ?? Uuid::fromString('0199a03e-0000-7000-8000-aaaaaaaaaaaa'), $at ?? new DateTimeImmutable('2026-10-02 12:00:00Z'), $type, $command, $parameters);
+        return new SchedulerOccurrence($id ?? Uuid::v7(), $job ?? Uuid::fromString('0199a03e-0000-7000-8000-aaaaaaaaaaaa'), $at ?? new DateTimeImmutable('2026-10-02 12:00:00Z'), $type, $command, $parameters, jobPublicId: new \App\Shared\Domain\Model\PublicId());
     }
 
     protected function tearDown(): void

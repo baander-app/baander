@@ -55,6 +55,7 @@ final class ActivityControllerSecurityTest extends TestCase
             albumService: $this->albumPort,
             imageService: $this->imagePort,
             movieService: $this->moviePort,
+            identities: $this->users(),
         );
 
         $this->controller = new ActivityController(
@@ -66,6 +67,7 @@ final class ActivityControllerSecurityTest extends TestCase
             albumPort: $this->albumPort,
             artistPort: $this->artistPort,
             moviePort: $this->moviePort,
+            identities: $this->users(),
         );
 
         $translator = $this->createStub(TranslatorInterface::class);
@@ -133,6 +135,15 @@ final class ActivityControllerSecurityTest extends TestCase
         self::assertInstanceOf(AuthenticatedUserIdentityInterface::class, $user);
 
         return $user;
+    }
+
+    private function users(): \App\Activity\Application\Port\ActivityIdentityProjectionPortInterface
+    {
+        $users = $this->createStub(\App\Activity\Application\Port\ActivityIdentityProjectionPortInterface::class);
+        $users->method('userPublicId')->willReturn(new \App\Shared\Domain\Model\PublicId());
+        $users->method('readScope')->willReturn(\App\Shared\Domain\ValueObject\LibraryReadScope::unrestricted());
+
+        return $users;
     }
 
 }

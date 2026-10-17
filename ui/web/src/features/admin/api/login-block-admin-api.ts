@@ -1,7 +1,7 @@
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 
 export interface LoginBlock {
-  id: string
+  publicId: string
   ipAddress: string
   email: string
   fieldValue: string

@@ -36,7 +36,7 @@ final class GenreCreateCommand extends Command
         $this
             ->addArgument('name', InputArgument::REQUIRED, 'The genre name')
             ->addArgument('slug', InputArgument::REQUIRED, 'The URL slug: lowercase letters, digits and single hyphens')
-            ->addOption('parent', null, InputOption::VALUE_REQUIRED, 'UUID of the parent genre')
+            ->addOption('parent', null, InputOption::VALUE_REQUIRED, 'Public ID of the parent genre')
             ->addOption('mbid', null, InputOption::VALUE_REQUIRED, 'MusicBrainz ID of the genre');
         AdminCommandSupport::addJsonOption($this);
     }
@@ -62,7 +62,7 @@ final class GenreCreateCommand extends Command
             return AdminCommandSupport::json($io, $genre);
         }
 
-        $io->success(sprintf('Genre "%s" (%s) created with UUID %s.', $genre['name'], $genre['slug'], $genre['uuid']));
+        $io->success(sprintf('Genre "%s" (%s) created with public ID %s.', $genre['name'], $genre['slug'], $genre['publicId']));
 
         return Command::SUCCESS;
     }

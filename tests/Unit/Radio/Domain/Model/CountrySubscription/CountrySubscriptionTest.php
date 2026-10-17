@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Radio\Domain\Model\CountrySubscription;
 
 use App\Radio\Domain\Model\CountrySubscription\CountrySubscription;
 use App\Radio\Domain\Model\CountrySubscription\CountrySubscriptionState;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use InvalidArgumentException;
@@ -74,6 +75,7 @@ final class CountrySubscriptionTest extends TestCase
 
         $state = new CountrySubscriptionState(
             id: $id,
+            publicId: new PublicId(),
             userId: $this->userId,
             sourceId: $this->sourceId,
             countryCode: 'US',

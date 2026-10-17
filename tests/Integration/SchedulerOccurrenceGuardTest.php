@@ -92,6 +92,7 @@ final class SchedulerOccurrenceGuardTest extends TestCase
         $authority = (new DoctrineDeploymentLease($this->writer))->acquire('baander.app:scheduler-guard', str_repeat('a', 32), 300);
         self::assertInstanceOf(DeploymentLease::class, $authority);
         $this->authority = $authority;
+        \App\Tests\Fixtures\Scheduler\PublicIdentitySchema::upgrade($this->writer);
     }
 
     public function testCommittedClaimPrecedesEffectAndRepeatedCommandDoesNotExecuteAgain(): void
@@ -262,8 +263,7 @@ final class SchedulerOccurrenceGuardTest extends TestCase
     public function testBusyJobExhaustsBoundedRetriesWithoutConsumptionAndCanBeExplicitlyRetriedAfterReturn(): void
     {
         [$blocker, $job] = $this->recordOccurrence();
-        $pending = new SchedulerOccurrence(Uuid::v7(), $job->getId(), $blocker->scheduledFor->modify('+1 minute'),
-            $blocker->jobType, $blocker->command, $blocker->parameters);
+        $pending = new SchedulerOccurrence(Uuid::v7(), $job->getId(), $blocker->scheduledFor->modify('+1 minute'), $blocker->jobType, $blocker->command, $blocker->parameters, jobPublicId: new \App\Shared\Domain\Model\PublicId());
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->writer))->record($pending));
         $attempt = Uuid::v7();
         $owner = new DoctrineSchedulerOccurrenceExecutionStore($this->observer, $this->authority);
@@ -335,8 +335,7 @@ final class SchedulerOccurrenceGuardTest extends TestCase
     public function testPersistedManualOriginRunsPausedJobAndCannotRepeatItsAttempt(): void
     {
         [$scheduled, $job] = $this->recordOccurrence();
-        $manual = new SchedulerOccurrence(Uuid::v7(), $job->getId(), $scheduled->scheduledFor,
-            $scheduled->jobType, $scheduled->command, $scheduled->parameters, SchedulerOccurrenceOrigin::Manual);
+        $manual = new SchedulerOccurrence(Uuid::v7(), $job->getId(), $scheduled->scheduledFor, $scheduled->jobType, $scheduled->command, $scheduled->parameters, origin: SchedulerOccurrenceOrigin::Manual, jobPublicId: new \App\Shared\Domain\Model\PublicId());
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->writer))->record($manual));
         $job->pause();
         $effects = 0;
@@ -369,8 +368,7 @@ final class SchedulerOccurrenceGuardTest extends TestCase
     {
         $job = ScheduledJob::create('Guarded schedule', '* * * * *', JobType::Messenger, GuardedSchedulerMessage::class,
             parameters: ['address' => 'worker@baander.app', 'fraction' => 1.0]);
-        $occurrence = new SchedulerOccurrence(Uuid::v7(), $job->getId(), new DateTimeImmutable('2026-10-02T10:00:00Z'),
-            JobType::Messenger, $job->getCommand(), $job->getParameters());
+        $occurrence = new SchedulerOccurrence(Uuid::v7(), $job->getId(), new DateTimeImmutable('2026-10-02T10:00:00Z'), JobType::Messenger, $job->getCommand(), $job->getParameters(), jobPublicId: new \App\Shared\Domain\Model\PublicId());
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->writer))->record($occurrence));
         return [$occurrence, $job];
     }

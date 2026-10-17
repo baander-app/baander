@@ -63,6 +63,13 @@ final class RecommendationScheduleTest extends TestCase
         self::assertFalse($this->scheduledGeneration());
         $this->runMigration('up');
         self::assertIsArray($this->scheduledGeneration());
+        $publicId = $this->manager->getConnection()->fetchOne(
+            'SELECT public_id FROM scheduled_jobs WHERE id = ?',
+            [Version20261007130000::GENERATION_JOB_ID],
+        );
+        self::assertIsString($publicId);
+        self::assertSame($publicId, PublicId::fromString($publicId)->toString());
+        self::assertNotSame(Version20261007130000::GENERATION_JOB_ID, $publicId);
     }
 
     public function testScheduledOccurrenceGeneratesWhileTheToggleIsOn(): void
@@ -135,6 +142,7 @@ final class RecommendationScheduleTest extends TestCase
             JobType::Messenger,
             $job->getCommand(),
             $job->getParameters(),
+            jobPublicId: $job->getPublicId(),
         ));
     }
 
@@ -186,7 +194,15 @@ final class RecommendationScheduleTest extends TestCase
         $migration = new Version20261007130000($connection, new NullLogger());
         $migration->{$direction}(new Schema());
         foreach ($migration->getSql() as $query) {
-            $connection->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
+            $sql = $query->getStatement();
+            $parameters = $query->getParameters();
+            if ($direction === 'up') {
+                // Replay this historical seed against the current schema, where identity has no default.
+                $sql = str_replace('scheduled_jobs (id,', 'scheduled_jobs (public_id, id,', $sql);
+                $sql = str_replace('VALUES (:id,', 'VALUES (:public_id, :id,', $sql);
+                $parameters['public_id'] = (new PublicId())->toString();
+            }
+            $connection->executeStatement($sql, $parameters, $query->getTypes());
         }
     }
 }

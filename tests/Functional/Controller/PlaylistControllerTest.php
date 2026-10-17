@@ -90,7 +90,7 @@ final class PlaylistControllerTest extends TestCase
 
         $this->assertIsArray($show['data']['songs']);
         $this->assertCount(1, $show['data']['songs']);
-        $this->assertSame($songId->toString(), $show['data']['songs'][0]['uuid']);
+        $this->assertSame($songId->toString(), $show['data']['songs'][0]['publicId']);
     }
 
     public function testUpdateMetadataKeepsSongs(): void
@@ -129,16 +129,17 @@ final class PlaylistControllerTest extends TestCase
 
         $conn = $this->entityManager->getConnection();
         $conn->executeStatement(
-            'INSERT INTO libraries (id, slug, name, path, type, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO libraries (id, public_id, slug, name, path, type, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 $libraryId->toString(),
+                (new PublicId())->toString(),
                 'test-lib-' . bin2hex(random_bytes(4)),
                 'Test Library',
                 '/tmp/test-' . bin2hex(random_bytes(4)),
                 'music',
                 0,
-                $now->format('Y-m-d H:i:s'),
-                $now->format('Y-m-d H:i:s'),
+                $now->format('Y-m-d H:i:s.uP'),
+                $now->format('Y-m-d H:i:s.uP'),
             ],
         );
 
@@ -167,15 +168,15 @@ final class PlaylistControllerTest extends TestCase
                 2023,
                 '{}',
                 '[]',
-                $now->format('Y-m-d H:i:s'),
-                $now->format('Y-m-d H:i:s'),
+                $now->format('Y-m-d H:i:s.uP'),
+                $now->format('Y-m-d H:i:s.uP'),
             ],
         );
 
         return $albumId;
     }
 
-    private function createSongFixture(Uuid $albumId, string $path, string $hash, string $title): Uuid
+    private function createSongFixture(Uuid $albumId, string $path, string $hash, string $title): PublicId
     {
         $songId = Uuid::v7();
         $publicId = new PublicId();
@@ -196,11 +197,11 @@ final class PlaylistControllerTest extends TestCase
                 180.0,
                 1,
                 1,
-                $now->format('Y-m-d H:i:s'),
-                $now->format('Y-m-d H:i:s'),
+                $now->format('Y-m-d H:i:s.uP'),
+                $now->format('Y-m-d H:i:s.uP'),
             ],
         );
 
-        return $songId;
+        return $publicId;
     }
 }

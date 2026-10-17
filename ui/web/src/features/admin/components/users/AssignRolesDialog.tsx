@@ -78,7 +78,7 @@ export function AssignRolesDialog({ user, open, onOpenChange }: { user: AdminUse
         ? ['ROLE_USER', 'ROLE_ADMIN'].filter((r) => roles.includes(r))
         : ['ROLE_USER']
     assignRoles.mutate(
-      { id: user.id, roles: finalRoles },
+      { id: user.publicId, roles: finalRoles },
       { onSuccess: () => onOpenChange(false) },
     )
   }

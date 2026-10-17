@@ -154,7 +154,7 @@ class AccessTokenEntity implements AccessTokenEntityInterface
 
     public function getUserIdentifier(): ?string
     {
-        return $this->user?->getId()->toString();
+        return $this->user?->getPublicId()->toString();
     }
 
     public function setClient(ClientEntityInterface $client): void
@@ -232,9 +232,9 @@ class AccessTokenEntity implements AccessTokenEntityInterface
             ->issuedAt($now)
             ->canOnlyBeUsedAfter($now)
             ->expiresAt($this->expiresAt)
-            ->relatedTo($this->getUserIdentifier() ?? $this->client->getId()->toString())
+            ->relatedTo($this->getUserIdentifier() ?? $this->client->getPublicId()->toString())
             ->withClaim('scopes', $this->scopes ?? [])
-            ->withClaim('client_id', $this->client->getId()->toString());
+            ->withClaim('client_id', $this->client->getPublicId()->toString());
         if ($this->dpopJkt !== null && $this->dpopJkt !== '') {
             $builder = $builder->withClaim('cnf', ['jkt' => $this->dpopJkt]);
         }

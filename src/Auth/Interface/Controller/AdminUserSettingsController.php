@@ -11,7 +11,7 @@ use App\Auth\Interface\Request\Admin\SetAdminUserSettingRequest;
 use App\Auth\Interface\Resource\AdminUserSettingResource;
 use App\Shared\Application\Exception\InvalidSettingValuesException;
 use App\Shared\Application\Exception\UnknownSettingException;
-use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -29,7 +29,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  * every change.
  */
 #[OA\Tag(name: 'Admin / Users', description: 'User management for administrators')]
-#[Route('/api/admin/users/{id}/settings', name: 'admin_user_settings_')]
+#[Route('/api/admin/users/{publicId}/settings', name: 'admin_user_settings_')]
 #[IsGranted('ROLE_ADMIN')]
 final class AdminUserSettingsController
 {
@@ -42,10 +42,10 @@ final class AdminUserSettingsController
     }
 
     #[OA\Get(
-        path: '/api/admin/users/{id}/settings',
+        path: '/api/admin/users/{publicId}/settings',
         summary: "List a user's settings",
         description: 'A stored value that is no longer allowed is returned with storedValueValid false.',
-        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))],
+        parameters: [new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'))],
         responses: [
             new OA\Response(response: '200', description: "The user's settings", content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: AdminUserSettingResource::class))),
@@ -57,14 +57,14 @@ final class AdminUserSettingsController
     #[Route('', name: 'index', methods: ['GET'])]
     #[IsGranted('USER_MANAGEMENT_LIST')]
     #[CliCounterpart('app:user:setting')]
-    public function index(string $id): JsonResponse
+    public function index(string $publicId): JsonResponse
     {
-        if (!self::isUuid($id)) {
+        if (!self::isPublicId($publicId)) {
             return $this->userNotFound();
         }
 
         try {
-            $settings = $this->settings->settings($id);
+            $settings = $this->settings->settings($publicId);
         } catch (UserNotFoundException) {
             return $this->userNotFound();
         }
@@ -73,12 +73,12 @@ final class AdminUserSettingsController
     }
 
     #[OA\Put(
-        path: '/api/admin/users/{id}/settings/{key}',
+        path: '/api/admin/users/{publicId}/settings/{key}',
         summary: "Set a user's choice for a setting",
         description: 'Works for every user setting, including ones users cannot change themselves. The change is logged.',
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: new Model(type: SetAdminUserSettingRequest::class))),
         parameters: [
-            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
             new OA\Parameter(name: 'key', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
@@ -93,14 +93,14 @@ final class AdminUserSettingsController
     #[Route('/{key}', name: 'set', requirements: ['key' => '[a-z0-9_.]+'], methods: ['PUT'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:user:setting')]
-    public function set(string $id, string $key, #[MapRequestPayload] SetAdminUserSettingRequest $request): JsonResponse
+    public function set(string $publicId, string $key, #[MapRequestPayload] SetAdminUserSettingRequest $request): JsonResponse
     {
-        if (!self::isUuid($id)) {
+        if (!self::isPublicId($publicId)) {
             return $this->userNotFound();
         }
 
         try {
-            $setting = $this->settings->set($this->actorId(), $id, $key, $request->value);
+            $setting = $this->settings->set($this->actorId(), $publicId, $key, $request->value);
         } catch (UserNotFoundException) {
             return $this->userNotFound();
         } catch (UnknownSettingException $e) {
@@ -113,11 +113,11 @@ final class AdminUserSettingsController
     }
 
     #[OA\Delete(
-        path: '/api/admin/users/{id}/settings/{key}',
+        path: '/api/admin/users/{publicId}/settings/{key}',
         summary: "Remove a user's choice so the setting follows its default",
         description: 'The change is logged.',
         parameters: [
-            new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'publicId', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
             new OA\Parameter(name: 'key', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
@@ -131,14 +131,14 @@ final class AdminUserSettingsController
     #[Route('/{key}', name: 'reset', requirements: ['key' => '[a-z0-9_.]+'], methods: ['DELETE'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:user:setting')]
-    public function reset(string $id, string $key): JsonResponse
+    public function reset(string $publicId, string $key): JsonResponse
     {
-        if (!self::isUuid($id)) {
+        if (!self::isPublicId($publicId)) {
             return $this->userNotFound();
         }
 
         try {
-            $setting = $this->settings->reset($this->actorId(), $id, $key);
+            $setting = $this->settings->reset($this->actorId(), $publicId, $key);
         } catch (UserNotFoundException) {
             return $this->userNotFound();
         } catch (UnknownSettingException $e) {
@@ -148,11 +148,11 @@ final class AdminUserSettingsController
         return $this->successResponse(AdminUserSettingResource::from($setting));
     }
 
-    /** Users are addressed by UUID here; the service would also accept an email address. */
-    private static function isUuid(string $id): bool
+    /** Users are addressed by public ID here; the service would also accept an email address. */
+    private static function isPublicId(string $publicId): bool
     {
         try {
-            Uuid::fromString($id);
+            PublicId::fromString($publicId);
         } catch (\InvalidArgumentException) {
             return false;
         }

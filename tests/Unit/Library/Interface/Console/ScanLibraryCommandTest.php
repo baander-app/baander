@@ -257,7 +257,7 @@ final class ScanLibraryCommandTest extends TestCase
                 $message instanceof ClaimAllLibraryScansCommand => new LibraryScanClaimResult($claims, $skipped),
                 $message instanceof EndLibraryScanClaimCommand => $this->released[] = $this->claimed[$message->claimId]->getSlug()->toString(),
                 $message instanceof ReleaseLibraryScanClaimCommand => $this->release($message, $liveClaim),
-                $message instanceof GetLibraryQuery => array_find($this->claimed, static fn (Library $library): bool => $library->getId()->toString() === $message->library),
+                $message instanceof GetLibraryQuery => array_find($this->claimed, static fn (Library $library): bool => $library->getPublicId()->toString() === $message->library),
                 default => self::fail('Unexpected message ' . $message::class),
             };
 

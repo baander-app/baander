@@ -35,7 +35,7 @@ final readonly class ChangeEmailHandler
     /**
      * @return User the user with the new address
      *
-     * @throws UserNotFoundException      when no user has the email address or UUID
+     * @throws UserNotFoundException      when no user has the email address or public ID
      * @throws EmailAddressInUseException when another account uses the new address
      * @throws \InvalidArgumentException  when the new address is not a valid email address
      */

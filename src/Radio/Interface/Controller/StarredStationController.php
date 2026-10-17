@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace App\Radio\Interface\Controller;
 
+use App\Radio\Application\Port\RadioStationPortInterface;
+
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Radio\Application\Command\StarStationCommand;
 use App\Radio\Application\Command\UnstarStationCommand;
 use App\Radio\Application\Port\StarredStationPortInterface;
 use App\Radio\Interface\Request\StarStationRequest;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -30,6 +34,7 @@ final class StarredStationController
         private readonly Security $security,
         private readonly StarredStationPortInterface $starredPort,
         private readonly MessageBusInterface $commandBus,
+        private readonly RadioStationPortInterface $stations,
     ) {
     }
 
@@ -39,7 +44,7 @@ final class StarredStationController
         responses: [
             new OA\Response(response: '200', description: 'List of starred stations', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [
-                    new OA\Property(property: 'stationId', type: 'string', format: 'uuid'),
+                    new OA\Property(property: 'stationId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
                     new OA\Property(property: 'name', type: 'string'),
                     new OA\Property(property: 'countryCode', type: 'string'),
                     new OA\Property(property: 'streamUrl', type: 'string', format: 'uri', nullable: true),
@@ -71,14 +76,14 @@ final class StarredStationController
             content: new OA\JsonContent(
                 required: ['stationId'],
                 properties: [
-                    new OA\Property(property: 'stationId', type: 'string', format: 'uuid'),
+                    new OA\Property(property: 'stationId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
                 ],
             ),
         ),
         responses: [
             new OA\Response(response: '201', description: 'Station starred', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', type: 'object', properties: [
-                    new OA\Property(property: 'stationId', type: 'string', format: 'uuid'),
+                    new OA\Property(property: 'stationId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
                     new OA\Property(property: 'starred', type: 'boolean'),
                 ])],
                 type: 'object',
@@ -96,7 +101,7 @@ final class StarredStationController
         }
 
         $userId = Uuid::fromString($user->getId());
-        $stationId = Uuid::fromString($payload->stationId);
+        $stationId = $this->stationId($payload->stationId);
 
         $envelope = $this->commandBus->dispatch(new StarStationCommand($userId, $stationId));
         $handledStamp = $envelope->last(HandledStamp::class);
@@ -109,7 +114,7 @@ final class StarredStationController
         path: '/api/radio/starred/{stationId}',
         summary: 'Unstar a station',
         parameters: [
-            new OA\Parameter(name: 'stationId', description: 'Station UUID', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'stationId', description: 'Station public identifier', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Station unstarred'),
@@ -126,7 +131,7 @@ final class StarredStationController
 
         $userId = Uuid::fromString($user->getId());
 
-        $this->commandBus->dispatch(new UnstarStationCommand($userId, Uuid::fromString($stationId)));
+        $this->commandBus->dispatch(new UnstarStationCommand($userId, $this->stationId($stationId)));
 
         return $this->noContent();
     }
@@ -140,4 +145,15 @@ final class StarredStationController
 
         return $user;
     }
+    private function stationId(string $publicId): Uuid
+    {
+        try {
+            $station = $this->stations->findByPublicId(PublicId::fromString($publicId));
+        } catch (\InvalidArgumentException) {
+            throw new NotFoundHttpException('Radio station not found.');
+        }
+
+        return ($station ?? throw new NotFoundHttpException('Radio station not found.'))->getId();
+    }
+
 }

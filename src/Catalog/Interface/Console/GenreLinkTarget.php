@@ -8,6 +8,10 @@ use App\Catalog\Application\Port\GenrePortInterface;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
+use App\Catalog\Application\Port\AlbumPortInterface;
+use App\Catalog\Application\Port\SongPortInterface;
+use App\Shared\Domain\ValueObject\LibraryReadScope;
 use InvalidArgumentException;
 
 /**
@@ -27,9 +31,9 @@ final readonly class GenreLinkTarget
      * @param string $kind `album` or `song`, as the error message names it
      *
      * @throws NotFoundException     when no genre has the slug
-     * @throws InvalidInputException when the album or song ID is not a UUID
+     * @throws InvalidInputException when the album or song ID is not a public ID
      */
-    public static function resolve(GenrePortInterface $genres, string $slug, string $targetId, string $kind): self
+    public static function resolve(GenrePortInterface $genres, string $slug, string $targetId, string $kind, AlbumPortInterface|SongPortInterface $targets): self
     {
         $genre = $genres->findBySlug($slug);
         if ($genre === null) {
@@ -37,11 +41,16 @@ final readonly class GenreLinkTarget
         }
 
         try {
-            $target = Uuid::fromString($targetId);
+            $publicId = PublicId::fromString($targetId);
         } catch (InvalidArgumentException $exception) {
             throw new InvalidInputException(sprintf('Invalid %s ID format.', $kind), [], $exception);
         }
 
-        return new self($genre->getId(), $target);
+        $target = $targets->findVisibleByPublicId($publicId, LibraryReadScope::unrestricted());
+        if ($target === null) {
+            throw new NotFoundException(sprintf('%s not found.', ucfirst($kind)));
+        }
+
+        return new self($genre->getId(), $target->getId());
     }
 }

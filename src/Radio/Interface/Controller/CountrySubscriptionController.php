@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace App\Radio\Interface\Controller;
 
+use App\Radio\Application\Port\RadioSourcePortInterface;
+
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Radio\Application\Command\SyncCountryStationsCommand;
 use App\Radio\Application\Port\CountrySubscriptionPortInterface;
 use App\Radio\Interface\Request\SubscribeCountryRequest;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
@@ -28,6 +32,7 @@ final class CountrySubscriptionController
         private readonly Security $security,
         private readonly CountrySubscriptionPortInterface $subscriptionPort,
         private readonly MessageBusInterface $commandBus,
+        private readonly RadioSourcePortInterface $sources,
     ) {
     }
 
@@ -37,7 +42,7 @@ final class CountrySubscriptionController
         responses: [
             new OA\Response(response: '200', description: 'List of subscriptions', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [
-                    new OA\Property(property: 'sourceId', type: 'string', format: 'uuid'),
+                    new OA\Property(property: 'sourceId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
                     new OA\Property(property: 'countryCode', type: 'string'),
                     new OA\Property(property: 'subscribedAt', type: 'string', format: 'date-time'),
                 ], type: 'object'))],
@@ -67,7 +72,7 @@ final class CountrySubscriptionController
             content: new OA\JsonContent(
                 required: ['sourceId', 'countryCode'],
                 properties: [
-                    new OA\Property(property: 'sourceId', type: 'string', format: 'uuid'),
+                    new OA\Property(property: 'sourceId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
                     new OA\Property(property: 'countryCode', type: 'string'),
                 ],
             ),
@@ -75,7 +80,7 @@ final class CountrySubscriptionController
         responses: [
             new OA\Response(response: '201', description: 'Subscribed', content: new OA\JsonContent(
                 properties: [new OA\Property(property: 'data', type: 'object', properties: [
-                    new OA\Property(property: 'sourceId', type: 'string', format: 'uuid'),
+                    new OA\Property(property: 'sourceId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'),
                     new OA\Property(property: 'countryCode', type: 'string'),
                 ])],
                 type: 'object',
@@ -93,7 +98,7 @@ final class CountrySubscriptionController
         }
 
         $userId = Uuid::fromString($user->getId());
-        $sourceId = $payload->sourceId ? Uuid::fromString($payload->sourceId) : null;
+        $sourceId = $payload->sourceId ? $this->sourceId($payload->sourceId) : null;
 
         $result = $this->subscriptionPort->subscribe($userId, $sourceId, $payload->countryCode);
 
@@ -127,7 +132,7 @@ final class CountrySubscriptionController
         }
 
         $subscription = reset($matching);
-        $sourceId = Uuid::fromString($subscription['sourceId']);
+        $sourceId = $this->sourceId($subscription['sourceId']);
 
         $this->subscriptionPort->unsubscribe($userId, $sourceId, $countryCode);
 
@@ -165,7 +170,7 @@ final class CountrySubscriptionController
         }
 
         $subscription = reset($matching);
-        $sourceId = Uuid::fromString($subscription['sourceId']);
+        $sourceId = $this->sourceId($subscription['sourceId']);
 
         $this->commandBus->dispatch(new SyncCountryStationsCommand($sourceId, $countryCode));
 
@@ -181,4 +186,15 @@ final class CountrySubscriptionController
 
         return $user;
     }
+    private function sourceId(string $publicId): Uuid
+    {
+        try {
+            $source = $this->sources->findByPublicId(PublicId::fromString($publicId));
+        } catch (\InvalidArgumentException) {
+            throw new NotFoundHttpException('Radio source not found.');
+        }
+
+        return ($source ?? throw new NotFoundHttpException('Radio source not found.'))->getId();
+    }
+
 }

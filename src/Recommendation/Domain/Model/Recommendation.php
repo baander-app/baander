@@ -6,6 +6,7 @@ namespace App\Recommendation\Domain\Model;
 
 use App\Recommendation\Domain\ValueObject\RecommendationType;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use DateTimeImmutable;
 
 final class Recommendation
@@ -22,6 +23,7 @@ final class Recommendation
         private ?Uuid $userId,
         private readonly DateTimeImmutable $createdAt,
         private DateTimeImmutable $updatedAt,
+        private readonly PublicId $publicId = new PublicId(),
     ) {
     }
 
@@ -62,6 +64,7 @@ final class Recommendation
         ?Uuid $userId,
         DateTimeImmutable $createdAt,
         DateTimeImmutable $updatedAt,
+        PublicId $publicId = new PublicId(),
     ): self {
         return new self(
             $id,
@@ -75,6 +78,7 @@ final class Recommendation
             $userId,
             $createdAt,
             $updatedAt,
+            $publicId,
         );
     }
 
@@ -88,6 +92,8 @@ final class Recommendation
     {
         return $this->id;
     }
+
+    public function getPublicId(): PublicId { return $this->publicId; }
 
     public function getName(): string
     {

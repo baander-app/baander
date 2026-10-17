@@ -113,33 +113,36 @@ final class OpenApiSpecTest extends KernelTestCase
         $this->assertPublicIdentifierSchema($parameters['serverPublicId']['schema']);
     }
 
-    public function test_uuid_identifiers_keep_their_uuid_contract(): void
+    public function test_entity_references_use_public_ids_and_device_tokens_keep_their_protocol_contract(): void
     {
         $spec = $this->getSpec();
         foreach ([
-            'UserResource' => 'uuid',
             'ActivityResource' => 'songId',
             'CreateTranscodeSessionRequest' => 'videoId',
             'TranscodeSessionResource' => 'videoId',
-            'PartySessionResource' => 'uuid',
+            'PartySessionResource' => 'publicId',
             'AddSongRequest' => 'songId',
+            'SongResource' => 'albumId',
         ] as $name => $field) {
-            $property = $spec['components']['schemas'][$name]['properties'][$field];
-            self::assertSame('uuid', $property['format']);
-            self::assertArrayNotHasKey('pattern', $property);
+            $this->assertPublicIdentifierSchema($spec['components']['schemas'][$name]['properties'][$field]);
+        }
+        foreach ($spec['components']['schemas'] as $name => $schema) {
+            if (!str_ends_with($name, 'Resource')) {
+                continue;
+            }
+            self::assertArrayNotHasKey('uuid', $schema['properties'] ?? [], $name);
+            foreach ($schema['properties'] ?? [] as $field => $property) {
+                self::assertNotSame('uuid', $property['format'] ?? null, $name . '.' . $field);
+            }
+        }
+        foreach (['RegisterDeviceRequest', 'ClaimSessionRequest'] as $name) {
+            self::assertSame('uuid', $spec['components']['schemas'][$name]['properties']['deviceId']['format']);
         }
         $passkeys = $spec['paths']['/api/auth/passkey']['get']['responses']['200']['content']['application/json']['schema'];
-        $passkeyId = $passkeys['properties']['data']['items']['properties']['publicId'];
-        self::assertSame('uuid', $passkeyId['format']);
-        self::assertArrayNotHasKey('pattern', $passkeyId);
-        $reorder = $spec['components']['schemas']['ReorderSongsRequest']['properties']['songIds'];
-        self::assertSame('uuid', $reorder['items']['format']);
+        $this->assertPublicIdentifierSchema($passkeys['properties']['data']['items']['properties']['publicId']);
+        $this->assertPublicIdentifierSchema($spec['components']['schemas']['ReorderSongsRequest']['properties']['songIds']['items']);
         $inlineReorder = $spec['paths']['/api/playlists/{publicId}/reorder']['post']['requestBody']['content']['application/json']['schema'];
-        self::assertSame('uuid', $inlineReorder['properties']['songIds']['items']['format']);
-        $albumId = $spec['components']['schemas']['SongResource']['properties']['albumId'];
-        self::assertSame('string', $albumId['type']);
-        self::assertArrayNotHasKey('format', $albumId);
-        self::assertArrayNotHasKey('pattern', $albumId);
+        $this->assertPublicIdentifierSchema($inlineReorder['properties']['songIds']['items']);
     }
 
     /** @param array<string, mixed> $schema */

@@ -12,8 +12,8 @@ make exec cmd="php bin/console app:library:member:revoke listener@baander.app my
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `user` | Yes | The user, by email address or UUID, as the `app:user:*` commands take it |
-| `library` | Yes | The library's UUID or slug |
+| `user` | Yes | The user, by email address or public ID, as the `app:user:*` commands take it |
+| `library` | Yes | The library's public ID or slug |
 
 ## Options
 
@@ -35,4 +35,4 @@ Revoking access the user lacks succeeds and changes nothing. Administrators see 
 | Code | Meaning |
 |------|---------|
 | 0 | The user may no longer see the library |
-| 1 | No user has the email address or UUID, no library has the UUID or slug, or another error occurred; the message says why |
+| 1 | No user has the email address or public ID, no library has the public ID or slug, or another error occurred; the message says why |

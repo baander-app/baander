@@ -58,7 +58,7 @@ final class AddSongHandlerTest extends TestCase
             ($this->handler)(new AddSongCommand($this->playlist->getId(), $songId, 1, $this->scope));
             $this->fail('An invisible song must not be added.');
         } catch (NotFoundException $exception) {
-            $this->assertSame(['songId' => $songId->toString()], $exception->details);
+            $this->assertSame([], $exception->details);
         }
 
         $this->assertCount(1, $this->playlist->getSongs());

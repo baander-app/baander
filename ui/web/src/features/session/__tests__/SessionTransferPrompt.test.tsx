@@ -10,7 +10,7 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 const mockSession = {
-  id: 'session-1',
+  publicId: 'session-1',
   userId: 'user-1',
   activeDeviceId: 'other-device',
   queue: ['track-1', 'track-2', 'track-3'],

@@ -35,7 +35,7 @@ export function DeleteJobDialog({ job, open, onOpenChange }: { job: ScheduledJob
           <Button
             variant="destructive"
             disabled={deleteJob.isPending}
-            onClick={() => deleteJob.mutate(job.id, { onSuccess: () => onOpenChange(false) })}
+            onClick={() => deleteJob.mutate(job.publicId, { onSuccess: () => onOpenChange(false) })}
           >
             {deleteJob.isPending ? 'Deleting...' : 'Delete'}
           </Button>

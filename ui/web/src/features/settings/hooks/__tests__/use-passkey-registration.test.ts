@@ -23,6 +23,8 @@ function createWrapper() {
   }
 }
 
+const USER_PUBLIC_ID = 'V1StGXR8_Z5jdHi6B-myT';
+
 const VALID_OPTIONS_RESPONSE = {
   data: {
     challengeKey: 'test-challenge-key',
@@ -30,8 +32,8 @@ const VALID_OPTIONS_RESPONSE = {
       challenge: btoa('challenge-bytes'),
       rp: { name: 'Test RP' },
       user: {
-        id: btoa('user-id'),
-        name: 'test@example.com',
+        id: btoa(USER_PUBLIC_ID),
+        name: 'test@baander.app',
         displayName: 'Test User',
       },
       pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
@@ -89,10 +91,18 @@ describe('usePasskeyRegistration', () => {
     expect(result.current.success).toBe(true);
     expect(result.current.error).toBeNull();
     expect(mockPostPasskeyOptions).toHaveBeenCalledWith({ method: 'POST' });
+    const creationOptions = vi.mocked(navigator.credentials.create).mock.calls[0][0]?.publicKey;
+    expect(Array.from(new Uint8Array(creationOptions!.user.id as ArrayBuffer))).toEqual(
+      Array.from(USER_PUBLIC_ID, (character) => character.charCodeAt(0)),
+    );
     expect(mockPostPasskeyRegister).toHaveBeenCalledWith(
       expect.objectContaining({
         challengeKey: 'test-challenge-key',
         name: 'Passkey',
+        response: expect.objectContaining({
+          attestationObject: btoa('\0'.repeat(8)),
+          clientDataJSON: btoa('\0'.repeat(8)),
+        }),
       }),
     );
   });

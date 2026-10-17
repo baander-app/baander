@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Scheduler\Infrastructure\Doctrine\Entity;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use Doctrine\ORM\Mapping as ORM;
 
 // Updates/deletes belong to the revision-checking DBAL repository, never managed-entity flush.
 #[ORM\Entity(readOnly: true)]
 #[ORM\Table(name: 'scheduled_jobs')]
+#[ORM\UniqueConstraint(name: 'uniq_scheduled_jobs_public_id', columns: ['public_id'])]
 #[ORM\Index(name: 'idx_scheduled_jobs_status', columns: ['status'])]
 #[ORM\Index(name: 'idx_scheduled_jobs_next_run_at', columns: ['next_run_at'])]
 #[ORM\Index(name: 'idx_scheduled_jobs_recovery_after_id', columns: ['recovery_after', 'id'], options: ['where' => "(status = 'active'::text)"])]
@@ -19,6 +21,11 @@ class ScheduledJobEntity
     #[ORM\Column(type: 'uuid')]
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
+
+    #[ORM\Column(type: 'public_id')]
+    private PublicId $publicId;
+
+    public function getPublicId(): PublicId { return $this->publicId; }
 
     #[ORM\Column(type: 'uuid')]
     private Uuid $revision;
@@ -85,9 +92,10 @@ class ScheduledJobEntity
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $lastError = null;
 
-    public function __construct(Uuid $id)
+    public function __construct(Uuid $id, PublicId $publicId = new PublicId())
     {
         $this->id = $id;
+        $this->publicId = $publicId;
         $this->revision = Uuid::v7();
     }
 

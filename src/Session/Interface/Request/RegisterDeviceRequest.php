@@ -11,7 +11,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     schema: 'RegisterDeviceRequest',
     required: ['deviceId'],
     properties: [
-        new OA\Property(property: 'deviceId', type: 'string', format: 'uuid', description: 'Persistent device identifier from localStorage'),
+        new OA\Property(property: 'deviceId', type: 'string', format: 'uuid', description: 'Browser-generated device token from localStorage; distinct from the persisted device publicId'),
         new OA\Property(property: 'name', type: 'string', example: 'Living Room Speaker', maxLength: 255),
     ],
 )]

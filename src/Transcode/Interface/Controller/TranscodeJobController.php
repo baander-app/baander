@@ -11,6 +11,8 @@ use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use App\Transcode\Application\Command\CleanupOrphanedJobsCommand;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
+use App\Transcode\Application\Port\PlaybackAccessInterface;
+use App\Transcode\Application\Port\TranscodePublicViewInterface;
 use App\Transcode\Application\Query\TranscodeJobQueryPort;
 use App\Transcode\Interface\Resource\TranscodeJobResource;
 use App\Transcode\Interface\Resource\TranscodeMetricsResource;
@@ -22,6 +24,7 @@ use Symfony\Component\Messenger\Stamp\HandledStamp;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 #[OA\Tag(name: 'Transcode', description: 'Video transcoding management endpoints')]
 #[Route('/api/transcode/jobs', name: 'transcode_job_')]
@@ -32,12 +35,14 @@ final class TranscodeJobController
     public function __construct(
         private readonly MessageBusInterface $commandBus,
         private readonly TranscodeJobPortInterface $jobPort,
+        private readonly TranscodePublicViewInterface $publicView,
+        private readonly PlaybackAccessInterface $playback,
     ) {
     }
 
     #[OA\Get(
         path: '/api/transcode/jobs/',
-        summary: 'List all transcode jobs',
+        summary: 'List orphaned transcode jobs in accessible libraries',
         responses: [
             new OA\Response(response: '200', description: 'Success', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', type: 'array', items: new OA\Items(properties: [new OA\Property(property: 'publicId', type: 'string'), new OA\Property(property: 'status', type: 'string'), new OA\Property(property: 'qualityTier', type: 'string')]))])),
         ],
@@ -47,7 +52,14 @@ final class TranscodeJobController
     {
         $orphans = $this->jobPort->findOrphanedJobs();
 
-        return $this->successResponse(TranscodeJobResource::collection($orphans));
+        $data = [];
+        foreach ($orphans as $job) {
+            if ($this->canAccessVideo($job->getVideoId())) {
+                $data[] = TranscodeJobResource::from($this->publicView->job($job));
+            }
+        }
+
+        return $this->successResponse($data);
     }
 
     #[OA\Get(
@@ -69,8 +81,9 @@ final class TranscodeJobController
         if ($job === null) {
             return $this->notFound();
         }
+        $this->playback->assertAccess($job->getVideoId());
 
-        return $this->successResponse(TranscodeJobResource::from($job));
+        return $this->successResponse(TranscodeJobResource::from($this->publicView->job($job)));
     }
 
     #[OA\Post(
@@ -109,7 +122,8 @@ final class TranscodeJobController
         if ($job === null) {
             return $this->notFound();
         }
-        return $this->successResponse(TranscodeMetricsResource::from($job));
+        $this->playback->assertAccess($job->getVideoId());
+        return $this->successResponse(TranscodeMetricsResource::from($this->publicView->job($job)));
     }
 
     #[OA\Get(
@@ -124,6 +138,26 @@ final class TranscodeJobController
     public function listJobs(TranscodeJobQueryPort $queryPort, #[CurrentUser] AuthenticatedUserIdentityInterface $user): JsonResponse
     {
         $jobs = $queryPort->findByUser(Uuid::fromString($user->getId()));
-        return $this->successResponse(array_map(fn($d) => $d->toArray(), $jobs));
+        $data = [];
+        foreach ($jobs as $job) {
+            $view = $job->toArray();
+            $videoId = $this->publicView->videoId(PublicId::fromString($view['videoId']));
+            if ($videoId !== null && $this->canAccessVideo($videoId)) {
+                $data[] = $view;
+            }
+        }
+
+        return $this->successResponse($data);
+    }
+
+    private function canAccessVideo(Uuid $videoId): bool
+    {
+        try {
+            $this->playback->assertAccess($videoId);
+
+            return true;
+        } catch (AccessDeniedException) {
+            return false;
+        }
     }
 }

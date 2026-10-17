@@ -7,12 +7,15 @@ namespace App\Scheduler\Domain\Repository;
 use App\Scheduler\Domain\Model\ScheduledJob;
 use App\Scheduler\Domain\ValueObject\ScheduleStatus;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 
 interface ScheduledJobRepositoryInterface
 {
     public function save(ScheduledJob $job): void;
 
     public function findByUuid(Uuid $uuid): ?ScheduledJob;
+
+    public function findByPublicId(PublicId $publicId): ?ScheduledJob;
 
     /** @return ScheduledJob[] */
     public function findAll(): array;

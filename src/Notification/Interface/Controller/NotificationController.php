@@ -46,7 +46,7 @@ final class NotificationController
             new OA\Parameter(name: 'category', description: 'Filter by category', in: 'query', schema: new OA\Schema(type: 'string', enum: ['security', 'background_jobs', 'media_changes', 'admin_operations'])),
             new OA\Parameter(name: 'unread', description: 'Filter unread only', in: 'query', schema: new OA\Schema(type: 'boolean')),
             new OA\Parameter(name: 'limit', description: 'Items per page', in: 'query', schema: new OA\Schema(type: 'integer', default: 50, maximum: 100, minimum: 1)),
-            new OA\Parameter(name: 'cursor', description: 'Internal notification UUID for pagination', in: 'query', schema: new OA\Schema(type: 'string', format: 'uuid')),
+            new OA\Parameter(name: 'cursor', description: 'Notification public ID for pagination', in: 'query', schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
             new OA\Parameter(name: 'since', description: 'Exclusive creation timestamp with timezone (RFC 3339, up to six fractional digits)', in: 'query', schema: new OA\Schema(type: 'string', format: 'date-time')),
         ],
         responses: [
@@ -54,7 +54,7 @@ final class NotificationController
                 required: ['data', 'nextCursor'],
                 properties: [
                     new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: new Model(type: NotificationResource::class))),
-                    new OA\Property(property: 'nextCursor', type: 'string', format: 'uuid', nullable: true, description: 'Cursor for the next page, or null when exhausted'),
+                    new OA\Property(property: 'nextCursor', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true, description: 'Cursor for the next page, or null when exhausted'),
                 ],
             )),
             new OA\Response(response: '400', description: 'Invalid query parameters', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
@@ -72,7 +72,7 @@ final class NotificationController
         $category = $categoryParam === null ? null : NotificationCategory::from($categoryParam);
         $unreadOnly = QueryParameters::optionalBoolean($request->query, 'unread');
         $limit = QueryParameters::integer($request->query, 'limit', 50, 1, 100);
-        $cursor = QueryParameters::optionalUuid($request->query, 'cursor');
+        $cursor = QueryParameters::optionalPublicId($request->query, 'cursor');
         $since = QueryParameters::optionalDateTime($request->query, 'since');
 
         $notifications = $this->notificationRepository->findByUserId(
@@ -86,7 +86,7 @@ final class NotificationController
 
         $hasMore = count($notifications) > $limit;
         $notifications = array_slice($notifications, 0, $limit);
-        $nextCursor = $hasMore ? $notifications[count($notifications) - 1]->getId()->toString() : null;
+        $nextCursor = $hasMore ? $notifications[count($notifications) - 1]->getPublicId()->toString() : null;
         $items = NotificationResource::collection($notifications);
 
         foreach ($items as $i => $item) {
@@ -137,10 +137,10 @@ final class NotificationController
         path: '/api/notifications/{publicId}/read',
         summary: 'Mark notification as read',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Notification public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Notification public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Notification marked as read', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'publicId', type: 'string'), new OA\Property(property: 'isRead', type: 'boolean')])])),
+            new OA\Response(response: '200', description: 'Notification marked as read', content: new OA\JsonContent(properties: [new OA\Property(property: 'data', properties: [new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$'), new OA\Property(property: 'isRead', type: 'boolean')])])),
             new OA\Response(response: '404', description: 'Not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
@@ -212,7 +212,7 @@ final class NotificationController
         path: '/api/notifications/{publicId}',
         summary: 'Delete a notification',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Notification public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Notification public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$')),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Deleted'),

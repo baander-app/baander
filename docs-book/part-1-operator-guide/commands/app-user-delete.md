@@ -1,6 +1,6 @@
 # app:user:delete
 
-Delete a user account. The command runs the same use case as deleting a user in the admin panel (`DELETE /api/admin/users/{id}` in the admin API). To stop someone from signing in while keeping their account, use [app:user:disable](app-user-disable.md) instead.
+Delete a user account. The command runs the same use case as deleting a user in the admin panel (`DELETE /api/admin/users/{publicId}` in the admin API). To stop someone from signing in while keeping their account, use [app:user:disable](app-user-disable.md) instead.
 
 ## Quick start
 
@@ -18,7 +18,7 @@ make exec cmd="php bin/console app:user:delete alice@baander.app --force"
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `identifier` | Yes | The user's email address or UUID |
+| `identifier` | Yes | The user's email address or public ID |
 
 ## Options
 
@@ -40,5 +40,5 @@ The command acts with full authority. It can delete any account, an admin's or a
 | Code | Meaning |
 |------|---------|
 | 0 | User deleted |
-| 1 | No user has the email address or UUID, the operator declined, or another error occurred; the message says why |
+| 1 | No user has the email address or public ID, the operator declined, or another error occurred; the message says why |
 | 2 | No terminal is attached and `--force` was not given; nothing was deleted |

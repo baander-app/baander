@@ -5,20 +5,20 @@ Delete a scheduled job. The command does what **Delete** on the admin **Schedule
 ## Quick start
 
 ```bash
-make exec cmd="php bin/console app:scheduler:delete 0192a3b4-c5d6-7890-abcd-ef1234567890 --force"
+make exec cmd="php bin/console app:scheduler:delete aB3dE5fG7hJ9kL1mN3pQr --force"
 ```
 
 In a script that reads only the exit code:
 
 ```bash
-make exec cmd="php bin/console app:scheduler:delete 0192a3b4-c5d6-7890-abcd-ef1234567890 --force --json"
+make exec cmd="php bin/console app:scheduler:delete aB3dE5fG7hJ9kL1mN3pQr --force --json"
 ```
 
 ## Arguments
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `id` | Yes | UUID of the scheduled job, as [app:scheduler:list](app-scheduler-list.md) prints it |
+| `id` | Yes | Public ID of the scheduled job, as [app:scheduler:list](app-scheduler-list.md) prints it |
 
 ## Options
 
@@ -40,5 +40,5 @@ With `--json` the command prints nothing on success, because the API answers `20
 | Code | Meaning |
 |------|---------|
 | 0 | Job deleted |
-| 1 | No scheduled job has this UUID, the operator declined, or the job changed concurrently; the message says why |
-| 2 | The argument is not a UUID, or no terminal is attached and `--force` was not given |
+| 1 | No scheduled job has this public ID, the operator declined, or the job changed concurrently; the message says why |
+| 2 | The argument is not a public ID, or no terminal is attached and `--force` was not given |

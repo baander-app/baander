@@ -7,6 +7,7 @@ namespace App\Catalog\Application\Port;
 use App\Catalog\Domain\Model\Genre;
 use App\Catalog\Domain\ReadModel\GenreReadView;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 
 interface GenrePortInterface
@@ -25,6 +26,10 @@ interface GenrePortInterface
     public function findAllVisible(LibraryReadScope $scope): array;
 
     public function countVisible(LibraryReadScope $scope): int;
+
+    public function findByPublicId(PublicId $publicId): ?Genre;
+
+    public function findVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): ?GenreReadView;
 
     public function findByUuid(Uuid $uuid): ?Genre;
 

@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Radio\Infrastructure\Doctrine\Entity;
 
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'radio_stations')]
+#[ORM\UniqueConstraint(name: 'uniq_radio_stations_public_id', columns: ['public_id'])]
 #[ORM\UniqueConstraint(name: 'uniq_radio_stations_source_id_external_id', columns: ['source_id', 'external_id'])]
 #[ORM\Index(name: 'idx_radio_stations_country', columns: ['country'])]
 #[ORM\Index(name: 'idx_radio_stations_source_id_country', columns: ['source_id', 'country'])]
@@ -18,6 +20,9 @@ class RadioStationEntity
     #[ORM\Column(type: 'uuid')]
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
+
+    #[ORM\Column(name: 'public_id', type: 'text')]
+    private string $publicId;
 
     #[ORM\ManyToOne(targetEntity: RadioSourceEntity::class)]
     #[ORM\JoinColumn(name: 'source_id', referencedColumnName: 'id', nullable: false)]
@@ -70,12 +75,23 @@ class RadioStationEntity
         string $country,
     ) {
         $this->id = $id;
+        $this->publicId = (new PublicId())->toString();
         $this->source = $source;
         $this->externalId = $externalId;
         $this->name = $name;
         $this->country = $country;
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function getPublicId(): PublicId
+    {
+        return PublicId::fromString($this->publicId);
+    }
+
+    public function setPublicId(PublicId $publicId): void
+    {
+        $this->publicId = $publicId->toString();
     }
 
     public function getId(): Uuid

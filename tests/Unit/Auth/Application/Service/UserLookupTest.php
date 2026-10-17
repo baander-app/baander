@@ -17,13 +17,13 @@ use PHPUnit\Framework\TestCase;
 /** The resolver other contexts' commands use finds a user by email address or UUID, or by public id alone, and nobody else. */
 final class UserLookupTest extends TestCase
 {
-    public function testResolvesAUserByEmailAddressOrUuidToTheirUuid(): void
+    public function testResolvesAUserByEmailAddressOrPublicIdToTheirUuid(): void
     {
         $user = User::createByOperator(new Email('viewer@baander.app'), 'hashed', 'Viewer', ['ROLE_USER']);
         $lookup = new UserLookup($this->repositoryWith($user));
 
         self::assertTrue($lookup->userId('viewer@baander.app')->equals($user->getId()));
-        self::assertTrue($lookup->userId($user->getId()->toString())->equals($user->getId()));
+        self::assertTrue($lookup->userId($user->getPublicId()->toString())->equals($user->getId()));
     }
 
     /** @return iterable<string, array{string}> */
@@ -53,6 +53,17 @@ final class UserLookupTest extends TestCase
         $lookup = new UserLookup($this->repositoryWith($user));
 
         self::assertTrue($lookup->userIdByPublicId($user->getPublicId())->equals($user->getId()));
+        self::assertTrue($lookup->publicIdByUserId($user->getId())->equals($user->getPublicId()));
+    }
+
+    public function testAnInternalUuidCannotBeUsedAsAPublicIdentifier(): void
+    {
+        $user = User::createByOperator(new Email('viewer@baander.app'), 'hashed', 'Viewer', ['ROLE_USER']);
+        $lookup = new UserLookup($this->repositoryWith($user));
+
+        $this->expectException(UserNotFoundException::class);
+
+        $lookup->userId($user->getId()->toString());
     }
 
     public function testAPublicIdNobodyHasIsNotFound(): void

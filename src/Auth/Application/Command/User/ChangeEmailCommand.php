@@ -11,7 +11,7 @@ namespace App\Auth\Application\Command\User;
 final readonly class ChangeEmailCommand
 {
     public function __construct(
-        /** The user's email address or UUID. */
+        /** The user's email address or public ID. */
         public string $identifier,
         public string $email,
     ) {

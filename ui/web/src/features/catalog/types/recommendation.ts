@@ -1,5 +1,5 @@
 export interface Recommendation {
-  id: string
+  public_id: string
   name: string
   source_type: string
   source_id: string

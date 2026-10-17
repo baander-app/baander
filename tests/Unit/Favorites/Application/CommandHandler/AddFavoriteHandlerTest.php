@@ -27,7 +27,7 @@ final class AddFavoriteHandlerTest extends TestCase
 
     private function createAddFavoriteHandlerFixture(): AddFavoriteHandler
     {
-        $fixture = new AddFavoriteHandler($this->favoritesPort);
+        $fixture = new AddFavoriteHandler($this->favoritesPort, $this->createStub(\App\Favorites\Application\Port\FavoriteTargetAccessInterface::class));
         return $fixture;
     }
 
@@ -37,18 +37,18 @@ final class AddFavoriteHandlerTest extends TestCase
         $this->handler = $this->createAddFavoriteHandlerFixture();
 
         $userId = Uuid::v4();
-        $newFavorite = UserFavorite::create($userId, FavoriteType::Song, 'song-pub-1');
+        $newFavorite = UserFavorite::create($userId, FavoriteType::Song, 'song-pub-100000000000');
 
         $this->favoritesPort->expects($this->once())
             ->method('findByUserAndEntity')
-            ->with($userId, FavoriteType::Song, 'song-pub-1')
+            ->with($userId, FavoriteType::Song, 'song-pub-100000000000')
             ->willReturn(null);
         $this->favoritesPort->expects($this->once())
             ->method('addFavorite')
-            ->with($userId, FavoriteType::Song, 'song-pub-1')
+            ->with($userId, FavoriteType::Song, 'song-pub-100000000000')
             ->willReturn($newFavorite);
 
-        $result = ($this->handler)(new AddFavoriteCommand($userId, 'song', 'song-pub-1'));
+        $result = ($this->handler)(new AddFavoriteCommand($userId, 'song', 'song-pub-100000000000'));
 
         $this->assertSame($newFavorite, $result);
         $this->assertSame(FavoriteType::Song, $result->getEntityType());
@@ -60,15 +60,15 @@ final class AddFavoriteHandlerTest extends TestCase
         $this->handler = $this->createAddFavoriteHandlerFixture();
 
         $userId = Uuid::v4();
-        $existing = UserFavorite::create($userId, FavoriteType::Album, 'album-pub-2');
+        $existing = UserFavorite::create($userId, FavoriteType::Album, 'album-pub-20000000000');
 
         $this->favoritesPort->expects($this->once())
             ->method('findByUserAndEntity')
-            ->with($userId, FavoriteType::Album, 'album-pub-2')
+            ->with($userId, FavoriteType::Album, 'album-pub-20000000000')
             ->willReturn($existing);
         $this->favoritesPort->expects($this->never())->method('addFavorite');
 
-        $result = ($this->handler)(new AddFavoriteCommand($userId, 'album', 'album-pub-2'));
+        $result = ($this->handler)(new AddFavoriteCommand($userId, 'album', 'album-pub-20000000000'));
 
         $this->assertSame($existing, $result);
     }
@@ -76,14 +76,37 @@ final class AddFavoriteHandlerTest extends TestCase
     public function testConvertsEntityTypeStringToEnum(): void
     {
         $userId = Uuid::v4();
-        $favorite = UserFavorite::create($userId, FavoriteType::Artist, 'artist-pub-3');
+        $favorite = UserFavorite::create($userId, FavoriteType::Artist, 'artist-pub-3000000000');
 
         $this->favoritesPort->method('findByUserAndEntity')->willReturn(null);
         $this->favoritesPort->method('addFavorite')->willReturn($favorite);
 
-        $result = ($this->handler)(new AddFavoriteCommand($userId, 'artist', 'artist-pub-3'));
+        $result = ($this->handler)(new AddFavoriteCommand($userId, 'artist', 'artist-pub-3000000000'));
 
         $this->assertSame(FavoriteType::Artist, $result->getEntityType());
+    }
+
+    public function testInternalUuidIsRejectedBeforeAnyTargetLookup(): void
+    {
+        $targets = $this->createMock(\App\Favorites\Application\Port\FavoriteTargetAccessInterface::class);
+        $targets->expects(self::never())->method('assertVisible');
+        $handler = new AddFavoriteHandler($this->favoritesPort, $targets);
+        $this->expectException(\InvalidArgumentException::class);
+        $handler(new AddFavoriteCommand(new Uuid(), 'song', (new Uuid())->toString()));
+    }
+
+    public function testTargetAccessIsCheckedBeforeReturningAnExistingFavorite(): void
+    {
+        $actorId = new Uuid();
+        $publicId = new \App\Shared\Domain\Model\PublicId();
+        $targets = $this->createMock(\App\Favorites\Application\Port\FavoriteTargetAccessInterface::class);
+        $targets->expects(self::once())->method('assertVisible')->with($actorId, FavoriteType::Song, $publicId)
+            ->willThrowException(new \OutOfBoundsException('Favorite target not found.'));
+        $favorites = $this->createMock(FavoritesPortInterface::class);
+        $favorites->expects(self::never())->method('findByUserAndEntity');
+        $handler = new AddFavoriteHandler($favorites, $targets);
+        $this->expectException(\OutOfBoundsException::class);
+        $handler(new AddFavoriteCommand($actorId, 'song', $publicId->toString()));
     }
 
     public function testThrowsOnInvalidEntityType(): void

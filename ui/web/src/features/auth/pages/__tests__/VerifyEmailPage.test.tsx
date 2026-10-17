@@ -8,7 +8,7 @@ import { httpError, renderAt } from './auth-page-test-utils'
 vi.mock('@/shared/api-client/axios-instance', () => ({ customInstance: vi.fn() }))
 
 interface MockUser {
-  uuid: string
+  publicId: string
   email: string
   emailVerifiedAt?: string | null
 }
@@ -21,7 +21,7 @@ interface MockAuthState {
 
 const authState = vi.hoisted(() => ({
   isAuthenticated: false,
-  user: null as { uuid: string; email: string; emailVerifiedAt?: string | null } | null,
+  user: null as { publicId: string; email: string; emailVerifiedAt?: string | null } | null,
   updateUser: vi.fn(),
 }))
 
@@ -41,7 +41,7 @@ vi.mock('@/features/auth/stores/auth-store', () => {
 
 const mockRequest = vi.mocked(customInstance)
 const TOKEN = '7d1e4b9a2c6f0e3d8b5a1c9e4f7a2d6b7d1e4b9a2c6f0e3d8b5a1c9e4f7a2d6b'
-const USER_UUID = '0192a7c4-6a4e-7c3b-9f1d-2b8e5c7a1d40'
+const USER_PUBLIC_ID = 'usr_listener'
 const VERIFIED_AT = '2026-10-07T12:00:00+00:00'
 
 function mount(entry = `/verify-email#token=${TOKEN}`) {
@@ -57,7 +57,7 @@ function verifyCalls() {
 
 function signIn() {
   authState.isAuthenticated = true
-  authState.user = { uuid: USER_UUID, email: 'listener@baander.app', emailVerifiedAt: null }
+  authState.user = { publicId: USER_PUBLIC_ID, email: 'listener@baander.app', emailVerifiedAt: null }
 }
 
 describe('VerifyEmailPage', () => {
@@ -99,7 +99,6 @@ describe('VerifyEmailPage', () => {
       if (url === '/api/auth/me') {
         return {
           data: {
-            uuid: USER_UUID,
             publicId: 'usr_listener',
             name: 'Listener',
             email: 'listener@baander.app',

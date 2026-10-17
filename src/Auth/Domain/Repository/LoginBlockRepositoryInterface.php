@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Domain\Repository;
 
 use App\Auth\Domain\Model\LoginBlock;
-use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 
 interface LoginBlockRepositoryInterface
 {
@@ -18,8 +18,8 @@ interface LoginBlockRepositoryInterface
 
     public function countRecent(): int;
 
-    /** @return bool whether a block had the UUID and was removed */
-    public function deleteByUuid(Uuid $uuid): bool;
+    /** @return bool whether a block had the public ID and was removed */
+    public function deleteByPublicId(PublicId $publicId): bool;
 
     public function deleteAll(): void;
 }

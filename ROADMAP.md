@@ -1,6 +1,6 @@
 # Baander roadmap
 
-Updated: 2026-10-15. This is the working delivery record for the remediation,
+Updated: 2026-10-17. This is the working delivery record for the remediation,
 registry, and web-state plans. Update it when scope changes or a stage is verified.
 Completed code is not proof of production or performance qualification.
 
@@ -18,22 +18,24 @@ roadmap records scope and acceptance; the linked design documents, current sourc
 and CI workflow are the executable detail. Measurements in later historical
 batches describe their own checkpoints; the current gate below takes precedence.
 
-### Handoff state on 2026-10-15
+### Handoff state on 2026-10-17
 
 Any harness can take over from this section; nothing below depends on a tool that
 only one agent host has.
 
-- **Branch.** `plan/provider-destination-policy` starts from published `master`
-  (`331b6ea1`). It secures metadata, IPRD catalog and persisted push destinations
-  with public-address validation, pinned TLS connections and explicit redirect
-  policy. Independent review, simplification and local qualification are complete;
-  the checkpoint below records their results and limits. Commits remain local
-  until publishing is requested.
-- **Published baseline.** Atomic rate limits, WebSocket handshake tickets,
-  registry security qualification and repository cleanup were merged into `master`
-  and pushed to both remotes. Completed older plans, obsolete repository analysis
-  tooling, the standalone `cli/` tree and root `bun.lock` were removed. Six older
-  plans for open or deferred work remain alongside the three recent security plans.
+- **Branch.** `plan/public-api-identities` starts from published `master`
+  (`0067f342`). The public-identity correction is delivered locally on 2026-10-17:
+  public APIs use entity public IDs while UUIDs remain internal. Independent
+  plan/code review and simplification have completed, with findings applied. The user
+  approved existing passkey re-enrollment on 2026-10-15. Public user handles and
+  credential invalidation pass focused CI, static checks and the final full backend
+  run. No push is authorized for this branch.
+- **Published baseline.** Provider destination policy was merged into `master`
+  and pushed to both remotes at `0067f342`, following atomic rate limits,
+  WebSocket handshake tickets, registry security qualification and repository
+  cleanup. Completed older plans, obsolete repository analysis tooling, the
+  standalone `cli/` tree and root `bun.lock` were removed. Six older plans for open
+  or deferred work remain alongside the recent security and identity plans.
   Book pages describe current behavior without plan references.
 
 - **History.** On 2026-10-14 the `Claude-Session:` trailer was removed from the 25
@@ -83,9 +85,10 @@ only one agent host has.
   an owner can add any user unasked; removing a song is not judged by the actor's
   visibility; the visible-song count materialises rows. None blocks the item.
 - **Next.** Close the playlist concurrent-write findings listed above: duplicate
-  collaborator creation and reorder conflicts. Provider live qualification and
-  bounded coroutine DNS resolution remain separate acceptance work. React Native
-  and Android remain deferred. The local dev database note below stands.
+  collaborator creation and reorder conflicts.
+  Provider live qualification and bounded coroutine DNS resolution remain separate
+  acceptance work. React Native and Android remain deferred. The local dev database
+  note below stands.
 
 
 The backend release-gate package is complete (see the next two sections). Eight
@@ -452,6 +455,129 @@ tests. React Native and Android remain deferred; Android's device login posts to
 pairing endpoint that does not exist and needs a decision when that work resumes.
 
 ## Current quality-gate checkpoint
+
+### Public API identities (2026-10-17)
+
+The implementation on `plan/public-api-identities` replaces internal entity UUIDs
+at HTTP, JWT, cursor, signed-delivery and realtime boundaries with independent
+public IDs. It supersedes the schema-only reconciliation below, which preserved
+some UUID-valued API contracts. Existing relationship field names remain where
+appropriate; their values resolve the related entity's public ID without a UUID
+fallback. Provider identifiers, OAuth token identifiers, WebAuthn credential IDs,
+browser device tokens and idempotency keys retain their separate protocol meaning.
+Delivered locally on 2026-10-17.
+
+Current scope:
+
+- Catalog, Media, Playlist and Library project public identities for resources and
+  relationships and resolve public inputs under existing media/owner scopes.
+- Auth user, client, login-block and passkey resources use public identities.
+  Both JWT signing paths and principal resolution use public claims; old
+  UUID-subject access tokens are rejected, with refresh or sign-in issuing the
+  new claims. Internal token persistence and DPoP identities remain unchanged.
+- Session, Party, Activity, Discovery and Notification project public relationships
+  and realtime identities. Browser device tokens remain distinct from persisted
+  device public IDs; notification cursors retain ordering and access checks.
+- Transcode manifest inputs, session/job projections, Radio references and EQ
+  profile identities use public IDs. Radio provider station identifiers and EQ's
+  client audio-output `deviceId` retain their existing meanings.
+- Scheduler jobs and occurrence receipts and Recommendation resources have public
+  identities. Occurrence request deduplication remains internal, and monitoring
+  projections omit internal serialized message data. Direct database writers and
+  relationship hydration have been updated alongside ORM mappings.
+- A forward migration backfills independent, unique, non-null public IDs without
+  replacing internal primary/foreign keys or resetting development databases.
+  Web and embedded-player consumers and generated API bindings are updated.
+
+Independent plan review, code review and simplification are complete, with findings
+applied. Corrections include the Recommendation pool's direct insert, ownership
+filtering for personalized recommendations, current media-access checks on
+Transcode job views, required Scheduler relationship identity and narrow application
+contracts at controller boundaries. A further independent review found that a leave
+broadcast's identity read could fail after persisted membership removal, leaving
+sockets subscribed. Identity projection failures now close the internal party room
+before propagating the original error, without broadcasting UUIDs. Controller
+identity-read outages refuse dispatch and leave the socket responsive. Independent
+fixture review preserves OAuth/proof/revocation, authorization, localization and
+cursor assertions while replacing stale public-boundary UUIDs.
+
+Verification in `baander-ci-prewarm:local`:
+
+- `PublicIdentityMigrationTest` passed **6 tests / 201 assertions** in
+  **0.516 seconds** in service lane 2, covering populated migration and identity
+  persistence. In the same run, Auth public-identity acceptance passed **3 tests /
+  22 assertions**, and job-monitor cursor pagination passed **6 tests / 46
+  assertions**. Artifacts: `var/test-runs/20261015-213735-381483da`.
+- The native WebSocket selection passed **56 tests**. The combined selection of
+  **96 tests** failed only on missing strict schema annotations. Those annotations
+  have been corrected. That failed run is not recorded as a pass.
+- The first full backend run executed **9,498 tests in 906 files** in
+  **738.2 seconds** and failed on stale fixtures, corrected before the passing
+  2026-10-15 run below. This failed run is not a qualification pass. Artifacts:
+  `var/test-runs/20261015-214412-ce91666d`.
+- The corrected selection ran **620 tests in 32 files** in **153.4 seconds**:
+  **619 passed**, with one stale user-profile assertion still expecting `uuid`.
+  That assertion was corrected before the passing full backend run below. Artifacts:
+  `var/test-runs/20261015-215937-c4d401b4`.
+- The corrected full backend run passed **9,507 tests in 906 files / 78,433
+  assertions** in **731.1 seconds** on 2026-10-15. Timing JSON and JUnit results
+  remain in `var/test-runs/20261015-220516-680d0d68`. This checkpoint precedes the
+  public passkey user-handle and credential invalidation changes.
+- After the passkey changes, a focused CI run passed **159 tests in 13 files /
+  2,516 assertions** in **98.0 seconds** on 2026-10-17. This includes populated
+  migration verification (**7 tests / 203 assertions** in **0.547643 seconds**),
+  public-handle registration, authentication and account signals with real
+  cryptography (**94 unit tests / 434 assertions**), and OAuth/integration checks.
+  Artifacts: `var/test-runs/20261017-110836-5c088ef2`.
+- The first full backend rerun after the passkey changes executed **9,521 tests
+  in 907 files** in **796.0 seconds** on 2026-10-17 and failed in two tests.
+  `DrainCoordinatorTest` raced the child process's command-line availability;
+  its fixture now waits up to one second for readiness before checking the same
+  watchdog and timer behavior. `PasskeyRegistrationOutboxTransactionTest` omitted
+  the required public user handle and hit that guard before its intended outbox
+  failure; both attempts now supply the handle, preserving rollback and retry
+  assertions. Independent review found no issues with either correction. The
+  focused and full runs below verify both corrections; this failed run is not a
+  qualification pass. Artifacts: `var/test-runs/20261017-111208-6c1914fb`.
+- Focused verification of those corrections passed **5 tests in 2 files / 43
+  assertions** in **63.3 seconds**, using seed `603235677`. Artifacts:
+  `var/test-runs/20261017-112547-d4068314`. PHPStan passed for both edited files;
+  logs remain in `var/test-runs/public-identity-fixture-static-je2u9tqj`.
+- The final full backend run passed **9,521 tests in 907 files / 78,489 assertions**
+  in **735.6 seconds**, with zero errors, failures or skips, using two workers and
+  seed `603235677`. Ordinary: **6,010 tests / 23,298 assertions**, **60.0 seconds**;
+  native: **644 / 8,001**, **92.3 seconds**; service lanes: **1,636 / 34,246**,
+  **553.3 seconds**, and **1,231 / 12,944**, **427.6 seconds**. Report completeness
+  validation passed, and resource checks found no retained test, security-drill or
+  web-runtime containers, networks or volumes. Artifacts:
+  `var/test-runs/20261017-112729-94834a03`.
+- Composer platform requirements, PHPStan, Deptrac, container lint and OpenAPI
+  freshness checks all passed after the passkey changes. Deptrac reports **zero
+  violations, warnings and errors**, with **489 existing baseline skips**. Static
+  logs remain in `var/test-runs/public-identity-static-gdf13cng`.
+- Focused frontend verification passed **274 tests in 37 files**, followed by
+  **8 EQ cases in 2 files**. The full web suite passed **2,054 tests in 186
+  files** in **36.08 seconds**; the embedded-player suite passed **167 tests in
+  12 files**. Web, embedded-player and shared typechecks pass after API generation.
+  Web lint reports **zero errors and seven standing warnings**. The final passkey
+  web selection passed **17 tests in 2 files** in **1.09 seconds**.
+- React Native reports **278 type errors**, identical to the normalized `HEAD`
+  baseline. Android verification is blocked by a package absent from its lockfile.
+  These results do not qualify either deferred client.
+- Serial runtime drills passed before the passkey changes: **15 rejection cases**,
+  WebSocket proof, replay, origin, logout and Redis-outage checks, streaming and range
+  delivery, PostgreSQL outage alerts, and Redis refresh/logout recovery. Their
+  temporary logs have expired; these are prior checkpoint results.
+
+The user approved invalidating existing passkeys and requiring re-enrollment on
+2026-10-15. An enrolled authenticator's immutable user handle cannot be repaired by
+a database backfill. New registrations use the user's public ID as the WebAuthn
+user handle; the migration takes an `ACCESS EXCLUSIVE` lock before deleting old
+credentials, with a five-second lock timeout. Accounts, passwords, roles and OAuth
+tokens are preserved. Registration now decodes browser credential IDs as base64url
+before comparing them with the authenticator response. Independent Auth and migration
+reviews found no remaining issues. Focused CI and the final full backend run verify
+the migration and public-handle behavior.
 
 ### Provider destination policy (2026-10-15)
 
@@ -1851,6 +1977,10 @@ coverage. The complete programme is done only when blocking checks, security and
 workflow integrations, and registry consistency/resource/failover/restore gates pass.
 
 ## API contract reconciliation
+
+This is the historical schema-only checkpoint. Its retained UUID API contracts
+are superseded by the [public-identity correction](#public-api-identities-2026-10-17),
+delivered locally on 2026-10-17. The measurements below describe the earlier tree.
 
 The old 24-path finding predates the delivered route-coverage and drift gates;
 current routing and the regenerated specification agree on 244 paths and 313

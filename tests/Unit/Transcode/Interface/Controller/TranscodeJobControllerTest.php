@@ -56,6 +56,8 @@ final class TranscodeJobControllerTest extends TestCase
         return new TranscodeJobController(
             $this->createStub(MessageBusInterface::class),
             $this->createStub(TranscodeJobPortInterface::class),
+            new \App\Tests\Unit\Transcode\PublicViewStub(),
+            $this->createStub(\App\Transcode\Application\Port\PlaybackAccessInterface::class),
         );
     }
 

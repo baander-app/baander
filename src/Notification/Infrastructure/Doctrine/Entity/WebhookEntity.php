@@ -5,16 +5,21 @@ declare(strict_types=1);
 namespace App\Notification\Infrastructure\Doctrine\Entity;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'webhooks')]
+#[ORM\UniqueConstraint(name: 'uniq_webhooks_public_id', columns: ['public_id'])]
 class WebhookEntity
 {
     #[ORM\Id]
     #[ORM\Column(type: 'uuid')]
     #[ORM\GeneratedValue(strategy: 'NONE')]
     private Uuid $id;
+
+    #[ORM\Column(type: 'public_id')]
+    private PublicId $publicId;
 
     #[ORM\Column(type: 'text')]
     private string $url;
@@ -56,6 +61,7 @@ class WebhookEntity
     public function __construct(Uuid $id, string $encryptedSecret)
     {
         $this->id = $id;
+        $this->publicId = new PublicId();
         $this->setEncryptedSigningSecret($encryptedSecret);
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
@@ -64,6 +70,11 @@ class WebhookEntity
     public function getId(): Uuid
     {
         return $this->id;
+    }
+
+    public function getPublicId(): PublicId
+    {
+        return $this->publicId;
     }
 
     public function getUrl(): string

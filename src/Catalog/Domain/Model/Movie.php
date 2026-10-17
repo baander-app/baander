@@ -125,6 +125,8 @@ final class Movie
     public function getCollectionName(): ?string { return $this->state->collectionName; }
     /** @return string[] */
     public function getVideoIds(): array { return $this->state->videoIds; }
+    /** @return list<string> */
+    public function getVideoPublicIds(): array { return $this->state->videoPublicIds; }
     public function getCreatedAt(): DateTimeImmutable { return $this->state->createdAt; }
     public function getUpdatedAt(): DateTimeImmutable { return $this->state->updatedAt; }
     public function getState(): MovieState { return $this->state; }

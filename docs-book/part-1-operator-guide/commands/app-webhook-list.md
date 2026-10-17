@@ -22,11 +22,11 @@ make exec cmd="php bin/console app:webhook:list --json"
 
 ## Details
 
-The table shows each webhook's UUID, URL, the notification categories it receives (`all` when it has no category filter), and when it was created and last updated. Webhooks are listed oldest first.
+The table shows each webhook's public ID, URL, the notification categories it receives (`all` when it has no category filter), and when it was created and last updated. Webhooks are listed oldest first.
 
 Neither the table nor the JSON shows a signing secret. The secret is printed only by [app:webhook:create](app-webhook-create.md) and [app:webhook:rotate-secret](app-webhook-rotate-secret.md); if it is lost, rotate it.
 
-With `--json` each webhook is an object with `id`, `url`, `category_filter`, `created_at` and `updated_at`, as the API returns it.
+With `--json` each webhook is an object with `publicId`, `url`, `category_filter`, `created_at` and `updated_at`, as the API returns it.
 
 ## Exit codes
 

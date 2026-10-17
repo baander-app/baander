@@ -20,16 +20,24 @@ final class TransferHostHandler
     #[AsMessageHandler]
     public function __invoke(TransferHostCommand $command): void
     {
-        $this->sessionPort->transferHost($command->getSessionId(), $command->getNewHostUserId());
+        $session = $this->sessionPort->findByUuid($command->getSessionId());
+        if ($session === null) {
+            throw new \RuntimeException('Party session not found.');
+        }
+        if (!$session->getHostUserId()->equals($command->getCurrentHostUserId())) {
+            throw new \Symfony\Component\Security\Core\Exception\AccessDeniedException('Only the host may transfer the party.');
+        }
 
         $newHostMember = $this->memberPort->findByUserAndSession(
             $command->getNewHostUserId(),
             $command->getSessionId(),
         );
-        if ($newHostMember !== null) {
-            $newHostMember->promoteToHost();
-            $this->memberPort->save($newHostMember);
+        if ($newHostMember === null) {
+            throw new \RuntimeException('The new host is not a party member.');
         }
+        $this->sessionPort->transferHost($command->getSessionId(), $command->getNewHostUserId());
+        $newHostMember->promoteToHost();
+        $this->memberPort->save($newHostMember);
 
         $oldHostMember = $this->memberPort->findByUserAndSession(
             $command->getCurrentHostUserId(),

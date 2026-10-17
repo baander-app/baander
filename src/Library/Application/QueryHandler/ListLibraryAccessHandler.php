@@ -12,6 +12,7 @@ use App\Library\Domain\Model\Library;
 use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
+use App\Shared\Domain\Model\PublicId;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /** Every library with whether a user may see it, for the admin user page and `app:library:member:list`. */
@@ -32,7 +33,10 @@ final readonly class ListLibraryAccessHandler
     #[AsMessageHandler]
     public function __invoke(ListLibraryAccessQuery $query): array
     {
-        $granted = array_flip($this->access->getUserLibraryIds($this->users->userId($query->user)));
+        $userId = preg_match('/^[0-9A-Za-z_-]{21}$/', $query->user) === 1
+            ? $this->users->userIdByPublicId(new PublicId($query->user))
+            : $this->users->userId($query->user);
+        $granted = array_flip($this->access->getUserLibraryIds($userId));
 
         return array_values(array_map(
             static fn (Library $library): LibraryAccess => new LibraryAccess($library, isset($granted[$library->getId()->toString()])),

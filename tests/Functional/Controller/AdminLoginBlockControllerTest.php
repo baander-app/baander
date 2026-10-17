@@ -39,7 +39,7 @@ final class AdminLoginBlockControllerTest extends TestCase
         $block = LoginBlock::create('192.0.2.1', 'blocked@baander.app', 'bot', 'test');
         $repository->save($block);
         $before = $repository->countRecent();
-        $uri = '/api/admin/login-blocks/' . $block->getId()->toString();
+        $uri = '/api/admin/login-blocks/' . $block->getPublicId()->toString();
 
         $response = match ($role) {
             'anonymous' => $this->anonymousRequest('DELETE', $uri),
@@ -59,7 +59,7 @@ final class AdminLoginBlockControllerTest extends TestCase
         $repository->save($block);
         $repository->save($other);
 
-        $response = $this->authenticatedRequest('DELETE', '/api/admin/login-blocks/' . $block->getId()->toString(), $this->createSuperAdminUser());
+        $response = $this->authenticatedRequest('DELETE', '/api/admin/login-blocks/' . $block->getPublicId()->toString(), $this->createSuperAdminUser());
 
         self::assertSame(204, $response->getStatusCode());
         $ids = array_map(static fn (LoginBlock $item): string => $item->getId()->toString(), $repository->findRecent());

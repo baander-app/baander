@@ -51,10 +51,10 @@ final class AlbumCoverController
             ),
         ),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
         ],
         responses: [
-            new OA\Response(response: '200', description: 'Cover image uploaded successfully', content: new OA\JsonContent(properties: [new OA\Property(property: 'publicId', type: 'string'), new OA\Property(property: 'url', type: 'string'), new OA\Property(property: 'size', type: 'integer'), new OA\Property(property: 'width', type: 'integer'), new OA\Property(property: 'height', type: 'integer')])),
+            new OA\Response(response: '200', description: 'Cover image uploaded successfully', content: new OA\JsonContent(properties: [new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21), new OA\Property(property: 'url', type: 'string'), new OA\Property(property: 'size', type: 'integer'), new OA\Property(property: 'width', type: 'integer'), new OA\Property(property: 'height', type: 'integer')])),
             new OA\Response(response: '401', description: 'Not authenticated', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '403', description: 'Forbidden', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
             new OA\Response(response: '404', description: 'Album not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
@@ -79,7 +79,7 @@ final class AlbumCoverController
         path: '/api/albums/{publicId}/cover',
         summary: 'Delete the cover image from an album',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Cover image deleted successfully'),

@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Radio\Infrastructure;
 
 use App\Radio\Application\Port\RadioSessionPortInterface;
+use App\Radio\Domain\Repository\RadioStation\RadioStationRepositoryInterface;
 use App\Radio\Domain\Model\RadioSession\RadioSession;
 use App\Radio\Domain\Repository\RadioSession\RadioSessionRepositoryInterface;
+use App\Radio\Application\Port\RadioPublicIdentityInterface;
+use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Domain\Model\Uuid;
 use RuntimeException;
 
@@ -14,6 +17,8 @@ final class RadioSessionService implements RadioSessionPortInterface
 {
     public function __construct(
         private readonly RadioSessionRepositoryInterface $repository,
+        private readonly RadioPublicIdentityInterface $identities,
+        private readonly RadioStationRepositoryInterface $stations,
     ) {
     }
 
@@ -60,10 +65,12 @@ final class RadioSessionService implements RadioSessionPortInterface
     private function sessionToArray(RadioSession $session): array
     {
         return [
-            'id' => $session->getId()->toString(),
-            'userId' => $session->getUserId()->toString(),
+            'userId' => $this->identities->userPublicId($session->getUserId())->toString(),
             'state' => $session->getState(),
-            'activeStationId' => $session->getActiveStationId()?->toString(),
+            'activeStationId' => $session->getActiveStationId() !== null
+                ? ($this->stations->find($session->getActiveStationId())
+                    ?? throw new NotFoundException('Radio station not found.'))->getPublicId()->toString()
+                : null,
             'activeStreamUrl' => $session->getActiveStreamUrl(),
             'createdAt' => $session->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'updatedAt' => $session->getUpdatedAt()->format(\DateTimeInterface::ATOM),

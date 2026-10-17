@@ -31,7 +31,7 @@ export function StarredStations() {
   const stationsQuery = useStations('', '', starred.length > 0)
   const starredIds = new Set(starred.map((item) => item.stationId))
   const stations = (stationsQuery.data ?? []).filter(
-    (station) => starredIds.has(station.id),
+    (station) => starredIds.has(station.publicId),
   )
   const loading = starredQuery.isPending || (
     starred.length > 0 && stationsQuery.isFetching && stationsQuery.isPlaceholderData
@@ -68,7 +68,7 @@ export function StarredStations() {
     <Container>
       {stations.map((station) => (
         <StationCard
-          key={station.id}
+          key={station.publicId}
           station={station}
           isStarred={true}
           onStar={() => {}}

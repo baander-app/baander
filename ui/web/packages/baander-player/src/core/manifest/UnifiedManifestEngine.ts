@@ -378,7 +378,7 @@ export interface ManifestEngineCallbacks {
  * Usage:
  * ```ts
  * const engine = new UnifiedManifestEngine(config, callbacks);
- * const manifest = await engine.load('video-uuid-here');
+ * const manifest = await engine.load('video-publicId-here');
  * ```
  *
  * The engine will:

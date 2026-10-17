@@ -27,7 +27,7 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 const library: Library = {
-  id: 'library-a',
+  publicId: 'library-a',
   name: 'Music',
   slug: 'music',
   path: '/music',
@@ -75,7 +75,7 @@ it('owns edit drafts and scan options by the selected library', () => {
   })
   const next = {
     ...library,
-    id: 'library-b',
+    publicId: 'library-b',
     name: 'Movies',
     sortOrder: 5,
   }

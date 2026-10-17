@@ -10,7 +10,7 @@ use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Auth\Infrastructure\Security\AuthenticationFailureMessage;
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Shared\Application\Http\BaanderHeader;
-use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use League\OAuth2\Server\ResourceServer;
 use League\OAuth2\Server\Exception\OAuthServerException;
 use Psr\Log\LoggerInterface;
@@ -31,7 +31,7 @@ use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPasspor
  *
  * Extracts the token from the Authorization header, validates it through
  * the league/oauth2-server ResourceServer, and creates a Passport with
- * the user loaded from the database by UUID. A disabled account does not authenticate.
+ * the user loaded from the database by public ID. A disabled account does not authenticate.
  *
  * A DPoP-bound token is accepted under the DPoP scheme only (RFC 9449 section 7.1);
  * presented as a Bearer token it is refused like any other invalid token. The
@@ -84,7 +84,20 @@ final class OAuth2Authenticator extends AbstractAuthenticator
         $accessTokenId = $validatedRequest->getAttribute('oauth_access_token_id');
         $dpopJkt = $validatedRequest->getAttribute(DpopAwareBearerTokenValidator::DPOP_JKT_ATTRIBUTE);
 
-        if ($userIdentifier === null || $userIdentifier === '') {
+        if (!is_string($userIdentifier) || $userIdentifier === '') {
+            throw new CustomUserMessageAuthenticationException(
+                AuthenticationFailureMessage::INVALID_TOKEN,
+                ['error_code' => 'AUTH_INVALID_TOKEN'],
+            );
+        }
+
+        try {
+            PublicId::fromString($userIdentifier);
+            if (!is_string($clientId)) {
+                throw new \InvalidArgumentException('Missing client identity.');
+            }
+            PublicId::fromString($clientId);
+        } catch (\InvalidArgumentException) {
             throw new CustomUserMessageAuthenticationException(
                 AuthenticationFailureMessage::INVALID_TOKEN,
                 ['error_code' => 'AUTH_INVALID_TOKEN'],
@@ -115,11 +128,11 @@ final class OAuth2Authenticator extends AbstractAuthenticator
 
         $badge = new UserBadge(
             $userIdentifier,
-            function (string $uuid): SecurityUser {
-                $user = $this->userRepository->findByUuid(Uuid::fromString($uuid));
+            function (string $publicId): SecurityUser {
+                $user = $this->userRepository->findByPublicId(PublicId::fromString($publicId));
 
                 if ($user === null) {
-                    $this->logger->warning('OAuth2 authenticated user not found in database.', ['uuid' => $uuid]);
+                    $this->logger->warning('OAuth2 authenticated user not found in database.', ['public_id' => $publicId]);
                     throw new CustomUserMessageAuthenticationException(
                         AuthenticationFailureMessage::INVALID_TOKEN,
                         ['error_code' => 'AUTH_INVALID_TOKEN'],
@@ -129,7 +142,7 @@ final class OAuth2Authenticator extends AbstractAuthenticator
                 // Disabling revokes the account's tokens; this also refuses any token
                 // issued past that revocation, such as by a refresh racing the disable.
                 if ($user->isDisabled()) {
-                    $this->logger->info('OAuth2 token of a disabled account refused.', ['uuid' => $uuid]);
+                    $this->logger->info('OAuth2 token of a disabled account refused.', ['public_id' => $publicId]);
                     throw new CustomUserMessageAuthenticationException(
                         AuthenticationFailureMessage::INVALID_TOKEN,
                         ['error_code' => 'AUTH_INVALID_TOKEN'],

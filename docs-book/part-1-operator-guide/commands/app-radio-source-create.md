@@ -27,13 +27,13 @@ make exec cmd="php bin/console app:radio:source:create --name=IPRD --type=iprd -
 
 ## Details
 
-A new source starts active. On success the command prints the source name and its UUID.
+A new source starts active. On success the command prints the source name and its public ID.
 
 The options are checked with the API request's constraints. A missing name, type or sync URL, or a sync URL that is not a valid URL, is rejected with `Validation failed.` and one line per field, such as `syncUrl: This value is not a valid URL.` These are the message and the per-field messages of the API's 422 response. Nothing is stored when the input is rejected.
 
 `app:radio:sync --init` creates the default IPRD source when none exists, so a fresh install does not need this command.
 
-With `--json` the command prints only the new source as the API's `data` object, with `id`, `name` and `type`.
+With `--json` the command prints only the new source as the API's `data` object, with `publicId`, `name` and `type`.
 
 ## Exit codes
 

@@ -6,6 +6,7 @@ namespace App\Notification\Application\Port;
 
 use App\Notification\Application\DTO\WebhookView;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 
 /**
  * Stores webhook configuration. Signing secrets go in encrypted and never come back out
@@ -17,6 +18,8 @@ interface WebhookRepositoryInterface
     public function findAll(): array;
 
     public function find(Uuid $id): ?WebhookView;
+
+    public function findByPublicId(PublicId $publicId): ?WebhookView;
 
     /** @param list<string>|null $categoryFilter */
     public function add(Uuid $id, string $url, ?array $categoryFilter, string $encryptedSecret): WebhookView;

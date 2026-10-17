@@ -58,10 +58,10 @@ final class AdminLoginBlockConsoleTest extends TestCase
             $this->blocks()->save($block);
         }
 
-        $response = $this->authenticatedRequest('DELETE', self::PATH . '/' . $viaApi->getId()->toString(), $this->createSuperAdminUser());
+        $response = $this->authenticatedRequest('DELETE', self::PATH . '/' . $viaApi->getPublicId()->toString(), $this->createSuperAdminUser());
         self::assertSame(204, $response->getStatusCode());
         $delete = $this->command('app:login-block:delete');
-        self::assertSame(Command::SUCCESS, $delete->execute(['id' => $viaCli->getId()->toString()], ['interactive' => false]), $delete->getDisplay());
+        self::assertSame(Command::SUCCESS, $delete->execute(['id' => $viaCli->getPublicId()->toString()], ['interactive' => false]), $delete->getDisplay());
 
         $ids = array_map(static fn (LoginBlock $block): string => $block->getId()->toString(), $this->blocks()->findRecent(100));
         self::assertNotContains($viaApi->getId()->toString(), $ids);

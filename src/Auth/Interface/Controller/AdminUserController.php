@@ -153,7 +153,7 @@ final class AdminUserController
     }
 
     #[OA\Patch(
-        path: '/api/admin/users/{id}',
+        path: '/api/admin/users/{publicId}',
         summary: 'Update a user',
         description: 'A new email address starts unverified and is sent a verification link. The CLI counterparts are app:user:rename and app:user:change-email.',
         requestBody: new OA\RequestBody(
@@ -169,47 +169,49 @@ final class AdminUserController
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
-    #[Route('/{id}', name: 'update', methods: ['PATCH'])]
+    #[Route('/{publicId}', name: 'update', methods: ['PATCH'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:user:rename')]
-    public function update(string $id, #[MapRequestPayload] AdminUpdateUserRequest $request): JsonResponse
+    public function update(string $publicId, #[MapRequestPayload] AdminUpdateUserRequest $request): JsonResponse
     {
+        $publicId = $this->publicIdentifier($publicId);
         $user = null;
 
         // The same use case as the user's own change and `app:user:change-email`: the new
         // address starts unverified and is sent a verification link.
         if ($request->email !== null) {
-            $user = $this->dispatch(new ChangeEmailCommand($id, $request->email));
+            $user = $this->dispatch(new ChangeEmailCommand($publicId, $request->email));
         }
 
         // The same use case as `app:user:rename`.
         if ($request->name !== null) {
-            $user = $this->dispatch(new RenameUserCommand($id, $request->name));
+            $user = $this->dispatch(new RenameUserCommand($publicId, $request->name));
         }
 
-        return $this->successResponse(AdminUserResource::from($user ?? $this->userLookup->byIdentifier($id)));
+        return $this->successResponse(AdminUserResource::from($user ?? $this->userLookup->byIdentifier($publicId)));
     }
 
     #[OA\Delete(
-        path: '/api/admin/users/{id}',
+        path: '/api/admin/users/{publicId}',
         summary: 'Delete a user',
         responses: [
             new OA\Response(response: '204', description: 'User deleted'),
             new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
+    #[Route('/{publicId}', name: 'delete', methods: ['DELETE'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:user:delete')]
-    public function delete(string $id): JsonResponse
+    public function delete(string $publicId): JsonResponse
     {
-        $this->dispatch(new DeleteUserCommand($id));
+        $publicId = $this->publicIdentifier($publicId);
+        $this->dispatch(new DeleteUserCommand($publicId));
 
         return $this->noContent();
     }
 
     #[OA\Post(
-        path: '/api/admin/users/{id}/roles',
+        path: '/api/admin/users/{publicId}/roles',
         summary: 'Assign roles to a user',
         requestBody: new OA\RequestBody(
             required: true,
@@ -223,18 +225,19 @@ final class AdminUserController
             new OA\Response(response: '422', description: 'Validation error', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ValidationError::class))),
         ],
     )]
-    #[Route('/{id}/roles', name: 'assign_roles', methods: ['POST'])]
+    #[Route('/{publicId}/roles', name: 'assign_roles', methods: ['POST'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:user:roles')]
-    public function assignRoles(string $id, #[MapRequestPayload] AdminAssignRolesRequest $request): JsonResponse
+    public function assignRoles(string $publicId, #[MapRequestPayload] AdminAssignRolesRequest $request): JsonResponse
     {
-        $user = $this->dispatch(new SetUserRolesCommand($id, array_values($request->roles)));
+        $publicId = $this->publicIdentifier($publicId);
+        $user = $this->dispatch(new SetUserRolesCommand($publicId, array_values($request->roles)));
 
         return $this->successResponse(AdminUserResource::from($user));
     }
 
     #[OA\Post(
-        path: '/api/admin/users/{id}/reset-password',
+        path: '/api/admin/users/{publicId}/reset-password',
         summary: 'Reset a user password',
         description: 'Sets the password and signs the user out of every session.',
         requestBody: new OA\RequestBody(
@@ -250,19 +253,20 @@ final class AdminUserController
             new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}/reset-password', name: 'reset_password', methods: ['POST'])]
+    #[Route('/{publicId}/reset-password', name: 'reset_password', methods: ['POST'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:user:reset-password')]
-    public function resetPassword(string $id, #[MapRequestPayload] AdminResetPasswordRequest $request): JsonResponse
+    public function resetPassword(string $publicId, #[MapRequestPayload] AdminResetPasswordRequest $request): JsonResponse
     {
+        $publicId = $this->publicIdentifier($publicId);
         // The same use case as `app:user:reset-password`: it also signs the user out everywhere.
-        $this->dispatch(new SetUserPasswordCommand($id, $request->password));
+        $this->dispatch(new SetUserPasswordCommand($publicId, $request->password));
 
         return $this->successResponse(['message' => 'Password reset successfully.']);
     }
 
     #[OA\Post(
-        path: '/api/admin/users/{id}/disable',
+        path: '/api/admin/users/{publicId}/disable',
         summary: 'Disable a user',
         responses: [
             new OA\Response(response: '200', description: 'User disabled', content: new OA\JsonContent(properties: [
@@ -271,20 +275,21 @@ final class AdminUserController
             new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}/disable', name: 'disable', methods: ['POST'])]
+    #[Route('/{publicId}/disable', name: 'disable', methods: ['POST'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:user:disable')]
-    public function disable(string $id): JsonResponse
+    public function disable(string $publicId): JsonResponse
     {
+        $publicId = $this->publicIdentifier($publicId);
         // The same use case as `app:user:disable`: it also ends the user's sessions, and
         // disabling a disabled user succeeds without change.
-        $user = $this->dispatch(new DisableUserCommand($id));
+        $user = $this->dispatch(new DisableUserCommand($publicId));
 
         return $this->successResponse(AdminUserResource::from($user));
     }
 
     #[OA\Post(
-        path: '/api/admin/users/{id}/enable',
+        path: '/api/admin/users/{publicId}/enable',
         summary: 'Enable a user',
         responses: [
             new OA\Response(response: '200', description: 'User enabled', content: new OA\JsonContent(properties: [
@@ -293,14 +298,24 @@ final class AdminUserController
             new OA\Response(response: '404', description: 'User not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}/enable', name: 'enable', methods: ['POST'])]
+    #[Route('/{publicId}/enable', name: 'enable', methods: ['POST'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:user:enable')]
-    public function enable(string $id): JsonResponse
+    public function enable(string $publicId): JsonResponse
     {
-        $user = $this->dispatch(new EnableUserCommand($id));
+        $publicId = $this->publicIdentifier($publicId);
+        $user = $this->dispatch(new EnableUserCommand($publicId));
 
         return $this->successResponse(AdminUserResource::from($user));
+    }
+
+    private function publicIdentifier(string $value): string
+    {
+        try {
+            return \App\Shared\Domain\Model\PublicId::fromString($value)->toString();
+        } catch (\InvalidArgumentException) {
+            throw new \App\Auth\Application\Exception\UserNotFoundException('User not found.');
+        }
     }
 
     /** Dispatches synchronously and returns the handler's result. */

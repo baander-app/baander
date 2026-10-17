@@ -30,12 +30,14 @@ The table has one row per station:
 
 | Column | Content |
 |--------|---------|
-| ID | The station UUID |
+| ID | The persisted station public ID |
 | Name | The station name |
 | Country | The country code |
 | Language | The broadcast language, or `-` |
 | Genres | The station's genres, comma separated, or `-` |
 | Streams | The number of stream URLs |
+
+The station public ID addresses the local resource. The JSON field `externalId` identifies the provider's entry and is separate from the local public ID.
 
 When no station matches, the command prints `No radio stations match.` Stations appear only after a sync; see [app:radio:sync](app-radio-sync.md).
 

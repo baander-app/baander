@@ -24,21 +24,21 @@ final class LibraryMemberAdministrationTest extends TestCase
         $apiMember = $this->createTestUser();
         $cliMember = $this->createTestUser();
         $library = $this->createLibrary();
-        $album = $this->createAlbum($library['id']);
+        $album = $this->createAlbum($library['publicId']);
 
         foreach ([$apiMember, $cliMember] as $member) {
             self::assertSame(404, $this->authenticatedRequest('GET', '/api/albums/' . $album, $member)->getStatusCode());
         }
 
-        $this->assertJsonResponse($this->authenticatedRequest('PUT', $this->route($apiMember, $library['id']), $admin), 200);
+        $this->assertJsonResponse($this->authenticatedRequest('PUT', $this->route($apiMember, $library['publicId']), $admin), 200);
         self::assertSame(Command::SUCCESS, $this->runCommand('app:library:member:grant', ['user' => $cliMember->getEmail(), 'library' => $library['slug']])->getStatusCode());
 
         foreach ([$apiMember, $cliMember] as $member) {
             $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/albums/' . $album, $member), 200);
         }
 
-        $this->assertJsonResponse($this->authenticatedRequest('DELETE', $this->route($apiMember, $library['id']), $admin), 200);
-        self::assertSame(Command::SUCCESS, $this->runCommand('app:library:member:revoke', ['user' => $cliMember->getId()->toString(), 'library' => $library['id']])->getStatusCode());
+        $this->assertJsonResponse($this->authenticatedRequest('DELETE', $this->route($apiMember, $library['publicId']), $admin), 200);
+        self::assertSame(Command::SUCCESS, $this->runCommand('app:library:member:revoke', ['user' => $cliMember->getPublicId()->toString(), 'library' => $library['publicId']])->getStatusCode());
 
         foreach ([$apiMember, $cliMember] as $member) {
             self::assertSame(404, $this->authenticatedRequest('GET', '/api/albums/' . $album, $member)->getStatusCode());
@@ -56,27 +56,27 @@ final class LibraryMemberAdministrationTest extends TestCase
         $apiGrant = [];
         $cliGrant = [];
         foreach ([1, 2] as $attempt) {
-            $apiGrant = $this->assertJsonResponse($this->authenticatedRequest('PUT', $this->route($apiMember, $granted['id']), $admin), 200, 'data')['data'];
-            $cliGrant = $this->json('app:library:member:grant', ['user' => $cliMember->getEmail(), 'library' => $granted['id']]);
+            $apiGrant = $this->assertJsonResponse($this->authenticatedRequest('PUT', $this->route($apiMember, $granted['publicId']), $admin), 200, 'data')['data'];
+            $cliGrant = $this->json('app:library:member:grant', ['user' => $cliMember->getEmail(), 'library' => $granted['publicId']]);
         }
-        self::assertSame(['libraryId' => $granted['id'], 'name' => $granted['name'], 'slug' => $granted['slug'], 'type' => 'music', 'granted' => true], $apiGrant);
+        self::assertSame(['libraryId' => $granted['publicId'], 'name' => $granted['name'], 'slug' => $granted['slug'], 'type' => 'music', 'granted' => true], $apiGrant);
         self::assertSame($apiGrant, $cliGrant);
-        self::assertSame(1, $this->memberships($apiMember, $granted['id']), 'Granting twice stores one membership.');
-        self::assertSame(1, $this->memberships($cliMember, $granted['id']), 'Granting twice stores one membership.');
+        self::assertSame(1, $this->memberships($apiMember, $granted['publicId']), 'Granting twice stores one membership.');
+        self::assertSame(1, $this->memberships($cliMember, $granted['publicId']), 'Granting twice stores one membership.');
 
         $apiList = $this->assertJsonResponse($this->authenticatedRequest('GET', $this->route($apiMember), $admin), 200, 'data')['data'];
-        $cliList = $this->json('app:library:member:list', ['user' => $cliMember->getId()->toString()]);
+        $cliList = $this->json('app:library:member:list', ['user' => $cliMember->getPublicId()->toString()]);
         // Other tests add libraries to the shared database concurrently; compare this test's own.
-        $ownApi = self::only($apiList, [$granted['id'], $other['id']]);
-        self::assertEquals([$granted['id'] => true, $other['id'] => false], array_map(static fn (array $entry): bool => $entry['granted'], $ownApi));
-        self::assertSame($ownApi, self::only($cliList, [$granted['id'], $other['id']]));
+        $ownApi = self::only($apiList, [$granted['publicId'], $other['publicId']]);
+        self::assertEquals([$granted['publicId'] => true, $other['publicId'] => false], array_map(static fn (array $entry): bool => $entry['granted'], $ownApi));
+        self::assertSame($ownApi, self::only($cliList, [$granted['publicId'], $other['publicId']]));
 
-        $apiRevoke = $this->assertJsonResponse($this->authenticatedRequest('DELETE', $this->route($apiMember, $other['id']), $admin), 200, 'data')['data'];
+        $apiRevoke = $this->assertJsonResponse($this->authenticatedRequest('DELETE', $this->route($apiMember, $other['publicId']), $admin), 200, 'data')['data'];
         $cliRevoke = $this->json('app:library:member:revoke', ['user' => $cliMember->getEmail(), 'library' => $other['slug']]);
         self::assertFalse($apiRevoke['granted'], 'Revoking access the user lacks succeeds.');
         self::assertSame($apiRevoke, $cliRevoke);
-        self::assertSame(1, $this->memberships($apiMember, $granted['id']));
-        self::assertSame(1, $this->memberships($cliMember, $granted['id']));
+        self::assertSame(1, $this->memberships($apiMember, $granted['publicId']));
+        self::assertSame(1, $this->memberships($cliMember, $granted['publicId']));
     }
 
     public function testAnUnknownUserOrLibraryIsNotFoundOnBothPaths(): void
@@ -84,13 +84,13 @@ final class LibraryMemberAdministrationTest extends TestCase
         $admin = $this->createSuperAdminUser();
         $member = $this->createTestUser();
         $library = $this->createLibrary();
-        $unknownUser = (new Uuid())->toString();
-        $unknownLibrary = (new Uuid())->toString();
+        $unknownUser = (new PublicId())->toString();
+        $unknownLibrary = (new PublicId())->toString();
 
         $apiCalls = [
             ['GET', '/api/admin/users/' . $unknownUser . '/libraries', 'User "' . $unknownUser . '" not found.'],
-            ['PUT', '/api/admin/users/' . $unknownUser . '/libraries/' . $library['id'], 'User "' . $unknownUser . '" not found.'],
-            ['DELETE', '/api/admin/users/' . $unknownUser . '/libraries/' . $library['id'], 'User "' . $unknownUser . '" not found.'],
+            ['PUT', '/api/admin/users/' . $unknownUser . '/libraries/' . $library['publicId'], 'User "' . $unknownUser . '" not found.'],
+            ['DELETE', '/api/admin/users/' . $unknownUser . '/libraries/' . $library['publicId'], 'User "' . $unknownUser . '" not found.'],
             ['PUT', $this->route($member, $unknownLibrary), 'Library "' . $unknownLibrary . '" not found.'],
             ['DELETE', $this->route($member, $unknownLibrary), 'Library "' . $unknownLibrary . '" not found.'],
         ];
@@ -103,8 +103,8 @@ final class LibraryMemberAdministrationTest extends TestCase
             ['app:library:member:list', ['user' => $unknownUser], 'User "' . $unknownUser . '" not found.'],
             ['app:library:member:grant', ['user' => 'nobody@baander.app', 'library' => $library['slug']], 'User "nobody@baander.app" not found.'],
             ['app:library:member:revoke', ['user' => $unknownUser, 'library' => $library['slug']], 'User "' . $unknownUser . '" not found.'],
-            ['app:library:member:grant', ['user' => $member->getId()->toString(), 'library' => $unknownLibrary], 'Library "' . $unknownLibrary . '" not found.'],
-            ['app:library:member:revoke', ['user' => $member->getId()->toString(), 'library' => 'no-such-library'], 'Library "no-such-library" not found.'],
+            ['app:library:member:grant', ['user' => $member->getPublicId()->toString(), 'library' => $unknownLibrary], 'Library "' . $unknownLibrary . '" not found.'],
+            ['app:library:member:revoke', ['user' => $member->getPublicId()->toString(), 'library' => 'no-such-library'], 'Library "no-such-library" not found.'],
         ];
         foreach ($cliCalls as [$name, $arguments, $message]) {
             $tester = $this->runCommand($name, $arguments);
@@ -113,7 +113,7 @@ final class LibraryMemberAdministrationTest extends TestCase
             self::assertSame('', $tester->getDisplay(), $name . ' prints nothing on stdout.');
         }
 
-        self::assertSame(0, $this->memberships($member, $library['id']));
+        self::assertSame(0, $this->memberships($member, $library['publicId']));
     }
 
     public function testOnlySuperAdminsChangeAccessOverHttp(): void
@@ -122,25 +122,25 @@ final class LibraryMemberAdministrationTest extends TestCase
         $member = $this->createTestUser();
         $library = $this->createLibrary();
 
-        $this->assertJsonResponse($this->authenticatedRequest('PUT', $this->route($member, $library['id']), $admin), 403);
-        $this->assertJsonResponse($this->authenticatedRequest('PUT', $this->route($member, $library['id']), $member), 403);
+        $this->assertJsonResponse($this->authenticatedRequest('PUT', $this->route($member, $library['publicId']), $admin), 403);
+        $this->assertJsonResponse($this->authenticatedRequest('PUT', $this->route($member, $library['publicId']), $member), 403);
         $this->assertJsonResponse($this->authenticatedRequest('GET', $this->route($member), $member), 403);
-        self::assertSame(0, $this->memberships($member, $library['id']));
+        self::assertSame(0, $this->memberships($member, $library['publicId']));
     }
 
     private function route(User $user, ?string $libraryId = null): string
     {
-        return '/api/admin/users/' . $user->getId()->toString() . '/libraries' . ($libraryId !== null ? '/' . $libraryId : '');
+        return '/api/admin/users/' . $user->getPublicId()->toString() . '/libraries' . ($libraryId !== null ? '/' . $libraryId : '');
     }
 
-    /** @return array{id: string, slug: string, name: string} */
+    /** @return array{publicId: string, slug: string, name: string} */
     private function createLibrary(): array
     {
         $suffix = bin2hex(random_bytes(4));
-        $library = ['id' => Uuid::v7()->toString(), 'slug' => 'members-' . $suffix, 'name' => 'Members ' . $suffix];
+        $library = ['publicId' => (new PublicId())->toString(), 'slug' => 'members-' . $suffix, 'name' => 'Members ' . $suffix];
         $this->entityManager->getConnection()->executeStatement(
-            'INSERT INTO libraries (id, slug, name, path, type, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, now(), now())',
-            [$library['id'], $library['slug'], $library['name'], '/tmp/baander-members-' . $suffix, 'music'],
+            'INSERT INTO libraries (id, public_id, slug, name, path, type, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, now(), now())',
+            [Uuid::v7()->toString(), $library['publicId'], $library['slug'], $library['name'], '/tmp/baander-members-' . $suffix, 'music'],
         );
 
         return $library;
@@ -151,7 +151,7 @@ final class LibraryMemberAdministrationTest extends TestCase
         $publicId = (new PublicId())->toString();
         $this->entityManager->getConnection()->executeStatement(
             "INSERT INTO albums (id, public_id, library_id, title, type, year, locked_fields, merged_from, created_at, updated_at)
-             VALUES (?, ?, ?, 'Members Album', 'studio', 2024, '{}', '[]', now(), now())",
+             VALUES (?, ?, (SELECT id FROM libraries WHERE public_id = ?), 'Members Album', 'studio', 2024, '{}', '[]', now(), now())",
             [Uuid::v7()->toString(), $publicId, $libraryId],
         );
 
@@ -161,7 +161,7 @@ final class LibraryMemberAdministrationTest extends TestCase
     private function memberships(User $user, string $libraryId): int
     {
         return (int) $this->entityManager->getConnection()->fetchOne(
-            'SELECT COUNT(*) FROM user_library_access WHERE user_id = ? AND library_id = ?',
+            'SELECT COUNT(*) FROM user_library_access WHERE user_id = ? AND library_id = (SELECT id FROM libraries WHERE public_id = ?)',
             [$user->getId()->toString(), $libraryId],
         );
     }

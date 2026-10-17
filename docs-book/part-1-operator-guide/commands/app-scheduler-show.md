@@ -5,14 +5,14 @@ Show one scheduled job: its schedule, command, parameters, status and the result
 ## Quick start
 
 ```bash
-make exec cmd="php bin/console app:scheduler:show 0192a3b4-c5d6-7890-abcd-ef1234567890"
+make exec cmd="php bin/console app:scheduler:show aB3dE5fG7hJ9kL1mN3pQr"
 ```
 
 ## Arguments
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `id` | Yes | UUID of the scheduled job, as [app:scheduler:list](app-scheduler-list.md) prints it |
+| `id` | Yes | Public ID of the scheduled job, as [app:scheduler:list](app-scheduler-list.md) prints it |
 
 ## Options
 
@@ -31,5 +31,5 @@ The command is read-only.
 | Code | Meaning |
 |------|---------|
 | 0 | Job shown |
-| 1 | No scheduled job has this UUID |
-| 2 | The argument is not a UUID |
+| 1 | No scheduled job has this public ID |
+| 2 | The argument is not a public ID |

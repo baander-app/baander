@@ -9,121 +9,60 @@ use App\Party\Application\CommandHandler\TransferHostHandler;
 use App\Party\Application\Port\PartyMemberPortInterface;
 use App\Party\Application\Port\PartySessionPortInterface;
 use App\Party\Domain\Model\PartyMember;
+use App\Party\Domain\Model\SyncedPartySession;
 use App\Party\Domain\ValueObject\MemberRole;
 use App\Shared\Domain\Model\Uuid;
-use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
 final class TransferHostHandlerTest extends TestCase
 {
-    private PartySessionPortInterface&MockObject $sessionPort;
-    private PartyMemberPortInterface&MockObject $memberPort;
-    private TransferHostHandler $handler;
-
-    protected function setUp(): void
+    public function testTransfersHostOnlyToAnExistingMemberAndPreservesInternalCommands(): void
     {
-        $this->sessionPort = $this->createMock(PartySessionPortInterface::class);
-        $this->memberPort = $this->createMock(PartyMemberPortInterface::class);
-        $this->handler = new TransferHostHandler($this->sessionPort, $this->memberPort);
+        $host = new Uuid();
+        $target = new Uuid();
+        $session = SyncedPartySession::create($host, new Uuid(), null);
+        $oldMember = PartyMember::create($host, $session->getId(), MemberRole::Host);
+        $newMember = PartyMember::create($target, $session->getId());
+        $sessions = $this->createMock(PartySessionPortInterface::class);
+        $sessions->expects($this->once())->method('findByUuid')->with($session->getId())->willReturn($session);
+        $sessions->expects($this->once())->method('transferHost')->with($session->getId(), $target);
+        $members = $this->createMock(PartyMemberPortInterface::class);
+        $members->expects($this->exactly(2))->method('findByUserAndSession')->willReturnOnConsecutiveCalls($newMember, $oldMember);
+        $members->expects($this->exactly(2))->method('save');
+
+        (new TransferHostHandler($sessions, $members))(new TransferHostCommand($session->getId(), $host, $target));
+
+        self::assertSame(MemberRole::Host, $newMember->getRole());
+        self::assertSame(MemberRole::Member, $oldMember->getRole());
     }
 
-    public function testTransfersHostPromotesNewAndDemotesOld(): void
+    public function testNonHostCannotTransferTheParty(): void
     {
-        $sessionId = Uuid::v4();
-        $currentHostUserId = Uuid::v4();
-        $newHostUserId = Uuid::v4();
+        $session = SyncedPartySession::create(new Uuid(), new Uuid(), null);
+        $sessions = $this->createMock(PartySessionPortInterface::class);
+        $sessions->method('findByUuid')->willReturn($session);
+        $sessions->expects($this->never())->method('transferHost');
+        $members = $this->createMock(PartyMemberPortInterface::class);
+        $members->expects($this->never())->method('findByUserAndSession');
+        $members->expects($this->never())->method('save');
+        $this->expectException(AccessDeniedException::class);
 
-        $oldHostMember = PartyMember::create($currentHostUserId, $sessionId, MemberRole::Host);
-        $newHostMember = PartyMember::create($newHostUserId, $sessionId, MemberRole::Member);
-
-        $this->sessionPort->expects($this->once())
-            ->method('transferHost')
-            ->with($sessionId, $newHostUserId);
-
-        $this->memberPort->expects($this->exactly(2))
-            ->method('findByUserAndSession')
-            ->willReturnOnConsecutiveCalls($newHostMember, $oldHostMember);
-
-        // New host member should be promoted before save
-        $this->memberPort->expects($this->exactly(2))
-            ->method('save')
-            ->with($this->callback(function (PartyMember $member) use ($newHostUserId, $currentHostUserId): bool {
-                if ($member->getUserId()->equals($newHostUserId)) {
-                    $this->assertSame(MemberRole::Host, $member->getRole(), 'New host should be promoted to Host.');
-                }
-                if ($member->getUserId()->equals($currentHostUserId)) {
-                    $this->assertSame(MemberRole::Member, $member->getRole(), 'Old host should be demoted to Member.');
-                }
-
-                return true;
-            }));
-
-        ($this->handler)(new TransferHostCommand($sessionId, $currentHostUserId, $newHostUserId));
+        (new TransferHostHandler($sessions, $members))(new TransferHostCommand($session->getId(), new Uuid(), new Uuid()));
     }
 
-    public function testDemotesOldHostWhenNewHostMemberNotFound(): void
+    public function testMissingTargetMemberCannotChangeTheHost(): void
     {
-        $sessionId = Uuid::v4();
-        $currentHostUserId = Uuid::v4();
-        $newHostUserId = Uuid::v4();
+        $host = new Uuid();
+        $session = SyncedPartySession::create($host, new Uuid(), null);
+        $sessions = $this->createMock(PartySessionPortInterface::class);
+        $sessions->method('findByUuid')->willReturn($session);
+        $sessions->expects($this->never())->method('transferHost');
+        $members = $this->createMock(PartyMemberPortInterface::class);
+        $members->method('findByUserAndSession')->willReturn(null);
+        $members->expects($this->never())->method('save');
+        $this->expectException(\RuntimeException::class);
 
-        $oldHostMember = PartyMember::create($currentHostUserId, $sessionId, MemberRole::Host);
-
-        $this->sessionPort->expects($this->once())->method('transferHost');
-
-        $this->memberPort->expects($this->exactly(2))
-            ->method('findByUserAndSession')
-            ->willReturnOnConsecutiveCalls(null, $oldHostMember);
-
-        // Only old host is saved (new host member not found)
-        $this->memberPort->expects($this->once())
-            ->method('save')
-            ->with($this->callback(function (PartyMember $member): bool {
-                $this->assertSame(MemberRole::Member, $member->getRole());
-
-                return true;
-            }));
-
-        ($this->handler)(new TransferHostCommand($sessionId, $currentHostUserId, $newHostUserId));
-    }
-
-    public function testPromotesNewHostWhenOldHostMemberNotFound(): void
-    {
-        $sessionId = Uuid::v4();
-        $currentHostUserId = Uuid::v4();
-        $newHostUserId = Uuid::v4();
-
-        $newHostMember = PartyMember::create($newHostUserId, $sessionId, MemberRole::Member);
-
-        $this->sessionPort->expects($this->once())->method('transferHost');
-
-        $this->memberPort->expects($this->exactly(2))
-            ->method('findByUserAndSession')
-            ->willReturnOnConsecutiveCalls($newHostMember, null);
-
-        // Only new host is saved (old host member not found)
-        $this->memberPort->expects($this->once())
-            ->method('save')
-            ->with($this->callback(function (PartyMember $member): bool {
-                $this->assertSame(MemberRole::Host, $member->getRole());
-
-                return true;
-            }));
-
-        ($this->handler)(new TransferHostCommand($sessionId, $currentHostUserId, $newHostUserId));
-    }
-
-    public function testTransferHostOnPortWhenNeitherMemberFound(): void
-    {
-        $sessionId = Uuid::v4();
-        $currentHostUserId = Uuid::v4();
-        $newHostUserId = Uuid::v4();
-
-        $this->sessionPort->expects($this->once())->method('transferHost');
-
-        $this->memberPort->method('findByUserAndSession')->willReturn(null);
-        $this->memberPort->expects($this->never())->method('save');
-
-        ($this->handler)(new TransferHostCommand($sessionId, $currentHostUserId, $newHostUserId));
+        (new TransferHostHandler($sessions, $members))(new TransferHostCommand($session->getId(), $host, new Uuid()));
     }
 }

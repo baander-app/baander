@@ -41,13 +41,14 @@ final readonly class CreateGenreHandler
             $genre = Genre::create(
                 name: $command->name,
                 slug: $command->slug,
-                parent: $parent,
+                parent: $parent?->getId(),
                 mbid: $command->mbid,
             );
         } catch (InvalidArgumentException $exception) {
             throw new InvalidInputException($exception->getMessage(), [], $exception);
         }
 
+        $genre->setParent($parent);
         $this->genres->save($genre);
 
         return $genre;

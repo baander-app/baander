@@ -17,6 +17,7 @@ use App\Catalog\Infrastructure\Doctrine\Entity\AlbumEntity;
 use App\Catalog\Infrastructure\Doctrine\Entity\MovieEntity;
 use App\Catalog\Infrastructure\Doctrine\Query\CatalogReadScopeQuery;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
@@ -30,6 +31,17 @@ final class GenreRepository implements GenreRepositoryInterface
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
     ) {
+    }
+
+    public function findVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): ?GenreReadView
+    {
+        $entities = $this->visibleQuery($scope)
+            ->andWhere('g.publicId = :id')
+            ->setParameter('id', $publicId->toString())
+            ->getQuery()
+            ->getResult();
+
+        return $this->toVisibleReadViews($entities, $scope)[0] ?? null;
     }
 
     public function findVisibleByUuid(Uuid $uuid, LibraryReadScope $scope): ?GenreReadView
@@ -155,6 +167,8 @@ final class GenreRepository implements GenreRepositoryInterface
                 $entity->getSlug(),
                 $parentId,
                 $entity->getMbid(),
+                $entity->getPublicId(),
+                $parentId !== null ? $entity->getParent()->getPublicId() : null,
             );
         }, $entities);
     }
@@ -177,6 +191,13 @@ final class GenreRepository implements GenreRepositoryInterface
     public function flush(): void
     {
         $this->entityManager->flush();
+    }
+
+    public function findByPublicId(PublicId $publicId): ?Genre
+    {
+        $entity = $this->entityManager->getRepository(GenreEntity::class)->findOneBy(['publicId' => $publicId->toString()]);
+
+        return $entity === null ? null : $this->toDomain($entity);
     }
 
     public function findByUuid(Uuid $uuid): ?Genre
@@ -311,6 +332,8 @@ final class GenreRepository implements GenreRepositoryInterface
             $genre->getSlug(),
             null,
             $genre->getMbid(),
+            id: $genre->getId(),
+            publicId: $genre->getPublicId(),
         );
         $this->entityManager->persist($entity);
 
@@ -359,6 +382,7 @@ final class GenreRepository implements GenreRepositoryInterface
             $parentEntity,
             $genre->getMbid(),
             id: $genre->getId(),
+            publicId: $genre->getPublicId(),
         );
     }
 
@@ -366,10 +390,12 @@ final class GenreRepository implements GenreRepositoryInterface
     {
         return Genre::reconstitute(new GenreState(
             id: $entity->getId(),
+            publicId: $entity->getPublicId(),
             name: $entity->getName(),
             slug: $entity->getSlug(),
             mbid: $entity->getMbid(),
             parent: $entity->getParent()?->getId(),
+            parentPublicId: $entity->getParent()?->getPublicId(),
             createdAt: $entity->getCreatedAt(),
             updatedAt: $entity->getUpdatedAt(),
         ));

@@ -20,7 +20,7 @@ The command prints a table with one row per job:
 
 | Column | Content |
 |--------|---------|
-| ID | Job UUID, which the other `app:scheduler:*` commands take |
+| ID | Job public ID, which the other `app:scheduler:*` commands take |
 | Name | Human-readable job name |
 | Expression | Cron expression |
 | Type | `messenger` or `console` |

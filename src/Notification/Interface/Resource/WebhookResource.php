@@ -19,7 +19,7 @@ final class WebhookResource extends AbstractResource
         assert($source instanceof WebhookView);
 
         return [
-            'id' => $source->id->toString(),
+            'publicId' => $source->publicId->toString(),
             'url' => $source->url,
             'category_filter' => $source->categoryFilter,
             'created_at' => $source->createdAt->format(\DateTimeInterface::ATOM),
@@ -33,7 +33,7 @@ final class WebhookResource extends AbstractResource
         $webhook = self::from($issued->webhook);
 
         return [
-            'id' => $webhook['id'],
+            'publicId' => $webhook['publicId'],
             'url' => $webhook['url'],
             'category_filter' => $webhook['category_filter'],
             'secret' => $issued->secret,
@@ -43,11 +43,11 @@ final class WebhookResource extends AbstractResource
         ];
     }
 
-    /** @return array{id: string, secret: string, signing_version: int} */
+    /** @return array{publicId: string, secret: string, signing_version: int} */
     public static function rotated(IssuedWebhookSecret $issued): array
     {
         return [
-            'id' => $issued->webhook->id->toString(),
+            'publicId' => $issued->webhook->publicId->toString(),
             'secret' => $issued->secret,
             'signing_version' => $issued->webhook->signingVersion,
         ];

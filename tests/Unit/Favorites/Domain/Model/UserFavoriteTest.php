@@ -26,12 +26,12 @@ final class UserFavoriteTest extends TestCase
         $favorite = UserFavorite::create(
             userId: $this->userId,
             entityType: FavoriteType::Song,
-            entityPublicId: 'song-pub-123',
+            entityPublicId: 'song-pub-123000000000',
         );
 
         $this->assertTrue($favorite->getUserId()->equals($this->userId));
         $this->assertSame(FavoriteType::Song, $favorite->getEntityType());
-        $this->assertSame('song-pub-123', $favorite->getEntityPublicId());
+        $this->assertSame('song-pub-123000000000', $favorite->getEntityPublicId());
     }
 
     public function testCreateGeneratesNewIdAndPublicId(): void
@@ -39,7 +39,7 @@ final class UserFavoriteTest extends TestCase
         $favorite = UserFavorite::create(
             userId: $this->userId,
             entityType: FavoriteType::Album,
-            entityPublicId: 'album-pub-456',
+            entityPublicId: 'album-pub-45600000000',
         );
 
         $this->assertInstanceOf(Uuid::class, $favorite->getId());
@@ -54,7 +54,7 @@ final class UserFavoriteTest extends TestCase
         $favorite = UserFavorite::create(
             userId: $this->userId,
             entityType: FavoriteType::Artist,
-            entityPublicId: 'artist-pub-789',
+            entityPublicId: 'artist-pub-7890000000',
         );
 
         $after = new DateTimeImmutable();
@@ -77,7 +77,7 @@ final class UserFavoriteTest extends TestCase
             publicId: $publicId,
             userId: $this->userId,
             entityType: FavoriteType::Album,
-            entityPublicId: 'album-pub-xyz',
+            entityPublicId: 'album-pub-xyz00000000',
             createdAt: $createdAt,
             updatedAt: $updatedAt,
         );
@@ -88,7 +88,7 @@ final class UserFavoriteTest extends TestCase
         $this->assertTrue($favorite->getPublicId()->equals($publicId));
         $this->assertTrue($favorite->getUserId()->equals($this->userId));
         $this->assertSame(FavoriteType::Album, $favorite->getEntityType());
-        $this->assertSame('album-pub-xyz', $favorite->getEntityPublicId());
+        $this->assertSame('album-pub-xyz00000000', $favorite->getEntityPublicId());
         $this->assertEquals($createdAt, $favorite->getCreatedAt());
         $this->assertEquals($updatedAt, $favorite->getUpdatedAt());
     }
@@ -100,7 +100,7 @@ final class UserFavoriteTest extends TestCase
             publicId: new PublicId(),
             userId: $this->userId,
             entityType: FavoriteType::Song,
-            entityPublicId: 'song-pub-1',
+            entityPublicId: 'song-pub-100000000000',
             createdAt: new DateTimeImmutable(),
         );
 
@@ -118,7 +118,7 @@ final class UserFavoriteTest extends TestCase
             publicId: new PublicId(),
             userId: $this->userId,
             entityType: FavoriteType::Artist,
-            entityPublicId: 'artist-pub-2',
+            entityPublicId: 'artist-pub-2000000000',
             createdAt: new DateTimeImmutable('2025-01-01'),
         );
 
@@ -129,9 +129,9 @@ final class UserFavoriteTest extends TestCase
 
     public function testSupportsAllFavoriteTypes(): void
     {
-        $song = UserFavorite::create($this->userId, FavoriteType::Song, 's');
-        $album = UserFavorite::create($this->userId, FavoriteType::Album, 'a');
-        $artist = UserFavorite::create($this->userId, FavoriteType::Artist, 'r');
+        $song = UserFavorite::create($this->userId, FavoriteType::Song, str_repeat('s', 21));
+        $album = UserFavorite::create($this->userId, FavoriteType::Album, str_repeat('a', 21));
+        $artist = UserFavorite::create($this->userId, FavoriteType::Artist, str_repeat('r', 21));
 
         $this->assertSame(FavoriteType::Song, $song->getEntityType());
         $this->assertSame(FavoriteType::Album, $album->getEntityType());

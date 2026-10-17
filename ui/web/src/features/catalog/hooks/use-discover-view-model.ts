@@ -3,7 +3,7 @@ import { useGetRecommendationIndex } from '@/shared/api-client/gen/endpoints'
 import type { Recommendation, RecommendationCluster } from '../types/recommendation'
 
 interface ApiRecommendation {
-  id?: string
+  public_id?: string
   name?: string
   source_type?: string
   source_id?: string
@@ -41,7 +41,7 @@ export function useDiscoverViewModel(): UseDiscoverViewModelReturn {
     for (const raw of items) {
       if (!raw.source_type || !raw.source_id) continue
       const rec: Recommendation = {
-        id: raw.id ?? '',
+        public_id: raw.public_id ?? '',
         name: raw.name ?? '',
         source_type: raw.source_type,
         source_id: raw.source_id,

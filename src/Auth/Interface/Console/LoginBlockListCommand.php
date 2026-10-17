@@ -64,7 +64,7 @@ final class LoginBlockListCommand extends Command
                 $block['fieldValue'],
                 $block['userAgent'],
                 $block['createdAt'],
-                $block['id'],
+                $block['publicId'],
             ],
             'No login blocks are recorded.',
         );

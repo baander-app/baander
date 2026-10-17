@@ -13,7 +13,6 @@ import {
 const STORE = 'auth'
 
 const user = {
-  uuid: 'user-1',
   email: 'listener@baander.app',
   publicId: 'usr_listener',
   name: 'Listener',

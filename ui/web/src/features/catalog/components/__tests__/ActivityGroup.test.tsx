@@ -38,7 +38,6 @@ const oneHourAgo = new Date(now.getTime() - 3600_000).toISOString()
 
 function makeEntry(overrides: Partial<ActivityEntry> = {}): ActivityEntry {
   return {
-    uuid: 'u1',
     publicId: 'p1',
     userId: 'user1',
     activityType: 'play',

@@ -33,10 +33,13 @@ final class ImageRepository implements ImageRepositoryInterface
             ->select(
                 'i.id', 'i.publicId', 'i.path', 'i.extension', 'i.mimeType', 'i.blurhash',
                 'i.size', 'i.width', 'i.height', 'i.imageableType', 'i.createdAt', 'i.updatedAt',
-                'IDENTITY(i.album) AS albumId', 'IDENTITY(i.artist) AS artistId',
-                'IDENTITY(i.playlist) AS playlistId',
+                'image_album.publicId AS albumPublicId', 'image_artist.publicId AS artistPublicId',
+                'image_playlist.publicId AS playlistPublicId',
             )
             ->from(ImageEntity::class, 'i')
+            ->leftJoin('i.album', 'image_album')
+            ->leftJoin('i.artist', 'image_artist')
+            ->leftJoin('i.playlist', 'image_playlist')
             ->where('i.publicId = :publicId')
             ->setParameter('publicId', $publicId);
         $this->applyReadScope($qb, $scope);
@@ -66,7 +69,7 @@ final class ImageRepository implements ImageRepositoryInterface
          *     id: Uuid, publicId: PublicId, path: string, extension: string, mimeType: string,
          *     blurhash: ?string, size: int, width: int, height: int, imageableType: string,
          *     createdAt: DateTimeImmutable, updatedAt: DateTimeImmutable,
-         *     albumId: Uuid|string|null, artistId: Uuid|string|null, playlistId: Uuid|string|null,
+         *     albumPublicId: PublicId|string|null, artistPublicId: PublicId|string|null, playlistPublicId: PublicId|string|null,
          *     albumVisible: int, artistVisible: int, playlistVisible: int
          * }|null $row
          */
@@ -86,9 +89,9 @@ final class ImageRepository implements ImageRepositoryInterface
             $row['width'],
             $row['height'],
             $row['imageableType'],
-            $this->visibleOwnerId($row['albumId'], (bool) $row['albumVisible']),
-            $this->visibleOwnerId($row['artistId'], (bool) $row['artistVisible']),
-            $this->visibleOwnerId($row['playlistId'], (bool) $row['playlistVisible']),
+            $this->visibleOwnerPublicId($row['albumPublicId'], (bool) $row['albumVisible']),
+            $this->visibleOwnerPublicId($row['artistPublicId'], (bool) $row['artistVisible']),
+            $this->visibleOwnerPublicId($row['playlistPublicId'], (bool) $row['playlistVisible']),
             $row['createdAt'],
             $row['updatedAt'],
         );
@@ -193,13 +196,13 @@ final class ImageRepository implements ImageRepositoryInterface
             DQL;
     }
 
-    private function visibleOwnerId(Uuid|string|null $ownerId, bool $visible): ?Uuid
+    private function visibleOwnerPublicId(PublicId|string|null $ownerId, bool $visible): ?PublicId
     {
         if (!$visible || $ownerId === null) {
             return null;
         }
 
-        return $ownerId instanceof Uuid ? $ownerId : Uuid::fromString($ownerId);
+        return $ownerId instanceof PublicId ? $ownerId : PublicId::fromString($ownerId);
     }
 
     public function save(Image $image): void

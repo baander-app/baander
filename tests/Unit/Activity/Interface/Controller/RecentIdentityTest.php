@@ -29,9 +29,18 @@ final class RecentIdentityTest extends TestCase
             $this->createStub(AlbumPortInterface::class),
             $this->createStub(ImagePortInterface::class),
             $this->createStub(MoviePortInterface::class),
+            $this->users(),
         );
         $controller = new UserRecentController($security, $activities, $enrichment);
 
         self::assertSame(401, $controller->recent(new Request())->getStatusCode());
+    }
+
+    private function users(): \App\Activity\Application\Port\ActivityIdentityProjectionPortInterface
+    {
+        $users = $this->createStub(\App\Activity\Application\Port\ActivityIdentityProjectionPortInterface::class);
+        $users->method('userPublicId')->willReturn(new \App\Shared\Domain\Model\PublicId());
+
+        return $users;
     }
 }

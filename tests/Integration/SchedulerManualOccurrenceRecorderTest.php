@@ -63,6 +63,7 @@ final class SchedulerManualOccurrenceRecorderTest extends TestCase
         foreach ($occurrences->getSql() as $query) {
             $this->first->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
         }
+        \App\Tests\Fixtures\Scheduler\PublicIdentitySchema::upgrade($this->first);
     }
 
     public function testDistinctManualRequestsCaptureDatabaseUtcMinuteAndExactOrderedSnapshot(): void
@@ -160,7 +161,7 @@ final class SchedulerManualOccurrenceRecorderTest extends TestCase
         $other = $this->job();
         $request = Uuid::v7();
         if ($scheduled) {
-            $existing = new SchedulerOccurrence($request, $job, $this->databaseMinute(), JobType::Console, 'app:scheduled-fixture', []);
+            $existing = new SchedulerOccurrence($request, $job, $this->databaseMinute(), JobType::Console, 'app:scheduled-fixture', [], jobPublicId: new \App\Shared\Domain\Model\PublicId());
             self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->second))->record($existing));
         } else {
             self::assertNotNull((new DoctrineSchedulerManualOccurrenceRecorder($this->second))->record($other, $request));
@@ -396,8 +397,7 @@ CHILD;
     {
         $job = $this->job();
         $request = Uuid::v7();
-        $winner = new SchedulerOccurrence($request, $job, $this->databaseMinute()->modify('-1 day'), JobType::Console,
-            'app:winning-manual-fixture', ['z' => 1.0, 'a' => -0.0], SchedulerOccurrenceOrigin::Manual);
+        $winner = new SchedulerOccurrence($request, $job, $this->databaseMinute()->modify('-1 day'), JobType::Console, 'app:winning-manual-fixture', ['z' => 1.0, 'a' => -0.0], origin: SchedulerOccurrenceOrigin::Manual, jobPublicId: new \App\Shared\Domain\Model\PublicId());
         $application = 'manual_retry_' . bin2hex(random_bytes(8));
         $code = <<<'CHILD'
 require $argv[1];
@@ -432,7 +432,7 @@ CHILD;
                 usleep(1000);
             }
             // The winning transaction retains its identity while removing the mutable schedule.
-            $this->second->executeStatement('INSERT INTO scheduler_occurrences (id, job_id, scheduled_for, job_type, command, parameters, origin) VALUES (:id, :job, :at, :type, :command, CAST(:parameters AS JSON), :origin)',
+            $this->second->executeStatement('INSERT INTO scheduler_occurrences (public_id, job_public_id, id, job_id, scheduled_for, job_type, command, parameters, origin) VALUES (substr(md5(random()::text), 1, 21), substr(md5(random()::text), 1, 21), :id, :job, :at, :type, :command, CAST(:parameters AS JSON), :origin)',
                 ['id' => $winner->id->toString(), 'job' => $job->toString(), 'at' => $winner->scheduledFor->format('c'), 'type' => $winner->jobType->value,
                     'command' => $winner->command, 'parameters' => $winner->parametersJson(), 'origin' => $winner->origin->value]);
             $this->second->executeStatement('DELETE FROM scheduled_jobs WHERE id = :id', ['id' => $job->toString()]);
@@ -514,7 +514,7 @@ CHILD;
     private function job(string $status = 'active', array $parameters = ['z' => 1.0, 'a' => -0.0]): Uuid
     {
         $id = Uuid::v7();
-        $this->second->executeStatement("INSERT INTO scheduled_jobs (id, revision, name, expression, job_type, command, status, parameters, created_at, updated_at, next_run_at, run_count) VALUES (:id, :revision, :name, '* * * * *', 'console', 'app:manual-fixture', :status, CAST(:parameters AS JSON), clock_timestamp(), clock_timestamp(), clock_timestamp() + INTERVAL '1 hour', 7)", ['id' => $id->toString(), 'revision' => Uuid::v7()->toString(), 'name' => 'Manual ' . $id->toString(), 'status' => $status, 'parameters' => json_encode($parameters, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION)]);
+        $this->second->executeStatement("INSERT INTO scheduled_jobs (public_id, id, revision, name, expression, job_type, command, status, parameters, created_at, updated_at, next_run_at, run_count) VALUES (substr(md5(random()::text), 1, 21), :id, :revision, :name, '* * * * *', 'console', 'app:manual-fixture', :status, CAST(:parameters AS JSON), clock_timestamp(), clock_timestamp(), clock_timestamp() + INTERVAL '1 hour', 7)", ['id' => $id->toString(), 'revision' => Uuid::v7()->toString(), 'name' => 'Manual ' . $id->toString(), 'status' => $status, 'parameters' => json_encode($parameters, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION)]);
         return $id;
     }
 

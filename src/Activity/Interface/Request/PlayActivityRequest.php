@@ -9,10 +9,10 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'PlayActivityRequest',
     properties: [
-        new OA\Property(property: 'songId', description: 'Public ID of the song being played', type: 'string', nullable: true),
-        new OA\Property(property: 'albumId', description: 'Public ID of the album', type: 'string', nullable: true),
-        new OA\Property(property: 'artistId', description: 'Public ID of the artist', type: 'string', nullable: true),
-        new OA\Property(property: 'movieId', description: 'Public ID of the movie', type: 'string', nullable: true),
+        new OA\Property(property: 'songId', description: 'Public ID of the song being played', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true),
+        new OA\Property(property: 'albumId', description: 'Public ID of the album', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true),
+        new OA\Property(property: 'artistId', description: 'Public ID of the artist', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true),
+        new OA\Property(property: 'movieId', description: 'Public ID of the movie', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', nullable: true),
         new OA\Property(property: 'platform', description: 'Playback platform (e.g. web, mobile, desktop)', type: 'string', nullable: true),
         new OA\Property(property: 'player', description: 'Player application name', type: 'string', nullable: true),
     ],

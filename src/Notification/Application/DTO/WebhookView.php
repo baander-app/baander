@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Notification\Application\DTO;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 
 /**
  * A configured webhook as administration shows it. It never carries the signing secret.
@@ -22,6 +23,7 @@ final readonly class WebhookView
         public int $signingVersion,
         public \DateTimeImmutable $createdAt,
         public \DateTimeImmutable $updatedAt,
+        public PublicId $publicId,
     ) {
     }
 }

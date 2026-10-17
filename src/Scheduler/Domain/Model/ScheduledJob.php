@@ -8,6 +8,7 @@ use App\Scheduler\Domain\Exception\DisabledScheduledJob;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Domain\ValueObject\ScheduleStatus;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use Cron\CronExpression;
 use DateTimeImmutable;
 
@@ -66,6 +67,11 @@ final class ScheduledJob
     public function getId(): Uuid
     {
         return $this->state->id;
+    }
+
+    public function getPublicId(): PublicId
+    {
+        return $this->state->publicId;
     }
 
     // --- Getters ---

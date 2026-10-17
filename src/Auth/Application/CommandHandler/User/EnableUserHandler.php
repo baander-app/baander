@@ -27,7 +27,7 @@ final readonly class EnableUserHandler
     /**
      * @return User the enabled user
      *
-     * @throws UserNotFoundException when no user has the email address or UUID
+     * @throws UserNotFoundException when no user has the email address or public ID
      */
     #[AsMessageHandler]
     public function __invoke(EnableUserCommand $command): User

@@ -40,7 +40,7 @@ export function TVArtistDetailPage() {
         <TVContentRow title="Albums" onViewAll={() => {}}>
           {albums.map((album) => (
             <TVCard
-              key={album.uuid}
+              key={album.publicId}
               title={album.title}
               subtitle={album.releaseYear?.toString()}
               onPress={() => {}}

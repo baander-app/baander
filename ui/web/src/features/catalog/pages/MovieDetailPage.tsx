@@ -69,7 +69,7 @@ export function MovieDetailPage() {
     return (
       <MoviePlayerOverlay
         title={movie.title}
-        videoId={video.publicId ?? video.uuid}
+        videoId={video.publicId}
         onClose={() => setIsPlaying(false)}
       />
     )

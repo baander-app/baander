@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Interface\Resource;
 
 use App\Shared\Application\DTO\FailedMessage;
+use App\Shared\Application\PublicDiagnosticText;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -31,7 +32,7 @@ final class FailedMessageResource extends AbstractResource
             'messageClass' => $source->messageClass,
             'originalTransport' => $source->originalTransport,
             'errorClass' => $source->errorClass,
-            'errorMessage' => $source->errorMessage,
+            'errorMessage' => $source->errorMessage === null ? null : PublicDiagnosticText::redact($source->errorMessage),
             'failedAt' => $source->failedAt?->format(\DateTimeInterface::RFC3339_EXTENDED),
             'retryCount' => $source->retryCount,
         ];

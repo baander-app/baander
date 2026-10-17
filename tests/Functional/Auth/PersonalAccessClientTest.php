@@ -103,10 +103,10 @@ final class PersonalAccessClientTest extends TestCase
         $owner = $this->createTestUser();
         $client = $this->createPersonalAccessClient($owner, 'Owner CLI');
         $otherClient = $this->createPersonalAccessClient($owner, 'Owner scripts');
-        $tokens = $this->issueTokens($owner, $client['uuid']);
-        $otherTokens = $this->issueTokens($owner, $otherClient['uuid']);
+        $tokens = $this->issueTokens($owner, $client['publicId']);
+        $otherTokens = $this->issueTokens($owner, $otherClient['publicId']);
 
-        self::assertSame($owner->getId()->toString(), $this->authenticatedUserId($tokens->getAccessToken()));
+        self::assertSame($owner->getPublicId()->toString(), $this->authenticatedUserId($tokens->getAccessToken()));
 
         $this->assertJsonResponse(
             $this->authenticatedRequest('DELETE', '/api/oauth/clients/' . $client['publicId'], $owner),
@@ -126,14 +126,14 @@ final class PersonalAccessClientTest extends TestCase
             $this->bus()->dispatch(new RefreshTokenCommand(
                 $refreshToken,
                 dpopJkt: self::DPOP_JKT,
-                clientId: Uuid::fromString($client['uuid']),
+                clientId: $this->clientId($client['publicId']),
             ));
             self::fail('A refresh token of a revoked client must not be redeemable.');
         } catch (HandlerFailedException) {
         }
 
         // Revocation is scoped to the client: the owner's other client keeps working.
-        self::assertSame($owner->getId()->toString(), $this->authenticatedUserId($otherTokens->getAccessToken()));
+        self::assertSame($owner->getPublicId()->toString(), $this->authenticatedUserId($otherTokens->getAccessToken()));
     }
 
     /** @return array<string, mixed> */
@@ -156,10 +156,19 @@ final class PersonalAccessClientTest extends TestCase
         return $data['data'];
     }
 
-    private function issueTokens(User $user, string $clientUuid): TokenResponseDTO
+    private function clientId(string $publicId): Uuid
+    {
+        $client = static::getContainer()->get(\App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface::class)
+            ->findClientByPublicId(\App\Shared\Domain\Model\PublicId::fromString($publicId));
+        self::assertNotNull($client);
+
+        return $client->getId();
+    }
+
+    private function issueTokens(User $user, string $clientPublicId): TokenResponseDTO
     {
         $result = $this->bus()
-            ->dispatch(new IssueTokenCommand(Uuid::fromString($clientUuid), $user->getId(), self::DPOP_JKT))
+            ->dispatch(new IssueTokenCommand($this->clientId($clientPublicId), $user->getId(), self::DPOP_JKT))
             ->last(HandledStamp::class)?->getResult();
         self::assertInstanceOf(TokenResponseDTO::class, $result);
 

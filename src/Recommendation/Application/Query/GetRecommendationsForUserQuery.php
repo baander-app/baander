@@ -11,6 +11,7 @@ final readonly class GetRecommendationsForUserQuery
     public function __construct(
         private readonly Uuid $userId,
         private readonly int $limit = 50,
+        public bool $administrator = false,
     ) {
     }
 

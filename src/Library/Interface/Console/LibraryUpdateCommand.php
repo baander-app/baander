@@ -32,7 +32,7 @@ final class LibraryUpdateCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addArgument('library', InputArgument::REQUIRED, 'Library UUID or slug')
+            ->addArgument('library', InputArgument::REQUIRED, 'Library public ID or slug')
             ->addOption('name', null, InputOption::VALUE_REQUIRED, 'The new name')
             ->addOption('sort-order', null, InputOption::VALUE_REQUIRED, 'The new sort order; lower numbers come first');
         AdminCommandSupport::addJsonOption($this);

@@ -19,7 +19,10 @@ final class TranscodeSessionQuery implements TranscodeSessionQueryPort
     public function findByPublicId(PublicId $publicId): ?TranscodeSessionDto
     {
         $row = $this->connection->executeQuery(
-            'SELECT * FROM transcode_sessions WHERE public_id = :publicId',
+            'SELECT s.*, u.public_id AS user_public_id, j.public_id AS job_public_id, v.public_id AS video_public_id'
+            . ' FROM transcode_sessions s JOIN users u ON u.id = s.user_id'
+            . ' JOIN transcode_jobs j ON j.id = s.job_id JOIN videos v ON v.id = s.video_id'
+            . ' WHERE s.public_id = :publicId',
             ['publicId' => $publicId->toString()],
         )->fetchAssociative();
 
@@ -33,7 +36,10 @@ final class TranscodeSessionQuery implements TranscodeSessionQueryPort
     public function findByUser(Uuid $userId): array
     {
         $rows = $this->connection->executeQuery(
-            'SELECT * FROM transcode_sessions WHERE user_id = :userId ORDER BY updated_at DESC',
+            'SELECT s.*, u.public_id AS user_public_id, j.public_id AS job_public_id, v.public_id AS video_public_id'
+            . ' FROM transcode_sessions s JOIN users u ON u.id = s.user_id'
+            . ' JOIN transcode_jobs j ON j.id = s.job_id JOIN videos v ON v.id = s.video_id'
+            . ' WHERE s.user_id = :userId ORDER BY s.updated_at DESC',
             ['userId' => $userId->toString()],
         )->fetchAllAssociative();
 

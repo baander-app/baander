@@ -155,6 +155,6 @@ final class SchedulerOccurrenceTest extends TestCase
     /** @param array<array-key,mixed> $parameters */
     private function occurrence(?DateTimeImmutable $scheduledFor = null, string $command = 'app:occurrence', array $parameters = []): SchedulerOccurrence
     {
-        return new SchedulerOccurrence(new Uuid(), new Uuid(), $scheduledFor ?? new DateTimeImmutable('2026-10-02T08:15:00Z'), JobType::Console, $command, $parameters);
+        return new SchedulerOccurrence(new Uuid(), new Uuid(), $scheduledFor ?? new DateTimeImmutable('2026-10-02T08:15:00Z'), JobType::Console, $command, $parameters, jobPublicId: new \App\Shared\Domain\Model\PublicId());
     }
 }

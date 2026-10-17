@@ -8,10 +8,10 @@ use App\Library\Application\Exception\LibraryNotFoundException;
 use App\Library\Domain\Model\Library;
 use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Library\Domain\ValueObject\LibrarySlug;
-use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 
-/** Finds a library by UUID or slug, as the admin API and the `app:library:*` commands name it. */
+/** Finds a library by public ID or slug, as the admin API and the `app:library:*` commands name it. */
 final readonly class LibraryLookup
 {
     public function __construct(
@@ -23,7 +23,7 @@ final readonly class LibraryLookup
      * @param LibraryReadScope $scope the libraries the caller may see; a caller that may see every
      *                                library passes the unrestricted scope and says why
      *
-     * @throws LibraryNotFoundException when no visible library has the UUID or slug
+     * @throws LibraryNotFoundException when no visible library has the public ID or slug
      */
     public function byIdentifier(string $identifier, LibraryReadScope $scope): Library
     {
@@ -33,12 +33,12 @@ final readonly class LibraryLookup
     private function find(string $identifier, LibraryReadScope $scope): ?Library
     {
         try {
-            $library = $this->libraries->findVisibleByUuid(Uuid::fromString($identifier), $scope);
+            $library = $this->libraries->findVisibleByPublicId(PublicId::fromString($identifier), $scope);
             if ($library !== null) {
                 return $library;
             }
         } catch (\InvalidArgumentException) {
-            // Not a UUID; try it as a slug.
+            // Not a public ID; try it as a slug.
         }
 
         try {

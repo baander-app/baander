@@ -122,6 +122,7 @@ final class CatalogMetadataCommandsTest extends TestCase
     public function testSongUpdatePrintsTheResourceWithArtistAndAlbumNames(): void
     {
         $song = Song::create(new Uuid(), 'Come Together', '/music/come-together.flac', 1024, 'audio/flac');
+        $song = Song::reconstitute(new \App\Catalog\Domain\Model\SongState(...array_replace(get_object_vars($song->getState()), ['albumPublicId' => new PublicId()])));
         $songs = $this->createMock(SongPortInterface::class);
         $songs->method('findByPublicId')->willReturn($song);
         $songs->expects(self::exactly(2))->method('save')->with($song);

@@ -11,7 +11,6 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'UserResource',
     properties: [
-        new OA\Property(property: 'uuid', type: 'string', format: 'uuid', description: 'Internal UUID'),
         new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
         new OA\Property(property: 'name', type: 'string', description: 'Display name'),
         new OA\Property(property: 'email', type: 'string', format: 'email', description: 'Email address'),
@@ -27,7 +26,6 @@ final class UserResource extends AbstractResource
         assert($source instanceof User);
 
         return [
-            'uuid' => $source->getId()->toString(),
             'publicId' => $source->getPublicId()->toString(),
             'name' => $source->getName(),
             'email' => $source->getEmail(),
@@ -40,7 +38,7 @@ final class UserResource extends AbstractResource
     /**
      * @deprecated Use from() instead. Kept for backward compatibility during migration.
      */
-    /** @return array{uuid: string, publicId: string, name: string, email: string, emailVerifiedAt: string|null, createdAt: string, roles: array<array-key, string>} */
+    /** @return array{publicId: string, name: string, email: string, emailVerifiedAt: string|null, createdAt: string, roles: array<array-key, string>} */
     public static function fromDomain(User $user): array
     {
         return self::from($user);

@@ -741,7 +741,7 @@ final class DpopStoreOutageTest extends TestCase
 
     private function registerPasskey(): WebAuthnTestCredential
     {
-        $credential = new WebAuthnTestCredential($this->user->getId()->toString(), RedisOutageOAuthKernel::RELYING_PARTY);
+        $credential = new WebAuthnTestCredential($this->user->getPublicId()->toString(), RedisOutageOAuthKernel::RELYING_PARTY);
         $passkeys = $this->kernel->getContainer()->get('oauth.acceptance.passkeys');
         self::assertInstanceOf(PasskeyRepositoryInterface::class, $passkeys);
         $passkeys->save($credential->passkey(), $this->user->getId());
@@ -752,7 +752,7 @@ final class DpopStoreOutageTest extends TestCase
     /** @return array{challengeKey: string, response: array<string, mixed>} */
     private function passkeyAssertion(WebAuthnTestCredential $credential): array
     {
-        $options = $this->send('POST', '/api/auth/passkey/authenticate/options', json: ['userId' => $this->user->getId()->toString()]);
+        $options = $this->send('POST', '/api/auth/passkey/authenticate/options', json: ['userId' => $this->user->getPublicId()->toString()]);
         self::assertSame(200, $options->getStatusCode(), (string) $options->getContent());
         $data = json_decode((string) $options->getContent(), true, flags: JSON_THROW_ON_ERROR)['data'];
         self::assertIsString($data['challengeKey']);

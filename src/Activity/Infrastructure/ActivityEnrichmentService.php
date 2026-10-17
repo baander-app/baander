@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Activity\Infrastructure;
 
 use App\Activity\Domain\Model\MediaActivity;
+use App\Activity\Application\DTO\ActivityView;
+use App\Activity\Application\Port\ActivityIdentityProjectionPortInterface;
 use App\Activity\Interface\Resource\ActivityResource;
 use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Catalog\Application\Port\MoviePortInterface;
@@ -21,6 +23,7 @@ final class ActivityEnrichmentService
         private readonly AlbumPortInterface $albumService,
         private readonly ImagePortInterface $imageService,
         private readonly MoviePortInterface $movieService,
+        private readonly ActivityIdentityProjectionPortInterface $identities,
     ) {
     }
 
@@ -93,10 +96,28 @@ final class ActivityEnrichmentService
             }
         }
 
+        $artists = [];
+        $userPublicIds = [];
+        foreach ($activities as $activity) {
+            $userKey = $activity->getUserId()->toString();
+            $userPublicIds[$userKey] ??= $this->identities->userPublicId($activity->getUserId());
+            $artistId = $activity->getArtistId();
+            if ($artistId !== null && !array_key_exists($artistId->toString(), $artists)) {
+                $artists[$artistId->toString()] = $this->identities->artistPublicId($artistId);
+            }
+        }
+
         // Build enriched response
         $enriched = array_map(
             fn(MediaActivity $activity) => ActivityResource::fromWithDetails(
-                $activity,
+                new ActivityView(
+                    $activity,
+                    $userPublicIds[$activity->getUserId()->toString()],
+                    $activity->getSongId() === null ? null : ($songs[$activity->getSongId()->toString()] ?? null)?->getPublicId(),
+                    $activity->getAlbumId() === null ? null : ($albums[$activity->getAlbumId()->toString()] ?? null)?->getPublicId(),
+                    $activity->getArtistId() === null ? null : ($artists[$activity->getArtistId()->toString()] ?? null),
+                    $activity->getMovieId() === null ? null : ($movies[$activity->getMovieId()->toString()] ?? null)?->getPublicId(),
+                ),
                 $songs,
                 $albums,
                 $images,

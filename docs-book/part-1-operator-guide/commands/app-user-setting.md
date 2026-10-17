@@ -1,6 +1,6 @@
 # app:user:setting
 
-Show, set or reset one user's settings, such as the language Baander emails them in. It is the command-line counterpart of the settings section in the admin user dialog and of the `/api/admin/users/{id}/settings` endpoints, and it runs the same application service, so the same validation and logging apply.
+Show, set or reset one user's settings, such as the language Baander emails them in. It is the command-line counterpart of the settings section in the admin user dialog and of the `/api/admin/users/{publicId}/settings` endpoints, and it runs the same application service, so the same validation and logging apply.
 
 ## Quick start
 
@@ -27,7 +27,7 @@ make exec cmd="php bin/console app:user:setting reset alice@baander.app language
 | Argument | Required | Description |
 |----------|----------|-------------|
 | `action` | Yes | `get`, `set` or `reset` |
-| `identifier` | Yes | The user's email address or UUID |
+| `identifier` | Yes | The user's email address or public ID |
 | `key` | For `set` and `reset` | Setting key, for example `language`. `get` without a key lists every setting |
 | `value` | For `set` | New value, for example `da` |
 
@@ -53,7 +53,7 @@ The stored column shows `(none)` when no choice is stored. A stored value that i
 
 **set** parses the value against the setting's definition the same way as [app:settings:set](app-settings.md) and stores it as the user's choice. It works for every user setting, including any that users cannot change themselves. **reset** deletes the stored choice. Both print the new value and its source.
 
-With `--json`, `get` without a key prints the array `GET /api/admin/users/{id}/settings` returns as `data`, and `get` with a key prints that setting's entry of it. `set` and `reset` print the setting as `PUT` and `DELETE` on `/api/admin/users/{id}/settings/{key}` return it. Each entry has `key`, `label`, `type`, `options`, `userEditable`, `storedValue`, `storedValueValid`, `value`, `resetValue` and `source`.
+With `--json`, `get` without a key prints the array `GET /api/admin/users/{publicId}/settings` returns as `data`, and `get` with a key prints that setting's entry of it. `set` and `reset` print the setting as `PUT` and `DELETE` on `/api/admin/users/{publicId}/settings/{key}` return it. Each entry has `key`, `label`, `type`, `options`, `userEditable`, `storedValue`, `storedValueValid`, `value`, `resetValue` and `source`.
 
 Every `set` and `reset` writes an info log entry with the actor, the target user's ID, the key, and the old and new stored values; a change made here is logged with the actor `cli`. Console access carries full authority, so the command asks for no role. In the admin API, an administrator can read a user's settings, and only a super administrator can change them.
 
@@ -64,5 +64,5 @@ Currently `language` is the only user setting. Its values are `en` (English), `d
 | Code | Meaning |
 |------|---------|
 | 0 | The settings were shown, or the choice was stored or removed |
-| 1 | No user has the email address or UUID, the setting key is unknown, or another error occurred; the message says why |
+| 1 | No user has the email address or public ID, the setting key is unknown, or another error occurred; the message says why |
 | 2 | The action is unknown, `set` or `reset` lacks a key, `set` lacks a value, or the value is not allowed; nothing was changed |

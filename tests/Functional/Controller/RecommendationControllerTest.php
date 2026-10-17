@@ -4,221 +4,121 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Controller;
 
+use App\Auth\Domain\Model\User;
 use App\Recommendation\Domain\Model\Recommendation;
 use App\Recommendation\Domain\Repository\RecommendationRepositoryInterface;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Tests\Functional\TestCase;
 
 final class RecommendationControllerTest extends TestCase
 {
-    private RecommendationRepositoryInterface $recommendationRepository;
+    private RecommendationRepositoryInterface $recommendations;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $container = static::getContainer();
-        $this->recommendationRepository = $container->get(RecommendationRepositoryInterface::class);
-
-        $entityManager = $container->get(\Doctrine\ORM\EntityManagerInterface::class);
-        $entityManager->createQuery('DELETE FROM App\Recommendation\Infrastructure\Doctrine\Entity\RecommendationEntity')->execute();
-        $entityManager->flush();
+        $this->recommendations = static::getContainer()->get(RecommendationRepositoryInterface::class);
     }
 
-    public function testIndexRequiresAuth(): void
-    {
-        $response = $this->anonymousRequest('GET', '/api/recommendations/');
-
-        $this->assertJsonResponse($response, 401);
-    }
-
-    public function testIndexReturnsEmptyArrayForNewUser(): void
+    public function testPublicReferencesRoundTripWithoutInternalIds(): void
     {
         $user = $this->createTestUser();
-
-        $response = $this->authenticatedRequest('GET', '/api/recommendations/', $user);
-
-        $data = $this->assertJsonResponse($response, 200, 'data');
-        $this->assertIsArray($data['data']);
-        $this->assertEmpty($data['data']);
-    }
-
-    public function testIndexReturnsUserRecommendations(): void
-    {
-        $user = $this->createTestUser();
-
-        $sourceId = Uuid::v7()->toString();
-        $targetId = Uuid::v7()->toString();
-        $recommendation = Recommendation::create(
-            sourceType: 'song',
-            sourceId: $sourceId,
-            targetType: 'song',
-            targetId: $targetId,
-            score: 0.9,
-            userId: $user->getId(),
-            name: 'default',
-        );
-        $this->recommendationRepository->save($recommendation);
-
-        $response = $this->authenticatedRequest('GET', '/api/recommendations/', $user);
-
-        $data = $this->assertJsonResponse($response, 200, 'data');
-        $this->assertIsArray($data['data']);
-        $this->assertCount(1, $data['data']);
-        $this->assertSame($targetId, $data['data'][0]['target_id']);
-    }
-
-    public function testIndexRespectsLimit(): void
-    {
-        $user = $this->createTestUser();
-
-        for ($i = 0; $i < 5; $i++) {
-            $recommendation = Recommendation::create(
-                sourceType: 'song',
-                sourceId: Uuid::v7()->toString(),
-                targetType: 'song',
-                targetId: Uuid::v7()->toString(),
-                score: (float)$i,
-                userId: $user->getId(),
-                name: 'default',
-            );
-            $this->recommendationRepository->save($recommendation);
+        [$source, $sourcePublic] = $this->song($user);
+        [$target, $targetPublic] = $this->song($user);
+        $rec = Recommendation::create('song', $source, 'song', $target, 0.9, $user->getId());
+        $this->recommendations->save($rec);
+        foreach (['/api/recommendations/', '/api/recommendations/source/song/' . $sourcePublic, '/api/recommendations/targeting/song/' . $targetPublic] as $path) {
+            $response = $this->authenticatedRequest('GET', $path, $user);
+            $data = $this->assertJsonResponse($response, 200, 'data')['data'];
+            self::assertCount(1, $data);
+            self::assertSame($rec->getPublicId()->toString(), $data[0]['public_id']);
+            self::assertSame($sourcePublic, $data[0]['source_id']);
+            self::assertSame($targetPublic, $data[0]['target_id']);
+            self::assertSame($user->getPublicId()->toString(), $data[0]['user_id']);
+            foreach ([$source, $target, $user->getId()->toString(), $rec->getId()->toString()] as $internal) { self::assertStringNotContainsString($internal, (string) $response->getContent()); }
         }
-
-        $response = $this->authenticatedRequest('GET', '/api/recommendations/?limit=2', $user);
-
-        $data = $this->assertJsonResponse($response, 200, 'data');
-        $this->assertCount(2, $data['data']);
+        self::assertSame($rec->getId()->toString(), $this->recommendations->findByPublicId($rec->getPublicId())?->getId()->toString());
     }
 
-    public function testBySourceReturnsRecommendations(): void
+    public function testCreationRequiresPublicReferencesAndKeepsInternalPersistence(): void
     {
         $user = $this->createTestUser();
-
-        $recommendation = Recommendation::create(
-            sourceType: 'song',
-            sourceId: 'song-src-1',
-            targetType: 'song',
-            targetId: 'song-tgt-1',
-            score: 0.85,
-            name: 'default',
-        );
-        $this->recommendationRepository->save($recommendation);
-
-        $response = $this->authenticatedRequest('GET', '/api/recommendations/source/song/song-src-1', $user);
-
-        $data = $this->assertJsonResponse($response, 200, 'data');
-        $this->assertIsArray($data['data']);
-        $this->assertCount(1, $data['data']);
-        $this->assertSame('song-tgt-1', $data['data'][0]['target_id']);
+        [$source, $sourcePublic] = $this->song($user);
+        [$target, $targetPublic] = $this->song($user);
+        $payload = ['source_type' => 'song', 'source_id' => $sourcePublic, 'target_type' => 'song', 'target_id' => $targetPublic, 'score' => 0.9];
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/recommendations/', $user, $payload), 201);
+        self::assertCount(1, $this->recommendations->findBySource('song', $source));
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/recommendations/', $user, array_replace($payload, ['source_id' => $source])), 404);
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/recommendations/', $user, array_replace($payload, ['target_id' => $target])), 404);
+        self::assertCount(1, $this->recommendations->findBySource('song', $source));
     }
 
-    public function testTargetingReturnsRecommendations(): void
+    public function testInternalAndHiddenEntityAddressesCannotBeResolved(): void
     {
-        $user = $this->createTestUser();
-
-        $recommendation = Recommendation::create(
-            sourceType: 'song',
-            sourceId: 'song-src-1',
-            targetType: 'song',
-            targetId: 'song-tgt-1',
-            score: 0.75,
-            name: 'default',
-        );
-        $this->recommendationRepository->save($recommendation);
-
-        $response = $this->authenticatedRequest('GET', '/api/recommendations/targeting/song/song-tgt-1', $user);
-
-        $data = $this->assertJsonResponse($response, 200, 'data');
-        $this->assertIsArray($data['data']);
-        $this->assertCount(1, $data['data']);
-        $this->assertSame('song-src-1', $data['data'][0]['source_id']);
+        $owner = $this->createTestUser();
+        $other = $this->createTestUser();
+        [$internal, $public] = $this->song($owner);
+        foreach ([$internal, $public] as $address) {
+            $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/recommendations/source/song/' . $address, $other), 404);
+        }
+        $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/recommendations/source/song/' . $internal, $owner), 404);
+        $rec = Recommendation::create('song', $internal, 'song', $internal, 0.5, $other->getId());
+        $this->recommendations->save($rec);
+        self::assertSame([], $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/recommendations/', $other), 200, 'data')['data']);
     }
 
-    public function testStoreRequiresAuth(): void
+    public function testDeletionUsesPublicRecommendationIdentityAndOwnership(): void
     {
-        $response = $this->anonymousRequest('POST', '/api/recommendations/', [
-            'source_type' => 'song',
-            'source_id'   => 'song-1',
-            'target_type' => 'song',
-            'target_id'   => 'song-2',
-            'score'       => 0.8,
-        ]);
-
-        $this->assertJsonResponse($response, 401);
+        $owner = $this->createTestUser();
+        [$source] = $this->song($owner);
+        $rec = Recommendation::create('song', $source, 'song', $source, 0.5, $owner->getId());
+        $this->recommendations->save($rec);
+        $this->assertJsonResponse($this->authenticatedRequest('DELETE', '/api/recommendations/' . $rec->getId()->toString(), $owner), 404);
+        $this->assertJsonResponse($this->authenticatedRequest('DELETE', '/api/recommendations/' . $rec->getPublicId()->toString(), $this->createTestUser()), 404);
+        self::assertNotNull($this->recommendations->findByUuid($rec->getId()));
+        self::assertSame(204, $this->authenticatedRequest('DELETE', '/api/recommendations/' . $rec->getPublicId()->toString(), $owner)->getStatusCode());
+        self::assertNull($this->recommendations->findByUuid($rec->getId()));
     }
 
-    public function testStoreCreatesRecommendation(): void
+    public function testSharedLibraryDoesNotExposeOrDeleteAnotherUsersRecommendation(): void
     {
-        $user = $this->createTestUser();
-
-        $response = $this->authenticatedRequest('POST', '/api/recommendations/', $user, [
-            'source_type' => 'song',
-            'source_id'   => 'song-1',
-            'target_type' => 'song',
-            'target_id'   => 'song-2',
-            'score'       => 0.9,
-        ]);
-
-        $this->assertSame(201, $response->getStatusCode());
-        $data = json_decode($response->getContent(), true, 512, JSON_THROW_ON_ERROR);
-        $this->assertSame('Recommendation created.', $data['message']);
+        $owner = $this->createTestUser();
+        $other = $this->createTestUser();
+        [$source, $public] = $this->song($owner);
+        $db = $this->entityManager->getConnection();
+        $library = $db->fetchOne('SELECT album.library_id FROM songs song JOIN albums album ON album.id = song.album_id WHERE song.id = ?', [$source]);
+        $db->insert('user_library_access', ['user_id' => $other->getId()->toString(), 'library_id' => $library, 'granted_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s.uP')]);
+        $rec = Recommendation::create('song', $source, 'song', $source, 0.5, $owner->getId());
+        $this->recommendations->save($rec);
+        self::assertSame([], $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/recommendations/source/song/' . $public, $other), 200, 'data')['data']);
+        self::assertSame(204, $this->authenticatedRequest('DELETE', '/api/recommendations/source/song/' . $public, $other)->getStatusCode());
+        self::assertNotNull($this->recommendations->findByUuid($rec->getId()));
+        self::assertSame(204, $this->authenticatedRequest('DELETE', '/api/recommendations/source/song/' . $public, $owner)->getStatusCode());
+        $this->entityManager->clear();
+        self::assertNull($this->recommendations->findByUuid($rec->getId()));
     }
 
-    public function testStoreRejectsInvalidSourceType(): void
+    public function testAnonymousRequestsRemainRejected(): void
     {
-        $user = $this->createTestUser();
-
-        $response = $this->authenticatedRequest('POST', '/api/recommendations/', $user, [
-            'source_type' => 'invalid',
-            'source_id'   => 'song-1',
-            'target_type' => 'song',
-            'target_id'   => 'song-2',
-            'score'       => 0.9,
-        ]);
-
-        $this->assertSame(400, $response->getStatusCode());
+        foreach (['GET', 'POST', 'DELETE'] as $method) {
+            $this->assertJsonResponse($this->anonymousRequest($method, '/api/recommendations/' . ($method === 'DELETE' ? (new PublicId())->toString() : '')), 401);
+        }
     }
 
-    public function testDestroyRequiresAuth(): void
+    /** @return array{string, string} Internal and public identities deliberately differ. */
+    private function song(User $user): array
     {
-        $response = $this->anonymousRequest('DELETE', '/api/recommendations/00000000-0000-0000-0000-000000000001');
-
-        $this->assertJsonResponse($response, 401);
-    }
-
-    public function testDestroyRejectsInvalidUuid(): void
-    {
-        $user = $this->createTestUser();
-
-        $response = $this->authenticatedRequest('DELETE', '/api/recommendations/not-a-uuid', $user);
-
-        $this->assertSame(400, $response->getStatusCode());
-    }
-
-    public function testDestroyBySourceRequiresAuth(): void
-    {
-        $response = $this->anonymousRequest('DELETE', '/api/recommendations/source/song/song-1');
-
-        $this->assertJsonResponse($response, 401);
-    }
-
-    public function testDestroyBySourceDeletesRecommendations(): void
-    {
-        $user = $this->createTestUser();
-
-        $recommendation = Recommendation::create(
-            sourceType: 'song',
-            sourceId: 'song-to-delete',
-            targetType: 'song',
-            targetId: 'song-tgt-1',
-            score: 0.5,
-            userId: $user->getId(),
-            name: 'default',
-        );
-        $this->recommendationRepository->save($recommendation);
-
-        $response = $this->authenticatedRequest('DELETE', '/api/recommendations/source/song/song-to-delete', $user);
-
-        $this->assertSame(204, $response->getStatusCode());
+        $db = $this->entityManager->getConnection();
+        $library = Uuid::v7()->toString();
+        $album = Uuid::v7()->toString();
+        $song = Uuid::v7()->toString();
+        $public = (new PublicId())->toString();
+        $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s.uP');
+        $db->insert('libraries', ['id' => $library, 'public_id' => (new PublicId())->toString(), 'slug' => 'recommendation-' . bin2hex(random_bytes(6)), 'name' => 'Recommendation fixture', 'path' => '/tmp/recommendation-' . bin2hex(random_bytes(6)), 'type' => 'music', 'sort_order' => 0, 'created_at' => $now, 'updated_at' => $now]);
+        $db->insert('user_library_access', ['user_id' => $user->getId()->toString(), 'library_id' => $library, 'granted_at' => $now]);
+        $db->insert('albums', ['id' => $album, 'public_id' => (new PublicId())->toString(), 'library_id' => $library, 'title' => 'Recommendation album', 'type' => 'studio', 'locked_fields' => '{}', 'merged_from' => '[]', 'created_at' => $now, 'updated_at' => $now]);
+        $db->insert('songs', ['id' => $song, 'public_id' => $public, 'album_id' => $album, 'path' => '/tmp/' . $public . '.mp3', 'hash' => hash('sha256', $song), 'title' => 'Recommendation song', 'size' => 1000, 'mime_type' => 'audio/mpeg', 'created_at' => $now, 'updated_at' => $now]);
+        return [$song, $public];
     }
 }

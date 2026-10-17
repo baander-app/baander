@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace App\Scheduler\Interface\Resource;
 
 use App\Scheduler\Domain\Model\ScheduledJob;
+use App\Shared\Application\PublicDiagnosticText;
 use App\Shared\Interface\Resource\AbstractResource;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
     schema: 'ScheduledJobResource',
     properties: [
-        new OA\Property(property: 'id', type: 'string', format: 'uuid', description: 'Job UUID'),
+        new OA\Property(property: 'publicId', type: 'string', description: 'Public job identity'),
         new OA\Property(property: 'name', type: 'string', description: 'Job name'),
         new OA\Property(property: 'expression', type: 'string', description: 'Cron expression'),
         new OA\Property(property: 'jobType', type: 'string', enum: ['messenger', 'console'], description: 'Job type'),
@@ -36,7 +37,7 @@ final class ScheduledJobResource extends AbstractResource
         assert($source instanceof ScheduledJob);
 
         return [
-            'id' => $source->getId()->toString(),
+            'publicId' => $source->getPublicId()->toString(),
             'name' => $source->getName(),
             'expression' => $source->getExpression(),
             'jobType' => $source->getJobType()->value,
@@ -46,10 +47,10 @@ final class ScheduledJobResource extends AbstractResource
             'parameters' => $source->getParameters(),
             'lastRunAt' => $source->getLastRunAt()?->format(\DateTimeInterface::ATOM),
             'nextRunAt' => $source->getNextRunAt()?->format(\DateTimeInterface::ATOM),
-            'lastResult' => $source->getLastResult(),
+            'lastResult' => $source->getLastResult() === null ? null : PublicDiagnosticText::redact($source->getLastResult()),
             'runCount' => $source->getRunCount(),
             'lastFailureAt' => $source->getLastFailureAt()?->format(\DateTimeInterface::ATOM),
-            'lastError' => $source->getLastError(),
+            'lastError' => $source->getLastError() === null ? null : PublicDiagnosticText::redact($source->getLastError()),
             'createdAt' => $source->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'updatedAt' => $source->getUpdatedAt()->format(\DateTimeInterface::ATOM),
         ];

@@ -26,7 +26,7 @@ function makeRecommendations() {
   return {
     data: [
       {
-        id: 'rec-1',
+        public_id: 'rec-1',
         name: 'Because you listened to Album A',
         source_type: 'album',
         source_id: 'album-a',
@@ -39,7 +39,7 @@ function makeRecommendations() {
         updated_at: '2026-01-01T00:00:00Z',
       },
       {
-        id: 'rec-2',
+        public_id: 'rec-2',
         name: 'Because you listened to Album A',
         source_type: 'album',
         source_id: 'album-a',
@@ -52,7 +52,7 @@ function makeRecommendations() {
         updated_at: '2026-01-01T00:00:00Z',
       },
       {
-        id: 'rec-3',
+        public_id: 'rec-3',
         name: 'Similar to Artist X',
         source_type: 'artist',
         source_id: 'artist-x',
@@ -136,7 +136,7 @@ describe('useDiscoverViewModel', () => {
     mockConfig.data = {
       data: [
         {
-          id: 'rec-bad',
+          public_id: 'rec-bad',
           name: 'Bad rec',
           source_type: undefined,
           source_id: 'album-a',

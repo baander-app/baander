@@ -169,7 +169,7 @@ export function RecommendationClusterRow({ cluster }: RecommendationClusterProps
       <SectionTitle>{headerLabel}</SectionTitle>
       <RecStrip>
         {cluster.items.map((rec) => (
-          <RecommendationCard key={rec.id} rec={rec} />
+          <RecommendationCard key={rec.public_id} rec={rec} />
         ))}
       </RecStrip>
     </section>

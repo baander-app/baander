@@ -33,7 +33,7 @@ The default table has one row per block:
 | Field value | What the bot wrote into the honeypot field |
 | User agent | The attempt's `User-Agent` header |
 | Blocked | When the attempt was recorded, in ISO 8601 format |
-| ID | The block UUID, which [app:login-block:delete](app-login-block-delete.md) takes |
+| ID | The block public ID, which [app:login-block:delete](app-login-block-delete.md) takes |
 
 Below the table the command prints which blocks the page holds and the total, for example `Blocks 1-50 of 120.` When the page is empty, it prints `No login blocks are recorded.`
 

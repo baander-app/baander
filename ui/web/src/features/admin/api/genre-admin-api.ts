@@ -1,7 +1,7 @@
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 
 export interface Genre {
-  uuid: string
+  publicId: string
   name: string
   slug: string
   parentId: string | null

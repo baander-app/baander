@@ -16,7 +16,6 @@
 import type { DpopKeyPair } from '../dpop/key-pair';
 
 export interface StoredAuthUser {
-  uuid: string;
   email: string;
   publicId: string;
   name: string | null;

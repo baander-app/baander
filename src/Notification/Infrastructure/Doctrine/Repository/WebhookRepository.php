@@ -8,6 +8,7 @@ use App\Notification\Application\DTO\WebhookView;
 use App\Notification\Application\Port\WebhookRepositoryInterface;
 use App\Notification\Infrastructure\Doctrine\Entity\WebhookEntity;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use Doctrine\ORM\EntityManagerInterface;
 
 final readonly class WebhookRepository implements WebhookRepositoryInterface
@@ -27,6 +28,13 @@ final readonly class WebhookRepository implements WebhookRepositoryInterface
     public function find(Uuid $id): ?WebhookView
     {
         $webhook = $this->entity($id);
+
+        return $webhook === null ? null : self::view($webhook);
+    }
+
+    public function findByPublicId(PublicId $publicId): ?WebhookView
+    {
+        $webhook = $this->entityManager->getRepository(WebhookEntity::class)->findOneBy(['publicId' => $publicId]);
 
         return $webhook === null ? null : self::view($webhook);
     }
@@ -97,6 +105,7 @@ final readonly class WebhookRepository implements WebhookRepositoryInterface
             $webhook->getSigningVersion(),
             $webhook->getCreatedAt(),
             $webhook->getUpdatedAt(),
+            $webhook->getPublicId(),
         );
     }
 }

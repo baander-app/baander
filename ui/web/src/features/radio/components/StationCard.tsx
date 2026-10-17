@@ -101,7 +101,7 @@ export function StationCard({ station, isStarred, onStar, onUnstar }: StationCar
   const { start } = useRadioPlayback()
   const activeStation = useRadioStore((s) => s.activeStation)
   const isPlaying = useRadioStore((s) => s.isPlaying)
-  const isActive = activeStation?.id === station.id
+  const isActive = activeStation?.publicId === station.publicId
 
   const handlePlay = () => {
     start(station)
@@ -109,9 +109,9 @@ export function StationCard({ station, isStarred, onStar, onUnstar }: StationCar
 
   const handleStar = () => {
     if (isStarred) {
-      onUnstar(station.id)
+      onUnstar(station.publicId)
     } else {
-      onStar(station.id)
+      onStar(station.publicId)
     }
   }
 

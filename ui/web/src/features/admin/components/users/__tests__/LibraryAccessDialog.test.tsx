@@ -20,7 +20,7 @@ const mockPut = vi.mocked(AXIOS_INSTANCE.put)
 const mockDelete = vi.mocked(AXIOS_INSTANCE.delete)
 
 const ALICE: AdminUser = {
-  id: '0199bf3c-8a00-7000-8000-00000000a11c',
+  publicId: 'AlicePublicIdentity01',
   email: 'alice@baander.app',
   name: 'Alice',
   roles: ['ROLE_USER'],
@@ -28,10 +28,10 @@ const ALICE: AdminUser = {
   createdAt: '2026-10-07T12:00:00+00:00',
 }
 
-const LIBRARIES_URL = `/api/admin/users/${ALICE.id}/libraries`
+const LIBRARIES_URL = `/api/admin/users/${ALICE.publicId}/libraries`
 
 const JAZZ: AdminUserLibraryAccess = {
-  libraryId: '0199bf3c-8a00-7000-8000-0000000000b1',
+  libraryId: 'LibraryPublicIdent000',
   name: 'Jazz',
   slug: 'jazz',
   type: 'music',
@@ -39,7 +39,7 @@ const JAZZ: AdminUserLibraryAccess = {
 }
 
 const ROCK: AdminUserLibraryAccess = {
-  libraryId: '0199bf3c-8a00-7000-8000-0000000000b2',
+  libraryId: 'LibraryPublicIdent001',
   name: 'Rock',
   slug: 'rock',
   type: 'music',
@@ -47,7 +47,7 @@ const ROCK: AdminUserLibraryAccess = {
 }
 
 const FILMS: AdminUserLibraryAccess = {
-  libraryId: '0199bf3c-8a00-7000-8000-0000000000b3',
+  libraryId: 'LibraryPublicIdent002',
   name: 'Films',
   slug: 'films',
   type: 'movie',
@@ -144,7 +144,7 @@ describe('LibraryAccessDialog', () => {
     expect(mockPut).toHaveBeenCalledWith(`${LIBRARIES_URL}/${ROCK.libraryId}`)
     expect(mockDelete).toHaveBeenCalledOnce()
     expect(mockDelete).toHaveBeenCalledWith(`${LIBRARIES_URL}/${FILMS.libraryId}`)
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['admin-user-libraries', ALICE.id] })
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['admin-user-libraries', ALICE.publicId] })
   })
 
   it('shows the empty message and no Save action when there are no libraries', async () => {

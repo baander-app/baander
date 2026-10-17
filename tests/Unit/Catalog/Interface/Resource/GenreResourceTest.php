@@ -18,7 +18,7 @@ final class GenreResourceTest extends TestCase
         $genre = Genre::create('Rock', 'rock');
 
         self::assertSame([
-            'uuid' => $genre->getId()->toString(),
+            'publicId' => $genre->getPublicId()->toString(),
             'name' => 'Rock',
             'slug' => 'rock',
             'parentId' => null,
@@ -26,17 +26,18 @@ final class GenreResourceTest extends TestCase
         ], GenreResource::from($genre));
     }
 
-    public function testChildGenreSerializesItsParentUuid(): void
+    public function testChildGenreSerializesItsParentPublicId(): void
     {
         $parent = Genre::create('Rock', 'rock');
         $mbid = '0192f3ca-c632-783c-88f6-c53f42d5a3c1';
         $genre = Genre::create('Alternative Rock', 'alternative-rock', parent: $parent->getId(), mbid: $mbid);
+        $genre->setParent($parent);
 
         self::assertSame([
-            'uuid' => $genre->getId()->toString(),
+            'publicId' => $genre->getPublicId()->toString(),
             'name' => 'Alternative Rock',
             'slug' => 'alternative-rock',
-            'parentId' => $parent->getId()->toString(),
+            'parentId' => $parent->getPublicId()->toString(),
             'mbid' => $mbid,
         ], GenreResource::from($genre));
     }
@@ -47,19 +48,21 @@ final class GenreResourceTest extends TestCase
         $now = new DateTimeImmutable('2026-10-04T12:00:00Z');
         $childId = Uuid::generate();
         $child = Genre::reconstitute(new GenreState(
+            publicId: new \App\Shared\Domain\Model\PublicId(),
             id: $childId,
             name: 'Ambient',
             slug: 'ambient',
             mbid: null,
             parent: $parent->getId(),
+            parentPublicId: $parent->getPublicId(),
             createdAt: $now,
             updatedAt: $now,
         ));
 
         $resources = GenreResource::collection([$parent, $child]);
         self::assertSame(null, $resources[0]['parentId']);
-        self::assertSame($parent->getId()->toString(), $resources[1]['parentId']);
-        self::assertSame($childId->toString(), $resources[1]['uuid']);
+        self::assertSame($parent->getPublicId()->toString(), $resources[1]['parentId']);
+        self::assertSame($child->getPublicId()->toString(), $resources[1]['publicId']);
         $child->setParent(null);
         self::assertNull(GenreResource::from($child)['parentId']);
     }

@@ -14,7 +14,7 @@ export function useScanPolling(intervalMs = 3000) {
       const ids = new Set(
         libraries
           .filter((l) => l.scanStatus === 'scanning')
-          .map((l) => l.id),
+          .map((l) => l.publicId),
       )
       setScanningIds(ids)
     } catch {

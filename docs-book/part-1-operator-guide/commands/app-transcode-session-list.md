@@ -18,7 +18,7 @@ make exec cmd="php bin/console app:transcode:session:list --user=listener@baande
 
 | Option | Description |
 |--------|-------------|
-| `--user` | List only the sessions of this user, by email address or UUID, as the `app:user:*` commands take it |
+| `--user` | List only the sessions of this user, by email address or public ID, as the `app:user:*` commands take it |
 | `--json` | Print the sessions in the shape of the API's `data` array, in JSON |
 
 ## Details
@@ -29,9 +29,9 @@ The table has one row per session:
 
 | Column | Content |
 |--------|---------|
-| UUID | The session UUID, which [app:transcode:session:show](app-transcode-session-show.md) takes |
-| User | The UUID of the user who started the session |
-| Video | The video UUID |
+| Public ID | The session public ID, which [app:transcode:session:show](app-transcode-session-show.md) takes |
+| User | The public ID of the user who started the session |
+| Video | The video public ID |
 | State | `pending`, `preparing`, `active` or `paused` |
 | Priority | `critical`, `high`, `normal`, `low` or `bulk` |
 | Audio | The audio profile name |
@@ -40,11 +40,11 @@ The table has one row per session:
 
 When no session is active, the command prints `No transcode session is active.`
 
-`--user` finds the user the same way as the `app:user:*` commands. The command checks a UUID against the user list just as it checks an email address, so a UUID that belongs to no user fails with `User "..." not found.` rather than listing no sessions. A value that is neither an email address nor a UUID fails the same way.
+`--user` finds the user the same way as the `app:user:*` commands. The command checks a public ID against the user list just as it checks an email address, so a public ID that belongs to no user fails with `User "..." not found.` rather than listing no sessions. A value that is neither an email address nor a public ID fails the same way.
 
 ## Exit codes
 
 | Code | Meaning |
 |------|---------|
 | 0 | List printed, possibly empty |
-| 1 | No user has the email address or UUID given to `--user`, or the sessions could not be read; the message says why |
+| 1 | No user has the email address or public ID given to `--user`, or the sessions could not be read; the message says why |

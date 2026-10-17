@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Functional\Controller;
 
 use App\Auth\Domain\Model\User;
+use App\Shared\Domain\Model\PublicId;
 use App\Tests\Functional\TestCase;
 use Symfony\Component\Uid\Uuid as SymfonyUuid;
 
@@ -52,6 +53,8 @@ final class DeviceControllerTest extends TestCase
 
         $this->assertCount(1, $list['data']);
         $this->assertSame($deviceId, $list['data'][0]['deviceId']);
+        $this->assertArrayNotHasKey('id', $list['data'][0]);
+        $this->assertSame(21, strlen($list['data'][0]['publicId']));
         $this->assertSame('Living Room Speaker', $list['data'][0]['name']);
     }
 
@@ -98,6 +101,8 @@ final class DeviceControllerTest extends TestCase
 
         $this->assertCount(1, $list['data'], 'Upsert must not create a duplicate device.');
         $this->assertSame($deviceId, $list['data'][0]['deviceId']);
+        $this->assertArrayNotHasKey('id', $list['data'][0]);
+        $this->assertSame(21, strlen($list['data'][0]['publicId']));
         $this->assertSame('Second Name', $list['data'][0]['name'], 'Upsert must adopt the new name.');
     }
 
@@ -219,7 +224,7 @@ final class DeviceControllerTest extends TestCase
             'name' => 'Original Name',
         ]);
 
-        $response = $this->authenticatedRequest('PUT', '/api/devices/' . $deviceId, $user, [
+        $response = $this->authenticatedRequest('PUT', '/api/devices/' . $this->devicePublicId($user), $user, [
             'name' => 'Renamed Device',
         ]);
 
@@ -234,6 +239,25 @@ final class DeviceControllerTest extends TestCase
         $this->assertSame('Renamed Device', $list['data'][0]['name']);
     }
 
+    public function testDeviceTargetsRejectThePrimaryKeyAndBrowserToken(): void
+    {
+        $user = $this->createTestUser();
+        $token = $this->validDeviceId();
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/devices', $user, [
+            'deviceId' => $token,
+            'name' => 'Speaker',
+        ]), 200);
+        $device = $this->entityManager->getRepository(\App\Session\Infrastructure\Doctrine\Entity\DeviceEntity::class)
+            ->findOneBy(['userId' => $user->getId()]);
+        self::assertNotNull($device);
+        foreach ([$device->getId()->toString(), $token] as $internalId) {
+            $this->assertJsonResponse($this->authenticatedRequest('PUT', '/api/devices/' . $internalId, $user, ['name' => 'Changed']), 400);
+            $this->assertJsonResponse($this->authenticatedRequest('DELETE', '/api/devices/' . $internalId, $user), 400);
+        }
+        $listed = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/devices', $user), 200, 'data');
+        self::assertSame('Speaker', $listed['data'][0]['name']);
+    }
+
     public function testRenameWithBlankNameFailsValidation(): void
     {
         $user = $this->createTestUser();
@@ -244,7 +268,7 @@ final class DeviceControllerTest extends TestCase
             'name' => 'Original Name',
         ]);
 
-        $response = $this->authenticatedRequest('PUT', '/api/devices/' . $deviceId, $user, [
+        $response = $this->authenticatedRequest('PUT', '/api/devices/' . $this->devicePublicId($user), $user, [
             'name' => '',
         ]);
 
@@ -255,7 +279,7 @@ final class DeviceControllerTest extends TestCase
     {
         $user = $this->createTestUser();
 
-        // Valid body so payload validation does not preempt the path-UUID check.
+        // Valid body so payload validation does not preempt the path-public-ID check.
         $response = $this->authenticatedRequest('PUT', '/api/devices/not-a-uuid', $user, [
             'name' => 'Whatever',
         ]);
@@ -267,7 +291,7 @@ final class DeviceControllerTest extends TestCase
     {
         $user = $this->createTestUser();
 
-        $response = $this->authenticatedRequest('PUT', '/api/devices/' . $this->validDeviceId(), $user, [
+        $response = $this->authenticatedRequest('PUT', '/api/devices/' . (new PublicId())->toString(), $user, [
             'name' => 'Ghost Device',
         ]);
 
@@ -289,7 +313,7 @@ final class DeviceControllerTest extends TestCase
             'name' => 'Other Device',
         ]), 200);
 
-        $response = $this->authenticatedRequest('PUT', '/api/devices/' . $ownedDeviceId, $otherUser, [
+        $response = $this->authenticatedRequest('PUT', '/api/devices/' . $this->devicePublicId($owner), $otherUser, [
             'name' => 'Attempted Rename',
         ]);
 
@@ -326,7 +350,7 @@ final class DeviceControllerTest extends TestCase
             'name' => 'To Forget',
         ]);
 
-        $response = $this->authenticatedRequest('DELETE', '/api/devices/' . $deviceId, $user);
+        $response = $this->authenticatedRequest('DELETE', '/api/devices/' . $this->devicePublicId($user), $user);
 
         $data = $this->assertJsonResponse($response, 200, 'data');
         $this->assertSame('Device forgotten.', $data['data']['message']);
@@ -354,7 +378,7 @@ final class DeviceControllerTest extends TestCase
 
         // Forgetting a device that was never registered succeeds silently,
         // mirroring an idempotent delete contract (unlike rename).
-        $response = $this->authenticatedRequest('DELETE', '/api/devices/' . $this->validDeviceId(), $user);
+        $response = $this->authenticatedRequest('DELETE', '/api/devices/' . (new PublicId())->toString(), $user);
 
         $data = $this->assertJsonResponse($response, 200, 'data');
         $this->assertSame('Device forgotten.', $data['data']['message']);
@@ -363,6 +387,13 @@ final class DeviceControllerTest extends TestCase
     // ---------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------
+
+    private function devicePublicId(User $user): string
+    {
+        $list = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/devices', $user), 200, 'data');
+
+        return $list['data'][0]['publicId'];
+    }
 
     private function validDeviceId(): string
     {

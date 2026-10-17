@@ -80,10 +80,12 @@ final class GenreReadScopeRepositoryTest extends TestCase
             $this->assertNotNull($view);
             $this->assertSame('mbid-' . $slug, $view->getMbid());
             $this->assertSame($slug, $this->repository->findVisibleByUuid($this->genres[$slug]->getId(), $this->scope)?->getSlug());
+            $this->assertSame($slug, $this->repository->findVisibleByPublicId($this->genres[$slug]->getPublicId(), $this->scope)?->getSlug());
         }
         foreach (['denied', 'orphan', 'hidden-parent', 'hidden-child'] as $slug) {
             $this->assertNull($this->repository->findVisibleBySlug($slug, $this->scope));
             $this->assertNull($this->repository->findVisibleByUuid($this->genres[$slug]->getId(), $this->scope));
+            $this->assertNull($this->repository->findVisibleByPublicId($this->genres[$slug]->getPublicId(), $this->scope));
         }
         $this->assertSame(11, $this->repository->countVisible(LibraryReadScope::unrestricted()));
         $this->assertCount(11, $this->repository->findAllVisible(LibraryReadScope::unrestricted()));
@@ -135,6 +137,7 @@ final class GenreReadScopeRepositoryTest extends TestCase
         $view = $this->repository->findVisibleByUuid($childId, $this->scope);
         $this->assertNotNull($view);
         $this->assertNull($view->getParent());
+        $this->assertNull($view->getParentPublicId());
         $this->assertSame($parentId->toString(), $this->genres['promoted-child']->getParent()?->getId()->toString());
         $this->entityManager->flush();
         $this->entityManager->clear();

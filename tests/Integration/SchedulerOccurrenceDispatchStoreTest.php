@@ -51,6 +51,7 @@ final class SchedulerOccurrenceDispatchStoreTest extends TestCase
                 $this->first->executeStatement($query->getStatement(), $query->getParameters(), $query->getTypes());
             }
         }
+        \App\Tests\Fixtures\Scheduler\PublicIdentitySchema::upgrade($this->first);
     }
 
     public function testCommittedReservationRetryReplacementAndStableReceipt(): void
@@ -220,7 +221,7 @@ final class SchedulerOccurrenceDispatchStoreTest extends TestCase
 
     private function seed(?\DateTimeImmutable $minute = null): Uuid
     {
-        $occurrence = new SchedulerOccurrence(Uuid::v7(), Uuid::v7(), $minute ?? new \DateTimeImmutable('2026-01-01 UTC'), JobType::Console, 'app:test', []);
+        $occurrence = new SchedulerOccurrence(Uuid::v7(), Uuid::v7(), $minute ?? new \DateTimeImmutable('2026-01-01 UTC'), JobType::Console, 'app:test', [], jobPublicId: new \App\Shared\Domain\Model\PublicId());
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->first))->record($occurrence));
         return $occurrence->id;
     }

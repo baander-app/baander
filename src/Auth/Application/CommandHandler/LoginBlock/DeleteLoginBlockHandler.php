@@ -7,7 +7,7 @@ namespace App\Auth\Application\CommandHandler\LoginBlock;
 use App\Auth\Application\Command\LoginBlock\DeleteLoginBlockCommand;
 use App\Auth\Application\Exception\LoginBlockNotFoundException;
 use App\Auth\Domain\Repository\LoginBlockRepositoryInterface;
-use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 final readonly class DeleteLoginBlockHandler
@@ -22,12 +22,12 @@ final readonly class DeleteLoginBlockHandler
     public function __invoke(DeleteLoginBlockCommand $command): void
     {
         try {
-            $id = Uuid::fromString($command->id);
+            $id = PublicId::fromString($command->id);
         } catch (\InvalidArgumentException $exception) {
             throw LoginBlockNotFoundException::forId($command->id, $exception);
         }
 
-        if (!$this->blocks->deleteByUuid($id)) {
+        if (!$this->blocks->deleteByPublicId($id)) {
             throw LoginBlockNotFoundException::forId($command->id);
         }
     }

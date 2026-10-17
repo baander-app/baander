@@ -207,11 +207,11 @@ export function GenresPage() {
             <Divider>
               {genreList.map((genre) => {
                 const parent = genre.parentId
-                  ? genreList.find((g) => g.uuid === genre.parentId)
+                  ? genreList.find((g) => g.publicId === genre.parentId)
                   : null
 
                 return (
-                  <BodyRow key={genre.uuid}>
+                  <BodyRow key={genre.publicId}>
                     <TdName>{genre.name}</TdName>
                     <TdMono>{genre.slug}</TdMono>
                     <TdMono>

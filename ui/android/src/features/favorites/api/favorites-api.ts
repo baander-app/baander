@@ -10,7 +10,6 @@ import { catalogApi } from '@/features/catalog/api/catalog-api';
  * Favorite types.
  */
 export interface Favorite {
-  uuid: string;
   publicId: string;
   entityType: 'song' | 'album' | 'artist';
   entityPublicId: string;

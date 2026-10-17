@@ -7,6 +7,7 @@ namespace App\Scheduler\Domain\Model;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Domain\ValueObject\ScheduleStatus;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use DateTimeImmutable;
 use RuntimeException;
 
@@ -32,6 +33,7 @@ final class ScheduledJobState
         public ?string $lastError = null,
         /** Null only for an unsaved job; discard snapshots after transaction rollback. */
         public ?Uuid $revision = null,
+        public readonly PublicId $publicId = new PublicId(),
     ) {
     }
 }

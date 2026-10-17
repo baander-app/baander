@@ -5,20 +5,20 @@ Pause a scheduled job, so it stops running on its schedule until it is resumed. 
 ## Quick start
 
 ```bash
-make exec cmd="php bin/console app:scheduler:pause 0192a3b4-c5d6-7890-abcd-ef1234567890"
+make exec cmd="php bin/console app:scheduler:pause aB3dE5fG7hJ9kL1mN3pQr"
 ```
 
 Print the result as JSON, for a script:
 
 ```bash
-make exec cmd="php bin/console app:scheduler:pause 0192a3b4-c5d6-7890-abcd-ef1234567890 --json"
+make exec cmd="php bin/console app:scheduler:pause aB3dE5fG7hJ9kL1mN3pQr --json"
 ```
 
 ## Arguments
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `id` | Yes | UUID of the scheduled job, as [app:scheduler:list](app-scheduler-list.md) prints it |
+| `id` | Yes | Public ID of the scheduled job, as [app:scheduler:list](app-scheduler-list.md) prints it |
 
 ## Options
 
@@ -39,5 +39,5 @@ With `--json` the command prints only the job as the API's `data` object, the sa
 | Code | Meaning |
 |------|---------|
 | 0 | Job paused, or it was already paused |
-| 1 | No scheduled job has this UUID, the job is disabled, or it changed concurrently; the message says why |
-| 2 | The argument is not a UUID |
+| 1 | No scheduled job has this public ID, the job is disabled, or it changed concurrently; the message says why |
+| 2 | The argument is not a public ID |

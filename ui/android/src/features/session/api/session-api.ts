@@ -12,7 +12,6 @@ import { getAuthSnapshot } from '@/features/auth/stores/auth-store';
  * Session types.
  */
 export interface Session {
-  uuid: string;
   publicId: string;
   deviceName: string;
   lastActiveAt: string;

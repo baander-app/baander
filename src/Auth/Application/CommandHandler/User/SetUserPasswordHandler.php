@@ -19,7 +19,7 @@ final readonly class SetUserPasswordHandler
     }
 
     /**
-     * @throws UserNotFoundException when no user has the email address or UUID
+     * @throws UserNotFoundException when no user has the email address or public ID
      */
     #[AsMessageHandler]
     public function __invoke(SetUserPasswordCommand $command): void

@@ -22,7 +22,8 @@ final class ResourcesTest extends TestCase
         $user = User::register(new Email('test@baander.app'), 'hashed', 'Alice');
         $result = UserResource::from($user);
 
-        $this->assertSame($user->getId()->toString(), $result['uuid']);
+        $this->assertArrayNotHasKey('uuid', $result);
+        $this->assertNotContains($user->getId()->toString(), $result);
         $this->assertSame($user->getPublicId()->toString(), $result['publicId']);
         $this->assertSame('Alice', $result['name']);
         $this->assertSame('test@baander.app', $result['email']);
@@ -62,7 +63,8 @@ final class ResourcesTest extends TestCase
         $client = Client::create('Test App', ['http://localhost'], secret: ClientSecret::fromString('secret'), confidential: true);
         $result = ClientResource::from($client);
 
-        $this->assertSame($client->getId()->toString(), $result['uuid']);
+        $this->assertArrayNotHasKey('uuid', $result);
+        $this->assertNotContains($client->getId()->toString(), $result);
         $this->assertSame($client->getPublicId()->toString(), $result['publicId']);
         $this->assertSame('Test App', $result['name']);
         $this->assertArrayNotHasKey('secret', $result, 'A client secret is never listed.');

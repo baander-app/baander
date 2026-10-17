@@ -25,6 +25,7 @@ final class LibraryResourceTest extends TestCase
         $now = new \DateTimeImmutable('2024-06-15T12:00:00+00:00');
 
         return Library::reconstitute(new LibraryState(
+            publicId: new \App\Shared\Domain\Model\PublicId(),
             id: $id,
             name: $name ?? 'My Music',
             slug: new LibrarySlug('my-music'),
@@ -45,7 +46,7 @@ final class LibraryResourceTest extends TestCase
 
         $result = LibraryResource::from($library);
 
-        $this->assertSame($library->getId()->toString(), $result['id']);
+        $this->assertSame($library->getPublicId()->toString(), $result['publicId']);
         $this->assertSame('My Music', $result['name']);
         $this->assertSame('my-music', $result['slug']);
         $this->assertSame('/media/music', $result['path']);
@@ -109,7 +110,7 @@ final class LibraryResourceTest extends TestCase
         $result = LibraryResource::from($library);
 
         $expectedKeys = [
-            'id', 'name', 'slug', 'path', 'type', 'filesystemType',
+            'publicId', 'name', 'slug', 'path', 'type', 'filesystemType',
             'sortOrder', 'lastScan', 'scanStatus',
             'createdAt', 'updatedAt',
         ];

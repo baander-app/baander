@@ -130,7 +130,6 @@ const FAKE_KEY_PAIR = {
 }
 
 const VALID_USER = {
-  uuid: 'user-1',
   email: 'test@baander.app',
   publicId: 'usr_abc123',
   name: null,
@@ -589,7 +588,7 @@ describe('adoptStoredAuth under the refresh lock', () => {
     storage.record = liveRecord(2, 'other-access', {
       cryptoKeyPair: otherKey,
       jkt: 'other-jkt',
-      user: { ...VALID_USER, uuid: 'user-2', email: 'other@baander.app' },
+      user: { ...VALID_USER, publicId: 'user-2', email: 'other@baander.app' },
     })
 
     await expect(useAuthStore.getState().adoptStoredAuth()).resolves.toBe(true)

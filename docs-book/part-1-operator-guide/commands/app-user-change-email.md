@@ -1,6 +1,6 @@
 # app:user:change-email
 
-Change a user's email address. It does the same as changing the email in the admin panel (`PATCH /api/admin/users/{id}`) and as users changing their own address in **Settings**: the new address starts unverified and Baander emails it a verification link.
+Change a user's email address. It does the same as changing the email in the admin panel (`PATCH /api/admin/users/{publicId}`) and as users changing their own address in **Settings**: the new address starts unverified and Baander emails it a verification link.
 
 ## Quick start
 
@@ -8,17 +8,17 @@ Change a user's email address. It does the same as changing the email in the adm
 make exec cmd="php bin/console app:user:change-email alice@baander.app alice.new@baander.app"
 ```
 
-By UUID:
+By public ID:
 
 ```bash
-make exec cmd="php bin/console app:user:change-email 0192a3b4-c5d6-7890-abcd-ef1234567890 alice.new@baander.app"
+make exec cmd="php bin/console app:user:change-email aB3dE5fG7hJ9kL1mN3pQr alice.new@baander.app"
 ```
 
 ## Arguments
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `identifier` | Yes | User's current email address or UUID |
+| `identifier` | Yes | User's current email address or public ID |
 | `email` | Yes | The new email address. Baander stores it in lower case. |
 
 ## Options
@@ -35,7 +35,7 @@ make exec cmd="php bin/console app:user:change-email 0192a3b4-c5d6-7890-abcd-ef1
 - A verification link goes to the new address at once. If sending fails, the command still succeeds and the failure is logged; the user can ask for a new link from **Settings**.
 - Giving the current address changes nothing and sends no email.
 
-With `--json` the command prints only the user as the API's `data` object, the same user resource `PATCH /api/admin/users/{id}` returns: `id`, `publicId`, `name`, `email`, `emailVerifiedAt`, `roles`, `disabled`, `createdAt` and `updatedAt`.
+With `--json` the command prints only the user as the API's `data` object, the same user resource `PATCH /api/admin/users/{publicId}` returns: `publicId`, `name`, `email`, `emailVerifiedAt`, `roles`, `disabled`, `createdAt` and `updatedAt`.
 
 ## Exit codes
 

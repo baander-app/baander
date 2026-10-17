@@ -101,7 +101,7 @@ export function EditJobDialog({ job, open, onOpenChange }: { job: ScheduledJob |
       parameters: Object.keys(parameterSchema).length > 0 ? params : undefined,
     }
     updateJob.mutate(
-      { id: job.id, payload },
+      { id: job.publicId, payload },
       { onSuccess: () => { onOpenChange(false); setInitialized(false) } },
     )
   }

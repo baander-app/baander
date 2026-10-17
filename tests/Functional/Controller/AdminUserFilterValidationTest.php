@@ -51,6 +51,6 @@ final class AdminUserFilterValidationTest extends TestCase
         $response = $this->authenticatedRequest('GET', '/api/admin/users?role=ROLE_ADMIN&disabled=' . $value, $admin);
         $data = $this->assertJsonResponse($response, 200);
         self::assertSame(1, $data['meta']['total']);
-        self::assertSame([$disabled ? $target->getId()->toString() : $admin->getId()->toString()], array_column($data['data'], 'id'));
+        self::assertSame([$disabled ? $target->getPublicId()->toString() : $admin->getPublicId()->toString()], array_column($data['data'], 'publicId'));
     }
 }

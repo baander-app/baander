@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Radio\Application\Port;
 
+use App\Shared\Domain\Model\PublicId;
+use App\Radio\Domain\Model\RadioSource\RadioSource;
 use App\Shared\Domain\Model\Uuid;
 
 interface RadioSourcePortInterface
 {
+    public function findByPublicId(PublicId $publicId): ?RadioSource;
+
     /**
      * @return list<array<string, mixed>>
      */

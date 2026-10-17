@@ -4,7 +4,7 @@ import type { AdminUserSettingResource } from '@/shared/api-client/gen/endpoints
 export type AdminUserSetting = AdminUserSettingResource
 
 export interface AdminUser {
-  id: string
+  publicId: string
   email: string
   name: string
   roles: string[]

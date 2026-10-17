@@ -88,7 +88,6 @@ describe('ActivityView', () => {
   it('renders activity groups', async () => {
     const entries = [
       {
-        uuid: 'u1',
         publicId: 'p1',
         userId: 'user1',
         activityType: 'play',

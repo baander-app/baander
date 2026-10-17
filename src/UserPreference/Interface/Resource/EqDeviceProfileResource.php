@@ -10,10 +10,10 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'EqDeviceProfileResource',
     properties: [
-        new OA\Property(property: 'id', type: 'string', format: 'uuid', description: 'Profile UUID'),
+        new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Profile public identifier'),
         new OA\Property(property: 'name', type: 'string', description: 'Profile name'),
         new OA\Property(property: 'icon', type: 'string', description: 'Icon identifier'),
-        new OA\Property(property: 'deviceId', type: 'string', format: 'uuid', nullable: true, description: 'Device UUID'),
+        new OA\Property(property: 'deviceId', type: 'string', nullable: true, description: 'Client audio-output token, independent of database identity'),
         new OA\Property(property: 'payload', type: 'object', description: 'EQ configuration payload'),
         new OA\Property(property: 'isDefault', type: 'boolean', description: 'Whether this is the default profile'),
         new OA\Property(property: 'sortOrder', type: 'integer', description: 'Sort order'),
@@ -25,12 +25,12 @@ use OpenApi\Attributes as OA;
 final class EqDeviceProfileResource
 {
     /**
-     * @return array{id: string, name: string, icon: string, deviceId: string|null, payload: array<array-key, mixed>, isDefault: bool, sortOrder: int, version: int, createdAt: string, updatedAt: string}
+     * @return array{publicId: string, name: string, icon: string, deviceId: string|null, payload: array<array-key, mixed>, isDefault: bool, sortOrder: int, version: int, createdAt: string, updatedAt: string}
      */
     public static function from(EqDeviceProfile $model): array
     {
         return [
-            'id' => $model->getId()->toString(),
+            'publicId' => $model->getPublicId()->toString(),
             'name' => $model->getName(),
             'icon' => $model->getIcon(),
             'deviceId' => $model->getDeviceId(),

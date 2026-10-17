@@ -32,7 +32,7 @@ make exec cmd="php bin/console app:image:prune-missing --force"
 
 ## Details
 
-With `--dry-run` the command checks the file of every image record. It prints a table with the image ID, the type of the image's owner (such as `album` or `artist`) and the storage path of each missing file, and the number of missing files out of all images. When every file is present it says so.
+With `--dry-run` the command checks the file of every image record. It prints a table with the image public ID, the type of the image's owner (such as `album` or `artist`) and the storage path of each missing file, and the number of missing files out of all images. When every file is present it says so.
 
 Without `--dry-run` the command asks before it deletes anything. Without a terminal and without `--force` it deletes nothing and exits with code 2. It then checks every image file again and deletes the record of each missing one. The web page queues this prune on the server's task workers; the command runs it in its own process, because a console process cannot reach them. The run is recorded in the job monitor like a queued job, and the command prints its job ID and the number of records deleted.
 

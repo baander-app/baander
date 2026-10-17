@@ -82,19 +82,19 @@ final class AdminLoginBlockController
     }
 
     #[OA\Delete(
-        path: '/api/admin/login-blocks/{id}',
+        path: '/api/admin/login-blocks/{publicId}',
         summary: 'Delete a single block',
         responses: [
             new OA\Response(response: '204', description: 'Block deleted'),
             new OA\Response(response: '404', description: 'Block not found', content: new OA\JsonContent(ref: new Model(type: \App\Shared\Interface\DTO\ApiError::class))),
         ],
     )]
-    #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
+    #[Route('/{publicId}', name: 'delete', methods: ['DELETE'])]
     #[IsGranted('ROLE_SUPER_ADMIN')]
     #[CliCounterpart('app:login-block:delete')]
-    public function delete(string $id): JsonResponse
+    public function delete(string $publicId): JsonResponse
     {
-        $this->dispatch(new DeleteLoginBlockCommand($id));
+        $this->dispatch(new DeleteLoginBlockCommand($publicId));
 
         return $this->noContent();
     }

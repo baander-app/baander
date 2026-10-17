@@ -244,12 +244,14 @@ final class MovieRepository implements MovieRepositoryInterface
     private function toDomain(MovieEntity $entity): Movie
     {
         $videoIds = [];
+        $videoPublicIds = [];
         $junctionRows = $this->entityManager
             ->getRepository(MovieVideoEntity::class)
             ->findBy(['movie' => $entity->getId()]);
 
         foreach ($junctionRows as $junction) {
             $videoIds[] = $junction->getVideo()->getId()->toString();
+            $videoPublicIds[] = $junction->getVideo()->getPublicId()->toString();
         }
 
         return Movie::reconstitute(new MovieState(
@@ -271,6 +273,7 @@ final class MovieRepository implements MovieRepositoryInterface
             tmdbCollectionId: $entity->getTmdbCollectionId(),
             collectionName: $entity->getCollectionName(),
             videoIds: $videoIds,
+            videoPublicIds: $videoPublicIds,
             createdAt: $entity->getCreatedAt(),
             updatedAt: $entity->getUpdatedAt(),
         ));

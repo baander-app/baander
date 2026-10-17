@@ -80,7 +80,6 @@ vi.mock('@/features/catalog/hooks/use-artist-detail', () => {
         : (albumsRaw as Record<string, unknown>).data as Array<Record<string, unknown>>
       // Shape as AlbumSummary objects
       const albumSummaries = albums?.map((a) => ({
-        uuid: '',
         publicId: a.publicId as string,
         title: a.title as string,
         type: 'album',

@@ -218,7 +218,7 @@ export async function startScriptedServer(bundles: FixtureBundles, hosts: SiteHo
         ...pair,
         tokenType: 'Bearer',
         expiresIn: 3600,
-        user: { uuid: `uuid-${root}`, email, publicId: `usr_${root}`, name: null, roles: ['ROLE_USER'] },
+        user: { email, publicId: `usr_${root}`, name: null, roles: ['ROLE_USER'] },
       },
     }), { 'DPoP-Nonce': issueNonce() })
   }

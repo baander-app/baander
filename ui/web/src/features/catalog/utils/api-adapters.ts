@@ -86,7 +86,6 @@ function asArtistCredits(raw: unknown): ArtistCredit[] {
 function asAlbum(raw: unknown): AlbumSummary {
   const item = (raw ?? {}) as Record<string, unknown>
   return {
-    uuid: asString(item.uuid),
     publicId: asString(item.publicId),
     title: asString(item.title) || 'Untitled',
     type: asString(item.type) || 'album',
@@ -132,7 +131,6 @@ export function asAlbumFromData(data: unknown): AlbumSummary | null {
 function asSong(raw: unknown): SongSummary {
   const item = (raw ?? {}) as Record<string, unknown>
   return {
-    uuid: asString(item.uuid),
     publicId: asString(item.publicId),
     albumId: asString(item.albumId),
     title: asString(item.title),
@@ -180,7 +178,6 @@ export function asSongFromData(data: unknown): SongSummary | null {
 function asArtist(raw: unknown): ArtistSummary {
   const item = (raw ?? {}) as Record<string, unknown>
   return {
-    uuid: asString(item.uuid),
     publicId: asString(item.publicId),
     name: asString(item.name),
     country: asStringOrNull(item.country),
@@ -217,7 +214,7 @@ export function asArtistFromData(data: unknown): ArtistSummary | null {
 function asGenre(raw: unknown): Genre {
   const item = (raw ?? {}) as Record<string, unknown>
   return {
-    uuid: asString(item.uuid),
+    publicId: asString(item.publicId),
     name: asString(item.name),
     slug: asString(item.slug),
     parentId: asStringOrNull(item.parentId),
@@ -237,8 +234,7 @@ export function asGenres(data: unknown): Genre[] {
 function asMovieVideo(raw: unknown): MovieVideo {
   const item = (raw ?? {}) as Record<string, unknown>
   return {
-    uuid: asString(item.uuid),
-    publicId: asStringOrNull(item.publicId) ?? undefined,
+    publicId: asString(item.publicId),
     width: asNumber(item.width) ?? undefined,
     height: asNumber(item.height) ?? undefined,
     duration: asNumber(item.duration) ?? undefined,
@@ -275,7 +271,6 @@ export function asMovieFromData(data: unknown): MovieDetail | null {
   const item = (response?.data ?? data) as Record<string, unknown>
   return {
     ...asMovie(item),
-    uuid: asStringOrNull(item.uuid) ?? undefined,
     tagline: asStringOrNull(item.tagline),
     backdropUrl: asStringOrNull(item.backdropUrl),
     overview: asStringOrNull(item.overview),

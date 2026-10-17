@@ -5,15 +5,14 @@ declare(strict_types=1);
 namespace App\Transcode\Interface\Resource;
 
 use App\Shared\Interface\Resource\AbstractResource;
-use App\Transcode\Domain\Model\TranscodeJob;
+use App\Transcode\Application\DTO\TranscodeJobDto;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
     schema: 'TranscodeJobResource',
     properties: [
-        new OA\Property(property: 'uuid', type: 'string', format: 'uuid', description: 'Job UUID'),
         new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
-        new OA\Property(property: 'videoId', type: 'string', format: 'uuid', description: 'Video UUID'),
+        new OA\Property(property: 'videoId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Video public identifier'),
         new OA\Property(property: 'qualityTier', type: 'string', description: 'Quality tier name'),
         new OA\Property(property: 'status', type: 'string', enum: ['pending', 'in_progress', 'completed', 'failed', 'cancelled'], description: 'Job status'),
         new OA\Property(property: 'referenceCount', type: 'integer', description: 'Number of references'),
@@ -32,24 +31,13 @@ final class TranscodeJobResource extends AbstractResource
 {
     public static function from(mixed $source): array
     {
-        assert($source instanceof TranscodeJob);
+        assert($source instanceof TranscodeJobDto);
 
-        return [
-            'uuid' => $source->getId()->toString(),
-            'publicId' => $source->getPublicId()->toString(),
-            'videoId' => $source->getVideoId()->toString(),
-            'qualityTier' => $source->getQualityTierName(),
-            'status' => $source->getStatus()->value,
-            'referenceCount' => $source->getReferenceCount(),
-            'totalSegments' => $source->getTotalSegments(),
-            'completedSegments' => $source->getCompletedSegments(),
-            'progress' => $source->getProgress(),
-            'videoCodec' => $source->getVideoCodec(),
-            'audioCodec' => $source->getAudioCodec(),
-            'width' => $source->getWidth(),
-            'height' => $source->getHeight(),
-            'createdAt' => $source->getCreatedAt()->format(\DateTimeInterface::ATOM),
-            'updatedAt' => $source->getUpdatedAt()->format(\DateTimeInterface::ATOM),
-        ];
+        return array_intersect_key($source->toArray(), array_flip([
+            'publicId', 'videoId', 'qualityTier', 'status',
+            'referenceCount', 'totalSegments', 'completedSegments', 'progress',
+            'videoCodec', 'audioCodec', 'width', 'height',
+            'createdAt', 'updatedAt',
+        ]));
     }
 }

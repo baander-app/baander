@@ -24,7 +24,7 @@ interface AlbumDetailPageProps {
 /** Convert a Song to a player Track. */
 function songToTrack(song: Song): Track {
   return {
-    id: song.uuid,
+    id: song.publicId,
     publicId: song.publicId,
     title: song.title,
     artistName: song.artistName,

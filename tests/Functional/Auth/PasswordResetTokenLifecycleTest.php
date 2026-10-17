@@ -88,7 +88,7 @@ final class PasswordResetTokenLifecycleTest extends TestCase
 
         $response = $this->authenticatedRequest(
             'POST',
-            '/api/admin/users/' . $user->getId()->toString() . '/reset-password',
+            '/api/admin/users/' . $user->getPublicId()->toString() . '/reset-password',
             $this->createSuperAdminUser(),
             ['password' => 'operator-chosen-789'],
         );

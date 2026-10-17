@@ -64,7 +64,7 @@ Answering no creates nothing and exits with code 1. Without a terminal, for exam
 
 ## JSON output
 
-With `--json` the command prints only the new user as the API's `data` object, the same user resource `POST /api/admin/users` returns: `id`, `publicId`, `name`, `email`, `emailVerifiedAt`, `roles`, `disabled`, `createdAt` and `updatedAt`. Questions go to stderr, so stdout carries only the JSON. `--json` does not stand in for `--force`.
+With `--json` the command prints only the new user as the API's `data` object, the same user resource `POST /api/admin/users` returns: `publicId`, `name`, `email`, `emailVerifiedAt`, `roles`, `disabled`, `createdAt` and `updatedAt`. Questions go to stderr, so stdout carries only the JSON. `--json` does not stand in for `--force`.
 
 ## Exit codes
 

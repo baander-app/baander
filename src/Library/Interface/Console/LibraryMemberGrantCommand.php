@@ -32,7 +32,7 @@ final class LibraryMemberGrantCommand extends Command
     {
         $this
             ->addArgument('user', InputArgument::REQUIRED, 'The user, by email address or UUID')
-            ->addArgument('library', InputArgument::REQUIRED, 'Library UUID or slug');
+            ->addArgument('library', InputArgument::REQUIRED, 'Library public ID or slug');
         AdminCommandSupport::addJsonOption($this);
     }
 

@@ -30,7 +30,7 @@ final class LibraryStatsCommand extends Command
 
     protected function configure(): void
     {
-        $this->addArgument('library', InputArgument::REQUIRED, 'Library UUID or slug');
+        $this->addArgument('library', InputArgument::REQUIRED, 'Library public ID or slug');
         AdminCommandSupport::addJsonOption($this);
     }
 

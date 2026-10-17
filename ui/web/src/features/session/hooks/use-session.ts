@@ -14,7 +14,7 @@ import { createLogger } from '@/shared/lib/logger'
 const logger = createLogger('Session')
 
 export interface SessionData {
-  id: string
+  publicId: string
   userId: string
   activeDeviceId: string | null
   queue: string[]
@@ -57,8 +57,17 @@ export function useSession() {
     staleTime: 30_000,
   })
 
-  const pendingSession = query.data?.activeDeviceId && query.data.activeDeviceId !== deviceId ? query.data : null
-  const showTransferPrompt = pendingSession !== null && !(dismissedTransfer?.sessionId === pendingSession.id
+  const { data: devices = [] } = useQuery({
+    queryKey: ['devices'],
+    queryFn: async (): Promise<Array<{ publicId: string; deviceId: string }>> => {
+      const res = await AXIOS_INSTANCE.get('/api/devices')
+      return res.data?.data ?? []
+    },
+  })
+  const devicePublicId = devices.find(device => device.deviceId === deviceId)?.publicId ?? null
+
+  const pendingSession = query.data?.activeDeviceId && query.data.activeDeviceId !== devicePublicId ? query.data : null
+  const showTransferPrompt = pendingSession !== null && !(dismissedTransfer?.sessionId === pendingSession.publicId
     && dismissedTransfer.deviceId === pendingSession.activeDeviceId)
 
   // Register this device once on mount
@@ -68,8 +77,9 @@ export function useSession() {
     AXIOS_INSTANCE.post('/api/devices', {
       deviceId,
       name: getDeviceName(),
-    }).catch((err) => { logger.warn('Device registration failed:', err) })
-  }, [deviceId])
+    }).then(() => queryClient.invalidateQueries({ queryKey: ['devices'] }))
+      .catch((err) => { logger.warn('Device registration failed:', err) })
+  }, [deviceId, queryClient])
 
   // Auto-create session when playback starts and no session exists
   const [sessionCreated, setSessionCreated] = useState(false)
@@ -102,11 +112,11 @@ export function useSession() {
   useEffect(() => {
     const session = query.data
     if (!session) return
-    if (session.activeDeviceId && session.activeDeviceId !== deviceId) return
+    if (session.activeDeviceId && session.activeDeviceId !== devicePublicId) return
 
     // This device is active — hydrate server queue into player store if empty
     const localQueue = usePlayerStore.getState().queue
-    if (session.activeDeviceId === deviceId && localQueue.length === 0 && session.queue.length > 0) {
+    if (devicePublicId !== null && session.activeDeviceId === devicePublicId && localQueue.length === 0 && session.queue.length > 0) {
       AXIOS_INSTANCE.get('/api/songs/', {
         params: { publicIds: session.queue.join(','), limit: session.queue.length }
       }).then(res => {
@@ -137,12 +147,12 @@ export function useSession() {
         }
       }).catch((err) => { logger.warn('Queue hydration failed:', err) })
     }
-  }, [query.data, deviceId])
+  }, [query.data, devicePublicId])
 
   // Initialize SessionSyncBus when the session id changes. Keying on the stable id (not the
   // whole query.data object) avoids disconnecting/reconnecting the socket — and resetting the
   // reconnect backoff — on every setQueryData/staleTime refetch that produces a new object.
-  const sessionId = query.data?.id ?? null
+  const sessionId = query.data?.publicId ?? null
   useEffect(() => {
     if (!sessionId || !isAuthenticated) return
 
@@ -164,7 +174,7 @@ export function useSession() {
         // queue change made meanwhile. A session no device holds belongs to the one playing it.
         // An empty local queue (a reloaded tab) still takes the server state.
         const activeDeviceId = state.activeDeviceId ?? null
-        const ownsPlayback = activeDeviceId === deviceId || (activeDeviceId === null && local.isPlaying)
+        const ownsPlayback = (devicePublicId !== null && activeDeviceId === devicePublicId) || (activeDeviceId === null && local.isPlaying)
         if (ownsPlayback && localQueueIds.length > 0) return
 
         const queueMatch = state.queue.length === localQueueIds.length &&
@@ -230,7 +240,7 @@ export function useSession() {
       bus.disconnect()
       if (sessionSyncBus.current === bus) sessionSyncBus.current = null
     }
-  }, [sessionId, isAuthenticated, deviceId, queryClient])
+  }, [sessionId, isAuthenticated, deviceId, devicePublicId, queryClient])
 
   const claimMutation = useMutation({
     mutationFn: async (): Promise<SessionData> => {
@@ -327,7 +337,7 @@ export function useSession() {
   const syncToServer = useCallback(() => {
     const { queue, currentIndex, isPlaying } = usePlayerStore.getState()
     const currentTime = getCurrentTime()
-    const isActive = query.data?.activeDeviceId === deviceId
+    const isActive = devicePublicId !== null && query.data?.activeDeviceId === devicePublicId
 
     if (!isActive) return // Client-side sync gate
 
@@ -345,7 +355,7 @@ export function useSession() {
         headers: { 'X-Baander-Device-Id': deviceId },
       }).catch((err) => { logger.warn('REST session sync failed:', err) })
     }
-  }, [deviceId, query.data?.activeDeviceId])
+  }, [deviceId, devicePublicId, query.data?.activeDeviceId])
 
   // A pending deadline is never extended by playback ticks: continuous playback syncs too.
   useEffect(() => {
@@ -371,7 +381,7 @@ export function useSession() {
 
   function dismissTransfer() {
     if (pendingSession?.activeDeviceId) {
-      setDismissedTransfer({ sessionId: pendingSession.id, deviceId: pendingSession.activeDeviceId })
+      setDismissedTransfer({ sessionId: pendingSession.publicId, deviceId: pendingSession.activeDeviceId })
     }
   }
 

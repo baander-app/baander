@@ -158,9 +158,10 @@ final class AlbumRepositoryTest extends TestCase
 
         $conn = $this->entityManager->getConnection();
         $conn->executeStatement(
-            'INSERT INTO libraries (id, slug, name, path, type, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO libraries (id, public_id, slug, name, path, type, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 $libraryId->toString(),
+                (new PublicId())->toString(),
                 'test-lib-' . bin2hex(random_bytes(4)),
                 'Test Library',
                 '/tmp/test-' . bin2hex(random_bytes(4)),

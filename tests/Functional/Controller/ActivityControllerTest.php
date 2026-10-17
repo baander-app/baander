@@ -22,7 +22,7 @@ final class ActivityControllerTest extends TestCase
     public function testRecordPlay(): void
     {
         $user = $this->createTestUser();
-        $songId = $this->createSongFixture();
+        $songId = $this->createSongFixture($user);
 
         $response = $this->authenticatedRequest('POST', '/api/activity/play', $user, [
             'songId' => $songId,
@@ -31,7 +31,10 @@ final class ActivityControllerTest extends TestCase
         ]);
 
         $data = $this->assertJsonResponse($response, 201, 'data');
-        $this->assertArrayHasKey('songId', $data['data']);
+        $this->assertSame($songId, $data['data']['songId']);
+        $this->assertSame($user->getPublicId()->toString(), $data['data']['userId']);
+        $this->assertArrayNotHasKey('uuid', $data['data']);
+        $this->assertStringNotContainsString($user->getId()->toString(), (string) $response->getContent());
     }
 
     public function testHistoryReturnsEmptyList(): void
@@ -54,7 +57,7 @@ final class ActivityControllerTest extends TestCase
     public function testRecordPlayAndToggleLove(): void
     {
         $user = $this->createTestUser();
-        $songId = $this->createSongFixture();
+        $songId = $this->createSongFixture($user);
 
         // Record a play
         $playResponse = $this->authenticatedRequest('POST', '/api/activity/play', $user, [
@@ -71,11 +74,29 @@ final class ActivityControllerTest extends TestCase
         $this->assertTrue($loveData['data']['love']);
     }
 
+    public function testInternalMediaUuidCannotRecordActivity(): void
+    {
+        $user = $this->createTestUser();
+        $publicId = $this->createSongFixture($user);
+        $internalId = $this->entityManager->getConnection()->fetchOne('SELECT id FROM songs WHERE public_id = :publicId', ['publicId' => $publicId]);
+
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/activity/play', $user, ['songId' => $internalId]), 400);
+    }
+
+    public function testPublicMediaOutsideTheUsersLibraryScopeCannotRecordActivity(): void
+    {
+        $owner = $this->createTestUser();
+        $intruder = $this->createTestUser();
+        $publicId = $this->createSongFixture($owner);
+
+        $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/activity/play', $intruder, ['songId' => $publicId]), 404);
+    }
+
     /**
      * Create a library -> album -> song chain and return the song's public ID,
-     * which the /play endpoint resolves via songPort->findByPublicId().
+     * which the /play endpoint resolves within the user's library scope.
      */
-    private function createSongFixture(): string
+    private function createSongFixture(\App\Auth\Domain\Model\User $user): string
     {
         $libraryId = Uuid::v7();
         $albumId = Uuid::v7();
@@ -85,17 +106,19 @@ final class ActivityControllerTest extends TestCase
         $conn = $this->entityManager->getConnection();
 
         $conn->executeStatement(
-            'INSERT INTO libraries (id, slug, name, path, type, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-            [$libraryId->toString(), 'lib-' . bin2hex(random_bytes(4)), 'Test Library', '/tmp/test-' . bin2hex(random_bytes(4)), 'music', 0, $now->format('Y-m-d H:i:s'), $now->format('Y-m-d H:i:s')],
+            'INSERT INTO libraries (id, public_id, slug, name, path, type, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [$libraryId->toString(), (new PublicId())->toString(), 'lib-' . bin2hex(random_bytes(4)), 'Test Library', '/tmp/test-' . bin2hex(random_bytes(4)), 'music', 0, $now->format('Y-m-d H:i:s.uP'), $now->format('Y-m-d H:i:s.uP')],
         );
         $conn->executeStatement(
             'INSERT INTO albums (id, public_id, library_id, title, type, year, locked_fields, merged_from, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [$albumId->toString(), (new PublicId())->toString(), $libraryId->toString(), 'Album', 'studio', 2023, '{}', '[]', $now->format('Y-m-d H:i:s'), $now->format('Y-m-d H:i:s')],
+            [$albumId->toString(), (new PublicId())->toString(), $libraryId->toString(), 'Album', 'studio', 2023, '{}', '[]', $now->format('Y-m-d H:i:s.uP'), $now->format('Y-m-d H:i:s.uP')],
         );
         $conn->executeStatement(
             'INSERT INTO songs (id, public_id, album_id, path, hash, title, size, mime_type, length, track, disc, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [$songId->toString(), $songPublicId->toString(), $albumId->toString(), 'track.mp3', 'hash1', 'Track', 1000, 'audio/mpeg', 180.0, 1, 1, $now->format('Y-m-d H:i:s'), $now->format('Y-m-d H:i:s')],
+            [$songId->toString(), $songPublicId->toString(), $albumId->toString(), 'track.mp3', 'hash1', 'Track', 1000, 'audio/mpeg', 180.0, 1, 1, $now->format('Y-m-d H:i:s.uP'), $now->format('Y-m-d H:i:s.uP')],
         );
+
+        static::getContainer()->get(\App\Library\Application\Port\LibraryAccessPortInterface::class)->grant($user->getId(), $libraryId);
 
         return $songPublicId->toString();
     }

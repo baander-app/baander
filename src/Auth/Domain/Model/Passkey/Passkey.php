@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Auth\Domain\Model\Passkey;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use DateTimeImmutable;
 use InvalidArgumentException;
 
@@ -38,6 +39,7 @@ final class Passkey
 
         return new self(new PasskeyState(
             id: $id,
+            publicId: new PublicId(),
             name: $name,
             credentialId: $credentialId,
             data: $data,
@@ -73,6 +75,11 @@ final class Passkey
     {
         $this->state->counter = $counter;
         $this->state->updatedAt = new DateTimeImmutable();
+    }
+
+    public function getPublicId(): PublicId
+    {
+        return $this->state->publicId;
     }
 
     public function getId(): Uuid

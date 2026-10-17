@@ -29,7 +29,7 @@ final class WebhookDeleteCommand extends Command
 
     protected function configure(): void
     {
-        $this->addArgument('id', InputArgument::REQUIRED, 'The webhook UUID');
+        $this->addArgument('id', InputArgument::REQUIRED, 'The webhook public ID');
         AdminCommandSupport::addForceOption($this);
         AdminCommandSupport::addJsonOption($this);
     }

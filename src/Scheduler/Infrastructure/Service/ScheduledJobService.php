@@ -18,6 +18,7 @@ use App\Scheduler\Domain\Service\SchedulerRegistry;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Domain\ValueObject\ScheduleStatus;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use Cron\CronExpression;
 
 final class ScheduledJobService implements ScheduledJobPortInterface, ScheduledJobAdministrationInterface
@@ -43,6 +44,11 @@ final class ScheduledJobService implements ScheduledJobPortInterface, ScheduledJ
         $this->repository->save($job);
 
         return $job;
+    }
+
+    public function getByPublicId(PublicId $id): ?ScheduledJob
+    {
+        return $this->repository->findByPublicId($id);
     }
 
     public function getById(Uuid $id): ?ScheduledJob

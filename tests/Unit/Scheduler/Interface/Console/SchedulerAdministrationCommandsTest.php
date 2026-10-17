@@ -92,7 +92,7 @@ final class SchedulerAdministrationCommandsTest extends TestCase
         self::assertSame(JobType::Console, $job->getJobType());
         self::assertSame('Runs the test command', $job->getDescription());
         self::assertSame(['limit' => 3], $job->getParameters());
-        self::assertStringContainsString($job->getId()->toString(), $tester->getDisplay());
+        self::assertStringContainsString($job->getPublicId()->toString(), $tester->getDisplay());
     }
 
     public function testCreateAndUpdateJsonPrintTheJobTheApiReturns(): void
@@ -110,7 +110,7 @@ final class SchedulerAdministrationCommandsTest extends TestCase
         self::assertSame(ScheduledJobResource::from($job), json_decode($create->getDisplay(), true, 32, JSON_THROW_ON_ERROR));
 
         $update = $this->tester(new SchedulerUpdateCommand($this->jobs, $this->reader()));
-        self::assertSame(Command::SUCCESS, $update->execute(['id' => $job->getId()->toString(), '--name' => 'Renamed', '--json' => true]));
+        self::assertSame(Command::SUCCESS, $update->execute(['id' => $job->getPublicId()->toString(), '--name' => 'Renamed', '--json' => true]));
         self::assertSame(
             ScheduledJobResource::from($this->rows[$job->getId()->toString()]),
             json_decode($update->getDisplay(), true, 32, JSON_THROW_ON_ERROR),
@@ -164,7 +164,7 @@ final class SchedulerAdministrationCommandsTest extends TestCase
         $job = $this->stored();
         $tester = $this->tester(new SchedulerUpdateCommand($this->jobs, $this->reader()));
 
-        $exitCode = $tester->execute(['id' => $job->getId()->toString(), '--name' => 'Renamed']);
+        $exitCode = $tester->execute(['id' => $job->getPublicId()->toString(), '--name' => 'Renamed']);
 
         self::assertSame(Command::SUCCESS, $exitCode, $tester->getDisplay());
         $updated = $this->rows[$job->getId()->toString()];
@@ -180,7 +180,7 @@ final class SchedulerAdministrationCommandsTest extends TestCase
         $job = $this->stored();
         $tester = $this->tester(new SchedulerUpdateCommand($this->jobs, $this->reader()));
 
-        $exitCode = $tester->execute(['id' => $job->getId()->toString(), '--description' => '']);
+        $exitCode = $tester->execute(['id' => $job->getPublicId()->toString(), '--description' => '']);
 
         self::assertSame(Command::SUCCESS, $exitCode, $tester->getDisplay());
         self::assertNull($this->rows[$job->getId()->toString()]->getDescription());
@@ -193,7 +193,7 @@ final class SchedulerAdministrationCommandsTest extends TestCase
         $tester = $this->tester(new SchedulerUpdateCommand($this->jobs, $this->reader()));
 
         $exitCode = $tester->execute(
-            ['id' => $job->getId()->toString(), '--name' => 'Renamed'],
+            ['id' => $job->getPublicId()->toString(), '--name' => 'Renamed'],
             ['capture_stderr_separately' => true],
         );
 
@@ -207,8 +207,8 @@ final class SchedulerAdministrationCommandsTest extends TestCase
         $job = $this->stored();
         $tester = $this->tester(new SchedulerPauseCommand($this->jobs));
 
-        self::assertSame(Command::SUCCESS, $tester->execute(['id' => $job->getId()->toString()]));
-        self::assertSame(Command::SUCCESS, $tester->execute(['id' => $job->getId()->toString()]), $tester->getDisplay());
+        self::assertSame(Command::SUCCESS, $tester->execute(['id' => $job->getPublicId()->toString()]));
+        self::assertSame(Command::SUCCESS, $tester->execute(['id' => $job->getPublicId()->toString()]), $tester->getDisplay());
         self::assertSame(ScheduleStatus::Paused, $this->rows[$job->getId()->toString()]->getStatus());
         self::assertStringContainsString('is paused', $tester->getDisplay());
     }
@@ -218,7 +218,7 @@ final class SchedulerAdministrationCommandsTest extends TestCase
         $job = $this->stored(ScheduleStatus::Disabled);
         $tester = $this->tester(new SchedulerPauseCommand($this->jobs));
 
-        $exitCode = $tester->execute(['id' => $job->getId()->toString()], ['capture_stderr_separately' => true]);
+        $exitCode = $tester->execute(['id' => $job->getPublicId()->toString()], ['capture_stderr_separately' => true]);
 
         self::assertSame(Command::FAILURE, $exitCode);
         self::assertStringContainsString('A disabled job cannot be paused. Enable it first.', $tester->getErrorOutput());
@@ -233,7 +233,7 @@ final class SchedulerAdministrationCommandsTest extends TestCase
         $job = $this->stored($from);
         $tester = $this->tester($command($this));
 
-        self::assertSame(Command::SUCCESS, $tester->execute(['id' => $job->getId()->toString()]), $tester->getDisplay());
+        self::assertSame(Command::SUCCESS, $tester->execute(['id' => $job->getPublicId()->toString()]), $tester->getDisplay());
         self::assertSame($to, $this->rows[$job->getId()->toString()]->getStatus());
     }
 
@@ -246,7 +246,7 @@ final class SchedulerAdministrationCommandsTest extends TestCase
         $job = $this->stored($from);
         $tester = $this->tester($command($this));
 
-        self::assertSame(Command::SUCCESS, $tester->execute(['id' => $job->getId()->toString(), '--json' => true]));
+        self::assertSame(Command::SUCCESS, $tester->execute(['id' => $job->getPublicId()->toString(), '--json' => true]));
         $printed = json_decode($tester->getDisplay(), true, 32, JSON_THROW_ON_ERROR);
         self::assertSame(ScheduledJobResource::from($this->rows[$job->getId()->toString()]), $printed);
         self::assertSame($to->value, $printed['status']);
@@ -279,13 +279,13 @@ final class SchedulerAdministrationCommandsTest extends TestCase
     {
         $tester = $this->tester($command($this));
 
-        $missing = $tester->execute(['id' => Uuid::generate()->toString()] + $options, ['capture_stderr_separately' => true]);
+        $missing = $tester->execute(['id' => (new \App\Shared\Domain\Model\PublicId())->toString()] + $options, ['capture_stderr_separately' => true]);
         self::assertSame(Command::FAILURE, $missing);
         self::assertStringContainsString('Scheduled job not found.', $tester->getErrorOutput());
 
         $malformed = $tester->execute(['id' => 'nightly'] + $options, ['capture_stderr_separately' => true]);
         self::assertSame(Command::INVALID, $malformed);
-        self::assertStringContainsString('The job ID must be a UUID.', $tester->getErrorOutput());
+        self::assertStringContainsString('The job identity must be a public ID.', $tester->getErrorOutput());
     }
 
     /** @return iterable<string, array{\Closure(self): Command, array<string, mixed>}> */
@@ -305,11 +305,11 @@ final class SchedulerAdministrationCommandsTest extends TestCase
         $job = $this->stored();
         $tester = $this->tester(new SchedulerDeleteCommand($this->jobs));
 
-        $refused = $tester->execute(['id' => $job->getId()->toString()], ['interactive' => false, 'capture_stderr_separately' => true]);
+        $refused = $tester->execute(['id' => $job->getPublicId()->toString()], ['interactive' => false, 'capture_stderr_separately' => true]);
         self::assertSame(Command::INVALID, $refused);
         self::assertArrayHasKey($job->getId()->toString(), $this->rows);
 
-        $forced = $tester->execute(['id' => $job->getId()->toString(), '--force' => true], ['interactive' => false]);
+        $forced = $tester->execute(['id' => $job->getPublicId()->toString(), '--force' => true], ['interactive' => false]);
         self::assertSame(Command::SUCCESS, $forced, $tester->getDisplay());
         self::assertSame([], $this->rows);
     }
@@ -319,11 +319,11 @@ final class SchedulerAdministrationCommandsTest extends TestCase
         $job = $this->stored();
         $tester = $this->tester(new SchedulerDeleteCommand($this->jobs));
 
-        $refused = $tester->execute(['id' => $job->getId()->toString(), '--json' => true], ['interactive' => false, 'capture_stderr_separately' => true]);
+        $refused = $tester->execute(['id' => $job->getPublicId()->toString(), '--json' => true], ['interactive' => false, 'capture_stderr_separately' => true]);
         self::assertSame(Command::INVALID, $refused);
         self::assertArrayHasKey($job->getId()->toString(), $this->rows);
 
-        $forced = $tester->execute(['id' => $job->getId()->toString(), '--force' => true, '--json' => true], ['interactive' => false]);
+        $forced = $tester->execute(['id' => $job->getPublicId()->toString(), '--force' => true, '--json' => true], ['interactive' => false]);
         self::assertSame(Command::SUCCESS, $forced);
         self::assertSame('', $tester->getDisplay());
         self::assertSame([], $this->rows);
@@ -335,11 +335,11 @@ final class SchedulerAdministrationCommandsTest extends TestCase
         $tester = $this->tester(new SchedulerDeleteCommand($this->jobs));
 
         $tester->setInputs(['no']);
-        self::assertSame(Command::FAILURE, $tester->execute(['id' => $job->getId()->toString()]));
+        self::assertSame(Command::FAILURE, $tester->execute(['id' => $job->getPublicId()->toString()]));
         self::assertArrayHasKey($job->getId()->toString(), $this->rows);
 
         $tester->setInputs(['yes']);
-        self::assertSame(Command::SUCCESS, $tester->execute(['id' => $job->getId()->toString()]));
+        self::assertSame(Command::SUCCESS, $tester->execute(['id' => $job->getPublicId()->toString()]));
         self::assertSame([], $this->rows);
     }
 
@@ -366,14 +366,14 @@ final class SchedulerAdministrationCommandsTest extends TestCase
             ScheduledJobResource::collection($this->jobs->findAll()),
             json_decode($list->getDisplay(), true, 32, JSON_THROW_ON_ERROR),
         );
-        self::assertSame(Command::SUCCESS, $show->execute(['id' => $job->getId()->toString(), '--json' => true], ['capture_stderr_separately' => true]));
+        self::assertSame(Command::SUCCESS, $show->execute(['id' => $job->getPublicId()->toString(), '--json' => true], ['capture_stderr_separately' => true]));
         self::assertSame(
             ScheduledJobResource::from($this->jobs->getById($job->getId())),
             json_decode($show->getDisplay(), true, 32, JSON_THROW_ON_ERROR),
         );
 
         self::assertSame(Command::SUCCESS, $list->execute([]));
-        self::assertStringContainsString($job->getId()->toString(), $list->getDisplay());
+        self::assertStringContainsString($job->getPublicId()->toString(), $list->getDisplay());
         self::assertStringContainsString('Original', $list->getDisplay());
     }
 
@@ -438,6 +438,14 @@ final class SchedulerAdministrationCommandsTest extends TestCase
             public function save(ScheduledJob $job): void
             {
                 $this->test->write($job);
+            }
+
+            public function findByPublicId(\App\Shared\Domain\Model\PublicId $id): ?ScheduledJob
+            {
+                foreach ($this->test->readAll() as $job) {
+                    if ($job->getPublicId()->equals($id)) { return $job; }
+                }
+                return null;
             }
 
             public function findByUuid(Uuid $uuid): ?ScheduledJob

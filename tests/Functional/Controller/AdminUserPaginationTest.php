@@ -43,7 +43,7 @@ final class AdminUserPaginationTest extends TestCase
         $response = $this->authenticatedRequest('GET', '/api/admin/users?role=ROLE_ADMIN&disabled=true&limit=1&offset=0', $admin);
         $data = $this->assertJsonResponse($response, 200);
         self::assertSame(['total' => 1, 'limit' => 1, 'offset' => 0], $data['meta']);
-        self::assertSame([$disabledAdmin->getId()->toString()], array_column($data['data'], 'id'));
+        self::assertSame([$disabledAdmin->getPublicId()->toString()], array_column($data['data'], 'publicId'));
 
         $response = $this->authenticatedRequest('GET', '/api/admin/users?role=ROLE_ADMIN&disabled=true&limit=100&offset=1', $admin);
         $data = $this->assertJsonResponse($response, 200);
@@ -59,6 +59,6 @@ final class AdminUserPaginationTest extends TestCase
         $data = $this->assertJsonResponse($response, 200);
         self::assertSame(50, $data['meta']['limit']);
         self::assertSame(0, $data['meta']['offset']);
-        self::assertContains($admin->getId()->toString(), array_column($data['data'], 'id'));
+        self::assertContains($admin->getPublicId()->toString(), array_column($data['data'], 'publicId'));
     }
 }

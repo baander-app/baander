@@ -110,7 +110,6 @@ export function useTimelineViewModel(): UseTimelineViewModelReturn {
             const coverImage = raw.coverImage as Record<string, unknown> | null | undefined
             const artists = raw.artists as Array<Record<string, unknown>> | undefined
             results.push({
-              uuid: (raw.uuid as string) ?? '',
               publicId: (raw.publicId as string) ?? '',
               title: (raw.title as string) ?? '',
               type: (raw.type as string) ?? '',

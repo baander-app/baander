@@ -7,6 +7,7 @@ namespace App\Tests\Functional\Notification\Interface\Console;
 use App\Notification\Application\Port\WebhookSecretPortInterface;
 use App\Notification\Infrastructure\Doctrine\Entity\WebhookEntity;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Tests\Functional\Notification\WebhookDnsStub;
 use App\Tests\Functional\TestCase;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -48,7 +49,7 @@ final class WebhookCommandsTest extends TestCase
         self::assertSame($viaApi['category_filter'], $viaCli['category_filter']);
         self::assertSame($viaApi['signing_version'], $viaCli['signing_version']);
         foreach ([$viaApi, $viaCli] as $printed) {
-            $stored = $this->storedWebhook($printed['id']);
+            $stored = $this->storedWebhook($printed['publicId']);
             self::assertSame($printed['url'], $stored->getUrl());
             self::assertSame(['security', 'media_changes'], $stored->getCategoryFilter());
             self::assertSame($printed['secret'], $this->secrets()->decrypt($stored->getEncryptedSecret()));
@@ -63,7 +64,7 @@ final class WebhookCommandsTest extends TestCase
         foreach ([$viaApi, $viaCli] as $printed) {
             self::assertStringNotContainsString($printed['secret'], json_encode($listedViaApi, JSON_THROW_ON_ERROR));
             self::assertStringNotContainsString($printed['secret'], $table->getDisplay());
-            self::assertStringContainsString($printed['id'], $table->getDisplay());
+            self::assertStringContainsString($printed['publicId'], $table->getDisplay());
         }
     }
 
@@ -83,28 +84,28 @@ final class WebhookCommandsTest extends TestCase
     {
         $admin = $this->createAdminUser();
         $created = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/webhooks/', $admin, ['url' => 'https://baander.app/hook']), 201, 'data')['data'];
-        $original = $this->storedWebhook($created['id'])->getEncryptedSecret();
+        $original = $this->storedWebhook($created['publicId'])->getEncryptedSecret();
 
         $refused = $this->command('app:webhook:rotate-secret');
-        self::assertSame(Command::INVALID, $refused->execute(['id' => $created['id']], ['interactive' => false]));
-        self::assertSame($original, $this->storedWebhook($created['id'])->getEncryptedSecret());
+        self::assertSame(Command::INVALID, $refused->execute(['id' => $created['publicId']], ['interactive' => false]));
+        self::assertSame($original, $this->storedWebhook($created['publicId'])->getEncryptedSecret());
 
         $rotate = $this->command('app:webhook:rotate-secret');
-        self::assertSame(Command::SUCCESS, $rotate->execute(['id' => $created['id'], '--force' => true, '--json' => true], ['interactive' => false]), $rotate->getDisplay());
+        self::assertSame(Command::SUCCESS, $rotate->execute(['id' => $created['publicId'], '--force' => true, '--json' => true], ['interactive' => false]), $rotate->getDisplay());
         $viaCli = json_decode($rotate->getDisplay(), true, 512, JSON_THROW_ON_ERROR);
-        $stored = $this->storedWebhook($created['id']);
-        self::assertSame(['id' => $created['id'], 'secret' => $this->secrets()->decrypt($stored->getEncryptedSecret()), 'signing_version' => $stored->getSigningVersion()], $viaCli);
+        $stored = $this->storedWebhook($created['publicId']);
+        self::assertSame(['publicId' => $created['publicId'], 'secret' => $this->secrets()->decrypt($stored->getEncryptedSecret()), 'signing_version' => $stored->getSigningVersion()], $viaCli);
 
-        $viaApi = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/webhooks/' . $created['id'] . '/rotate-secret', $admin), 200, 'data')['data'];
+        $viaApi = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/webhooks/' . $created['publicId'] . '/rotate-secret', $admin), 200, 'data')['data'];
         self::assertSame(array_keys($viaCli), array_keys($viaApi));
         self::assertSame($viaCli['signing_version'], $viaApi['signing_version']);
-        self::assertSame($viaApi['secret'], $this->secrets()->decrypt($this->storedWebhook($created['id'])->getEncryptedSecret()));
+        self::assertSame($viaApi['secret'], $this->secrets()->decrypt($this->storedWebhook($created['publicId'])->getEncryptedSecret()));
     }
 
     public function testDeletingAnUnknownWebhookAnswers404AndExits1AndAMalformedIdIsInvalidInput(): void
     {
         $admin = $this->createAdminUser();
-        $unknown = Uuid::generate()->toString();
+        $unknown = (new PublicId())->toString();
 
         $this->assertJsonResponse($this->authenticatedRequest('DELETE', '/api/webhooks/' . $unknown, $admin), 404);
         $delete = $this->command('app:webhook:delete');
@@ -116,10 +117,10 @@ final class WebhookCommandsTest extends TestCase
 
         $created = $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/webhooks/', $admin, ['url' => 'https://baander.app/hook']), 201, 'data')['data'];
         $deleted = $this->command('app:webhook:delete');
-        self::assertSame(Command::SUCCESS, $deleted->execute(['id' => $created['id'], '--force' => true, '--json' => true], ['interactive' => false]));
+        self::assertSame(Command::SUCCESS, $deleted->execute(['id' => $created['publicId'], '--force' => true, '--json' => true], ['interactive' => false]));
         self::assertSame('', $deleted->getDisplay());
         $this->entityManager->clear();
-        self::assertNull($this->entityManager->find(WebhookEntity::class, Uuid::fromString($created['id'])));
+        self::assertNull($this->entityManager->getRepository(WebhookEntity::class)->findOneBy(['publicId' => PublicId::fromString($created['publicId'])]));
     }
 
     public function testClearingTheCategoryFilterStoresNullOnBothPaths(): void
@@ -146,13 +147,13 @@ final class WebhookCommandsTest extends TestCase
         return $this->assertJsonResponse($this->authenticatedRequest('POST', '/api/webhooks/', $admin, [
             'url' => 'https://baander.app/hook',
             'category_filter' => ['security'],
-        ]), 201, 'data')['data']['id'];
+        ]), 201, 'data')['data']['publicId'];
     }
 
     private function storedWebhook(string $id): WebhookEntity
     {
         $this->entityManager->clear();
-        $webhook = $this->entityManager->find(WebhookEntity::class, Uuid::fromString($id));
+        $webhook = $this->entityManager->getRepository(WebhookEntity::class)->findOneBy(['publicId' => PublicId::fromString($id)]);
         self::assertInstanceOf(WebhookEntity::class, $webhook);
 
         return $webhook;

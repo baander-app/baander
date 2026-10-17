@@ -76,9 +76,9 @@ type ActiveDevice = string | null
 
 function sessionFor(activeDeviceId: ActiveDevice, position: number, queue = ['first']) {
   return {
-    id: 'session-1',
+    publicId: 'session-1',
     userId: 'user-1',
-    activeDeviceId,
+    activeDeviceId: activeDeviceId === 'local-device' ? 'local-device-public-id' : activeDeviceId,
     queue,
     currentTrackIndex: 0,
     position,
@@ -97,7 +97,7 @@ function wrapper({ children }: { children: ReactNode }) {
 }
 
 async function mountConnected(activeDeviceId: ActiveDevice) {
-  vi.mocked(AXIOS_INSTANCE.get).mockResolvedValue({ data: { data: sessionFor(activeDeviceId, 15) } })
+  vi.mocked(AXIOS_INSTANCE.get).mockImplementation(async (url) => ({ data: { data: url === '/api/devices' ? [{ publicId: 'local-device-public-id', deviceId: 'local-device' }] : sessionFor(activeDeviceId, 15) } }))
   const hook = renderHook(() => useSession(), { wrapper })
   await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1))
   const socket = FakeWebSocket.instances[0]
@@ -200,7 +200,7 @@ it('closes an open session socket when the tab clears its credentials and does n
 })
 
 it('closes a session socket that is still connecting when the tab clears its credentials', async () => {
-  vi.mocked(AXIOS_INSTANCE.get).mockResolvedValue({ data: { data: sessionFor('local-device', 15) } })
+  vi.mocked(AXIOS_INSTANCE.get).mockImplementation(async (url) => ({ data: { data: url === '/api/devices' ? [{ publicId: 'local-device-public-id', deviceId: 'local-device' }] : sessionFor('local-device', 15) } }))
   const hook = renderHook(() => useSession(), { wrapper })
   await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1))
   const socket = FakeWebSocket.instances[0]
@@ -235,7 +235,7 @@ it('does not open a socket when logout wins a pending ticket request', async () 
     signal = config?.signal as AbortSignal
     return pending as ReturnType<typeof AXIOS_INSTANCE.post>
   })
-  vi.mocked(AXIOS_INSTANCE.get).mockResolvedValue({ data: { data: sessionFor('local-device', 15) } })
+  vi.mocked(AXIOS_INSTANCE.get).mockImplementation(async (url) => ({ data: { data: url === '/api/devices' ? [{ publicId: 'local-device-public-id', deviceId: 'local-device' }] : sessionFor('local-device', 15) } }))
   const hook = renderHook(() => useSession(), { wrapper })
   await waitFor(() => expect(signal).toBeDefined())
   act(() => { useAuthStore.getState().clearAuth() })

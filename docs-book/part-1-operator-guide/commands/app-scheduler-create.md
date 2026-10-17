@@ -32,9 +32,9 @@ A new job starts active, and its next run is computed from the expression.
 
 The input is checked in two steps, as in the admin API. First the fields themselves: a missing name, expression, type or command, a name over 255 characters, an expression that is not a valid cron expression, or a type other than `messenger` or `console` is rejected with `Validation failed.` and one line per field, such as `expression: Invalid cron expression: ...`. These are the message and the per-field messages of the API's 422 response. Then the command and its parameters: the command must be registered as schedulable under the given type, every parameter must be in the command's schema with the schema's type (`int`, `string`, `bool`, `float` or `array`), and every required parameter must be present. A failure names the problem, such as `Invalid parameter "ttl-hours": expected int, got string.` Nothing is stored when the input is rejected.
 
-On success the command prints the new job with its ID.
+On success the command prints the new job with its public ID.
 
-With `--json` the command prints only the new job as the API's `data` object, the same fields [app:scheduler:show](app-scheduler-show.md) `--json` prints, so a script can read the job's UUID from `id`.
+With `--json` the command prints only the new job as the API's `data` object, the same fields [app:scheduler:show](app-scheduler-show.md) `--json` prints, so a script can read the job's public ID from `publicId`.
 
 ## Exit codes
 

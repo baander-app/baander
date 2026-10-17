@@ -11,7 +11,6 @@ use OpenApi\Attributes as OA;
 #[OA\Schema(
     schema: 'PlaylistResource',
     properties: [
-        new OA\Property(property: 'uuid', type: 'string', format: 'uuid', description: 'Playlist UUID'),
         new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, description: 'Public identifier'),
         new OA\Property(property: 'ownerPublicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, description: "The owner's public id"),
         new OA\Property(property: 'collaboratorPublicIds', type: 'array', items: new OA\Items(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21), description: 'The public ids of the collaborators, oldest first'),
@@ -31,7 +30,6 @@ final class PlaylistResource extends AbstractResource
         assert($source instanceof PlaylistReadView);
 
         return [
-            'uuid' => $source->getId()->toString(),
             'publicId' => $source->getPublicId()->toString(),
             'ownerPublicId' => $source->getOwnerPublicId()->toString(),
             'collaboratorPublicIds' => array_map(

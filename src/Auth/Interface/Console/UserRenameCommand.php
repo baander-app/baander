@@ -34,7 +34,7 @@ final class UserRenameCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addArgument('identifier', InputArgument::REQUIRED, 'User email or UUID')
+            ->addArgument('identifier', InputArgument::REQUIRED, 'User email or public ID')
             ->addArgument('name', InputArgument::REQUIRED, 'The new display name');
         AdminCommandSupport::addJsonOption($this);
     }

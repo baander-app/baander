@@ -22,7 +22,7 @@
  * });
  *
  * await player.attach(videoElement);
- * await player.load('video-uuid-here');
+ * await player.load('video-publicId-here');
  * player.play();
  * ```
  */

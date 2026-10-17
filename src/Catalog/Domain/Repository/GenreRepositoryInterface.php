@@ -7,6 +7,7 @@ namespace App\Catalog\Domain\Repository;
 use App\Catalog\Domain\Model\Genre;
 use App\Catalog\Domain\ReadModel\GenreReadView;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 
 interface GenreRepositoryInterface
@@ -31,6 +32,10 @@ interface GenreRepositoryInterface
     public function persist(Genre $genre): void;
 
     public function flush(): void;
+
+    public function findByPublicId(PublicId $publicId): ?Genre;
+
+    public function findVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): ?GenreReadView;
 
     public function findByUuid(Uuid $uuid): ?Genre;
 

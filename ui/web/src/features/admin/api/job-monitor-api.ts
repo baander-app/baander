@@ -18,9 +18,6 @@ export interface JobListItem {
 }
 
 export interface JobDetail extends JobListItem {
-  exception: { message: string; file: string; line: number } | null;
-  data: string | null;
-  dataTruncated: boolean;
   duration: number | null;
   /** Running or queued, or finished with queued work, such as lyrics fetches, still waiting. */
   cancellable: boolean;

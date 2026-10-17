@@ -8,7 +8,7 @@ use App\Catalog\Application\Command\Movie\DeleteMovieCommand;
 use App\Catalog\Application\Command\Movie\UpdateMovieCommand;
 use App\Catalog\Application\Port\MoviePortInterface;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
-use App\Catalog\Domain\Repository\VideoRepositoryInterface;
+use App\Catalog\Application\Port\VideoPortInterface;
 use App\Catalog\Interface\Request\UpdateMovieRequest;
 use App\Catalog\Interface\Resource\CatalogDeletionResource;
 use App\Catalog\Interface\Resource\MovieResource;
@@ -39,7 +39,7 @@ final class MovieController
     public function __construct(
         private readonly MoviePortInterface $movieService,
         private readonly LibraryReadScopeProviderInterface $libraryReadScopeProvider,
-        private readonly VideoRepositoryInterface $videoRepository,
+        private readonly VideoPortInterface $videoRepository,
         private readonly MessageBusInterface $bus,
     ) {
     }
@@ -90,7 +90,7 @@ final class MovieController
         path: '/api/movies/{publicId}',
         summary: 'Get a single movie',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Movie public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Movie public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Movie details', content: new OA\JsonContent(
@@ -121,7 +121,6 @@ final class MovieController
             $video = $this->videoRepository->findByUuid(Uuid::fromString($videoIdStr));
             if ($video !== null) {
                 $videos[] = [
-                    'uuid' => $video->getId()->toString(),
                     'publicId' => $video->getPublicId()->toString(),
                     'height' => $video->getHeight(),
                     'width' => $video->getWidth(),
@@ -153,7 +152,7 @@ final class MovieController
                 new OA\Property(property: 'summary', type: 'string', nullable: true),
             ])),
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Movie public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Movie public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
         ],
         responses: [
             new OA\Response(response: '200', description: 'Movie updated', content: new OA\JsonContent(
@@ -185,7 +184,7 @@ final class MovieController
         path: '/api/movies/{publicId}',
         summary: 'Delete a movie',
         parameters: [
-            new OA\Parameter(name: 'publicId', description: 'Movie public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'publicId', description: 'Movie public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
         ],
         responses: [
             new OA\Response(

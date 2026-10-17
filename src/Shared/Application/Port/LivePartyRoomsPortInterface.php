@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Shared\Application\Port;
 
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 
 /**
  * Keeps a party's live WebSocket room in step with the party's membership: the room
@@ -20,7 +21,7 @@ interface LivePartyRoomsPortInterface
      * Removes every socket of the user from the party's room, then sends the sockets
      * left in it one `party.member_event` leave event.
      */
-    public function removeMember(Uuid $sessionId, Uuid $userId): void;
+    public function removeMember(Uuid $sessionId, Uuid $userId, PublicId $sessionPublicId, PublicId $userPublicId): void;
 
     /** Removes every socket from the party's room. */
     public function close(Uuid $sessionId): void;

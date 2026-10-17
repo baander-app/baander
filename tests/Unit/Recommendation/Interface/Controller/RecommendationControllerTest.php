@@ -36,7 +36,7 @@ final class RecommendationControllerTest extends TestCase
         $security->method('getUser')->willReturn($authenticated ? $this->createStub(UserInterface::class) : null);
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects($this->never())->method('dispatch');
-        $controller = new RecommendationController($security, $bus, new JsonEncoder());
+        $controller = new RecommendationController($security, $bus, new JsonEncoder(), $this->createStub(\App\Recommendation\Application\Port\RecommendationPublicIdentityInterface::class));
 
         $response = $controller->{$action}(new Request());
 
@@ -52,7 +52,7 @@ final class RecommendationControllerTest extends TestCase
         $bus->expects($this->once())->method('dispatch')
             ->with(self::callback(static fn (GetRecommendationsForUserQuery $query): bool => $query->getUserId()->equals($userId)))
             ->willReturnCallback(static fn (object $query): Envelope => new Envelope($query, [new HandledStamp([], 'recommendations')]));
-        $controller = new RecommendationController($security, $bus, new JsonEncoder());
+        $controller = new RecommendationController($security, $bus, new JsonEncoder(), $this->createStub(\App\Recommendation\Application\Port\RecommendationPublicIdentityInterface::class));
 
         $response = $controller->index(new Request());
 

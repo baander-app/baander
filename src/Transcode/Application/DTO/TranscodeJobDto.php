@@ -4,15 +4,13 @@ declare(strict_types=1);
 
 namespace App\Transcode\Application\DTO;
 
+use App\Shared\Application\PublicDiagnosticText;
+use App\Shared\Domain\Model\PublicId;
 use App\Transcode\Domain\Model\TranscodeJob;
 
 final readonly class TranscodeJobDto
 {
-    /**
-     * @param array<string, array{path: string, size: int, duration: float}> $segmentMap
-     */
     public function __construct(
-        private string $uuid,
         private string $publicId,
         private string $videoId,
         private string $qualityTier,
@@ -21,9 +19,6 @@ final readonly class TranscodeJobDto
         private int $totalSegments,
         private int $completedSegments,
         private float $progress,
-        private string $outputDirectory,
-        private ?string $initSegmentPath,
-        private array $segmentMap,
         private ?string $videoCodec,
         private ?string $audioCodec,
         private int $videoBitrate,
@@ -37,21 +32,17 @@ final readonly class TranscodeJobDto
     ) {
     }
 
-    public static function fromModel(TranscodeJob $job): self
+    public static function fromModel(TranscodeJob $job, PublicId $videoId): self
     {
         return new self(
-            uuid: $job->getId()->toString(),
             publicId: $job->getPublicId()->toString(),
-            videoId: $job->getVideoId()->toString(),
+            videoId: $videoId->toString(),
             qualityTier: $job->getQualityTierName(),
             status: $job->getStatus()->value,
             referenceCount: $job->getReferenceCount(),
             totalSegments: $job->getTotalSegments(),
             completedSegments: $job->getCompletedSegments(),
             progress: $job->getProgress(),
-            outputDirectory: $job->getOutputDirectory(),
-            initSegmentPath: $job->getInitSegmentPath(),
-            segmentMap: $job->getSegmentMap(),
             videoCodec: $job->getVideoCodec(),
             audioCodec: $job->getAudioCodec(),
             videoBitrate: $job->getVideoBitrate(),
@@ -74,18 +65,14 @@ final readonly class TranscodeJobDto
         $completedSegments = (int) $row['completed_segments'];
 
         return new self(
-            uuid: (string) $row['id'],
             publicId: (string) $row['public_id'],
-            videoId: (string) $row['video_id'],
+            videoId: (string) $row['video_public_id'],
             qualityTier: (string) $row['quality_tier_name'],
             status: (string) $row['status'],
             referenceCount: (int) $row['reference_count'],
             totalSegments: $totalSegments,
             completedSegments: $completedSegments,
             progress: $totalSegments === 0 ? 0.0 : $completedSegments / $totalSegments * 100.0,
-            outputDirectory: (string) $row['output_directory'],
-            initSegmentPath: $row['init_segment_path'] !== null ? (string) $row['init_segment_path'] : null,
-            segmentMap: \is_string($row['segment_map']) ? json_decode($row['segment_map'], true, 512, JSON_THROW_ON_ERROR) : (array) $row['segment_map'],
             videoCodec: $row['video_codec'] !== null ? (string) $row['video_codec'] : null,
             audioCodec: $row['audio_codec'] !== null ? (string) $row['audio_codec'] : null,
             videoBitrate: (int) $row['video_bitrate'],
@@ -105,7 +92,6 @@ final readonly class TranscodeJobDto
     public function toArray(): array
     {
         return [
-            'uuid' => $this->uuid,
             'publicId' => $this->publicId,
             'videoId' => $this->videoId,
             'qualityTier' => $this->qualityTier,
@@ -114,9 +100,6 @@ final readonly class TranscodeJobDto
             'totalSegments' => $this->totalSegments,
             'completedSegments' => $this->completedSegments,
             'progress' => $this->progress,
-            'outputDirectory' => $this->outputDirectory,
-            'initSegmentPath' => $this->initSegmentPath,
-            'segmentMap' => $this->segmentMap,
             'videoCodec' => $this->videoCodec,
             'audioCodec' => $this->audioCodec,
             'videoBitrate' => $this->videoBitrate,
@@ -124,7 +107,7 @@ final readonly class TranscodeJobDto
             'width' => $this->width,
             'height' => $this->height,
             'framerate' => $this->framerate,
-            'failReason' => $this->failReason,
+            'failReason' => $this->failReason !== null ? PublicDiagnosticText::redact($this->failReason) : null,
             'createdAt' => $this->createdAt,
             'updatedAt' => $this->updatedAt,
         ];

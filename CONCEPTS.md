@@ -2,6 +2,28 @@
 
 > Shared domain vocabulary for this project — entities, named processes, and status concepts with project-specific meaning. Seeded with core domain vocabulary, then accretes as ce-compound and ce-compound-refresh process learnings; direct edits are fine. Glossary only, not a spec or catch-all.
 
+## Identity
+
+### Internal UUID
+
+The persisted identity used inside the application for primary keys, foreign keys and domain events. Public transport contracts do not expose or require it to identify an entity.
+
+### Public ID
+
+An entity's independent, 21-character NanoID, represented by `PublicId` in code and usually `publicId` in resources. Public routes, relationships, cursors and realtime messages use this identity; existing snake-case contracts use `public_id`. A contextual name such as `videoId` still carries a public ID. Resolving it does not grant access to the entity.
+
+### Browser device token
+
+The client-generated UUID sent as `deviceId` during device registration and session claims, and in the `X-Baander-Device-Id` header. It identifies the browser installation within the account. The device resource's `publicId` addresses rename and forget operations and appears as a listening session's `activeDeviceId`.
+
+### EQ audio-output token
+
+The optional client value stored in an EQ profile's `deviceId`. It names an audio output according to the client and does not refer to the persisted device resource. The profile itself has a public ID.
+
+### OAuth client identifier
+
+The registered client's public ID, carried by OAuth's `client_id`, administration's `clientId` and the access-token JWT's `client_id` claim. It is separate from a token identifier or secret.
+
 ## Web server lifecycle
 
 ### Drain
@@ -16,6 +38,10 @@ A drain has a deadline, which an operator configures, and a shorter drain window
 Replacing the web server's worker processes while the server itself keeps running and keeps its client connections. A reload never starts a drain, and a reload requested during a drain is ignored.
 
 ## Authentication
+
+### Passkey user handle
+
+The user's public ID encoded as bytes for WebAuthn registration, authentication and account signals. It identifies the account independently of the authenticator's credential ID. Passkeys enrolled with UUID handles are invalidated and require re-enrollment; authentication has no UUID-handle fallback.
 
 ### Refresh token chain
 

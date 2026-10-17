@@ -184,7 +184,7 @@ final class PlaylistReadFirewallTest extends TestCase
         // The collaborator reads the library the owner cannot, so their one song is the other one.
         $visibility = $actor === 'collaborator' ? 'denied' : 'allowed';
         $visibleSong = $actor === 'collaborator' ? $this->deniedSong : $this->allowedSong;
-        self::assertSame($visibleSong->getId()->toString(), $data['songs'][0]['uuid']);
+        self::assertSame($visibleSong->getPublicId()->toString(), $data['songs'][0]['publicId']);
         self::assertSame($visibility . ' song', $data['songs'][0]['title']);
         self::assertSame($visibility . ' artist', $data['songs'][0]['artistName']);
         self::assertSame($visibility . ' album', $data['songs'][0]['albumName']);
@@ -192,10 +192,10 @@ final class PlaylistReadFirewallTest extends TestCase
             self::assertArrayNotHasKey('path', $song);
         }
         if ($actor === 'owner') {
-            self::assertNotContains($this->deniedSong->getId()->toString(), array_column($data['songs'], 'uuid'));
+            self::assertNotContains($this->deniedSong->getPublicId()->toString(), array_column($data['songs'], 'publicId'));
         }
         if ($actor === 'collaborator') {
-            self::assertNotContains($this->allowedSong->getId()->toString(), array_column($data['songs'], 'uuid'));
+            self::assertNotContains($this->allowedSong->getPublicId()->toString(), array_column($data['songs'], 'publicId'));
         }
     }
 

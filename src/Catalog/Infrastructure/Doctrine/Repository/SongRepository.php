@@ -403,10 +403,22 @@ final class SongRepository implements SongRepositoryInterface
         $sortField = $options->hasSort() ? SongSortField::from($options->getSortField()) : SongSortField::Title;
         $descending = $options->hasSort() && strtolower($options->getSortOrder()) === 'desc';
 
+        if ($options->getCursor() !== null) {
+            $cursorId = $options->getCursor()->getValues()['id'] ?? null;
+            try {
+                if (!is_string($cursorId)) {
+                    throw new \InvalidArgumentException('Missing cursor public identity.');
+                }
+                PublicId::fromString($cursorId);
+            } catch (\InvalidArgumentException $exception) {
+                throw new \App\Shared\Domain\Exception\CursorMismatchException('Invalid cursor public identity.', previous: $exception);
+            }
+        }
+
         $result = $this->cursorPaginator->paginate(
             $qb,
             $this->resolveSortColumn($sortField, $qb),
-            's.id',
+            's.publicId',
             $options->getCursor(),
             $options->getLimit(),
             $this->buildValueExtractor($sortField),
@@ -699,13 +711,13 @@ final class SongRepository implements SongRepositoryInterface
         return match ($sortField) {
             SongSortField::Artist => function (SongEntity $e): array {
                 $artistName = $this->getArtistNameForSong($e->getId()) ?? '';
-                return ['sort' => $artistName, 'id' => $e->getId()->toString()];
+                return ['sort' => $artistName, 'id' => $e->getPublicId()->toString()];
             },
-            SongSortField::Album => fn (SongEntity $e): array => ['sort' => $e->getAlbum()->getTitle(), 'id' => $e->getId()->toString()],
-            SongSortField::Year => fn (SongEntity $e): array => ['sort' => $e->getAlbum()->getYear(), 'id' => $e->getId()->toString()],
+            SongSortField::Album => fn (SongEntity $e): array => ['sort' => $e->getAlbum()->getTitle(), 'id' => $e->getPublicId()->toString()],
+            SongSortField::Year => fn (SongEntity $e): array => ['sort' => $e->getAlbum()->getYear(), 'id' => $e->getPublicId()->toString()],
             // Keep the microseconds: a whole-second cursor sorts before its own row and repeats or skips songs added within that second.
-            SongSortField::Added => fn (SongEntity $e): array => ['sort' => $e->getCreatedAt()->format(InstantType::WRITE_FORMAT), 'id' => $e->getId()->toString()],
-            SongSortField::Title => fn (SongEntity $e): array => ['sort' => $e->getTitle(), 'id' => $e->getId()->toString()],
+            SongSortField::Added => fn (SongEntity $e): array => ['sort' => $e->getCreatedAt()->format(InstantType::WRITE_FORMAT), 'id' => $e->getPublicId()->toString()],
+            SongSortField::Title => fn (SongEntity $e): array => ['sort' => $e->getTitle(), 'id' => $e->getPublicId()->toString()],
         };
     }
 

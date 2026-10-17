@@ -8,13 +8,13 @@ const { useActivityViewModel, loadMore, refetch } = vi.hoisted(() => ({
 }))
 vi.mock('../../hooks/use-activity-view-model', () => ({ useActivityViewModel }))
 vi.mock('../../components/ActivityGroup', () => ({
-  ActivityGroup: ({ items }: { items: { uuid: string }[] }) => items.map((item) => <div key={item.uuid}>{item.uuid}</div>),
+  ActivityGroup: ({ items }: { items: { publicId: string }[] }) => items.map((item) => <div key={item.publicId}>{item.publicId}</div>),
 }))
 
 beforeEach(() => vi.resetAllMocks())
 afterEach(cleanup)
 
-const loadedGroups = [{ label: 'Today', items: [{ uuid: 'loaded-history' }] }]
+const loadedGroups = [{ label: 'Today', items: [{ publicId: 'loaded-history' }] }]
 
 describe('activity history recovery', () => {
   it.each([true, false])('retains history when a request fails (next page: %s)', async (isFetchMoreError) => {

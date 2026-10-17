@@ -13,7 +13,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     properties: [
         new OA\Property(property: 'name', type: 'string', maxLength: 255, example: 'Headphones'),
         new OA\Property(property: 'icon', type: 'string', example: 'headphones'),
-        new OA\Property(property: 'deviceId', type: 'string', nullable: true, example: 'audio-output-group-abc'),
+        new OA\Property(property: 'deviceId', description: 'Client audio-output token, independent of database identity', type: 'string', nullable: true, example: 'audio-output-group-abc'),
     ],
 )]
 final readonly class CreateEqDeviceProfileRequest

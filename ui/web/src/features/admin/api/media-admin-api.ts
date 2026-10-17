@@ -13,7 +13,7 @@ export interface StorageStats {
 }
 
 export interface MissingImage {
-  id: string
+  publicId: string
   path: string
   type: string
 }

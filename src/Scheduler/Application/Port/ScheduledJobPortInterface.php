@@ -8,6 +8,7 @@ use App\Scheduler\Domain\Model\ScheduledJob;
 use App\Scheduler\Domain\ValueObject\JobType;
 use App\Scheduler\Domain\ValueObject\ScheduleStatus;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 
 interface ScheduledJobPortInterface
 {
@@ -22,6 +23,8 @@ interface ScheduledJobPortInterface
     ): ScheduledJob;
 
     public function getById(Uuid $id): ?ScheduledJob;
+
+    public function getByPublicId(PublicId $id): ?ScheduledJob;
 
     /** @return ScheduledJob[] */
     public function findAll(): array;

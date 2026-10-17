@@ -32,7 +32,7 @@ final class AlbumDuplicateControllerTest extends TestCase
 
         $this->createDuplicateAlbumsFixture($libraryId);
 
-        $response = $this->authenticatedRequest('GET', '/api/admin/albums/duplicates?libraryId=' . $libraryId->toString(), $user);
+        $response = $this->authenticatedRequest('GET', '/api/admin/albums/duplicates?libraryId=' . $this->libraryPublicId($libraryId), $user);
 
         $data = $this->assertJsonResponse($response, 200, 'data');
         $this->assertIsArray($data['data']);
@@ -54,7 +54,7 @@ final class AlbumDuplicateControllerTest extends TestCase
         $user = $this->createTestUser();
         $libraryId = $this->createLibraryFixture();
 
-        $response = $this->authenticatedRequest('GET', '/api/admin/albums/duplicates?libraryId=' . $libraryId->toString(), $user);
+        $response = $this->authenticatedRequest('GET', '/api/admin/albums/duplicates?libraryId=' . $this->libraryPublicId($libraryId), $user);
 
         $this->assertSame(403, $response->getStatusCode());
     }
@@ -84,7 +84,7 @@ final class AlbumDuplicateControllerTest extends TestCase
 
         $this->createSingleAlbumFixture($libraryId, 'Unique Album');
 
-        $response = $this->authenticatedRequest('GET', '/api/admin/albums/duplicates?libraryId=' . $libraryId->toString(), $user);
+        $response = $this->authenticatedRequest('GET', '/api/admin/albums/duplicates?libraryId=' . $this->libraryPublicId($libraryId), $user);
 
         $data = $this->assertJsonResponse($response, 200, 'data');
         $this->assertIsArray($data['data']);
@@ -199,6 +199,21 @@ final class AlbumDuplicateControllerTest extends TestCase
 
     // --- Fixture helpers ---
 
+    private function libraryPublicId(Uuid $id): string
+    {
+        $value = $this->entityManager->getConnection()->fetchOne('SELECT public_id FROM libraries WHERE id = ?', [$id->toString()]);
+        self::assertIsString($value);
+        return $value;
+    }
+
+    public function testInternalLibraryUuidIsRejected(): void
+    {
+        $admin = $this->createAdminUser();
+        $libraryId = $this->createLibraryFixture();
+        $response = $this->authenticatedRequest('GET', '/api/admin/albums/duplicates?libraryId=' . $libraryId->toString(), $admin);
+        self::assertSame(400, $response->getStatusCode());
+    }
+
     private function createLibraryFixture(): Uuid
     {
         $libraryId = Uuid::v7();
@@ -206,9 +221,10 @@ final class AlbumDuplicateControllerTest extends TestCase
 
         $conn = $this->entityManager->getConnection();
         $conn->executeStatement(
-            'INSERT INTO libraries (id, slug, name, path, type, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO libraries (id, public_id, slug, name, path, type, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
                 $libraryId->toString(),
+                (new PublicId())->toString(),
                 'test-lib-' . bin2hex(random_bytes(4)),
                 'Test Library',
                 '/tmp/test-' . bin2hex(random_bytes(4)),

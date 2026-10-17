@@ -11,7 +11,7 @@ use App\Library\Domain\Repository\LibraryRepositoryInterface;
 use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
-use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\ValueObject\FilesystemType;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use PHPUnit\Framework\TestCase;
@@ -30,11 +30,11 @@ final class LibraryLookupTest extends TestCase
         $this->lookup = new LibraryLookup($this->repositoryHonouringScope($this->music, $this->films));
     }
 
-    public function testTheUnrestrictedScopeFindsAnyLibraryByUuidOrSlug(): void
+    public function testTheUnrestrictedScopeFindsAnyLibraryByPublicIdOrSlug(): void
     {
         $scope = LibraryReadScope::unrestricted();
 
-        self::assertSame($this->music, $this->lookup->byIdentifier($this->music->getId()->toString(), $scope));
+        self::assertSame($this->music, $this->lookup->byIdentifier($this->music->getPublicId()->toString(), $scope));
         self::assertSame($this->films, $this->lookup->byIdentifier('films', $scope));
     }
 
@@ -43,9 +43,9 @@ final class LibraryLookupTest extends TestCase
         $scope = LibraryReadScope::restricted([$this->music->getId()]);
 
         self::assertSame($this->music, $this->lookup->byIdentifier('music', $scope));
-        self::assertSame($this->music, $this->lookup->byIdentifier($this->music->getId()->toString(), $scope));
+        self::assertSame($this->music, $this->lookup->byIdentifier($this->music->getPublicId()->toString(), $scope));
 
-        foreach (['films', $this->films->getId()->toString()] as $identifier) {
+        foreach (['films', $this->films->getPublicId()->toString()] as $identifier) {
             try {
                 $this->lookup->byIdentifier($identifier, $scope);
                 self::fail('A library outside the member scope must be not found.');
@@ -53,6 +53,13 @@ final class LibraryLookupTest extends TestCase
                 self::assertSame(sprintf('Library "%s" not found.', $identifier), $exception->getMessage());
             }
         }
+    }
+
+    public function testInternalUuidCannotAddressALibrary(): void
+    {
+        $this->expectException(LibraryNotFoundException::class);
+
+        $this->lookup->byIdentifier($this->music->getId()->toString(), LibraryReadScope::unrestricted());
     }
 
     public function testAnEmptyScopeFindsNothing(): void
@@ -66,10 +73,10 @@ final class LibraryLookupTest extends TestCase
     private function repositoryHonouringScope(Library ...$libraries): LibraryRepositoryInterface
     {
         $repository = $this->createStub(LibraryRepositoryInterface::class);
-        $repository->method('findVisibleByUuid')->willReturnCallback(
-            static function (Uuid $uuid, LibraryReadScope $scope) use ($libraries): ?Library {
+        $repository->method('findVisibleByPublicId')->willReturnCallback(
+            static function (PublicId $publicId, LibraryReadScope $scope) use ($libraries): ?Library {
                 foreach ($libraries as $library) {
-                    if ($library->getId()->equals($uuid) && $scope->allows($library->getId())) {
+                    if ($library->getPublicId()->equals($publicId) && $scope->allows($library->getId())) {
                         return $library;
                     }
                 }

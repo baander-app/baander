@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Radio\Domain\Model\RadioStation;
 
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 
@@ -27,6 +28,7 @@ final class RadioStationState
      */
     public function __construct(
         public readonly Uuid $id,
+        public readonly PublicId $publicId,
         public readonly Uuid $sourceId,
         public string $externalId,
         public string $name,

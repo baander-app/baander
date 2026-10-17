@@ -204,10 +204,12 @@ final class NotificationOwnershipPersistenceTest extends TestCase
 
         // Interleave owners so every owner predicate is exercised against foreign rows.
         $ids = [];
+        $publicIds = [];
         foreach ([[$first, 'a1'], [$second, 'b1'], [$first, 'a2'], [$second, 'b2'], [$first, 'a3']] as $offset => [$userId, $title]) {
             $notification = $this->notification($userId, $title);
             $repository->save($notification);
             $ids[$title] = $notification->getId();
+            $publicIds[$title] = $notification->getPublicId();
             $connection->executeStatement(
                 "UPDATE notifications SET created_at = TIMESTAMPTZ '2026-10-06 12:00:00+00' + make_interval(secs => :offset) WHERE id = :id",
                 ['offset' => $offset * 10, 'id' => $notification->getId()->toString()],
@@ -221,9 +223,11 @@ final class NotificationOwnershipPersistenceTest extends TestCase
 
         $titles = static fn (array $notifications): array => array_map(static fn (Notification $n): string => $n->getTitle(), $notifications);
         self::assertSame(['a3', 'a2'], $titles($repository->findByUserId($first, limit: 2)));
-        self::assertSame(['a1'], $titles($repository->findByUserId($first, limit: 2, cursor: $ids['a2']->toString())));
-        self::assertSame(['a2', 'a3'], $titles($repository->findByUserId($first, limit: 2, cursor: $ids['a1']->toString(), direction: 'asc')));
+        self::assertSame(['a1'], $titles($repository->findByUserId($first, limit: 2, cursor: $publicIds['a2']->toString())));
+        self::assertSame(['a2', 'a3'], $titles($repository->findByUserId($first, limit: 2, cursor: $publicIds['a1']->toString(), direction: 'asc')));
         self::assertSame(['a3', 'a2'], $titles($repository->findByUserId($first, unreadOnly: true)));
+        self::assertSame([], $repository->findByUserId($first, cursor: $publicIds['b1']->toString()));
+        self::assertSame([], $repository->findByUserId($first, cursor: (new \App\Shared\Domain\Model\PublicId())->toString()));
         self::assertSame(
             ['a3', 'a2'],
             $titles($repository->findByUserId($first, since: new \DateTimeImmutable('2026-10-06T14:00:15+02:00'))),

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Interface\Console;
 
 use App\Catalog\Application\Port\GenrePortInterface;
+use App\Catalog\Application\Port\SongPortInterface;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Interface\Console\AdminCommandSupport;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -26,6 +27,7 @@ final class GenreSongRemoveCommand extends Command
 {
     public function __construct(
         private readonly GenrePortInterface $genres,
+        private readonly SongPortInterface $targets,
     ) {
         parent::__construct();
     }
@@ -34,7 +36,7 @@ final class GenreSongRemoveCommand extends Command
     {
         $this
             ->addArgument('slug', InputArgument::REQUIRED, 'The genre slug')
-            ->addArgument('song-id', InputArgument::REQUIRED, 'The song UUID');
+            ->addArgument('song-id', InputArgument::REQUIRED, 'The song public ID');
         AdminCommandSupport::addJsonOption($this);
     }
 
@@ -44,7 +46,7 @@ final class GenreSongRemoveCommand extends Command
         $slug = (string) $input->getArgument('slug');
 
         try {
-            $link = GenreLinkTarget::resolve($this->genres, $slug, (string) $input->getArgument('song-id'), 'song');
+            $link = GenreLinkTarget::resolve($this->genres, $slug, (string) $input->getArgument('song-id'), 'song', $this->targets);
             if (!$this->genres->removeSongFromGenre($link->genreId, $link->targetId)) {
                 throw new NotFoundException('Song not found.');
             }
@@ -53,7 +55,7 @@ final class GenreSongRemoveCommand extends Command
         }
 
         if (!AdminCommandSupport::wantsJson($input)) {
-            $io->success(sprintf('Song %s no longer has the genre "%s".', $link->targetId->toString(), $slug));
+            $io->success(sprintf('Song %s no longer has the genre "%s".', (string) $input->getArgument('song-id'), $slug));
         }
 
         return Command::SUCCESS;

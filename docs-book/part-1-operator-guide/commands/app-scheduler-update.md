@@ -5,20 +5,20 @@ Change a scheduled job's name, cron expression, type, command, description or pa
 ## Quick start
 
 ```bash
-make exec cmd="php bin/console app:scheduler:update 0192a3b4-c5d6-7890-abcd-ef1234567890 --expression='30 4 * * *'"
+make exec cmd="php bin/console app:scheduler:update aB3dE5fG7hJ9kL1mN3pQr --expression='30 4 * * *'"
 ```
 
 Print the result as JSON, for a script:
 
 ```bash
-make exec cmd="php bin/console app:scheduler:update 0192a3b4-c5d6-7890-abcd-ef1234567890 --expression='0 4 * * *' --json"
+make exec cmd="php bin/console app:scheduler:update aB3dE5fG7hJ9kL1mN3pQr --expression='0 4 * * *' --json"
 ```
 
 ## Arguments
 
 | Argument | Required | Description |
 |----------|----------|-------------|
-| `id` | Yes | UUID of the scheduled job, as [app:scheduler:list](app-scheduler-list.md) prints it |
+| `id` | Yes | Public ID of the scheduled job, as [app:scheduler:list](app-scheduler-list.md) prints it |
 
 ## Options
 
@@ -54,5 +54,5 @@ With `--json` the command prints only the updated job as the API's `data` object
 | Code | Meaning |
 |------|---------|
 | 0 | Job updated |
-| 1 | No scheduled job has this UUID, the job changed concurrently, or it could not be stored; the message says why |
-| 2 | The argument is not a UUID, the input was rejected, or `--parameters` is not a JSON object |
+| 1 | No scheduled job has this public ID, the job changed concurrently, or it could not be stored; the message says why |
+| 2 | The argument is not a public ID, the input was rejected, or `--parameters` is not a JSON object |

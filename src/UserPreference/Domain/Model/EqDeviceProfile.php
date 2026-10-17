@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\UserPreference\Domain\Model;
 
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 
@@ -28,6 +29,7 @@ final class EqDeviceProfile
 
         return new self(new EqDeviceProfileState(
             id: Uuid::generate(),
+            publicId: new PublicId(),
             userId: $userId,
             name: $name,
             icon: $icon,
@@ -81,6 +83,11 @@ final class EqDeviceProfile
     public function getId(): Uuid
     {
         return $this->state->id;
+    }
+
+    public function getPublicId(): PublicId
+    {
+        return $this->state->publicId;
     }
 
     public function getUserId(): Uuid

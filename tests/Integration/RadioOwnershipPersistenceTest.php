@@ -154,7 +154,7 @@ final class RadioOwnershipPersistenceTest extends TestCase
         $starredAt = new \DateTimeImmutable('2024-02-29 13:14:15');
         $createdAt = new \DateTimeImmutable('2023-11-05 01:02:03');
         $star = StarredStation::reconstitute(new StarredStationState(Uuid::generate(), $owner, $station, $starredAt));
-        $subscription = CountrySubscription::reconstitute(new CountrySubscriptionState(Uuid::generate(), $owner, $source, 'DK', null, $createdAt));
+        $subscription = CountrySubscription::reconstitute(new CountrySubscriptionState(Uuid::generate(), new \App\Shared\Domain\Model\PublicId(), $owner, $source, 'DK', null, $createdAt));
 
         (new StarredStationDoctrineRepository($this->manager))->save($star);
         (new CountrySubscriptionDoctrineRepository($this->manager))->save($subscription);

@@ -173,6 +173,15 @@ final class SongListSortTest extends TestCase
         self::assertSame(['cursor'], array_keys($body['error']['details']));
     }
 
+    public function testCursorWithInternalUuidIdentityIsRejected(): void
+    {
+        $codec = static::getContainer()->get(CursorCodec::class);
+        $cursor = $codec->encode(Cursor::create(CursorDirection::Next, [
+            'sort' => 'Track A', 'id' => (new \App\Shared\Domain\Model\Uuid())->toString(), 'binding' => 'title:asc',
+        ]));
+        $this->assertJsonResponse($this->list('limit=1&cursor=' . $cursor), 400, 'error');
+    }
+
     public function testCursorWithoutOrderingIsRejected(): void
     {
         $codec = static::getContainer()->get(CursorCodec::class);

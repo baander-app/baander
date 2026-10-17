@@ -6,6 +6,8 @@ namespace App\Tests\Unit\Transcode\Interface\Controller;
 
 use App\Auth\Infrastructure\Security\SecurityUser;
 use App\Shared\Domain\Model\Uuid;
+use App\Catalog\Domain\Model\Video;
+use App\Catalog\Application\Port\VideoPortInterface;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\Port\PlaybackPortInterface;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
@@ -39,7 +41,7 @@ final class TranscodeSessionIdentityTest extends TestCase
         $this->expectNoCalls($sessions, TranscodeSessionPortInterface::class);
         $this->expectNoCalls($playback, PlaybackPortInterface::class);
         $this->expectNoCalls($query, TranscodeSessionQueryPort::class);
-        $controller = new TranscodeSessionController($security, $bus, $sessions, $playback);
+        $controller = new TranscodeSessionController($security, $bus, $sessions, $playback, new \App\Tests\Unit\Transcode\PublicViewStub());
 
         $response = match ($action) {
             'create' => $controller->create(new CreateTranscodeSessionRequest(videoId: Uuid::generate()->toString())),
@@ -79,7 +81,7 @@ final class TranscodeSessionIdentityTest extends TestCase
             $this->expectNoCalls($sessions, TranscodeSessionPortInterface::class);
             $query->expects(self::once())->method('findByUser')->with($owner)->willReturn([]);
         }
-        $controller = new TranscodeSessionController($security, $bus, $sessions, $playback);
+        $controller = new TranscodeSessionController($security, $bus, $sessions, $playback, new \App\Tests\Unit\Transcode\PublicViewStub());
 
         $response = $action === 'index' ? $controller->index() : $controller->listSessions($query);
 
@@ -97,7 +99,8 @@ final class TranscodeSessionIdentityTest extends TestCase
     public function testValidIdentityCreatesSessionWithItsUuid(): void
     {
         $owner = Uuid::generate();
-        $video = Uuid::generate();
+        $videoModel = Video::create('/video.mp4', 'hash');
+        $video = $videoModel->getId();
         $session = TranscodeSession::create($owner, Uuid::generate(), $video, AudioProfile::streamingStereo());
         $security = $this->createStub(Security::class);
         $security->method('getUser')->willReturn(new SecurityUser($owner->toString(), 'viewer@baander.app', ''));
@@ -115,14 +118,14 @@ final class TranscodeSessionIdentityTest extends TestCase
                 return new Envelope($command, [new HandledStamp($session, 'test-handler')]);
             },
         );
-        $controller = new TranscodeSessionController($security, $bus, $sessions, $playback);
+        $controller = new TranscodeSessionController($security, $bus, $sessions, $playback, new \App\Tests\Unit\Transcode\PublicViewStub($video));
 
-        $response = $controller->create(new CreateTranscodeSessionRequest(videoId: $video->toString(), qualityTier: '720p'));
+        $response = $controller->create(new CreateTranscodeSessionRequest(videoId: $videoModel->getPublicId()->toString(), qualityTier: '720p'));
 
         self::assertSame(201, $response->getStatusCode());
         $body = json_decode((string) $response->getContent(), true);
         self::assertIsArray($body);
-        self::assertSame($session->getId()->toString(), $body['uuid']);
+        self::assertSame($session->getPublicId()->toString(), $body['publicId']);
     }
 
     /** @param class-string $contract */

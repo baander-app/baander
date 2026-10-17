@@ -98,7 +98,7 @@ final class ScheduledJobConcurrencyTest extends TestCase
     public function testActualHandlerResultCannotOverwritePauseAndEditDuringConsoleExecution(): void
     {
         $job = $this->createJob();
-        $snapshot = new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-02T10:00:00Z'), $job->getJobType(), $job->getCommand(), $job->getParameters());
+        $snapshot = new SchedulerOccurrence(Uuid::generate(), $job->getId(), new \DateTimeImmutable('2026-10-02T10:00:00Z'), $job->getJobType(), $job->getCommand(), $job->getParameters(), jobPublicId: new \App\Shared\Domain\Model\PublicId());
         $registeredCommand = new class extends Command implements SchedulableConsoleCommandInterface {
             public function __construct() { parent::__construct('app:original'); }
             /** @return array<string, array<string, mixed>> */

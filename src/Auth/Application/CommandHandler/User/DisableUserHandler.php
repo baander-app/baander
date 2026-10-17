@@ -46,7 +46,7 @@ final readonly class DisableUserHandler
     /**
      * @return User the disabled user
      *
-     * @throws UserNotFoundException when no user has the email address or UUID
+     * @throws UserNotFoundException when no user has the email address or public ID
      * @throws LiveConnectionsNotClosedException when the disable committed but the web server did not close the connections
      */
     #[AsMessageHandler]

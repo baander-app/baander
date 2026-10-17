@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Shared\Interface\Controller;
 
+use App\Shared\Application\Port\WebSocketIdentityLookupInterface;
+use App\Party\Application\Port\PartyPublicIdentityPortInterface;
+use App\Party\Application\Port\PartySessionPortInterface;
+use App\Party\Domain\Model\SyncedPartySession;
+use App\Party\Domain\Model\SyncedPartySessionState;
+use App\Shared\Domain\Model\PublicId;
 use App\Party\Application\Command\JoinPartySessionCommand;
 use App\Party\Application\Command\LeavePartySessionCommand;
 use App\Party\Application\Command\SyncPlaybackCommand;
@@ -43,6 +49,8 @@ final class WebSocketControllerTest extends TestCase
     private Server&Stub $server;
     private MessageBusInterface&Stub $bus;
     private WebSocketController $controller;
+    private PartySessionPortInterface&Stub $parties;
+    private WebSocketIdentityLookupInterface&Stub $identities;
     private ListeningSessionInteractionInterface&Stub $listeningSessions;
 
     /** @var list<array{fd: int, data: string}> Captured push calls from the mock server. */
@@ -92,13 +100,78 @@ final class WebSocketControllerTest extends TestCase
         $this->bus = $this->createStub(MessageBusInterface::class);
         $this->listeningSessions = $this->createStub(ListeningSessionInteractionInterface::class);
 
+        $this->parties = $this->createStub(PartySessionPortInterface::class);
+        $this->parties->method('findByPublicId')->willReturnCallback(static fn (PublicId $id): SyncedPartySession => self::party('01900000-0000-7000-8000-00000000000' . substr($id->toString(), -1)));
+        $this->parties->method('findByUuid')->willReturnCallback(static fn (Uuid $id): SyncedPartySession => self::party($id->toString()));
+        $this->identities = $this->createStub(WebSocketIdentityLookupInterface::class);
+        $this->identities->method('partyId')->willReturnCallback(static fn (PublicId $id): Uuid => Uuid::fromString('01900000-0000-7000-8000-00000000000' . substr($id->toString(), -1)));
+        $this->identities->method('userPublicId')->willReturnCallback(static fn (Uuid $id): PublicId => new PublicId(self::publicId($id->toString())));
+
         $this->controller = new WebSocketController(
             $this->registry,
             $this->pusher,
             $this->bus,
             new JsonEncoder(),
             $this->listeningSessions,
+            $this->identities,
         );
+    }
+
+    public function testIdentityReadOutageRefusesMutationAndKeepsTheSocketResponsive(): void
+    {
+        foreach (['party.join', 'party.leave', 'party.playback', 'party.sync', 'transcode.position'] as $type) {
+            $this->pushedMessages = [];
+            $identities = $this->createStub(WebSocketIdentityLookupInterface::class);
+            $identities->method('partyId')->willThrowException(new \RuntimeException('Database unavailable'));
+            $identities->method('transcodeSessionId')->willThrowException(new \RuntimeException('Database unavailable'));
+            $bus = $this->createMock(MessageBusInterface::class);
+            $bus->expects(self::never())->method('dispatch');
+            $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $identities);
+            $controller->onOpen(1, '01900000-0000-7000-8000-000000000001', 'token-1');
+            $controller->onMessage(1, json_encode(['type' => $type, 'sessionId' => str_repeat('s', 21), 'action' => 'play'], JSON_THROW_ON_ERROR));
+            $this->assertLastPushMatches(1, 'error', ['message' => 'Identity lookup unavailable']);
+            $controller->onMessage(1, '{"type":"ping"}');
+            $this->assertLastPushMatches(1, 'pong');
+            self::assertSame(['connected', 'error', 'pong'], array_column(array_column($this->allPushedPayloads(), 'payload'), 'type'));
+            $controller->onClose(1);
+        }
+    }
+
+    public function testJoiningPartyRefusesMissingOrUnavailablePublicUserIdentityBeforeDispatch(): void
+    {
+        foreach ([false, true] as $unavailable) {
+            $this->pushedMessages = [];
+            $identities = $this->createStub(WebSocketIdentityLookupInterface::class);
+            $identities->method('partyId')->willReturn(new Uuid());
+            if ($unavailable) {
+                $identities->method('userPublicId')->willThrowException(new \RuntimeException('Database unavailable'));
+            } else {
+                $identities->method('userPublicId')->willReturn(null);
+            }
+            $bus = $this->createMock(MessageBusInterface::class);
+            $bus->expects(self::never())->method('dispatch');
+            $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $identities);
+            $controller->onOpen(1, '01900000-0000-7000-8000-000000000001', 'token-1');
+            $controller->onMessage(1, json_encode(['type' => 'party.join', 'sessionId' => str_repeat('s', 21)], JSON_THROW_ON_ERROR));
+            self::assertSame([
+                ['fd' => 1, 'payload' => ['type' => 'connected']],
+                ['fd' => 1, 'payload' => ['type' => 'error', 'message' => 'Identity lookup unavailable']],
+            ], $this->allPushedPayloads());
+            $controller->onClose(1);
+        }
+    }
+
+    private static function publicId(string $uuid): string
+    {
+        return str_repeat('s', 20) . substr($uuid, -1);
+    }
+
+    private static function party(string $uuid): SyncedPartySession
+    {
+        return SyncedPartySession::reconstitute(new SyncedPartySessionState(
+            id: Uuid::fromString($uuid), publicId: new PublicId(self::publicId($uuid)),
+            hostUserId: new Uuid(), videoId: new Uuid(), transcodeJobId: null, maxMembers: 10,
+        ));
     }
 
     /** @param callable(JoinPartySessionCommand): PartyMember $handler */
@@ -108,7 +181,7 @@ final class WebSocketControllerTest extends TestCase
             JoinPartySessionCommand::class => [$handler],
         ]))]);
 
-        return new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions);
+        return new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities);
     }
 
     /** @return array<string, mixed>|null */
@@ -282,6 +355,7 @@ final class WebSocketControllerTest extends TestCase
             $this->bus,
             new JsonEncoder(),
             $this->listeningSessions,
+            $this->identities,
         );
 
         $controller->onOpen(5, 'user-uuid-2', 'token-5');
@@ -370,7 +444,7 @@ final class WebSocketControllerTest extends TestCase
     public function testRoomJoinOfAnUnknownRoomIsRefusedAndLogged(): void
     {
         $logger = new RefusalRecordingLogger();
-        $controller = new WebSocketController($this->registry, $this->pusher, $this->bus, new JsonEncoder(), $this->listeningSessions, $logger);
+        $controller = new WebSocketController($this->registry, $this->pusher, $this->bus, new JsonEncoder(), $this->listeningSessions, $this->identities, $logger);
         $controller->onOpen(1, 'user-1', 'token-1');
 
         $controller->onMessage(1, json_encode(['type' => 'room.join', 'room' => 'notifications:user-1'], JSON_THROW_ON_ERROR));
@@ -450,7 +524,7 @@ final class WebSocketControllerTest extends TestCase
             'sessionId' => 'not-a-uuid',
         ]));
 
-        $this->assertLastPushMatches(1, 'error', ['message' => 'Invalid UUID format']);
+        $this->assertLastPushMatches(1, 'error', ['message' => 'Invalid public identity']);
     }
 
     public function testPartyJoinReportsTheRoleOfTheJoinedMember(): void
@@ -464,10 +538,10 @@ final class WebSocketControllerTest extends TestCase
         ), new ResultStampMiddleware([PartyMemberResultStamp::class]));
         $controller->onOpen(1, $userId, 'token-1');
 
-        $controller->onMessage(1, json_encode(['type' => 'party.join', 'sessionId' => $sessionId], JSON_THROW_ON_ERROR));
+        $controller->onMessage(1, json_encode(['type' => 'party.join', 'sessionId' => self::publicId($sessionId)], JSON_THROW_ON_ERROR));
 
         self::assertSame([1], $this->registry->getRoomMembers('party:' . $sessionId));
-        self::assertContains(['fd' => 1, 'payload' => ['type' => 'party.joined', 'sessionId' => $sessionId, 'role' => 'host']], $this->allPushedPayloads());
+        self::assertContains(['fd' => 1, 'payload' => ['type' => 'party.joined', 'sessionId' => self::publicId($sessionId), 'role' => 'host']], $this->allPushedPayloads());
     }
 
     public function testPartyJoinWithoutAStampedResultSendsErrorAndKeepsConnectionUsable(): void
@@ -480,7 +554,7 @@ final class WebSocketControllerTest extends TestCase
         ));
         $controller->onOpen(1, '01900000-0000-7000-8000-000000000001', 'token-1');
 
-        $controller->onMessage(1, json_encode(['type' => 'party.join', 'sessionId' => $sessionId], JSON_THROW_ON_ERROR));
+        $controller->onMessage(1, json_encode(['type' => 'party.join', 'sessionId' => self::publicId($sessionId)], JSON_THROW_ON_ERROR));
 
         $this->assertLastPushMatches(1, 'error', ['message' => 'Failed to join party session']);
         self::assertSame([], $this->registry->getRoomMembers('party:' . $sessionId));
@@ -506,7 +580,7 @@ final class WebSocketControllerTest extends TestCase
         $this->bus->method('dispatch')->willReturnCallback(
             static function (object $command): never {
                 throw new HandlerFailedException(new Envelope($command), [
-                    'party.handler' => new \RuntimeException('Party action denied'),
+                    'party.handler' => new \RuntimeException('Party operation refused'),
                 ]);
             },
         );
@@ -515,13 +589,13 @@ final class WebSocketControllerTest extends TestCase
 
         $this->controller->onMessage(1, json_encode([
             'type' => $type,
-            'sessionId' => $sessionId,
+            'sessionId' => self::publicId($sessionId),
             'action' => $action,
             'position' => 12.5,
         ], JSON_THROW_ON_ERROR));
 
         $this->assertCount($messageCount + 1, $this->pushedMessages);
-        $this->assertLastPushMatches(1, 'error', ['message' => 'Party action denied']);
+        $this->assertLastPushMatches(1, 'error', ['message' => 'Party operation refused']);
         $this->controller->onMessage(1, '{"type":"ping"}');
         $this->assertLastPushMatches(1, 'pong');
     }
@@ -538,12 +612,12 @@ final class WebSocketControllerTest extends TestCase
                 return 43.25;
             }],
         ]))]);
-        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions);
+        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities);
         $controller->onOpen(1, $userId, 'token-1');
 
         $controller->onMessage(1, json_encode([
             'type' => 'party.sync',
-            'sessionId' => $sessionId,
+            'sessionId' => self::publicId($sessionId),
             'userId' => '01900000-0000-7000-8000-000000000003',
             'position' => 42,
             'latency' => 0.25,
@@ -581,7 +655,7 @@ final class WebSocketControllerTest extends TestCase
 
         $this->controller->onMessage(1, json_encode([
             'type' => 'party.sync',
-            'sessionId' => '01900000-0000-7000-8000-000000000002',
+            'sessionId' => self::publicId('01900000-0000-7000-8000-000000000002'),
             'position' => $position,
             'latency' => $latency,
         ], JSON_THROW_ON_ERROR));
@@ -596,7 +670,7 @@ final class WebSocketControllerTest extends TestCase
 
         $this->controller->onMessage(1, json_encode([
             'type' => 'party.sync',
-            'sessionId' => '01900000-0000-7000-8000-000000000002',
+            'sessionId' => self::publicId('01900000-0000-7000-8000-000000000002'),
         ], JSON_THROW_ON_ERROR));
 
         $this->assertLastPushMatches(1, 'error', ['message' => 'Sync failed']);
@@ -606,7 +680,7 @@ final class WebSocketControllerTest extends TestCase
     {
         $this->controller->onOpen(1, '01900000-0000-7000-8000-000000000001', 'token-1');
 
-        $this->controller->onMessage(1, '{"type":"party.sync","sessionId":"01900000-0000-7000-8000-000000000002","position":1e999}');
+        $this->controller->onMessage(1, '{"type":"party.sync","sessionId":"ssssssssssssssssssss2","position":1e999}');
 
         $this->assertLastPushMatches(1, 'error', ['message' => 'Invalid position or latency']);
     }
@@ -618,11 +692,11 @@ final class WebSocketControllerTest extends TestCase
                 throw new \Symfony\Component\Security\Core\Exception\AccessDeniedException('Private party');
             }],
         ]))]);
-        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions);
+        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities);
         $controller->onOpen(1, '01900000-0000-7000-8000-000000000001', 'token-1');
         $messageCount = count($this->pushedMessages);
 
-        $controller->onMessage(1, '{"type":"party.sync","sessionId":"01900000-0000-7000-8000-000000000002"}');
+        $controller->onMessage(1, '{"type":"party.sync","sessionId":"ssssssssssssssssssss2"}');
 
         self::assertCount($messageCount + 1, $this->pushedMessages);
         self::assertSame(['type' => 'error', 'message' => 'Sync failed'], $this->lastPushedPayload());
@@ -710,7 +784,9 @@ final class WebSocketControllerTest extends TestCase
         // The Leave handler dispatches MemberLeft; the Party listener changes the room.
         $workers = $this->createStub(ServerWorkers::class);
         $workers->method('currentHttpWorkerId')->willReturn(0);
-        $listener = new LivePartyRoomListener(new SwooleLivePartyRooms($workers, $this->registry, $this->pusher));
+        $partyIdentities = $this->createStub(PartyPublicIdentityPortInterface::class);
+        $partyIdentities->method('userPublicId')->willReturnCallback(static fn (Uuid $id): PublicId => new PublicId(self::publicId($id->toString())));
+        $listener = new LivePartyRoomListener(new SwooleLivePartyRooms($workers, $this->registry, $this->pusher), $this->parties, $partyIdentities);
         $events = new EventDispatcher();
         $events->addListener(MemberLeft::class, $listener->onMemberLeft(...));
         $bus = new MessageBus([new HandleMessageMiddleware(new HandlersLocator([
@@ -718,7 +794,7 @@ final class WebSocketControllerTest extends TestCase
                 $events->dispatch(new MemberLeft($command->getSessionId(), $command->getUserId()));
             }],
         ]))]);
-        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions);
+        $controller = new WebSocketController($this->registry, $this->pusher, $bus, new JsonEncoder(), $this->listeningSessions, $this->identities);
         $controller->onOpen(1, $leaver, 'token-1');
         $controller->onOpen(2, $leaver, 'token-2');
         $controller->onOpen(3, $member, 'token-3');
@@ -727,12 +803,12 @@ final class WebSocketControllerTest extends TestCase
         }
         $this->pushedMessages = [];
 
-        $controller->onMessage(1, json_encode(['type' => 'party.leave', 'sessionId' => $sessionId], JSON_THROW_ON_ERROR));
+        $controller->onMessage(1, json_encode(['type' => 'party.leave', 'sessionId' => self::publicId($sessionId)], JSON_THROW_ON_ERROR));
 
         self::assertSame([3], $this->registry->getRoomMembers($room));
         self::assertSame([[
             'fd' => 3,
-            'payload' => ['type' => 'party.member_event', 'sessionId' => $sessionId, 'action' => 'leave', 'userId' => $leaver],
+            'payload' => ['type' => 'party.member_event', 'sessionId' => self::publicId($sessionId), 'action' => 'leave', 'userId' => self::publicId($leaver)],
         ]], $this->allPushedPayloads());
     }
 
@@ -775,7 +851,7 @@ final class WebSocketControllerTest extends TestCase
         $controller->onOpen(1, '01900000-0000-7000-8000-000000000001', 'token-1');
         self::fillTable($this->registryTable('roomMembers'), ['joined_at' => 0]);
 
-        $controller->onMessage(1, json_encode(['type' => 'party.join', 'sessionId' => $sessionId], JSON_THROW_ON_ERROR));
+        $controller->onMessage(1, json_encode(['type' => 'party.join', 'sessionId' => self::publicId($sessionId)], JSON_THROW_ON_ERROR));
 
         $this->assertLastPushMatches(1, 'error', ['message' => 'Room limit reached; try again later']);
         self::assertSame([], $this->registry->getRoomMembers('party:' . $sessionId));

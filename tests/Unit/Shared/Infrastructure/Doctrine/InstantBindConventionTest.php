@@ -29,6 +29,8 @@ final class InstantBindConventionTest extends TestCase
         'src/Metadata/Infrastructure/Admin/MetadataAdminService.php' => 1,
         // The API `last_generated_at` field.
         'src/Recommendation/Infrastructure/Doctrine/Repository/RecommendationInsightsRepository.php' => 1,
+        // The recommendation API's `created_at` and `updated_at` response fields.
+        'src/Recommendation/Infrastructure/Projection/RecommendationPublicIdentity.php' => 2,
         // The webhook payload's `timestamp` field.
         'src/Notification/Infrastructure/Webhook/WebhookDeliveryService.php' => 1,
         // The analytics `failedAt` API field and the `at` field inside the audit-log JSON.

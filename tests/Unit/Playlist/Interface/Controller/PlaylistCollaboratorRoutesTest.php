@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Playlist\Interface\Controller;
 
 use App\Auth\Application\Port\AuthenticatedUserIdentityInterface;
 use App\Catalog\Application\Port\SongPortInterface;
+use App\Playlist\Application\Port\PlaylistSongVisibilityInterface;
 use App\Library\Application\Port\LibraryReadScopeProviderInterface;
 use App\Playlist\Application\Command\AddCollaboratorCommand;
 use App\Playlist\Application\Command\RemoveCollaboratorCommand;
@@ -65,6 +66,7 @@ final class PlaylistCollaboratorRoutesTest extends TestCase
             $this->bus,
             $this->createStub(LibraryReadScopeProviderInterface::class),
             $this->users,
+            $this->createStub(PlaylistSongVisibilityInterface::class),
         );
     }
 

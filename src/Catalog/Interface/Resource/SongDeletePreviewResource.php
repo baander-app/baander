@@ -14,10 +14,10 @@ use OpenApi\Attributes as OA;
     schema: 'SongDeletePreviewResource',
     properties: [
         new OA\Property(property: 'song', properties: [
-            new OA\Property(property: 'id', type: 'string'),
+            new OA\Property(property: 'id', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
             new OA\Property(property: 'title', type: 'string'),
             new OA\Property(property: 'album', properties: [
-                new OA\Property(property: 'id', type: 'string'),
+                new OA\Property(property: 'id', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
                 new OA\Property(property: 'title', type: 'string'),
             ], type: 'object', nullable: true),
         ], type: 'object'),

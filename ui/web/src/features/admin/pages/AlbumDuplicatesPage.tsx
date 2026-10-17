@@ -167,7 +167,7 @@ export function AlbumDuplicatesPage() {
 
   // Auto-select first library if available and none selected
   if (libraries && libraries.length > 0 && selectedLibraryId === null) {
-    setSelectedLibraryId(libraries[0].id)
+    setSelectedLibraryId(libraries[0].publicId)
   }
 
   const totalDuplicates = duplicateGroups?.length ?? 0
@@ -183,7 +183,7 @@ export function AlbumDuplicatesPage() {
           >
             <option value="">Select library...</option>
             {libraries.map((lib) => (
-              <option key={lib.id} value={lib.id}>
+              <option key={lib.publicId} value={lib.publicId}>
                 {lib.name}
               </option>
             ))}

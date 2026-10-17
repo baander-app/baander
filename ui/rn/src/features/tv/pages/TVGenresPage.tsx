@@ -19,7 +19,7 @@ export function TVGenresPage() {
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.chips}>
         {genres?.map((genre) => (
-          <TVFocusable key={genre.uuid} style={styles.chip} onPress={() => {}}>
+          <TVFocusable key={genre.publicId} style={styles.chip} onPress={() => {}}>
             <Text style={styles.chipText}>{genre.name}</Text>
           </TVFocusable>
         ))}

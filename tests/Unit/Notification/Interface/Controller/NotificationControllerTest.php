@@ -121,6 +121,34 @@ final class NotificationControllerTest extends TestCase
         self::assertSame(404, $this->controller($repository, Uuid::generate())->{$method}('invalid-public-id')->getStatusCode());
     }
 
+    public function testPublicCursorAndNextCursorNeverExposeTheUuidOrderingKey(): void
+    {
+        $userId = Uuid::generate();
+        $anchor = new PublicId();
+        $first = $this->notification($userId);
+        $second = $this->notification($userId);
+        $repository = $this->createMock(NotificationRepositoryInterface::class);
+        $repository->expects($this->once())->method('findByUserId')
+            ->with($userId, null, null, 2, $anchor->toString(), 'desc', null)
+            ->willReturn([$first, $second]);
+        $response = $this->controller($repository, $userId)->index(new \Symfony\Component\HttpFoundation\Request(['limit' => '1', 'cursor' => $anchor->toString()]));
+        $output = json_decode((string) $response->getContent(), true, flags: JSON_THROW_ON_ERROR);
+
+        self::assertSame($first->getPublicId()->toString(), $output['nextCursor']);
+        self::assertSame($first->getPublicId()->toString(), $output['data'][0]['publicId']);
+        self::assertStringNotContainsString($first->getId()->toString(), (string) $response->getContent());
+        self::assertStringNotContainsString($userId->toString(), (string) $response->getContent());
+    }
+
+    public function testInternalUuidCursorIsRejectedBeforeRepositoryRead(): void
+    {
+        $repository = $this->createMock(NotificationRepositoryInterface::class);
+        $repository->expects($this->never())->method('findByUserId');
+        $this->expectException(\App\Shared\Interface\Exception\InvalidQueryParameter::class);
+
+        $this->controller($repository, Uuid::generate())->index(new \Symfony\Component\HttpFoundation\Request(['cursor' => Uuid::generate()->toString()]));
+    }
+
     private function notification(Uuid $ownerId): Notification
     {
         return Notification::create($ownerId, NotificationCategory::MediaChanges, 'media.imported', 'Private notification title', 'Private notification body');

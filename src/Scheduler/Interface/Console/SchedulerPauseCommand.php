@@ -37,7 +37,7 @@ final class SchedulerPauseCommand extends Command
             $input,
             new SymfonyStyle($input, $output),
             $this->jobs->pause(...),
-            'Paused',
+            'Paused', $this->jobs,
         );
     }
 }

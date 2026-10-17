@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Interface\Controller;
 
 use App\Catalog\Application\Port\AlbumDuplicatePortInterface;
+use App\Shared\Domain\Model\PublicId;
 use App\Catalog\Interface\Resource\DuplicateGroupResource;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
@@ -38,7 +39,7 @@ final class AlbumDuplicateController
                 description: 'Library ID to scan for duplicates',
                 in: 'query',
                 required: true,
-                schema: new OA\Schema(type: 'string'),
+                schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
             ),
         ],
         responses: [
@@ -66,12 +67,15 @@ final class AlbumDuplicateController
         }
 
         try {
-            $libraryUuid = \App\Shared\Domain\Model\Uuid::fromString($libraryId);
-        } catch (\Throwable) {
-            return $this->errorResponse($this->trans('errors.invalid_uuid'), 400);
+            $libraryPublicId = PublicId::fromString($libraryId);
+        } catch (\InvalidArgumentException) {
+            return $this->errorResponse($this->trans('errors.invalid_public_id'), 400);
         }
 
-        $groups = $this->duplicateService->findDuplicates($libraryUuid);
+        $groups = $this->duplicateService->findDuplicatesByLibraryPublicId($libraryPublicId);
+        if ($groups === null) {
+            return $this->notFound();
+        }
 
         return $this->successResponse(array_map(
             fn($group) => DuplicateGroupResource::from($group),

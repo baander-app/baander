@@ -6,7 +6,8 @@ namespace App\Catalog\Application\Service;
 
 use App\Catalog\Application\Port\GenrePortInterface;
 use App\Shared\Application\Exception\InvalidInputException;
-use App\Shared\Domain\Model\Uuid;
+use App\Catalog\Domain\Model\Genre;
+use App\Shared\Domain\Model\PublicId;
 use InvalidArgumentException;
 
 /**
@@ -20,18 +21,18 @@ final readonly class GenreParentResolver
     }
 
     /** @throws InvalidInputException when the ID is malformed or names no genre */
-    public function resolve(string $parentId): Uuid
+    public function resolve(string $parentId): Genre
     {
         try {
-            $id = Uuid::fromString($parentId);
+            $id = PublicId::fromString($parentId);
         } catch (InvalidArgumentException $exception) {
             throw new InvalidInputException('Invalid parent ID format.', ['parentId' => [$exception->getMessage()]], $exception);
         }
 
-        if ($this->genres->findByUuid($id) === null) {
+        if (($parent = $this->genres->findByPublicId($id)) === null) {
             throw new InvalidInputException('Parent genre not found.', ['parentId' => [sprintf('No genre has the ID "%s".', $parentId)]]);
         }
 
-        return $id;
+        return $parent;
     }
 }

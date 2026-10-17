@@ -5,17 +5,16 @@ declare(strict_types=1);
 namespace App\Transcode\Interface\Resource;
 
 use App\Shared\Interface\Resource\AbstractResource;
-use App\Transcode\Domain\Model\TranscodeSession;
+use App\Transcode\Application\DTO\TranscodeSessionDto;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
     schema: 'TranscodeSessionResource',
     properties: [
-        new OA\Property(property: 'uuid', type: 'string', format: 'uuid', description: 'Session UUID'),
         new OA\Property(property: 'publicId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Public identifier'),
-        new OA\Property(property: 'userId', type: 'string', format: 'uuid', description: 'User UUID'),
-        new OA\Property(property: 'jobId', type: 'string', format: 'uuid', description: 'Transcode job UUID'),
-        new OA\Property(property: 'videoId', type: 'string', format: 'uuid', description: 'Video UUID'),
+        new OA\Property(property: 'userId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'User public identifier'),
+        new OA\Property(property: 'jobId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Transcode job public identifier'),
+        new OA\Property(property: 'videoId', type: 'string', minLength: 21, maxLength: 21, pattern: '^[0-9a-zA-Z_-]{21}$', description: 'Video public identifier'),
         new OA\Property(property: 'state', type: 'string', enum: ['pending', 'preparing', 'active', 'paused', 'completed', 'failed', 'cancelled'], description: 'Session state'),
         new OA\Property(property: 'priority', type: 'string', enum: ['critical', 'high', 'normal', 'low', 'bulk'], description: 'Session priority'),
         new OA\Property(property: 'audioProfile', type: 'object', description: 'Audio profile configuration'),
@@ -30,22 +29,12 @@ final class TranscodeSessionResource extends AbstractResource
 {
     public static function from(mixed $source): array
     {
-        assert($source instanceof TranscodeSession);
+        assert($source instanceof TranscodeSessionDto);
 
-        return [
-            'uuid' => $source->getId()->toString(),
-            'publicId' => $source->getPublicId()->toString(),
-            'userId' => $source->getUserId()->toString(),
-            'jobId' => $source->getJobId()->toString(),
-            'videoId' => $source->getVideoId()->toString(),
-            'state' => $source->getSessionState()->value,
-            'priority' => $source->getPriority()->value,
-            'audioProfile' => $source->getAudioProfile()->jsonSerialize(),
-            'currentSegmentIndex' => $source->getCurrentSegmentIndex(),
-            'wallClockOffset' => $source->getWallClockOffset(),
-            'metrics' => $source->getMetrics(),
-            'createdAt' => $source->getCreatedAt()->format(\DateTimeInterface::ATOM),
-            'updatedAt' => $source->getUpdatedAt()->format(\DateTimeInterface::ATOM),
-        ];
+        return array_intersect_key($source->toArray(), array_flip([
+            'publicId', 'userId', 'jobId', 'videoId',
+            'state', 'priority', 'audioProfile', 'currentSegmentIndex',
+            'wallClockOffset', 'metrics', 'createdAt', 'updatedAt',
+        ]));
     }
 }

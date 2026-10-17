@@ -1,7 +1,7 @@
 import { AXIOS_INSTANCE } from '@/shared/api-client/axios-instance'
 
 export interface ScheduledJob {
-  id: string
+  publicId: string
   name: string
   expression: string
   jobType: 'messenger' | 'console'

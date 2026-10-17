@@ -299,14 +299,14 @@ final class RecommendationPoolWorker implements ProcessPoolWorkerInterface
     private function insertRecommendation(\PDO $pdo, string $sourceId, string $targetId, float $score, string $name, ?string $userId): void
     {
         $stmt = $pdo->prepare("
-            INSERT INTO recommendations (id, source_type, source_id, target_type, target_id, score, user_id, name, position, created_at, updated_at)
-            VALUES (?, 'song', ?, 'song', ?, ?, ?, ?, 0, NOW(), NOW())
+            INSERT INTO recommendations (public_id, id, source_type, source_id, target_type, target_id, score, user_id, name, position, created_at, updated_at)
+            VALUES (?, ?, 'song', ?, 'song', ?, ?, ?, ?, 0, NOW(), NOW())
             ON CONFLICT (source_type, source_id, target_type, target_id, name, user_id)
             DO UPDATE SET score = EXCLUDED.score, updated_at = NOW()
         ");
         $id = $this->generateUuid();
 
-        $stmt->execute([$id, $sourceId, $targetId, $score, $userId, $name]);
+        $stmt->execute([(new \App\Shared\Domain\Model\PublicId())->toString(), $id, $sourceId, $targetId, $score, $userId, $name]);
     }
 
     private function clearAllRecommendations(\PDO $pdo): void

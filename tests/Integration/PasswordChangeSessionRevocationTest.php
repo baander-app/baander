@@ -147,7 +147,7 @@ final class PasswordChangeSessionRevocationTest extends TestCase
 
         $response = $this->send(
             'POST',
-            '/api/admin/users/' . $this->user->getId()->toString() . '/reset-password',
+            '/api/admin/users/' . $this->user->getPublicId()->toString() . '/reset-password',
             $adminSession['accessToken'],
             $adminKey,
             ['password' => 'changed-by-admin-3'],

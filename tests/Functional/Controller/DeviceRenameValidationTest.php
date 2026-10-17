@@ -27,13 +27,18 @@ final class DeviceRenameValidationTest extends TestCase
             'name' => 'Original Device',
         ]), 200);
 
-        $response = $this->authenticatedRequest('PUT', '/api/devices/' . $deviceId, $user, ['name' => $name]);
+        $registered = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/devices', $user), 200, 'data')['data'];
+        $this->assertCount(1, $registered);
+        $devicePublicId = $registered[0]['publicId'];
+        $this->assertNotSame($deviceId, $devicePublicId);
+        $response = $this->authenticatedRequest('PUT', '/api/devices/' . $devicePublicId, $user, ['name' => $name]);
 
         $this->assertJsonResponse($response, $status);
         $this->entityManager->clear();
         $devices = $this->assertJsonResponse($this->authenticatedRequest('GET', '/api/devices', $user), 200, 'data')['data'];
         $this->assertCount(1, $devices);
         $this->assertSame($deviceId, $devices[0]['deviceId']);
+        $this->assertSame($devicePublicId, $devices[0]['publicId']);
         $this->assertSame($expectedName, $devices[0]['name']);
     }
 }

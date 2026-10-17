@@ -44,7 +44,7 @@ final class ResetUserPasswordCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addArgument('identifier', InputArgument::REQUIRED, 'User email or UUID')
+            ->addArgument('identifier', InputArgument::REQUIRED, 'User email or public ID')
             ->addOption('password', null, InputOption::VALUE_NONE, 'Read the password from stdin instead of prompting (for CI/scripting)');
         AdminCommandSupport::addJsonOption($this);
     }

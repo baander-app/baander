@@ -193,7 +193,7 @@ export function RadioAdminPage() {
             </thead>
             <tbody>
               {stations.map((station) => (
-                <BodyRow key={station.id}>
+                <BodyRow key={station.publicId}>
                   <TdBold>{station.name}</TdBold>
                   <TdNum>{station.country}</TdNum>
                   <TdMuted>

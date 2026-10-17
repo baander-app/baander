@@ -43,7 +43,7 @@ export function TVAlbumDetailPage() {
       ) : (
         tracks.map((track, index) => (
           <TVTrackRow
-            key={track.uuid}
+            key={track.publicId}
             trackNumber={track.trackNumber ?? index + 1}
             title={track.title}
             artistName={track.artistName}

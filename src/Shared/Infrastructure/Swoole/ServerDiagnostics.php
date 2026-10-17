@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Shared\Infrastructure\Swoole;
 
+use App\Shared\Application\PublicDiagnosticText;
 use App\Shared\Application\Port\ServerControlException;
 use App\Shared\Application\Port\ServerControlPortInterface;
 use App\Shared\Application\Port\ServerControlResult;
@@ -58,7 +59,7 @@ final readonly class ServerDiagnostics implements ServerDiagnosticsInterface
         $spans = $this->single($this->serverControl->execute(DebugSpansOperation::NAME, ['limit' => $limit]));
 
         /** @var list<array<string, mixed>> */
-        return is_array($spans) ? array_values($spans) : [];
+        return is_array($spans) ? array_values(PublicDiagnosticText::details($spans)) : [];
     }
 
     public function clearSpans(): void
@@ -75,7 +76,7 @@ final readonly class ServerDiagnostics implements ServerDiagnosticsInterface
         }
         $errors = [];
         foreach ($result->errors as $workerId => $error) {
-            $errors[] = ['worker_id' => $workerId, 'error' => $error];
+            $errors[] = ['worker_id' => $workerId, 'error' => PublicDiagnosticText::redact($error)];
         }
 
         return ['workers' => $workers, 'missing_workers' => $result->missingWorkers, 'worker_errors' => $errors];
@@ -111,7 +112,7 @@ final readonly class ServerDiagnostics implements ServerDiagnosticsInterface
                 ];
             });
         } catch (Throwable $exception) {
-            return ['connected' => false, 'error' => $exception->getMessage()];
+            return ['connected' => false, 'error' => PublicDiagnosticText::redact($exception->getMessage())];
         }
     }
 }

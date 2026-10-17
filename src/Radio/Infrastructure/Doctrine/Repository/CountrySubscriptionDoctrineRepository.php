@@ -9,6 +9,7 @@ use App\Radio\Domain\Model\CountrySubscription\CountrySubscriptionState;
 use App\Radio\Domain\Repository\CountrySubscription\CountrySubscriptionRepositoryInterface;
 use App\Radio\Infrastructure\Doctrine\Entity\CountrySubscriptionEntity;
 use App\Radio\Infrastructure\Doctrine\Entity\RadioSourceEntity;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -96,6 +97,7 @@ final class CountrySubscriptionDoctrineRepository implements CountrySubscription
 
     private function syncToEntity(CountrySubscription $subscription, CountrySubscriptionEntity $entity): void
     {
+        $entity->setPublicId($subscription->getPublicId());
         $entity->setLastSyncedAt($subscription->getLastSyncedAt());
     }
 
@@ -103,6 +105,7 @@ final class CountrySubscriptionDoctrineRepository implements CountrySubscription
     {
         return CountrySubscription::reconstitute(new CountrySubscriptionState(
             id: $entity->getId(),
+            publicId: $entity->getPublicId(),
             userId: $entity->getUserId(),
             sourceId: $entity->getSourceId(),
             countryCode: $entity->getCountryCode(),

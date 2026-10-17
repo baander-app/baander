@@ -80,7 +80,7 @@ final class DisabledUserAccessTest extends TestCase
         $this->bus()->dispatch(new DisableUserCommand($user->getEmail()));
         $disabledAt = $this->storedUser($user)->getUpdatedAt();
 
-        $this->bus()->dispatch(new DisableUserCommand($user->getId()->toString()));
+        $this->bus()->dispatch(new DisableUserCommand($user->getPublicId()->toString()));
 
         $stored = $this->storedUser($user);
         self::assertTrue($stored->isDisabled());
@@ -235,7 +235,7 @@ final class DisabledUserAccessTest extends TestCase
             201,
             'data',
         );
-        $this->clientUuids[$data['data']['publicId']] = $data['data']['uuid'];
+        $this->clientUuids[$data['data']['publicId']] = static::getContainer()->get(\App\Auth\Domain\Repository\OAuth\ClientRepositoryInterface::class)->findClientByPublicId(\App\Shared\Domain\Model\PublicId::fromString($data['data']['publicId']))->getId()->toString();
 
         return $data['data']['publicId'];
     }

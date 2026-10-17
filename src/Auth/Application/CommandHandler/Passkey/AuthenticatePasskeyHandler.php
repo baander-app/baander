@@ -7,6 +7,7 @@ namespace App\Auth\Application\CommandHandler\Passkey;
 use App\Auth\Application\Command\Passkey\AuthenticatePasskeyCommand;
 use App\Auth\Application\Port\PasskeyVerifierInterface;
 use App\Auth\Domain\Repository\Passkey\PasskeyRepositoryInterface;
+use App\Auth\Domain\Repository\UserRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
 use RuntimeException;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -16,6 +17,7 @@ final class AuthenticatePasskeyHandler
     public function __construct(
         private readonly PasskeyRepositoryInterface $passkeyRepository,
         private readonly PasskeyVerifierInterface $passkeyVerifier,
+        private readonly UserRepositoryInterface $users,
     ) {
     }
 
@@ -64,8 +66,8 @@ final class AuthenticatePasskeyHandler
         if ($userId === null) {
             throw new RuntimeException('Unable to resolve user for the given credential ID.');
         }
-        // Registration stores the owner's UUID string as the WebAuthn user handle.
-        if (!hash_equals($userId->toString(), $storedCredential->userHandle)) {
+        $owner = $this->users->findByUuid($userId);
+        if ($owner === null || !hash_equals($owner->getPublicId()->toString(), $storedCredential->userHandle)) {
             throw new RuntimeException('Credential owner does not match its registered user handle.');
         }
         $claimedUserId = $command->getUserId();

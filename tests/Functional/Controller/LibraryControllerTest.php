@@ -71,7 +71,10 @@ final class LibraryControllerTest extends TestCase
         ]);
 
         $data = $this->assertJsonResponse($response, 201, 'data');
-        $libraryId = \App\Shared\Domain\Model\Uuid::fromString($data['data']['id']);
+        $library = static::getContainer()->get(\App\Library\Application\Port\LibraryPortInterface::class)->findByPublicId(\App\Shared\Domain\Model\PublicId::fromString($data['data']['publicId']));
+        self::assertNotNull($library);
+        $libraryId = $library->getId();
+        self::assertArrayNotHasKey('id', $data['data']);
         $userId = \App\Shared\Domain\Model\Uuid::fromString($user->getId()->toString());
 
         $libraryAccess = static::getContainer()->get(\App\Library\Application\Port\LibraryAccessPortInterface::class);

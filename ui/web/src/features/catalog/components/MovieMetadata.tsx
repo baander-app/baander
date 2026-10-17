@@ -163,7 +163,7 @@ export function MovieMetadata({ movie }: MovieMetadataProps) {
               <VersionTitle>Versions</VersionTitle>
               <div>
                 {movie.videos.map((video, idx: number) => (
-                  <VersionRow key={video.uuid ?? idx}>
+                  <VersionRow key={video.publicId ?? idx}>
                     <VersionLabel>Version {idx + 1}</VersionLabel>
                     <VersionValue>{video.width}\u00d7{video.height}</VersionValue>
                     {video.duration && (

@@ -12,6 +12,7 @@ use App\Library\Domain\ValueObject\LibraryClaimAttempt;
 use App\Library\Domain\ValueObject\LibraryClaimKind;
 use App\Library\Domain\ValueObject\LibraryClaimRelease;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\ValueObject\LibraryReadScope;
 use DateTimeImmutable;
 use Psr\Clock\ClockInterface;
@@ -68,6 +69,18 @@ final class InMemoryLibraryRepository implements LibraryRepositoryInterface
     public function save(Library $library): void
     {
         $this->add($library);
+    }
+
+    public function findByPublicId(PublicId $publicId): ?Library
+    {
+        return array_find($this->libraries, static fn (Library $library): bool => $library->getPublicId()->equals($publicId));
+    }
+
+    public function findVisibleByPublicId(PublicId $publicId, LibraryReadScope $scope): ?Library
+    {
+        $library = $this->findByPublicId($publicId);
+
+        return $library !== null && $scope->allows($library->getId()) ? $library : null;
     }
 
     public function findByUuid(Uuid $uuid): ?Library

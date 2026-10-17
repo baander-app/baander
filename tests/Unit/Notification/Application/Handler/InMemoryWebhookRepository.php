@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Notification\Application\Handler;
 use App\Notification\Application\DTO\WebhookView;
 use App\Notification\Application\Port\WebhookRepositoryInterface;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 
 /**
  * Stores webhooks in memory, each with its own signing version, so a test can hold one
@@ -47,11 +48,22 @@ final class InMemoryWebhookRepository implements WebhookRepositoryInterface
         return $this->webhooks[$id->toString()] ?? null;
     }
 
+    public function findByPublicId(PublicId $publicId): ?WebhookView
+    {
+        foreach ($this->webhooks as $webhook) {
+            if ($webhook->publicId->toString() === $publicId->toString()) {
+                return $webhook;
+            }
+        }
+
+        return null;
+    }
+
     public function add(Uuid $id, string $url, ?array $categoryFilter, string $encryptedSecret): WebhookView
     {
         ++$this->writes;
         $now = new \DateTimeImmutable();
-        $webhook = new WebhookView($id, $url, $categoryFilter, $this->signingVersion, $now, $now);
+        $webhook = new WebhookView($id, $url, $categoryFilter, $this->signingVersion, $now, $now, new PublicId());
         $this->seed($webhook, $encryptedSecret);
 
         return $webhook;
@@ -65,7 +77,7 @@ final class InMemoryWebhookRepository implements WebhookRepositoryInterface
         }
         ++$this->writes;
 
-        return $this->webhooks[$id->toString()] = new WebhookView($id, $url, $categoryFilter, $current->signingVersion, $current->createdAt, new \DateTimeImmutable());
+        return $this->webhooks[$id->toString()] = new WebhookView($id, $url, $categoryFilter, $current->signingVersion, $current->createdAt, new \DateTimeImmutable(), $current->publicId);
     }
 
     public function replaceSecret(Uuid $id, string $encryptedSecret): ?WebhookView
@@ -77,7 +89,7 @@ final class InMemoryWebhookRepository implements WebhookRepositoryInterface
         ++$this->writes;
         $this->encryptedSecrets[$id->toString()] = $encryptedSecret;
 
-        return $this->webhooks[$id->toString()] = new WebhookView($id, $current->url, $current->categoryFilter, $current->signingVersion, $current->createdAt, new \DateTimeImmutable());
+        return $this->webhooks[$id->toString()] = new WebhookView($id, $current->url, $current->categoryFilter, $current->signingVersion, $current->createdAt, new \DateTimeImmutable(), $current->publicId);
     }
 
     public function delete(Uuid $id): bool

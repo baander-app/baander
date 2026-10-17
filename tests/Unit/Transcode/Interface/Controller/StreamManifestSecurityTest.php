@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Transcode\Interface\Controller;
 
 use App\Shared\Application\Port\SleeperInterface;
+use App\Catalog\Domain\Model\Video;
+use App\Transcode\Application\Port\TranscodePublicViewInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\Port\PlaybackPortInterface;
@@ -22,7 +24,8 @@ final class StreamManifestSecurityTest extends TestCase
     #[DataProvider('manifests')]
     public function testManifestRequiresAnUntamperedUnexpiredSignature(string $method, string $kind): void
     {
-        $videoId = (new Uuid())->toString();
+        $video = Video::create('/video.mp4', 'hash');
+        $videoId = $video->getPublicId()->toString();
         $jobId = (new PublicId())->toString();
         $path = match ($method) {
             'masterManifest' => "/api/transcode/$videoId/master.m3u8",
@@ -47,7 +50,10 @@ final class StreamManifestSecurityTest extends TestCase
         $streaming->expects($valid ? $this->once() : $this->never())->method($serviceMethod)->willReturn('#EXTINF:10');
         $playback = $this->createMock(PlaybackPortInterface::class);
         $playback->expects($this->never())->method('start');
-        $controller = new StreamManifestController($streaming, new SignedStreamRequest($signer), $playback, $this->createStub(SleeperInterface::class));
+        $videos = $this->createMock(TranscodePublicViewInterface::class);
+        $videos->expects($valid && in_array($method, ['masterManifest', 'dashManifest'], true) ? $this->once() : $this->never())
+            ->method('videoId')->with($video->getPublicId())->willReturn($video->getId());
+        $controller = new StreamManifestController($streaming, new SignedStreamRequest($signer), $playback, $this->createStub(SleeperInterface::class), $videos);
         if (!$valid) {
             $this->expectException(AccessDeniedHttpException::class);
         }
@@ -69,7 +75,7 @@ final class StreamManifestSecurityTest extends TestCase
             ->willReturnOnConsecutiveCalls('#EXTM3U', "#EXTM3U\n#EXTINF:10");
         $sleeper = $this->createMock(SleeperInterface::class);
         $sleeper->expects($this->once())->method('sleep')->with(0.5);
-        $controller = new StreamManifestController($streaming, new SignedStreamRequest($signer), $this->createStub(PlaybackPortInterface::class), $sleeper);
+        $controller = new StreamManifestController($streaming, new SignedStreamRequest($signer), $this->createStub(PlaybackPortInterface::class), $sleeper, $this->createStub(TranscodePublicViewInterface::class));
 
         $response = $controller->mediaManifest($jobId, Request::create($signer->signUrl("/api/transcode/$jobId/media.m3u8")['url']));
         ob_start();

@@ -68,7 +68,7 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
           </DialogDescription>
         </DialogHeader>
         {/* The form mounts with the dialog content, so each opening starts from the user's current values. */}
-        <EditUserForm key={user.id} user={user} onDone={() => onOpenChange(false)} />
+        <EditUserForm key={user.publicId} user={user} onDone={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
   )
@@ -80,7 +80,7 @@ function EditUserForm({ user, onDone }: { user: AdminUser; onDone: () => void })
   const [languageSelection, setLanguageSelection] = useState<string | null>(null)
   const { isSuperAdmin } = useAdminCheck()
   const updateUser = useUpdateUser()
-  const settings = useUserSettings(user.id)
+  const settings = useUserSettings(user.publicId)
   const changeSetting = useChangeUserSetting()
   const language = settings.data?.find((setting) => setting.key === EMAIL_LANGUAGE_KEY)
   const saving = updateUser.isPending || changeSetting.isPending
@@ -98,7 +98,7 @@ function EditUserForm({ user, onDone }: { user: AdminUser; onDone: () => void })
     e.preventDefault()
     updateUser.reset()
     const change = isSuperAdmin && language && languageSelection !== null
-      ? languageChange(user.id, language, languageSelection)
+      ? languageChange(user.publicId, language, languageSelection)
       : null
 
     try {
@@ -107,7 +107,7 @@ function EditUserForm({ user, onDone }: { user: AdminUser; onDone: () => void })
         await changeSetting.mutateAsync(change)
         setLanguageSelection(null)
       }
-      await updateUser.mutateAsync({ id: user.id, email, name })
+      await updateUser.mutateAsync({ id: user.publicId, email, name })
     } catch {
       // Both mutations keep their error, which the form shows next to the field that failed.
       return

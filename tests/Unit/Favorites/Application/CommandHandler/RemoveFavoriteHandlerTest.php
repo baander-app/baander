@@ -29,7 +29,7 @@ final class RemoveFavoriteHandlerTest extends TestCase
     {
         $userId = Uuid::v4();
         $publicId = new PublicId();
-        $favorite = UserFavorite::create($userId, FavoriteType::Song, 'song-pub-1');
+        $favorite = UserFavorite::create($userId, FavoriteType::Song, 'song-pub-100000000000');
 
         $this->favoritesPort->expects($this->once())
             ->method('findByPublicId')
@@ -60,7 +60,7 @@ final class RemoveFavoriteHandlerTest extends TestCase
         $ownerId = Uuid::v4();
         $otherUserId = Uuid::v4();
         $publicId = new PublicId();
-        $favorite = UserFavorite::create($ownerId, FavoriteType::Album, 'album-pub-2');
+        $favorite = UserFavorite::create($ownerId, FavoriteType::Album, 'album-pub-20000000000');
 
         $this->favoritesPort->expects($this->once())
             ->method('findByPublicId')

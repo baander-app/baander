@@ -28,7 +28,7 @@ The command prints a table with one row per user:
 | Name | The display name |
 | Roles | The assigned roles, comma-separated |
 | Disabled | `yes` or `no` |
-| UUID | The identifier the other `app:user:*` commands and the admin API accept |
+| Public ID | The identifier the other `app:user:*` commands and the admin API accept |
 | Created | Creation time in ISO 8601 format |
 
 Below the table, a line such as `Users 1-50 of 120.` gives the position of the page. Run the command again with `--offset=50` for the next one. When no user matches, the command prints `No users match.`

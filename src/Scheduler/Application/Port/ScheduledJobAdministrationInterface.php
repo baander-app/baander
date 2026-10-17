@@ -7,6 +7,7 @@ namespace App\Scheduler\Application\Port;
 use App\Scheduler\Application\DTO\ScheduledJobInput;
 use App\Scheduler\Domain\Model\ScheduledJob;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 
 interface ScheduledJobAdministrationInterface
 {
@@ -14,6 +15,8 @@ interface ScheduledJobAdministrationInterface
     public function findAll(): array;
 
     public function getById(Uuid $id): ?ScheduledJob;
+
+    public function getByPublicId(PublicId $publicId): ?ScheduledJob;
 
     public function createJob(ScheduledJobInput $input): ScheduledJob;
 

@@ -10,7 +10,8 @@ final readonly class StarStationRequest
 {
     public function __construct(
         #[Assert\NotBlank]
-        #[Assert\Uuid]
+        #[Assert\Length(exactly: 21)]
+        #[Assert\Regex(pattern: '/^[0-9a-zA-Z_-]{21}$/D')]
         public string $stationId,
     ) {
     }

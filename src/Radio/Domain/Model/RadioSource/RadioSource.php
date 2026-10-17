@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Radio\Domain\Model\RadioSource;
 
 use App\Radio\Domain\ValueObject\SyncConfig;
+use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
 use DateTimeImmutable;
 use InvalidArgumentException;
@@ -36,6 +37,7 @@ final class RadioSource
 
         return new self(new RadioSourceState(
             id: new Uuid(),
+            publicId: new PublicId(),
             name: $name,
             type: $type,
             syncConfig: $syncConfig,
@@ -65,6 +67,11 @@ final class RadioSource
         $this->pendingEvents = [];
 
         return $events;
+    }
+
+    public function getPublicId(): PublicId
+    {
+        return $this->state->publicId;
     }
 
     public function getId(): Uuid

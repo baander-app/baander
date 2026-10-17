@@ -134,7 +134,7 @@ final class SchedulerOccurrenceMaterializerTest extends TestCase
         $job = $this->job();
         $base = $this->databaseMinute()->modify('-20 minutes');
         $this->seedCursor($job, $base);
-        $poison = new SchedulerOccurrence(Uuid::generate(), $job->getId(), $base->modify('+2 minutes'), JobType::Console, 'app:conflicting-snapshot', []);
+        $poison = new SchedulerOccurrence(Uuid::generate(), $job->getId(), $base->modify('+2 minutes'), JobType::Console, 'app:conflicting-snapshot', [], jobPublicId: new \App\Shared\Domain\Model\PublicId());
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->observer))->record($poison));
         try {
             $this->materializer()->materialize($job->getId(), 2);
@@ -156,7 +156,7 @@ final class SchedulerOccurrenceMaterializerTest extends TestCase
         $job = $this->job();
         $base = $this->databaseMinute()->modify('-20 minutes');
         $this->seedCursor($job, $base);
-        $existing = new SchedulerOccurrence(Uuid::generate(), $job->getId(), $base->modify('+1 minute'), $job->getJobType(), $job->getCommand(), $job->getParameters());
+        $existing = new SchedulerOccurrence(Uuid::generate(), $job->getId(), $base->modify('+1 minute'), $job->getJobType(), $job->getCommand(), $job->getParameters(), jobPublicId: new \App\Shared\Domain\Model\PublicId());
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->observer))->record($existing));
         self::assertSame(1, $this->materializer()->materialize($job->getId(), 2));
         $rows = $this->occurrences($job);
@@ -199,7 +199,7 @@ final class SchedulerOccurrenceMaterializerTest extends TestCase
     {
         $job = $this->job();
         $base = $this->databaseMinute()->modify('-20 minutes');
-        $retained = new SchedulerOccurrence(Uuid::generate(), $job->getId(), $base, $job->getJobType(), $job->getCommand(), $job->getParameters());
+        $retained = new SchedulerOccurrence(Uuid::generate(), $job->getId(), $base, $job->getJobType(), $job->getCommand(), $job->getParameters(), jobPublicId: new \App\Shared\Domain\Model\PublicId());
         self::assertTrue((new DoctrineSchedulerOccurrenceStore($this->observer))->record($retained));
         if ($change === 'resume' || $change === 'enable') {
             $change === 'resume' ? $job->pause() : $job->disable();

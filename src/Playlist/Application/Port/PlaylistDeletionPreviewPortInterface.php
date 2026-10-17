@@ -13,7 +13,7 @@ interface PlaylistDeletionPreviewPortInterface
      * Return each affected playlist once, preserving distinct playlists with the same name.
      *
      * @param list<Uuid> $songIds
-     * @return list<array{uuid: string, name: string}>
+     * @return list<array{publicId: string, name: string}>
      */
     public function findContainingSongs(array $songIds): array;
 }

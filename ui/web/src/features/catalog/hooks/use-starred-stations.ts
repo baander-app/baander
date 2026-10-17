@@ -21,7 +21,7 @@ export function useStarredStations() {
       const allStations = (stationsRes?.data ?? []) as RadioStation[]
 
       const starredIds = new Set(starred.map((s) => s.stationId))
-      return allStations.filter((s) => starredIds.has(s.id))
+      return allStations.filter((s) => starredIds.has(s.publicId))
     },
     staleTime: 60_000,
   })

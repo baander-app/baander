@@ -9,6 +9,7 @@ use App\Library\Domain\ValueObject\LibraryPath;
 use App\Library\Domain\ValueObject\LibrarySlug;
 use App\Library\Domain\ValueObject\LibraryType;
 use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
 use DateTimeImmutable;
 use InvalidArgumentException;
 
@@ -38,6 +39,7 @@ final class Library
 
         return new self(new LibraryState(
             id: new Uuid(),
+            publicId: new PublicId(),
             name: $name,
             slug: $slug,
             path: $path,
@@ -71,6 +73,8 @@ final class Library
     }
 
     // --- Getters ---
+
+    public function getPublicId(): PublicId { return $this->state->publicId; }
 
     public function getId(): Uuid { return $this->state->id; }
     public function getName(): string { return $this->state->name; }

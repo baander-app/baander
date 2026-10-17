@@ -28,6 +28,9 @@ final class RecommendationJobService implements RecommendationJobPortInterface
     public function create(bool $isFull, ?Uuid $userId = null, array $metadata = [], ?Uuid $originalJobId = null): RecommendationJob
     {
         $job = RecommendationJob::create($isFull, $userId, $metadata, $originalJobId);
+        if ($originalJobId !== null) {
+            $job->getState()->originalJobPublicId = $this->repository->findByUuid($originalJobId)?->getPublicId();
+        }
         $this->repository->save($job);
 
         return $job;

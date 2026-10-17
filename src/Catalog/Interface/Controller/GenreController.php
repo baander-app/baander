@@ -14,7 +14,9 @@ use App\Catalog\Interface\Request\GenreAlbumRequest;
 use App\Catalog\Interface\Request\GenreSongRequest;
 use App\Catalog\Interface\Request\UpdateGenreRequest;
 use App\Catalog\Interface\Resource\GenreResource;
-use App\Shared\Domain\Model\Uuid;
+use App\Shared\Domain\Model\PublicId;
+use App\Catalog\Application\Port\SongPortInterface;
+use App\Catalog\Application\Port\AlbumPortInterface;
 use App\Shared\Interface\Attribute\CliCounterpart;
 use App\Shared\Interface\Controller\ApiResponsesTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
@@ -38,6 +40,8 @@ final class GenreController
         private readonly GenrePortInterface $genreService,
         private readonly LibraryReadScopeProviderInterface $libraryReadScopeProvider,
         private readonly MessageBusInterface $bus,
+        private readonly SongPortInterface $songs,
+        private readonly AlbumPortInterface $albums,
     ) {
     }
 
@@ -82,7 +86,7 @@ final class GenreController
         requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'name', type: 'string'),
                 new OA\Property(property: 'slug', type: 'string'),
-                new OA\Property(property: 'parentId', type: 'string', nullable: true),
+                new OA\Property(property: 'parentId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, nullable: true),
                 new OA\Property(property: 'mbid', type: 'string', nullable: true),
             ])),
         responses: [
@@ -122,10 +126,10 @@ final class GenreController
             new OA\Response(response: '200', description: 'Genre with children', content: new OA\JsonContent(
                 properties: [
                     new OA\Property(property: 'data', properties: [
-                        new OA\Property(property: 'uuid', type: 'string', format: 'uuid'),
+                        new OA\Property(property: 'publicId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
                         new OA\Property(property: 'name', type: 'string'),
                         new OA\Property(property: 'slug', type: 'string'),
-                        new OA\Property(property: 'parentId', type: 'string', format: 'uuid', nullable: true),
+                        new OA\Property(property: 'parentId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, nullable: true),
                         new OA\Property(property: 'mbid', type: 'string'),
                         new OA\Property(property: 'children', type: 'array', items: new OA\Items(ref: new Model(type: GenreResource::class))),
                     ], type: 'object'),
@@ -162,7 +166,7 @@ final class GenreController
         requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'name', type: 'string', nullable: true),
                 new OA\Property(property: 'slug', type: 'string', nullable: true),
-                new OA\Property(property: 'parentId', type: 'string', nullable: true),
+                new OA\Property(property: 'parentId', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21, nullable: true),
                 new OA\Property(property: 'mbid', type: 'string', nullable: true),
             ])),
         parameters: [
@@ -225,7 +229,7 @@ final class GenreController
         path: '/api/genres/{slug}/songs',
         summary: 'Assign a genre to a song',
         requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'songId', description: 'Song UUID', type: 'string'),
+                new OA\Property(property: 'songId', description: 'Song public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
             ])),
         parameters: [
             new OA\Parameter(name: 'slug', description: 'Genre slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
@@ -247,12 +251,13 @@ final class GenreController
         }
 
         try {
-            $songId = Uuid::fromString($payload->songId);
-        } catch (\Throwable) {
+            $publicId = PublicId::fromString($payload->songId);
+        } catch (\InvalidArgumentException) {
             return $this->errorResponse('Invalid song ID format.');
         }
+        $songId = $this->songs->findVisibleByPublicId($publicId, $this->libraryReadScopeProvider->current())?->getId();
 
-        if (!$this->genreService->addSongToGenre($genre->getId(), $songId)) {
+        if ($songId === null || !$this->genreService->addSongToGenre($genre->getId(), $songId)) {
             return $this->notFound('Song not found.');
         }
 
@@ -267,7 +272,7 @@ final class GenreController
         summary: 'Remove a song from a genre',
         parameters: [
             new OA\Parameter(name: 'slug', description: 'Genre slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'songId', description: 'Song UUID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'songId', description: 'Song public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Song removed from genre'),
@@ -286,12 +291,13 @@ final class GenreController
         }
 
         try {
-            $resolvedSongId = Uuid::fromString($songId);
-        } catch (\Throwable) {
+            $publicId = PublicId::fromString($songId);
+        } catch (\InvalidArgumentException) {
             return $this->errorResponse('Invalid song ID format.');
         }
+        $resolvedSongId = $this->songs->findVisibleByPublicId($publicId, $this->libraryReadScopeProvider->current())?->getId();
 
-        if (!$this->genreService->removeSongFromGenre($genre->getId(), $resolvedSongId)) {
+        if ($resolvedSongId === null || !$this->genreService->removeSongFromGenre($genre->getId(), $resolvedSongId)) {
             return $this->notFound('Song not found.');
         }
 
@@ -305,7 +311,7 @@ final class GenreController
         path: '/api/genres/{slug}/albums',
         summary: 'Assign a genre to an album',
         requestBody: new OA\RequestBody(content: new OA\JsonContent(properties: [
-                new OA\Property(property: 'albumId', description: 'Album UUID', type: 'string'),
+                new OA\Property(property: 'albumId', description: 'Album public ID', type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21),
             ])),
         parameters: [
             new OA\Parameter(name: 'slug', description: 'Genre slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
@@ -327,12 +333,13 @@ final class GenreController
         }
 
         try {
-            $albumId = Uuid::fromString($payload->albumId);
-        } catch (\Throwable) {
+            $publicId = PublicId::fromString($payload->albumId);
+        } catch (\InvalidArgumentException) {
             return $this->errorResponse('Invalid album ID format.');
         }
+        $albumId = $this->albums->findVisibleByPublicId($publicId, $this->libraryReadScopeProvider->current())?->getId();
 
-        if (!$this->genreService->addAlbumToGenre($genre->getId(), $albumId)) {
+        if ($albumId === null || !$this->genreService->addAlbumToGenre($genre->getId(), $albumId)) {
             return $this->notFound('Album not found.');
         }
 
@@ -347,7 +354,7 @@ final class GenreController
         summary: 'Remove an album from a genre',
         parameters: [
             new OA\Parameter(name: 'slug', description: 'Genre slug', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'albumId', description: 'Album UUID', in: 'path', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'albumId', description: 'Album public ID', in: 'path', required: true, schema: new OA\Schema(type: 'string', pattern: '^[0-9a-zA-Z_-]{21}$', minLength: 21, maxLength: 21)),
         ],
         responses: [
             new OA\Response(response: '204', description: 'Album removed from genre'),
@@ -366,12 +373,13 @@ final class GenreController
         }
 
         try {
-            $resolvedAlbumId = Uuid::fromString($albumId);
-        } catch (\Throwable) {
+            $publicId = PublicId::fromString($albumId);
+        } catch (\InvalidArgumentException) {
             return $this->errorResponse('Invalid album ID format.');
         }
+        $resolvedAlbumId = $this->albums->findVisibleByPublicId($publicId, $this->libraryReadScopeProvider->current())?->getId();
 
-        if (!$this->genreService->removeAlbumFromGenre($genre->getId(), $resolvedAlbumId)) {
+        if ($resolvedAlbumId === null || !$this->genreService->removeAlbumFromGenre($genre->getId(), $resolvedAlbumId)) {
             return $this->notFound('Album not found.');
         }
 

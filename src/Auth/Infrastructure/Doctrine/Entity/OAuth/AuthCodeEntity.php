@@ -61,7 +61,6 @@ class AuthCodeEntity implements AuthCodeEntityInterface
     #[ORM\Column(type: 'text')]
     private string $codeChallengeMethod;
 
-    private ?string $userIdentifier = null;
 
     /** @param array<array-key, string>|null $scopes */
     public function __construct(
@@ -139,12 +138,14 @@ class AuthCodeEntity implements AuthCodeEntityInterface
 
     public function setUserIdentifier(string $identifier): void
     {
-        $this->userIdentifier = $identifier;
+        if ($identifier !== $this->user->getPublicId()->toString()) {
+            throw new \InvalidArgumentException('Authorization code user identity does not match.');
+        }
     }
 
     public function getUserIdentifier(): string
     {
-        return $this->userIdentifier ?? $this->user->getId()->toString();
+        return $this->user->getPublicId()->toString();
     }
 
     public function getClient(): ClientEntity

@@ -38,10 +38,10 @@ final class JwtGenerator implements JwtGeneratorInterface
         $client = $accessToken->getClient();
         $user = $accessToken->getUser();
 
-        // Mirror League's getSubjectIdentifier(): user UUID if present, else client UUID
+        // The subject is the public user identity, or the public client identity for a client-only token.
         $subject = $user !== null
-            ? $user->getId()->toString()
-            : $client->getId()->toString();
+            ? $user->getPublicId()->toString()
+            : $client->getPublicId()->toString();
 
         $builder = $this->jwtConfiguration->builder()
             ->permittedFor($this->resourceServerUri)
@@ -51,7 +51,7 @@ final class JwtGenerator implements JwtGeneratorInterface
             ->expiresAt($accessToken->getExpiresAt() ?? new DateTimeImmutable('+1 hour'))
             ->relatedTo($subject)
             ->withClaim('scopes', $accessToken->getScopeIdentifiers())
-            ->withClaim('client_id', $client->getId()->toString());
+            ->withClaim('client_id', $client->getPublicId()->toString());
 
         if ($dpopJkt !== null) {
             $builder = $builder->withClaim('cnf', ['jkt' => $dpopJkt]);

@@ -26,6 +26,25 @@ use PHPUnit\Framework\TestCase;
 
 final class DeletePreviewHandlersTest extends TestCase
 {
+    public function testAlbumCoverPreviewUsesTheImagePublicIdentity(): void
+    {
+        $album = Album::create(new Uuid(), 'Album', 'album');
+        $image = \App\Media\Domain\Model\Image::create('/covers/album.jpg', 'jpg', 'image/jpeg', 1, 10, 10, 'album', albumId: $album->getId());
+        $album->setCoverImage($image->getId());
+        $albums = $this->createStub(AlbumPortInterface::class);
+        $albums->method('findByPublicId')->willReturn($album);
+        $images = $this->createMock(\App\Media\Application\Port\ImagePortInterface::class);
+        $images->expects(self::once())->method('findByUuid')->with($image->getId())->willReturn($image);
+        $handler = new GetAlbumDeletePreviewHandler(
+            $albums, $this->createStub(SongPortInterface::class),
+            $this->createStub(PlaylistDeletionPreviewPortInterface::class),
+            $this->createStub(LibraryMediaFilesInterface::class), $images,
+        );
+        $data = AlbumDeletePreviewResource::from($handler(new GetAlbumDeletePreviewQuery($album->getPublicId()->toString())));
+        self::assertSame(['id' => $image->getPublicId()->toString()], $data['coverImage']);
+        self::assertStringNotContainsString($image->getId()->toString(), json_encode($data, JSON_THROW_ON_ERROR));
+    }
+
     public function testTheAlbumPreviewCountsEverySongAndKeepsItsResponseShape(): void
     {
         $album = Album::create(new Uuid(), 'Album', 'album');
@@ -40,13 +59,13 @@ final class DeletePreviewHandlersTest extends TestCase
         $playlists->expects(self::once())->method('findContainingSongs')
             ->with([$first->getId(), $second->getId()])
             ->willReturn([
-                ['uuid' => (new Uuid())->toString(), 'name' => 'Favorites'],
-                ['uuid' => (new Uuid())->toString(), 'name' => 'Favorites'],
+                ['publicId' => (new Uuid())->toString(), 'name' => 'Favorites'],
+                ['publicId' => (new Uuid())->toString(), 'name' => 'Favorites'],
             ]);
         $files = $this->createMock(LibraryMediaFilesInterface::class);
         $files->expects(self::never())->method('inspect');
 
-        $preview = (new GetAlbumDeletePreviewHandler($albums, $songs, $playlists, $files))(new GetAlbumDeletePreviewQuery($album->getPublicId()->toString()));
+        $preview = (new GetAlbumDeletePreviewHandler($albums, $songs, $playlists, $files, $this->createStub(\App\Media\Application\Port\ImagePortInterface::class)))(new GetAlbumDeletePreviewQuery($album->getPublicId()->toString()));
 
         self::assertSame([
             'album' => ['id' => $album->getPublicId()->toString(), 'title' => 'Album', 'songCount' => 2],
@@ -74,7 +93,7 @@ final class DeletePreviewHandlersTest extends TestCase
                 new LibraryMediaFileCheck('/elsewhere/outside.flac', LibraryMediaFileVerdict::OutsideRoot),
             ], false, true));
 
-        $preview = (new GetAlbumDeletePreviewHandler($albums, $songs, $this->createStub(PlaylistDeletionPreviewPortInterface::class), $files))(
+        $preview = (new GetAlbumDeletePreviewHandler($albums, $songs, $this->createStub(PlaylistDeletionPreviewPortInterface::class), $files, $this->createStub(\App\Media\Application\Port\ImagePortInterface::class)))(
             new GetAlbumDeletePreviewQuery($album->getPublicId()->toString(), deleteFiles: true),
         );
 
