@@ -23,8 +23,7 @@ use Throwable;
 /**
  * The CLI counterpart of POST /api/admin/recommendations/generate.
  *
- * The job runs in this process, because the CPU process pool the web server uses lives
- * inside the web server. It leaves the same recommendation job record as the web path,
+ * The job runs in this process. It leaves the same recommendation job record as the web path,
  * and the run is recorded in the job monitor.
  */
 #[AsCommand(
@@ -83,6 +82,7 @@ final class RecommendationGenerateCommand extends Command
                 mode: $mode,
                 userId: $userId,
                 actor: Actor::CLI,
+                foreground: true,
             ));
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);

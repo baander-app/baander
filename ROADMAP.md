@@ -2151,9 +2151,40 @@ and access mode, and requires explicit media memory and PID budgets.
 The authoritative shared unit selection passes **378 tests / 886 assertions** in
 an **8.0-second** lane, including worker CLI, configuration, mount and containment
 suites. Host creation, start and recovery checks pass **57 tests / 564 assertions**
-in **80.1 seconds**. U2, U3 and U4–U8 remain pending acceptance. Full static and
-backend gates and production runtime drills remain pending; every worker checkbox
-below remains unchecked.
+in **80.1 seconds**.
+
+U2 moves ordinary background execution to Redis `async`. Recommendation admission
+returns typed results, preserves foreground CLI counts and exit behavior, and
+queues a worker job containing only its identifier. Workers generate image
+derivatives and publish them atomically; web serves the original while a derivative
+is pending.
+
+Focused functional, image, recommendation and transport checks pass. The native
+selection ran **197 tests / 509 assertions**, with **one fileinfo-dependent
+skip**; the image case passes in the CI functional image. An initial broader CI
+selection of **567 tests in 22 files** found one outdated assertion, now corrected.
+The affected catalog mutation suite passes in a later selection covering U3,
+codecs and controls: **257 tests / 4,273 assertions in 14 files**, **107.1 seconds**.
+These selections overlap and do not establish a full-gate result.
+
+U3 implements durable video and audio execution authorities, atomic admission with
+rollback, ordered synchronous controls and bounded control request state. Leases
+use the database clock, and generation fences reject stale owners. Forward
+migration `Version20261017150000` adds the runtime schema; the initial migration
+is preserved.
+
+The frozen focused selection passes **25 tests / 305 assertions in 5 files** in
+**70.2 seconds**, alongside the broader selection recorded above. Review changes
+to partial indexes and cleanup are applied. Final verification after review passes
+**49 tests / 545 assertions in 7 files** in **79.6 seconds**. Artifacts:
+`var/test-runs/20261017-150155-13778b36`.
+
+All five CI static gates pass: Composer platform requirements, PHPStan, Deptrac
+with zero violations, container lint and OpenAPI drift checking. Types were
+corrected and an obsolete dependency baseline entry removed; no suppressions were
+added. The U2/U3 foundation phase is ready for a local commit, and U4 work is
+starting. U4–U8 acceptance, full backend verification and production runtime drills
+remain pending; every worker checkbox below remains unchecked.
 
 - [ ] Verify the two-command deployment contract end to end: web owns delivery and
   client connections; worker owns consumers, scheduler, outbox relay, media execution,

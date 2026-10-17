@@ -12,6 +12,8 @@ final class TranscodeForeignKeys implements ForeignKeyDeclarationProviderInterfa
 {
     public function foreignKeys(): iterable
     {
+        yield new ForeignKeyDeclaration('fk_transcode_runtime_job', 'transcode_runtime_state', 'job_id', 'transcode_jobs', 'id', 'CASCADE');
+        yield new ForeignKeyDeclaration('fk_transcode_runtime_session', 'transcode_runtime_state', 'session_id', 'transcode_sessions', 'id', 'CASCADE');
         yield new ForeignKeyDeclaration('fk_transcode_sessions_user_id', 'transcode_sessions', 'user_id', 'users', 'id', 'CASCADE');
         yield new ForeignKeyDeclaration('fk_transcode_jobs_video_id', 'transcode_jobs', 'video_id', 'videos', 'id', 'CASCADE');
         yield new ForeignKeyDeclaration('fk_transcode_sessions_video_id', 'transcode_sessions', 'video_id', 'videos', 'id', 'CASCADE');

@@ -194,7 +194,7 @@ final class MetadataAdminControllerTest extends TestCase
 
     private function swooleTasks(): InMemoryTransport
     {
-        $transport = static::getContainer()->get('messenger.transport.swoole_task');
+        $transport = static::getContainer()->get('messenger.transport.async');
         $this->assertInstanceOf(InMemoryTransport::class, $transport);
 
         return $transport;

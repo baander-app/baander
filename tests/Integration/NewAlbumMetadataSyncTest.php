@@ -27,7 +27,7 @@ use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 
 /**
  * Runs a real scan through the console, ingests what it discovered, and checks
- * which album syncs reach the swoole_task queue, with the setting in PostgreSQL.
+ * which album syncs reach the async queue, with the setting in PostgreSQL.
  */
 final class NewAlbumMetadataSyncTest extends KernelTestCase
 {
@@ -146,7 +146,7 @@ final class NewAlbumMetadataSyncTest extends KernelTestCase
     /** @return list<string> */
     private function queuedAlbumSyncs(): array
     {
-        $transport = static::getContainer()->get('messenger.transport.swoole_task');
+        $transport = static::getContainer()->get('messenger.transport.async');
         self::assertInstanceOf(InMemoryTransport::class, $transport);
 
         $syncs = [];

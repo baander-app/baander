@@ -52,7 +52,7 @@ final class RecommendationJobRequeueCommand extends Command
         }
 
         try {
-            $run = $this->jobMonitor->runInline(new RequeueRecommendationJobCommand($publicId, Actor::CLI));
+            $run = $this->jobMonitor->runInline(new RequeueRecommendationJobCommand($publicId, Actor::CLI, foreground: true));
         } catch (Throwable $exception) {
             return AdminCommandSupport::fail($io, $exception);
         }

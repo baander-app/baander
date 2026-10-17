@@ -40,6 +40,11 @@ final class TranscodeSessionOwnershipPersistenceTest extends TestCase
         $this->assertSchemaComparisonIsClean(['transcode_sessions']);
     }
 
+    public function testSchemaComparisonIsCleanForMediaRuntimeAuthorities(): void
+    {
+        $this->assertSchemaComparisonIsClean(['transcode_runtime_state', 'audio_rendition_runtime']);
+    }
+
     public function testLookupsByUserAndByJobStayOwnerScoped(): void
     {
         $first = $this->createUser();

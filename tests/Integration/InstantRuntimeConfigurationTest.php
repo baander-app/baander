@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration;
 
-use App\Recommendation\Infrastructure\Swoole\RecommendationPoolWorker;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerManualOccurrenceRecorder;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceDispatchStore;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceExecutionStore;
@@ -73,7 +72,6 @@ final class InstantRuntimeConfigurationTest extends TestCase
             DoctrineSchedulerOccurrenceMaterializer::class => 'UTC',
             DoctrineSchedulerRecoveryScheduleStore::class => 'UTC',
             DoctrineSchedulerWorkerAuthority::class => 'UTC',
-            RecommendationPoolWorker::class => 'UTC',
             DedicatedConnectionFactory::class => 'UTC',
         ], self::$probe['zones']);
     }

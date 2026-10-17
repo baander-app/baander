@@ -16,6 +16,7 @@ final readonly class RequeueRecommendationJobCommand
     public function __construct(
         public string $publicId,
         public string $actor,
+        public bool $foreground = false,
     ) {
     }
 }

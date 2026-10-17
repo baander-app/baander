@@ -19,7 +19,6 @@ final class SyncSongHandler
     ) {
     }
 
-    #[AsMessageHandler(fromTransport: 'swoole_task')]
     #[AsMessageHandler(fromTransport: 'async')]
     public function __invoke(SyncSongMessage $message): void
     {

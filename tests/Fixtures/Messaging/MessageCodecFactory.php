@@ -29,6 +29,7 @@ final class MessageCodecFactory
             new MetadataMessagePayloadCodec(),
             new NotificationMessagePayloadCodec(),
             new RadioMessagePayloadCodec(),
+            new \App\Recommendation\Infrastructure\Messaging\RecommendationMessagePayloadCodec(),
             new SchedulerMessagePayloadCodec(),
             new OutboxMessagePayloadCodec(),
             new TranscodeMessagePayloadCodec(),

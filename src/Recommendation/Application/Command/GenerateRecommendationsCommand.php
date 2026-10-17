@@ -28,6 +28,7 @@ final readonly class GenerateRecommendationsCommand implements SchedulableComman
         private bool $automatic = false,
         private ?string $actor = null,
         private ?Uuid $jobId = null,
+        public bool $foreground = false,
     ) {
     }
 

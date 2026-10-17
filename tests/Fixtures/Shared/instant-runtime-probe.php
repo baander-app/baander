@@ -11,7 +11,6 @@ declare(strict_types=1);
  */
 
 use App\Kernel;
-use App\Recommendation\Infrastructure\Swoole\RecommendationPoolWorker;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerManualOccurrenceRecorder;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceDispatchStore;
 use App\Scheduler\Infrastructure\Doctrine\DoctrineSchedulerOccurrenceExecutionStore;
@@ -60,15 +59,6 @@ foreach ([
     $zones[$store] = $connection->fetchOne('SHOW TimeZone');
     $connection->close();
 }
-$pdo = (new ReflectionMethod(RecommendationPoolWorker::class, 'createPdo'))->invoke(new RecommendationPoolWorker(), $databaseUrl);
-if (!$pdo instanceof PDO) {
-    throw new LogicException('The recommendation pool worker opened no PDO connection.');
-}
-$statement = $pdo->query('SHOW TimeZone');
-if ($statement === false) {
-    throw new LogicException('SHOW TimeZone failed on the recommendation pool worker connection.');
-}
-$zones[RecommendationPoolWorker::class] = $statement->fetchColumn();
 // bin/worker-lease-agent.php and bin/worker-deployment.php connect through fromParams.
 $dedicated = DedicatedConnectionFactory::fromParams((new DsnParser(['postgresql' => 'pdo_pgsql']))->parse($databaseUrl));
 $zones[DedicatedConnectionFactory::class] = $dedicated->fetchOne('SHOW TimeZone');

@@ -37,49 +37,31 @@ final class MessengerRoutingTest extends TestCase
         );
     }
 
-    public function testScanLibraryCommandRoutesToSwooleTaskTransport(): void
+    public function testScanLibraryCommandRoutesToAsyncTransport(): void
     {
         $config = $this->loadMessengerConfig();
 
         $this->assertArrayHasKey('routing', $config['framework']['messenger']);
         $routing = $config['framework']['messenger']['routing'];
 
-        // Verify ScanLibraryCommand is routed to swoole_task transport
+        // Verify ScanLibraryCommand is routed to async transport
         $this->assertArrayHasKey(
             'App\\Library\\Application\\Command\\ScanLibraryCommand',
             $routing
         );
 
         $this->assertSame(
-            'swoole_task',
+            'async',
             $routing['App\\Library\\Application\\Command\\ScanLibraryCommand'],
-            'ScanLibraryCommand should be routed to swoole_task transport'
+            'ScanLibraryCommand should be routed to async transport'
         );
     }
 
-    public function testAsyncAndSwooleTaskAreDifferentTransports(): void
+    public function testOnlyDurableWorkerTransportsAreConfigured(): void
     {
-        $config = $this->loadMessengerConfig();
-
-        $this->assertArrayHasKey('transports', $config['framework']['messenger']);
-        $transports = $config['framework']['messenger']['transports'];
-
-        // Verify both transports exist and are configured differently
-        $this->assertArrayHasKey('async', $transports);
-        $this->assertArrayHasKey('swoole_task', $transports);
-
-        // They must use different DSNs/implementations
-        $this->assertNotSame(
-            $transports['async']['dsn'] ?? '',
-            $transports['swoole_task']['dsn'] ?? '',
-            'async and swoole_task must be different transports to avoid nesting'
-        );
-
-        // swoole_task should use swoole://task
-        $this->assertStringContainsString('swoole', $transports['swoole_task']['dsn']);
-
-        // async should use Redis ( MESSENGER_TRANSPORT_DNS env var)
-        $this->assertStringContainsString('%env(MESSENGER_TRANSPORT_DSN)%', $transports['async']['dsn']);
+        $transports = $this->loadMessengerConfig()['framework']['messenger']['transports'];
+        self::assertArrayNotHasKey('swoole_task', $transports);
+        self::assertStringContainsString('%env(MESSENGER_TRANSPORT_DSN)%', $transports['async']['dsn']);
     }
 
     /** @return array<string, mixed> */

@@ -108,10 +108,10 @@ final class InitialSchemaMigrationTest extends TestCase
         }
         $factory = $this->factory();
         $factory->getMetadataStorage()->ensureInitialized();
-        self::assertCount(2, $factory->getMigrationRepository()->getMigrations());
+        self::assertCount(3, $factory->getMigrationRepository()->getMigrations());
         self::assertSame(0, $this->migrate($factory));
-        self::assertSame(['DoctrineMigrations\\Version20261017000000', 'DoctrineMigrations\\Version20261017130000'], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
-        self::assertSame(80, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
+        self::assertSame(['DoctrineMigrations\\Version20261017000000', 'DoctrineMigrations\\Version20261017130000', 'DoctrineMigrations\\Version20261017150000'], $this->connection->fetchFirstColumn('SELECT version FROM doctrine_migration_versions ORDER BY version'));
+        self::assertSame(82, (int) $this->connection->fetchOne("SELECT count(*) FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'doctrine_migration_versions'"));
         $this->assertSchedules();
         $this->assertIdentitiesAllocate();
         $catalog = $this->catalog('public');
@@ -129,7 +129,7 @@ final class InitialSchemaMigrationTest extends TestCase
         self::assertSame($history, $this->connection->fetchAllAssociative('SELECT * FROM doctrine_migration_versions'));
 
         self::assertSame(0, $this->migrate($this->factory(true)));
-        self::assertSame(3, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
+        self::assertSame(4, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
         self::assertSame('future_migration_probe', $this->connection->fetchOne("SELECT to_regclass('future_migration_probe')::text"));
     }
 
@@ -193,7 +193,7 @@ final class InitialSchemaMigrationTest extends TestCase
         $before = $snapshot();
 
         self::assertSame(0, $this->migrate($this->factory()));
-        self::assertSame(2, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
+        self::assertSame(3, (int) $this->connection->fetchOne('SELECT count(*) FROM doctrine_migration_versions'));
         $after = $snapshot();
         self::assertSame(0, (int) $after['playlists'][0]['persistence_version']);
         $withoutVersion = $after;

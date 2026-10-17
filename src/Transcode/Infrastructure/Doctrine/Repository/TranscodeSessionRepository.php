@@ -56,6 +56,9 @@ final class TranscodeSessionRepository implements TranscodeSessionRepositoryInte
             ->getRepository(TranscodeSessionEntity::class)
             ->find($uuid);
 
+        if ($entity !== null) {
+            $this->entityManager->refresh($entity);
+        }
         return $entity !== null ? $this->toDomain($entity) : null;
     }
 

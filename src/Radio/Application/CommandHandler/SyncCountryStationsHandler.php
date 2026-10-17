@@ -8,7 +8,6 @@ use App\Radio\Application\Command\SyncCountryStationsCommand;
 use App\Radio\Application\Port\RadioStationPortInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
-#[AsMessageHandler(fromTransport: 'swoole_task')]
 #[AsMessageHandler(fromTransport: 'async')]
 final class SyncCountryStationsHandler
 {

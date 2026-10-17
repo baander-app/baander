@@ -234,7 +234,6 @@ deptrac:
       - App\Activity\Application\Port\ActivityPortInterface
       - App\Catalog\Domain\Model\Song
       - App\Catalog\Domain\Repository\SongRepositoryInterface
-      - App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool
     App\Recommendation\Application\QueryHandler\GetPersonalizedRecommendationsHandler:
       - App\Catalog\Domain\Model\Song
       - App\Catalog\Domain\Repository\SongRepositoryInterface

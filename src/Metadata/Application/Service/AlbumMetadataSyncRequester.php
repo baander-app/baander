@@ -13,8 +13,7 @@ use App\Shared\Domain\Model\Uuid;
 /**
  * Queues automatic metadata syncs for new albums while `metadata.auto_sync` is on.
  *
- * The orchestrator dispatches SyncAlbumMessage, which is routed to swoole_task and
- * falls back to the Redis async transport outside the Swoole server, so ingest
+ * The orchestrator dispatches SyncAlbumMessage to the Redis async transport, so ingest
  * never waits for the external lookups.
  */
 final readonly class AlbumMetadataSyncRequester implements AlbumMetadataSyncRequestInterface

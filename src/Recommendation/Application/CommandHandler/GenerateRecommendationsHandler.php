@@ -8,6 +8,7 @@ use App\Activity\Application\Port\ActivityPortInterface;
 use App\Catalog\Domain\Repository\SongRepositoryInterface;
 use App\Recommendation\Application\Command\DeleteRecommendationsBySourceCommand;
 use App\Recommendation\Application\Command\GenerateRecommendationsCommand;
+use App\Recommendation\Application\Command\ExecuteRecommendationJobCommand;
 use App\Recommendation\Application\Command\SaveRecommendationCommand;
 use App\Recommendation\Application\DTO\RecommendationGenerationResult;
 use App\Recommendation\Application\Port\RecommendationJobPortInterface;
@@ -24,19 +25,11 @@ use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
 use Throwable;
 
-/**
- * Runs a recommendation job: the job record is created first on every path, so each run
- * shows in the admin job list and can be cancelled. In the web server the job goes to the
- * CPU process pool; elsewhere, such as from the console or the scheduler worker, it runs
- * here and the record follows each stage.
- */
 final class GenerateRecommendationsHandler
 {
     /** The scheduler records this as the run's last result. */
@@ -54,9 +47,6 @@ final class GenerateRecommendationsHandler
         private readonly ContentSimilarityCalculator $contentCalculator,
         private readonly GenreSimilarityCalculator $genreCalculator,
         private readonly RecommendationJobPortInterface $jobPort,
-        private readonly CpuProcessPool $cpuProcessPool,
-        private readonly JsonEncoder $jsonEncoder,
-        private readonly string $databaseUrl,
         private readonly SystemSettingsPortInterface $settings,
         private readonly LoggerInterface $logger,
     ) {
@@ -88,10 +78,25 @@ final class GenerateRecommendationsHandler
 
         $job = $this->job($command);
 
-        // Use pool worker if available (Swoole context)
-        if ($this->cpuProcessPool->isRunning()) {
-            return $this->dispatchToPool($job);
+        if ($command->foreground) {
+            return $this->runHere($job);
         }
+
+        try {
+            $this->commandBus->dispatch(new ExecuteRecommendationJobCommand($job->getId()));
+        } catch (Throwable $failure) {
+            $this->recordFailure($job, $failure);
+            throw $failure;
+        }
+
+        return $this->result($job, RecommendationGenerationResult::EXECUTION_ASYNC);
+    }
+
+    /** Executes a queued job with dependencies and credentials owned by this process. */
+    public function execute(Uuid $jobId): RecommendationGenerationResult
+    {
+        $job = $this->jobPort->getById($jobId)
+            ?? throw new NotFoundException('Recommendation job not found.', ['jobId' => $jobId->toString()]);
 
         return $this->runHere($job);
     }
@@ -107,7 +112,6 @@ final class GenerateRecommendationsHandler
                     'mode' => $command->getMode(),
                     'triggered_by' => $command->getActor() ?? Actor::SYSTEM,
                     'triggered_at' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
-                    'database_url_hash' => hash('xxh128', $this->databaseUrl),
                 ],
             );
         }
@@ -122,22 +126,6 @@ final class GenerateRecommendationsHandler
         }
 
         return $job;
-    }
-
-    private function dispatchToPool(RecommendationJob $job): RecommendationGenerationResult
-    {
-        $key = CpuProcessPool::resultKey('generate_recommendations', $job->getId()->toString());
-        $payload = $this->jsonEncoder->encode([
-            'type' => 'generate_recommendations',
-            'job_id' => $job->getId()->toString(),
-            'is_full' => $job->isFull(),
-            'database_url' => $this->databaseUrl,
-            'metadata' => $job->getMetadata(),
-        ], 'json');
-
-        $this->cpuProcessPool->dispatch($payload, $key);
-
-        return $this->result($job, RecommendationGenerationResult::EXECUTION_ASYNC);
     }
 
     /**

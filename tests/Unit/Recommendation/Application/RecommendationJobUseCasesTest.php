@@ -27,7 +27,6 @@ use App\Shared\Application\Exception\NotFoundException;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Domain\Model\Uuid;
-use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool;
 use App\Tests\Unit\Recommendation\InMemoryRecommendationJobs;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -35,7 +34,6 @@ use Symfony\Component\Messenger\Handler\HandlersLocator;
 use Symfony\Component\Messenger\MessageBus;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Middleware\HandleMessageMiddleware;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 /**
  * The rules behind the admin job actions, shared by the API and the app:recommendation:* commands.
@@ -51,7 +49,7 @@ final class RecommendationJobUseCasesTest extends TestCase
 
     public function testARunOutsideTheWebServerCreatesAJobRecordThatFollowsEachStrategy(): void
     {
-        $result = $this->generator()(new GenerateRecommendationsCommand(mode: 'incremental', actor: 'cli'));
+        $result = $this->generator()(new GenerateRecommendationsCommand(foreground: true, mode: 'incremental', actor: 'cli'));
 
         self::assertInstanceOf(RecommendationGenerationResult::class, $result);
         self::assertSame(RecommendationGenerationResult::EXECUTION_SYNC, $result->execution);
@@ -77,7 +75,7 @@ final class RecommendationJobUseCasesTest extends TestCase
             }
         };
 
-        $result = $this->generator()(new GenerateRecommendationsCommand(mode: 'full'));
+        $result = $this->generator()(new GenerateRecommendationsCommand(foreground: true, mode: 'full'));
 
         self::assertInstanceOf(RecommendationGenerationResult::class, $result);
         self::assertSame('cancelled', $result->status);
@@ -95,7 +93,7 @@ final class RecommendationJobUseCasesTest extends TestCase
             }
         };
 
-        $result = $this->generator()(new GenerateRecommendationsCommand(mode: 'full'));
+        $result = $this->generator()(new GenerateRecommendationsCommand(foreground: true, mode: 'full'));
 
         self::assertInstanceOf(RecommendationGenerationResult::class, $result);
         self::assertSame('cancelled', $result->status);
@@ -113,7 +111,7 @@ final class RecommendationJobUseCasesTest extends TestCase
             }
         };
 
-        $result = $this->generator()(new GenerateRecommendationsCommand(mode: 'full'));
+        $result = $this->generator()(new GenerateRecommendationsCommand(foreground: true, mode: 'full'));
 
         self::assertInstanceOf(RecommendationGenerationResult::class, $result);
         self::assertSame('cancelled', $result->status);
@@ -126,7 +124,7 @@ final class RecommendationJobUseCasesTest extends TestCase
         $activity->method('getAllListeningHistories')->willThrowException(new \RuntimeException('activity store unavailable'));
 
         try {
-            $this->generator(activity: $activity)(new GenerateRecommendationsCommand(mode: 'full'));
+            $this->generator(activity: $activity)(new GenerateRecommendationsCommand(foreground: true, mode: 'full'));
             self::fail('The run should fail.');
         } catch (\RuntimeException $exception) {
             self::assertSame('activity store unavailable', $exception->getMessage());
@@ -142,7 +140,7 @@ final class RecommendationJobUseCasesTest extends TestCase
         $this->expectException(InvalidInputException::class);
 
         try {
-            $this->generator()(new GenerateRecommendationsCommand(mode: 'Full'));
+            $this->generator()(new GenerateRecommendationsCommand(foreground: true, mode: 'Full'));
         } finally {
             self::assertSame([], $this->jobs->jobs);
         }
@@ -218,11 +216,11 @@ final class RecommendationJobUseCasesTest extends TestCase
 
         $result = $this->requeue()(new RequeueRecommendationJobCommand($original->getPublicId()->toString(), 'cli'));
 
-        self::assertSame('completed', $result->status);
+        self::assertSame('pending', $result->status);
         self::assertSame('incremental', $result->mode);
         $job = $this->jobs->getByPublicId(PublicId::fromString($result->publicId));
         self::assertInstanceOf(RecommendationJob::class, $job);
-        self::assertSame(RecommendationJobStatus::Completed, $job->getStatus());
+        self::assertSame(RecommendationJobStatus::Pending, $job->getStatus());
         self::assertTrue($original->getId()->equals($job->getOriginalJobId()));
         self::assertTrue($userId->equals($job->getUserId()));
         $metadata = $job->getMetadata();
@@ -252,7 +250,7 @@ final class RecommendationJobUseCasesTest extends TestCase
         $done->markCancelled();
 
         $this->expectException(ConflictException::class);
-        $this->generator()(new GenerateRecommendationsCommand(mode: 'full', jobId: $done->getId()));
+        $this->generator()(new GenerateRecommendationsCommand(foreground: true, mode: 'full', jobId: $done->getId()));
     }
 
     public function testTheListClampsTheLimitAndRejectsAnUnknownStatus(): void
@@ -296,17 +294,13 @@ final class RecommendationJobUseCasesTest extends TestCase
         }
 
         return new GenerateRecommendationsHandler(
-            $this->createStub(MessageBusInterface::class),
+            new MessageBus(),
             $songs,
             $activity,
             new CollaborativeFilteringCalculator(),
             new ContentSimilarityCalculator(),
             new GenreSimilarityCalculator(),
             $this->jobs,
-            // Never started, so the job runs in this process as it does from the console.
-            new CpuProcessPool([], 1, new NullLogger()),
-            new JsonEncoder(),
-            'postgresql://baander.app/unused',
             $this->createStub(SystemSettingsPortInterface::class),
             new NullLogger(),
         );

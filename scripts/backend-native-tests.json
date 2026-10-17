@@ -24,7 +24,6 @@
   "tests/Unit/Shared/Infrastructure/Http/SwooleBinaryFileResponseTransportTest.php": "nested native Swoole probe",
   "tests/Unit/Shared/Infrastructure/Messenger/JobCancellationCheckpointTest.php": "native coroutine/reactor/server",
   "tests/Unit/Shared/Infrastructure/Messenger/SwooleFallbackHandlerRegistrationTest.php": "Container compilation uses fixed cache, build and log path /tmp/baander-handler-registration.",
-  "tests/Unit/Shared/Infrastructure/Messenger/SwooleJsonDeliveryTest.php": "native coroutine/reactor/server",
   "tests/Unit/Shared/Infrastructure/Messenger/WorkerHeartbeatSubscriberTest.php": "native shared table/channel/process-pool wrapper",
   "tests/Unit/Shared/Infrastructure/Messenger/WorkerServicePoolResetSubscriberTest.php": "native coroutine/reactor/server",
   "tests/Unit/Shared/Infrastructure/OpenTelemetry/SpanBufferProbeTest.php": "nested native Swoole probe",

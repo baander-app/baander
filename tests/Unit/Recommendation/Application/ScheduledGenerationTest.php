@@ -18,12 +18,10 @@ use App\Scheduler\Domain\Model\SchedulableCommandInterface;
 use App\Shared\Application\Exception\InvalidInputException;
 use App\Shared\Application\Port\SystemSettingsPortInterface;
 use App\Tests\Unit\Recommendation\InMemoryRecommendationJobs;
-use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 use Psr\Log\NullLogger;
 use Symfony\Component\Messenger\MessageBusInterface;
-use Symfony\Component\Serializer\Encoder\JsonEncoder;
 
 /**
  * The daily scheduler job builds the command with automatic: true; only that run reads
@@ -67,7 +65,7 @@ final class ScheduledGenerationTest extends TestCase
         $jobs->expects(self::never())->method('create');
 
         $result = $this->handler($songs, $this->settings(false), $jobs)(
-            new GenerateRecommendationsCommand(mode: GenerateRecommendationsCommand::MODE_FULL, automatic: true),
+            new GenerateRecommendationsCommand(foreground: true, mode: GenerateRecommendationsCommand::MODE_FULL, automatic: true),
         );
 
         self::assertSame(GenerateRecommendationsHandler::SKIPPED_AUTO_GENERATE_OFF, $result);
@@ -81,7 +79,7 @@ final class ScheduledGenerationTest extends TestCase
         $songs->expects(self::once())->method('findAllForRecommendations')->willReturn([]);
 
         $result = $this->handler($songs, $this->settings(true))(
-            new GenerateRecommendationsCommand(mode: GenerateRecommendationsCommand::MODE_FULL, automatic: true),
+            new GenerateRecommendationsCommand(foreground: true, mode: GenerateRecommendationsCommand::MODE_FULL, automatic: true),
         );
 
         self::assertInstanceOf(RecommendationGenerationResult::class, $result);
@@ -97,7 +95,7 @@ final class ScheduledGenerationTest extends TestCase
         $settings = $this->createMock(SystemSettingsPortInterface::class);
         $settings->expects(self::never())->method('get');
 
-        $result = $this->handler($songs, $settings)(new GenerateRecommendationsCommand(mode: GenerateRecommendationsCommand::MODE_FULL));
+        $result = $this->handler($songs, $settings)(new GenerateRecommendationsCommand(foreground: true, mode: GenerateRecommendationsCommand::MODE_FULL));
 
         self::assertInstanceOf(RecommendationGenerationResult::class, $result);
         self::assertSame(['collaborative' => 0, 'content' => 0, 'genre' => 0], $result->counts);
@@ -109,7 +107,49 @@ final class ScheduledGenerationTest extends TestCase
         $songs->expects(self::never())->method('findUpdatedAfter');
 
         $this->expectException(InvalidInputException::class);
-        $this->handler($songs, $this->createStub(SystemSettingsPortInterface::class))(new GenerateRecommendationsCommand(mode: 'Full', automatic: true));
+        $this->handler($songs, $this->createStub(SystemSettingsPortInterface::class))(new GenerateRecommendationsCommand(foreground: true, mode: 'Full', automatic: true));
+    }
+
+    public function testAdmissionQueuesOnlyTheJobIdentifierWithoutReadingSongs(): void
+    {
+        $songs = $this->createMock(SongRepositoryInterface::class);
+        $songs->expects(self::never())->method('findAllForRecommendations');
+        $jobs = new InMemoryRecommendationJobs();
+        $queued = [];
+        $bus = new \Symfony\Component\Messenger\MessageBus([
+            new \Symfony\Component\Messenger\Middleware\HandleMessageMiddleware(
+                new \Symfony\Component\Messenger\Handler\HandlersLocator([
+                    \App\Recommendation\Application\Command\ExecuteRecommendationJobCommand::class => [
+                        static function ($command) use (&$queued): void { $queued[] = $command; },
+                    ],
+                ]),
+            ),
+        ]);
+        $handler = $this->handler($songs, $this->createStub(SystemSettingsPortInterface::class), $jobs, $bus);
+        $result = $handler(new GenerateRecommendationsCommand());
+
+        self::assertSame('pending', $result->status);
+        self::assertSame('async', $result->execution);
+        self::assertCount(1, $queued);
+        self::assertSame(['jobId'], array_keys(get_object_vars($queued[0])));
+        self::assertSame($result->jobId, $queued[0]->jobId->toString());
+    }
+
+    public function testFailedEnqueueFailsTheJobAndNeverRunsComputationLocally(): void
+    {
+        $songs = $this->createMock(SongRepositoryInterface::class);
+        $songs->expects(self::never())->method('findAllForRecommendations');
+        $jobs = new InMemoryRecommendationJobs();
+        $bus = $this->createStub(MessageBusInterface::class);
+        $bus->method('dispatch')->willThrowException(new \RuntimeException('queue unavailable'));
+        $handler = $this->handler($songs, $this->createStub(SystemSettingsPortInterface::class), $jobs, $bus);
+        try {
+            $handler(new GenerateRecommendationsCommand());
+            self::fail('Admission must report a failed enqueue.');
+        } catch (\RuntimeException $failure) {
+            self::assertSame('queue unavailable', $failure->getMessage());
+        }
+        self::assertSame('failed', array_values($jobs->jobs)[0]->getStatus()->value);
     }
 
     private function settings(bool $autoGenerate): SystemSettingsPortInterface
@@ -124,6 +164,7 @@ final class ScheduledGenerationTest extends TestCase
         SongRepositoryInterface $songs,
         SystemSettingsPortInterface $settings,
         ?RecommendationJobPortInterface $jobs = null,
+        ?MessageBusInterface $bus = null,
     ): GenerateRecommendationsHandler {
         $this->logger = new InfoLineLogger();
 
@@ -131,17 +172,13 @@ final class ScheduledGenerationTest extends TestCase
         $activity->method('getAllListeningHistories')->willReturn([]);
 
         return new GenerateRecommendationsHandler(
-            $this->createStub(MessageBusInterface::class),
+            $bus ?? new \Symfony\Component\Messenger\MessageBus(),
             $songs,
             $activity,
             new CollaborativeFilteringCalculator(),
             new ContentSimilarityCalculator(),
             new GenreSimilarityCalculator(),
             $jobs ?? new InMemoryRecommendationJobs(),
-            // Never started, so isRunning() is false and generation runs synchronously.
-            new CpuProcessPool([], 1, new NullLogger()),
-            new JsonEncoder(),
-            'postgresql://baander.app/unused',
             $settings,
             $this->logger,
         );

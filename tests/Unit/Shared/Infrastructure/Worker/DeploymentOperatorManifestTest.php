@@ -79,6 +79,7 @@ final class DeploymentOperatorManifestTest extends TestCase
             $manifest->recipe(new DeploymentRuntimeEnvironment(['CONVERT_STORAGE_PATH' => '/storage/conversions']))->createArguments('/tmp/baander-test.env'));
     }
 
+    /** @return list<array{volume:string,target:string,readOnly:bool,role:string}> */
     private static function mounts(): array
     {
         return [...DeploymentMediaMountsTest::mounts(), ['volume' => 'baander-state', 'target' => '/var/www/html/var/transcode_state', 'readOnly' => false, 'role' => 'derived']];

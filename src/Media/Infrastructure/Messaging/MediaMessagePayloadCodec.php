@@ -5,18 +5,21 @@ declare(strict_types=1);
 namespace App\Media\Infrastructure\Messaging;
 
 use App\Media\Application\Command\PruneMissingImagesCommand;
+use App\Media\Application\Command\GenerateImageDerivativeCommand;
 use App\Shared\Application\Messaging\MessagePayloadCodecInterface;
 
 final readonly class MediaMessagePayloadCodec implements MessagePayloadCodecInterface
 {
     private const array FIELDS = [
         'media.prune_missing_images' => [],
+        'media.generate_image_derivative' => ['source_path', 'preset'],
     ];
 
     public function types(): array
     {
         return [
             'media.prune_missing_images' => PruneMissingImagesCommand::class,
+            'media.generate_image_derivative' => GenerateImageDerivativeCommand::class,
         ];
     }
 
@@ -29,6 +32,7 @@ final readonly class MediaMessagePayloadCodec implements MessagePayloadCodecInte
     {
         return match (true) {
             $message instanceof PruneMissingImagesCommand => [],
+            $message instanceof GenerateImageDerivativeCommand => [$message->sourcePath, $message->preset],
             default => throw new \InvalidArgumentException('Unsupported message type.'),
         };
     }
@@ -37,6 +41,7 @@ final readonly class MediaMessagePayloadCodec implements MessagePayloadCodecInte
     {
         return match ($type) {
             'media.prune_missing_images' => new PruneMissingImagesCommand(),
+            'media.generate_image_derivative' => new GenerateImageDerivativeCommand($p['source_path'], $p['preset']),
             default => throw new \InvalidArgumentException('Unsupported message type.'),
         };
     }

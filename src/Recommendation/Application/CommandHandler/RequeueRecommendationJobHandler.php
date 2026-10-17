@@ -15,10 +15,6 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\HandledStamp;
 
-/**
- * Creates the new job and dispatches it, so it runs like a generated one: on the CPU
- * process pool in the web server, in this process elsewhere.
- */
 #[AsMessageHandler]
 final readonly class RequeueRecommendationJobHandler
 {
@@ -69,6 +65,7 @@ final readonly class RequeueRecommendationJobHandler
             userId: $original->getUserId(),
             actor: $command->actor,
             jobId: $job->getId(),
+            foreground: $command->foreground,
         ))->last(HandledStamp::class)?->getResult();
         assert($result instanceof RecommendationGenerationResult);
 

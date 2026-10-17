@@ -15,17 +15,14 @@ use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 /**
  * The production kernel for the catalog and library mutation matrix. The real firewall, the ORM
  * adapters and the disposable PostgreSQL and Redis stay; only the boundaries with external side
- * effects are replaced. The `swoole_task` and `async` Messenger transports are in-memory, so a
- * handler that queues work (a scan, a cover extraction) leaves its message where a test can read
- * it: without a Swoole server the task sender falls back to the Redis transport, and the `test`
- * environment's in-memory override does not apply to a `prod` kernel. The storage port is a
+ * effects are replaced. The `async` Messenger transport is in-memory so queued scans and
+ * cover extraction remain observable without an external consumer. The storage port is a
  * synthetic service the suite sets to a mock, so a cover upload or discard never touches a disk
  * and a refused request proves it was never asked.
  */
 final class CatalogMutationOAuthKernel extends ProductionOAuthKernel
 {
     public const string DISPATCHER = 'catalog_mutation.event_dispatcher';
-    public const string TASK_TRANSPORT = 'catalog_mutation.task_transport';
     public const string ASYNC_TRANSPORT = 'catalog_mutation.async_transport';
     public const string LIBRARIES = 'catalog_mutation.libraries';
 
@@ -41,7 +38,6 @@ final class CatalogMutationOAuthKernel extends ProductionOAuthKernel
             public function process(ContainerBuilder $container): void
             {
                 $transports = [
-                    'swoole_task' => CatalogMutationOAuthKernel::TASK_TRANSPORT,
                     'async' => CatalogMutationOAuthKernel::ASYNC_TRANSPORT,
                 ];
                 foreach ($transports as $name => $alias) {

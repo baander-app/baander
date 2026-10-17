@@ -8,11 +8,7 @@ framework:
         serializer:
             default_serializer: App\Shared\Infrastructure\Messenger\JsonTransportSerializer
         transports:
-            # Swoole task workers — primary async transport
-            swoole_task:
-                dsn: 'swoole://task'
-
-            # Redis transport — durable async routes and Swoole fallback
+            # Durable background execution under the worker supervisor
             async:
                 dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
                 options:
@@ -76,33 +72,34 @@ framework:
             'App\Catalog\Application\Command\BatchExtractCoversCommand': async
 
             # Library
-            'App\Library\Application\Command\ScanLibraryCommand': swoole_task
+            'App\Library\Application\Command\ScanLibraryCommand': async
             'App\Library\Application\Message\FilesDiscovered': async
 
             # Metadata
             'App\Metadata\Application\Command\ExtractAlbumCoverCommand': async
-            'App\Metadata\Application\Message\SyncSongMessage': swoole_task
-            'App\Metadata\Application\Message\SyncAlbumMessage': swoole_task
-            'App\Metadata\Application\Message\SyncLibraryMessage': swoole_task
+            'App\Metadata\Application\Message\SyncSongMessage': async
+            'App\Metadata\Application\Message\SyncAlbumMessage': async
+            'App\Metadata\Application\Message\SyncLibraryMessage': async
 
             # Notification
-            'App\Notification\Application\DTO\SendEmailCommand': swoole_task
-            'App\Notification\Application\DTO\SendPushCommand': swoole_task
+            'App\Notification\Application\DTO\SendEmailCommand': async
+            'App\Notification\Application\DTO\SendPushCommand': async
 
             # Media
-            'App\Media\Application\Command\PruneMissingImagesCommand': swoole_task
+            'App\Media\Application\Command\PruneMissingImagesCommand': async
 
             # Radio
-            'App\Radio\Application\Command\SyncCountryStationsCommand': swoole_task
+            'App\Radio\Application\Command\SyncCountryStationsCommand': async
 
             # Scheduler
             'App\Scheduler\Application\Command\ExecuteScheduledOccurrenceCommand': scheduler
 
             # Outbox
-            'App\Shared\Domain\Event\Outbox\RelayOutboxCommand': swoole_task
+            'App\Shared\Domain\Event\Outbox\RelayOutboxCommand': async
 
-            # Transcode
-            'App\Transcode\Application\Command\UpdateTranscodePositionCommand': swoole_task
+            # Recommendation admission stays synchronous; computation runs in the worker.
+            'App\Recommendation\Application\Command\ExecuteRecommendationJobCommand': async
+            'App\Media\Application\Command\GenerateImageDerivativeCommand': async
 
         buses:
             messenger.bus.default:
@@ -122,7 +119,6 @@ when@test:
         messenger:
             transports:
                 # Override to use in-memory transport for tests
-                swoole_task: 'in-memory://'
                 async: 'in-memory://'
                 scheduler: 'in-memory://'
                 # The failure transport keeps its PostgreSQL table, so tests exercise

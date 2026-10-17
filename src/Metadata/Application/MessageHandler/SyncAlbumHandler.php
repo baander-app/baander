@@ -19,7 +19,6 @@ final class SyncAlbumHandler
     ) {
     }
 
-    #[AsMessageHandler(fromTransport: 'swoole_task')]
     #[AsMessageHandler(fromTransport: 'async')]
     public function __invoke(SyncAlbumMessage $message): void
     {

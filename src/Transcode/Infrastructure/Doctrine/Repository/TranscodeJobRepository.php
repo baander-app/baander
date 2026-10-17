@@ -47,6 +47,9 @@ final class TranscodeJobRepository implements TranscodeJobRepositoryInterface
             ->getRepository(TranscodeJobEntity::class)
             ->find($uuid);
 
+        if ($entity !== null) {
+            $this->entityManager->refresh($entity);
+        }
         return $entity !== null ? $this->toDomain($entity) : null;
     }
 
@@ -71,6 +74,9 @@ final class TranscodeJobRepository implements TranscodeJobRepositoryInterface
             ->getRepository(TranscodeJobEntity::class)
             ->findOneBy(['videoId' => $videoId, 'qualityTierName' => $qualityTierName]);
 
+        if ($entity !== null) {
+            $this->entityManager->refresh($entity);
+        }
         return $entity !== null ? $this->toDomain($entity) : null;
     }
 

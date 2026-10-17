@@ -118,7 +118,6 @@ final class CatalogMutationFirewallTest extends TestCase
     private UserRepositoryInterface $users;
     private LibraryRepositoryInterface $libraries;
     private RedisClientFactory $redis;
-    private TransportInterface $taskTransport;
     private TransportInterface $asyncTransport;
     private StoragePortInterface&MockObject $storage;
     private SignedDpopProof $proof;
@@ -191,9 +190,6 @@ final class CatalogMutationFirewallTest extends TestCase
         $redis = $container->get('oauth.acceptance.redis_pool');
         self::assertInstanceOf(RedisClientFactory::class, $redis);
         $this->redis = $redis;
-        $taskTransport = $container->get(CatalogMutationOAuthKernel::TASK_TRANSPORT);
-        self::assertInstanceOf(TransportInterface::class, $taskTransport);
-        $this->taskTransport = $taskTransport;
         $asyncTransport = $container->get(CatalogMutationOAuthKernel::ASYNC_TRANSPORT);
         self::assertInstanceOf(TransportInterface::class, $asyncTransport);
         $this->asyncTransport = $asyncTransport;
@@ -280,7 +276,6 @@ final class CatalogMutationFirewallTest extends TestCase
                 self::assertSame(403, $this->json($response)['error']['code'] ?? null);
             }
             self::assertSame($before, $this->state(), 'A refused mutation must leave the catalog, the libraries and the files as they were.');
-            self::assertSame([], $this->sent($this->taskTransport));
             self::assertSame([], $this->sent($this->asyncTransport));
             self::assertSame(0, $this->redisEntries() - $this->redisEntriesBefore);
 
@@ -341,21 +336,20 @@ final class CatalogMutationFirewallTest extends TestCase
         self::assertLessThanOrEqual(self::CLAIM_LEASE_SECONDS, $lease);
 
         self::assertSame(0, $this->redisEntries() - $this->redisEntriesBefore, 'A scan message reached the disposable Redis stream.');
-        $sent = $this->sent($this->taskTransport);
+        $sent = $this->sent($this->asyncTransport);
         self::assertCount(1, $sent);
         $message = $sent[0];
         self::assertInstanceOf(ScanLibraryCommand::class, $message);
         self::assertSame($library->getSlug(), $message->getLibrarySlug()->toString());
         self::assertSame($claim['claim_id'], $message->getClaimId()?->toString(), 'The queued scan carries the claim it runs under.');
         self::assertFalse($message->isRescan());
-        self::assertSame([], $this->sent($this->asyncTransport));
 
         $second = $this->request('POST', $path, $jwt);
         self::assertSame(409, $second->getStatusCode(), $this->responseDetails($second));
         $conflict = $this->json($second);
         self::assertSame(['reason' => 'library_busy', 'holder' => 'scan'], $conflict['error']['details'] ?? null);
         self::assertSame($claim, $this->claimRow($library), 'A refused second scan leaves the claim as it was.');
-        self::assertCount(1, $this->sent($this->taskTransport));
+        self::assertCount(1, $this->sent($this->asyncTransport));
         self::assertSame(0, $this->redisEntries() - $this->redisEntriesBefore);
 
         $this->releaseScanClaim($library);
@@ -376,7 +370,6 @@ final class CatalogMutationFirewallTest extends TestCase
         self::assertSame($before, $this->claimRow($library));
         self::assertNull($before['claim_id']);
         self::assertNull($before['scan_status']);
-        self::assertSame([], $this->sent($this->taskTransport));
         self::assertSame([], $this->sent($this->asyncTransport));
         self::assertSame(0, $this->redisEntries() - $this->redisEntriesBefore);
     }
@@ -401,7 +394,7 @@ final class CatalogMutationFirewallTest extends TestCase
         self::assertGreaterThanOrEqual(1, $body['data']['skipped'] ?? null);
 
         $messages = [];
-        foreach ($this->sent($this->taskTransport) as $message) {
+        foreach ($this->sent($this->asyncTransport) as $message) {
             self::assertInstanceOf(ScanLibraryCommand::class, $message);
             $messages[$message->getLibrarySlug()->toString()] = $message->getClaimId()?->toString();
         }
@@ -413,7 +406,6 @@ final class CatalogMutationFirewallTest extends TestCase
         }
         self::assertSame($heldBefore, $this->claimRow($claimed), 'A claimed library keeps its claim.');
         self::assertArrayNotHasKey($claimed->getSlug(), $messages, 'No scan is queued for a claimed library.');
-        self::assertSame([], $this->sent($this->asyncTransport));
         self::assertSame(0, $this->redisEntries() - $this->redisEntriesBefore);
 
         // Release every claim the row took, the suite's and any other library's in the shared database.
@@ -456,7 +448,6 @@ final class CatalogMutationFirewallTest extends TestCase
         $claim = $this->claimRow($library);
         self::assertNull($claim['claim_id'], 'The delete releases its claim.');
         self::assertNull($claim['claim_kind']);
-        self::assertSame([], $this->sent($this->taskTransport));
         self::assertSame([], $this->sent($this->asyncTransport));
     }
 
@@ -825,7 +816,6 @@ final class CatalogMutationFirewallTest extends TestCase
                 $queued = $this->sent($this->asyncTransport);
                 self::assertCount(1, $queued);
                 self::assertInstanceOf(BatchExtractCoversCommand::class, $queued[0]);
-                self::assertSame([], $this->sent($this->taskTransport));
                 break;
             case 'admin_album_delete_preview':
                 self::assertSame($before, $after, 'A preview changes nothing.');
@@ -883,7 +873,6 @@ final class CatalogMutationFirewallTest extends TestCase
 
     private function assertNothingQueued(): void
     {
-        self::assertSame([], $this->sent($this->taskTransport));
         self::assertSame([], $this->sent($this->asyncTransport));
     }
 
@@ -948,12 +937,12 @@ final class CatalogMutationFirewallTest extends TestCase
         self::assertIsArray($claim);
         self::assertSame('scan', $claim['claim_kind']);
         self::assertIsString($claim['claim_id']);
-        $sent = $this->sent($this->taskTransport);
+        $sent = $this->sent($this->asyncTransport);
         self::assertCount(1, $sent);
         self::assertInstanceOf(ScanLibraryCommand::class, $sent[0]);
         self::assertSame($this->library->getSlug(), $sent[0]->getLibrarySlug()->toString());
         self::assertSame($claim['claim_id'], $sent[0]->getClaimId()?->toString());
-        self::assertSame([], $this->sent($this->asyncTransport));
+
         $this->releaseScanClaim($this->library);
     }
 
@@ -968,12 +957,12 @@ final class CatalogMutationFirewallTest extends TestCase
         self::assertSame('scan', $claim['claim_kind']);
         self::assertGreaterThanOrEqual(1, $data['dispatched'] ?? null);
         $queued = [];
-        foreach ($this->sent($this->taskTransport) as $message) {
+        foreach ($this->sent($this->asyncTransport) as $message) {
             self::assertInstanceOf(ScanLibraryCommand::class, $message);
             $queued[$message->getLibrarySlug()->toString()] = $message->getClaimId()?->toString();
         }
         self::assertSame($claim['claim_id'], $queued[$this->library->getSlug()] ?? null);
-        self::assertSame([], $this->sent($this->asyncTransport));
+
         foreach (array_keys($queued) as $slug) {
             $library = $this->libraries->findBySlug(new LibrarySlug($slug));
             self::assertNotNull($library);

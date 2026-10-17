@@ -72,6 +72,16 @@ final class RecommendationScheduleTest extends TestCase
         $this->setAutoGenerate(true);
 
         $this->runScheduledOccurrence();
+        self::assertSame(0, $this->recommendationsFrom($songs));
+        $container = $this->kernel->getContainer()->get('test.service_container');
+        $transport = $container->get('messenger.transport.async');
+        self::assertInstanceOf(\Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport::class, $transport);
+        $bus = $container->get(\Symfony\Component\Messenger\MessageBusInterface::class);
+        foreach ($transport->getSent() as $envelope) {
+            if ($envelope->getMessage() instanceof \App\Recommendation\Application\Command\ExecuteRecommendationJobCommand) {
+                $bus->dispatch($envelope->with(new \Symfony\Component\Messenger\Stamp\ReceivedStamp('async')));
+            }
+        }
 
         self::assertGreaterThan(0, $this->recommendationsFrom($songs));
         self::assertSame('dispatched', $this->lastResult());

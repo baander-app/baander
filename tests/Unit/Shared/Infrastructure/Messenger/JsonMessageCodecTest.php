@@ -64,6 +64,9 @@ final class JsonMessageCodecTest extends TestCase
         yield [new SendPushCommand($id, NotificationCategory::Security, 'title', 'body', 'notification')];
         yield [new SendWebhookCommand($id, NotificationCategory::Security, 'title', 'body', 'notification')];
         yield [new PruneMissingImagesCommand()];
+        yield [new \App\Media\Application\Command\GenerateImageDerivativeCommand('source.png')];
+        yield [new \App\Media\Application\Command\GenerateImageDerivativeCommand('source.png', 'thumb')];
+        yield [new \App\Recommendation\Application\Command\ExecuteRecommendationJobCommand(Uuid::v7())];
         yield [new SyncCountryStationsCommand($id, 'de')];
         yield [new ExecuteScheduledJobCommand('job-id', 'command', 'command-name', ['limit' => 3])];
         yield [new ExecuteScheduledOccurrenceCommand($id)];

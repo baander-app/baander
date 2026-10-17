@@ -5,175 +5,80 @@ declare(strict_types=1);
 namespace App\Transcode\Application\CommandHandler;
 
 use App\Shared\Application\Port\SleeperInterface;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
+use App\Transcode\Application\DTO\DesiredTranscodeState;
 use App\Transcode\Application\Exception\TranscodeStartupUnavailableException;
+use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
-use App\Transcode\Application\Port\TranscodeLoopLockInterface;
-use App\Transcode\Application\Port\TranscodeLoopStarterInterface;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
-use App\Transcode\Domain\Event\TranscodeSessionAttached;
 use App\Transcode\Domain\Model\TranscodeSession;
-use App\Transcode\Domain\ValueObject\SessionState;
 use App\Transcode\Domain\ValueObject\TranscodeStatus;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
-final class CreateTranscodeSessionHandler
+final readonly class CreateTranscodeSessionHandler
 {
-    private const LOOP_LOCK_TTL_SECONDS = 30;
-    private const LOCK_WAIT_TIMEOUT_SECONDS = 5.0;
-    private const LOCK_WAIT_INTERVAL_SECONDS = 0.1;
+    private const int STARTUP_POLLS = 50;
 
     public function __construct(
-        private readonly TranscodeJobPortInterface $jobPort,
-        private readonly TranscodeSessionPortInterface $sessionPort,
-        private readonly TranscodeStoragePortInterface $storagePort,
-        private readonly EventDispatcherInterface $eventDispatcher,
-        private readonly TranscodeLoopLockInterface $loopLock,
-        private readonly TranscodeLoopStarterInterface $loopStarter,
-        private readonly SleeperInterface $sleeper,
-    )
-    {
-    }
+        private TranscodeJobPortInterface $jobPort,
+        private TranscodeSessionPortInterface $sessionPort,
+        private TranscodeStoragePortInterface $storagePort,
+        private TranscodeExecutionOwnershipPort $ownership,
+        private TransactionPortInterface $transaction,
+        private SleeperInterface $sleeper,
+    ) {}
 
     #[AsMessageHandler]
     public function __invoke(CreateTranscodeSessionCommand $command): TranscodeSession
     {
-        $outputDirectory = $this->storagePort->resolveJobDirectory(
-            $command->getVideoId(),
-            $command->getQualityTier(),
-        );
-
-        $job = $this->jobPort->getOrCreateJob(
-            $command->getVideoId(),
-            $command->getQualityTier(),
-            $outputDirectory,
-            $command->getAudioLanguages(),
-        );
-
-        // Fast path: if a live session already exists, reuse it immediately.
-        $liveSession = $this->findLiveSession($job->getId());
-        if ($liveSession !== null) {
-            return $liveSession;
-        }
-
-        // Only one worker may start the encoding loop for a job. Acquire a
-        // distributed lock; if another worker is already starting it, wait
-        // briefly for a live session to appear and then reuse it.
-        $lease = $this->loopLock->acquire($job->getId(), self::LOOP_LOCK_TTL_SECONDS);
-        if ($lease === null) {
-            $liveSession = $this->waitForLiveSession($job->getId());
-            if ($liveSession !== null) {
-                return $liveSession;
+        $outputDirectory = $this->storagePort->resolveJobDirectory($command->getVideoId(), $command->getQualityTier());
+        $session = $this->transaction->run(function () use ($command, $outputDirectory): TranscodeSession {
+            $this->ownership->lockAdmission($command->getVideoId());
+            $job = $this->jobPort->getOrCreateJob($command->getVideoId(), $command->getQualityTier(), $outputDirectory, $command->getAudioLanguages());
+            $runtime = $this->ownership->find($job->getId());
+            if ($runtime !== null) {
+                $this->ownership->lockSession($runtime->sessionId);
+                $job = $this->jobPort->findByUuid($job->getId()) ?? $job;
+                $runtime = $this->ownership->find($job->getId());
             }
-
-            throw new TranscodeStartupUnavailableException();
-        }
-
-        $handedOff = false;
-        try {
-            // We hold the lock. Re-check the DB: another worker may have created a
-            // session between our fast-path check and acquiring the lock.
-            $liveSession = $this->findLiveSession($job->getId());
-            if ($liveSession !== null) {
-                return $liveSession;
-            }
-
-            // Mutate retry state only after obtaining ownership and confirming that
-            // another startup has not already supplied a live session.
-            if (empty($job->getAudioTrackLanguages()) && !empty($command->getAudioLanguages())) {
-                $job->setAudioTrackLanguages($command->getAudioLanguages());
-            }
-            $wasRetried = in_array($job->getStatus(), [TranscodeStatus::Failed, TranscodeStatus::Cancelled], true);
-            if ($wasRetried) {
-                $job->retry();
-            }
-
-            // A retried job skips the stale-session recovery: old sessions are
-            // leftovers from the failed run and a fresh loop must start.
-            if (!$wasRetried) {
-                foreach ($this->sessionPort->findByJob($job->getId()) as $existing) {
-                    $state = $existing->getSessionState();
-                    if (!in_array($state, [
-                        SessionState::Pending,
-                        SessionState::Preparing,
-                        SessionState::Active,
-                        SessionState::Paused,
-                    ], true)) {
-                        continue;
-                    }
-
-                    $idleSeconds = (new \DateTimeImmutable())->getTimestamp() - $existing->getUpdatedAt()->getTimestamp();
-                    if ($idleSeconds > 60) {
-                        $existing->markFailed();
-                        $this->sessionPort->save($existing);
-                    }
-                }
-            }
-
-            $job->attachSession();
-            $this->jobPort->save($job);
-
-            $session = $this->sessionPort->createSession(
-                $command->getUserId(),
-                $job->getId(),
-                $command->getVideoId(),
-                $command->getAudioProfile(),
-                $command->getPriority(),
-                $command->getAudioLanguages(),
-            );
-
-            $this->eventDispatcher->dispatch(new TranscodeSessionAttached(
-                sessionId: $session->getId(),
-                jobId: $job->getId(),
-                userId: $command->getUserId(),
-                qualityTier: $job->getQualityTierName(),
-            ));
-
-            $this->loopStarter->start($session->getId(), $lease);
-            $handedOff = true;
-
-            return $session;
-        } finally {
-            if (!$handedOff) {
-                $lease->release();
-            }
-        }
-    }
-
-    private function findLiveSession(\App\Shared\Domain\Model\Uuid $jobId): ?TranscodeSession
-    {
-        foreach ($this->sessionPort->findByJob($jobId) as $existing) {
-            if (in_array($existing->getSessionState(), [
-                SessionState::Pending,
-                SessionState::Preparing,
-                SessionState::Active,
-                SessionState::Paused,
-            ], true)) {
-                $idleSeconds = (new \DateTimeImmutable())->getTimestamp() - $existing->getUpdatedAt()->getTimestamp();
-                if ($idleSeconds <= 60) {
+            if ($runtime !== null && ($runtime->requestId === $command->requestId || in_array($runtime->outcome, ['pending', 'accepted', 'ready', 'complete'], true))) {
+                $existing = $this->sessionPort->findByUuid($runtime->sessionId);
+                if ($existing !== null) {
                     return $existing;
                 }
             }
+            if (in_array($job->getStatus(), [TranscodeStatus::Failed, TranscodeStatus::Cancelled], true)) {
+                $job->retry();
+            }
+            $job->attachSession();
+            $this->jobPort->save($job);
+            $session = $this->sessionPort->createSession($command->getUserId(), $job->getId(), $command->getVideoId(), $command->getAudioProfile(), $command->getPriority(), $command->getAudioLanguages());
+            $this->ownership->admit($job->getId(), $session->getId(), $command->requestId, new DesiredTranscodeState($command->getAudioProfile(), audioLanguages: array_values($command->getAudioLanguages())));
+            return $session;
+        });
+
+        // The transaction is committed before a worker can accept the execution.
+        for ($poll = 0; $poll < self::STARTUP_POLLS; $poll++) {
+            $runtime = $this->ownership->find($session->getJobId());
+            if ($runtime !== null && $runtime->sessionId->equals($session->getId())) {
+                if ($runtime->outcome === 'complete' || ($runtime->ownershipLive && in_array($runtime->outcome, ['accepted', 'ready'], true))) {
+                    return $session;
+                }
+                if (in_array($runtime->outcome, ['refused', 'failed', 'cancelled'], true)) {
+                    throw new TranscodeStartupUnavailableException();
+                }
+            }
+            $this->sleeper->sleep(0.1);
         }
-
-        return null;
-    }
-
-    private function waitForLiveSession(\App\Shared\Domain\Model\Uuid $jobId): ?TranscodeSession
-    {
-        // Count polls as integers: summing 0.1 in floating point stays below 5.0 after 50 steps.
-        $polls = (int) round(self::LOCK_WAIT_TIMEOUT_SECONDS / self::LOCK_WAIT_INTERVAL_SECONDS);
-        for ($poll = 0; $poll < $polls; $poll++) {
-            $this->sleeper->sleep(self::LOCK_WAIT_INTERVAL_SECONDS);
-
-            $live = $this->findLiveSession($jobId);
-            if ($live !== null) {
-                return $live;
+        $expired = $this->ownership->expireAdmission($session->getJobId(), $session->getId(), $runtime->requestId ?? $command->requestId);
+        if (!$expired) {
+            $runtime = $this->ownership->find($session->getJobId());
+            if ($runtime !== null && $runtime->sessionId->equals($session->getId()) && ($runtime->outcome === 'complete' || ($runtime->ownershipLive && in_array($runtime->outcome, ['accepted', 'ready'], true)))) {
+                return $session;
             }
         }
-
-        return null;
+        throw new TranscodeStartupUnavailableException();
     }
 }

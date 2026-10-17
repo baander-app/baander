@@ -33,6 +33,8 @@ final class MessagingCodecWiringTest extends KernelTestCase
             new BatchExtractCoversCommand(),
             new ScanLibraryCommand(new LibrarySlug('music'), true),
             new PruneMissingImagesCommand(),
+            new \App\Media\Application\Command\GenerateImageDerivativeCommand('image.png', 'thumb'),
+            new \App\Recommendation\Application\Command\ExecuteRecommendationJobCommand($id),
             new ExtractAlbumCoverCommand($id),
             new SendPushCommand($id, NotificationCategory::Security, 'title', 'body', 'notification'),
             new SyncCountryStationsCommand($id, 'de'),

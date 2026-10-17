@@ -692,6 +692,9 @@ services:
         arguments:
             $basePath: '%kernel.project_dir%/storage/media'
 
+    App\Media\Application\Port\ImageDerivativePortInterface:
+        alias: App\Media\Infrastructure\Converter\ImageDerivativeGenerator
+
     # --- Media Stream ---
     App\Media\Application\Port\StreamPortInterface:
         alias: App\Media\Infrastructure\Service\StreamService
@@ -707,11 +710,6 @@ services:
         alias: App\Recommendation\Infrastructure\Doctrine\Repository\RecommendationInsightsRepository
     App\Recommendation\Application\Port\RecommendationJobPortInterface:
         alias: App\Recommendation\Infrastructure\RecommendationJobService
-
-    # --- CPU Process Pool Worker ---
-    App\Recommendation\Infrastructure\Swoole\RecommendationPoolWorker:
-        tags:
-            - { name: 'swoole.cpu_pool_worker' }
 
     # --- Playlist Domain Repository Aliases ---
     App\Playlist\Domain\Repository\PlaylistRepositoryInterface:
@@ -862,25 +860,6 @@ services:
             $spotifyClientSecret: '%env(SPOTIFY_CLIENT_SECRET)%'
             $tasteDiveApiKey: '%env(TASTE_DIVE_API_KEY)%'
 
-    # --- Swoole Task Worker Fallback Sender ---
-    # Wraps SwooleServerTaskSender to fall back to Redis when the task queue is full
-    # or the server is shutting down. Uses SwooleTaskDispatcherInterface to
-    # decouple from the Swoole bundle's HttpServer class.
-    App\Shared\Infrastructure\Messenger\HttpServerTaskDispatcher:
-        arguments:
-            $httpServer: '@SwooleBundle\SwooleBundle\Server\HttpServer'
-            $serializer: '@messenger.default_serializer'
-
-    App\Shared\Infrastructure\Messenger\SwooleTaskDispatcherInterface:
-        alias: App\Shared\Infrastructure\Messenger\HttpServerTaskDispatcher
-
-    App\Shared\Infrastructure\Messenger\SwooleTaskWithRedisFallbackSender:
-        decorates: 'SwooleBundle\SwooleBundle\Bridge\Symfony\Messenger\SwooleServerTaskSender'
-        arguments:
-            $dispatcher: '@App\Shared\Infrastructure\Messenger\HttpServerTaskDispatcher'
-            $redisFallback: '@messenger.transport.async'
-            $logger: '@logger'
-
     # --- Swoole Task Job Monitor ---
     # Decorates the Swoole TaskHandler to track async jobs in job_monitors.
     # Priority -5 places it just inside SwooleServerTaskTransportHandler (-10),
@@ -1019,6 +998,12 @@ services:
         decorates: App\Transcode\Infrastructure\QoL\QualityFilteringStreamingDecorator
         arguments:
             $inner: '@.inner'
+
+    App\Transcode\Application\Port\TranscodeExecutionOwnershipPort:
+        alias: App\Transcode\Infrastructure\Doctrine\TranscodeRuntimeState
+
+    App\Transcode\Application\Port\AudioRenditionRuntimePort:
+        alias: App\Transcode\Infrastructure\Doctrine\AudioRenditionRuntime
 
     # --- Transcode Infrastructure ---
     App\Transcode\Infrastructure\Storage\SegmentFileResolver:

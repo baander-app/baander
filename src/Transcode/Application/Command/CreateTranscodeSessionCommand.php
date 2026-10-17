@@ -11,6 +11,8 @@ use App\Transcode\Domain\ValueObject\SessionPriority;
 
 final readonly class CreateTranscodeSessionCommand
 {
+    public string $requestId;
+
     /**
      * @param string[] $audioLanguages BCP-47 language tags for audio tracks to encode
      */
@@ -21,7 +23,9 @@ final readonly class CreateTranscodeSessionCommand
         private AudioProfile $audioProfile,
         private SessionPriority $priority = SessionPriority::Normal,
         private array $audioLanguages = [],
+        ?string $requestId = null,
     ) {
+        $this->requestId = $requestId ?? Uuid::generate()->toString();
     }
 
     public function getUserId(): Uuid { return $this->userId; }

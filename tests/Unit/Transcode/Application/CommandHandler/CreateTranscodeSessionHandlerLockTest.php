@@ -5,226 +5,141 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Transcode\Application\CommandHandler;
 
 use App\Shared\Application\Port\SleeperInterface;
+use App\Shared\Application\Port\TransactionPortInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
 use App\Transcode\Application\CommandHandler\CreateTranscodeSessionHandler;
+use App\Transcode\Application\DTO\DesiredTranscodeState;
+use App\Transcode\Application\DTO\TranscodeRuntimeSnapshot;
+use App\Transcode\Application\Exception\TranscodeStartupUnavailableException;
+use App\Transcode\Application\Port\TranscodeExecutionOwnershipPort;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
-use App\Transcode\Application\Port\TranscodeLoopLockInterface;
-use App\Transcode\Application\Port\TranscodeLoopLeaseInterface;
-use App\Transcode\Application\Port\TranscodeLoopStarterInterface;
 use App\Transcode\Application\Port\TranscodeSessionPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
-use App\Transcode\Domain\Event\TranscodeSessionAttached;
 use App\Transcode\Domain\Model\TranscodeJob;
 use App\Transcode\Domain\Model\TranscodeSession;
 use App\Transcode\Domain\ValueObject\AudioProfile;
 use App\Transcode\Domain\ValueObject\QualityTier;
-use App\Transcode\Domain\ValueObject\TranscodeStatus;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 final class CreateTranscodeSessionHandlerLockTest extends TestCase
 {
     private TranscodeJobPortInterface&MockObject $jobs;
     private TranscodeSessionPortInterface&MockObject $sessions;
-    private TranscodeLoopLockInterface&MockObject $lock;
-    private TranscodeLoopLeaseInterface&MockObject $lease;
-    private TranscodeLoopStarterInterface&MockObject $starter;
-    private EventDispatcherInterface&MockObject $events;
+    private TranscodeExecutionOwnershipPort&MockObject $ownership;
     private TranscodeJob $job;
     private TranscodeSession $session;
     private CreateTranscodeSessionCommand $command;
     private CreateTranscodeSessionHandler $handler;
+    private bool $insideTransaction = false;
     /** @var list<float> */
     private array $sleeps = [];
 
     protected function setUp(): void
     {
-        $userId = Uuid::generate();
-        $videoId = Uuid::generate();
+        $video = Uuid::generate();
+        $user = Uuid::generate();
+        $profile = AudioProfile::streamingStereo();
         $tier = QualityTier::p720();
-        $audio = AudioProfile::streamingStereo();
-        $this->job = TranscodeJob::create($videoId, $tier, '/tmp/baander-transcode');
-        $this->session = TranscodeSession::create($userId, $this->job->getId(), $videoId, $audio);
-        $this->command = new CreateTranscodeSessionCommand($userId, $videoId, $tier, $audio, audioLanguages: ['en']);
+        $this->job = TranscodeJob::create($video, $tier, '/fixture/video');
+        $this->session = TranscodeSession::create($user, $this->job->getId(), $video, $profile);
+        $this->command = new CreateTranscodeSessionCommand($user, $video, $tier, $profile);
         $this->jobs = $this->createMock(TranscodeJobPortInterface::class);
         $this->sessions = $this->createMock(TranscodeSessionPortInterface::class);
-        $this->lock = $this->createMock(TranscodeLoopLockInterface::class);
-        $this->lease = $this->createMock(TranscodeLoopLeaseInterface::class);
-        $this->starter = $this->createMock(TranscodeLoopStarterInterface::class);
-        $this->events = $this->createMock(EventDispatcherInterface::class);
-        $storage = $this->createMock(TranscodeStoragePortInterface::class);
-        $storage->expects(self::once())->method('resolveJobDirectory')->with($videoId, $tier)->willReturn('/tmp/baander-transcode');
-        $this->jobs->expects(self::once())->method('getOrCreateJob')
-            ->with($videoId, $tier, '/tmp/baander-transcode', ['en'])->willReturn($this->job);
+        $this->ownership = $this->createMock(TranscodeExecutionOwnershipPort::class);
+        $storage = $this->createStub(TranscodeStoragePortInterface::class);
+        $storage->method('resolveJobDirectory')->willReturn('/fixture/video');
+        $this->jobs->expects(self::once())->method('getOrCreateJob')->willReturn($this->job);
+        $transaction = $this->createStub(TransactionPortInterface::class);
+        $transaction->method('run')->willReturnCallback(function (callable $operation): mixed {
+            $this->insideTransaction = true;
+            try {
+                return $operation();
+            } finally {
+                $this->insideTransaction = false;
+            }
+        });
         $sleeper = $this->createStub(SleeperInterface::class);
         $sleeper->method('sleep')->willReturnCallback(function (float $seconds): void {
+            self::assertFalse($this->insideTransaction, 'Waiting cannot hold the producer transaction.');
             $this->sleeps[] = $seconds;
         });
-        $this->handler = new CreateTranscodeSessionHandler($this->jobs, $this->sessions, $storage, $this->events, $this->lock, $this->starter, $sleeper);
+        $this->handler = new CreateTranscodeSessionHandler($this->jobs, $this->sessions, $storage, $this->ownership, $transaction, $sleeper);
     }
 
-    public function testDeniedLockWithoutLiveSessionFailsWithoutWritesOrRelease(): void
+    private function snapshot(string $outcome): TranscodeRuntimeSnapshot
     {
-        $before = clone $this->job->getState();
-        $this->expectNoWrites();
-        $this->sessions->method('findByJob')->willReturn([]);
-        $this->lock->expects(self::once())->method('acquire')->with($this->job->getId(), 30)->willReturn(null);
-        $this->lease->expects(self::never())->method('release');
-        $this->expectException('App\\Transcode\\Application\\Exception\\TranscodeStartupUnavailableException');
+        return new TranscodeRuntimeSnapshot($this->job->getId(), $this->session->getId(), $this->command->requestId, new DesiredTranscodeState($this->command->getAudioProfile()), 1, 0, 1, $outcome, null, null, in_array($outcome, ['accepted', 'ready'], true));
+    }
 
+    public function testDurableIntentIsWrittenInsideTransactionAndStartupWaitsForAcceptance(): void
+    {
+        $this->ownership->expects(self::once())->method('lockAdmission')->willReturnCallback(function (): void { self::assertTrue($this->insideTransaction); });
+        $this->sessions->expects(self::once())->method('createSession')->willReturn($this->session);
+        $this->jobs->expects(self::once())->method('save');
+        $this->ownership->expects(self::once())->method('admit')->willReturnCallback(function (): TranscodeRuntimeSnapshot {
+            self::assertTrue($this->insideTransaction);
+            return $this->snapshot('pending');
+        });
+        $this->ownership->method('find')->willReturnOnConsecutiveCalls(null, $this->snapshot('pending'), $this->snapshot('accepted'));
+        self::assertSame($this->session, ($this->handler)($this->command));
+        self::assertSame([0.1], $this->sleeps);
+    }
+
+    public function testExistingAcceptedSessionIsReusedWithoutAnotherAdmission(): void
+    {
+        $this->ownership->method('find')->willReturn($this->snapshot('accepted'));
+        $this->sessions->expects(self::once())->method('findByUuid')->with($this->session->getId())->willReturn($this->session);
+        $this->sessions->expects(self::never())->method('createSession');
+        $this->jobs->expects(self::never())->method('save');
+        $this->ownership->expects(self::never())->method('admit');
+        self::assertSame($this->session, ($this->handler)($this->command));
+        self::assertSame([], $this->sleeps);
+    }
+
+    public function testExpiredAcceptanceDoesNotReportOwnedExecution(): void
+    {
+        $accepted = $this->snapshot('accepted');
+        $expired = new TranscodeRuntimeSnapshot($accepted->jobId, $accepted->sessionId, $accepted->requestId, $accepted->desired, $accepted->desiredRevision, $accepted->observedRevision, $accepted->generation, 'accepted', null, null, false);
+        $this->ownership->method('find')->willReturn($expired);
+        $this->sessions->expects(self::once())->method('findByUuid')->willReturn($this->session);
+        $this->sessions->expects(self::never())->method('createSession');
+        $this->ownership->expects(self::once())->method('expireAdmission')->willReturn(false);
+        $this->expectException(TranscodeStartupUnavailableException::class);
+        ($this->handler)($this->command);
+    }
+
+    public function testReplayOfARefusedAdmissionCannotCreateAnotherStartup(): void
+    {
+        $this->ownership->method('find')->willReturn($this->snapshot('refused'));
+        $this->sessions->expects(self::once())->method('findByUuid')->willReturn($this->session);
+        $this->sessions->expects(self::never())->method('createSession');
+        $this->ownership->expects(self::never())->method('admit');
+        $this->expectException(TranscodeStartupUnavailableException::class);
+        ($this->handler)($this->command);
+    }
+
+    public function testUnacceptedStartupExpiresTheDurableRequestAfterTheBound(): void
+    {
+        $this->ownership->method('find')->willReturnOnConsecutiveCalls(null, ...array_fill(0, 50, $this->snapshot('pending')));
+        $this->sessions->expects(self::once())->method('createSession')->willReturn($this->session);
+        $this->ownership->method('admit')->willReturn($this->snapshot('pending'));
+        $this->ownership->expects(self::once())->method('expireAdmission')->with($this->job->getId(), $this->session->getId(), $this->command->requestId)->willReturn(true);
+        $this->expectException(TranscodeStartupUnavailableException::class);
         try {
             ($this->handler)($this->command);
         } finally {
-            self::assertEquals($before, $this->job->getState());
-            // Polls for a live session every 0.1 s for the 5 s lock-wait window.
             self::assertSame(array_fill(0, 50, 0.1), $this->sleeps);
         }
     }
 
-    /** @return iterable<string, array{TranscodeStatus}> */
-    public static function retryableStates(): iterable
+    public function testAcceptanceRacingTimeoutIsReturnedWithoutRefusingItsOwner(): void
     {
-        yield 'failed' => [TranscodeStatus::Failed];
-        yield 'cancelled' => [TranscodeStatus::Cancelled];
-    }
-
-    #[DataProvider('retryableStates')]
-    public function testDeniedLockReusesAppearingSessionWithoutMutatingRetryableJob(TranscodeStatus $status): void
-    {
-        $this->makeRetryable($status);
-        $before = clone $this->job->getState();
-        $this->expectNoWrites();
-        $this->sessions->expects(self::exactly(2))->method('findByJob')->willReturnOnConsecutiveCalls([], [$this->session]);
-        $this->lock->expects(self::once())->method('acquire')->willReturn(null);
-        $this->lease->expects(self::never())->method('release');
-
+        $this->ownership->method('find')->willReturnOnConsecutiveCalls(null, ...[...array_fill(0, 50, $this->snapshot('pending')), $this->snapshot('accepted')]);
+        $this->sessions->expects(self::once())->method('createSession')->willReturn($this->session);
+        $this->ownership->method('admit')->willReturn($this->snapshot('pending'));
+        $this->ownership->expects(self::once())->method('expireAdmission')->willReturn(false);
         self::assertSame($this->session, ($this->handler)($this->command));
-        self::assertEquals($before, $this->job->getState());
-    }
-
-    public function testAcquiredLockRechecksLiveSessionAndReleasesWithoutWrites(): void
-    {
-        $this->makeRetryable(TranscodeStatus::Failed);
-        $before = clone $this->job->getState();
-        $this->expectNoWrites();
-        $this->sessions->expects(self::exactly(2))->method('findByJob')->willReturnOnConsecutiveCalls([], [$this->session]);
-        $this->lock->expects(self::once())->method('acquire')->willReturn($this->lease);
-        $this->lease->expects(self::once())->method('release');
-
-        self::assertSame($this->session, ($this->handler)($this->command));
-        self::assertEquals($before, $this->job->getState());
-    }
-
-    /** @return iterable<string, array{TranscodeStatus}> */
-    public static function startupStates(): iterable
-    {
-        yield 'new job' => [TranscodeStatus::Pending];
-        yield from self::retryableStates();
-    }
-
-    #[DataProvider('startupStates')]
-    public function testSuccessfulStartupMutatesOnlyAfterLockAndDispatchesOneSession(TranscodeStatus $status): void
-    {
-        if ($status !== TranscodeStatus::Pending) {
-            $this->makeRetryable($status);
-        }
-        $before = clone $this->job->getState();
-        $this->sessions->expects(self::exactly($status === TranscodeStatus::Pending ? 3 : 2))->method('findByJob')->willReturn([]);
-        $this->lock->expects(self::once())->method('acquire')->with($this->job->getId(), 30)
-            ->willReturnCallback(function () use ($before): TranscodeLoopLeaseInterface {
-                self::assertEquals($before, $this->job->getState());
-
-                return $this->lease;
-            });
-        $this->lease->expects(self::never())->method('release');
-        $this->jobs->expects(self::once())->method('save')->with($this->job);
-        $this->sessions->expects(self::never())->method('save');
-        $this->sessions->expects(self::once())->method('createSession')
-            ->with($this->command->getUserId(), $this->job->getId(), $this->command->getVideoId(),
-                $this->command->getAudioProfile(), $this->command->getPriority(), ['en'])
-            ->willReturn($this->session);
-        $dispatched = new \ArrayObject();
-        $this->starter->expects(self::once())->method('start')->with($this->session->getId(), $this->lease)
-            ->willReturnCallback(function () use ($dispatched): void { self::assertCount(1, $dispatched); });
-        $this->events->expects(self::once())->method('dispatch')->with(self::callback(
-            fn(object $event): bool => $event instanceof TranscodeSessionAttached
-                && $event->getSessionId()->equals($this->session->getId())
-                && $event->getJobId()->equals($this->job->getId()),
-        ))->willReturnCallback(function (object $event) use ($dispatched): object {
-            $dispatched->append($event);
-            return $event;
-        });
-
-        self::assertSame($this->session, ($this->handler)($this->command));
-        self::assertSame(TranscodeStatus::Pending, $this->job->getStatus());
-        self::assertSame(['en'], $this->job->getAudioTrackLanguages());
-        self::assertSame(1, $this->job->getReferenceCount());
-    }
-
-    /** @return iterable<string, array{string}> */
-    public static function failedStartupBoundaries(): iterable
-    {
-        yield 'session recheck' => ['recheck'];
-        yield 'job persistence' => ['job'];
-        yield 'session creation' => ['session'];
-        yield 'budget or event listener' => ['event'];
-        yield 'starter rejection' => ['starter'];
-    }
-
-    #[DataProvider('failedStartupBoundaries')]
-    public function testFailureBeforeHandoffReleasesCapturedLease(string $boundary): void
-    {
-        $error = new \RuntimeException('startup failed');
-        $this->lock->expects(self::once())->method('acquire')->willReturn($this->lease);
-        $this->lease->expects(self::once())->method('release');
-        $reads = 0;
-        $this->sessions->expects(self::exactly($boundary === 'recheck' ? 2 : 3))->method('findByJob')->willReturnCallback(function () use ($boundary, $error, &$reads): array {
-            if (++$reads === 2 && $boundary === 'recheck') {
-                throw $error;
-            }
-            return [];
-        });
-        if ($boundary === 'job') {
-            $this->jobs->method('save')->willThrowException($error);
-        }
-        if ($boundary === 'session') {
-            $this->sessions->method('createSession')->willThrowException($error);
-        } else {
-            $this->sessions->method('createSession')->willReturn($this->session);
-        }
-        if ($boundary === 'event') {
-            $this->events->expects(self::once())->method('dispatch')->willThrowException($error);
-        } else {
-            $this->events->expects($boundary === 'starter' ? self::once() : self::never())->method('dispatch')->willReturnArgument(0);
-        }
-        if ($boundary === 'starter') {
-            $this->starter->expects(self::once())->method('start')->with($this->session->getId(), $this->lease)
-                ->willThrowException($error);
-        } else {
-            $this->starter->expects(self::never())->method('start');
-        }
-        $this->expectExceptionObject($error);
-        ($this->handler)($this->command);
-    }
-
-    private function expectNoWrites(): void
-    {
-        $this->jobs->expects(self::never())->method('save');
-        $this->sessions->expects(self::never())->method('createSession');
-        $this->sessions->expects(self::never())->method('save');
-        $this->events->expects(self::never())->method('dispatch');
-        $this->starter->expects(self::never())->method('start');
-    }
-
-    private function makeRetryable(TranscodeStatus $status): void
-    {
-        if ($status === TranscodeStatus::Failed) {
-            $this->job->markFailed('original failure');
-        } else {
-            $this->job->markCancelled();
-        }
     }
 }

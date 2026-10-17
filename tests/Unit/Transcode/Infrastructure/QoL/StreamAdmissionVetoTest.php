@@ -14,16 +14,12 @@ use App\QoL\Infrastructure\EventListener\StreamBudgetExceptionListener;
 use App\QoL\Infrastructure\StreamAdmissionService;
 use App\QoL\Infrastructure\Swoole\CpuGpuSampler;
 use App\QoL\Infrastructure\Swoole\LearningDataPersister;
-use App\Shared\Application\Port\SleeperInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool;
-use App\Transcode\Application\Command\CreateTranscodeSessionCommand;
-use App\Transcode\Application\CommandHandler\CreateTranscodeSessionHandler;
 use App\Transcode\Application\Port\TranscodeJobPortInterface;
 use App\Transcode\Application\Port\TranscodeLoopLeaseInterface;
 use App\Transcode\Application\Port\TranscodeLoopLockInterface;
 use App\Transcode\Application\Port\TranscodeLoopStarterInterface;
-use App\Transcode\Application\Port\TranscodeSessionPortInterface;
 use App\Transcode\Application\Port\TranscodeStoragePortInterface;
 use App\Transcode\Domain\Event\TranscodeSessionAttached;
 use App\Transcode\Domain\Model\TranscodeJob;
@@ -70,30 +66,9 @@ final class StreamAdmissionVetoTest extends TestCase
     {
         $governor = $this->activeGovernor([100.0, 0.0, 0.0, 0.0]);
         $governor->allocateStream(Uuid::generate(), '1080p', 12.34567);
-        $userId = Uuid::generate();
-        $videoId = Uuid::generate();
-        $tier = QualityTier::p720();
-        $audio = AudioProfile::streamingStereo();
-        $job = TranscodeJob::create($videoId, $tier, '/tmp/baander-transcode');
-        $session = TranscodeSession::create($userId, $job->getId(), $videoId, $audio);
-        $storage = $this->createStub(TranscodeStoragePortInterface::class);
-        $storage->method('resolveJobDirectory')->willReturn('/tmp/baander-transcode');
-        $jobs = $this->createStub(TranscodeJobPortInterface::class);
-        $jobs->method('getOrCreateJob')->willReturn($job);
-        $sessions = $this->createStub(TranscodeSessionPortInterface::class);
-        $sessions->method('findByJob')->willReturn([]);
-        $sessions->method('createSession')->willReturn($session);
-        $lease = $this->createMock(TranscodeLoopLeaseInterface::class);
-        $lease->expects(self::once())->method('release');
-        $lock = $this->createStub(TranscodeLoopLockInterface::class);
-        $lock->method('acquire')->willReturn($lease);
-        $starter = $this->createMock(TranscodeLoopStarterInterface::class);
-        $starter->expects(self::never())->method('start');
-        $handler = new CreateTranscodeSessionHandler($jobs, $sessions, $storage, $this->dispatcher($governor), $lock, $starter, $this->createStub(SleeperInterface::class));
-
-        $veto = $this->expectVeto(static fn (): TranscodeSession => $handler(
-            new CreateTranscodeSessionCommand($userId, $videoId, $tier, $audio),
-        ));
+        $dispatcher = $this->dispatcher($governor);
+        $event = $this->attached(Uuid::generate(), '720p');
+        $veto = $this->expectVeto(static fn (): object => $dispatcher->dispatch($event));
 
         self::assertSame(1, $governor->getActiveStreamCount());
         $event = new ExceptionEvent(

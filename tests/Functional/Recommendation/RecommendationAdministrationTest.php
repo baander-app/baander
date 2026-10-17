@@ -56,7 +56,7 @@ final class RecommendationAdministrationTest extends TestCase
             'data',
         )['data'];
         $show = $this->assertJsonResponse($this->authenticatedRequest('GET', self::PATH . '/jobs/' . $requeued['public_id'], $admin), 200, 'data')['data'];
-        self::assertSame('completed', $show['status']);
+        self::assertSame('pending', $show['status']);
         self::assertSame($failed, $show['metadata']['requeued_from']);
 
         $cancelled = $this->cancelledJob();

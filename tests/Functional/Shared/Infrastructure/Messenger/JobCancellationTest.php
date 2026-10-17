@@ -8,19 +8,11 @@ use App\Shared\Application\JobCancelledException;
 use App\Shared\Application\Port\JobMonitorAdministrationInterface;
 use App\Shared\Domain\Model\PublicId;
 use App\Shared\Infrastructure\Messenger\JobIdStamp;
-use App\Shared\Infrastructure\Messenger\JobMessageSerializer;
-use App\Shared\Infrastructure\Messenger\JobMonitorService;
-use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
-use App\Shared\Infrastructure\Messenger\SwooleTaskJobMonitorDecorator;
 use App\Shared\Infrastructure\Messenger\WorkerJobMonitorSubscriber;
 use App\Shared\Infrastructure\Redis\RedisClientFactory;
 use App\Tests\Fixtures\Messaging\CancellationProbe;
 use App\Tests\Fixtures\Messaging\CancellationProbeHandler;
-use App\Tests\Fixtures\Messaging\MessageCodecFactory;
 use App\Tests\Functional\TestCase;
-use Monolog\Handler\TestHandler;
-use Monolog\Logger;
-use SwooleBundle\SwooleBundle\Bridge\Symfony\Messenger\SwooleServerTaskTransportHandler;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -34,14 +26,13 @@ use Symfony\Component\Messenger\EventListener\SendFailedMessageForRetryListener;
 use Symfony\Component\Messenger\EventListener\SendFailedMessageToFailureTransportListener;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Retry\MultiplierRetryStrategy;
-use Symfony\Component\Messenger\Stamp\ReceivedStamp;
 use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 use Symfony\Component\Messenger\Worker;
 
 /**
  * `app:monitor:job:cancel` on a running job stops it at its next checkpoint, and the job's
  * row ends `cancelled`, on each path that runs jobs: an inline run from the console, a
- * Messenger worker and a Swoole task worker. A cancelled job is not retried and does not
+ * Messenger worker. A cancelled job is not retried and does not
  * reach the failure transport.
  */
 final class JobCancellationTest extends TestCase
@@ -122,29 +113,6 @@ final class JobCancellationTest extends TestCase
         self::assertCount(1, $async->getSent(), 'The cancelled job was not sent again for a retry.');
         self::assertSame([], $failed->getSent(), 'The cancelled job did not reach the failure transport.');
         $this->assertCancelled($this->jobIds[0], 'async');
-    }
-
-    public function testASwooleTaskStopsAndEndsCancelled(): void
-    {
-        $container = static::getContainer();
-        $serializer = new JsonTransportSerializer(MessageCodecFactory::create());
-        $logs = new TestHandler();
-        $decorator = new SwooleTaskJobMonitorDecorator(
-            new SwooleServerTaskTransportHandler($container->get(MessageBusInterface::class), $serializer),
-            $container->get(JobMonitorService::class),
-            $container->get(JobMessageSerializer::class),
-            new Logger('test', [$logs]),
-            $serializer,
-        );
-        $task = new \Swoole\Server\Task();
-        $task->data = new Envelope(new CancellationProbe('task', 3), [new JobIdStamp(new PublicId()), new ReceivedStamp('swoole_task')]);
-
-        $decorator->handle(new \Swoole\Server('127.0.0.1', 0), $task);
-
-        self::assertSame(['task:1'], CancellationProbeHandler::$handled);
-        $this->assertCancelled($this->jobIds[0], 'swoole_task');
-        self::assertFalse($logs->hasInfoThatContains('Job completed'), 'A cancelled task is not logged as completed.');
-        self::assertTrue($logs->hasInfoThatContains('Job ended without finishing its attempt'));
     }
 
     private function runningJobId(): string

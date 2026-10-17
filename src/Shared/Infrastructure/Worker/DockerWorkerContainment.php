@@ -108,7 +108,7 @@ FORMAT;
 
     private function verifyMounts(mixed $mounts): void
     {
-        $expected = $this->recipe?->mediaMounts ?? [];
+        $expected = $this->recipe->mediaMounts ?? [];
         if ($expected === [] && in_array($mounts, [null, []], true)) {
             return;
         }

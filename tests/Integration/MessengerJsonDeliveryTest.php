@@ -24,18 +24,11 @@ use App\Radio\Application\CommandHandler\SyncCountryStationsHandler;
 use App\Radio\Application\Port\RadioStationPortInterface;
 use App\Metadata\Application\Command\ExtractAlbumCoverCommand;
 use App\Scheduler\Application\Command\ExecuteScheduledJobCommand;
-use App\Shared\Application\Port\ServerDrainStateInterface;
 use App\Shared\Domain\Model\Uuid;
 use App\Shared\Infrastructure\Messenger\JsonTransportSerializer;
-use App\Shared\Infrastructure\Messenger\HttpServerTaskDispatcher;
-use App\Shared\Infrastructure\Messenger\SwooleTaskDispatcherInterface;
-use App\Shared\Infrastructure\Messenger\SwooleTaskWithRedisFallbackSender;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
-use SwooleBundle\SwooleBundle\Bridge\Symfony\Messenger\SwooleServerTaskTransportFactory;
-use SwooleBundle\SwooleBundle\Server\HttpServer;
-use SwooleBundle\SwooleBundle\Server\HttpServerConfiguration;
 use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\Messenger\Bridge\Redis\Transport\Connection;
@@ -76,35 +69,12 @@ final class MessengerJsonDeliveryTest extends TestCase
     private int $completed = 0;
     private int $attempted = 0;
 
-    /** @return iterable<string, array{bool|null}> */
-    public static function unavailableModes(): iterable
-    {
-        yield 'queue full' => [false];
-        yield 'server unavailable' => [true];
-        yield 'real unavailable server' => [null];
-    }
-
-    #[DataProvider('unavailableModes')]
-    public function testRealRedisFallbackRetriesThenDeadLettersWithoutRepeatingCompletedHandler(?bool $throw): void
+    public function testRealRedisDeliveryRetriesThenDeadLettersWithoutRepeatingCompletedHandler(): void
     {
         $async = $this->transport();
         $failed = $this->transport();
-        $server = new HttpServer($this->createStub(HttpServerConfiguration::class));
-        $serializer = new SigningSerializer(new JsonTransportSerializer(MessageCodecFactory::create()), 'integration-test-key', [ExtractAlbumCoverCommand::class]);
-        $dispatcher = $this->createStub(SwooleTaskDispatcherInterface::class);
-        if ($throw === null) {
-            $dispatcher = new HttpServerTaskDispatcher($server, $serializer);
-        } elseif ($throw) {
-            $dispatcher->method('dispatchTask')->willThrowException(new \RuntimeException('Swoole unavailable'));
-        } else {
-            $dispatcher->method('dispatchTask')->willReturn(false);
-        }
-        $sender = new SwooleTaskWithRedisFallbackSender($dispatcher, $async, new NullLogger());
-        $factory = new SwooleServerTaskTransportFactory($server);
-        $factory->setSender($sender);
-        $transport = $factory->createTransport('swoole://task', [], $serializer);
         $bus = new MessageBus([
-            new SendMessageMiddleware(new SendersLocator([ExtractAlbumCoverCommand::class => ['swoole_task']], new ServiceLocator(['swoole_task' => static fn () => $transport]))),
+            new SendMessageMiddleware(new SendersLocator([ExtractAlbumCoverCommand::class => ['async']], new ServiceLocator(['async' => static fn () => $async]))),
             new HandleMessageMiddleware(new HandlersLocator([ExtractAlbumCoverCommand::class => [$this->complete(...), function (ExtractAlbumCoverCommand $command): never {
                 ++$this->attempted;
                 throw new \RuntimeException('Poison message');
@@ -220,8 +190,8 @@ final class MessengerJsonDeliveryTest extends TestCase
         self::assertSame(0, $failed->getMessageCount());
     }
 
-    /** @return iterable<string, array{class-string, bool}> */
-    public static function syncFallbackMessages(): iterable
+    /** @return iterable<string, array{class-string}> */
+    public static function workerMessages(): iterable
     {
         $messages = [
             'song' => SyncSongMessage::class,
@@ -230,15 +200,13 @@ final class MessengerJsonDeliveryTest extends TestCase
             'country stations' => SyncCountryStationsCommand::class,
         ];
         foreach ($messages as $name => $messageType) {
-            yield $name . ' when the task queue is full' => [$messageType, false];
-            // A draining server sends to Redis without trying the task queue.
-            yield $name . ' while the server drains' => [$messageType, true];
+            yield $name => [$messageType];
         }
     }
 
     /** @param class-string $messageType */
-    #[DataProvider('syncFallbackMessages')]
-    public function testRedisFallbackSelectsActualTransportRestrictedSyncHandler(string $messageType, bool $draining): void
+    #[DataProvider('workerMessages')]
+    public function testWorkerSelectsActualTransportRestrictedHandler(string $messageType): void
     {
         $async = $this->transport([$messageType]);
         $id = Uuid::v4();
@@ -291,17 +259,12 @@ final class MessengerJsonDeliveryTest extends TestCase
             self::assertNotNull($registration->fromTransport);
             $descriptors[] = new HandlerDescriptor($handler, ['from_transport' => $registration->fromTransport]);
         }
-        $dispatcher = $this->createMock(SwooleTaskDispatcherInterface::class);
-        $dispatcher->expects($draining ? $this->never() : $this->once())->method('dispatchTask')->willReturn(false);
-        $drain = $this->createStub(ServerDrainStateInterface::class);
-        $drain->method('isDraining')->willReturn($draining);
-        $sender = new SwooleTaskWithRedisFallbackSender($dispatcher, $async, $logger, $drain);
         $bus = new MessageBus([
-            new SendMessageMiddleware(new SendersLocator([$messageType => ['swoole_task']], new ServiceLocator(['swoole_task' => static fn () => $sender]))),
+            new SendMessageMiddleware(new SendersLocator([$messageType => ['async']], new ServiceLocator(['async' => static fn () => $async]))),
             new HandleMessageMiddleware(new HandlersLocator([$messageType => $descriptors])),
         ]);
         $bus->dispatch($message);
-        self::assertSame(0, $effects, 'Fallback must enqueue before invoking a handler.');
+        self::assertSame(0, $effects, 'Dispatch must enqueue before invoking a handler.');
         self::assertSame(1, $async->getMessageCount());
         $events = new EventDispatcher();
         $received = [];

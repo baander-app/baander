@@ -32,6 +32,7 @@ final class DeploymentMediaMountsTest extends TestCase
         self::recipe($mounts);
     }
 
+    /** @param list<array<string,mixed>> $mounts */
     #[DataProvider('unsafeMounts')]
     public function testRejectsUnsafeTopology(array $mounts): void
     {
@@ -39,6 +40,7 @@ final class DeploymentMediaMountsTest extends TestCase
         self::recipe($mounts);
     }
 
+    /** @return iterable<string,array{list<array<string,mixed>>}> */
     public static function unsafeMounts(): iterable
     {
         foreach ([
@@ -101,6 +103,7 @@ final class DeploymentMediaMountsTest extends TestCase
         $containment->verifyIsolation(str_repeat('c', 64), 'worker.baander.app', str_repeat('a', 32));
     }
 
+    /** @return iterable<string,array{string}> */
     public static function mismatchedStorage(): iterable
     {
         foreach (['writable source', 'different volume', 'bind mount', 'missing mount', 'extra mount', 'different target', 'source substitution', 'driver options', 'remote driver', 'global volume'] as $kind) {
@@ -108,6 +111,7 @@ final class DeploymentMediaMountsTest extends TestCase
         }
     }
 
+    /** @return array<string,mixed> */
     private static function inspection(): array
     {
         return [
@@ -123,12 +127,14 @@ final class DeploymentMediaMountsTest extends TestCase
         ];
     }
 
+    /** @return array{name:string,driver:string,options:null,scope:string,mountpoint:string} */
     private static function volume(string $name): array
     {
         return ['name' => $name, 'driver' => 'local', 'options' => null, 'scope' => 'local',
             'mountpoint' => '/var/lib/docker/volumes/' . $name . '/_data'];
     }
 
+    /** @return list<array{volume:string,target:string,readOnly:bool,role:string}> */
     public static function mounts(): array
     {
         return [
@@ -137,6 +143,7 @@ final class DeploymentMediaMountsTest extends TestCase
         ];
     }
 
+    /** @param list<array<string,mixed>> $mounts */
     public static function recipe(array $mounts): DeploymentContainerRecipe
     {
         return new DeploymentContainerRecipe('worker.baander.app', str_repeat('a', 32), 'daemon', 'sha256:' . str_repeat('b', 64), ['/usr/local/bin/php', '/var/www/html/bin/console', 'app:worker'], 'none', 2 * 1024 * 1024 * 1024, 1000000000, 64, mediaMounts: $mounts);

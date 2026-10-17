@@ -71,10 +71,8 @@ final class GdImageConverter implements ImageConversionPortInterface
         $originalWidth = $imageInfo[0];
         $originalHeight = $imageInfo[1];
 
-        // Only downscale, never upscale
-        if ($originalWidth <= $maxWidth) {
-            return $sourcePath;
-        }
+        // Preserve small source dimensions while still publishing the requested WebP.
+        $maxWidth = min($maxWidth, $originalWidth);
 
         $ratio = $maxWidth / $originalWidth;
         $newHeight = (int) round($originalHeight * $ratio);

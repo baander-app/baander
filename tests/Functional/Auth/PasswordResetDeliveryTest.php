@@ -196,7 +196,7 @@ final class PasswordResetDeliveryTest extends RateLimitTestCase
             ), sprintf('The raw token must not be stored in %s.', $table));
         }
 
-        foreach (['async', 'swoole_task', 'scheduler'] as $name) {
+        foreach (['async', 'scheduler'] as $name) {
             $transport = static::getContainer()->get('messenger.transport.' . $name);
             $this->assertInstanceOf(InMemoryTransport::class, $transport);
             foreach ([...$transport->getSent(), ...$transport->get()] as $envelope) {

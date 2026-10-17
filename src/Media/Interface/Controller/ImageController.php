@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Media\Interface\Controller;
 
-use App\Media\Application\Port\ImageConversionPortInterface;
+use App\Media\Application\Command\GenerateImageDerivativeCommand;
 use App\Media\Application\Port\ImagePortInterface;
 use App\Media\Application\Port\MediaReadScopeProviderInterface;
 use App\Media\Application\Port\StoragePortInterface;
@@ -15,7 +15,7 @@ use App\Shared\Interface\Controller\TranslatorTrait;
 use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
-use SwooleBundle\SwooleBundle\Bridge\Symfony\Container\CoWrapper;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -32,10 +32,9 @@ final class ImageController
     public function __construct(
         private readonly ImagePortInterface $imageService,
         private readonly StoragePortInterface $storage,
-        private readonly ImageConversionPortInterface $converter,
         private readonly BlurHashGenerator $blurHashGenerator,
         private readonly LoggerInterface $logger,
-        private readonly CoWrapper $coWrapper,
+        private readonly MessageBusInterface $commandBus,
         private readonly MediaReadScopeProviderInterface $scopes,
     ) {
     }
@@ -117,7 +116,6 @@ final class ImageController
             return $this->notFound($this->trans('errors.image_file_not_found', domain: 'media'));
         }
 
-        $outputDir = dirname($fullPath);
         $extension = $image->getExtension();
         $sourcePath = $image->getPath();
         $sourceDirectory = pathinfo($sourcePath, PATHINFO_DIRNAME);
@@ -131,18 +129,7 @@ final class ImageController
             if ($presetPath !== null && file_exists($presetPath)) {
                 $fullPath = $presetPath;
             } elseif ($presetPath !== null) {
-                // Fire-and-forget: generate preset in background, serve original now
-                $this->coWrapper->go(function () use ($fullPath, $outputDir, $preset): void {
-                    try {
-                        $this->converter->convertPreset($fullPath, $outputDir, $preset);
-                    } catch (\Throwable $e) {
-                        $this->logger->warning('Failed to generate image preset', [
-                            'preset' => $preset,
-                            'path' => $fullPath,
-                            'error' => $e->getMessage(),
-                        ]);
-                    }
-                });
+                $this->commandBus->dispatch(new GenerateImageDerivativeCommand($sourcePath, $preset));
             }
         } elseif (!in_array($extension, ['webp', 'gif'], true)) {
             // Unconditional WebP conversion for non-WebP, non-GIF sources
@@ -150,17 +137,7 @@ final class ImageController
             if ($webpPath !== null && file_exists($webpPath)) {
                 $fullPath = $webpPath;
             } elseif ($webpPath !== null) {
-                // Fire-and-forget: generate WebP in background, serve original now
-                $this->coWrapper->go(function () use ($fullPath, $outputDir): void {
-                    try {
-                        $this->converter->convertToWebp($fullPath, $outputDir);
-                    } catch (\Throwable $e) {
-                        $this->logger->warning('Failed to convert image to WebP', [
-                            'path' => $fullPath,
-                            'error' => $e->getMessage(),
-                        ]);
-                    }
-                });
+                $this->commandBus->dispatch(new GenerateImageDerivativeCommand($sourcePath));
             }
         }
 
