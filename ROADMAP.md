@@ -23,14 +23,14 @@ batches describe their own checkpoints; the current gate below takes precedence.
 Any harness can take over from this section; nothing below depends on a tool that
 only one agent host has.
 
-- **Branch.** `plan/public-api-identities` starts from published `master`
-  (`0067f342`). The public-identity correction is delivered locally on 2026-10-17:
-  public APIs use entity public IDs while UUIDs remain internal. Independent
-  plan/code review and simplification have completed, with findings applied. The user
-  approved existing passkey re-enrollment on 2026-10-15. Public user handles and
-  credential invalidation pass focused CI, static checks and the final full backend
-  run. No push is authorized for this branch.
-- **Published baseline.** Provider destination policy was merged into `master`
+- **Branch.** `master` contains the public-identity implementation at `6149f5b1`,
+  fast-forward merged on 2026-10-17. Public APIs use entity public IDs while UUIDs
+  remain internal. Independent plan/code review and simplification have completed,
+  with findings applied. The user approved existing passkey re-enrollment on
+  2026-10-15. Public user handles and credential invalidation pass focused CI,
+  static checks and the final full backend run. The user authorized the merge and
+  push to both remotes on 2026-10-17.
+- **Previous published baseline.** Provider destination policy was merged into `master`
   and pushed to both remotes at `0067f342`, following atomic rate limits,
   WebSocket handshake tickets, registry security qualification and repository
   cleanup. Completed older plans, obsolete repository analysis tooling, the
