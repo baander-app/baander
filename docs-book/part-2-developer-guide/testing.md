@@ -528,6 +528,19 @@ this selection as a blocking step. This qualifies the console and Messenger
 paths exercised here; the web server still requires Swoole, and the Composer
 extension requirement remains unchanged.
 
+Run the backend runner regressions before changing orchestration or cleanup:
+
+```bash
+python3 -m unittest discover -s scripts/tests
+bash scripts/test-worker-operator-cleanup.sh
+```
+
+CI runs both commands in its backend runner regression step. The operator cleanup
+script uses a disposable Docker CLI stub to check enumeration failures, removal
+failures, retained resources, browser-hook cleanup and preservation of an earlier
+failure exit code. It does not prove cleanup against a real daemon; the production
+operator drill must still verify absence of its containers, networks and volumes.
+
 For strict unit and messaging checks, run from the checkout:
 
 ```bash
@@ -575,8 +588,11 @@ to the trusted test controller. Credentials are streamed into private files owne
 by its user, and it reaches PostgreSQL on a separate controller network with
 no published database port. The controller verifies that its socket reaches the
 same daemon before issuing an operator action. The worker keeps its private
-network and receives no
-mounts or Docker authority. With no explicit endpoint override, setup uses the
+network and receives only its admitted named media volumes, with no Docker
+authority. Version 2 manifests require read-only source and writable derived
+volumes, media memory/descendant reservations and a PID ceiling that includes
+encoder threads; see the [operator recipe](../part-1-operator-guide/commands/README.md#worker-deployment).
+With no explicit endpoint override, setup uses the
 runner's ambient Docker connection, supporting CI runners outside the daemon host.
 
 Both modes exercise `bin/worker-deployment.php` create, reconciliation, start,
@@ -602,16 +618,66 @@ BAANDER_TEST_IMAGE=baander-worker:test bash scripts/test-worker-production-conta
 The runner has a 300-second outer deadline; image build time is outside that bound.
 It verifies the worker user, entrypoint, disabled web health check and production
 environment and disabled PHP error display; checks that development dependencies,
-baked OAuth keys and agent artifacts are absent; and runs Composer's production platform checks. It then uses
+baked OAuth keys and agent artifacts are absent; and runs Composer's production
+platform checks. A real coroutine file read/write smoke test runs against the
+immutable image with default Docker seccomp, all capabilities dropped and
+`no-new-privileges`. This catches an io_uring-enabled Swoole build that cannot use
+its native file backend under those restrictions. The supported image builds
+Swoole without io_uring; no runtime INI switch substitutes for that build choice.
+It then uses
 `BAANDER_TEST_USE_IMAGE=1` with container controller mode to run the lifecycle
 against that exact immutable image. This skips the fixture rebuild and injects no
 source, dependencies, keys or cache into the worker. Test preparation and Docker
 authority remain in separate containers. The scope is the worker lifecycle,
 outbox and scheduler, without OAuth certification. Forgejo now includes blocking
 context-exclusion, production-worker build and production-lifecycle steps. Their
-configuration does not establish a passing Forgejo run. The clean worker build,
-platform checks and direct-image lifecycle pass locally with native Swoole pinned
-to Composer's required 6.2.0. PIE installation failures fail the image build.
+configuration does not establish a passing Forgejo run. The current immutable-image
+lifecycle and combined Chromium playback/recovery gate pass locally; exact image,
+phase, containment and cleanup evidence is recorded in the
+[worker checkpoint](../../ROADMAP.md#worker-architecture-and-resource-control).
+Native Swoole is pinned to Composer's required 6.2.0. PIE installation failures
+fail the image build.
+
+The combined two-command runner exercises shared media with the production worker
+image:
+
+```bash
+BAANDER_TEST_IMAGE=baander-worker:test bash scripts/test-two-command-deployment-container.sh
+```
+
+It has a 600-second outer deadline. For an attached browser checkpoint, install web
+dependencies and provide the pinned Playwright Docker image, then enable the
+optional hook:
+
+```bash
+BAANDER_TEST_IMAGE=baander-worker:test \
+BAANDER_TEST_TWO_COMMAND_CHECKPOINT="$PWD/scripts/test-two-command-browser-checkpoint.sh" \
+  bash scripts/test-two-command-deployment-container.sh
+```
+
+The hook uses `mcr.microsoft.com/playwright:v1.60.0-noble`, Docker host networking
+and the checkout's `playwright-core` dependency. It launches headless Chromium
+with `channel: 'chromium'`, records the engine/version and checks native HLS
+capability during its authenticated phase before testing worker absence. No media
+JavaScript library or media feature override is used. A successful capability
+probe or HTTP response is not proof of decoded playback. The browser gate still
+requires actual decoding, an advancing clock and paused seeking from
+worker-produced output.
+
+The production fixture also submits a captured old-generation native seek after
+an explicit paused seek, while the worker is live and while it is absent. It must
+leave desired position, execution generation and control revision unchanged. This
+checks the server's fence independently of whether a browser reproduces the race.
+
+The hook retains browser evidence with the drill artifacts and removes its browser
+container during cleanup. The standard runner does not require this hook. The
+current combined gate with this hook passes authenticated playback, paused seek,
+web restart, worker containment and recovery, and final completion. It also proves
+both stale-generation probes leave paused state unchanged, checks fourteen
+contained process identities with no survivors and verifies cleanup. The
+[worker checkpoint](../../ROADMAP.md#worker-architecture-and-resource-control)
+records the exact local result. Autoscaling, saturation and regional qualification
+remain separate gates.
 
 The messaging runner waits for PostgreSQL TCP readiness (not its temporary
 initialization socket) and prints service logs on readiness timeout. It also
@@ -693,7 +759,8 @@ reconciliation without process activity, and registered startup/recovery.
 
 The worker-command runner boots the actual `app:worker` as PID 1 against disposable
 production-mode PostgreSQL and Redis after fresh and repeat migrations. It verifies
-three direct child roles, their exact committed deployment tuple (overriding a bogus
+four direct child roles, media readiness after runtime/authority initialization,
+their exact committed deployment tuple (overriding a bogus
 inherited epoch), and the namespace/boot-qualified Redis consumer. It kills the
 consumer and scheduler separately to require whole-container draining, tests TERM and forced database lease
 expiry, and confirms a duplicate
@@ -706,7 +773,8 @@ preferences are disabled, the disposable user is unverified and no webhook
 endpoints exist; no external delivery is requested. A paused manual console request
 runs the registered cache sweep in dry-run mode through the dedicated scheduler
 stream; duplicate delivery must not invoke it twice. These checks do not establish
-application readiness, autoscaling, production capacity or media ownership.
+complete application readiness, autoscaling, measured production capacity or
+end-to-end media playback and recovery.
 CI runs this as a blocking step using `BAANDER_TEST_CHECKOUT_IN_IMAGE=1`, which
 copies source and Composer dependencies from the built application image.
 The functional `Console/ServeCommandTest` verifies that `app:serve` and the legacy
@@ -1069,8 +1137,8 @@ has two parts:
    - `docker stop`, `SIGINT`, `DELETE /api/server` and `swoole:server:stop` each
      run one drain and exit `0` within the deadline, and `SIGTERM` followed by
      `SIGINT` still drains once; `swoole:server:stop` itself exits `0`;
-   - a worker reload through `PATCH /api/server` keeps the server, the CPU
-     pool's processes and an open WebSocket, and starts no drain;
+   - a worker reload through `PATCH /api/server` keeps the server and an open
+     WebSocket, and starts no drain; web has no CPU pool to restart;
    - an open WebSocket receives close code `1012` before its connection ends,
      and an idle server closes the drain window as soon as every worker has
      reported drained;
@@ -1083,8 +1151,8 @@ has two parts:
    - a stopped event worker is killed by Swoole and the server still exits `0`,
      and a stopped manager is killed by the drain watchdog at the deadline, with
      exit `1`;
-   - with the server started through `docker exec` rather than as PID 1, no
-     FFmpeg or CPU pool process remains after the stop;
+   - with the server started through `docker exec` rather than as PID 1, no web
+     process remains after the stop; web starts no FFmpeg or CPU pool children;
    - with PostgreSQL down, the start-up cleanup logs its failure once and the
      server still drains and exits `0`.
 

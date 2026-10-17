@@ -121,15 +121,34 @@ policies.
 
 ### Transcode execution generation
 
-The identity of one admitted encoding attempt and its output directory. A seek or
-restarted attempt advances the generation so stale output cannot be delivered as
-current output. This identity is distinct from a worker deployment's boot generation.
+The identity of one admitted encoding attempt inside a job-specific output
+directory. A seek or restarted attempt advances the generation so stale output
+cannot be delivered as current output. Different jobs have independent generations.
+This identity is distinct from a worker deployment's boot generation.
 
 ### Transcode control revision
 
 The monotonically increasing order of committed desired-state changes for a video
 job. The worker applies the latest revision, preserving paused state across a seek
 and treating cancellation as terminal.
+
+### Owned video job
+
+A transcode job belonging to one playback user, video and quality tier. Another
+user's job for the same source has independent controls, execution claims and
+output. Historical jobs whose owner cannot be resolved retain no owner.
+
+### Rendition set
+
+The immutable set of owned video job public IDs and their individual execution
+generations carried by a signed adaptive HLS or DASH manifest request. It fixes
+which outputs the player may switch between; a changed set needs a new signature.
+
+### Transcode control receipt
+
+A durable record that one session has applied a request identity. It prevents the
+same request from applying again after other controls have intervened. Controls
+fan out transactionally to sibling renditions of the same playback owner and video.
 
 ## Backend verification
 

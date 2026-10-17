@@ -105,9 +105,10 @@ only one agent host has.
   visibility; the visible-song count materialises rows. These remain deferred.
   The duplicate collaborator and unguarded reorder findings are closed by the
   [playlist implementation](#playlist-concurrent-writes-2026-10-17).
-- **Next.** Reconcile and qualify the current two-command web/worker deployment
-  contract end to end, starting with the first unchecked
-  [worker architecture item](#worker-architecture-and-resource-control).
+- **Next.** Continue the remaining
+  [worker architecture items](#worker-architecture-and-resource-control), starting
+  with validated routes/resource classes. The two-command deployment item is closed
+  by the production and browser checkpoint below.
   Provider live qualification and regional acceptance remain separate work.
   React Native and Android remain deferred. The local dev database note below
   stands.
@@ -2142,7 +2143,7 @@ The detailed design is [Web and worker runtime redesign](docs/plans/2026-07-17-0
 Its historical baseline is not a current completion report; reconcile against source
 and passing integration gates as each item is closed.
 
-Interim checkpoint on 2026-10-17: U1 of the
+Implementation checkpoint on 2026-10-17: U1 of the
 [reviewed two-command deployment plan](docs/plans/2026-10-17-1430-refactor-two-command-deployment-plan.md)
 implements the storage admission foundation. Manifest version 2 admits named source
 volumes read-only and derived volumes read-write, verifies immutable volume identity
@@ -2182,11 +2183,160 @@ to partial indexes and cleanup are applied. Final verification after review pass
 All five CI static gates pass: Composer platform requirements, PHPStan, Deptrac
 with zero violations, container lint and OpenAPI drift checking. Types were
 corrected and an obsolete dependency baseline entry removed; no suppressions were
-added. The U2/U3 foundation phase is ready for a local commit, and U4 work is
-starting. U4–U8 acceptance, full backend verification and production runtime drills
-remain pending; every worker checkbox below remains unchecked.
+added. The U2/U3 foundation phase is verified. The media role, durable video/audio
+execution, generation-aware delivery and web executor removal are implemented.
+Phase 2 authoritative verification passes **1,184 tests / 6,793 assertions in
+106 files** in **126.1 seconds**; artifacts:
+`var/test-runs/20261017-151907-3a82c762`. Final focused CI verification after
+heartbeat, playback timeline, progress and encoder thread-budget changes passes
+**1,112 tests / 6,065 assertions in 94 files** in **116.8 seconds**; artifacts:
+`var/test-runs/20261017-152959-5493fc63`. These selections overlap. All five CI
+static gates pass after those changes; log:
+`/tmp/two-command-static-phase2-final.log`. The refreshed generated client and
+frontend checks pass: **2,061 tests in 186 files** in **32.62 seconds**, typechecking
+in **18.0 seconds**, lint in **20.9 seconds** and production build in
+**19.6 seconds**.
+Source-root configuration checks pass **173 tests / 208 assertions** after
+`MEDIA_STORAGE_PATH` was wired into the filesystem and admitted runtime recipe.
+Final review corrections scope video jobs and generation paths to each playback
+owner, sign immutable adaptive rendition sets, fan out controls only to the same
+owner/video, and retain durable session/request receipts. Audio eviction reuses
+its canonical row with generation-fenced reset. Worker QoL restores, samples and
+merges learning under shared derived storage. Forward migrations
+`Version20261017160000` and `Version20261017170000` preserve the initial migration
+and historical jobs while fencing prior active/complete output for re-encoding.
+All **20 stack-isolation checks** pass; artifacts:
+`var/test-isolation/two-command`. The initial full backend run found four obsolete
+fixture or naming expectations; those tests were corrected before the later
+full-run and focused-correction checkpoint below. This initial failed run is not
+recorded as a qualification pass.
+The final delta code review completed with **13 reviewers**. All **four confirmed
+findings** are fixed and independently checked. Receipt:
+`/tmp/compound-engineering-1000/ce-code-review/20261017-160205-c86f3c2e/`, including
+`post-snapshot-fix-verification.json`. Completed-primary control checks pass
+**23 tests / 248 assertions**. The four real-PostgreSQL sibling rollback cases
+also pass **90 assertions** in the full run's service lane 2; that lane's unrelated
+index-test failure is recorded below. The latest player selection passes
+**33 tests**, including rejected-intent, zero-seek, paused-preroll and media-error
+regressions. The latest full frontend run passes **2,089 tests in 186 files** in
+**29.24 seconds**. Lint passes in **21.01 seconds** with **zero errors and seven
+standing warnings**, and build including typechecking in **19.13 seconds**.
+Evidence: `/tmp/two-command-frontend-cursor-readiness/results.json`.
 
-- [ ] Verify the two-command deployment contract end to end: web owns delivery and
+The CI integration selection passes **35 tests / 336 assertions in 7 files** in
+**86.1 seconds**; artifacts: `var/test-runs/20261017-160023-cae5e039`. Authority
+drills pass: containment in **19.44 seconds**, retirement in **9.4 seconds** and
+recovery in **32.5 seconds**. Harness verification passes **69 Python tests**,
+**20 harness cases** (13 cleanup, two final-drill and five receipt cases), and
+**18 process-guard tests / 41 assertions**. The operator cleanup runner is now
+part of CI's backend runner regression step.
+
+The real worker-command drill exposed loss of empty environment values.
+Child launch now passes literal `NAME=value` environment entries, and nested
+inheritance checks pass **9 tests / 28 assertions** in **0.608 seconds**. The
+PHPStan `proc_open` stub now matches the verified native key/value-pair type;
+no suppression was added. The real worker-command acceptance rerun passes in
+**228 seconds**. These focused results do not establish final production
+acceptance.
+
+Production qualification found that the io_uring-enabled Swoole 6.2 build failed
+coroutine file reads under default Docker seccomp: the reproduction exited **1**.
+There is no supported runtime INI backend switch. The image now builds without
+io_uring, the obsolete development INI option is removed, private media jobs cap
+AIO at **one core / one maximum thread**, and web uses **one core / four maximum
+threads**. The production wrapper now exercises real coroutine file read/write
+under the admitted restrictions. Authenticated browser startup exposed an HTTP-to-HTTPS DPoP URI mismatch;
+proof construction now uses the request origin and pathname, with five URI cases
+and focused independent review. Backend proof checks retain their enforcement.
+Native harness isolation selected Chromium **148.0.7778.96** from the pinned
+Playwright image, without media feature flags or a media JavaScript library.
+Standalone playback and paused-seek probes pass; evidence:
+`/tmp/two-command-chromium-hls-results/result.json`.
+
+Dedicated result files separate phase receipts from production Redis warnings;
+fixture PHPStan passes in **10.91 seconds** with cleanup verified. The reporting
+correction's production run passes in **280.64 seconds**, reaches all seven browser
+phases, and verifies fourteen contained identities, zero survivors and cleanup.
+That result predates the current seek-generation correction. An earlier run
+exposed an intermittent old native seek replacing a paused position of **30**
+with **33.246624**, advancing generation/revision from **5/11** to **6/12**.
+
+Native events now carry their captured execution generation. Existing playback
+locks reject stale events while explicit seeks and progress retain their separate
+contracts; no schema change is required. Authoritative verification passes
+**79 tests / 512 assertions in 5 files** in **61.6 seconds**; artifacts:
+`var/test-runs/20261017-183627-76a8d28c`. Independent follow-ups
+`native-seek-generation-fence-followup` and
+`deterministic-stale-seek-acceptance-followup` are resolved. The production fixture
+now submits the stale **33.246624** seek after paused **30**, with the worker live
+and absent, and checks unchanged desired state, generation and revision. The prior
+image's pass predates these final changes; the current-image result is recorded
+below.
+
+A subsequent production run failed after **312.87 seconds** despite passing the
+stale-generation probes. Resume exposed a cursor-readiness defect: a running
+sibling could be advertised before its target fragment closed. Readiness now
+requires the desired-cursor fragment for all desired statuses, and media-error
+pause events preserve the playback error instead of persisting a user pause.
+Authoritative verification passes **54 tests / 333 assertions in 5 files** in
+**25.0 seconds** (**11.7 seconds** in the lane); artifacts:
+`var/test-runs/20261017-184926-df5a8b1e`. PHPStan passes in **54.36 seconds** and
+Deptrac in **5.2 seconds**, with cleanup verified; results:
+`/tmp/two-command-static-cursor-readiness/results.json`. The independent
+`running-target-readiness-error-pause-followup.json` review finds no issues.
+The final current-image run below verifies the corrected readiness behavior.
+
+Paused-preroll backend verification passes **53 tests / 327 assertions** in
+**36.9 seconds**; artifacts: `var/test-runs/20261017-174751-0d947a51`. PHPStan
+passes in **54.76 seconds** and Deptrac in **5.2 seconds** with zero violations;
+evidence: `/tmp/two-command-static-paused`.
+
+Final static verification after the seek-generation correction passes export
+preparation in **6.1 seconds**, Composer platform requirements in **0.4 seconds**,
+PHPStan in **51.96 seconds**, Deptrac in **5.2 seconds**, container lint in
+**2.1 seconds** and OpenAPI drift checking in **2.1 seconds**. The duplicate
+custom-stub issue is resolved. All recorded exits are zero and cleanup passes;
+results: `/tmp/two-command-static-seek-fence/results.json`.
+
+The remaining runtime drills pass: web runtime in **59.02 seconds**, web shutdown
+in **108.75 seconds** and legacy consumer recovery in **122.94 seconds**. Shutdown
+covers all stop routes and records **36 MiB / 512 MiB** peak web-worker memory
+(**7.0%**). The legacy fixture observes the killed consumer as unhealthy after
+**90 seconds**, then recovers unacknowledged work. Results:
+`/tmp/two-command-remaining-drills/results.json`. These complement the authority
+and **228-second** worker-command results above. Those separate drills do not by
+themselves establish the combined worker/browser result recorded below.
+
+The full backend run executed **9,679 tests in 927 files / 78,504 assertions**
+in **983.8 seconds**. Ordinary, native and service lane 1 pass; service lane 2
+fails solely on an obsolete `CoveredIndexPersistenceTest` expectation. Artifacts:
+`var/test-runs/20261017-170639-17d75655`; log:
+`/tmp/two-command-backend-accepted.log`. The corrected file passes a focused rerun
+of **3 tests / 56 assertions in 1 file**, **49.9 seconds** including coordination
+(**29.6 seconds** in its service lane). Artifacts:
+`var/test-runs/20261017-172920-0cc78a9e`; log:
+`/tmp/two-command-index-accepted.log`. This records the full run and its focused
+correction; it is not an uninterrupted passing full-suite rerun.
+
+Final current-image production acceptance passes in **274.89 seconds**, exit
+**0**, with Chromium **148.0.7778.96**. The immutable worker image is
+`sha256:17cd8e17983adc08348cdbf16dc52c97a85c7f185a1197b82c2f2f0af361125b`. All seven browser phases pass:
+authenticated, attached, sought-paused, web-restarted, worker-contained,
+worker-recovered and complete. Both live-worker and worker-absent stale-generation
+probes report `staleGenerationIgnored: true` and preserve paused position **30**.
+Final containment checks **14 identities** with **zero survivors**; cleanup
+reports exit **0** and `cleanupVerified: true`. Results:
+`/tmp/two-command-combined-cursor-readiness-result.json`; artifacts:
+`var/test-runs/baander-worker-operator-1792256034-1425218`.
+
+The two-command deployment item is closed by this production/browser result,
+backend full-run evidence plus its focused correction, affected static/frontend
+gates and independent review. Operator and testing guidance describes manifest
+version 2, shared media storage, worker execution and explicit recovery. Later
+route/resource qualification, control capacity, autoscaling, failure/load coverage
+and media saturation items remain open.
+
+- [x] Verify the two-command deployment contract end to end: web owns delivery and
   client connections; worker owns consumers, scheduler, outbox relay, media execution,
   control services, and child cleanup. No competing supervisor or hidden web pool.
 - [ ] Use validated routes/resource classes with a handler, independent JSON codec,

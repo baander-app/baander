@@ -76,14 +76,18 @@ Then visit `http://localhost`.
 ## Message delivery and upgrades
 
 Queued commands and job retry data use the `baander.message` JSON format, version 1.
-The codec lists supported message types and fields explicitly. Redis and Swoole use
-this same contract; message payloads do not depend on Symfony object serialization.
+The codec lists supported message types and fields explicitly. Redis delivery uses
+this contract; message payloads do not depend on Symfony object serialization.
 Retry metadata retains completed handler names so a retry skips handlers that
 already succeeded. External delivery still requires consumer idempotency.
 
-Each app container runs one Supervisor-managed `async` consumer. Its Redis
-consumer name includes the container hostname. The consumer writes its heartbeat
-to a Redis key, which the web container reads. An idle consumer renews it about
+The web container runs `app:serve`. A separate admitted `app:worker` deployment
+owns the `async`/`scheduler` consumer, outbox relay, scheduler and media execution.
+It runs without a live HTTP server; web starts no task workers or CPU pool.
+Follow [Worker deployment](docs-book/part-1-operator-guide/commands/README.md#worker-deployment)
+for the version 2 manifest, shared named volumes and immutable boot lifecycle.
+The Redis consumer name includes its deployment and boot identity. The consumer
+writes its heartbeat to a Redis key, which the web container reads. An idle consumer renews it about
 every 10 seconds and a consumer handling a job every 30 seconds; the worker reads
 unhealthy when its heartbeat is older than 45 seconds while idle or 90 seconds
 while busy. `/health` and `app:health:check` list the worker and the memory
@@ -94,13 +98,14 @@ instead. `/live` remains process liveness.
 
 The Messenger health details report `lastDeliveryQueueAgeSeconds` and
 `lastDeliveryAt`. These describe the last dequeued message, not the oldest waiting
-message. Supervisor allows active work up to 3,600 seconds to finish on shutdown;
-Compose allows 3,605 seconds before killing the container. Other orchestrators
-need an equivalent shutdown grace period. Development cache cleanup runs before
-Supervisor starts either process, never during an individual child restart.
+message. Worker child failure, lease loss or a termination signal drains the
+whole deployment. Give its container more than the 35-second drain deadline before
+forced teardown. Replacement requires explicit host recovery; automatic worker
+restart and a second child supervisor are unsupported. Restarting web leaves
+background ownership with the worker.
 
-A second supervised worker runs `app:outbox:consume`. Live domain events enter
-the outbox; notification and admin-alert listeners run on its private replay
+The worker supervisor runs `app:outbox:consume` as its relay child. Live domain
+events enter the outbox; notification and admin-alert listeners run on its private replay
 dispatcher. Each event's receipt, notifications, and channel delivery intents
 commit together. Replaying the same outbox ID skips an already committed receipt.
 Session and transcode listeners remain on the live dispatcher.
@@ -116,8 +121,8 @@ verification now commit their domain writes and event capture in one transaction
 Other event producers still need transaction boundaries reviewed.
 
 Before upgrading an instance that has older queued messages, stop producers and
-use the previous release to drain Redis and Swoole work. Resolve or export failed
-messages and back up the Redis streams and job history. Upgrade producers and
+preserve queued and retrying Redis work while retiring the old worker deployment.
+Resolve or export failed messages and back up the Redis streams and job history. Upgrade producers and
 workers together. PHP-serialized envelopes and legacy `__class` job payloads are
 rejected; archived legacy jobs cannot be retried through the new codec. Do not
 remove pending messages to make an upgrade pass.

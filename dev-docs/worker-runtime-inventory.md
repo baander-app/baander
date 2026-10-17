@@ -1,5 +1,167 @@
 # Worker runtime inventory
 
+## Current ownership on 2026-10-17
+
+`app:serve` owns request handling, file delivery, client connections and web health
+checks. `app:worker` runs independently as its container's PID 1 and supervises
+four roles: the Redis consumer, outbox relay, scheduler and media execution.
+Web starts no task workers, CPU pool, encoder, scheduler or relay. The historical
+records below describe earlier implementations; this section supersedes their
+routing, ownership, deployment and completion descriptions.
+
+[WorkerSupervisorRunner](../src/Shared/Infrastructure/Worker/WorkerSupervisorRunner.php)
+defines the four child roles. The consumer receives `async` and `scheduler` with
+a deployment/boot/launch-qualified identity. Scheduler polling records immutable
+occurrences and publishes their IDs to the dedicated receiver. The relay handles
+committed outbox events and notification delivery intents. Neither role requires
+a running web server.
+
+### Routing and synchronous admission
+
+[messenger.yaml](../config/packages/messenger.yaml) declares fifteen production
+routes: fourteen to Redis `async` and one to `scheduler`. No `swoole_task`
+transport remains. The independent
+[JSON codec](../src/Shared/Infrastructure/Messaging/JsonMessageCodec.php) and its
+context codecs carry supported payloads; transport-specific handler registration
+must agree with each route.
+
+| Message | Transport |
+| --- | --- |
+| `BatchExtractCoversCommand` | `async` |
+| `ScanLibraryCommand` | `async` |
+| `FilesDiscovered` | `async` |
+| `ExtractAlbumCoverCommand` | `async` |
+| `SyncSongMessage` | `async` |
+| `SyncAlbumMessage` | `async` |
+| `SyncLibraryMessage` | `async` |
+| `SendEmailCommand` | `async` |
+| `SendPushCommand` | `async` |
+| `PruneMissingImagesCommand` | `async` |
+| `SyncCountryStationsCommand` | `async` |
+| `ExecuteScheduledOccurrenceCommand` | `scheduler` |
+| `RelayOutboxCommand` | `async` |
+| `ExecuteRecommendationJobCommand` | `async` |
+| `GenerateImageDerivativeCommand` | `async` |
+
+Recommendation admission remains synchronous and returns typed results; its
+worker command contains the persisted job identifier. Foreground CLI counts and
+exit behavior are preserved. Image derivative requests queue work and serve the
+original until worker publication succeeds. Video/audio admission and playback
+controls use durable PostgreSQL authority directly. They do not wait behind the
+ordinary Messenger backlog. Notification delivery intents continue to override
+the transport to `async` through their dedicated relay.
+
+### Media lifetime and shared state
+
+[MediaWorkerRunner](../src/Transcode/Infrastructure/Worker/MediaWorkerRunner.php)
+admits three video jobs and one audio rendition at once. Each job has a fresh
+kernel; a video's private CPU helper starts before live database or Redis
+connections exist. Encoders, helper processes and their groups belong to the
+worker container. Web performs no lazy hardware probe or inline encode fallback.
+
+[TranscodeRuntimeState](../src/Transcode/Infrastructure/Doctrine/TranscodeRuntimeState.php)
+and [AudioRenditionRuntime](../src/Transcode/Infrastructure/Doctrine/AudioRenditionRuntime.php)
+store separate video and audio authorities. Database-clock leases, exact-owner
+claims, ordered desired revisions and execution generations fence publication.
+Session creation and video intent commit or roll back together. Synchronous
+pause/resume/seek/cancel updates persist desired state; cancellation is terminal
+and seeking while paused preserves the pause.
+
+Video jobs are keyed by playback owner, video and tier. Output directories include
+the job UUID; signed adaptive rendition sets pin each owned job's own generation.
+Controls fan out transactionally across sibling renditions for that owner/video,
+with durable per-session/request receipts preventing replay after an intervening
+request. Independent users retain independent playback authority. Native media seek events
+carry the attached generation and are checked under the existing locks; a stale
+event cannot mutate desired position, generation or revision. Explicit seek intent
+and progress remain distinct: progress requires the current generation and
+revision.
+
+Readiness for every desired status waits for the desired cursor's available
+fragment. Resume cannot publish a still-encoding sibling before that fragment
+closes. A browser media error remains an error rather than persisting an automatic
+pause as user intent.
+
+Video delivery pins the job and execution generation. Worker-published metadata
+supplies codec selection, source duration and `startTime`; the player translates
+between the generation's local media clock and source position. Audio followers
+read only their accepted generation, require live ownership while output grows
+and accept final publication after committed completion. Web restart cuts client
+connections while worker execution continues. Worker replacement requires explicit
+retirement and recovery of the old deployment.
+
+Eviction of a completed audio file resets the same canonical runtime row through
+a generation-matching compare-and-swap; the next claim advances its generation.
+Worker QoL restores and samples learning under `CONVERT_STORAGE_PATH/qol-state`,
+then merges new samples under a bounded file lock. Forward migrations add durable
+control receipts and owner-scoped jobs while preserving unresolved historical
+owners as null and fencing old active/complete output for re-encoding.
+
+### Admitted deployment recipe
+
+The host-only [deployment controller](../bin/worker-deployment.php) admits immutable
+version 2 recipes. Named local Docker volumes provide read-only worker sources
+and writable derived storage at identical web/worker paths. Set
+`MEDIA_STORAGE_PATH` explicitly, for example `/media/library`, inside a source
+volume; `CONVERT_STORAGE_PATH` belongs inside a derived volume. Derived mounts
+also cover `/var/www/html/storage` and `/var/www/html/var/transcode_state`.
+The controller verifies volume names, mountpoints and access modes. Bind mounts,
+devices, extra mounts and Docker authority in the worker are refused.
+
+The media reservation is at least 2624 MiB and fourteen descendant processes.
+Management reserves 128 MiB, and consumer, relay and scheduler each reserve
+320 MiB. Scheduled console execution is disabled at zero or reserves at least
+192 MiB. All reservations must fit the total ceiling. The PID ceiling is at
+least 128, or eight plus media descendants when larger; encoder threads consume
+PID slots too. These are admission policies, not measured resource defaults.
+
+Compose starts web and dependencies; the separately admitted worker has no
+automatic restart. Child failure, lost authority or a termination signal drains
+the worker deployment. Its 35-second deadline requires a longer external stop
+grace period. Host status reports committed observations with readiness
+`not_checked`. See the [operator recipe](../docs-book/part-1-operator-guide/commands/README.md#worker-deployment)
+for exact fields, credentials, startup and recovery.
+
+### Native file backend
+
+The production image builds Swoole 6.2 without io_uring so coroutine file reads use
+the asynchronous thread backend under Docker's default seccomp profile. A native
+read reproduction failed with the io_uring build; no supported runtime INI switch
+selects a fallback. Private media jobs cap AIO at one core/maximum thread before
+helper fork or reactor startup. Web caps AIO at one core and four maximum threads.
+These threads remain inside the existing container PID budget. The production
+wrapper now tests real coroutine file read/write under the admitted restrictions;
+the current rebuilt image passes the combined production/browser gate.
+
+### Verification boundary
+
+[ROADMAP.md](../ROADMAP.md#worker-architecture-and-resource-control) records the
+current static, frontend, runtime and production/browser checkpoints. The full
+backend run completed with one obsolete index-test expectation; its corrected
+file passes a focused rerun. This is full-run evidence plus a focused correction,
+not an uninterrupted passing full-suite rerun.
+
+The gate runs through `scripts/test-two-command-deployment-container.sh` with
+its optional browser checkpoint. The current production image passes all seven
+combined browser phases using
+Chromium 148.0.7778.96 from the pinned Playwright image: authenticated playback,
+attachment, paused seek, web restart, worker containment, recovery and completion.
+Both live-worker and worker-absent stale-generation probes preserve paused desired
+state. Final containment verifies fourteen identities with zero survivors, and
+cleanup passes. The optional browser checkpoint records engine/version and uses
+native HLS without a media library or feature override.
+
+Only the two-command deployment item is closed. Later route/resource validation,
+responsive control capacity, autoscaling, measured capacity, failure/load coverage
+and media saturation qualification remain open.
+
+## Historical inventory and incremental evidence
+
+The remaining inventory and verification records describe their original stage
+boundaries. Old routes, web-owned executors, version 1 recipes, resource totals
+and completion statements are retained as historical evidence. Use the current
+ownership section and operator recipe above for present deployment decisions.
+
 Verified against source on 2026-10-03 for stage 1 of the
 [web and worker runtime redesign](../docs/plans/2026-07-17-001-feat-messenger-enterprise-hardening-plan.md).
 `app:serve` now names the existing foreground web server, and `app:worker` runs a
@@ -16,7 +178,7 @@ and lint on the changed web files pass. OpenAPI and the generated web client
 were regenerated; source schema fixes remove invalid empty required lists and
 an invalid float type. A fresh export matches the checked-in specification.
 
-## Current asynchronous routes
+## Historical asynchronous routes
 
 [messenger.yaml](../config/packages/messenger.yaml) declares **13 routes**: ten
 to `swoole_task`, two to Redis `async`, and one to Redis `scheduler`. The table records current handler
@@ -146,7 +308,7 @@ completion pauses an active schedule and stops the consumer, draining the whole
 deployment. Permanent execution receipts prevent the wrapper from running twice;
 these do not provide exactly-once effects for downstream asynchronous messages.
 
-## Swoole lifecycle and background ownership
+## Historical Swoole lifecycle and background ownership
 
 All five application `Bootable` implementations are explicitly tagged in
 [services.yaml](../config/services.yaml). Tables created before fork are shared
@@ -177,7 +339,7 @@ also uses this pool and has inline fallback; moving the pool affects recommendat
 execution as well as media. These internal JSON job payloads are distinct from the
 versioned Messenger codec and need an explicit compatibility contract when IPC moves.
 
-## Deployment and migration traps
+## Historical deployment and migration traps
 
 [start-web.sh](../docker/general/start-web.sh) starts only `app:serve`, replacing
 the mixed Supervisor startup. The `worker` image target starts `app:worker`

@@ -16,14 +16,21 @@ Run `bin/worker-deployment.php` from a trusted host checkout with Composer depen
 PHP 8.5 with extensions `posix` and `pdo_pgsql`, and an absolute Docker executable connected
 to a local Unix socket. The application container receives no Docker authority.
 Provision the migrated database, Redis and a private Docker network first; use a
-locally available immutable image ID. The initial recipe has no mounts or devices.
+locally available immutable image ID. The version 2 recipe requires explicitly
+authorized shared media volumes and rejects devices and bind mounts.
 
-The manifest is a JSON object of at most 8192 bytes. Version 1 requires exactly
+Build the worker target locally before selecting its immutable image ID:
+
+```bash
+docker buildx build --target worker --load -t baander-worker:local .
+```
+
+The manifest is a JSON object of at most 8192 bytes. Version 2 requires exactly
 these fields, with JSON integers for version and resource values:
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "namespace": "worker.baander.app",
   "bootId": "0123456789abcdef0123456789abcdef",
   "daemonId": "replace-with-docker-info-ID",
@@ -31,14 +38,22 @@ these fields, with JSON integers for version and resource values:
   "network": "baander-workers",
   "dockerBinary": "/usr/bin/docker",
   "dockerEndpoint": "unix:///var/run/docker.sock",
-  "memoryMiB": 1280,
+  "memoryMiB": 3904,
   "managementMiB": 128,
   "consumerMiB": 320,
   "relayMiB": 320,
   "schedulerMiB": 320,
   "scheduledConsoleMiB": 192,
+  "mediaMiB": 2624,
+  "mediaDescendantPids": 14,
   "nanoCpus": 1000000000,
-  "pidsLimit": 64
+  "pidsLimit": 128,
+  "mediaMounts": [
+    {"volume": "baander-source", "target": "/media", "readOnly": true, "role": "source"},
+    {"volume": "baander-conversions", "target": "/storage/conversions", "readOnly": false, "role": "derived"},
+    {"volume": "baander-storage", "target": "/var/www/html/storage", "readOnly": false, "role": "derived"},
+    {"volume": "baander-transcode-state", "target": "/var/www/html/var/transcode_state", "readOnly": false, "role": "derived"}
+  ]
 }
 ```
 
@@ -47,9 +62,31 @@ local image's `docker image inspect --format '{{.Id}}'` values on the same endpo
 Generate a fresh 32-character lowercase hexadecimal boot ID for each deployment
 attempt. Reservations must fit the memory ceiling: management requires at least
 128 MiB; consumer, relay and scheduler each require at least 320 MiB. Scheduled
-console execution requires at least 192 MiB or `0` to disable it. The worker argv,
+console execution requires at least 192 MiB or `0` to disable it. Media execution
+requires at least 2624 MiB and 14 descendant process reservations for three video
+slots and one audio slot. The PID ceiling must be at least 128, or eight plus
+`mediaDescendantPids` when that is larger; encoder and asynchronous file-I/O threads also consume PID slots.
+The worker argv,
 PHP management limit, identity and lock directory are fixed by the manifest parser;
 arbitrary commands, environment fields and secret paths are rejected.
+
+Provision the named volumes before creation, with the local Docker volume driver
+and no driver options. Source volumes are read-only in worker; derived volumes are
+writable. The declarations must cover `/var/www/html/storage`,
+`/var/www/html/var/transcode_state` and the configured `CONVERT_STORAGE_PATH`.
+At least one source volume is required. Set `MEDIA_STORAGE_PATH` explicitly to the
+source root inside that volume, for example `/media/library`; never point it at
+derived output. Its canonical absolute path must be covered by a read-only source
+declaration. Use the same `MEDIA_STORAGE_PATH` in web. Mount the same volumes at the same paths
+in web, giving web writable access where authorized library deletion requires it.
+Copy existing media into these volumes explicitly; the development Compose bind
+mounts do not provide this shared topology. Do not reset or replace existing media.
+
+Mount targets cannot overlap or replace code, secrets, operating-system paths or
+worker-private paths. Bind mounts, devices, extra mounts and source volumes
+aliased as writable derived storage are refused. Creation/start/recovery checks
+verify declared names, concrete local-volume mountpoints and access modes. A
+changed recipe requires a fresh admitted deployment.
 
 Keep credentials in a separate canonical absolute regular file owned by the
 invoking user, with mode `0600`, no symlink components and at most 8192 bytes:
@@ -63,7 +100,9 @@ invoking user, with mode `0600`, no symlink components and at most 8192 bytes:
     "APP_SECRET": "replace-with-runtime-secret",
     "DATABASE_URL": "postgresql://worker:replace-password@db-worker.baander.app/baander?serverVersion=18&charset=utf8",
     "REDIS_URL": "redis://:replace-password@redis.baander.app:6379",
-    "MESSENGER_TRANSPORT_DSN": "redis://:replace-password@redis.baander.app:6379/messages"
+    "MESSENGER_TRANSPORT_DSN": "redis://:replace-password@redis.baander.app:6379/messages",
+    "CONVERT_STORAGE_PATH": "/storage/conversions",
+    "MEDIA_STORAGE_PATH": "/media/library"
   }
 }
 ```
@@ -72,8 +111,9 @@ The two database addresses must reach the same database from the host and worker
 network respectively. The controller URL and credentials file stay on the host.
 Docker receives the admitted runtime values through a temporary private env-file;
 trusted daemon operators can inspect the resulting container environment.
-Optional runtime keys are `REDIS_PASSWORD`, `MAILER_DSN`, `MAIL_FROM_ADDRESS` and
-`MAIL_FROM_NAME`; without the last two, email a worker sends comes from
+Additional runtime keys are `CONVERT_STORAGE_PATH`, `MEDIA_STORAGE_PATH`,
+`REDIS_PASSWORD`, `MAILER_DSN`,
+`MAIL_FROM_ADDRESS` and `MAIL_FROM_NAME`; without the last two, email a worker sends comes from
 `noreply@localhost`. Values cannot contain
 line breaks and their complete env-file is limited to 4 KiB.
 
@@ -284,8 +324,8 @@ own exit code without JSON. Error output contains no credentials or raw diagnost
 | [app:server:drain:watch](app-server-drain-watch.md) | Kill the web server processes still running at the drain deadline (started by app:serve) |
 | [app:server:spans](app-server-spans.md) | List the web server's recent request spans, or empty the span buffer |
 | [app:server:stats](app-server-stats.md) | Show memory, process and coroutine figures of every web server worker |
-| [app:server:workers](app-server-workers.md) | Show the HTTP worker, task worker and transcoding pool statistics |
-| [app:worker](app-worker.md) | Run a worker container's supervisor: Redis consumer, outbox relay and scheduler |
+| [app:server:workers](app-server-workers.md) | Show the web server's HTTP and user worker statistics |
+| [app:worker](app-worker.md) | Run a worker container's supervisor: Redis consumer, outbox relay, scheduler and media execution |
 
 ## System & Diagnostics
 

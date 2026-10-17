@@ -45,20 +45,28 @@ make migrate
 ```
 
 This initializes both the main and test databases with `Version20261017000000`,
-then applies `Version20261017130000`. The initial migration creates the 80-table
-schema and two daily schedules: OAuth code purging at 03:30 UTC and recommendation
-generation at 04:00 UTC. The incremental migration adds the nonnegative playlist
-persistence version used to detect concurrent writes. Running migrations again
-leaves no pending work.
+then applies the forward migrations through `Version20261017170000`. The initial
+migration creates the 80-table schema and two daily schedules: OAuth code purging
+at 03:30 UTC and recommendation generation at 04:00 UTC. The forward migrations
+add playlist persistence versions, video/audio execution authority, durable
+control receipts and playback-owner scoping. Running migrations again leaves no
+pending work.
 
 Each target must be empty before the initial migration; preinstalled extensions
 and an empty Doctrine migration metadata table are allowed. Existing user objects,
 even an empty table, cause initialization to stop before application schema changes.
-A database already initialized with `Version20261017000000` applies the incremental
-migration normally, preserving its data.
+A database already initialized with `Version20261017000000` applies the forward
+migrations normally, preserving its data.
 
 For the main database alone, use `make migrate-no-test`. For an existing database
 with an older migration history, follow the [manual reset procedure](upgrading.md#manual-reset-of-an-existing-database).
+
+The web container runs `app:serve`; it handles requests, streams files and keeps
+client connections. Background work requires a separately admitted `app:worker`
+container. After migrations, follow [Worker deployment](commands/README.md#worker-deployment)
+to build the worker image, provision shared named media volumes and create/start
+the deployment. The development Compose file starts only web and dependencies;
+`make start` alone does not start consumers, scheduling or media encoding.
 
 ### 3. Create an admin user
 
@@ -97,7 +105,7 @@ AUTH_SPA_CLIENT_ID=<printed-id>
 make exec cmd="php bin/console app:library:create \"My Music\" /path/to/your/music"
 ```
 
-Replace `/path/to/your/music` with the absolute path to your media directory on the Docker host. This path must be accessible from inside the container (configured as a volume mount in `docker-compose.yml`).
+Replace `/path/to/your/music` with the absolute path inside both web and worker, for example `/media/library/music` below `MEDIA_STORAGE_PATH=/media/library` in a shared source volume. Use identical paths in both roles; worker reads sources and writes derived media through the admitted volumes. Keep web access needed for authorized file deletion. See [Worker deployment](commands/README.md#worker-deployment) for the storage declarations.
 
 ### 7. Scan your library
 

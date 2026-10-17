@@ -6,16 +6,21 @@ Music tracks can also be transcoded to Opus, AAC or MP3 for clients that cannot 
 
 ## How It Works
 
-When a client requests a video stream, Baander creates a **transcode session** and an associated **transcode job** for the requested quality tier. The encoding loop runs in a Swoole coroutine and dispatches FFmpeg work to isolated worker processes:
+When a client requests a video stream, web commits the session and its durable execution intent together. The independent worker claims that intent, probes the source and starts FFmpeg under its media role. Web serves the published files and keeps the client connections.
 
-1. **Probe** the source video (resolution, HDR, interlacing, framerate, audio channels).
-2. **Encode the init segment** (movie header for the chosen codec and bitrate).
-3. **Analyze loudness** (two-pass EBU R128 measurement) so the audio filter chain can normalize to the target loudness standard.
-4. **Build filter chains** -- video scaling, deinterlacing, HDR tonemapping, framerate capping, audio downmixing, loudness normalization, DRC.
-5. **Encode media segments** -- 6-second CMAF segments, dispatched to the CPU process pool with a sliding window of in-flight work.
-6. **Serve manifests** -- the client receives an HLS v6 media playlist or DASH MPD that references the encoded segments.
+1. The worker probes the source and resolves its encoder capabilities.
+2. It publishes generation metadata, including the selected codecs, source duration and timeline start.
+3. It writes the init and six-second CMAF media segments into that generation's directory.
+4. Web serves HLS or DASH manifests and segments only for the current execution generation.
 
-Segments are encoded with `libx265` (HEVC) tagged as `hvc1` for broad player compatibility. The pixel format is always `yuv420p`. Each segment is a fragmented MP4 with `frag_keyframe+separate_moof+default_base_moof` flags for independent seekability.
+Video jobs are scoped to the playback owner, video and quality tier. Their output
+paths include the job UUID and execution generation, so two users watching the
+same source do not share controls or generation directories. Adaptive HLS and DASH
+requests sign an immutable rendition set containing each owned job and its own
+generation; a manifest cannot substitute another user's job or assume all tiers
+share one generation.
+
+Encoder selection belongs to the worker. Manifest codec declarations come from the worker's published metadata; web does not probe devices or choose a different encoder while serving a request.
 
 ## Quality Tiers
 
@@ -30,7 +35,7 @@ The quality ladder defines six HEVC tiers. The client selects a tier at session 
 | 1440p | 2560 x 1440 | 10 Mbps | 15 Mbps | 20 Mbps | hvc1 |
 | 4K | 3840 x 2160 | 20 Mbps | 30 Mbps | 40 Mbps | hvc1 |
 
-All tiers use the RFC 6381 codec string `hvc1.1.6.L93.B0` with AAC audio (`mp4a.40.2`) in manifests.
+The table describes the HEVC ladder. Published manifests describe the actual worker-selected video and audio codecs for that generation.
 
 ### Audio Profiles
 
@@ -47,38 +52,16 @@ Each session is assigned an audio profile that controls codec, bitrate, channel 
 | hifi_stereo | AAC | 256 kbps | 2.0 (stereo) | 48 kHz | Dialogue (-20 LUFS) | Off |
 | opus_stereo | Opus | 96 kbps | 2.0 (stereo) | 48 kHz | Streaming (-16 LUFS) | Off |
 
-## CPU Process Pool
+## Worker execution capacity
 
-FFmpeg uses `proc_open()` under the hood, which is **not** hooked by Swoole's coroutine runtime. If FFmpeg ran directly in an HTTP worker, it would block that worker for the entire duration of the encode. To avoid this, all FFmpeg work is dispatched to a **CPU process pool** -- a set of isolated worker processes that communicate with the main server over Unix sockets.
+The media role admits at most three video jobs and one audio rendition at once. Each video job has a fresh PHP kernel and one private CPU helper, started before any database or Redis connection opens. FFmpeg processes and their process groups belong to the worker deployment. Web has no CPU pool or encoder fallback.
 
-The pool is managed by `CpuProcessPool` and accessed through the domain-specific `TranscodeProcessPool` facade. Results are written to a shared Swoole\Table so the encoding coroutine can poll for completion without blocking.
+Private media jobs use one asynchronous file-I/O thread, configured before helper
+forks or reactor startup. The shipped Swoole build uses its thread backend for
+coroutine file reads under the worker's default Docker security restrictions.
+AIO threads and encoder threads both count toward the container PID ceiling.
 
-### Worker Count
-
-The default pool size is **2 workers**, configured in `config/services.yaml`:
-
-```yaml
-App\Shared\Infrastructure\Swoole\ProcessPool\CpuProcessPool:
-    arguments:
-        $handlers: !tagged_iterator 'swoole.cpu_pool_worker'
-        $workerCount: 2
-```
-
-The encoding loop uses a sliding window of at most `workerCount` in-flight segments per job. If multiple transcode sessions are active, they share the pool -- so each job gets at most `workerCount` segments encoding concurrently. Increase the worker count to match your CPU cores if you need more parallelism.
-
-### Worker Process Details
-
-Workers are plain PHP processes (no Symfony container) that receive a JSON payload, execute FFmpeg, and return the result. Each worker has a 300-second timeout for segment encoding and a 600-second timeout for loudness analysis. Stalled processes are killed with `SIGKILL`.
-
-## Job Types
-
-The pool handles three job types:
-
-| Job Type | Description | Timeout |
-|----------|-------------|---------|
-| `encode_segment` | Encode a single 6-second media segment with video and audio filters | 300s |
-| `encode_init_segment` | Encode the init segment (movie header, no audio) | 120s |
-| `analyze_loudness` | Run EBU R128 loudness analysis pass on the source audio | 600s |
+The host manifest reserves at least 2624 MiB for media and 14 descendant processes, with a container PID ceiling of at least 128 to include bounded encoder threads. These are admission reservations, not measured capacity guarantees. See [Worker deployment](commands/README.md#worker-deployment) for the complete memory and storage recipe.
 
 ## Job Monitoring and State
 
@@ -88,33 +71,48 @@ Each transcode job tracks progress per-segment. When a segment completes, the jo
 
 State transitions for a transcode job: `pending` -> `in_progress` -> `completed` (or `failed` / `cancelled`).
 
-### Seek-Aware Queue
+### Playback controls and generations
 
-The encoding loop listens for playback position changes (seeks and pauses) via the `SeekSignalBroker`. When a client seeks:
+Pause, resume, seek, audio-profile changes, progress and cancellation update
+durable desired state synchronously. The transaction applies each change to
+sibling renditions of the same playback owner and video. Other users' sessions
+remain independent. Durable per-session/request receipts prevent a repeated
+request from applying again after an intervening control. Controls have ordered revisions; playback progress includes the currently attached generation and revision so an old player cannot overwrite a later seek. Cancellation is terminal. Seeking while paused preserves the paused state.
 
-- In-flight segments always finish -- workers are never killed.
-- The remaining pending queue is reorganized so segments closest to the seek target are encoded first.
-- This ensures the client gets watchable content around the new position as quickly as possible.
+Native seek events carry the generation captured when the media element was
+attached. The server checks it under the existing playback locks and ignores an
+old event without changing the generation, revision or desired position. Explicit
+seek requests remain new user intent. Progress separately requires both the
+current generation and revision; it cannot overwrite a later explicit seek.
 
-On pause, dispatching stops and the loop waits. In-flight segments are allowed to finish before the loop goes idle.
+A seek or recovered execution uses a new generation. The worker retires superseded work before acknowledging its effects. Manifests, init segments, media segments and subtitles carry that generation; stale files cannot satisfy current delivery requests.
+
+Signing returns the current job, generation, revision, readiness, position and desired status. Once ready, it also returns `startTime` and source `duration`. A generation may begin at a nonzero source position. The player adds `startTime` to the media element's local clock for progress and subtracts it when restoring a source position. After a generation change it obtains the current signed manifest and restores position and paused state.
+
+Readiness requires a closed, available fragment at the desired playback cursor,
+for running and paused sessions alike. Resuming a still-encoding rendition does
+not bypass this check. A native media error remains a playback error; the pause
+event it causes does not persist a new user pause.
+
+### Worker learning state
+
+Each video child restores the worker's quality-governor learning, starts resource
+sampling and monitoring, then persists its new samples when it stops. Learning
+state lives under `CONVERT_STORAGE_PATH/qol-state`. A bounded file lock merges
+new samples with stored learning so independent children do not overwrite each
+other's updates.
 
 ### Restarts
 
-When the web server stops, it [drains](upgrading.md#stopping-and-restarting-the-web-server). As each HTTP worker stops, its encoding loops stop and release their loop leases, and the FFmpeg processes the worker started stop with them. The CPU process pool stops after the workers. Each FFmpeg process runs in its own process group, and the pool stops the whole group, first with `SIGTERM` and then with `SIGKILL`, so no encoder outlives the server.
+A web restart [drains client connections](upgrading.md#stopping-and-restarting-the-web-server) while the independent worker keeps encoding. Reconnecting clients read persisted desired state and obtain the current generation; attaching again does not create another encoder for the same owned execution.
 
-The server does not resume transcode sessions after a restart. The sessions whose encoding loops the drain stopped end as failed, so a player that asks for the same video again gets a new session, and its encode starts again. The encoding loop writes each job's state to `var/transcode_state/<job-public-id>.json` as it saves the job, but nothing reads those files when the server starts. `GracefulRestartHandler`, which would resume persisted jobs, is groundwork for the movie feature; nothing calls it today.
+A worker stop closes admission and stops its job children and encoder groups. A replacement requires explicit deployment recovery and retirement of the old container. Execution claims use database-clock leases, ownership tokens and generation checks; replacement work cannot publish through an old claim. PostgreSQL runtime rows are authoritative. Files under `var/transcode_state/` do not authorize execution.
 
-See [Monitoring](monitoring.md) for checking job status and pool health.
+See [Monitoring](monitoring.md) for job status and [Worker deployment](commands/README.md#worker-deployment) for recovery.
 
 ## Hardware Acceleration
 
-Hardware acceleration is **not currently implemented**. FFmpeg uses `libx265` software encoding exclusively.
-
-The `docker-compose.yml` file contains commented-out configuration for both NVIDIA (NVENC/NVDEC) and Intel (QSV/VAAPI) GPU passthrough. Enabling this in the future would require:
-
-- Installing the NVIDIA Container Toolkit on the host and uncommenting the GPU device reservation.
-- Passing `/dev/dri` into the container for Intel iGPU access.
-- Updating `TranscodePoolWorker` to select a hardware encoder when available.
+The worker probes encoder capabilities and publishes its selected profile for media execution. The current admitted deployment recipe rejects devices and device requests, so it does not provide GPU passthrough. Do not add GPU access to the web container to enable background encoding.
 
 ## Audio Transcoding
 
@@ -140,13 +138,18 @@ Baander then rounds the bitrate down to the highest step of a fixed ladder that 
 
 An unsupported format, a bitrate that is not a positive whole number, or a bitrate without a format gets `400`. A failed encode gets `500` and is logged with the track, format and bitrate.
 
-Rendition encodes share the [CPU process pool](#cpu-process-pool) with video transcodes and other work. The server queues or runs at most four rendition encodes at once, so that other work always has workers left. A request that would start a fifth encode gets `503` with a `Retry-After` header. A request that joins an encode already running, or streams a cached rendition, is never refused. The limit is `$maxConcurrentEncodes` on `AudioRenditionCache` in `config/services.yaml`; keep it below the pool's `$workerCount`.
+Renditions are admitted through durable PostgreSQL runtime state. The media role runs one audio encode at a time, independently of its three video slots. Requests for the same source fingerprint, format and bitrate join the same accepted work. Web waits up to 60 seconds for output to start; an unavailable worker or failed generation produces an encode failure rather than an inline web encode.
 
 ### Cached renditions
 
-Each track, format and bitrate has one cached rendition under `CONVERT_STORAGE_PATH/audio-renditions/<track>/`. Its file name includes a fingerprint of the source file, so a replaced source is encoded again.
+Each track, format and bitrate has one cached rendition under `CONVERT_STORAGE_PATH/audio-renditions/<track>/`. Each execution writes a generation directory; its file name includes a fingerprint of the source file, so a replaced source is encoded again.
 
-The first request for a rendition starts the encode and streams the output while FFmpeg writes it. Its length is not known yet, so that response carries `Accept-Ranges: none` and the listener cannot seek. A second request for the same rendition while it is encoding joins that encode instead of starting another. Once the rendition is complete, later requests get the cached file with full byte-range support, so seeking works. Encodes run in the [CPU process pool](#cpu-process-pool), never in the HTTP worker.
+The first request for a rendition starts the encode and streams the output while FFmpeg writes it. Its length is not known yet, so that response carries `Accept-Ranges: none` and the listener cannot seek. A second request for the same rendition while it is encoding joins that encode instead of starting another. Once the rendition is complete, later requests get the cached file with full byte-range support, so seeking works. Each encode has a worker-owned claim and generation. Web follows only that accepted generation, checks live ownership while output is growing and accepts its final file only after completion is committed. Lost ownership or a changed generation cuts the stream as an error.
+
+If a completed cache file has been evicted, a compare-and-swap against its
+completed generation resets the same canonical runtime row to pending. The next
+worker claim advances its generation and rebuilds the file; concurrent readers do
+not create another canonical row.
 
 The transcode cache sweep (`app:transcode:cache-sweep`) treats each track's renditions, all formats and bitrates together, as one cache unit under the same age limit and size budget as video segments. A track's renditions count as in use while an encode has written to a partial rendition recently.
 
@@ -154,13 +157,13 @@ The transcode cache sweep (`app:transcode:cache-sweep`) treats each track's rend
 
 The web player always asks for the original file first. When the browser rejects it as an unsupported source, the player asks for the same track as Opus, then AAC, then MP3, without a bitrate, so the server applies `transcode.max_bitrate`. While a transcoded stream is still encoding, the player refuses to seek and says so. If the transcoded stream fails as well, playback stops with an error message. With `transcode.enabled` off, a track the browser cannot play therefore does not play in the web player.
 
-When the web server restarts during a transcoded stream, the server cuts the stream as an error and the rendition's encode stops. After the restart, the next request for the rendition starts its encode again from the beginning. The player keeps the listener's position, requests the track again until the rendition is complete, and then continues at that position; see [Listeners during a restart](upgrading.md#listeners-during-a-restart).
+When the web server restarts during a transcoded stream, the connection is cut as an error while the worker continues encoding. The next request joins the accepted rendition or reads its completed file. The player keeps the listener's position and continues once byte-range seeking is available; see [Listeners during a restart](upgrading.md#listeners-during-a-restart).
 
 ## Configuration
 
-Transcoding does not have dedicated environment variables. Audio transcoding is switched on and capped with the [server settings](#settings) above. The rest of the relevant configuration is:
+Audio transcoding is switched on and capped with the [server settings](#settings) above. Execution uses the worker deployment's admitted resources and shared storage:
 
-- **CPU process pool worker count** -- set `$workerCount` in `config/services.yaml` (default: 2). See [Configuration](configuration.md) for general server settings.
-- **State directory** -- the encoding loop writes job state to `var/transcode_state/` inside the container. Nothing reads it after a restart yet; see [Restarts](#restarts).
-- **FFmpeg path** -- hardcoded to `/usr/local/bin/ffmpeg` in `TranscodePoolWorker`.
-- **Source media path** -- mounted read-only into the container (see `docker-compose.yml` volumes).
+- **Derived output** uses `CONVERT_STORAGE_PATH`, default `/storage/conversions`, mounted at the same path in web and worker.
+- **Application storage and state** require shared writable worker volumes covering `/var/www/html/storage` and `/var/www/html/var/transcode_state`.
+- **Source media** uses an explicit `MEDIA_STORAGE_PATH`, for example `/media/library`, covered by a read-only worker source volume. Use the identical source root in both roles. Preserve web access needed for authorized library deletion.
+- **Capacity** is fixed at three video jobs and one audio rendition in the current media role; configure its explicit memory and descendant reservations in the [host manifest](commands/README.md#worker-deployment).

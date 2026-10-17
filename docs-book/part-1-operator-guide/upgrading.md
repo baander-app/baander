@@ -18,6 +18,14 @@ make migrate
 4. **`make composer-install`** updates PHP dependencies inside the app container.
 5. **`make migrate`** runs pending database migrations.
 
+These commands update the web/dependency stack. The separately admitted worker
+uses an immutable image and boot identity. Before changing its image or storage
+recipe, use the host [deployment controller](commands/README.md#worker-deployment)
+to recover and retire the old deployment, then create/start a new boot with the
+updated image and manifest. Never enable automatic worker restart or place its
+children under another supervisor. Prepare shared media volumes before starting
+either role, and preserve pending work and existing media.
+
 Check the commit log for notable changes between your current version and the one you are upgrading to:
 
 ```bash
@@ -31,14 +39,22 @@ git log --oneline <current-tag>..HEAD
 If you only need to migrate the main database (for example, on a production server without a test database), use `make migrate-no-test` instead.
 
 Fresh databases start with the transactional migration `Version20261017000000`,
-then apply `Version20261017130000`. The initial migration creates the schema,
-including microsecond `timestamptz` columns, and cannot be downgraded. The
-incremental migration adds a nonnegative `persistence_version` to playlists,
-starting existing rows at zero and preserving their identities, songs and
-collaborators.
+then apply forward migrations through `Version20261017170000`. The initial
+migration creates the schema, including microsecond `timestamptz` columns, and
+cannot be downgraded. Forward migrations add playlist persistence versions and
+video/audio execution authority. `Version20261017160000` preserves durable
+session/request control receipts; `Version20261017170000` scopes video jobs to
+playback owners without rewriting the initial migration or existing histories.
 
-A database already initialized with `Version20261017000000` applies the incremental
-migration through the normal update commands; no database reset is required.
+Ownership is derived from the recorded runtime session or an unambiguous session
+owner. Ambiguous or unattached historical jobs retain a null owner. Existing
+accepted, ready and complete execution generations are fenced and queued for
+re-encoding into job-specific output paths; old output does not become current
+through the migration. Preserve the shared source and derived volumes during this
+update.
+
+A database already initialized with `Version20261017000000` applies the forward
+migrations through the normal update commands; no database reset is required.
 Migrations run in timestamp order, and a repeat run leaves no pending work.
 
 While the initial migration is pending, Doctrine refuses a target containing user
@@ -105,12 +121,12 @@ The drain ends within the drain deadline `WEB_DRAIN_SECONDS` (D, 30 seconds by d
 
 1. The server accepts no new connections. Connections already open keep working. Requests that still arrive on them are answered with `Connection: close`, `/ready` answers `503`, and `/live` answers `200` with `"draining": true`.
 2. Every WebSocket receives a close frame with code `1012` ("service restart"). Session-sync clients reconnect once the server is back, with a current access token.
-3. Requests in progress finish with complete responses. Background tasks dispatched to the web server's task workers during the drain go to the Redis `async` transport, which the background worker handles. Tasks already waiting in the task workers' in-memory queue are lost; their claims expire.
+3. Requests in progress finish with complete responses. Background commands use Redis `async`; web has no task workers, CPU pool or media executor. The worker deployment keeps its consumers and encoders while web drains.
 4. When the drain window ends (13 seconds at the default), the server closes every response it is still sending, such as an audio stream, without finishing it. The client sees a transfer error, not the end of the track. The server then resets every connection still open.
-5. Swoole stops the HTTP workers, then the task workers. As each worker stops, its video encoding loops release their leases and its FFmpeg processes stop, and the transcode sessions of those loops end as failed, so a client that asks again gets a new session. The CPU process pool stops last; each FFmpeg process it runs is stopped through its process group.
+5. Swoole stops the HTTP workers. Video and audio execution remain in the independent worker deployment; reconnecting clients read the persisted media state and current generation.
 6. The server exits with status `0`. A drain that had nothing to wait for takes under a second.
 
-If the server's manager process or the CPU process pool is still running at the deadline, the drain watchdog, [`app:server:drain:watch`](commands/app-server-drain-watch.md), kills them with `SIGKILL`, and the server exits with status `1`. The server logs a line when the drain starts, with the deadline, the window and Swoole's `max_wait_time`, and another when the window closes. A planned stop sends no [health alert](monitoring.md#what-is-checked).
+If the server's manager process is still running at the deadline, the drain watchdog, [`app:server:drain:watch`](commands/app-server-drain-watch.md), kills it with `SIGKILL`, and the server exits with status `1`. The server logs a line when the drain starts, with the deadline, the window and Swoole's `max_wait_time`, and another when the window closes. A planned stop sends no [health alert](monitoring.md#what-is-checked).
 
 ### Stop timeout
 
@@ -132,9 +148,9 @@ When its stream fails, or stalls for 10 seconds, the web player asks the server'
 - retries with a growing, randomised delay, from 1 second up to 15 seconds, and honours a `Retry-After` header on a `503`;
 - once `/live` answers, requests the same track again and continues at that position. The resume records no second play.
 
-A transcoded track whose encode started again from the beginning resumes once its rendition is complete; until then the player shows "Reconnecting…". When the browser will not start playback without a user gesture, the player shows a "Tap to resume" button. After about two minutes without success, the player pauses with its usual failure notice and keeps the position, so pressing play tries again.
+A transcoded track resumes once its accepted rendition is complete; until then the player shows "Reconnecting…". When the browser will not start playback without a user gesture, the player shows a "Tap to resume" button. After about two minutes without success, the player pauses with its usual failure notice and keeps the position, so pressing play tries again.
 
-A token refresh that fails because the server is restarting, with a network error or a `5xx` answer, keeps the user signed in. Only a `400` or `401` from the refresh signs the user out. The server does not resume video transcode sessions after a restart; see [Transcoding](transcoding.md#restarts).
+A token refresh that fails because the server is restarting, with a network error or a `5xx` answer, keeps the user signed in. Only a `400` or `401` from the refresh signs the user out. Video execution stays with the worker during a web restart; see [Transcoding](transcoding.md#restarts).
 
 ### nginx and a replaced app container
 

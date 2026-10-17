@@ -293,12 +293,26 @@ Configured in `config/packages/swoole.yaml`:
 Swoole's `max_wait_time` is not set in this file. When the server starts, it derives the whole drain budget from the deadline D, `WEB_DRAIN_SECONDS`:
 
 - the drain window, during which requests finish and clients are told to reconnect, is `floor((D - 4) / 2)`: 13 seconds at the default of 30;
-- `max_wait_time` is `floor((D - 4 - window) / 2)`: 6 seconds at the default. After the window, Swoole stops the HTTP workers and then the task workers, waiting up to `max_wait_time` for each group;
-- 4 seconds are kept for stopping the CPU process pool, which takes up to 3 seconds, and a 1-second margin.
+- `max_wait_time` is `floor((D - 4 - window) / 2)`: 6 seconds at the default. After the window, Swoole stops the HTTP workers. The formula retains room for two Swoole stop phases;
+- 4 seconds remain reserved as shutdown margin. Web starts no CPU process pool; encoders belong to the independent worker deployment.
 
 The window, twice `max_wait_time` and those 4 seconds never add up to more than D.
 
 The startup table of `app:serve` shows the derived `max_wait_time`, and the line the server logs when a drain starts names the deadline, the window and `max_wait_time`.
+
+### Coroutine file I/O
+
+The image builds Swoole 6.2 with its asynchronous thread backend for coroutine
+file I/O. An io_uring-enabled build cannot read coroutine files under Docker's
+default seccomp profile, and this Swoole version has no supported runtime INI
+switch to select another backend. Rebuild the image with the shipped flags;
+changing PHP INI or relaxing the worker's security profile is not the deployment
+recipe.
+
+Web configures `aio_core_worker_num: 1` and `aio_worker_num: 4`. Each private media
+job sets both limits to `1` before its helper forks or a reactor starts. These
+finite thread limits apply independently of the host CPU count. Include the AIO
+and encoder threads in container PID accounting.
 
 ### PHP memory limit
 
