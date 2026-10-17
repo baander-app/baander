@@ -23,13 +23,14 @@ batches describe their own checkpoints; the current gate below takes precedence.
 Any harness can take over from this section; nothing below depends on a tool that
 only one agent host has.
 
-- **Migration consolidation.** The local branch
+- **Migration consolidation.** Implementation `78165f61` on
   `plan/consolidate-doctrine-migrations` replaces the historical chain with one
-  guarded initial migration. All 9,498 backend tests and required gates pass. The
+  guarded initial migration. The user authorized merging into `master` and pushing
+  to both remotes on 2026-10-17. All 9,498 backend tests and required gates pass. The
   authorized reset of local `baander` is complete; `baander_test` is unchanged.
   See the [verification checkpoint](#doctrine-migration-consolidation-2026-10-17).
 
-- **Branch.** `master` contains the public-identity implementation at `6149f5b1`,
+- **Public identity baseline.** `master` contains implementation `6149f5b1`,
   fast-forward merged on 2026-10-17. Public APIs use entity public IDs while UUIDs
   remain internal. Independent plan/code review and simplification have completed,
   with findings applied. The user approved existing passkey re-enrollment on
@@ -2342,6 +2343,6 @@ Verification checkpoint:
   no app service was running beforehand. Its pre-existing nginx restart behavior
   remains outside this task. PostgreSQL volumes, Redis, registry storage and media
   files were untouched. Evidence: `/tmp/baander-consolidate-local-reset/`.
-- Implementation and documentation are delivered locally on
-  `plan/consolidate-doctrine-migrations`. No merge or push is authorized by this
-  checkpoint.
+- Implementation and documentation were committed as `78165f61` on
+  `plan/consolidate-doctrine-migrations`. After verification, the user authorized
+  merging into `master` and pushing to both remotes on 2026-10-17.
